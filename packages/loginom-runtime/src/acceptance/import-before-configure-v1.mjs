@@ -88,8 +88,11 @@ export function readImportSurface(o) {
     output0:candidates.length===1?{status:'observed_native_binding',node_id:guid,port:0,port_guid:candidates[0].guid}:{status:'unknown'},
     settings:{status:'unknown',reason:'wizard_not_open'},activity:{status:'unknown'},freshness:{status:'unknown',execution_verified:false}});
   }
-  // Read potentially active getters before rechecking their retained ownership.
-  const graphUnchanged=bindings.every(b=>{
+  // Finish potentially changing data reads for the entire emitted Import set
+  // before validating any inventory: a later Import may change an earlier one.
+  const firstData=bindings.map(b=>b.inventory.map(c=>c.port.data));
+  const data=bindings.map(b=>b.inventory.map(c=>c.port.data));
+  const graphUnchanged=bindings.every((b,bi)=>{
    if(nodes.filter(n=>n.FGuid===b.guid).length!==1||b.n.FGuid!==b.guid||!nodes.includes(b.n)||b.n.FIconCls!=='bg-vendor-icon-importtextfile'
     ||b.n.FCell!==b.cell||b.n.FPorts!==b.ports||graph.view.getState(b.cell)?.shape?.node!==b.body
     ||b.body.getAttribute('data-tid')!==b.tid||!roots[0].contains(b.body)
@@ -97,14 +100,13 @@ export function readImportSurface(o) {
      ||(g.collection?.length??0)!==g.items.length||g.items.some((port,j)=>g.collection[j]!==port)))return false;
    // Read data for ALL retained ports first: even a non-candidate can become
    // eligible, and a late getter can change an earlier port's DOM alias.
-   const firstData=b.inventory.map(c=>c.port.data),data=b.inventory.map(c=>c.port.data);
-   if(data.some((value,i)=>value!==firstData[i]))return false;
+   if(data[bi].some((value,i)=>value!==firstData[bi][i]))return false;
    const current=b.inventory.map((c,i)=>{
     const port=c.port,cell=port.FCell,dom=graph.view.getState(cell)?.shape?.node;
     return {port,cell,dom,tid:dom?.getAttribute('data-tid'),parent:port.parent,
-     cellParent:cell?.parent,guid:port.FGuid,data:data[i]};
+     cellParent:cell?.parent,guid:port.FGuid,data:Object.getOwnPropertyDescriptor(port,'data')?.value};
    });
-   if(current.some((c,i)=>Object.keys(c).some(k=>c[k]!==b.inventory[i][k])))return false;
+   if(current.some((c,i)=>c.data!==data[bi][i]||Object.keys(c).some(k=>c[k]!==b.inventory[i][k])))return false;
    const eligible=current.filter(c=>c.tid===b.tid+';Output_Data-0'&&roots[0].contains(c.dom)
     &&c.parent===b.n&&c.cellParent===b.cell&&c.data&&typeof c.guid==='string'&&c.guid);
    return eligible.length===b.candidates.length&&eligible.every((c,i)=>c.port===b.candidates[i].port)

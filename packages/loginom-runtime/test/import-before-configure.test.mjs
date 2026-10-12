@@ -176,3 +176,26 @@ for(const mutation of ['append-port','append-group','replace-group','remove-port
  assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);assert.equal(events.length,1);
  assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
 });
+
+for(const affected of [0,1])for(const atRead of [2,3])for(const change of ['alias','parent','cell-parent','data','guid','append-port','append-group'])
+ test('capture cross Import '+affected+' read'+atRead+' '+change,async()=>{
+ const f=graphFixture(),n=f.collection[affected],other=f.collection[1-affected].FPorts[0].FCollection[0];
+ const base=n.FCell.dom.getAttribute('data-tid');let alias=base+';Output_Data-'+(change==='alias'?'1':'0');
+ const dom={getAttribute:()=>alias},extra={parent:change==='parent'?{}:n,FGuid:change==='guid'?'':'extra',data:change==='data'?null:{},FCell:{parent:change==='cell-parent'?{}:n.FCell,dom}};
+ if(!change.startsWith('append'))n.FPorts[0].FCollection.push(extra);f.entries.set('extra-native-port',[dom]);
+ let reads=0;const retained=other.data;
+ Object.defineProperty(other,'data',{get(){if(++reads===atRead){
+  if(change==='alias')alias=base+';Output_Data-0';if(change==='parent')extra.parent=n;
+  if(change==='cell-parent')extra.FCell.parent=n.FCell;if(change==='data')extra.data={};if(change==='guid')extra.FGuid='extra';
+  if(change==='append-port')n.FPorts[0].FCollection.push(extra);if(change==='append-group')n.FPorts.push({FCollection:[extra]});
+ }return retained;}});
+ const c=context(f),events=[];c.record=async e=>events.push(e);const r=await resource.captureImport(c);
+ assert.ok(reads>=atRead);assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);assert.equal(r.output0.status,'unknown');
+ assert.equal(events.length,1);assert.equal(events[0].result.status,'REFUSED');assert.equal(events[0].result.imports,undefined);
+ assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
+});
+test('capture unchanged accessor data is not inert current binding proof',async()=>{
+ const f=graphFixture(),p=f.collection[1].FPorts[0].FCollection[0],data=p.data;
+ Object.defineProperty(p,'data',{get(){return data;}});const r=await resource.captureImport(context(f));
+ assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);assert.equal(r.complete,false);assert.equal(r.close_authority,false);
+});

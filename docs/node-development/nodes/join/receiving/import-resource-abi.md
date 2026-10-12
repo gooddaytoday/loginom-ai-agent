@@ -94,3 +94,10 @@ Non-candidate promotion and duplicates cannot preserve a unique observed claim;
 changed inventory refuses, unchanged static duplicates remain unknown. This
 also covers a late candidate getter changing an earlier non-candidate's alias
 or data. Complete/close authority remain false.
+
+Cross-Import consistency: both global data sampling passes finish for ALL
+emitted Imports before any final full inventory validation. Final data identity
+uses the inert own property descriptor instead of invoking another getter after
+validating a sibling. Accessor/inherited data without this inert current proof
+refuses conservatively; repeated getter results do not establish current data
+identity. All inventories/groups and both Import directions are covered.
