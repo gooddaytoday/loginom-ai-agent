@@ -1,0 +1,44 @@
+{
+  "observed_at": "2026-10-12T14:56:03+03:00",
+  "issue": "LAB-57",
+  "issue_status": "in_progress",
+  "issue_revision": 72,
+  "rich_task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+  "partial_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b",
+  "report_comment_id": "01a12fe8-badc-75f0-b6d1-d73d6233c83c",
+  "archive_attachment_id": "01a12fe8-b943-7a0e-9a7b-eca745450137",
+  "archive_sha256": "6ce0e9669549338e65cf3003b03ecdd7822b1195c549cbfe0ff062bb3ccc09f7",
+  "manifest_sha256": "0b7121d47df4dac03f430d9876e2fa3dc46555a38542ed2582b2490caebf0a04",
+  "manifest_files_verified": 31,
+  "native_current_result": "READY",
+  "native_receipt": {
+    "ok": true,
+    "code": "LOGINOM_CONNECTION_VALID"
+  },
+  "process_cleanup": "confirmed; continuous capture; two zero observations; unknownProcesses empty",
+  "owner_sha_acquiredAt_bindings": "VERIFIED for admission/completion/release",
+  "completion_sha_matches_release": true,
+  "history_delivered": "archived by unchanged pinned helper; remote existence checked by Evaler, not by this local monitor",
+  "release": "RELEASED; delivered closing status FREE and storage empty",
+  "historical_failure": "PRESERVED_UNCLASSIFIED; lower exception missing; diagnostic success does not recover old trace",
+  "wrapper_budget": {
+    "authorization_comment": "01a12fd4-7b9e-7dc6-a74f-162f70abc945",
+    "task": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+    "limit": 1,
+    "consumed": 1,
+    "remaining": 0,
+    "source_function": "preflightNodeStand",
+    "supplement_sha": "89b416c257a43a187edef4c40b68f3c9b1fa4d53"
+  },
+  "confirmed_repeat_budget": {
+    "limit": 10,
+    "consumed": 1,
+    "remaining": 9
+  },
+  "new_scenario_or_model_calls": 0,
+  "native_connection_check_calls": 1,
+  "ready_scope": "This historical diagnostic lease only; every next live lease still requires fresh native READY, resources and cleanup",
+  "scenario_model": "openai/gpt-6-luna/high remains required by actual evidence; configured default of a no-model connection check is not scenario usage",
+  "independent_evaler_decision": "PENDING; currently running 01a12fe8-bafe-78ac-a48b-73fba3494ba6",
+  "new_monitor_runs_or_messages": 0
+}
