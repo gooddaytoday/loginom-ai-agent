@@ -112,3 +112,15 @@ for(const kind of ['store','root'])test('final outer provider replaces current p
  f.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>{if(++reads===2){if(kind==='store')f.views.right.getStore=()=>foreign;else f.store.getRoot=()=>foreign}return f.card};
  const r=read(f);assert.equal(r.process_owner.status,'unknown');assert.equal(r.activity.status,'observed_toggle');assert.equal(r.freshness.execution_verified,false);assert.equal(r.complete,false);
 });
+
+for(const kind of ['activity-tip','process-store'])test('last process root cross-sample drift '+kind+' drops claim',()=>{
+ const f=graph();let reads=0,tip='Выполнить узел';f.button.getAttribute=()=>tip;
+ f.store.getRoot=()=>{if(++reads===3){if(kind==='activity-tip')tip='foreign';else f.views.right.getStore=()=>({})}return f.root};
+ const r=read(f);assert.equal(r[kind==='activity-tip'?'activity':'process_owner'].status,'unknown');assert.equal(r.complete,false);assert.equal(r.effect_possible,false);assert.equal(r.close_authority,false);
+});
+test('later activity provider replacing process store drops earlier process sample',()=>{
+ const f=graph();let armed=false,reads=0;
+ f.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>{if(++reads===2)armed=true;return f.card};
+ f.graph.getSelectionCells=()=>{if(armed)f.views.right.getStore=()=>({});return [f.n.FCell]};
+ assert.equal(read(f).process_owner.status,'unknown');
+});

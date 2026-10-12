@@ -125,11 +125,14 @@ export function readFixedImportCandidates(identity) {
     &&views.every(v=>v.getStore()===store)&&(store.getRoot?.()??store.getRootNode?.())===root){
     const retained={node:n,nodeGuid:n.FGuid,nodeData:data,root,record:owned[0],records:retainedRecords};
     claims.push({key:'process_owner',sample:()=>{
-     const currentViews=grids.map(xs=>globalThis.Ext?.getCmp?.(xs[0].id));
-     const currentStores=currentViews.map(v=>v?.getStore?.()),currentStore=currentStores[0];
+     const rootView=globalThis.Ext?.getCmp?.(grids[0][0].id),currentStore=rootView?.getStore?.();
+     const rootProviders=[currentStore?.getRoot,currentStore?.getRootNode];
      const currentRoot=currentStore?.getRoot?.()??currentStore?.getRootNode?.(),loading=currentStore?.isLoading?.();
-     return {views:currentViews,stores:currentStores,root:currentRoot,loading};
-    },valid:current=>current.views.every((v,i)=>v===views[i])&&current.stores.every(s=>s===store)&&current.root===root&&current.loading===false&&model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph&&own(retained.node,'data')===retained.nodeData&&retained.node.FGuid===retained.nodeGuid&&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1
+     const currentViews=grids.map(xs=>globalThis.Ext?.getCmp?.(xs[0].id));
+     // Root/loading reads can change sibling view stores: sample them afterwards.
+     const providers=currentViews.map(v=>v?.getStore),currentStores=currentViews.map(v=>v?.getStore?.());
+     return {views:currentViews,stores:currentStores,providers,rootProviders,root:currentRoot,loading};
+    },valid:current=>current.views.every((v,i)=>v===views[i]&&v.getStore===current.providers[i])&&store.getRoot===current.rootProviders[0]&&store.getRootNode===current.rootProviders[1]&&current.stores.every(s=>s===store)&&current.root===root&&current.loading===false&&model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph&&own(retained.node,'data')===retained.nodeData&&retained.node.FGuid===retained.nodeGuid&&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1
      &&own(retained.record,'data')?.ModelNode===retained.nodeData&&retained.root===root&&root.internalId===rootBinding.id&&own(root,'data')===rootBinding.data&&own(root,'data')?.loaded===true
      &&root.childNodes.length===rootBinding.children.length&&rootBinding.children.every((r,i)=>root.childNodes[i]===r)
      &&retained.records.every(b=>own(b.r,'data')===b.data&&b.r.internalId===b.id&&own(b.data,'id')===b.processId&&own(b.data,'ModelNode')===b.owner
@@ -141,12 +144,15 @@ export function readFixedImportCandidates(identity) {
  }
  // Finish outer and claim provider reads before checking any emitted owner/binding.
  const currentCard=main.Items.Workspace.getActiveTab();
- const samples=claims.map(claim=>claim.sample?.());
+ // Process root reads precede activity reads; keep samples keyed to their claims.
+ const samples=new Map();
+ const samplingOrder=[...claims.filter(c=>c.key==='process_owner'),...claims.filter(c=>c.key!=='process_owner')];
+ for(const claim of samplingOrder)samples.set(claim,claim.sample?.());
  if(currentCard!==card||card.Controller!==controller||controller.FController!==model||controller.Node?.data?.node!==start
   ||ancestry.some(b=>b.n.ParentNode!==b.parent)||map.FServerConnection!==connection||connection.UserName!==identity.account||connection.Connected!==true
   ||p.document!==document||p.id!==identity.document_id)return refuse('OWNER_CHANGED');
  // Validators below do not invoke selection/state/Ext/store/root providers.
- for(const [i,claim] of claims.entries())if(!claim.valid(samples[i]))result[claim.key]=unknown('CLAIM_BINDING_CHANGED');
+ for(const claim of claims)if(!claim.valid(samples.get(claim)))result[claim.key]=unknown('CLAIM_BINDING_CHANGED');
  return result;
 }
 
