@@ -330,26 +330,57 @@ export async function createBridge(config, session, { browserTransport: managedB
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: { code } }, undefined,
                   { timeout: transportRemaining===null?125000:Math.min(125000,transportRemaining) });
                 const state = parseWorkspacePreparation(response);
+                // Keep the actual preparation receipt even when post-await
+                // admission refuses. Preparation may already have had effects.
+                if (importBinding) session.metadata.workspacePreparation = {
+                  ...session.metadata.workspacePreparation,state,effect_possible:state.effect_possible,
+                };
+                try {
+                importBudget();
                 if (state.status === 'READY') {
                   if (config.storageDirectories) session.metadata.storageBinding = createStorageBinding({
                     sessionId: session.metadata.sessionId, origin: new URL(config.loginomUrl).origin,
                     build: state.target.loginom_build, documentId: state.document_id,
                     account: state.loginom_account, directories: config.storageDirectories,
                   });
-                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-                    code: makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
+                  const geometryCode=makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
                       operation_id: state.operation_id, document_id: state.document_id,
                       runtime_revision: session.metadata.clientRevision,
                       manifest_sha256: session.metadata.actionManifestDigest,
-                      workflow_ref: state.workflow_ref }),
-                  } }, undefined, { timeout: 15000 });
+                      workflow_ref: state.workflow_ref });
+                  const geometryRemaining=importBudget();
+                  if (geometryRemaining!==null && geometryRemaining<=0) throw Error('LOGINOM_IMPORT_PRECONFIGURE_GATE');
+                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+                    code:geometryCode,
+                  } }, undefined, { timeout: geometryRemaining===null?15000:Math.min(15000,geometryRemaining) });
+                  importBudget();
                   state.browser_geometry = parseBrowserGeometry(geometry);
                 }
                 return state;
+                } catch (error) {
+                  if (importBinding) {
+                    session.metadata.workspaceReady=false;
+                    session.metadata.workspacePreparation.admission_failed=true;
+                    session.metadata.workspacePreparation.admission_rejection=shutdownRejection(error);
+                    try {await session.save(catalog)} catch (persistence) {
+                      session.metadata.workspacePreparation.persistence_failure=shutdownRejection(persistence);
+                    }
+                  }
+                  throw error;
+                }
               },
               assertTarget: target => assertCatalogTarget(pinnedActions, target), record: recordExecution,
               save: () => session.save(catalog),
               });
+              try {importBudget()} catch (error) {
+                session.metadata.workspaceReady=false;
+                session.metadata.workspacePreparation.admission_failed=true;
+                session.metadata.workspacePreparation.admission_rejection=shutdownRejection(error);
+                try {await session.save(catalog)} catch (persistence) {
+                  session.metadata.workspacePreparation.persistence_failure=shutdownRejection(persistence);
+                }
+                throw error;
+              }
               if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
               return state;
             });
