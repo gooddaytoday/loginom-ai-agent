@@ -1,14 +1,16 @@
-import {runReplacementDiagnostic,retainReplacementOwner} from './replacement-live-owner.mjs';
+import {runReplacementDiagnostic,retainReplacementOwner,createReplacementStartupBridge} from './replacement-live-owner.mjs';
 import {readFile,writeFile,mkdir,appendFile} from 'node:fs/promises';
 import {resolve,join} from 'node:path';import {pathToFileURL} from 'node:url';import {randomUUID,createHash} from 'node:crypto';import {createInterface} from 'node:readline';
 export async function runLive398(args, owner) {
  if(!owner || typeof owner!=='object' || owner.context)throw Error('FOREGROUND_OWNER_REQUIRED');
+let startupBridge,observedWrites=Promise.resolve();
 try {
 process.umask(0o077);
 if (!process.stdin.isTTY) throw Error("DIAGNOSTIC_INTERACTIVE_STDIN_REQUIRED_BEFORE_LOGIN");
 const root=resolve(args[0]),out=resolve(args[2]),load=n=>import(pathToFileURL(join(root,'runtime',n)).href);
 await mkdir(out,{recursive:true});const config=JSON.parse(await readFile(args[1]));
 const account=config.workflow_profile.loginom_user,storage='/'+account,name='replacement-null-live-'+randomUUID()+'.lgp',packagePath=storage+'/'+name,sid=randomUUID();
+const startupOwner={directory:join(out,'startup')};startupBridge=createReplacementStartupBridge(startupOwner,owner);
 const {verifyResources}=await load('src/resources.mjs'),resources=await verifyResources(root),{loginBrowser}=await load('src/connection-check.mjs');
 const {createActionRuntime}=await load('client/lib/executor.mjs'),{createCandidateNodeSupport}=await load('client/lib/node-support.mjs'),{createArtifactStore}=await load('client/lib/artifacts.mjs'),{createExecutionJournal}=await load('client/lib/execution-journal.mjs'),{makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs'),{makePackageCleanupCode}=await load('client/lib/package-cleanup.mjs');
 const save=(n,v)=>writeFile(join(out,n+'.json'),JSON.stringify(v,null,2));const need=(v,m)=>{if(!v)throw Error(m);};
@@ -16,19 +18,19 @@ const save=(n,v)=>writeFile(join(out,n+'.json'),JSON.stringify(v,null,2));const 
 const {createRequire}=await import('node:module');const req=createRequire(join(root,'runtime/client/package.json'));const {chromium}=req('playwright-core');
 const secrets=[config.workflow_profile.password,config.api_key].filter(Boolean),redact=v=>secrets.reduce((t,s)=>t.split(s).join('[REDACTED]'),String(v));
 const redactValues=value=>typeof value==='string'?redact(value):Array.isArray(value)?value.map(redactValues):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,redactValues(item)])):value;
-const observe=(stage,data={})=>{appendFile(join(out,'login-observer.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,...data})+'\n').catch(()=>{});};
+const observe=(stage,data={})=>{observedWrites=observedWrites.then(()=>appendFile(join(out,'login-observer.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,...data})+'\n')).catch(error=>startupBridge.evidenceFailure(error));};
 const originalLaunch=chromium.launchPersistentContext.bind(chromium);
-chromium.launchPersistentContext=async(...args)=>{observe('launch-start');try{const ctx=await originalLaunch(...args);observe('launch-success');
- const hook=page=>{page.on('pageerror',e=>observe('pageerror',{error:redact(e.message)}));page.on('requestfailed',r=>observe('requestfailed',{url:new URL(r.url()).origin+new URL(r.url()).pathname,error:redact(r.failure()?.errorText)}));
- const wrap=(obj,names)=>{for(const n of names){const original=obj[n];if(typeof original!=='function')continue;obj[n]=function(...a){observe('call:'+n);try{const value=original.apply(this,a);if(value?.then)return value.catch(e=>{observe('original-failure:'+n,{error:redact(e.message)});throw e;});return value;}catch(e){observe('original-failure:'+n,{error:redact(e.message)});throw e;}};}};
+chromium.launchPersistentContext=async(...args)=>{observe('launch-start');try{const ctx=await originalLaunch(...args);startupBridge.captureContext(ctx);observe('launch-success');
+ const hook=page=>{startupBridge.capturePage(page);page.on('pageerror',e=>observe('pageerror',{error:redact(e?.message??String(e))}));page.on('requestfailed',r=>observe('requestfailed',{url:new URL(r.url()).origin+new URL(r.url()).pathname,error:redact(r.failure()?.errorText)}));
+ const wrap=(obj,names)=>{for(const n of names){const original=obj[n];if(typeof original!=='function')continue;obj[n]=function(...a){observe('call:'+n);try{const value=original.apply(this,a);if(value?.then)return value.catch(e=>{observe('original-failure:'+n,{error:redact(e?.message??String(e))});throw e;});return value;}catch(e){observe('original-failure:'+n,{error:redact(e?.message??String(e))});throw e;}};}};
  wrap(page,['goto','evaluate']);const proto=Object.getPrototypeOf(page.locator('body'));if(!proto.__observed){wrap(proto,['waitFor','click','fill','inputValue','isVisible']);proto.__observed=true;}};
- ctx.pages().forEach(hook);ctx.on('page',hook);return ctx;}catch(e){observe('original-failure:launch',{error:redact(e.message)});throw e;}};
+ ctx.pages().forEach(hook);ctx.on('page',hook);return ctx;}catch(e){observe('original-failure:launch',{error:redact(e?.message??String(e))});throw e;}};
 console.log(JSON.stringify({diagnostic_out:out}));
-const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(out,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:true,keepOpen:true}).catch(async e=>{await save('login-failure',{error:redact(e.message),at:new Date().toISOString(),profile:join(out,'browser'),runtime_created:false});throw e;});const page=context.pages()[0];
-Object.assign(owner,{page,context});
-const execute=code=>new Function('page',`return (${code})(page)`)(page);
+const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(out,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:true,keepOpen:true,owner:startupOwner}).catch(async e=>{startupBridge.fail(e,'login');try{await save('login-failure',{error:redact(e?.message??String(e)),at:new Date().toISOString(),profile:join(out,'browser'),runtime_created:!!owner.runtime});}catch(evidenceError){startupBridge.evidenceFailure(evidenceError);}throw e;});const page=startupOwner.page;
+startupBridge.fulfilled({context});
+const execute=owner.execute;
 const lifecycle={context,page,execute,directory:join(out,'lifecycle'),identity:{sessionId:sid,account,packagePath,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'},makeCleanupCode:makePackageCleanupCode};
-delete owner.context;retainReplacementOwner(lifecycle,owner);
+// Keep startup guarded recovery through all fallible post-login setup.
 const journal=createExecutionJournal({directory:out,metadata:{sessionId:sid},knownSecrets:[config.api_key,config.workflow_profile.password].filter(Boolean)});let trace=0;
 const snapshot=async label=>{
  const value=await page.evaluate(async()=>{
@@ -36,7 +38,7 @@ const snapshot=async label=>{
   const result={account:m.FServerConnection.UserName,packages:Array.from({length:m.PackageNodes.Count},(_,i)=>{const p=m.PackageNodes.Items(i);return {path:p.PackageFileName,read_only:p.ReadOnly,running:p.HasRunningNodes()};})};
   if(roots.length!==1)return result;const base=roots[0].getAttribute('data-tid')+';',cmp=n=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+n)+']')];return es.length===1&&roots[0].contains(es[0])?Ext.getCmp(es[0].id):null;};
   const grid=cmp('grdReplaceItems'),input=cmp('grdDataList');result.selected=input?.getSelectionModel?.().getSelection?.().map(r=>({id:r.internalId,name:r.data.Name,type:r.data.DataType}));result.pairs=[];
-  for(const r of grid?.getStore?.().getData?.().items??[]){const d=r.data,p={id:r.internalId,index:d.Index,collection:d.CollectionID,cache:{from:d.ValueRender,to:d.ReplaceRender}};if(d.DataValue&&d.ReplaceBy)try{const read=async v=>({DataType:await v.DataType,IsNull:await v.IsNull,Value:await v.Value});p.native={from:await read(d.DataValue),to:await read(d.ReplaceBy)};}catch(e){p.error=String(e.message);}result.pairs.push(p);}
+  for(const r of grid?.getStore?.().getData?.().items??[]){const d=r.data,p={id:r.internalId,index:d.Index,collection:d.CollectionID,cache:{from:d.ValueRender,to:d.ReplaceRender}};if(d.DataValue&&d.ReplaceBy)try{const read=async v=>({DataType:await v.DataType,IsNull:await v.IsNull,Value:await v.Value});p.native={from:await read(d.DataValue),to:await read(d.ReplaceBy)};}catch(e){p.error=String(e?.message??e);}result.pairs.push(p);}
   result.editor={from:cmp('ReplaceEditor')?.Controller?.getValue?.(),to:cmp('ReplaceEditor-1')?.Controller?.getValue?.(),record:grid?.findPlugin?.('rowediting')?.context?.record?.internalId};return result;
  });const safe=redactValues(value);await save('trace-'+(++trace),{label,at:new Date().toISOString(),value:safe});return safe;
 };
@@ -49,7 +51,8 @@ owner.runtime=runtime;lifecycle.runtime=runtime;
 let prepared,artifact,source,result,absent=false,step=0;
 const inventory=()=>page.evaluate(async()=>{const m=bg.app.Application.FInstance.FMainForm.FMapTree;return {account:m.FServerConnection.UserName,build:bg.app.Version,packages:await Promise.all(Array.from({length:m.PackageNodes.Count},async(_,i)=>{const n=m.PackageNodes.Items(i);return {path:n.PackageFileName,read_only:n.ReadOnly,running:n.HasRunningNodes(),modified:await m.FServerConnection.Session.IsPackageModified(n.Package)};}))};});
 await save('identity',{session:sid,packagePath,historical_replacement_sha:'398109d58ccd6e01032b3a72416c79ece8d889b2',resources_manifest:resources.manifestHash,at:new Date().toISOString()});
-console.log(JSON.stringify({ready:true,out,name,packagePath,inventory:await inventory(),unsettled:runtime.hasUnsettledWork()}));
+const readyInventory=await inventory();startupBridge.handoff(lifecycle,retainReplacementOwner);
+console.log(JSON.stringify({ready:true,out,name,packagePath,inventory:readyInventory,unsettled:runtime.hasUnsettledWork()}));
 const base=()=>({contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,inputs:[],mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:120000,execute_ms:120000,total_ms:300000}});
 return await runReplacementDiagnostic(lifecycle,owner,async({bindPrepared})=>{
  const lines=createInterface({input:process.stdin});try{for await(const line of lines){
@@ -91,5 +94,5 @@ return await runReplacementDiagnostic(lifecycle,owner,async({bindPrepared})=>{
  }finally{lines.close();}
  throw Error('DIAGNOSTIC_STDIN_EOF_BEFORE_CLEANUP');
 });
-}catch(error){owner.failed=true;owner.error=error;return owner;}
+}catch(error){if(startupBridge)startupBridge.fail(error,'entry/setup');else{owner.failed=true;owner.error=error;}return owner;}finally{await observedWrites;}
 }
