@@ -16,7 +16,7 @@ type NodeHostInput = {
   strictRecovery?: boolean
   acceptanceCleanupPackage?: string
 }
-const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" }>()
+const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" | "import-before-configure-v1"; deadline?: number }>()
 
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
@@ -30,7 +30,12 @@ export async function launchSortingDiagnostic(input: NodeHostInput & {packagePat
   if (!input.packagePath) throw Error("LOGINOM_HANDSHAKE_INVALID")
   return launchDiagnostic({...input,packagePath:input.packagePath}, "sorting-before-close-v1")
 }
-async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1" | "sorting-before-close-v1") {
+export async function launchImportDiagnostic(input: NodeHostInput & {packagePath: string; deadline: number}) {
+  if (!Number.isSafeInteger(input.deadline) || input.deadline <= Date.now() || input.deadline > Date.now()+600000)
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  return launchDiagnostic(input, "import-before-configure-v1")
+}
+async function launchDiagnostic(input: NodeHostInput & { packagePath: string; deadline?: number }, harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1" | "sorting-before-close-v1" | "import-before-configure-v1") {
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
@@ -57,7 +62,8 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
   const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath,
-    ...(harness !== "calculator-grouped-before-done-v1" ? { harness } : {}) }
+    ...(harness !== "calculator-grouped-before-done-v1" ? { harness } : {}),
+    ...(harness === "import-before-configure-v1" ? {deadline: input.deadline} : {}) }
   const options = { ...input }
   diagnostics.set(options, grant)
   const host = await launchNodeHost(options)

@@ -132,6 +132,13 @@ function shutdownRejection(value) {
     {kind:'value',value:value===undefined?null:value,is_undefined:value===undefined};
 }
 
+// These fixed private checks grant neither a public tool nor caller authority.
+function assertImportPhase(binding, tool) {
+  if (binding?.harness !== 'import-before-configure-v1') return;
+  if (Date.now() >= binding.expires || !['dock_prepare','dock_action_describe','dock_workspace_observe',
+    'dock_operation_inspect','dock_node_status','tool_search','tool_describe'].includes(tool))
+    throw Error('LOGINOM_IMPORT_PRECONFIGURE_GATE');
+}
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture, authenticatedReadiness } = {}) {
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
@@ -178,6 +185,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
   let sortingResult, sortingInvalid = false, captureEvidence;
+  let importRefused = false;
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
   let closing, shutdownStarted = false, shutdownStage;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
@@ -243,6 +251,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(catalog.tools) }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      assertImportPhase(acceptanceCapture?.binding, request.params.name);
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
@@ -524,11 +533,15 @@ export async function createBridge(config, session, { browserTransport: managedB
         if (clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
             || Date.now() >= binding.expires || session.metadata.workspaceReady !== true
             || binding.session !== session.metadata.sessionId || !prepared?.attempted
-            || prepared.state.loginom_account !== binding.account || !managedSave
+            || prepared.state.loginom_account !== binding.account
+            || (binding.harness==='import-before-configure-v1'
+              ? !prepared.state.document_id || !prepared.state.workflow_ref?.tab_tid || prepared.state.package_ref?.path!==binding.packagePath
+                || session.metadata.targetIdentity?.loginom_build!=='7.4.2'
+              : !managedSave
             || managedSave.sessionId !== binding.session || managedSave.documentId !== prepared.state.document_id
             || managedSave.tabTid !== prepared.state.workflow_ref.tab_tid || managedSave.account !== binding.account
             || managedSave.packagePath !== binding.packagePath || !savedPackages.has(binding.packagePath)
-            || managedSave.loginomBuild !== session.metadata.targetIdentity?.loginom_build)
+            || managedSave.loginomBuild !== session.metadata.targetIdentity?.loginom_build))
           throw Error('LOGINOM_CAPTURE_IDENTITY_REFUSED');
       };
       try {
@@ -536,9 +549,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       captureConsumed=true;
       captureInFlight=browserGate(async () => {
         assertBound();
-        const identity=Object.freeze({session_id:binding.session, document_id:managedSave.documentId,
-          tab_tid:managedSave.tabTid, account:binding.account, package_path:binding.packagePath,
-          loginom_build:managedSave.loginomBuild});
+        const importing=binding.harness==='import-before-configure-v1',prepared=session.metadata.workspacePreparation.state;
+        const identity=Object.freeze({session_id:binding.session, document_id:importing?prepared.document_id:managedSave.documentId,
+          tab_tid:importing?prepared.workflow_ref.tab_tid:managedSave.tabTid, account:binding.account, package_path:binding.packagePath,
+          loginom_build:importing?session.metadata.targetIdentity?.loginom_build:managedSave.loginomBuild});
         // Only the fixed verified resource receives this private Page transport.
         // It is never supplied by IPC, the tool catalogue or the model.
         captureUnknown=true;
@@ -547,6 +561,22 @@ export async function createBridge(config, session, { browserTransport: managedB
         const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution,
           ...(sorting?{ordinary:structuredClone(sortingResult)}:{})});
         assertBound();
+        if(importing) {
+          if(!receipt || receipt.revision!==1 || receipt.harness!==binding.harness
+              || !['PARTIAL','REFUSED'].includes(receipt.status) || receipt.complete!==false
+              || receipt.close_authority!==false || receipt.settings_applied!==false || receipt.effect_possible!==false
+              || ['session_id','document_id','account'].some(key=>receipt[key]!==identity[key]))
+            throw Error('LOGINOM_IMPORT_PARTIAL_RECEIPT_INVALID');
+          captureEvidence={binding,identity,receipt};
+          importRefused=true;
+          captureUnknown=false;
+          await persistCapture();
+          // The accepted ABI is explicitly PARTIAL/REFUSED. Do not anticipate a
+          // future complete resource by accepting unreviewed affirmative fields.
+          importRefused=true;
+          captureUnknown=false;
+          throw Error('LOGINOM_IMPORT_COMPLETE_PROOF_UNAVAILABLE',{cause:receipt});
+        }
         if (!receipt || receipt.settings_applied !== false || (sorting ? receipt.readonly !== true || receipt.capture_complete !== true : receipt.cancel_verified !== true)
             || Object.keys(identity).some(key => receipt[key] !== identity[key]))
           throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
@@ -575,6 +605,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       finally { captureInFlight=undefined }
     }
     function closeBridge() {
+      if (importRefused) return Promise.reject(captureRejection);
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if(captureEvidence&&captureRejected&&!captureUnknown) return persistCapture().then(()=>{captureRejected=false;return closeBridge()});
       if (captureInFlight) return captureInFlight.then(() => closeBridge());

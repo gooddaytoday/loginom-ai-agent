@@ -125,15 +125,16 @@ async function handle(message) {
       let captureHarness
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
+        const importing = acceptanceCapture.harness === "import-before-configure-v1"
         const sorting = acceptanceCapture.harness === "sorting-before-close-v1"
         const amount = acceptanceCapture.harness === "amount-import-type-v1"
-        const path = sorting ? "runtime/src/acceptance/sorting-before-close-v1.mjs" : amount ? "runtime/src/acceptance/amount-import-type-v1.mjs"
+        const path = importing ? "runtime/src/acceptance/import-before-configure-v1.mjs" : sorting ? "runtime/src/acceptance/sorting-before-close-v1.mjs" : amount ? "runtime/src/acceptance/amount-import-type-v1.mjs"
           : "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
         if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)
-        if (typeof (sorting ? module.captureSorting : amount ? module.captureAmount : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
-        captureHarness = sorting ? module.captureSorting : amount ? module.captureAmount : module.captureCalculator
+        if (typeof (importing ? module.captureImport : sorting ? module.captureSorting : amount ? module.captureAmount : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        captureHarness = importing ? module.captureImport : sorting ? module.captureSorting : amount ? module.captureAmount : module.captureCalculator
       }
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(

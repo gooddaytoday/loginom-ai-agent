@@ -96,8 +96,11 @@ async function dispatch(message: unknown) {
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
       const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
       if (capture !== undefined && (!capture || typeof capture !== "object"
-          || !["authorization,packagePath", "authorization,harness,packagePath"].includes(Object.keys(capture).sort().join(","))
-          || ("harness" in capture && !["amount-import-type-v1","sorting-before-close-v1"].includes(String(capture.harness)))
+          || !["authorization,packagePath", "authorization,harness,packagePath", "authorization,deadline,harness,packagePath"].includes(Object.keys(capture).sort().join(","))
+          || ("harness" in capture && !["amount-import-type-v1","sorting-before-close-v1","import-before-configure-v1"].includes(String(capture.harness)))
+          || ("harness" in capture && capture.harness === "import-before-configure-v1"
+            ? !("deadline" in capture) || !Number.isSafeInteger(capture.deadline) || Number(capture.deadline) <= Date.now() || Number(capture.deadline) > Date.now()+600000
+            : "deadline" in capture)
           || !("authorization" in capture) || typeof capture.authorization !== "string" || !/^[a-f0-9]{64}$/.test(capture.authorization)
           || !("packagePath" in capture) || typeof capture.packagePath !== "string" || capture.packagePath.length > 1024
           || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
@@ -105,7 +108,7 @@ async function dispatch(message: unknown) {
         throw Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
-        acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" } | undefined,
+        acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" | "import-before-configure-v1"; deadline?: number } | undefined,
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,

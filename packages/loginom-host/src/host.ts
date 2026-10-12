@@ -17,7 +17,7 @@ export async function createLoginomHost(options: {
   strictRecovery?: boolean
   // Acceptance-only forwarding of the existing managed shutdown binding.
   acceptanceCleanupPackage?: string
-  acceptanceCapture?: { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" }
+  acceptanceCapture?: { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" | "import-before-configure-v1"; deadline?: number }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -186,7 +186,7 @@ export async function createLoginomHost(options: {
     recoveries,
     authorizeCapture(authorization: unknown, owner?: string, run?: string, chat?: string, lease?: unknown) {
       if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
-      if (options.acceptanceCapture.harness !== "sorting-before-close-v1") return true
+      if (!["sorting-before-close-v1","import-before-configure-v1"].includes(options.acceptanceCapture.harness ?? "")) return true
       const bound=chat?captures.get(chat):undefined
       return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
         && bound.expires>Date.now() && captureLeases.get(chat!)===lease
@@ -197,12 +197,15 @@ export async function createLoginomHost(options: {
       if (!options.acceptanceCapture) return
       const current = generations.get(lease.generation)
       if (!current || current.children.has(chat) || captures.has(chat)
-          || (options.acceptanceCapture.harness === "sorting-before-close-v1" && captures.size !== 0)
+          || (["sorting-before-close-v1","import-before-configure-v1"].includes(options.acceptanceCapture.harness ?? "") && captures.size !== 0)
           || !options.acceptanceCapture.packagePath.startsWith(`/${current.connection.username}/`))
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
+      if (options.acceptanceCapture.harness === "import-before-configure-v1"
+          && (!Number.isSafeInteger(options.acceptanceCapture.deadline) || options.acceptanceCapture.deadline! <= Date.now()))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
       captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
-        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+600000 })
+        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: options.acceptanceCapture.harness === "import-before-configure-v1" ? options.acceptanceCapture.deadline! : Date.now()+600000 })
       captureLeases.set(chat,lease)
     },
     resetRestarts(chat: string) {
