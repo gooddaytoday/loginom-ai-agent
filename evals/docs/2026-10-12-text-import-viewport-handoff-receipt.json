@@ -1,0 +1,33 @@
+{
+  "checked_utc": "2026-10-12T15:49:40.490883+00:00",
+  "issue": "LAB-57",
+  "comment_id": "01a130cd-5c11-7aff-a072-583fdbf8113b",
+  "parent_id": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+  "plan_commit": "fe47a3e6d34f89cc1761c771b8db6d1b5548dca2",
+  "body_sha256": "aa2a5c2ceeb9944882f87f3c1eade53d2b66d1370c9ccc5dabedb3f0a5b85628",
+  "body_readback_exact": true,
+  "parent_readback_exact": true,
+  "routed_mention_count": 1,
+  "target_agent": "Evaler",
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "attachment_id": "01a130cd-5ad2-7d95-83d0-92d4cdcd3c04",
+  "attachment_bytes": 3670,
+  "attachment_sha256": "d9b43306fa5008be0f01770a31c5c2076564c0a83d69b92c7de79316e712e58b",
+  "attachment_download_bytes_exact": true,
+  "rich_active_queued_before_handoff": 0,
+  "evaler_running_before_handoff": "01a13084-4ff2-722b-a790-ca984e79ff98",
+  "followup_queued_task_id": "01a130cd-5c36-7072-880c-f018a5655cf0",
+  "monitor_dispatched_rich": false,
+  "monitor_native_model_or_lease_actions": false,
+  "new_budget_authorized": false,
+  "root_classification": "UNCLASSIFIED pending real GREEN",
+  "repeat_consumed": 2,
+  "repeat_limit": 10
+}

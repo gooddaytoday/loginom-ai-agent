@@ -17,7 +17,8 @@ public test evals/test/text-import-cold-reader.test.ts, без mocks/source asse
 
 - [x] Сохранён RED: один begin_wizard, GUID verified, 5 breadcrumbs/owner unobserved.
 - [x] Read-only spec review ACCEPT; resize внутри diagnostic callback для cleanup.
-- [ ] Handoff Evaler с явным ограничением cold бюджета.
+- [x] Handoff Evaler 01a130cd-5c11-7aff-a072-583fdbf8113b; body/parent/attachment
+  exact readback PASS, follow-up queued, явное ограничение cold бюджета.
 - [ ] Evaler: проверить текущий worker, original receipts, resolution/release и cold allowance.
 - [ ] Rich: минимально добавить внутри callback withDiagnosticSession, перед
   первым bindPrepared/workspace prepare:
