@@ -1,0 +1,7 @@
+{
+  "qualification": "unreviewed source snapshot for offline eligibility comparison only; not received runtime",
+  "source_sha": "60c753cab70cd45259f241c114e81b6301cf688e",
+  "source_path": "packages/loginom-runtime/client/lib/bridge.mjs",
+  "source_module_sha256": "720be0c31ede19c257598b131189f9f930a0847973fcedffb30b18621948506b",
+  "fragment_sha256": "3dedbe38d366fe45fb6809c1270c01ac6f41e2ceb9a8dd6ee186992cf031ed22"
+}

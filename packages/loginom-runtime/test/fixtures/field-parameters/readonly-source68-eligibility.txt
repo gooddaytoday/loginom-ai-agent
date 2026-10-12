@@ -1,0 +1,11 @@
+    function readonlyContinuation(name,args) {
+      // This describes only a pre-native save guard on this bridge. It never
+      // classifies an unknown effect or a failed evidence writer as safe.
+      if (!readonlyCleanupRefusal || nativeCleanupDispatched || confirmedCleanup || shutdownStarted
+          || captureConsumed || captureInFlight || captureUnknown || captureWriters.size
+          || clipboardUncertain || heldLeases.size || !actionRuntime
+          || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()) return false;
+      if (name==='dock_diagnostics') return !!args && Object.keys(args).length===1 && args.checkConnections===false;
+      if (name!=='dock_workspace_observe') return false;
+      try {validateActionParameters(workspaceObserveTool.inputSchema,args??{});return true;} catch {return false;}
+    }
