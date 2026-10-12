@@ -24,12 +24,14 @@ async function readReplacementCapture(page,request,readNode,observe,readIdentity
  const observation=await observe(page);
  if(observation.status!=='SUCCEEDED'||observation.effect_possible!==false)return refuse('replacement_capture_observer',{observation});
  const s=observation.output,w=s?.wizard;
+ if(!exact(s?.prepared_node_context)||!same(before,s.prepared_node_context))return refuse('replacement_capture_observer_proof',{native_before:before,observation});
  if(w?.status!=='observed'||w.stage!=='input_mapping'||w.root_tid!==before.tid||w.input_port_context?.status!=='observed'||w.input_port_context.direction!=='input'||(w.input_port_context.port_index!==null&&w.input_port_context.port_index!==0)||!s.dom_epoch)return refuse('replacement_capture_mapping_context',{observation});
  const raw=await page.evaluate(readGeometry,{root:before.tid,epoch:s.dom_epoch});
  if(raw?.verified!==true)return refuse('replacement_capture_raw',{raw});
  const after=await readNode(page,request.binding),afterIdentity=await page.evaluate(readIdentity,request.binding);
  if(!exact(after)||!same(before,after)||!identity(afterIdentity)||!same(nativeIdentity,afterIdentity))return refuse('replacement_capture_changed');
  const final=await observe(page);
+ if(!exact(final.output?.prepared_node_context)||!same(after,final.output.prepared_node_context)||!same(s.prepared_node_context,final.output.prepared_node_context))return refuse('replacement_capture_final_proof',{native_before:before,native_after:after,observation,final_observation:final});
  if(final.status!=='SUCCEEDED'||final.effect_possible!==false||!same(s.dom_epoch,final.output?.dom_epoch)||!same(s.wizard,final.output?.wizard)||!same(s.package_identity,final.output?.package_identity))return refuse('replacement_capture_observation_changed');
  return {status:'DIAGNOSTIC_READ',effect_possible:false,native_capture_admitted:false,gates,requested_page:request.output_column_page??null,native_before:before,native_after:after,identity:nativeIdentity,observation,raw,final_observation:final};
 }

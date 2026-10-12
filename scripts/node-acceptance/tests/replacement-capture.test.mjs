@@ -60,3 +60,23 @@ for(const [label,cause]of [['undefined',undefined],['null',null],['false',false]
  f.page.evaluate=(fn,arg)=>{if(String(fn).includes('semantic_connections_verified')){calls++;throw cause;}return original(fn,arg)};
  try{await execute(f,request(f))}catch(e){caught=true;value=e}assert.equal(caught,true);assert.equal(value,cause);assert.equal(calls,1);assert.deepEqual(f.page.events,[]);
 });
+for(const projection of ['first','final'])for(const field of ['opening','guid','index','owner'])test('proof tied to request and native reads: '+projection+' '+field,async()=>{
+ const f=await captureFixture(),original=f.page.evaluate.bind(f.page),receipt=f.f.prep.inputPortOpenReceipts.get('open');let identities=0;
+ const saved={opening:receipt.operation_id,guid:receipt.portGuid,index:f.port.FIndex,connection:f.f.main.FMapTree.FServerConnection};
+ const change=()=>{
+  if(field==='opening')receipt.operation_id='changed-opening-after-last-native-check';
+  if(field==='guid'){receipt.portGuid='foreign-guid';receipt.port.FGuid='foreign-guid';}
+  if(field==='index'){f.port.FIndex=1;receipt.portIndex=1;receipt.nativeIndex=1;receipt.port.FPortIndex=1;}
+  if(field==='owner')f.f.main.FMapTree.FServerConnection={UserName:saved.connection.UserName};
+ };
+ const restore=()=>{receipt.operation_id=saved.opening;receipt.portGuid=saved.guid;receipt.port.FGuid=saved.guid;f.port.FIndex=saved.index;receipt.portIndex=0;receipt.nativeIndex=0;receipt.port.FPortIndex=0;f.f.main.FMapTree.FServerConnection=saved.connection;};
+ f.page.evaluate=async(fn,arg)=>{
+  const r=await original(fn,arg);
+  if(fn.name==='readCaptureIdentity'&&++identities===(projection==='first'?1:2))change();
+  // First observer proof may be transient; restore before later native reads.
+  if(projection==='first'&&fn.name==='readOwnedMappingCapture')restore();
+  return r;
+ };
+ const r=await execute(f,request(f));assert.equal(r.status,'NOT_APPLIED',projection+'/'+field+' must reject mixed proof');assert.equal(r.effect_possible,false);assert.equal(r.native_capture_admitted,false);assert.ok(Object.values(r.gates).every(v=>v==='not_verified'));assert.deepEqual(f.page.events,[]);
+ if(field==='opening'||field==='guid'||field==='index')assert.equal(r.reason,projection==='first'?'replacement_capture_observer_proof':'replacement_capture_final_proof');
+});
