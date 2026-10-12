@@ -8,6 +8,7 @@ import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '.
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, skillTransport, skillUri, prepareTool } from './skill.mjs';
 import { readFile, writeFile, open } from 'node:fs/promises';
+import {open as receiptOpen,writeFile as receiptWrite,fsync as receiptSync,close as receiptClose} from 'node:fs';
 import { join } from 'node:path';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
@@ -676,35 +677,64 @@ export async function createBridge(config, session, { browserTransport: managedB
         cleanupPersistencePrimary ??= primary;
         cleanupPersistenceFailures.push({phase:failedPhase,rejection:shutdownRejection(value)});
       };
-      // Keep unresolved file/directory handles on this foreground owner. Only
-      // successful close or the original FileHandle's fd=-1 proves completion.
-      for (const handle of cleanupWriters) {
-        try {
-          if(handle.fd!==-1)await handle.close();
-          if(handle.fd!==-1)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNCONFIRMED');
-          cleanupWriters.delete(handle);
+      const closeWriter=async file=>{
+        if(file.closeComplete)return;
+        if(file.io?.pending)throw Error('LOGINOM_CLEANUP_WRITER_IO_UNKNOWN');
+        if(file.closeStarted)throw file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+        file.closeStarted=true;
+        let projection;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=receiptClose(file.fd,error=>{
+            if(error===null||error===undefined){file.closeComplete=true;resolve()}
+            else{file.closeFailure={value:error};reject(error)}
+          })}catch(value){file.closeFailure??={value};reject(value)}
+        });
+        // Only the original native callback proves close, never fd/status or
+        // fulfillment of a returned projection. Preserve a rejected projection.
+        await Promise.all([completion,projection]);
+      };
+      for(const file of cleanupWriters){
+        if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
+          try{await closeWriter(file)}catch(value){file.closeFailure??={value};remember(value,'retained_close')}
         }
-        catch(value){remember(value,phase);throw cleanupPersistencePrimary.value}
+        if(!file.closeComplete){
+          remember(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN'),'retained_close');
+          throw cleanupPersistencePrimary.value;
+        }
+        cleanupWriters.delete(file);
       }
       const persistHandle=async(path,mode,write)=>{
-        let handle;
-        try {
+        const file={fd:undefined,closeComplete:false};
+        cleanupWriters.add(file);
+        const callback=invoke=>{
+          const operation={pending:true,phase};file.io=operation;
+          let projection;
+          const completion=new Promise((resolve,reject)=>{
+            try{projection=invoke((error,result)=>{
+              operation.pending=false;
+              if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve(result);
+            })}catch(value){reject(value)}
+          });
+          return Promise.all([completion,projection]).then(([result])=>result);
+        };
+        try{
           phase=write?'file_open':'directory_open';
-          handle=await open(path,mode,write?0o600:undefined);
-          cleanupWriters.add(handle);
-          if(write){phase='file_write';await handle.writeFile(JSON.stringify(cleanup,null,2)+'\n')}
-          phase=write?'file_sync':'directory_sync';await handle.sync();
+          await callback(done=>receiptOpen(path,mode,0o600,(error,fd)=>{
+            file.openComplete=true;
+            if(error===null||error===undefined)file.fd=fd;
+            else cleanupWriters.delete(file);
+            done(error,fd);
+          }));
+          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,JSON.stringify(cleanup,null,2)+'\n',done))}
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));
         }catch(value){remember(value,phase)}
-        if(handle){
+        if(file.fd!==undefined){
           const closePhase=write?'file_close':'directory_close';
-          try {
-            await handle.close();
-            if(handle.fd!==-1)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNCONFIRMED');
-            cleanupWriters.delete(handle);
-          }
-          catch(value){remember(value,closePhase)}
+          try{await closeWriter(file);cleanupWriters.delete(file)}
+          catch(value){file.closeFailure??={value};remember(value,closePhase)}
         }
         if(primary)throw primary.value;
+        if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
       };
       await persistHandle(join(session.directory,'package-cleanup.json'),'w',true);
       await persistHandle(session.directory,'r',false);
