@@ -18,6 +18,18 @@ for(const [operation,timeout] of [['start',120000],['start',250],['close',5000]]
 })
 const managed=await readFile(process.env.READINESS_MANAGED??new URL('../../loginom-runtime/src/managed-entry.mjs',import.meta.url),'utf8')
 const handler=managed.slice(managed.indexOf('async function handle(message)'))
+test('actual start forwards original absolute deadline and cancellation to owner; auth is a double',async()=>{
+ const begin=managed.indexOf('state.startupController=new AbortController()')
+ const end=managed.indexOf('      const config =',begin)
+ const state:any={},deadline=Date.now()+120000
+ const run=vm.runInNewContext('(async()=>{'+managed.slice(begin,end)+'})',{
+  state,message:{deadline},input:{validation:true,generation:2,chat:'fixture',connection:{fixture:true}},
+  directory:'/fixture',resources:{browserPath:'/fixture'},browserProfile:'/fixture',AbortController,
+  checkConnection:async(login:any)=>{expect(login.owner.deadline).toBe(deadline);expect(login.owner.deadlineSource).toBe('supervisor.request.start');expect(login.owner.signal).toBe(state.startupController.signal);expect(login.owner.generation).toBe(2)},send:()=>{},
+ })
+ await run()
+ expect(state.startupController).toBeUndefined()
+})
 for(const blocked of [false,true])test(`actual startup interrupt precedes persistence; blocked=${blocked}; writer/IPC are doubles`,async()=>{
  const messages:any[]=[],events:string[]=[],controller=new AbortController(),owner={fixture:true}
  const state={startupController:controller,startupOwner:owner}

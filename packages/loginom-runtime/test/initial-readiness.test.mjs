@@ -52,12 +52,14 @@ function fixture(directory,phase,rejected){
  return {owner,options,functions,events,context,page,pageState,connection,logout:()=>logout,contextClose:()=>contextClose};
 }
 
-const scenarios=['ready','running-pending-ready','count-pending-ready','count-null-ready','null-pending-ready','parent-diagnostic','persistent','local-cap','expired','cancelled','count-busy','count-string','running-busy','running-number','foreign-account','foreign-build','dialog','replaced-page','replaced-context','after-await-identity','fresh-before-menu','persistence','confirmed-receipt-retry',...['error','undefined','null','false','zero','empty'].map(x=>'throw-'+x),...['error','undefined','null','false','zero','empty'].map(x=>'persist-throw-'+x)];
+const scenarios=['ready','running-pending-ready','count-pending-ready','count-null-ready','null-pending-ready','parent-diagnostic','persistent','read-deadline','read-cancel','local-cap','expired','cancelled','count-busy','count-string','running-busy','running-number','foreign-account','foreign-build','dialog','replaced-page','replaced-context','after-await-identity','deadline-renewal','fresh-before-menu','persistence','confirmed-receipt-retry',...['error','undefined','null','false','zero','empty'].map(x=>'throw-'+x),...['error','undefined','null','false','zero','empty'].map(x=>'persist-throw-'+x)];
 for(const scenario of scenarios)test('bounded initial readiness '+scenario,async()=>{
  const root=await mkdtemp(join(tmpdir(),'initial-ready-'));const f=fixture(root,scenario==='confirmed-receipt-retry'?'context-write':undefined),controller=new AbortController();f.owner.signal=controller.signal;
- f.owner.deadline=Date.now()+(scenario==='persistent'?1000:scenario==='expired'?-1:5000);f.owner.deadlineSource='fixture_private_request';if(scenario==='local-cap'){f.owner.deadline=null;f.owner.deadlineSource='NOT_SUPPLIED'}
+ f.owner.deadline=Date.now()+(['persistent','read-deadline','read-cancel'].includes(scenario)?1000:scenario==='expired'?-1:5000);f.owner.deadlineSource='fixture_private_request';if(scenario==='local-cap'){f.owner.deadline=null;f.owner.deadlineSource='NOT_SUPPLIED'}
  let reads=0;
- f.page.onGuard=()=>{
+ f.page.onGuard=async()=>{
+  if(scenario==='read-cancel')setImmediate(()=>controller.abort(false));
+  if(['read-cancel','read-deadline'].includes(scenario))await new Promise(r=>setTimeout(r,1200));
   const m=f.pageState.bg.app.Application.FInstance.FMainForm.FMapTree;reads++;
   m.HasRunningNodes=()=>false;
   if(scenario==='running-pending-ready'&&reads===1)m.HasRunningNodes=()=>undefined;
@@ -80,6 +82,7 @@ for(const scenario of scenarios)test('bounded initial readiness '+scenario,async
   if(scenario==='persistence'||scenario.startsWith('persist-throw-'))return mkdir(join(root,'startup-cleanup.json'));
  };
  f.page.afterGuard=()=>{
+  if(scenario==='deadline-renewal')f.owner.deadline+=100000;
   if(scenario==='replaced-page')f.owner.page={};
   if(scenario==='replaced-context')f.owner.context={pages:()=>[]};
   if(scenario==='after-await-identity')f.owner.account='foreign';
@@ -95,11 +98,11 @@ for(const scenario of scenarios)test('bounded initial readiness '+scenario,async
   if(['running-pending-ready','count-pending-ready','count-null-ready','null-pending-ready'].includes(scenario)){assert.equal(f.owner.evidence.first_guard.result.authenticated,false);assert.equal(f.owner.evidence.guard_observations.at(-1).result.authenticated,true);assert.ok(f.owner.evidence.initial_refusal)}
   if(scenario==='local-cap'){assert.equal(f.owner.evidence.first_guard.deadline,null);assert.equal(f.owner.evidence.initial_readiness.upstream_available,false);assert.equal(f.owner.evidence.initial_readiness.budget_ms,5000);assert.equal(f.owner.evidence.initial_readiness.provenance,'NOT_SUPPLIED')}
   if(scenario==='parent-diagnostic')assert.equal(f.owner.evidence.first_guard.package_parent_ready,false);
-  if(scenario!=='expired')assert.ok(f.owner.evidence.first_guard);
+  if(!['expired','read-deadline','read-cancel'].includes(scenario))assert.ok(f.owner.evidence.first_guard);
   if(scenario.startsWith('persist-throw-')){assert.ok(f.owner.evidence.persistence_failure);assert.equal(f.owner.evidence.guard_rejection.kind,scenario.endsWith('error')?'Error':'value')}
   if(scenario.startsWith('throw-'))assert.equal(f.owner.evidence.guard_rejection.kind,scenario==='throw-error'?'Error':'value');
   if(scenario==='replaced-context')assert.equal(f.owner.readinessBinding.context,f.context);
   if(scenario==='replaced-page')assert.equal(f.owner.readinessBinding.page,f.page);
   if(process.env.READINESS_RESULTS){await mkdir(process.env.READINESS_RESULTS,{recursive:true});await writeFile(join(process.env.READINESS_RESULTS,scenario+'.json'),JSON.stringify({scenario,fixture:true,source:String(path),reads,native_logout_calls:f.logout(),context_close_calls:f.contextClose(),evidence:f.owner.evidence,failure:failure&&{message:failure.message,cause:failure.cause},scope:'whole actual connection-check functions; labelled Page/Application/auth doubles, real FS; original owner retained; no native Loginom'},null,2)+'\n')}
- }finally{await rm(root,{recursive:true,force:true})}
+ }finally{if(f.owner.guardReadOperation?.state==='pending')await f.owner.guardReadOperation.promise.catch(()=>{});await rm(root,{recursive:true,force:true})}
 });

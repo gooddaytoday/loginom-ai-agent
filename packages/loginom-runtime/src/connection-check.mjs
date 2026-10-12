@@ -137,7 +137,7 @@ async function startupEvidence(owner) {
 }
 // Shared initial read-only gate. Reuse the same owner budget, never renew it.
 async function startupReadiness(owner, initial=true, persist=true) {
-  owner.readinessBinding ??= Object.freeze({id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page});
+  owner.readinessBinding ??= Object.freeze({id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page,deadline:owner.deadline,signal:owner.signal});
   const binding=owner.readinessBinding;
   const start=Date.now();
   if(initial) owner.initialReadiness ??= {started_at:new Date(start).toISOString(),budget_ms:5000,
@@ -148,7 +148,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
   owner.evidence.initial_readiness ??= budget?{...budget,status:'observing'}:{parent_policy:'diagnostic_only',status:'strict_cleanup'};
   const guard=()=>{
     if(owner.id!==binding.id||owner.account!==binding.account||owner.origin!==binding.origin
-        ||owner.context!==binding.context||owner.page!==binding.page
+        ||owner.context!==binding.context||owner.page!==binding.page||owner.deadline!==binding.deadline||owner.signal!==binding.signal
         ||owner.context.pages().length!==1||owner.context.pages()[0]!==binding.page)
       throw Error('LOGINOM_INITIAL_READINESS_OWNER_CHANGED');
     if(owner.signal?.aborted)throw owner.signal.reason;
@@ -158,7 +158,10 @@ async function startupReadiness(owner, initial=true, persist=true) {
   let iteration=0;
   for(;;) {
     guard();
-    const observed=await owner.page.evaluate(o=>{
+    if(owner.guardReadOperation?.state==='pending')throw Error('LOGINOM_INITIAL_READINESS_READ_PENDING');
+    const reading={state:'pending'};
+    owner.guardReadOperation=reading;
+    reading.promise=owner.page.evaluate(o=>{
       const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
       const exact=value=>({type:typeof value,is_undefined:value===undefined,value:value===undefined?null:value});
       const rejection=value=>value instanceof Error?{kind:'Error',name:value.name,message:value.message,
@@ -194,6 +197,19 @@ async function startupReadiness(owner, initial=true, persist=true) {
       if(running!==false) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
       return result({authenticated:true});
     },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true,deadline:owner.deadline??null})
+    reading.promise.then(()=>{reading.state='settled'},value=>{reading.state='settled';reading.rejection=startupRejection(value)});
+    let timer,stop;
+    const interrupted=new Promise((_,reject)=>{
+      stop=()=>reject(binding.signal.reason);
+      binding.signal?.addEventListener('abort',stop,{once:true});
+      if(binding.signal?.aborted)stop();
+      const remaining=Math.min(budget?.effective_deadline??owner.deadline??Infinity,Date.now()+5000)-Date.now();
+      if(Number.isFinite(remaining))timer=setTimeout(()=>reject(Error('LOGINOM_INITIAL_READINESS_DEADLINE')),Math.max(0,remaining));
+    });
+    let observed;
+    try {observed=await Promise.race([reading.promise,interrupted])}
+    catch(value){owner.evidence.guard_read={state:reading.state,read_only:true,rejection:startupRejection(value)};throw value}
+    finally {clearTimeout(timer);binding.signal?.removeEventListener('abort',stop)}
     if(observed.guardFailure && !owner.guardFailure) {
       const detail=observed.guardFailure.rejection;
       let value=observed.guardFailure.value;
@@ -243,7 +259,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
     guard();
     const delay=Math.min(10*2**Math.min(iteration-1,4),budget.effective_deadline-Date.now());
     await new Promise((resolve,reject)=>{
-      const signal=owner.signal;
+      const signal=binding.signal;
       const stop=()=>{clearTimeout(timer);signal?.removeEventListener('abort',stop);reject(signal.reason)};
       const timer=setTimeout(()=>{signal?.removeEventListener('abort',stop);resolve()},Math.max(0,delay));
       signal?.addEventListener('abort',stop,{once:true});if(signal?.aborted)stop();
@@ -379,7 +395,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       viewport: launch.viewport,
     })
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
-    owner.readinessBinding=Object.freeze({id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page})
+    owner.readinessBinding=Object.freeze({id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page,deadline:owner.deadline,signal:owner.signal})
     await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
     const result=await loginPage(owner.page,candidate,owner)
     const ready=await startupReadiness(owner,!owner.initialReadinessCompleted)
