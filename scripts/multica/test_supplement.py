@@ -15,6 +15,7 @@ TASK = '22222222-2222-4222-8222-222222222222'
 
 
 class DeliveryTest(unittest.TestCase):
+    script = SCRIPT
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.root = Path(self.directory.name)
@@ -37,11 +38,28 @@ class DeliveryTest(unittest.TestCase):
                 self.wfile.write(json.dumps(value).encode())
 
             def do_GET(self):
+                if self.path == f'/api/issues/{ISSUE}/task-runs':
+                    return self.reply(200, [{'id': TASK, 'status': 'completed' if case.closed else 'running'}])
                 if self.path != f'/api/issues/{ISSUE}/comments':
                     return self.reply(404, {})
                 self.reply(200, case.comments)
 
             def do_POST(self):
+                if self.path == f'/api/issues/{ISSUE}/comments/trigger-preview':
+                    return self.reply(200, {'agents': []})
+                if self.path == f'/api/issues/{ISSUE}/comments':
+                    case.calls += 1
+                    payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                    if not payload['content'].startswith('[@all](mention://all/all)'):
+                        return self.reply(400, {})
+                    result = {'id': 'comment-1', 'content': payload['content']}
+                    case.comments.append(result)
+                    if case.drop:
+                        case.drop = False
+                        self.connection.shutdown(socket.SHUT_RDWR)
+                        self.connection.close()
+                        return
+                    return self.reply(200, result)
                 if self.path != f'/api/issues/{ISSUE}/tasks/{TASK}/supplements':
                     return self.reply(404, {})
                 case.calls += 1
@@ -72,7 +90,7 @@ class DeliveryTest(unittest.TestCase):
         self.directory.cleanup()
 
     def run_client(self):
-        return subprocess.run([sys.executable, str(SCRIPT), '--issue', ISSUE, '--task', TASK,
+        return subprocess.run([sys.executable, str(self.script), '--issue', ISSUE, '--task', TASK,
             '--message', str(self.root / 'message'), '--receipt', str(self.root / 'receipt')],
             env=dict(os.environ, MULTICA_SERVER_URL=f'http://127.0.0.1:{self.server.server_port}', MULTICA_TOKEN='test-only'), capture_output=True, text=True)
 
@@ -110,6 +128,38 @@ class DeliveryTest(unittest.TestCase):
     def test_readback_mismatch_is_not_success(self):
         self.assertEqual(self.run_client().returncode, 0)
         self.comments[0]['content'] = 'Changed'
+        self.assertNotEqual(self.run_client().returncode, 0)
+        self.assertEqual(self.calls, 1)
+
+
+class AgentUpdateTest(unittest.TestCase):
+    script = SCRIPT.with_name('update.py')
+    setUp = DeliveryTest.setUp
+    tearDown = DeliveryTest.tearDown
+    run_client = DeliveryTest.run_client
+
+    def test_lost_response_reconciles_without_repost(self):
+        self.drop = True
+        self.assertNotEqual(self.run_client().returncode, 0)
+        self.closed = True
+        self.assertEqual(self.run_client().returncode, 0)
+        self.assertEqual(self.calls, 1)
+        self.assertEqual(json.loads((self.root / 'receipt').read_text())['delivery'], 'pull_at_safe_boundary')
+
+    def test_mentions_refused(self):
+        (self.root / 'message').write_text('mention://agent/' + TASK)
+        self.assertNotEqual(self.run_client().returncode, 0)
+        self.assertEqual(self.calls, 0)
+
+    def test_terminal_target_refused(self):
+        self.closed = True
+        self.assertNotEqual(self.run_client().returncode, 0)
+        self.assertEqual(self.calls, 0)
+
+    def test_unknown_delivery_is_not_reposted(self):
+        self.drop = True
+        self.assertNotEqual(self.run_client().returncode, 0)
+        self.comments.clear()
         self.assertNotEqual(self.run_client().returncode, 0)
         self.assertEqual(self.calls, 1)
 
