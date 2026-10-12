@@ -1169,7 +1169,7 @@ describe("HttpApi SDK", () => {
         const messages = yield* capture(() => sdk.session.messages({ sessionID }))
         expect(JSON.stringify(messages.data)).toContain("first request completed")
         expect(record((yield* capture(() => sdk.session.status())).data)[sessionID]).toBeUndefined()
-      }),
+      }).pipe(Effect.scoped),
     ),
   )
 
