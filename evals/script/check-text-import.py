@@ -7,6 +7,8 @@ import sys
 import importlib.util
 import decimal
 import re
+import zipfile
+import xml.etree.ElementTree as ET
 
 sys.dont_write_bytecode = True
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -263,7 +265,51 @@ def typed_table(receipt):
     return {'schema': schema, 'comparison': 'ordered', 'row_count': port['row_count'], 'rows': rows}
 
 
-def package_graph(attempt_dir, node_id=None, source_path=None, empty=False):
+def unused_structural_ports(attempt_dir, node, output_guid):
+    unit, workflow = node['scope'].rsplit(':', 1)
+    with zipfile.ZipFile(attempt_dir / 'artifact/package.lgp') as archive:
+        root = ET.fromstring(archive.read(unit))
+    workflow = list(root.iter('WorkFlow'))[int(workflow)]
+    item = next(item for item in workflow.findall('./Nodes/Item') if item.get('Guid') == node['id'])
+    inputs = item.findall('./InputPorts/Item')
+    sockets = item.findall('./Component/InputSockets/Item')
+    outputs = item.findall('./OutputPorts/Item')
+    services = item.findall('./ServiceInputPorts/Item')
+    if len(outputs) != 1 or not outputs[0].get('Guid') or (output_guid and outputs[0].get('Guid') != output_guid):
+        return False
+    if outputs[0].get('Name') not in (('DataSet',) if inputs else ('DataSet', 'DataSource')):
+        return False
+    if services and (len(services) != 1 or services[0].get('Name') != 'SynchronizationInputPort' or not services[0].get('Guid')):
+        return False
+    if not inputs:
+        return not sockets
+    names = {'Connection': 'TBGConnectionInputSocket', 'ControlVariables': 'TBGTuneVariablesSocket'}
+    if len(inputs) != 2 or len(sockets) != 2 or {port.get('Name') for port in inputs} != set(names):
+        return False
+    guids = [port.get('Guid') for port in inputs + outputs + services]
+    if not all(guids) or len(set(guids)) != len(guids) or node['variables'] or node['property_bindings']:
+        return False
+    for port in inputs:
+        matching = [socket for socket in sockets if socket.get('Name') == port.get('Name') and socket.get('Guid') == port.get('Guid')]
+        if len(matching) != 1:
+            return False
+        socket = matching[0].find('./Socket')
+        if socket is None or socket.get('{http://www.w3.org/2001/XMLSchema-instance}type') != names[port.get('Name')] or socket.get('Virgin') != 'true':
+            return False
+        constraints = socket.find('./Constraints')
+        if constraints is None or len(constraints):
+            return False
+        if port.get('Name') == 'Connection':
+            if [child.tag for child in socket] != ['Constraints']:
+                return False
+        else:
+            elements = socket.find('./Variables/Elements')
+            if elements is None or len(elements) or [child.tag for child in socket] != ['Constraints', 'Variables']:
+                return False
+    return True
+
+
+def package_graph(attempt_dir, node_id=None, source_path=None, empty=False, output_guid=None):
     artifact = attempt_dir / 'artifact'
     if empty and not (artifact / 'package.lgp').exists():
         return
@@ -277,7 +323,7 @@ def package_graph(attempt_dir, node_id=None, source_path=None, empty=False):
     require(len(imports) == (0 if empty else 1), 'graph: exact import count required')
     if not empty:
         require(imports[0]['id'] == node_id and (source_path is None or imports[0]['engine'].get('FileName') == source_path)
-            and not imports[0]['inputs'] and len(imports[0]['outputs']) == 1, 'graph: persisted import owner/source differs')
+            and unused_structural_ports(attempt_dir, imports[0], output_guid), 'graph: persisted import owner/source differs')
 
 
 def settled_receipt(calls, call):
@@ -470,7 +516,7 @@ def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, p
         and saves[-1]['result']['output'].get('workflow_preserved') is True
         and saves[-1]['input'].get('parameters', {}).get('path') == saves[-1]['result']['output'].get('package_ref', {}).get('path')
         and (not package_path or saves[-1]['result']['output']['package_ref']['path'] == package_path), 'graph: final package save required')
-    package_graph(attempt_dir, node['node_id'], path)
+    package_graph(attempt_dir, node['node_id'], path, output_guid=result['output']['ports'][0]['port_guid'])
 
 
 def audit(task_dir, attempt_dir, package_path):
