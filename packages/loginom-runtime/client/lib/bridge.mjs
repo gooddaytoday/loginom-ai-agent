@@ -184,7 +184,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   // settled save on this bridge, never from a caller-supplied cleanup path.
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
-  let confirmedCleanup, cleanupReceiptWritten = false;
+  let confirmedCleanup, retainedNativeCleanup, cleanupShutdownBinding, cleanupReceiptWritten = false;
   const cleanupWriters = new Set();
   let cleanupEvidenceBinding;
   let cleanupPersistencePrimary;
@@ -766,12 +766,14 @@ export async function createBridge(config, session, { browserTransport: managedB
       if(captureEvidence&&captureRejected&&!captureUnknown) return persistCapture().then(()=>{captureRejected=false;return closeBridge()});
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
       if(closing)return closing;
-      if([...cleanupWriters].some(file=>!file.closeComplete))
+      if([...cleanupWriters].some(file=>!file.closeComplete &&
+          (file.io?.pending || file.closeStarted || !file.openComplete || file.fd===undefined)))
         return Promise.reject(cleanupPersistencePrimary?cleanupPersistencePrimary.value:Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED'));
-      const shutdownBinding=Object.freeze({directory:session.directory,metadata:session.metadata,
+      const shutdownBinding=cleanupShutdownBinding??=Object.freeze({directory:session.directory,metadata:session.metadata,
         sessionId:session.metadata.sessionId});
       const assertShutdownBound=()=>{
         assertCleanupDestination(shutdownBinding);
+        if(retainedNativeCleanup)assertCleanupDestination(retainedNativeCleanup.binding);
         if(cleanupEvidenceBinding)assertCleanupReceiptBinding(cleanupEvidenceBinding,confirmedCleanup);
       };
       shutdownStarted = true;
@@ -783,7 +785,10 @@ export async function createBridge(config, session, { browserTransport: managedB
           if (managedCleanup) cleanupRefused=true;
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
+          assertShutdownBound();
+          if(retainedNativeCleanup)assertCleanupDestination(retainedNativeCleanup.binding);
           if (confirmedCleanup) cleanup=confirmedCleanup;
+          else if(retainedNativeCleanup)cleanup=retainedNativeCleanup.receipt;
           else if (managedCleanup && (clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
             cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
           else if (!prepared?.attempted && authenticatedReadiness) {
@@ -794,7 +799,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 || ![expected.account,expected.documentId].every(v=>typeof v==='string'&&v.length>0))
               throw Error('LOGINOM_READINESS_IDENTITY_REQUIRED');
             cleanup=await browserGate(async()=>{
-              actionRuntime.assertPreparationAllowed();
+              actionRuntime.assertPreparationAllowed();assertShutdownBound();
               const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
                 code:`async page=>(${logoutReadiness.toString()})(page,${JSON.stringify(expected)})`}},undefined,{timeout:30000});
               if(response?.isError)throw Error('LOGINOM_READINESS_REPLY_INVALID');
@@ -825,6 +830,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
+                assertShutdownBound();
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup
@@ -847,8 +853,16 @@ export async function createBridge(config, session, { browserTransport: managedB
               });
             } catch { cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'}; }
           }
-          cleanup = {...cleanup, session_id:session.metadata.sessionId,
-            save_operation_id:savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath) ?? null};
+          // Escrow only the parsed native receipt and its original destination.
+          // This is not a persisted cache/marker or transport/release authority.
+          if(cleanup.status==='SUCCEEDED' && !retainedNativeCleanup)
+            retainedNativeCleanup=Object.freeze({binding:shutdownBinding,receipt:Object.freeze({...cleanup,
+              save_operation_id:savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath)??null})});
+          assertShutdownBound();
+          if(retainedNativeCleanup)assertCleanupDestination(retainedNativeCleanup.binding);
+          cleanup = {...cleanup, session_id:cleanup.session_id??shutdownBinding.sessionId,
+            save_operation_id:retainedNativeCleanup ? retainedNativeCleanup.receipt.save_operation_id
+              :savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath) ?? null};
           shutdownCleanup=cleanup;
           if (managedCleanup && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=true;
           // Preserve the verified native result across persistence failures on
@@ -876,9 +890,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         assertShutdownBound();
         shutdownStage='transport_close';
         const closed=await closeClients();
-        assertShutdownBound();
         const rejectedStages=closed.flatMap((result,index)=>result.status==='rejected'?[{stage:index===0?'remote_close':'browser_transport_close',rejection:shutdownRejection(result.reason)}]:[]);
         if(rejectedStages.length) shutdownPrimary={stage:'transport_close',rejections:rejectedStages,reason:closed.find(result=>result.status==='rejected').reason};
+        assertShutdownBound();
         if (closed[1].status === 'fulfilled') await awaitBrowserExit();
         const browserTransportClosed = closed[1].status === 'fulfilled' && browserTransportEnded;
         const cleanupComplete=browserTransportClosed&&closed.every(result=>result.status==='fulfilled');
