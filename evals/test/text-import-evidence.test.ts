@@ -135,6 +135,63 @@ test("text import checks full typed warm data and raw native settings", async ()
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+test("text import binds the compact public output to a complete native checkpoint", async () => {
+  const f = await positiveFixture()
+  try {
+    f.port.schema = f.port.schema.map((column: Record<string, unknown>, index: number) => ({ ...column, index }))
+    Object.assign(f.output.output, { workflow_returned: true })
+    const native = structuredClone(f.output)
+    delete (native.output as { workflow_returned?: boolean }).workflow_returned
+    const proof = Object.assign(native.output, { verified: true, cleanup_complete: true, effect_possible: true,
+      workflow_return: { verified: true }, read_settings: { internal: "read proof" } })
+    const port = Object.assign(native.output.ports[0]!, { freshness_basis: "native execution", table_schema_id: "table",
+      filter_enabled: false })
+    port.schema = port.schema.map((column: Record<string, unknown>) => ({ ...column, header_tid: "private header" }))
+    port.sample = port.sample.map((row: { type: string; value: string | null; is_null: boolean; decimal?: string }[]) =>
+      row.map(cell => Object.assign(cell, { display_text: cell.value })))
+    f.events[2]!.result = native
+    await f.write()
+    expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+    const original = structuredClone(native)
+    for (const mutate of [
+      () => { port.schema[0].name = "other" },
+      () => { port.schema[0].label = "other" },
+      () => { port.schema[0].type = "integer" },
+      () => { port.schema[0].data_kind = "other" },
+      () => { port.schema[0].index = 1 },
+      () => { port.port_guid = "other" },
+      () => { port.execution_id = "old" },
+      () => { port.fresh = false },
+      () => { port.sample[0]![0]!.value = "changed" },
+      () => { port.sample[0]![2]!.decimal = "12.26" },
+      () => { port.sample[1]![4]!.is_null = false },
+      () => { port.sample_rows-- },
+      () => { port.row_count-- },
+      () => { port.sample_complete = false },
+      () => { port.precision.numbers_verified = false },
+      () => { proof.verified = false },
+      () => { proof.cleanup_complete = false },
+      () => { proof.workflow_return.verified = false },
+      () => { native.cleanup_complete = false },
+    ]) {
+      mutate()
+      await f.write()
+      const result = await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")
+      expect(result.errors).toEqual([])
+      expect(result.failures.length).toBeGreaterThan(0)
+      Object.assign(native, structuredClone(original), { output: proof })
+      Object.assign(proof, structuredClone(original.output), { ports: [port] })
+      Object.assign(port, structuredClone(original.output.ports[0]))
+    }
+    f.port.sample.pop()
+    f.port.sample_rows = f.port.sample.length; f.port.sample_complete = false
+    await f.write()
+    const truncated = await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")
+    expect(truncated.errors).toEqual([])
+    expect(truncated.failures.length).toBeGreaterThan(0)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("inputStore admission accepts its pinned identity/index name while preserving exact input gates", async () => {
   const f = await positiveFixture()
   try {
