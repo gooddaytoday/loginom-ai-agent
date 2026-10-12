@@ -1,0 +1,80 @@
+{
+  "checked_at": "2026-10-12T13:59:57+03:00",
+  "issue": "LAB-57",
+  "issue_status": "in_progress",
+  "issue_revision": 59,
+  "rich_partial_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b",
+  "rich_report_comment_id": "01a12fb8-eb87-7749-9397-35fbf2a38024",
+  "archive_attachment_id": "01a12fb8-e9ce-7329-a2fc-b884202b69ea",
+  "archive_sha256": "a7ff91d65ee15ce351fe6b2f4f3736634e9e2fd4dd8ea7427629ec2daf2597a1",
+  "manifest_sha256": "a5d661cf7ee30ed6684ee56f6823a900a9df98ee42684838fc9bf434441b077f",
+  "manifest_files_verified": 183,
+  "warm_delivered_verdict": {
+    "errors": [],
+    "failures": []
+  },
+  "graph_TDD_delivered": {
+    "red": "original graph FAIL",
+    "green": "PASS",
+    "negative_mutations": 16
+  },
+  "unit_delivered": {
+    "pass": 533,
+    "skip": 14,
+    "fail": 0,
+    "files": 53,
+    "typecheck": "PASS",
+    "process_cleanup": "confirmed"
+  },
+  "stand_delivered": "FREE; release confirmed; storage roots empty",
+  "model_delivered": "13/13 original reference assistant records openai/gpt-6-luna/high; private DB not published",
+  "new_blocker": {
+    "stage": "preflight before admission/browser-check",
+    "reason": "OPERATION_FAILED",
+    "lower_level_exception": "NOT_CAPTURED",
+    "classification": "UNCLASSIFIED; not charged"
+  },
+  "repeat_budget_delivered": {
+    "consumed": 1,
+    "limit": 10,
+    "remaining": 9,
+    "native_task_count": 4
+  },
+  "diagnostic_hypotheses_only": [
+    "same evalProfile provider assertAuth gate",
+    "agentInfo/CLI manifest",
+    "root/workspace free-space checks",
+    "remaining generic preflight or admission write failure"
+  ],
+  "source_supplement_sha": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+  "local_live_or_model_calls": 0,
+  "server_or_lease_changes_by_monitor": 0,
+  "handoff": {
+    "comment_id": "01a12fc3-4333-7dbe-b70c-bfdf17936d3f",
+    "parent_id": "01a12fb8-eb87-7749-9397-35fbf2a38024",
+    "trigger_outcomes": [
+      {
+        "reason_code": "queued",
+        "status": "queued",
+        "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "target_type": "agent"
+      }
+    ],
+    "readback": "VERIFIED_EXCEPT_TRIMMED_TERMINAL_NEWLINE"
+  },
+  "full_independent_acceptance": "PENDING; Evaler reviewing; Ben not assigned",
+  "active_runs": [
+    {
+      "id": "01a12fc3-433e-708b-b481-abc9091e7f57",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "queued",
+      "started_at": null
+    },
+    {
+      "id": "01a12f9e-6cbf-7807-a529-ddf60031eb5d",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "started_at": "2026-10-12T13:47:35+03:00"
+    }
+  ]
+}

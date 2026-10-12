@@ -1,19 +1,20 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T13:22:02+03:00; свежие issue/active/metadata/roots всех 8 + LAB-55 и thread LAB-57 прочитаны; нового worker report/evidence нет.
-- lab-56-lab-63-30 ACTIVE, каждые 30 минут; все 8 ещё не done, условие удаления расписания не достигнуто.
-- LAB-56: in_review rev65, Ben ACCEPT + Evaler confirmed evidence/cleanup; новых runs нет, done не выставлен.
-- LAB-57: in_progress rev55, phase=rich; Rich 01a12f9d-99bf-79a6-a978-026c32df932e running с 13:17:37 MSK; Evaler policy clarification 01a12f9e-6cbf-7807-a529-ddf60031eb5d queued, штатно ждёт concurrency=1.
-- LAB-58–LAB-63: in_progress/admission rev9, runs отсутствуют; ждут последовательные независимые ACCEPT/cleanup.
+- Проверка: 2026-10-12T13:59:57+03:00; свежие issue/active/metadata/roots всех 8 + LAB-55 прочитаны 13:51 MSK; LAB-57 thread и новый handoff read-back проверены.
+- lab-56-lab-63-30 ACTIVE каждые 30 минут; все 8 ещё не done, условие удаления расписания не достигнуто.
+- LAB-56: in_review rev65; Ben ACCEPT + Evaler confirmed evidence/cleanup; done не выставлен, runs нет.
+- LAB-57: in_progress rev59; active: 01a12fc3-433e-708b-b481-abc9091e7f57 queued, 01a12f9e-6cbf-7807-a529-ddf60031eb5d running.
+- LAB-58–LAB-63: in_progress/admission rev9, runs нет; последовательные независимые ACCEPT/cleanup ещё ожидаются.
 - LAB-55: in_review rev16, runs нет; чужие процессы/leases/defaults не затронуты.
-- Первый name fix перенесён Rich: partial 2c02eb9c5fde7eea2ff013ccd40c8a4417a1e9a7; source admission/delivery PASS.
-- Evaler независимо подтвердил fix a01125ba4: producer/native/public binding PASS, обе typed tables DATA_MATCH; receipt SHA 0cb9dbdf…05d82e скачан/проверен.
-- Исправление a01125ba40ef4e6df5422a6ad14a37da525c9569 в origin/input-name-fix: точная user-v1 проекция + raw typed/count/precision/false-proof guards; только checker/tests.
-- Spec review ACCEPT; RED воспроизведён, GREEN 24 tests/0 fail, 273 assertions, 7 файлов, bun typecheck PASS; 44 ordinary imports/refresh/diagnostics/cold/runner.
-- Исходный архив 5a846d7b…04104b сохранён: binding old FAIL → patched PASS; native/public typed tables IDENTICAL, обе DATA_MATCH (3×5). Replay 2026-10-12-public-output-replay.json.
-- Graph blocker (неподключённые Connection/ControlVariables) назначен Rich: TDD fix + перенос a01125ba4 + offline replay; активный run не дублировать. Полный warm/cold ACCEPT отсутствует.
-- Handoff Evaler 01a12f7e-870a-7c28-b0f1-2af179c3e4bd под blocker 01a12f59-547d-7d12-b5e9-830d520abd72; queued; ZIP bytes/SHA read-back VERIFIED, receipt 2026-10-12-public-output-handoff.json.
-- Уточнение владельца: 10 НА КАРТОЧКУ расходуют только одинаковые повторные blocker Rich; новые уникальные blocker/первая работа с ними — 0. Общего cap 10 native runs нет; историю и общий repeat counter не сбрасывать.
-- Reference txt-comma-utf8 1/3, остальные пять 0/3; admission 3/3; product/cold 0. Исторический FAIL/ERROR/ledger сохранены; новых live/model/probes нет.
-- Rich/Ben/Evaler gpt-6.1-sol/xhigh и CLI/skill/oracle/criteria pins прежние; scenario reference/product actual openai/gpt-6-luna/high обязателен по evidence.
-- Уточнение передано Evaler 01a12f9e-6ca3-73d7-acbf-c0180d51fef5; подтверждённая историческая тройка даёт repeat=1/10, remaining=9. Текущий Rich run pending, заранее не списан; blocker ledger в 2026-10-12-rich-repeat-budget-policy.json. Новых сообщений не требуется.
+- Rich завершил graph TDD repair; partial 8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b опубликован; owner/source/GUID/links/ports/output negatives сохранены.
+- Архив a7ff91d6…f2597a1, manifest a5d661cf…1b077f и все 183/183 файлов проверены локально; links/необычные типы/опасные paths отсутствуют.
+- Rich proofs: offline full warm reference №1 PASS (errors=[], failures=[]); unit 533 PASS/14 SKIP/0 FAIL, 53 файла, typecheck PASS; граф RED→GREEN и 16 negative mutations.
+- Исходные 27 файлов и FAIL сохранены; native reconstruction идентична; собственный unit lease RELEASED, cleanup confirmed, FREE/storage empty; private DB не публикуется.
+- Новый blocker: native preflight exit2 OPERATION_FAILED до admission.json/native-check capture; нижняя причина пока НЕ доказана. Новых reference/product/cold не было.
+- Exact helper 89b416c25 скрывает non-NodeOpsFailure; перед admission нужны generic preflight, assertAuth(evalProfile), запись proof. Гипотезы auth/manifest/free-space требуют проверки; READY не подменять.
+- Диагностический handoff Evaler 01a12fc3-4333-7dbe-b70c-bfdf17936d3f под Rich report 01a12fb8-eb87-7749-9397-35fbf2a38024 принят queued, content read-back VERIFIED; не дублировать его текущий диагноз.
+- Владелец: лимит 10/card расходуют только одинаковые повторные blocker; новые уникальные/первая работа с ними — 0; нет cap на общее число native runs.
+- Delivered ledger: native4, confirmed repeat1/10, remaining9; новый preflight unclassified charge0. Reference txt-comma 1/3, остальные пять 0/3; admission3/3, product/cold0.
+- Rich/Ben/Evaler gpt-6.1-sol/xhigh прежние; reference/product actual openai/gpt-6-luna/high подтверждать по evidence. CLI/skill/oracle/criteria/recovery/probes неизменны.
+- Локальный мониторинг не запускал runtime/model/SSH/preflight, не менял сервер/lease/CLI/credentials. Evidence receipt: 2026-10-12-preflight-monitor-evidence.json.
+- Следующий шаг: Evaler проверяет передачу, получает lower-level exception без model calls и координирует узкое исправление; cold/reference/product только после настоящего fresh READY.
