@@ -57,8 +57,30 @@ async function recordClose(stage, detail) {
   state.shutdown ??= {stages:[]}
   if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
   state.shutdown.stages.push({stage,...detail})
-  const directory=state.session?.directory??state.startupOwner?.directory
-  if (!directory) return // No-start has acquired no native resources.
+  const owner=state.session??state.startupOwner
+  const directory=owner?.directory
+  const retained=state.evidenceOwnerBinding
+  const acquired=retained || owner || state.startupBinding || state.startupCleanup
+    || state.bridge || state.bridgeCleanup || state.bridgeCloseAttempted
+    || state.browser || state.browserServer || state.browserProfile || state.client
+    || state.evidenceWriters?.size || state.evidencePublication
+  if (!acquired) return // Only a genuinely unacquired no-start may omit evidence.
+  if (!owner || typeof directory!=="string" || !directory)
+    throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+  state.evidenceOwnerBinding ??= Object.freeze({owner,directory,session:state.session,
+    startupOwner:state.startupOwner,id:owner.id,account:owner.account,origin:owner.origin,
+    context:owner.context,page:owner.page,metadata:owner.metadata,sessionId:owner.metadata?.sessionId})
+  const binding=state.evidenceOwnerBinding
+  const assertBinding=()=>{
+    if (binding.owner!==(state.session??state.startupOwner) || binding.directory!==binding.owner.directory
+        || binding.session!==state.session || binding.startupOwner!==state.startupOwner
+        || binding.id!==owner.id || binding.account!==owner.account || binding.origin!==owner.origin
+        || binding.context!==owner.context || binding.page!==owner.page
+        || binding.metadata!==owner.metadata || binding.sessionId!==owner.metadata?.sessionId)
+      throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+  }
+  assertBinding()
+  const bytes=JSON.stringify(state.shutdown,null,2)+"\n"
   state.evidenceWriters ??= new Set()
   // Atomic publication belongs to this receiving owner, not a whole source blob.
   if (state.evidencePublication?.pending) throw state.evidencePrimary ? state.evidencePrimary.value : Error("LOGINOM_MANAGED_PUBLICATION_UNKNOWN")
@@ -91,6 +113,7 @@ async function recordClose(stage, detail) {
       state.shutdown.persistenceFailures.push({phase:"retained_file_close",rejection:closeRejection(error)})
       throw state.evidencePrimary ? state.evidencePrimary.value : error
     }
+    assertBinding()
     state.evidenceWriters.delete(file)
     // Only a confirmed original close permits cleanup of this owned temporary.
     if (file.temporary && file.ownsTemporary) await removeTemporary(file.temporary)
@@ -99,7 +122,8 @@ async function recordClose(stage, detail) {
   const temporary=join(directory,".managed-shutdown-"+randomUUID()+".json")
   const attempt={created:false,published:false}
   const persist=async(target,write)=>{
-    const file={fd:undefined,closeComplete:false,...(write?{temporary:target}:{})}
+    assertBinding()
+    const file={binding,fd:undefined,closeComplete:false,...(write?{temporary:target}:{})}
     state.evidenceWriters.add(file)
     let phase=write?"file_open":"directory_open",primary
     const remember=value=>{
@@ -129,8 +153,9 @@ async function recordClose(stage, detail) {
         else state.evidenceWriters.delete(file) // authoritative open failure acquired no writer
         done(error,fd)
       }))
-      if(write){phase="file_write";await callback(done=>evidenceWrite(file.fd,JSON.stringify(state.shutdown,null,2)+"\n",done))}
-      phase=write?"file_sync":"directory_sync";await callback(done=>evidenceSync(file.fd,done))
+      assertBinding()
+      if(write){phase="file_write";await callback(done=>evidenceWrite(file.fd,bytes,done));assertBinding()}
+      phase=write?"file_sync":"directory_sync";await callback(done=>evidenceSync(file.fd,done));assertBinding()
     }catch(value){remember(value)}
     if(file.fd!==undefined){
       phase=write?"file_close":"directory_close"
@@ -138,6 +163,7 @@ async function recordClose(stage, detail) {
       // after scheduling close: retain the original callback, never retry it.
       try {
         await closeEvidenceFile(file)
+        assertBinding()
         state.evidenceWriters.delete(file)
       }catch(value){file.closeFailure ??= {value};remember(value)}
     }
@@ -146,14 +172,17 @@ async function recordClose(stage, detail) {
   }
   try {
     await persist(temporary,true)
+    assertBinding()
     await publishOperation(done=>evidenceRename(temporary,path,error=>{if(error===null||error===undefined)attempt.published=true;done(error)}))
+    assertBinding()
     await persist(directory,false)
+    assertBinding()
   } catch(value) {
     state.evidencePrimary ??= {phase:"publication",value}
     state.shutdown.persistencePrimary ??= {phase:state.evidencePrimary.phase,rejection:closeRejection(state.evidencePrimary.value)}
     // Unknown IO/close/publication retains original writer and owned temporary.
     if (attempt.created && !attempt.published && !state.evidencePublication?.pending && ![...state.evidenceWriters].some(f=>f.temporary===temporary)) {
-      try {await removeTemporary(temporary)} catch(secondary) {
+      try {assertBinding();await removeTemporary(temporary)} catch(secondary) {
         state.shutdown.persistenceFailures ??= []
         state.shutdown.persistenceFailures.push({phase:"temporary_unlink",rejection:closeRejection(secondary)})
       }
