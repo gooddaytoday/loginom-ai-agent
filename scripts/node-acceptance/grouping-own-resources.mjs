@@ -8,9 +8,12 @@ export function primaryPresence(owner) {
 
 export async function readOwnConnection(expected) {
  const reject=reason=>({status:'NOT_VERIFIED',reason,request_id:expected.request_id});
- const app=globalThis.bg?.app,main=app?.Application?.FInstance?.FMainForm,map=main?.FMapTree;
+ const bg=globalThis.bg,app=bg?.app,application=app?.Application,instance=application?.FInstance;
+ const main=instance?.FMainForm,map=main?.FMapTree;
  const own=globalThis.__loginomStartupV1,connection=map?.FServerConnection,session=connection?.Session;
- const valid=()=>document===own?.document&&own.id===expected.owner_id&&own.account===expected.account
+ const valid=()=>globalThis.__loginomStartupV1===own&&globalThis.bg===bg&&bg?.app===app
+  &&app?.Application===application&&application?.FInstance===instance&&instance?.FMainForm===main
+  &&document===own?.document&&own?.id===expected.owner_id&&own.account===expected.account
   &&location.origin===expected.origin&&app?.Version===expected.build&&main?.FMapTree===map
   &&map.FServerConnection===connection&&connection.Session===session
   &&connection.Connected===true&&connection.UserName===expected.account;
@@ -23,11 +26,27 @@ export async function readOwnConnection(expected) {
  // Nonempty caches need a prepared receipt/native package chain not supplied by
  // this empty-observer caller. Existing package-persistence owns that read.
  if(count!==0)return reject('PREPARED_PACKAGE_AUTHORITY_REQUIRED');
- const user=await session.get_CurrentUser();if(!valid()||typeof user?.get_Name!=='function')return reject('CURRENT_USER_REFERENCE_CHANGED');
- const name=await user.get_Name();if(!valid()||name!==expected.account)return reject('NATIVE_CURRENT_USER_MISMATCH');
- const guid=await session.get_Guid();if(!valid()||typeof guid!=='string'||! /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(guid))return reject('NATIVE_OWN_GUID_UNAVAILABLE');
+ // Each awaited native getter yields authority. Rebind the complete live
+ // chain and empty cache before touching another RPC or resource getter.
+ const authorityReason=()=>{
+  if(!valid())return 'OWN_DOCUMENT_ACCOUNT_CONNECTION';
+  if(map.FPackagesParentNode!==root||map.PackageNodes!==inventory)return 'RESOURCE_REFERENCES_CHANGED';
+  const currentCount=inventory.Count;
+  if(!Number.isSafeInteger(currentCount)||currentCount<0||currentCount>100)return 'CACHE_COUNT_UNAVAILABLE';
+  if(currentCount!==0)return 'PREPARED_PACKAGE_AUTHORITY_REQUIRED';
+  return null;
+ };
+ const user=await session.get_CurrentUser();
+ let refusal=authorityReason();if(refusal)return reject(refusal);
+ if(typeof user?.get_Name!=='function')return reject('CURRENT_USER_REFERENCE_CHANGED');
+ const name=await user.get_Name();
+ refusal=authorityReason();if(refusal)return reject(refusal);
+ if(name!==expected.account)return reject('NATIVE_CURRENT_USER_MISMATCH');
+ const guid=await session.get_Guid();
+ refusal=authorityReason();if(refusal)return reject(refusal);
+ if(typeof guid!=='string'||! /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(guid))return reject('NATIVE_OWN_GUID_UNAVAILABLE');
  const running=map.HasRunningNodes();
- if(!valid()||map.FPackagesParentNode!==root||map.PackageNodes!==inventory||inventory.Count!==count)return reject('RESOURCE_REFERENCES_CHANGED');
+ refusal=authorityReason();if(refusal)return reject(refusal);
  if(running!==false)return reject('IDLE_NOT_OBSERVED');
  return {status:'OWN_CONNECTION_IDLE_CACHE_VERIFIED',request_id:expected.request_id,owner_id:expected.owner_id,
   account:name,origin:location.origin,build:app.Version,session_guid:guid,started_at,finished_at:new Date().toISOString(),
