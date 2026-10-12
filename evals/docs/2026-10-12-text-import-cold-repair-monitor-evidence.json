@@ -1,0 +1,110 @@
+{
+  "observed_utc": "2026-10-12T13:30:12.069876+00:00",
+  "issue": "LAB-57",
+  "revision": 93,
+  "evaler_plan_accept_comment_id": "01a1304c-79e9-7a66-b170-d0d9878ed80d",
+  "rich_dispatch_comment_id": "01a13042-dc67-71ba-ba49-23e4ee202f5e",
+  "rich_task_id": "01a13042-dc9d-72d8-b324-60d52c04ebf8",
+  "active_runs": [
+    {
+      "id": "01a13042-dc9d-72d8-b324-60d52c04ebf8",
+      "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "status": "running",
+      "started_at": "2026-10-12T16:28:21+03:00"
+    }
+  ],
+  "worker_models_readback": [
+    {
+      "id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "max_concurrent_tasks": 1,
+      "model": "gpt-6.1-sol",
+      "name": "Evaler",
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+      "status": "idle",
+      "thinking_level": "xhigh",
+      "config": {},
+      "execution_config": {},
+      "model_config": {}
+    },
+    {
+      "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "max_concurrent_tasks": 1,
+      "model": "gpt-6.1-sol",
+      "name": "Rich",
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+      "status": "working",
+      "thinking_level": "xhigh",
+      "config": {},
+      "execution_config": {},
+      "model_config": {}
+    },
+    {
+      "id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+      "max_concurrent_tasks": 1,
+      "model": "gpt-6.1-sol",
+      "name": "Ben",
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+      "status": "idle",
+      "thinking_level": "xhigh",
+      "config": {},
+      "execution_config": {},
+      "model_config": {}
+    }
+  ],
+  "native_message_progress": {
+    "count": 14,
+    "last_seq": 14,
+    "last_created_at": "2026-10-12T13:30:02.96292Z",
+    "content_and_env_excluded": true
+  },
+  "evidence_receipts": [
+    {
+      "attachment_id": "01a13042-da35-7737-b09e-da9518769846",
+      "bytes": 2640,
+      "sha256": "93afaad34c6beae98e3eca3c9f4c946d4725d98c72cecdd9850d01d16ef192a0",
+      "bytes_sha_match_server_metadata": true
+    },
+    {
+      "attachment_id": "01a13042-db55-721c-9156-09e71735b67f",
+      "bytes": 6758,
+      "sha256": "0a9426069a5ae0096075bf1629da9c88b7c513e52bb0237861e2d18644c3da8a",
+      "bytes_sha_match_server_metadata": true
+    }
+  ],
+  "confirmed_repeat_budget": {
+    "limit": 10,
+    "consumed": 2,
+    "remaining": 8
+  },
+  "ledger_charge_sum_verified": 2,
+  "cold_history": {
+    "reader_invocations": 2,
+    "launch_attempts": 1,
+    "completed": 0,
+    "historical_failures_preserved": true
+  },
+  "scenario_budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 0,
+      "txt-semicolon-cp1251-decimal": 0,
+      "csv-pipe-multiline": 0,
+      "tsv-utf8": 0,
+      "tsv-utf16le": 0
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 0,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0
+  },
+  "unclassified_launch_preserved": true,
+  "cold_pass": false,
+  "new_frozen_sha": null,
+  "repair_scope_confirmed": "headless:true; reader provenance adaptation/current hash only; unchanged source/original SHA and native/cold gates",
+  "monitor_created_new_dispatch": false,
+  "monitor_live_model_or_lease_calls": false,
+  "all_eight_done": false,
+  "automation_retained": "lab-56-lab-63-30"
+}
