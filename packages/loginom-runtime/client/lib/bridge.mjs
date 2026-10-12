@@ -579,7 +579,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         captureReceiptWritten=true;
       }
       if(!captureJournalWritten){
-        await recordExecution({event:'acceptance_capture',...captureEvidence});
+        try{await recordExecution({event:'acceptance_capture',...captureEvidence})}
+        catch(value){rememberCapturePersistence(value,'journal');throw value}
         captureJournalWritten=true;
       }
     }

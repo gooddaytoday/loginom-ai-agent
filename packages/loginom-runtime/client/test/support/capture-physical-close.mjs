@@ -13,8 +13,9 @@ import * as workspace from '../../lib/workspace.mjs';
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
 import * as journal from '../../lib/execution-journal.mjs';
+const journalPrimary=Error('original journal rejection',{cause:0});
 let current;
-mock.module(new URL('../../lib/execution-journal.mjs',import.meta.url).href,{namedExports:{...journal,createExecutionJournal:options=>{const original=journal.createExecutionJournal(options);return async value=>{await original(value);if(value.event==='acceptance_capture'&&current.case==='journal-failure-close'&&!current.journalFault){current.journalFault=true;throw 0}}}}});
+mock.module(new URL('../../lib/execution-journal.mjs',import.meta.url).href,{namedExports:{...journal,createExecutionJournal:options=>{const original=journal.createExecutionJournal(options);return async value=>{await original(value);if(value.event==='acceptance_capture'&&current.case==='journal-failure-close'&&!current.journalFault){current.journalFault=true;throw journalPrimary}}}}});
 const target={profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'};
 const path='/test-2/packages/result.lgp';
 class ExternalClient {
@@ -98,7 +99,7 @@ mock.module('node:fs',{defaultExport:{},namedExports:{...nativeCallbackFs,
    }));
    f.events.push('close-scheduled');
    if(['early-fulfilled','missing-callback'].includes(f.case))return Promise.resolve('projection');
-   throw ['sync-','write-','dirsync-'].some(p=>f.case.startsWith(p))?false:0;
+   throw f.case==='journal-failure-close'?false:['sync-','write-','dirsync-'].some(p=>f.case.startsWith(p))?false:0;
   }
   nativeCallbackFs.close(fd,e=>{if(!e)owned.delete(fd);f.events.push(kind+'-close-callback');callback(e)});
  }
@@ -160,7 +161,7 @@ function nativeFixture(overrides = {}) {
 }
 
 const scenarios=['normal','lost-reply','early-fulfilled','missing-callback','directory-lost','callback-error','io-open','io-write','io-sync',...['sync-','write-','dirsync-'].flatMap(p=>Object.keys(failValues).map(x=>p+x)),'foreign-session','foreign-directory','foreign-receipt','foreign-binding','journal-failure-close'];
-for(const scenario of scenarios)test('whole bridge capture writer '+scenario,async()=>{
+for(const scenario of scenarios.filter(s=>!process.env.CAPTURE_ONLY_JOURNAL||s==='journal-failure-close'))test('whole bridge capture writer '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'capture-kernel-'));let signal;
  const ready=new Promise(r=>signal=r);
  const f=current={case:scenario,scenario:'hybrid-success',directory,events:[],native:nativeFixture(),nativeReceipts:[],saves:0,signal,finished:false,captureWrites:0};
@@ -191,7 +192,7 @@ for(const scenario of scenarios)test('whole bridge capture writer '+scenario,asy
      if(['foreign-receipt','foreign-binding'].includes(scenario)){const obj=scenario==='foreign-receipt'?captureRaw:acceptanceCapture.binding,key=scenario==='foreign-receipt'?'cancel_verified':'account',old=obj[key];obj[key]=scenario==='foreign-receipt'?false:'foreign';await assert.rejects(bridge.close());assert.equal(f.events.includes('browser-close'),false);obj[key]=old}
      f.original();
     }
-    if(f.case==='journal-failure-close'){assert.equal(physical(f.fd),false);await assert.rejects(bridge.close());assert.equal(f.events.includes('browser-close'),false);f.original()}
+    if(f.case==='journal-failure-close'){assert.equal(first,journalPrimary);assert.equal(session.metadata.capturePersistencePrimary.phase,'journal');assert.equal(session.metadata.capturePersistencePrimary.rejection.cause.value,0);assert.equal(physical(f.fd),false);await assert.rejects(bridge.close(),value=>value===first);assert.equal(f.events.includes('browser-close'),false);f.original()}
     if(f.kernel)await f.kernel;
     const closed=await bridge.close();assert.equal(closed.cleanup_complete,true);receipt={cleanupComplete:true};
    }
