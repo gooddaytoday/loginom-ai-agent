@@ -135,6 +135,35 @@ test("text import checks full typed warm data and raw native settings", async ()
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+test("inputStore admission accepts its pinned identity/index name while preserving exact input gates", async () => {
+  const f = await positiveFixture()
+  try {
+    const prepare = f.calls[0]!.output as { input_artifacts: { name: string; bytes: number; sha256: string; artifact_id: string; upload: { grant_id: string; destination: string } }[] }
+    const artifact = prepare.input_artifacts[0]!
+    const original = structuredClone(artifact)
+    const prefix = "8a61685823094e223dbef99f3bb732f57a50debe0392f3871299650c6ab61667"
+    artifact.name = `${prefix}-0-${original.name}`
+    await f.write()
+    expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+    for (const name of [`${prefix}-1-${original.name}`, `${prefix.slice(1)}-0-${original.name}`, `${prefix.toUpperCase()}-0-${original.name}`, `${prefix}-0-other-${original.name}`]) {
+      artifact.name = name
+      await f.write()
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("admitted")
+    }
+    artifact.name = `${prefix}-0-${original.name}`
+    artifact.sha256 = "0".repeat(64)
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("admitted")
+    artifact.sha256 = original.sha256; artifact.bytes = original.bytes + 1
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("admitted")
+    artifact.bytes = original.bytes
+    prepare.input_artifacts.push(original)
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("admitted")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("text import preserves a known first refusal and corrects the same GUID exactly once", async () => {
   const f = await positiveFixture("csv-delimiter-correction")
   try {

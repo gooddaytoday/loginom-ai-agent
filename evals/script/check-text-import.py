@@ -64,9 +64,11 @@ def source_bindings(spec, calls):
     require(len(delivered) == len(spec['inputs']), 'source: exact delivery count required')
     admitted = prepared[0]['result'].get('input_artifacts', [])
     transfers = []
-    for item in spec['inputs']:
+    for index, item in enumerate(spec['inputs']):
+        name = pathlib.PurePosixPath(item['path']).name
         matches = [artifact for artifact in admitted if artifact.get('bytes') == item['bytes']
-            and artifact.get('sha256') == item['sha256'] and pathlib.PurePosixPath(artifact.get('name', '')).name == pathlib.PurePosixPath(item['path']).name]
+            and artifact.get('sha256') == item['sha256'] and (pathlib.PurePosixPath(artifact.get('name', '')).name == name
+                or re.fullmatch(r'[0-9a-f]{64}-' + str(index) + '-' + re.escape(name[-120:]), artifact.get('name', '')))]
         require(len(matches) == 1, 'source: exact admitted bytes required')
         artifact = matches[0]
         matches = [call for call in delivered if call['input'].get('artifact_id') == artifact['artifact_id']]
