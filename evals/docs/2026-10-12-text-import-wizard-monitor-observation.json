@@ -1,0 +1,48 @@
+{
+  "observed_utc": "2026-10-12T14:26:31.528638+00:00",
+  "issue": "LAB-57",
+  "worker_task_id": "01a13042-dc9d-72d8-b324-60d52c04ebf8",
+  "native_seq": 248,
+  "native_created_at": "2026-10-12T14:21:06.460375Z",
+  "native_output_sha256": "8786634127d1498475ccf52d22ed5e85d80989affc01841eea32c63546a657cf",
+  "selected_diagnostics": {
+    "result.json": {
+      "status": "FAIL",
+      "error": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+      "cleanup": {
+        "package_closed": false,
+        "logged_out": false
+      },
+      "confirmed": null,
+      "errors": null,
+      "failures": null
+    },
+    "cleanup.json": {
+      "status": null,
+      "error": null,
+      "cleanup": null,
+      "confirmed": false,
+      "errors": null,
+      "failures": null
+    },
+    "verdict.json": {
+      "status": null,
+      "error": null,
+      "cleanup": null,
+      "confirmed": null,
+      "errors": [],
+      "failures": [
+        "cold: saved graph and cleanup required"
+      ]
+    }
+  },
+  "source_stage": "cold reader: native wizard opening completion guard; precise action/owner awaits mutation receipt",
+  "exact_lower_root_cause": "UNCLASSIFIED; requires native mutation receipt/capture",
+  "terminal_worker_report": "NOT_YET_DELIVERED",
+  "cleanup_observation": "intermediate unconfirmed, final cleanup not asserted",
+  "repeat_charge": "deferred until confirmed root/repetition; dispatch is not charged",
+  "last_confirmed_repeats": 2,
+  "last_confirmed_limit": 10,
+  "worker_still_active": true,
+  "monitor_live_or_lease_actions": false
+}
