@@ -7,6 +7,7 @@
     "compare": "bun run src/compare.ts",
     "prepare-bundle": "bun run script/prepare-bundle.ts",
     "test": "bun test",
+    "test:unit": "bun test --path-ignore-patterns '**/{isolated-storage,node-eval-ops,node-skill,sandbox}.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

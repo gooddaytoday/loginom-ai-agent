@@ -137,6 +137,7 @@ LOGINOM_AI_AGENT_CLI_PROFILE=$PWD/.profile/agent LOGINOM_AI_AGENT_CLI_BUNDLE=$PW
 
 ```bash
 bun test && bun typecheck                    # самопроверка harness
+bun run test:unit                           # offline unit gate инфраструктуры для CI
 bun run src/run.ts --dry-run --repeat 2      # весь цикл на фикстурах, без Loginom/модели/квоты
 bun run src/run.ts --calibrate               # калибровка судьи на эталонах (без агента)
 bun run src/run.ts --repeat 3 --label base   # живой прогон
@@ -146,6 +147,12 @@ bun run src/compare.ts <run-a> <run-b>       # сравнить два прог�
 bun run src/compare.ts <run-a> <run-b> --margin 0.5 --confidence 0.95 --k 3
 bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline simulation
 ```
+
+В reusable `test.yml` job `evals-unit` выполняет frozen install, `bun typecheck`
+и `bun run test:unit`. Unit-команда использует fake CLI/judge и локальные фикстуры;
+наборы `isolated-storage`, `node-eval-ops`, `node-skill`, `sandbox`, требующие Docker
+или реальной bubblewrap-границы, остаются в полном `bun test`. Живые eval-прогоны
+и пересуживание корпуса моделью в CI не запускаются.
 
 Флаги: `--only`, `--tasks`, `--label`, `--repeat`, `--timeout-ms`, `--skip-judge`, `--keep-storage`, `--judge-only <run-id>`, `--calibrate`, `--reset-profile`, `--dry-run`.
 
