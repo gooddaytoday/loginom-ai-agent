@@ -1,23 +1,28 @@
 import { cellText, copyCell, type Cell, type DefectRecord, type TableData } from "./cells"
 import { numberOf } from "./generate"
+import { forceViolation, strictViolation } from "./rules"
 import type { Rng } from "./rng"
-import type { Column, Defect, Table } from "./spec"
+import type { Column, Defect, Realism, Table, When } from "./spec"
 
 const alphabet = "абвгдежзийклмнопрстуфхцчшщыэюяaeiou"
 
-export function applyDefects(rng: Rng, tables: Array<{ spec: Table; data: TableData }>, defects: Defect[]) {
+export function applyDefects(rng: Rng, tables: Array<{ spec: Table; data: TableData }>, defects: Defect[], realism?: Realism) {
   const records: DefectRecord[] = []
+  const rejected = new Map<string, number>()
+  const guard = realism || tables.some((table) => table.spec.rules.some((rule) => rule.severity === "strict")) ? createGuard(realism) : undefined
   for (const defect of defects) {
     const table = tables.find((item) => item.spec.name === defect.table)
     if (!table) continue
     if (defect.kind === "duplicate") duplicate(rng, table.data, defect, records)
     else if (defect.kind === "broken_row") broken(rng, table.data, defect, records)
-    else change(rng, table, defect, tables, records)
+    else if (defect.kind === "rule_violation") violate(rng, table, defect, records, guard, rejected)
+    else if (defect.kind === "drop") dropRows(rng, table.data, defect, records)
+    else change(rng, table, defect, tables, records, guard, rejected)
   }
-  return records
+  return { records, rejected }
 }
 
-function change(rng: Rng, table: { spec: Table; data: TableData }, defect: Exclude<Defect, { kind: "duplicate" | "broken_row" }>, tables: Array<{ spec: Table; data: TableData }>, records: DefectRecord[]) {
+function change(rng: Rng, table: { spec: Table; data: TableData }, defect: Exclude<Defect, { kind: "duplicate" | "broken_row" | "rule_violation" | "drop" }>, tables: Array<{ spec: Table; data: TableData }>, records: DefectRecord[], guard: Guard | undefined, rejected: Map<string, number>) {
   const column = table.spec.columns.find((item) => item.name === defect.column)
   const index = table.data.columns.indexOf(defect.column)
   if (!column || index < 0) return
@@ -25,7 +30,7 @@ function change(rng: Rng, table: { spec: Table; data: TableData }, defect: Exclu
   if (defect.kind === "missing" && defect.mechanism === "block") {
     for (let row = 0; row < length; row += defect.length) {
       if (!rng.chance(defect.rate)) continue
-      for (let offset = 0; offset < defect.length && row + offset < length; offset += 1) write(table.data, row + offset, index, defect.column, "missing", blank(defect), records)
+      for (let offset = 0; offset < defect.length && row + offset < length; offset += 1) write(table, row + offset, index, defect.column, "missing", blank(defect), records, guard, rejected)
     }
     return
   }
@@ -36,7 +41,7 @@ function change(rng: Rng, table: { spec: Table; data: TableData }, defect: Exclu
     const cell = table.data.rows[row]?.[index]
     if (!cell) continue
     const next = replacement(rng, defect, column, cell, stats, tables)
-    if (next) write(table.data, row, index, defect.column, defect.kind === "noise" ? defect.noise : defect.kind, next, records)
+    if (next) write(table, row, index, defect.column, defect.kind === "noise" ? defect.noise : defect.kind, next, records, guard, rejected)
   }
 }
 
@@ -124,16 +129,111 @@ function broken(rng: Rng, data: TableData, defect: Extract<Defect, { kind: "brok
   }
 }
 
-function write(data: TableData, row: number, index: number, column: string, kind: string, cell: Cell, records: DefectRecord[]) {
-  const current = data.rows[row]?.[index]
+function write(table: { spec: Table; data: TableData }, row: number, index: number, column: string, kind: string, cell: Cell, records: DefectRecord[], guard: Guard | undefined, rejected: Map<string, number>) {
+  const current = table.data.rows[row]?.[index]
   if (!current) return
-  records.push({ table: data.name, row, column, kind, original: cellText(current), value: cellText(cell) })
-  data.rows[row][index] = cell
+  const next = guard ? guard.prepare(table, row, index, cell) : cell
+  if (!next) {
+    rejected.set(table.spec.name, (rejected.get(table.spec.name) ?? 0) + 1)
+    return
+  }
+  records.push({ table: table.data.name, row, column, kind, original: cellText(current), value: cellText(next) })
+  table.data.rows[row][index] = next
+  guard?.mark(table.spec.name, row, index)
 }
 
-function matches(row: Cell[], columns: string[], when: { column: string; equals?: string; above?: number }) {
+function violate(rng: Rng, table: { spec: Table; data: TableData }, defect: Extract<Defect, { kind: "rule_violation" }>, records: DefectRecord[], guard: Guard | undefined, rejected: Map<string, number>) {
+  const rule = table.spec.rules.find((item) => item.name === defect.rule && item.severity === "soft")
+  if (!rule) return
+  for (let row = 0; row < table.data.rows.length; row += 1) {
+    if (!rng.chance(defect.rate)) continue
+    const current = table.data.rows[row]
+    if (!current) continue
+    const changes = forceViolation(rule, table.spec.columns, current)
+    const last = [...changes].at(-1)
+    if (!last) continue
+    const trial = current.map((cell) => cell)
+    for (const [index, cell] of changes) trial[index] = cell
+    if (strictViolation(table.spec.rules, table.spec.columns, trial)) {
+      rejected.set(table.spec.name, (rejected.get(table.spec.name) ?? 0) + 1)
+      continue
+    }
+    for (const [index, cell] of changes) {
+      if (index !== last[0]) table.data.rows[row][index] = cell
+    }
+    write(table, row, last[0], table.spec.columns[last[0]]?.name ?? "", "rule_violation", last[1], records, guard, rejected)
+    const saved = records.at(-1)
+    if (saved?.row === row && saved.kind === "rule_violation") saved.value = `${defect.rule}=${saved.value}`
+  }
+}
+
+function dropRows(rng: Rng, data: TableData, defect: Extract<Defect, { kind: "drop" }>, records: DefectRecord[]) {
+  const dropped: number[] = []
+  for (let row = 0; row < data.rows.length; row += 1) {
+    if (rng.chance(defect.rate)) dropped.push(row)
+  }
+  while (dropped.length >= data.rows.length) dropped.pop()
+  if (!dropped.length) return
+  const omit = new Set(dropped)
+  const kept = data.rows.map((_, index) => index).filter((index) => !omit.has(index))
+  const mapped = new Map(kept.map((index, position) => [index, position]))
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index]
+    if (!record || record.table !== data.name) continue
+    const position = mapped.get(record.row)
+    if (position === undefined) records.splice(index, 1)
+    else record.row = position
+  }
+  for (const row of dropped) {
+    const anchor = kept.filter((index) => index < row).at(-1) ?? kept[0] ?? 0
+    records.push({ table: data.name, row: mapped.get(anchor) ?? 0, column: "", kind: "drop", original: String(row + 1), value: "dropped" })
+  }
+  data.rows = kept.map((index) => data.rows[index] ?? [])
+  data.broken = kept.map((index) => data.broken[index] ?? null)
+}
+
+type Guard = { prepare: (table: { spec: Table; data: TableData }, row: number, index: number, cell: Cell) => Cell | undefined; mark: (table: string, row: number, index: number) => void }
+
+function createGuard(realism: Realism | undefined): Guard {
+  const touched = new Set<string>()
+  const counts = new Map<string, number>()
+  return {
+    prepare(table, row, index, cell) {
+      const key = `${table.spec.name}:${row}`
+      if (realism?.oneDefectPerCell && touched.has(`${key}:${index}`)) return
+      if (realism && (counts.get(key) ?? 0) >= realism.maxDefectsPerRow) return
+      const next = realism?.respectLimits ? limitCell(table.spec.columns[index], cell) : cell
+      const current = table.data.rows[row]?.[index]
+      if (!current || cellText(current) === cellText(next ?? { kind: "null" })) return
+      if (!table.spec.rules.some((rule) => rule.severity === "strict")) return next
+      const previous = current
+      table.data.rows[row][index] = next ?? previous
+      const violated = strictViolation(table.spec.rules, table.spec.columns, table.data.rows[row] ?? [])
+      table.data.rows[row][index] = previous
+      if (violated) return
+      return next
+    },
+    mark(table, row, index) {
+      touched.add(`${table}:${row}:${index}`)
+      const key = `${table}:${row}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    },
+  }
+}
+
+function limitCell(column: Column | undefined, cell: Cell): Cell {
+  if (cell.kind !== "number") return cell
+  let value = cell.value
+  if (column?.limits?.min !== undefined) value = Math.max(column.limits.min, value)
+  if (column?.limits?.max !== undefined) value = Math.min(column.limits.max, value)
+  if (column?.limits?.min === undefined && column?.limits?.max === undefined) value = Math.max(-1_000_000, Math.min(1_000_000, value))
+  return { kind: "number", value, scale: cell.scale }
+}
+
+function matches(row: Cell[], columns: string[], when: When) {
   const cell = row[columns.indexOf(when.column)]
   if (!cell) return false
+  if (when.in) return when.in.includes(cellText(cell))
   if (when.equals !== undefined) return cellText(cell) === when.equals
   const value = numberOf(cell)
   return when.above !== undefined && value !== null && value > when.above

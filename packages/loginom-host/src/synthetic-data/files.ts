@@ -49,14 +49,14 @@ function splitTable(table: Table, data: TableData): Group[] {
   data.rows.forEach((cells, index) => {
     const key = table.split ? cellText(cells[data.columns.indexOf(table.split.by)] ?? { kind: "null" }) : ""
     const rows = buckets.get(key) ?? []
-    rows.push({ index, cells, broken: data.broken[index] ?? null })
+    rows.push({ index, cells: projectCells(table, data, cells), broken: data.broken[index] ?? null })
     buckets.set(key, rows)
   })
   return [...buckets].map(([key, rows]) => ({
     filename: table.split ? table.split.file.replaceAll("{value}", sanitize(key)) : table.output.file ?? `${sanitize(table.name)}.${extension}`,
     sheet: table.split ? `${table.output.sheet} ${key}`.trim() : table.output.sheet,
     table: table.name,
-    columns: data.columns,
+    columns: visibleColumns(table, data),
     output: table.output,
     rows,
   }))
@@ -70,6 +70,14 @@ async function render(groups: Group[]) {
   if (first.output.format === "jsonl") return writeJsonl(first.columns, first.rows.map((row) => row.cells), first.output)
   if (first.output.format === "xml") return writeXml(first.table, first.columns, first.rows.map((row) => row.cells), first.output)
   return writeDelimited(first.columns, first.rows, first.output)
+}
+
+function visibleColumns(table: Table, data: TableData) {
+  return data.columns.filter((_, index) => table.columns[index]?.hidden !== true)
+}
+
+function projectCells(table: Table, data: TableData, cells: Cell[]) {
+  return cells.filter((_, index) => table.columns[index]?.hidden !== true && index < data.columns.length)
 }
 
 function sanitize(value: string) {

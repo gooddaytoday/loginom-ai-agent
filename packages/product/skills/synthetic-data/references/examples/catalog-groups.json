@@ -1,0 +1,26 @@
+{
+  "name": "catalog",
+  "seed": 3,
+  "tables": [
+    {
+      "name": "models",
+      "rows": 24,
+      "links": [
+        {
+          "name": "catalog",
+          "columns": ["section", "maker", "model"],
+          "rows": [
+            ["audio", "north", "shared"],
+            ["video", "west", "shared"],
+            ["audio", "north", "solo"]
+          ]
+        }
+      ],
+      "columns": [
+        { "name": "section", "type": "linked", "link": "catalog" },
+        { "name": "maker", "type": "linked", "link": "catalog" },
+        { "name": "model", "type": "linked", "link": "catalog" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "tickets",
+  "seed": 9,
+  "realism": { "oneDefectPerCell": true, "maxDefectsPerRow": 2, "respectLimits": true },
+  "tables": [
+    {
+      "name": "tickets",
+      "rows": 40,
+      "rules": [
+        { "name": "created_assigned", "compare": { "left": "created", "op": "<=", "right": "assigned" } },
+        { "name": "assigned_closed", "compare": { "left": "assigned", "op": "<=", "right": "closed" } },
+        {
+          "name": "high_without_note",
+          "severity": "soft",
+          "never": [
+            { "column": "priority", "in": ["high"] },
+            { "column": "note", "empty": true }
+          ]
+        }
+      ],
+      "columns": [
+        { "name": "created", "type": "date", "from": "2024-04-01", "to": "2024-04-20" },
+        { "name": "assigned", "type": "offset", "from": "created", "unit": "days", "min": 0, "max": 3 },
+        { "name": "closed", "type": "offset", "from": "assigned", "unit": "days", "min": 0, "max": 5 },
+        { "name": "priority", "type": "category", "values": ["low", "normal", "high"] },
+        { "name": "note", "type": "category", "values": ["checked", "waiting"] },
+        { "name": "hours", "type": "int", "min": 1, "max": 40, "limits": { "min": 0, "max": 200 } }
+      ]
+    }
+  ],
+  "defects": [
+    { "table": "tickets", "kind": "rule_violation", "rate": 0.25, "rule": "high_without_note" }
+  ]
+}

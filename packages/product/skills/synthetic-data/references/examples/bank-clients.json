@@ -1,0 +1,37 @@
+{
+  "name": "bank",
+  "seed": 7,
+  "realism": { "oneDefectPerCell": true, "maxDefectsPerRow": 2, "respectLimits": true },
+  "tables": [
+    {
+      "name": "clients",
+      "rows": 20,
+      "rules": [
+        {
+          "name": "open_has_no_close",
+          "never": [
+            { "column": "status", "in": ["open"] },
+            { "column": "closed", "notEmpty": true }
+          ]
+        }
+      ],
+      "columns": [
+        { "name": "client", "type": "sequence", "start": 1 },
+        { "name": "age", "type": "int", "min": 18, "max": 70, "limits": { "min": 0, "max": 120 } },
+        { "name": "income", "type": "int", "min": 20000, "max": 200000, "limits": { "min": 0 } },
+        { "name": "segment", "type": "category", "values": ["mass", "premium"] },
+        { "name": "status", "type": "category", "values": ["open", "closed"] },
+        { "name": "opened", "type": "date", "from": "2020-01-01", "to": "2022-01-01" },
+        { "name": "closed", "type": "date", "from": "2022-01-02", "to": "2024-01-01" }
+      ]
+    },
+    {
+      "name": "accounts",
+      "rows": 20,
+      "columns": [
+        { "name": "account", "type": "sequence", "start": 100 },
+        { "name": "client", "type": "ref", "table": "clients", "column": "client" }
+      ]
+    }
+  ]
+}

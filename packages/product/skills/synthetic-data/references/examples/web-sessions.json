@@ -1,0 +1,41 @@
+{
+  "name": "sessions",
+  "seed": 5,
+  "realism": { "oneDefectPerCell": true, "maxDefectsPerRow": 2, "respectLimits": true },
+  "tables": [
+    {
+      "name": "events",
+      "rows": 24,
+      "groups": {
+        "keys": ["session", "event"],
+        "shared": ["session", "platform", "browser", "started"],
+        "size": { "min": 2, "max": 4 },
+        "sortBy": ["session"]
+      },
+      "links": [
+        {
+          "name": "agent",
+          "columns": ["platform", "browser"],
+          "rows": [
+            ["desktop", "firefox"],
+            ["mobile", "safari"],
+            ["desktop", "chrome"]
+          ]
+        }
+      ],
+      "columns": [
+        { "name": "session", "type": "sequence", "start": 1, "prefix": "s" },
+        { "name": "platform", "type": "linked", "link": "agent" },
+        { "name": "browser", "type": "linked", "link": "agent" },
+        { "name": "started", "type": "datetime", "from": "2024-01-01", "to": "2024-01-02" },
+        { "name": "event", "type": "sequence", "start": 1, "per": ["session"], "unit": "row" },
+        { "name": "at", "type": "offset", "from": "started", "unit": "minutes", "min": 1, "max": 20, "cumulative": true },
+        { "name": "duration", "type": "int", "min": 1, "max": 40, "limits": { "min": 0, "max": 600 } }
+      ]
+    }
+  ],
+  "defects": [
+    { "table": "events", "column": "duration", "kind": "outlier", "rate": 0.08, "method": "multiplier", "factor": 8 },
+    { "table": "events", "kind": "duplicate", "rate": 0.05, "mode": "fuzzy" }
+  ]
+}

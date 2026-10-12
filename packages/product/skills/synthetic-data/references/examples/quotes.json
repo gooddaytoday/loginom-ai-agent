@@ -1,0 +1,23 @@
+{
+  "name": "quotes",
+  "seed": 2,
+  "realism": { "oneDefectPerCell": true, "maxDefectsPerRow": 2, "respectLimits": true },
+  "tables": [
+    {
+      "name": "bars",
+      "series": { "by": ["ticker"], "date": "date", "step": "day", "weekdays": "mon-fri" },
+      "columns": [
+        { "name": "ticker", "type": "category", "values": ["USD", "EUR"] },
+        { "name": "date", "type": "date", "from": "2024-01-01", "to": "2024-01-12" },
+        { "name": "close", "type": "walk", "model": "arithmetic", "start": 100, "drift": 0.1, "volatility": 0.4, "floor": 1, "scale": 4 },
+        { "name": "spread", "type": "float", "min": 0.001, "max": 0.01, "hidden": true },
+        { "name": "open", "type": "expr", "expr": "close", "scale": 4 },
+        { "name": "high", "type": "expr", "expr": "max(open, close) * (1 + spread)", "scale": 4 },
+        { "name": "low", "type": "expr", "expr": "min(open, close) * (1 - spread)", "scale": 4 }
+      ]
+    }
+  ],
+  "defects": [
+    { "table": "bars", "kind": "drop", "rate": 0.1 }
+  ]
+}

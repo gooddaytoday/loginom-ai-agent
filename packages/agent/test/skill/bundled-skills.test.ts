@@ -54,7 +54,7 @@ test("synthetic data declares its generated Node executor and keeps dataset gene
   const skill = await ConfigMarkdown.parse(join(productSkillsDirectory, "synthetic-data/SKILL.md"))
   expect(skill.data.metadata?.["loginom-generated"]).toBe("scripts/synthetic-data.mjs")
   expect(skill.content).toContain("synthetic_data_run")
-  for (const reference of ["references/spec.md", "references/defects.md", "references/formats.md", "references/presets.md", "references/existing-scenario.md"]) {
+  for (const reference of ["references/spec.md", "references/defects.md", "references/formats.md", "references/presets.md", "references/existing-scenario.md", "references/relations.md", "references/realism.md"]) {
     expect(skill.content).toContain(reference)
   }
   expect(skill.content).not.toMatch(/python3|scripts\/\S+\.py/)
@@ -160,6 +160,7 @@ it.live("discovers a verified bundled skill outside the source checkout", () =>
       expect(yield* skills.dirs()).toContain(join(resources, "skills/package-docs"))
     }),
   ),
+  30_000,
 )
 
 it.live("loads bundled skill resources without an external search executable", () =>

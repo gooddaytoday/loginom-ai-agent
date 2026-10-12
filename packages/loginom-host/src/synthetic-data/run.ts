@@ -39,8 +39,13 @@ async function generate(input: RunInput, directory: string) {
   if (!loaded.ok) return loaded
   const name = input.name && folderName(input.name)
   if (!name) throw Error("SYNTHETIC_DATA_ARGUMENTS_INVALID")
-  const { rng, tables } = generateTables(loaded.spec)
-  const defects = applyDefects(rng, tables, loaded.spec.defects)
+  const generated = generateSafely(loaded.spec)
+  if (generated instanceof Error) return failure(generated)
+  const { rng, tables, constraints } = generated
+  if (constraints.some((item) => item.violations > 0)) return { ok: false, errors: ["Строгие правила не выполняются на чистых данных."] }
+  const applied = applyDefects(rng, tables, loaded.spec.defects, loaded.spec.realism)
+  for (const item of constraints) item.rejected_defects = applied.rejected.get(item.table) ?? 0
+  const defects = applied.records
   const rendered = await renderFiles(tables, defects).catch((error: unknown) => {
     if (error instanceof Error && (error.message === "SYNTHETIC_DATA_SPEC_INVALID" || error.message === "SYNTHETIC_DATA_LIMIT"))
       return error.message
@@ -64,6 +69,7 @@ async function generate(input: RunInput, directory: string) {
     tables: loaded.spec.tables.map((table) => ({ name: table.name, rows: table.rows, columns: table.columns.map((column) => ({ name: column.name, type: column.type })) })),
     defects_file: "defects.csv",
     defect_count: rendered.defects.length,
+    constraints,
   }
   const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2) + "\n")
   await writeOwned(output, [...payloads.map((file) => [file.filename, file.bytes] as const), ["manifest.json", manifestBytes]])
@@ -89,6 +95,21 @@ async function loadSpec(specPath: string | undefined) {
   const value = parseJson(text)
   if (value === undefined) return { ok: false as const, errors: ["Спецификация не является JSON."] }
   return parseSpec(value)
+}
+
+function generateSafely(spec: Parameters<typeof generateTables>[0]) {
+  try {
+    return generateTables(spec)
+  } catch (error) {
+    if (error instanceof Error) return error
+    throw error
+  }
+}
+
+function failure(error: Error) {
+  if (error.message === "SYNTHETIC_DATA_RULE_UNSATISFIABLE") return { ok: false as const, errors: ["Правила не оставляют допустимых значений."] }
+  if (error.message === "SYNTHETIC_DATA_KEY_COLLISION") return { ok: false as const, errors: ["Составной ключ получился неуникальным."] }
+  throw error
 }
 
 function presetSpec(preset: string, params: string | undefined) {

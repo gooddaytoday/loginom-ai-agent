@@ -24,6 +24,20 @@ packages/agent: bun test test/skill/bundled-skills.test.ts test/session/profile-
 нужен `LOGINOM_AI_AGENT_TEST_NODE`. Полный staging с манифестом ресурсов
 по-прежнему требует `LOGINOM_AI_AGENT_TEST_NODE` и `LOGINOM_AI_AGENT_TEST_BROWSERS`.
 
+Генератор дополнительно разбирает связи кортежей, группы строк, временные ряды,
+цепочки дат, строгие и мягкие правила и блок `realism`. Пресет `retail` и
+спецификации без этих полей сохраняют прежние байты файлов данных. Шаблоны в
+`packages/product/skills/synthetic-data/references/examples/` проходят `validate`
+и `generate` тестом host. Новых пресетов нет.
+
+Проверка связей, групп, рядов и `realism` выполнена по исходникам:
+`bun test test/synthetic-data.test.ts` и `bun typecheck` в `loginom-host`,
+каталог скилов и `bun typecheck` в `agent`, плюс `test/tool/synthetic-data.test.ts`
+с `LOGINOM_AI_AGENT_TEST_NODE`. Тест инструмента гоняет уже собранный
+`synthetic-data.mjs` и проверяет контракт вызова, а не новые поля спецификации.
+Новый исполнитель попадёт в поставку при следующей сборке ресурсов. Установщик
+для этой правки не собирался.
+
 Эти команды проверяют генератор, каталог скила и регистрацию инструмента.
 Они не заменяют установленный Desktop или CLI.
 
