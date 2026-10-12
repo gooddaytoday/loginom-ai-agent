@@ -283,6 +283,8 @@ async function handle(message) {
           registration:captureRegistration, retained } : undefined })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
+      state.readonlyBinding=Object.freeze({startup:state.startupBinding,owner:state.startupOwner,
+        bridge:state.bridge,client:state.client,session:state.session})
       if(retained)bindCaptureRuntime(retained,state.bridge,state.client)
       await state.bridge.server.connect(serverTransport)
       if(retained)assertCaptureOwner(retained)
@@ -358,16 +360,19 @@ async function handle(message) {
       return
     }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
-    const original=state.startupBinding,current=state.startupOwner,originalBridge=state.bridge,originalClient=state.client,originalSession=state.session;
-    const retainedOwner=()=>state.startupBinding===original && state.startupOwner===current
+    const bound=state.readonlyBinding,original=bound?.startup,current=bound?.owner,
+      originalBridge=bound?.bridge,originalClient=bound?.client,originalSession=bound?.session;
+    const qualified=originalBridge?.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
+    const readonlyRequired=state.readonlyRetained===true || qualified;
+    const retainedOwner=()=>!!bound && state.readonlyBinding===bound
+      && state.startupBinding===original && state.startupOwner===current
       && state.bridge===originalBridge && state.client===originalClient && state.session===originalSession
       && !!original && original.owner===current && original.id===current?.id
       && !!original.context && !!original.page && original.context===current.context && original.page===current.page
       && original.account===current.account && original.origin===current.origin
       && original.generation===current.generation && original.chat===current.chat
       && !current.closed && !current.contextClosed && !state.bridgeCleanup;
-    if (state.readonlyRetained && (!retainedOwner()
-        || state.bridge.readonlyContinuation?.(message.input.name,message.input.arguments)!==true))
+    if (readonlyRequired && (!retainedOwner() || !qualified))
       throw Error("LOGINOM_RECOVERY_REQUIRED")
     const controller = new AbortController()
     state.controller = controller
@@ -378,8 +383,8 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
-      const readonlyContinuation=retainedOwner() && state.bridge.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
-      if (state.readonlyRetained && !readonlyContinuation) throw Error("LOGINOM_RECOVERY_REQUIRED")
+      const readonlyContinuation=retainedOwner() && originalBridge?.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
+      if (readonlyRequired && !readonlyContinuation) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (readonlyContinuation) state.readonlyRetained=true;
       send({ id: message.id, result: {
         readonlyContinuation,

@@ -32,6 +32,7 @@ for(const scenario of scenarios)test('linked readonly continuation: '+scenario,a
  const raw=Error('original guard',{cause:0});const globals:any={readonlyCleanupRefusal:true,nativeCleanupDispatched:false,confirmedCleanup:undefined,shutdownStarted:false,captureConsumed:false,captureInFlight:undefined,captureUnknown:false,captureWriters:new Set(),clipboardUncertain:false,heldLeases:new Set(),actionRuntime:{hasUnsettledWork:()=>globals.unknown===true,hasActiveWork:()=>globals.running===true},workspaceObserveTool,validateActionParameters};
  const readPolicy=vm.runInNewContext(policy+';readonlyContinuation',globals);
  const state:any={startupOwner:owner,startupBinding:original,session:{},bridge:{readonlyContinuation:readPolicy,hasUnsettledWork:()=>true,hasActiveWork:()=>globals.running===true},client:{callTool:async()=>{dispatches++;return raw}}};
+ state.readonlyBinding=Object.freeze({startup:original,owner,bridge:state.bridge,client:state.client,session:state.session});
  let reply:any;const api=vm.runInNewContext(handle+';({handle})',{state,Error,AbortController,send:(v:any)=>reply=v});
  const runtime={request:async(op:string,input:any)=>{reply=undefined;await api.handle({id:'managed',operation:op,input});if(reply.error)throw Error(reply.error);return scenario==='missing-flag'?{...reply.result,readonlyContinuation:undefined}:reply.result}};
  const service:any={recoveries:new Map(),journal,acquire:(run:string)=>{acquires++;return connection.acquire(run)},retireRuntime:async()=>{},resetRestarts(){},bindCapture(){},runtime:async()=>{lookups++;return runtime},markRuntimeStale(){stale++}};
@@ -43,6 +44,9 @@ for(const scenario of scenarios)test('linked readonly continuation: '+scenario,a
   if(scenario==='confirmed-cleanup')globals.confirmedCleanup={};if(scenario==='writer-retained')globals.captureWriters.add({});
   if(scenario==='foreign-owner')state.startupOwner={...owner};if(scenario==='foreign-page')owner.page={};if(scenario==='foreign-account')owner.account='foreign';
   if(scenario==='pending'){const id=await journal.begin('a'.repeat(64),7);await journal.settle(id,false);await expect(lease!.call('dock_workspace_observe',{scope:'all'},'read')).rejects.toThrow('LOGINOM_RECOVERY_REQUIRED');expect(dispatches).toBe(0);return}
+  if(['foreign-owner','foreign-page','foreign-account'].includes(scenario)){
+   await expect(lease!.call('dock_workspace_observe',{scope:'all'},'read')).rejects.toThrow();expect(dispatches).toBe(0);return
+  }
   expect(await lease!.call('dock_workspace_observe',{scope:'all'},'read')).toBe(raw);
   const safe=!['running','unknown','native-dispatched','confirmed-cleanup','capture-consumed','writer-retained','clipboard','foreign-owner','foreign-page','foreign-account','missing-flag'].includes(scenario);
   if(!safe){expect(stale).toBe(scenario==='running'?0:1);return}
