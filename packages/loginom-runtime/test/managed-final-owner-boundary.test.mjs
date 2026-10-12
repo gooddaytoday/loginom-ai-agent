@@ -41,5 +41,9 @@ for(const late of [false,true])test('managed final directory-close owner boundar
   assert.equal(native,1);
   assert.equal(released,late?0:3);
   assert.equal(allowed,!late);
+  if(late){
+   await assert.rejects(f.close());assert.equal(released,0);assert.equal(native,1);
+   state.session.directory=original;await f.close();assert.equal(released,3);assert.equal(native,1);
+  }
  }finally{await fsp.rm(root,{recursive:true,force:true})}
 });

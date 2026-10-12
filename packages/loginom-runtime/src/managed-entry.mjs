@@ -61,6 +61,10 @@ async function recordClose(stage, detail) {
   const evidenceOwner=state.session??state.startupOwner
   const directory=state.session?.directory??state.startupOwner?.directory
   if (!directory) return // No-start has acquired no native resources.
+  state.evidenceOwnerBinding ??= Object.freeze({owner:evidenceOwner,directory})
+  const evidenceBinding=state.evidenceOwnerBinding
+  if(evidenceBinding.owner!==evidenceOwner||evidenceBinding.directory!==directory)
+    throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
   if(state.evidencePublication?.pending)throw state.evidencePrimary?state.evidencePrimary.value:Error("LOGINOM_MANAGED_PUBLICATION_UNKNOWN")
   const parent=await lstat(directory)
   if(!parent.isDirectory()||parent.isSymbolicLink())throw Error("LOGINOM_MANAGED_DIRECTORY_REFUSED")
