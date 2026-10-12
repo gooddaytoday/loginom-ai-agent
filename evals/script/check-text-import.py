@@ -173,7 +173,12 @@ def native_application(events, call, receipt):
     rows = [event for event in events if event.get('operation_id') == call['input']['operation_id']]
     checkpoints = [event['result'] for event in rows if event.get('phase') == 'node_checkpoint']
     require(len(checkpoints) == 1 and all(checkpoints[0].get(key) == receipt.get(key)
-        for key in ('status', 'node', 'configuration', 'execution', 'output', 'cleanup_complete')), 'native: settled checkpoint differs')
+        for key in ('status', 'node', 'configuration', 'execution', 'cleanup_complete')), 'native: settled checkpoint differs')
+    output = checkpoints[0].get('output')
+    if output and output.get('status') == 'complete':
+        typed_table(checkpoints[0])
+        require(all(output[key] is True for key in ('verified', 'cleanup_complete') if key in output), 'native: output not verified')
+    require(public_output(output) == receipt.get('output'), 'native: settled checkpoint differs')
     phases = [event['receipt'] for event in rows if event.get('phase') == 'node_phase_completed'
         and event.get('receipt', {}).get('phase') == 'configure']
     require(len(phases) == 1 and phases[0].get('status') == 'verified', 'native: one verified configure phase required')
@@ -189,6 +194,41 @@ def native_application(events, call, receipt):
     require(all(field.get('status') == 'observed' and field.get('index') == i for i, field in enumerate(columns)), 'native: column coverage differs')
     observed['columns'] = columns
     return observed, rows
+
+
+def public_output(output):
+    """Unbudgeted compactNodeResult projection from the pinned user-v1 producer."""
+    if output is None:
+        return None
+    def pick(value, keys):
+        return {key: value[key] for key in keys if key in value}
+    result = pick(output, ('status', 'evidence_ref', 'execution_id', 'no_output_requested'))
+    if 'ports' in output:
+        result['ports'] = []
+        for port in output['ports']:
+            value = pick(port, ('port', 'port_guid', 'fresh', 'execution_id', 'category_fields', 'schema', 'row_count',
+                'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage',
+                'read_consistency', 'cell_precision', 'binding', 'limitations'))
+            value['schema'] = [pick(column, ('index', 'name', 'label', 'type', 'data_kind')) for column in port['schema']]
+            value['sample'] = []
+            for row in port['sample']:
+                cells = [pick(cell, ('type', 'value', 'decimal', 'representation', 'display_text', 'precision',
+                    'is_null', 'timezone', 'cell_type', 'native')) for cell in row]
+                for cell in cells:
+                    if 'display_text' in cell and 'value' in cell and type(cell['value']) == type(cell['display_text']) and cell['value'] == cell['display_text']:
+                        del cell['display_text']
+                value['sample'].append(cells)
+            value['sample_rows'] = len(value['sample'])
+            value['sample_complete'] = port.get('sample_complete') and len(value['sample']) == len(port['sample'])
+            result['ports'].append(value)
+    if 'file_artifacts' in output:
+        result['file_artifacts'] = [pick(file, ('artifact_id', 'destination', 'bytes', 'sha256', 'execution_id',
+            'verification_id', 'freshness_basis')) for file in output['file_artifacts']]
+    if 'format_restoration' in output:
+        result['format_restoration'] = pick(output['format_restoration'], ('restored', 'table'))
+    if 'workflow_return' in output:
+        result['workflow_returned'] = output['workflow_return'].get('verified') is True
+    return result
 
 
 def typed_table(receipt):
