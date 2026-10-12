@@ -1,6 +1,5 @@
 import path from "node:path"
 import { cp, mkdir, rm } from "node:fs/promises"
-import type { EvalConfig } from "./config"
 import { evalsRoot } from "./config"
 import type { ChecklistItem, Task } from "./task"
 import type { AgentRun } from "./cli"
@@ -74,8 +73,8 @@ function parseJson(text: string): unknown {
   }
 }
 
-export async function judgeInfo(config: EvalConfig) {
-  const version = await Bun.$`${config.judge.command} --version`.quiet().nothrow()
+export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env"> }) {
+  const version = await Bun.$`${config.judge.command} --version`.env(judgeEnvironment(config.judge.env)).quiet().nothrow()
   return {
     backend: "codex" as const,
     codex_version: version.exitCode === 0 ? version.text().trim() : null,
@@ -86,6 +85,17 @@ export async function judgeInfo(config: EvalConfig) {
   }
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
+
+export function judgeEnvironment(env?: Record<string, string>) {
+  return {
+    ...Object.fromEntries(
+      Object.entries(process.env).flatMap(([key, value]) =>
+        value === undefined || /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/.test(key) ? [] : [[key, value] as const],
+      ),
+    ),
+    ...env,
+  }
+}
 
 export function judgeCommand(input: { command: string[]; dir: string; model: string; reasoning: string }) {
   return [
@@ -222,14 +232,7 @@ async function invoke(
     judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
     {
       cwd: input.outDir,
-      env: {
-        ...Object.fromEntries(
-          Object.entries(process.env).flatMap(([key, value]) =>
-            value === undefined || /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/.test(key) ? [] : [[key, value] as const],
-          ),
-        ),
-        ...input.judge.env,
-      },
+      env: judgeEnvironment(input.judge.env),
       stdin: Bun.file(path.join(input.outDir, "PROMPT.md")),
       stdout: Bun.file(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`)),
       stderr: Bun.file(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`)),

@@ -1,6 +1,15 @@
 import path from "node:path"
 
 const args = Bun.argv.slice(2)
+if (args.includes("--environment-probe")) {
+  await Bun.write(
+    args[args.indexOf("--environment-probe") + 1]!,
+    JSON.stringify(Object.fromEntries(
+      ["LOGINOM_SECRET_PROBE", "EVAL_SECRET_PROBE", "JUDGE_SECRET_PROBE", "FAKE_CODEX_SECRET_PROBE", "PATH", "PROBE_ALLOWED_ENV"]
+        .map((key) => [key, process.env[key] ?? null]),
+    )),
+  )
+}
 if (args.includes("--version")) {
   process.stdout.write("fake-codex 0.0.0\n")
   process.exit(0)

@@ -10,6 +10,7 @@ import { aggregate } from "../src/report"
 import { loadTasks } from "../src/task"
 import { analyzeComparison, parseComparisonSummary } from "../src/compare-analysis"
 import { comparisonSummary } from "./helpers/compare-summary"
+import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const checklist = [
   { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false, required: false },
@@ -67,6 +68,33 @@ test("judgeInfo: версия судьи и sha256 промпта", async () => 
   expect(info).toMatchObject({ backend: "codex", codex_version: "fake-codex 0.0.0", model: "fake", reasoning: "high" })
   expect(info.prompt_sha256).toMatch(/^[0-9a-f]{64}$/)
   expect(info.schema_sha256).toMatch(/^[0-9a-f]{64}$/)
+})
+
+test("judgeInfo: --version не наследует секреты harness и сохраняет обычное окружение", async () => {
+  const probe = await probeJudgeEnvironment("info")
+  expect(probe.version).toBe("fake-codex 0.0.0")
+  expect(probe.environment).toEqual({
+    LOGINOM_SECRET_PROBE: null,
+    EVAL_SECRET_PROBE: null,
+    JUDGE_SECRET_PROBE: null,
+    FAKE_CODEX_SECRET_PROBE: null,
+    PATH: "/judge-probe-preserved-path",
+    PROBE_ALLOWED_ENV: "ordinary-value",
+  })
+})
+
+test("judgeInfo: --version применяет явный judge.env после фильтрации", async () => {
+  const env = {
+    LOGINOM_SECRET_PROBE: "explicit-judge-value",
+    EVAL_SECRET_PROBE: "explicit-judge-value",
+    JUDGE_SECRET_PROBE: "explicit-judge-value",
+    FAKE_CODEX_SECRET_PROBE: "explicit-judge-value",
+    PATH: "/judge-probe-overridden-path",
+    PROBE_ALLOWED_ENV: "overridden-value",
+  }
+  const probe = await probeJudgeEnvironment("info", env)
+  expect(probe.version).toBe("fake-codex 0.0.0")
+  expect(probe.environment).toEqual(env)
 })
 
 const fixtureArtifact = async () => {

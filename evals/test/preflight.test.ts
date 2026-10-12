@@ -6,6 +6,7 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
 import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight } from "../src/preflight"
+import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
@@ -73,6 +74,33 @@ test("preflight: --judge-only проверяет только судью и не
   const environment = await preflight(config, parseArtifactSource("docker", config.loginom))
   expect(environment.codex?.version).toBe("fake-codex 0.0.0")
   expect(environment.loginom).toBeNull()
+})
+
+test("preflight: --version не наследует секреты harness и сохраняет обычное окружение", async () => {
+  const probe = await probeJudgeEnvironment("preflight")
+  expect(probe.version).toBe("fake-codex 0.0.0")
+  expect(probe.environment).toEqual({
+    LOGINOM_SECRET_PROBE: null,
+    EVAL_SECRET_PROBE: null,
+    JUDGE_SECRET_PROBE: null,
+    FAKE_CODEX_SECRET_PROBE: null,
+    PATH: "/judge-probe-preserved-path",
+    PROBE_ALLOWED_ENV: "ordinary-value",
+  })
+})
+
+test("preflight: --version применяет явный judge.env после фильтрации", async () => {
+  const env = {
+    LOGINOM_SECRET_PROBE: "explicit-judge-value",
+    EVAL_SECRET_PROBE: "explicit-judge-value",
+    JUDGE_SECRET_PROBE: "explicit-judge-value",
+    FAKE_CODEX_SECRET_PROBE: "explicit-judge-value",
+    PATH: "/judge-probe-overridden-path",
+    PROBE_ALLOWED_ENV: "overridden-value",
+  }
+  const probe = await probeJudgeEnvironment("preflight", env)
+  expect(probe.version).toBe("fake-codex 0.0.0")
+  expect(probe.environment).toEqual(env)
 })
 
 test("checkStorage: существующий dir: проходит, отсутствующий — EvalFailure с кодом 2", async () => {

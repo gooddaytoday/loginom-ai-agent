@@ -8,6 +8,7 @@ import { assertIsolatedStorageEmpty, listStorage, type ArtifactSource } from "./
 import { agentCommand } from "./cli"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { superviseProcess } from "./process-supervisor"
+import { judgeEnvironment, type JudgeSettings } from "./judge"
 
 export type Environment = {
   git: { sha: string; dirty: boolean } | null
@@ -23,7 +24,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
     await requireFixtures()
     return environment
   }
-  if (!config.skipJudge) environment.codex = await codexInfo(config.judge.command)
+  if (!config.skipJudge) environment.codex = await codexInfo(config.judge)
   // --judge-only и --calibrate не запускают агента: Loginom, docker, Dock и bundle не нужны.
   if (config.judgeOnly !== undefined || config.calibrate) return environment
   if (config.agent.cliMode === "source")
@@ -135,12 +136,12 @@ export async function gitInfo() {
   return { sha: sha.text().trim(), dirty: status.text().trim().length > 0 }
 }
 
-async function codexInfo(command: string[]) {
-  const version = await Bun.$`${command} --version`.quiet().nothrow()
+async function codexInfo(judge: Pick<JudgeSettings, "command" | "env">) {
+  const version = await Bun.$`${judge.command} --version`.env(judgeEnvironment(judge.env)).quiet().nothrow()
   if (version.exitCode !== 0)
-    throw new EvalFailure(`Судья недоступен: ${command.join(" ")} --version → код ${version.exitCode}`, 2)
+    throw new EvalFailure(`Судья недоступен: ${judge.command.join(" ")} --version → код ${version.exitCode}`, 2)
   const home = process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex")
-  if (path.basename(command[0] ?? "") === "codex" && !(await Bun.file(path.join(home, "auth.json")).exists()))
+  if (path.basename(judge.command[0] ?? "") === "codex" && !(await Bun.file(path.join(home, "auth.json")).exists()))
     throw new EvalFailure(`Нет входа Codex: отсутствует ${path.join(home, "auth.json")}. Выполните: codex login`, 2)
   return { version: version.text().trim() }
 }
