@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {fork} from 'node:child_process';
 import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';import {fileURLToPath} from 'node:url';
 const entry=process.env.PHYSICAL_ENTRY??fileURLToPath(new URL('../src/managed-entry.mjs',import.meta.url));
-for(const scenario of ['normal','lost-reply','early-fulfilled','missing-callback','directory-lost','callback-error',...['error','undefined','null','false','zero','empty'].map(x=>'sync-'+x)])test('whole managed physical close '+scenario,async()=>{
+for(const scenario of ['normal','lost-reply','early-fulfilled','missing-callback','directory-lost','callback-error','io-open','io-write','io-sync',...['error','undefined','null','false','zero','empty'].map(x=>'sync-'+x)])test('whole managed physical close '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'physical-close-')),messages=[],logs=[];
  const child=fork(fileURLToPath(new URL('./fixtures/managed/physical-close-child.mjs',import.meta.url)),[],{execArgv:['--experimental-vm-modules'],stdio:['ignore','pipe','pipe','ipc'],env:{...process.env,UV_THREADPOOL_SIZE:'1',PHYSICAL_ENTRY:entry,PHYSICAL_SCENARIO:scenario,PHYSICAL_DIRECTORY:directory}});
  child.on('message',m=>messages.push(m));child.stdout.on('data',b=>logs.push(String(b)));child.stderr.on('data',b=>logs.push(String(b)));
@@ -16,6 +16,10 @@ for(const scenario of ['normal','lost-reply','early-fulfilled','missing-callback
     const p=await probe();assert.equal(p.kernelFinished,true);assert.equal(p.physicalOpen,false);assert.equal(p.callbackDelivered,false);assert.equal(p.writers,1);assert.equal(messages.some(m=>m.id==='first'),false);assert.equal(p.events.some(e=>e.event==='client-close'),false);
     send({id:'concurrent',operation:'close'});send({fixture:'deliver-original-callback'});
    }
+  }
+  if(scenario.startsWith('io-')){
+   await wait(()=>messages.some(m=>m.fixture==='io-complete'));await wait(()=>messages.some(m=>m.id==='first'));const pending=await probe();assert.equal(pending.ioKernelFinished,true);assert.equal(pending.ioCallbackDelivered,false);assert.equal(pending.physicalOpen,true);assert.equal(pending.writers,1);assert.equal(pending.events.some(e=>e.event==='close-before-io-confirmation'),false);
+   send({id:'held-retry',operation:'close'});await wait(()=>messages.some(m=>m.id==='held-retry'));assert.ok(messages.find(m=>m.id==='held-retry').error);assert.equal((await probe()).native,1);send({fixture:'deliver-original-io-callback'});send({id:'retry',operation:'close'});
   }
   if(scenario==='callback-error'){
    await wait(()=>messages.some(m=>m.id==='first'));const before=await probe();assert.equal(before.physicalOpen,true);assert.equal(before.native,1);assert.equal(before.events.some(e=>e.event==='context-close-double'),false);
@@ -32,7 +36,7 @@ for(const scenario of ['normal','lost-reply','early-fulfilled','missing-callback
    const proof=messages.find(m=>m.fixture==='release-proof');assert.equal(proof.native,1);assert.equal(proof.writers,0);assert.equal(proof.events.some(e=>e.event==='new-open-before-kernel'),false);assert.ok(proof.events.some(e=>e.event==='sync-callback'&&e.kind==='directory'&&e.succeeded));assert.ok(proof.events.some(e=>e.event==='close-callback'&&e.kind==='directory'&&e.succeeded));
    const evidence=JSON.parse(await readFile(join(directory,'managed-shutdown.json'),'utf8'));assert.ok(evidence.stages.some(s=>s.stage==='outer_acknowledgement'&&s.status==='allowed'));
   }
-  const reports=messages.filter(m=>m.fixture==='probe');for(const p of reports){assert.equal(p.events.some(e=>e.event==='new-open-before-kernel'),false);assert.equal(p.native,1)}
+  const reports=messages.filter(m=>m.fixture==='probe');for(const p of reports){assert.equal(p.events.some(e=>e.event==='new-open-before-kernel'),false);assert.equal(p.events.some(e=>e.event==='close-before-io-confirmation'),false);assert.equal(p.native,1)}
  }finally{
   if(!exited){send({fixture:'dispose'});await exit}
   if(process.env.PHYSICAL_RESULTS){await mkdir(process.env.PHYSICAL_RESULTS,{recursive:true});await writeFile(join(process.env.PHYSICAL_RESULTS,scenario+'.json'),JSON.stringify({fixture:true,entry,scenario,messages,logs,exit:exited,scope:'whole managed module; genuine Node fs/kernel/child IPC; Page/native/bridge/context and reply faults doubles; no native Loginom'},null,2))}

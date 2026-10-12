@@ -4,21 +4,29 @@ import vm from 'node:vm';import * as fs from 'node:fs';import * as promises from
 import * as module from 'node:module';import * as crypto from 'node:crypto';import * as path from 'node:path';
 import * as url from 'node:url';import * as os from 'node:os';
 const entryPath=process.env.PHYSICAL_ENTRY,directory=process.env.PHYSICAL_DIRECTORY,scenario=process.env.PHYSICAL_SCENARIO;
-const events=[],fds=new Set(),metadata=new Map();let native=0,selected=false,selectedFd,scheduled,originalCallback,kernelFinished=false,callbackDelivered=false,blocker;
+const events=[],fds=new Set(),metadata=new Map();let native=0,selected=false,selectedFd,scheduled,originalCallback,kernelFinished=false,callbackDelivered=false,blocker,ioKernelFinished=false,ioCallbackDelivered=false,ioCallback;
 const values={error:Error('primary sync',{cause:0}),undefined:undefined,null:null,false:false,zero:0,empty:''};
 let state;
 const eligible=fd=>!selected&&state?.shutdown?.stages.some(s=>s.stage==='bridge'&&s.status==='returned')&&metadata.get(fd)===(scenario==='directory-lost'?'directory':'file');
 const builtinFs={...fs,
  open(p,flags,mode,callback){
   if(selected&&!kernelFinished)events.push({event:'new-open-before-kernel',physicalOpen:physicalOpen()});
-  fs.open(p,flags,mode,(error,fd)=>{if(!error){fds.add(fd);metadata.set(fd,p===directory?'directory':'file')}events.push({event:'open-callback',kind:metadata.get(fd)});callback(error,fd)});
+  const fault=scenario==='io-open'&&!selected&&p!==directory&&state?.shutdown?.stages.some(s=>s.stage==='bridge'&&s.status==='returned');
+  if(fault)selected=true;
+  fs.open(p,flags,mode,(error,fd)=>{if(!error){fds.add(fd);metadata.set(fd,p===directory?'directory':'file')}events.push({event:'open-callback',kind:metadata.get(fd)});
+   if(fault){selectedFd=fd;ioKernelFinished=true;ioCallback=()=>{ioCallbackDelivered=true;callback(error,fd)};process.send({fixture:'io-complete'})}else callback(error,fd)});
+  if(fault)throw 0;
  },
- writeFile(fd,bytes,callback){events.push({event:'write',kind:metadata.get(fd)});fs.writeFile(fd,bytes,callback)},
+ writeFile(fd,bytes,callback){events.push({event:'write',kind:metadata.get(fd)});
+  if(scenario==='io-write'&&eligible(fd)){selected=true;selectedFd=fd;fs.writeFile(fd,bytes,error=>{ioKernelFinished=true;ioCallback=()=>{ioCallbackDelivered=true;callback(error)};process.send({fixture:'io-complete'})});throw 0}
+  fs.writeFile(fd,bytes,callback)},
  fsync(fd,callback){
-  if(eligible(fd)&&scenario.startsWith('sync-')){selected=true;selectedFd=fd;throw values[scenario.slice(5)]}
+  if(scenario==='io-sync'&&eligible(fd)){selected=true;selectedFd=fd;fs.fsync(fd,error=>{ioKernelFinished=true;ioCallback=()=>{ioCallbackDelivered=true;callback(error)};process.send({fixture:'io-complete'})});throw 0}
+  if(eligible(fd)&&scenario.startsWith('sync-')){selected=true;selectedFd=fd;return new Promise((resolve,reject)=>fs.fsync(fd,error=>{events.push({event:'sync-callback',kind:metadata.get(fd),succeeded:error===null||error===undefined});callback(error);reject(values[scenario.slice(5)])}))}
   fs.fsync(fd,error=>{events.push({event:'sync-callback',kind:metadata.get(fd),succeeded:error===null||error===undefined});callback(error)});
  },
  close(fd,callback){
+  if(scenario.startsWith('io-')&&fd===selectedFd&&!ioCallbackDelivered)events.push({event:'close-before-io-confirmation'});
   const target=eligible(fd)||(fd===selectedFd&&scenario.startsWith('sync-')&&!scheduled);
   if(target){selected=true;selectedFd=fd;
    if(scenario==='callback-error'){callback(Error('native close callback failed'));return}
@@ -36,7 +44,7 @@ const builtinFs={...fs,
    if(scenario==='early-fulfilled'||scenario==='missing-callback')return Promise.resolve('status-projection-only');
    throw scenario.startsWith('sync-')?false:0;
   }
-  fs.close(fd,error=>{if(error===null||error===undefined)fds.delete(fd);events.push({event:'close-callback',kind:metadata.get(fd),succeeded:error===null||error===undefined});callback(error)});
+  fs.close(fd,error=>{if(error===null||error===undefined){fds.delete(fd);if(scenario.startsWith('io-')&&fd===selectedFd)kernelFinished=true}events.push({event:'close-callback',kind:metadata.get(fd),succeeded:error===null||error===undefined});callback(error)});
  }
 };
 function physicalOpen(){if(selectedFd===undefined)return null;try{fs.fstatSync(selectedFd);return true}catch{return false}}
@@ -55,7 +63,8 @@ state.client={async close(){events.push({event:'client-close'});process.send({fi
 state.browserServer={async close(){events.push({event:'server-close'})}};
 const keepAlive=setInterval(()=>{},1000);
 process.on('message',async message=>{
- if(message.fixture==='probe')process.send({fixture:'probe',tag:message.tag,native,selected,kernelFinished,callbackDelivered,physicalOpen:physicalOpen(),writers:state.evidenceWriters?.size,events,shutdown:state.shutdown,evidencePrimary:state.evidencePrimary&&{phase:state.evidencePrimary.phase,rejection:serial(state.evidencePrimary.value)}});
+ if(message.fixture==='probe')process.send({fixture:'probe',tag:message.tag,native,selected,kernelFinished,callbackDelivered,physicalOpen:physicalOpen(),ioKernelFinished,ioCallbackDelivered,writers:state.evidenceWriters?.size,events,shutdown:state.shutdown,evidencePrimary:state.evidencePrimary&&{phase:state.evidencePrimary.phase,rejection:serial(state.evidencePrimary.value)}});
+ if(message.fixture==='deliver-original-io-callback'){if(ioKernelFinished)ioCallback()}
  if(message.fixture==='deliver-original-callback'){if(kernelFinished&&scenario==='missing-callback')originalCallback()}
  if(message.fixture==='dispose'){
   if(blocker)await blocker;if(scheduled)await scheduled;

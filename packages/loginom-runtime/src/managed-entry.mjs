@@ -40,14 +40,19 @@ function closeRejection(value) {
 }
 async function closeEvidenceFile(file) {
   if (file.closeComplete) return
+  if (file.io?.pending) throw Error("LOGINOM_MANAGED_WRITER_IO_UNKNOWN")
   if (file.closeStarted) throw file.closeFailure ? file.closeFailure.value : Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
   file.closeStarted=true
-  await new Promise((resolve,reject)=>{
-    try {evidenceClose(file.fd,error=>{
+  let projection
+  const completion=new Promise((resolve,reject)=>{
+    try {projection=evidenceClose(file.fd,error=>{
       if(error===null||error===undefined){file.closeComplete=true;resolve()}
       else {file.closeFailure={value:error};reject(error)}
     })}catch(value){file.closeFailure ??= {value};reject(value)}
   })
+  // A returned thenable may report a failure, but fulfillment never replaces
+  // the original kernel callback (the standard Node API returns void).
+  await Promise.all([completion,projection])
 }
 async function recordClose(stage, detail) {
   state.shutdown ??= {stages:[]}
@@ -84,10 +89,19 @@ async function recordClose(stage, detail) {
       state.shutdown.persistenceFailures ??= []
       state.shutdown.persistenceFailures.push({phase,rejection:closeRejection(value)})
     }
-    const callback=invoke=>new Promise((resolve,reject)=>{
-      try {invoke((error,result)=>error!==null&&error!==undefined?reject(error):resolve(result))}
-      catch(value){reject(value)}
-    })
+    const callback=invoke=>{
+      const operation={pending:true,phase}
+      file.io=operation
+      let projection
+      const completion=new Promise((resolve,reject)=>{
+        try {projection=invoke((error,result)=>{
+          operation.pending=false
+          if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}
+          else resolve(result)
+        })}catch(value){reject(value)}
+      })
+      return Promise.all([completion,projection]).then(([result])=>result)
+    }
     try {
       await callback(done=>evidenceOpen(target,write?"w":"r",0o600,(error,fd)=>{
         file.openComplete=true
