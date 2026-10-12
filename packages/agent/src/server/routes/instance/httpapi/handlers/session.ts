@@ -322,6 +322,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
               sessionID: ctx.params.sessionID,
               error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
             })
+            // The client marks the session busy before this request returns.
+            // A failure here never reaches the loop, so publish idle explicitly.
+            yield* statusSvc.set(ctx.params.sessionID, { type: "idle" })
           }),
         ),
         Effect.forkIn(scope, { startImmediately: true }),
