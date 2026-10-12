@@ -97,7 +97,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       if (data.method === "acceptance.capture") {
         if (Object.keys(input).sort().join(",") !== "authorization,run"
-            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization) || run.captured)
+            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, input.run, run.chat, run.lease) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
         if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
           throw Error("LOGINOM_CALL_BUSY")

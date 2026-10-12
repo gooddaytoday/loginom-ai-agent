@@ -1,11 +1,13 @@
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
-import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
+import { launchNodeHost, launchSortingDiagnostic } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
 import { standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
+
+declare const LOGINOM_AI_AGENT_SORTING_ACCEPTANCE: string | undefined
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run", acceptanceCleanupPackage?: string) {
   const signal = mode === "run" ? standaloneCancellation() : undefined
@@ -49,15 +51,21 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     failure("CLI_CANCELLED", 130)
     return
   }
-  const host = await launchNodeHost({
+  const sorting = typeof LOGINOM_AI_AGENT_SORTING_ACCEPTANCE !== "undefined" && LOGINOM_AI_AGENT_SORTING_ACCEPTANCE === "sorting-before-close-v1"
+  if (sorting && (mode !== "run" || !acceptanceCleanupPackage)) throw Error("LOGINOM_SORTING_ADMISSION_REQUIRED")
+  const launcher = sorting ? launchSortingDiagnostic : launchNodeHost
+  const host = await launcher({
     ...bundle,
     root: paths.loginom,
     headless,
     environment: process.env,
     acceptanceCleanupPackage,
+    ...(sorting ? {packagePath: acceptanceCleanupPackage!} : {}),
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
   })
-  const owner = { deferRelease: true, leases: new Set<{ release(): Promise<void> }>() }
+  const owner = { deferRelease: true, leases: new Set<{ release(): Promise<void> }>(),
+    ...(sorting ? {audit: {authorization: (host as {auditAuthorization: string}).auditAuthorization, phase: "ordinary" as "ordinary" | "capture"}} : {}) }
+  let auditRefused = false, auditRejection: unknown
   const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
   try {
     if (signal?.aborted) throw Error("CLI_CANCELLED")
@@ -125,6 +133,13 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       const { RunCommand } = await import("./cmd/run")
       if (signal?.aborted) throw Error("CLI_CANCELLED")
       await parser.command(RunCommand).parseAsync(filtered)
+      if (sorting) {
+        try {
+          if (owner.leases.size !== 1) throw Error("LOGINOM_SORTING_RUN_REQUIRED")
+          owner.audit!.phase = "capture"
+          for (const lease of owner.leases) await lease.release()
+        } catch (rejected) {auditRefused = true; auditRejection = rejected; throw rejected}
+      }
     } else {
       const { TuiThreadCommand, setTuiLoginomHost, setTuiStartupWarning } = await import("./cmd/tui")
       setTuiLoginomHost(host.port)
@@ -149,6 +164,9 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       error instanceof Error && error.message === "CLI_ARGUMENT_INVALID" ? 2 : 1,
     )
   } finally {
+    if (auditRefused) throw Object.assign(new Error("LOGINOM_SORTING_AUDIT_REFUSED"), {
+      failed: true, rejectedValue: auditRejection, host, owner, cleanup,
+    })
     try {
       await host.close()
     } catch (rejectedValue) {

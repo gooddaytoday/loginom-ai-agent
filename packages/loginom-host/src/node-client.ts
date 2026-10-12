@@ -16,7 +16,7 @@ type NodeHostInput = {
   strictRecovery?: boolean
   acceptanceCleanupPackage?: string
 }
-const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" }>()
+const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "sorting-before-close-v1" }>()
 
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
@@ -26,7 +26,11 @@ export async function launchCalculatorDiagnostic(input: NodeHostInput & { packag
 export async function launchAmountDiagnostic(input: NodeHostInput & { packagePath: string }) {
   return launchDiagnostic(input, "amount-import-type-v1")
 }
-async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1") {
+export async function launchSortingDiagnostic(input: NodeHostInput & {packagePath?: string}) {
+  if (!input.packagePath) throw Error("LOGINOM_HANDSHAKE_INVALID")
+  return launchDiagnostic({...input,packagePath:input.packagePath}, "sorting-before-close-v1")
+}
+async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1" | "sorting-before-close-v1") {
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
@@ -53,11 +57,11 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
   const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath,
-    ...(harness === "amount-import-type-v1" ? { harness } : {}) }
+    ...(harness !== "calculator-grouped-before-done-v1" ? { harness } : {}) }
   const options = { ...input }
   diagnostics.set(options, grant)
   const host = await launchNodeHost(options)
-  return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
+  return { ...host, ...(harness === "sorting-before-close-v1" ? {auditAuthorization:grant.authorization} : {}), capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
 }
 
 export async function launchNodeHost(input: NodeHostInput) {

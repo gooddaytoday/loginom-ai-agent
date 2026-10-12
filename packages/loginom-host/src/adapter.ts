@@ -4,7 +4,7 @@ export * as LoginomHost from "./adapter"
 import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
 
-type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }> }
+type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }>; audit?: { authorization: string; phase: "ordinary" | "capture" } }
 const state: { connection?: ReturnType<typeof transport>; owner?: Owner } = {}
 export function connect(port: Port, owner?: Owner) {
   state.connection?.close()
@@ -25,7 +25,7 @@ export async function acquire(session: string) {
   if (typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number")
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   const owner = state.owner
-  const queue = { tail: Promise.resolve(), released: false }
+  const queue = { tail: Promise.resolve(), released: false, audited: false }
   const lease = {
     generation: value.generation,
     async admit(userMessage: string, files: InputFile[]) {
@@ -54,7 +54,16 @@ export async function acquire(session: string) {
       }
     },
     async release() {
-      if (owner?.deferRelease) return
+      if (owner?.deferRelease) {
+        if (owner.audit?.phase !== "capture") return
+        await queue.tail
+        if (queue.released || queue.audited) throw Error("LOGINOM_SORTING_AUDIT_REPLAY")
+        queue.audited = true
+        const result = await connection.request("acceptance.capture", {run, authorization: owner.audit.authorization})
+        if (!result || typeof result !== "object" || !("cleanupComplete" in result) || result.cleanupComplete !== true)
+          throw Object.assign(new Error("LOGINOM_SORTING_AUDIT_REFUSED"), {failed:true, rejectedValue:result})
+        return
+      }
       queue.released = true
       await connection.request("release", { run }).catch(() => undefined)
       owner?.leases.delete(lease)
