@@ -101,10 +101,12 @@ export function readImportSurface(o) {
    // Read data for ALL retained ports first: even a non-candidate can become
    // eligible, and a late getter can change an earlier port's DOM alias.
    if(data[bi].some((value,i)=>value!==firstData[bi][i]))return false;
+   const descriptors=b.inventory.map(c=>Object.getOwnPropertyDescriptor(c.port,'data'));
+   if(descriptors.some(d=>!d||!Object.hasOwn(d,'value')))return false;
    const current=b.inventory.map((c,i)=>{
     const port=c.port,cell=port.FCell,dom=graph.view.getState(cell)?.shape?.node;
     return {port,cell,dom,tid:dom?.getAttribute('data-tid'),parent:port.parent,
-     cellParent:cell?.parent,guid:port.FGuid,data:Object.getOwnPropertyDescriptor(port,'data')?.value};
+     cellParent:cell?.parent,guid:port.FGuid,data:descriptors[i].value};
    });
    if(current.some((c,i)=>c.data!==data[bi][i]||Object.keys(c).some(k=>c[k]!==b.inventory[i][k])))return false;
    const eligible=current.filter(c=>c.tid===b.tid+';Output_Data-0'&&roots[0].contains(c.dom)

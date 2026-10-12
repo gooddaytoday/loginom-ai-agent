@@ -199,3 +199,18 @@ test('capture unchanged accessor data is not inert current binding proof',async(
  Object.defineProperty(p,'data',{get(){return data;}});const r=await resource.captureImport(context(f));
  assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);assert.equal(r.complete,false);assert.equal(r.close_authority,false);
 });
+
+for(const role of [0,1])for(const kind of ['own-object','own-undefined','accessor-object','accessor-undefined','inherited-object','inherited-undefined','missing'])
+ test('capture inert data descriptor '+role+' '+kind,async()=>{
+ const f=graphFixture(),n=f.collection[role],dom={getAttribute:()=>n.FCell.dom.getAttribute('data-tid')+';Output_Data-1'};
+ const extra={parent:n,FGuid:'extra',FCell:{parent:n.FCell,dom}},value=kind.endsWith('object')?{}:undefined;
+ if(kind.startsWith('own'))Object.defineProperty(extra,'data',{value});
+ if(kind.startsWith('accessor'))Object.defineProperty(extra,'data',{get(){return value;}});
+ if(kind.startsWith('inherited'))Object.setPrototypeOf(extra,{data:value});
+ n.FPorts[0].FCollection.push(extra);f.entries.set('extra-native-port',[dom]);
+ const c=context(f),events=[];c.record=async e=>events.push(e);const r=await resource.captureImport(c);
+ const allowed=kind.startsWith('own');assert.equal(r.status,allowed?'PARTIAL':'REFUSED');assert.equal(events.length,1);
+ assert.equal(events[0].result.status,r.status);assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
+ if(allowed){assert.equal(r.imports[role].output0.status,'observed_native_binding');assert.equal(events[0].result.imports[role].output0.status,'observed_native_binding');}
+ else{assert.equal(r.imports,undefined);assert.equal(events[0].result.imports,undefined);assert.equal(r.output0.status,'unknown');}
+});

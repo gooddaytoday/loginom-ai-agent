@@ -101,3 +101,8 @@ uses the inert own property descriptor instead of invoking another getter after
 validating a sibling. Accessor/inherited data without this inert current proof
 refuses conservatively; repeated getter results do not establish current data
 identity. All inventories/groups and both Import directions are covered.
+
+The inert descriptor check requires an existing own descriptor with its own
+`value` key before comparing values. Own value-property undefined is valid
+non-candidate data; missing, accessor or inherited undefined refuses. Value
+equality and truthiness cannot substitute for descriptor presence/kind.
