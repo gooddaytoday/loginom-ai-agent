@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T21:51:45Z; один bounded read LAB-57 снова FAILED: тот же CLI TLS handshake timeout. Причина недоступности пока не установлена; известные неудачные workaround/public fetch не повторялись. Нового server JSON нет; statuses/runs/comments/metadata UNKNOWN. Ниже состояние19:21:58Z, отсутствие runs сейчас не доказано.
+- Проверка: 2026-10-12T22:21:45Z; bounded read LAB-57 FAILED: тот же CLI TLS handshake timeout; скрытый browser fallback — navigation/read CDP timeout, данных нет. Причина недоступности не установлена. Statuses/runs/comments/metadata UNKNOWN; ниже только состояние19:21:58Z, отсутствие runs сейчас не доказано.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; выполнение всех8 не подтверждено, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
 - LAB-57: blocked rev149; оба Evaler runs01a13138-6f0f-7266-8736-a3fd9734a8ad/01a13153-b536-7ae8-9b14-4993a38f1f77 completed; active/queued всех работников нет. Metadata обновлена: TSV pin blocker, full frozen/READY_FOR_BEN/ACCEPT отсутствуют.
@@ -11,7 +11,7 @@
 - Blocker PINNED_CLI_PROVIDER_INPUT_SERIALIZATION_UNSUPPORTED_TSV: non-UTF8 --file MIME → CSV-only MessageV2 shim → OpenAI SDK unsupported file part. Pinned source byte-equal Git5cd; UTF16302 bytes/BOMfffe/SHA9cd38e66…5a04 совпали, events пусты/native calls0.
 - Подготовлен proposals/2026-10-12-tsv-provider-shim.patch от exact5cd: inline TSV descriptor аналогично CSV, original file part/bytes не меняются; реальный UTF16 fixture/BOM/SHA и6 negative MIME/suffix/URL/absent-name случаев, модели/oracle/criteria прежние.
 - Combined patch dry-run и TypeScript syntax PASS в isolated copy. Functional tests/typecheck NOT_RUN: @opentui/solid/preload отсутствует, отказ до test body; это не RED/GREEN. Общий/installed CLI и принятый pin не менялись.
-- Release ранее сверён: RELEASED(reference)/FREE, owner/acquisition/raw completion SHA0c9fafaf…c074 match. Новый blocker monitor:Multica:TLS-secure-handshake-timeout; scoped GODEBUG=tlsmlkem=0 read тоже FAIL, persistent CLI/credentials/VPN не менялись; receipt2026-10-12-text-import-monitor-connectivity-blocker.json.
+- Release ранее сверён: RELEASED(reference)/FREE, owner/acquisition/raw completion SHA0c9fafaf…c074 match. Monitor TLS timeout; прежний scoped GODEBUG FAIL не повторялся. Browser own temporary tab close не подтверждён из-за CDP timeout; end-of-turn cleanup ожидается, чужие процессы/CLI/credentials/VPN не затронуты; connectivity receipt сохранён.
 - Последний report ledger: reference TXT/CSV/CP1251/pipe/TSV8/TSV16 =1/1/2/1/1/1 из3; product0; cold calls8/launch7/completed5, cleanup continuations2, recovery0; admission3/3 и diagnostic wrapper1/1 исчерпаны.
 - Repeat2/10, остаток8; Rich native ordinal10 completed, общего native cap10 нет; новый TSV cause первый/charge0, прежние budget/history не сброшены, неизменённый отказ не повторялся.
 - Автономный LAB-57 stage16:40:20Z→22:40:20Z без сброса; остановлен по external pin blocker. П.6 owner command01a130f3 требует отдельного решения для нового CLI/runtime pin; запрос владельцу отправлен, ответ ожидается, новые генерации не разрешены автоматически.
