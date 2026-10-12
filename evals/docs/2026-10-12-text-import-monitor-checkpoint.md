@@ -1,9 +1,9 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T18:17:19.980804+00:00; fresh issues/active/metadata/roots всех8 + LAB-55 и latest LAB-57 report/evidence/source/handoff прочитаны; внешний CLI pin blocker, owner decision pending.
+- Проверка: 2026-10-12T18:21:56Z; fresh issues/active/metadata/roots всех8 + LAB-55 и latest LAB-57 thread прочитаны; статусы/comments без изменений, внешний CLI pin blocker, owner decision pending.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; все8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
-- LAB-57: blocked rev141; Rich autonomy task01a130ff-f583-7158-a212-250ff18600cf завершён, Evaler current run+proposal follow-up active/queued, Rich/Ben pending нет. Старую metadata не считать новым acceptance.
+- LAB-57: blocked rev141; Rich task01a130ff-f583-7158-a212-250ff18600cf завершён; Evaler01a13138-6f0f-7266-8736-a3fd9734a8ad running, proposal01a13153-b536-7ae8-9b14-4993a38f1f77 queued; messages seq190/18:25:35Z подтверждают активность, Rich/Ben pending нет. Metadata прежняя, нового ACCEPT нет.
 - LAB-58–LAB-63: in_progress/admission rev9, runs нет, ждут ACCEPT/cleanup LAB-57. LAB-55: in_review rev16, runs нет, не затронут.
 - Partial49522d83318bac29779e497798becb2f799bc84e прежний. CP1251 ref2 native journal независимо проверен: actual owner observed, один begin_wizard, viewport1920×1080, document/workflow/node совпали; delivered full cold verdict PASS/cleanup подтверждён.
 - Report01a13138-6ee4-7a6d-aea5-f798eea0bb9f: 5/6 reference/cold PASS (TXT/CSV/CP1251/pipe/TSV8), по17 negatives; UTF16 reference1 FAIL до генерации, product всех0, full frozen SHA/READY_FOR_BEN отсутствуют.
