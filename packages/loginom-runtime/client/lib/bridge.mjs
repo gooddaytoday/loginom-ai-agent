@@ -679,7 +679,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       // Keep unresolved file/directory handles on this foreground owner. Only
       // successful close or the original FileHandle's fd=-1 proves completion.
       for (const handle of cleanupWriters) {
-        try {if(handle.fd!==-1)await handle.close();cleanupWriters.delete(handle)}
+        try {
+          if(handle.fd!==-1)await handle.close();
+          if(handle.fd!==-1)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNCONFIRMED');
+          cleanupWriters.delete(handle);
+        }
         catch(value){remember(value,phase);throw cleanupPersistencePrimary.value}
       }
       const persistHandle=async(path,mode,write)=>{
@@ -693,7 +697,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         }catch(value){remember(value,phase)}
         if(handle){
           const closePhase=write?'file_close':'directory_close';
-          try {await handle.close();cleanupWriters.delete(handle)}
+          try {
+            await handle.close();
+            if(handle.fd!==-1)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNCONFIRMED');
+            cleanupWriters.delete(handle);
+          }
           catch(value){remember(value,closePhase)}
         }
         if(primary)throw primary.value;

@@ -67,7 +67,7 @@ mock.module('node:fs/promises',{namedExports:{...nativeFs,open:async(name,mode,.
  const write=h.writeFile.bind(h),sync=h.sync.bind(h),close=h.close.bind(h);
  h.writeFile=async(...a)=>{fail(kind+'_write');await write(...a);event(kind+'_write')};
  h.sync=async()=>{fail(kind+'_sync');await sync();event(kind+'_sync')};
- h.close=async()=>{fail(kind+'_close');await close();event(kind+'_close')};
+ h.close=async()=>{if(f.blocked&&f.phase===kind+'_close_unknown')return;fail(kind+'_close');await close();event(kind+'_close')};
  return h;
 }}});
 
@@ -131,7 +131,7 @@ function nativeFixture(overrides = {}) {
 // against the independent VM/Page fixture; real journal and receipt files are used.
 
 const errors={error:Error('receipt filesystem refusal',{cause:0}),undefined:undefined,null:null,false:false,zero:0,empty:''};
-const cases=[{scenario:'observation',phase:null,label:'zero'},...['file_open','file_write','file_sync','file_close','directory_open','directory_sync','directory_close'].flatMap(phase=>Object.keys(errors).map(label=>({scenario:phase+'-'+label,phase,label}))),{scenario:'sync-zero-close-false',phase:'file_sync',label:'zero',dual:true},...['session','directory'].map(changed=>({scenario:'foreign-'+changed,phase:'file_sync',label:'zero',changed}))];
+const cases=[...['file','directory'].map(k=>({scenario:k+'-unknown-close',phase:k+'_close_unknown',label:'zero',unknown:true})),{scenario:'observation',phase:null,label:'zero'},...['file_open','file_write','file_sync','file_close','directory_open','directory_sync','directory_close'].flatMap(phase=>Object.keys(errors).map(label=>({scenario:phase+'-'+label,phase,label}))),{scenario:'sync-zero-close-false',phase:'file_sync',label:'zero',dual:true},...['session','directory'].map(changed=>({scenario:'foreign-'+changed,phase:'file_sync',label:'zero',changed}))];
 for(const c of cases)test('real bridge cleanup receipt durability '+c.scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'receipt-durable-'));
  const f=current={scenario:'hybrid-success',directory,events:[],saves:0,native:nativeFixture('hybrid-success'),nativeReceipts:[],handles:[],phase:c.phase,rejected:errors[c.label],blocked:!!c.phase,dual:c.dual};
@@ -144,7 +144,7 @@ for(const c of cases)test('real bridge cleanup receipt durability '+c.scenario,a
  let first,initialReceipt;
  if(c.phase){
   const results=await Promise.allSettled([bridge.close(),bridge.close()]);assert.ok(results.every(x=>x.status==='rejected'));
-  first=results[0].reason;assert.equal(first.cause,errors[c.label]);
+  first=results[0].reason;if(c.unknown)assert.match(first.cause.message,/CLOSE_UNCONFIRMED/);else assert.equal(first.cause,errors[c.label]);
   assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);assert.equal(bridge.hasUnsettledWork(),true);
   const failure=JSON.parse(await readFile(join(directory,'bridge-shutdown-failure.json'),'utf8'));assert.equal(failure.primary_phase,'cleanup_receipt');
   if(c.dual){assert.equal(failure.primary_rejection.value,0);assert.equal(failure.rejections.at(-1).rejection.value,false)}
