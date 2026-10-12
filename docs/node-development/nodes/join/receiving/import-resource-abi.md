@@ -49,3 +49,40 @@ For actual bundle set IMPORT_RESOURCE_MODULE to its absolute resource file path.
 Page/Ext/native objects are doubles; resource and serialized functions are real.
 This checks the component's observed/partial/refused boundaries, not host gate,
 53-case lifecycle, clean-close, native Loginom or full Join acceptance.
+
+## Retained binding revalidation and remaining proof
+
+After cached reads the resource revalidates the current controller/tree record/
+data/node and every retained ancestor link, native wizard model pair and root.
+Graph observations retain both fixed GUID nodes, graph/root/cells/DOM, native
+port groups/collections and port GUID/data/cell/parent bindings. Changed bindings
+return REFUSED with no observed node/columns/imports. Counterfactual late getter
+controls run through captureImport, its serialized Page reader and awaited record.
+
+Existing sources identify possible proof routes, but do not provide current
+same-owner observations for this reader:
+
+- `client/lib/workspace-ui.mjs:3290` uses numeric type mapping only with owned
+  Ext records and rendered row/record identities plus matching type icons. This
+  is a table-format page, not sufficient authority for Import definition codes.
+  Import `DataKind` needs its own native enum/label binding; raw integers and
+  pinned XML are insufficient. Synthetic test codes are deliberately raw codes.
+- `client/lib/workspace-ui.mjs:2837` binds output ownership through prepared
+  node/port tree objects, native data, cells and graph. A wizard's FModelNode
+  alone does not establish its current output0 socket/tree binding.
+- `client/lib/workspace-ui.mjs:2773` infers activity only for the unique selected
+  graph node with matching native toggle and rendered tooltip/icon. This route
+  is unavailable inside the current wizard. HasRunningNodes=false proves only
+  the guarded absence of running work; it does not prove node activation.
+- `client/lib/node-execution-evidence.mjs:21` requires a complete before/after
+  process inventory, root incarnation, new group and independently bound child
+  owner. A single cached status/idle/schema read cannot prove fresh execution.
+
+Historical native capture `cold-before-wizard-native.json` (2026-10-11 cold
+materializer evidence) records FStatus=2 / 'Порт частично сконфигурирован' and
+FPortIndex undefined. It is a different historical output context, not current
+Import output0 or activation/freshness authority. No old refs are reused.
+Until these current native bindings are available via the approved read route,
+canonical types/kind, wizard output0, activity and execution freshness remain
+unknown; complete and close_authority stay false. No live or extra preparation
+was performed for this proof analysis. Shared host gate/clean proof remains LAB-68.

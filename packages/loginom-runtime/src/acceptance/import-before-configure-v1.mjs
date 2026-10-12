@@ -45,13 +45,17 @@ export function readImportSurface(o) {
  if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||!receipts.length
   ||receipts.some(r=>r.packageNode!==receipts[0].packageNode||r.workflowId!==receipts[0].workflowId))return refuse('PREPARATION');
  const card=main.Items?.Workspace?.getActiveTab();
- let current=card?.Controller?.Node?.data?.node,node,workflow,pack;const seen=new Set();
+ const controller=card?.Controller,treeRecord=controller?.Node,treeData=treeRecord?.data;
+ let current=treeData?.node,node,workflow,pack;const seen=new Set(),lineage=[];
  for(let i=0;current&&i<32&&!seen.has(current);i++,current=current.ParentNode){
-  seen.add(current);
+  seen.add(current);lineage.push({node:current,parent:current.ParentNode});
   if(app.ModelNodeTreeNode&&current instanceof app.ModelNodeTreeNode)node=current;
   if(app.WorkFlowTreeNode&&current instanceof app.WorkFlowTreeNode)workflow=current;
   if(app.PackageTreeNode&&current instanceof app.PackageTreeNode){pack=current;break;}
  }
+ // Retain the actual tree binding, including intermediate owners, not just GUIDs.
+ const treeUnchanged=()=>card.Controller===controller&&controller.Node===treeRecord&&treeRecord.data===treeData
+  &&treeData.node===lineage[0]?.node&&lineage.every(b=>b.node.ParentNode===b.parent);
  const normalized=v=>typeof v==='string'?'/'+v.replaceAll('\\','/').replace(/^\/+/, ''):null;
  if(pack!==receipts[0].packageNode||normalized(pack?.PackageFileName)!==o.package_path
   ||workflow!==receipts[0].nodeTargetWorkflowNode)return refuse('PACKAGE_OR_WORKFLOW');
@@ -62,25 +66,48 @@ export function readImportSurface(o) {
  if(app.ModelForm&&model instanceof app.ModelForm){
   const diagram=model.FDiagram,graph=diagram?.FmxGraph,roots=exact(prefix+';ModelForm;cmpDiagram'),nodes=diagram?.FNodes?.FCollection;
   if(roots.length!==1||graph?.container!==roots[0]||!Array.isArray(nodes)||nodes.length>200)return refuse('GRAPH_OWNER');
-  const imports=[];
+  const imports=[],bindings=[];
   for(const [guid,role] of Object.entries(roles)){
    const matches=nodes.filter(n=>n.FGuid===guid);
    if(matches.length!==1||matches[0].FIconCls!=='bg-vendor-icon-importtextfile')return refuse('FIXED_IMPORT_GUID_OR_TYPE');
    const n=matches[0],body=graph.view.getState(n.FCell)?.shape?.node,tid=body?.getAttribute('data-tid');
    if(!body||!roots[0].contains(body)||!tid?.startsWith(prefix+';Graph;'))return refuse('GRAPH_NODE_DOM');
-   const candidates=[];
-   for(const group of n.FPorts??[])for(const port of group.FCollection??[]){
+   const candidates=[],ports=n.FPorts;
+   const native={n,guid,cell:n.FCell,body,tid,ports,groups:[],candidates};bindings.push(native);
+   for(const group of ports??[]){
+    const collection=group.FCollection;native.groups.push({group,collection,items:[...(collection??[])]});
+    for(const port of collection??[]){
     const dom=graph.view.getState(port.FCell)?.shape?.node;
     if(dom?.getAttribute('data-tid')===tid+';Output_Data-0'&&roots[0].contains(dom)&&port.parent===n
-     &&port.FCell.parent===n.FCell&&port.data&&typeof port.FGuid==='string'&&port.FGuid)candidates.push(port);
-   }
+     &&port.FCell.parent===n.FCell){
+     const portGuid=port.FGuid,cell=port.FCell,data=port.data;
+     if(data&&typeof portGuid==='string'&&portGuid)candidates.push({port,data,guid:portGuid,cell,dom});
+    }
+   }}
    imports.push({role,node_id:guid,component:'imports.text',workflow_id:receipts[0].workflowId,
-    output0:candidates.length===1?{status:'observed_native_binding',node_id:guid,port:0,port_guid:candidates[0].FGuid}:{status:'unknown'},
+    output0:candidates.length===1?{status:'observed_native_binding',node_id:guid,port:0,port_guid:candidates[0].guid}:{status:'unknown'},
     settings:{status:'unknown',reason:'wizard_not_open'},activity:{status:'unknown'},freshness:{status:'unknown',execution_verified:false}});
   }
-  if(main.Items.Workspace.getActiveTab()!==card||card.Controller.FController!==model||model.FDiagram!==diagram
+  // Read potentially active getters before rechecking their retained ownership.
+  const graphUnchanged=bindings.every(b=>{
+   if(nodes.filter(n=>n.FGuid===b.guid).length!==1||b.n.FGuid!==b.guid||!nodes.includes(b.n)||b.n.FIconCls!=='bg-vendor-icon-importtextfile'
+    ||b.n.FCell!==b.cell||b.n.FPorts!==b.ports||graph.view.getState(b.cell)?.shape?.node!==b.body
+    ||b.body.getAttribute('data-tid')!==b.tid||!roots[0].contains(b.body)
+    ||(b.ports?.length??0)!==b.groups.length||b.groups.some((g,i)=>b.ports[i]!==g.group||g.group.FCollection!==g.collection
+     ||(g.collection?.length??0)!==g.items.length||g.items.some((port,j)=>g.collection[j]!==port)))return false;
+   return b.candidates.every(c=>{
+    const data=c.port.data,guid=c.port.FGuid,cell=c.port.FCell,dom=graph.view.getState(cell)?.shape?.node;
+    const tid=dom?.getAttribute('data-tid');
+    return data===c.data&&guid===c.guid&&cell===c.cell&&dom===c.dom&&tid===b.tid+';Output_Data-0'
+     &&roots[0].contains(dom)&&c.port.parent===b.n&&cell.parent===b.cell&&b.n.FCell===b.cell;
+   });
+  });
+  if(!graphUnchanged||bindings.some(b=>b.n.FGuid!==b.guid||b.n.FCell!==b.cell||b.n.FPorts!==b.ports
+   ||b.candidates.some(c=>c.port.parent!==b.n||c.port.FCell!==c.cell||c.cell.parent!==b.cell||c.port.FGuid!==c.guid))||exact(prefix+';ModelForm;cmpDiagram').length!==1
+   ||exact(prefix+';ModelForm;cmpDiagram')[0]!==roots[0]||graph.container!==roots[0]
+   ||diagram.FNodes.FCollection!==nodes||diagram.FmxGraph!==graph||main.Items.Workspace.getActiveTab()!==card||card.Controller.FController!==model||model.FDiagram!==diagram
    ||map.FServerConnection!==connection||connection.Connected!==true||connection.UserName!==o.account
-   ||p.document!==document||p.id!==o.document_id||map.HasRunningNodes()!==false||pack.HasRunningNodes()!==false)return refuse('GRAPH_CHANGED');
+   ||p.document!==document||p.id!==o.document_id||map.HasRunningNodes()!==false||pack.HasRunningNodes()!==false||!treeUnchanged())return refuse('GRAPH_CHANGED');
   return {...result,status:'PARTIAL',reason:'GRAPH_IDENTITY_ONLY',imports,missing:['settings','activity','execution_freshness']};
  }
  if(!node?.FModelNode||!Object.hasOwn(roles,node.FGuid))return refuse('FIXED_IMPORT_GUID');
@@ -90,7 +117,7 @@ export function readImportSurface(o) {
  const root=roots[0];
  const markers=['ImportTextFilePreviewWizard','ImportTextFileParamsWizard'];
  if(!markers.some(m=>root.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';WizrdMCF;'+m+';')+']').length))return refuse('IMPORT_SURFACE');
- const bound={card,node,workflow,pack,connection,model,root,nativeSession:connection.Session};
+ const bound={card,node,workflow,pack,connection,model,root,nativeSession:connection.Session,nativeModel:node.FModelNode};
  result.status='PARTIAL';result.reason='PRECONFIGURATION_FACTS_ONLY';
  result.node={role:roles[node.FGuid],node_id:node.FGuid,workflow_id:receipts[0].workflowId,component:'imports.text',native_owner_verified:true};
  const read=(form,key,name,dest)=>{
@@ -124,10 +151,12 @@ export function readImportSurface(o) {
  // Never equate cached labels/schema, or idle, with native activity/freshness.
  result.missing.push('output0_native_binding','canonical_type_and_data_kind','activity','execution_freshness');
  const after=main.Items.Workspace.getActiveTab();
- if(after!==bound.card||after.Controller?.FController!==bound.model||bound.model.FModelNode!==bound.node.FModelNode
+ if(after!==bound.card||after.Controller?.FController!==bound.model
+  ||bound.model.FModelNode!==bound.nativeModel||bound.node.FModelNode!==bound.nativeModel
+  ||exact(prefix+';WizrdMCF').length!==1||exact(prefix+';WizrdMCF')[0]!==bound.root||bound.model.getEl?.()?.dom!==bound.root
   ||bound.node.FGuid!==result.node.node_id||bound.node.ParentNode!==bound.workflow||bound.connection.Session!==bound.nativeSession
   ||map.FServerConnection!==bound.connection||bound.connection.Connected!==true||bound.connection.UserName!==o.account
   ||normalized(bound.pack.PackageFileName)!==o.package_path||p.document!==document||p.id!==o.document_id
-  ||map.HasRunningNodes()!==false||pack.HasRunningNodes()!==false)return refuse('IDENTITY_CHANGED_DURING_READ');
+  ||map.HasRunningNodes()!==false||pack.HasRunningNodes()!==false||!treeUnchanged())return refuse('IDENTITY_CHANGED_DURING_READ');
  return result;
 }

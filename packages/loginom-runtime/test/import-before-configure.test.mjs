@@ -89,3 +89,45 @@ for(const [name,change,status] of [
  ['duplicate-guid',f=>f.collection.push(f.collection[0]),'REFUSED'],
  ['foreign-port-owner',f=>f.collection[0].FPorts[0].FCollection[0].parent={},'PARTIAL'],
 ])test('graph '+name,()=>{const f=graphFixture();change(f);const r=read(f);assert.equal(r.status,status);assert.equal(r.complete,false);if(status==='PARTIAL')assert.equal(r.imports[0].output0.status,'unknown');});
+
+// P2 controls use the real capture -> serialized page reader -> awaited record path.
+for(const [name,change] of [
+ ['current-tree-node',f=>{f.card.Controller.Node.data.node=Object.assign(Object.create(Object.getPrototypeOf(f.node)),f.node,{FModelNode:{}});}],
+ ['tree-record',f=>{f.card.Controller.Node={data:{node:f.node}};}],
+ ['tree-data',f=>{f.card.Controller.Node.data={node:f.node};}],
+ ['controller',f=>{f.card.Controller={...f.card.Controller};}],
+ ['workflow-parent',f=>{f.workflow.ParentNode={};}],
+ ['native-model-pair',f=>{const other={};f.model.FModelNode=other;f.node.FModelNode=other;}],
+ ['wizard-root',f=>{f.model.getEl=()=>({dom:{}});}]
+])test('capture wizard late '+name+' refuses stale claims',async()=>{
+ const f=fixture();Object.defineProperty(f.records[0].data,'Name',{get(){change(f);return 'LKey';}});
+ const c=context(f),events=[];c.record=async e=>events.push(e);
+ const r=await resource.captureImport(c);assert.equal(r.status,'REFUSED');assert.equal(r.node,null);
+ assert.equal(r.columns.status,'unknown');assert.equal(r.complete,false);assert.equal(r.close_authority,false);
+ assert.equal(events.length,1);assert.equal(events[0].result.status,'REFUSED');
+});
+for(const [name,change] of [
+ ['port-owner',(f,p)=>p.parent={}],['port-cell-owner',(f,p)=>p.FCell.parent={}],
+ ['port-cell',(f,p)=>p.FCell={...p.FCell}],['port-guid',(f,p)=>p.FGuid='foreign'],
+ ['port-collection',(f,p)=>f.collection[0].FPorts[0].FCollection=[]],
+ ['port-group',(f,p)=>f.collection[0].FPorts[0]={FCollection:[p]}],
+ ['node-cell',(f,p)=>f.collection[0].FCell={}],['node-guid',(f,p)=>f.collection[0].FGuid='foreign'],
+ ['node-pair',(f,p)=>f.collection.splice(0,1)],
+ ['port-dom',(f,p)=>p.FCell.dom={getAttribute:()=>''}],
+ ['graph-container',(f,p)=>f.card.Controller.FController.FDiagram.FmxGraph.container={}],
+ ['current-tree-node',(f,p)=>f.card.Controller.Node.data.node={}]
+])test('capture graph late '+name+' refuses stale output binding',async()=>{
+ const f=graphFixture(),p=f.collection[0].FPorts[0].FCollection[0],data=p.data;
+ Object.defineProperty(p,'data',{get(){change(f,p);return data;}});
+ const c=context(f),events=[];c.record=async e=>events.push(e);
+ const r=await resource.captureImport(c);assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);
+ assert.equal(r.output0.status,'unknown');assert.equal(r.complete,false);assert.equal(r.close_authority,false);
+ assert.equal(events.length,1);assert.equal(events[0].result.status,'REFUSED');
+});
+for(const [name,create] of [['wizard',fixture],['graph',graphFixture]])test('capture unchanged '+name+' records partial native claims',async()=>{
+ const f=create(),c=context(f),events=[];c.record=async e=>events.push(e);
+ const r=await resource.captureImport(c);assert.equal(r.status,'PARTIAL');assert.equal(events.length,1);
+ if(name==='wizard')assert.equal(r.node.native_owner_verified,true);
+ else assert.equal(r.imports[0].output0.status,'observed_native_binding');
+ assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
+});
