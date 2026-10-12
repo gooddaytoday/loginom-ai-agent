@@ -21,6 +21,9 @@ const diagnostics = new WeakMap<object, { authorization: string; packagePath: st
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
 export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
+  return launchDiagnostic(input, "calculator-grouped-before-done-v1")
+}
+async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1") {
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
@@ -38,7 +41,7 @@ export async function launchCalculatorDiagnostic(input: NodeHostInput & { packag
       || createHash("sha256").update(await readFile(input.entry)).digest("hex") !== hostItem.sha256)
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   for (const [path, actual] of [["bin/node", input.node],
-    ["runtime/src/acceptance/calculator-grouped-before-done-v1.mjs", join(input.resources, "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs")]]) {
+    [`runtime/src/acceptance/${harness}.mjs`, join(input.resources, `runtime/src/acceptance/${harness}.mjs`)]]) {
     const items = manifest.files?.filter((file: { path: string }) => file.path === path)
     const item = items?.[0]
     if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
