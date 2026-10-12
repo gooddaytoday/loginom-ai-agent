@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T19:54:16Z; свежий read Multica FAILED: TLS handshake timeout в CLI и независимом HTTPS. Текущие statuses/runs/comments/metadata UNKNOWN; ниже только последнее подтверждённое состояние19:21:58Z, отсутствие runs сейчас не доказано.
+- Проверка: 2026-10-12T20:21:47Z; один bounded read LAB-57 до полной проверки снова FAILED: тот же CLI TLS handshake timeout. Нового server JSON нет; statuses/runs/comments/metadata UNKNOWN. Ниже только последнее подтверждённое состояние19:21:58Z, отсутствие runs сейчас не доказано.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; все8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
 - LAB-57: blocked rev149; оба Evaler runs01a13138-6f0f-7266-8736-a3fd9734a8ad/01a13153-b536-7ae8-9b14-4993a38f1f77 completed; active/queued всех работников нет. Metadata обновлена: TSV pin blocker, full frozen/READY_FOR_BEN/ACCEPT отсутствуют.
