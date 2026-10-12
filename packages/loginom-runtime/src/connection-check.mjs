@@ -1,9 +1,12 @@
 import { createRequire } from "node:module"
-import { mkdir, writeFile } from "node:fs/promises"
-import { randomUUID } from "node:crypto"
-import { join } from "node:path"
+import { mkdir, writeFile, readFile } from "node:fs/promises"
+import { randomUUID, createHash } from "node:crypto"
+import { fileURLToPath } from "node:url"
+import { join, dirname } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
+
+const runtimeModulePath = fileURLToPath(import.meta.url)
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -80,6 +83,14 @@ function startupRejection(value) {
     ...('cause' in value?{cause:startupRejection(value.cause)}:{})}:
     {kind:'value',value:value===undefined?null:value,is_undefined:value===undefined}
 }
+function startupRejectionValue(detail) {
+  if(detail.kind==='Error') {const value=new Error(detail.message);value.name=detail.name;if('cause' in detail)value.cause=startupRejectionValue(detail.cause);return value}
+  return detail.is_undefined?undefined:detail.value
+}
+async function startupFingerprint(path) {
+  try {const bytes=await readFile(path);return {available:true,size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}}
+  catch(error){return {available:false,rejection:startupRejection(error)}}
+}
 async function startupEvidence(owner) {
   await writeFile(join(owner.directory,'startup-cleanup.json'),JSON.stringify(owner.evidence,null,2)+'\n',{mode:0o600})
 }
@@ -106,17 +117,65 @@ function startupOwner(owner, profile, candidate) {
           if(!owner.page) throw Error('LOGINOM_STARTUP_PAGE_UNKNOWN')
           const observed=await owner.page.evaluate(o=>{
             const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
-            if(!o.navigationStarted && location.href==='about:blank' && !app) return {unauthenticated:true}
-            if(!own||own.document!==document||own.id!==o.id||own.account!==o.account||location.origin!==o.origin)
-              return {reason:'STARTUP_DOCUMENT_CHANGED'}
+            const exact=value=>({type:typeof value,is_undefined:value===undefined,value:value===undefined?null:value});
+            const rejection=value=>value instanceof Error?{kind:'Error',name:value.name,message:value.message,
+              ...('cause' in value?{cause:rejection(value.cause)}:{})}:{kind:'value',value:value===undefined?null:value,is_undefined:value===undefined};
+            // Sample each operand once. The later pre-logout native identity
+            // check is intentionally independent; it cannot rewrite this sample.
+            const documentMatches=own?.document===document&&own?.id===o.id&&own?.account===o.account;
+            const origin=location.origin,build=app?.Version,connection=m?.FServerConnection;
+            const account=connection?.UserName,connected=connection?.Connected;
+            const parent=m?.FPackagesParentNode,count=m?.PackageNodes?.Count;
+            const snapshot={observed_at:new Date().toISOString(),deadline:o.deadline,deadline_available:o.deadline!==null,
+              document_matches:documentMatches,origin_matches:origin===o.origin,identity_matches:account===o.account,
+              build:exact(build),connected:exact(connected),
+              package_parent:{type:typeof parent,is_undefined:parent===undefined,is_null:parent===null},
+              package_parent_ready:!!parent,count:exact(count),dialogs:{available:false},running:{...exact(undefined),available:false,observed:false}};
+            const result=value=>({...value,snapshot});
+            if(!o.navigationStarted && location.href==='about:blank' && !app) return result({unauthenticated:true});
+            if(!documentMatches||origin!==o.origin) return result({reason:'STARTUP_DOCUMENT_CHANGED'});
             const visible=e=>!!e.getBoundingClientRect().width&&!!e.getBoundingClientRect().height&&getComputedStyle(e).visibility!=='hidden';
-            if([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible))
-              return {reason:'STARTUP_OPERATION_OPEN'}
-            if(m?.FServerConnection?.Connected!==true) return {unauthenticatedCandidate:!o.loginSubmitted,reason:'LOGIN_EFFECT_UNKNOWN'}
-            if(app.Version!=='7.4.2'||m.FServerConnection.UserName!==o.account||m.PackageNodes?.Count!==0||m.HasRunningNodes()!==false)
-              return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE'}
-            return {authenticated:true}
-          },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true})
+            snapshot.dialogs={available:true,visible:[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)};
+            if(snapshot.dialogs.visible) return result({reason:'STARTUP_OPERATION_OPEN'});
+            if(connected!==true) return result({unauthenticatedCandidate:!o.loginSubmitted,reason:'LOGIN_EFFECT_UNKNOWN'});
+            if(build!=='7.4.2'||account!==o.account||count!==0) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
+            let running;
+            try {running=m.HasRunningNodes();snapshot.running={...exact(running),available:true,observed:true}}
+            catch(error){
+              const detail=rejection(error);
+              snapshot.running={available:false,observed:true,rejection:detail};
+              // Raw values preserve VM/transport identity; the DTO preserves
+              // Error causes even when browser serialization omits them.
+              return result({reason:'STARTUP_GUARD_READ_REJECTED',guardFailure:{value:error,rejection:detail}});
+            }
+            if(running!==false) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
+            return result({authenticated:true});
+          },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true,deadline:owner.deadline??null})
+          if(observed.guardFailure && !owner.guardFailure) {
+            const detail=observed.guardFailure.rejection;
+            let value=observed.guardFailure.value;
+            if(detail.kind==='Error') {
+              if(!(value instanceof Error)) {value=new Error(detail.message);value.name=detail.name;}
+              value.name=detail.name;value.message=detail.message;
+              if('cause' in detail && (!('cause' in value)
+                  || JSON.stringify(startupRejection(value.cause))!==JSON.stringify(detail.cause)))
+                value.cause=startupRejectionValue(detail.cause);
+            } else if(detail.is_undefined) value=undefined;
+            owner.guardFailure={value,rejection:detail};
+            owner.evidence.guard_rejection=detail;
+          }
+          // Freeze the FIRST observation; later cleanup/retries cannot replace it.
+          if(!owner.evidence.first_guard) {
+            owner.evidence.first_guard={...observed.snapshot,result:{authenticated:observed.authenticated===true,reason:observed.reason??null},artifacts:owner.artifacts??{available:false}}
+          }
+          try {await startupEvidence(owner)}
+            catch(error) {
+              owner.evidence.guard_persistence_failure=startupRejection(error)
+              if(observed.guardFailure) throw owner.guardFailure.value
+              if(!observed.authenticated&&!observed.unauthenticated) throw new Error('LOGINOM_STARTUP_CLEANUP_BLOCKED',{cause:observed})
+              throw error // no native gesture without durable first evidence
+          }
+          if(observed.guardFailure) throw owner.guardFailure.value
           if(observed.authenticated) {
             owner.nativeAttempted=true
             nativeStage='native_menu_open'
@@ -167,12 +226,13 @@ function startupOwner(owner, profile, candidate) {
           owner.evidence.native_failure={stage:nativeStage,rejection:startupRejection(error)}
           owner.evidence.stages.push({stage:nativeStage,status:'rejected',rejection:startupRejection(error)})
         }
-        owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:error
+        owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:owner.guardFailure?owner.guardFailure.value:error
         owner.evidence.cleanup_complete=false
         owner.evidence.effect_possible=owner.nativeAttempted===true||owner.loginSubmitted===true||(owner.launchAttempted===true&&!owner.context)
         owner.evidence.cleanup_rejection=startupRejection(owner.cleanupFailure)
         owner.evidence.cleanup_attempt_rejection=startupRejection(error)
         try { await startupEvidence(owner) } catch(persistenceFailure) {owner.evidence.persistence_failure=startupRejection(persistenceFailure)}
+        if(owner.guardFailure && !nativeStage && !owner.nativeConfirmed) throw owner.guardFailure.value
         throw error
       }
     })()
@@ -183,6 +243,8 @@ function startupOwner(owner, profile, candidate) {
 }
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, owner = {} }) {
   startupOwner(owner,profile,candidate)
+  owner.deadline??=null // No upstream absolute deadline is supplied by the existing start contract.
+  owner.artifacts??={node:await startupFingerprint(process.execPath),browser:await startupFingerprint(browserPath),runtime:await startupFingerprint(runtimeModulePath),resource_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../resource-manifest.json')),cli_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../../../cli-manifest.json')),foreground_caller:{available:false,reason:'NOT_SUPPLIED_BY_START_CONTRACT'}}
   try {
     const { chromium } = require('playwright-core')
     const launch=browserLaunch(headless)
