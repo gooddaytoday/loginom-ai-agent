@@ -151,7 +151,8 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
       await Bun.sleep(20)
       return processView(pid, relevant, owners, retries - 1)
     }
-    throw Error(`Cannot inspect process identity PID ${pid}`)
+    // These reads only use /proc paths; retain the cause without exposing argv.
+    throw Error(`Cannot inspect process identity PID ${pid}: ${message(error)}`, { cause: error })
   }
 }
 

@@ -54,6 +54,20 @@ Mapping сохраняет текущий UID и обычные права пр�
 недоступного native process, protected fixture и helper дала 3 PASS / 0 FAIL.
 Настройки sysctl и рабочие браузеры пользователя не менялись.
 
+Первый изолированный полный набор: **557 PASS / 1 FAIL**, 558 тестов,
+53 файла, 573 с. Отказ другого supervisor-теста сохранил `Cannot inspect process
+identity` собственной CLI вместо ожидаемого отказа неизвестного helper.
+Пять узких повторов и дополнительный повтор прошли. Гипотеза UID zombie
+не подтверждена независимым fork/waitid probe на host и в namespace;
+проверки UID/birth/permissions не менялись.
+
+Для следующего воспроизведения `processView` сохраняет исходную `/proc` ошибку
+и `cause` в диагностике, без argv. Тест постоянного отказа доступа сначала
+дал RED на отсутствии errno в сообщении, затем GREEN; процесс остаётся жив,
+сигнал не разрешается. `bun typecheck` — PASS. Полный процессный файл после
+изменения — **19 PASS / 0 FAIL**, 86 assertions, 93 с. Точный syscall исходных
+двух редких отказов не установлен; финальный полный rerun требуется.
+
 `actionlint` 1.7.10 проверяет изменённый workflow с единственным исключением
 для существующей функции `case`, неизвестной этому валидатору; GitHub принял
 workflow и запустил jobs. SHA-256 скачанного официального actionlint проверен.
@@ -64,6 +78,11 @@ workflow и запустил jobs. SHA-256 скачанного официаль
 `mode=candidate`, `channel=prod`, commit `441bc032b84910516fae9eceb80703c92b254ffd`.
 Release/tag/publish не создаются. Окончательный candidate и статус PR
 будут закреплены после завершения исправлений.
+
+Текущий product candidate: [run 38251472380](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/38251472380),
+source `525ad4ff64bef76704f2be5fbb9fbfb99eaad1bb`. Последующее изменение
+касается только диагностик harness и теста; `packages/`, pins и build scripts
+после этого candidate не изменялись.
 
 ## Границы доказательств
 

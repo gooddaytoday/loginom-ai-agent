@@ -177,7 +177,7 @@ test("signalProcess: постоянный запрет чтения собств
     const closed = new Promise<void>(resolve => child.stdout!.on("data", data => { if (data.toString().includes("closed")) resolve() }))
     child.kill("SIGUSR1")
     await closed
-    await expect(signalProcess(identity, "SIGTERM")).rejects.toThrow("Cannot inspect process identity")
+    await expect(signalProcess(identity, "SIGTERM")).rejects.toThrow(/Cannot inspect process identity PID \d+: (EACCES|EPERM)/)
     expect(child.exitCode).toBeNull()
     process.kill(pid, 0)
   } finally { child.kill("SIGKILL"); await exited }
