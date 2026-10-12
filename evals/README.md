@@ -181,7 +181,7 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 oracle не заменяют обнаружение дефекта судьёй. Предупреждения дают код 1 после
 сохранения отчёта; повреждённый корпус даёт код 2 до вызовов судьи.
 
-Корпус из 35 analytic-задач / 113 мутаций хранится в calibration/; источники
+Корпус из 35 analytic-задач / 114 мутаций хранится в calibration/; источники
 закреплены SHA256. Команды выполняются из evals/:
 ```bash
 python3 script/check-calibration-corpus.py --tasks tasks/analytic
@@ -201,6 +201,13 @@ calibration.json и calibration.md показывают ожидания,
 [отчёте](../docs/testing/loginom-ai-agent/reports/2026-10-06-calibration-near-miss.md).
 Она подтверждает синтетические артефакты без выполнения в Loginom и без нового
 baseline агента.
+
+Контракт `category-rating-revenue` исправлен 2026-10-12: оценивается доля
+рекомендованных в процентах, отдельное количество рекомендованных необязательно.
+Добавлена мутация `recommended-scale`; корпус теперь содержит 114 мутаций.
+Новый rubric hash и адресная приёмка фиксируются в
+[записи исправления](docs/2026-10-12-category-rating-revenue.md).
+Приёмка 2026-10-06 относится к прежнему контракту и остаётся исторической.
 
 `judge_status`: с `--skip-judge` у **всех** попыток `skipped` (score `null`), независимо от артефакта; oracle тоже пропущен. Без `--skip-judge` попытка без `.lgp` получает score 0 и `judge_status: no_artifact`. `scored` — валидный вердикт; `error` — отказ, таймаут или невалидный вердикт судьи после повтора (или убийство судьи по Ctrl+C). `harness_error` / `infra_error` / `interrupted` и Ctrl+C до старта судьи тоже дают `skipped`.
 

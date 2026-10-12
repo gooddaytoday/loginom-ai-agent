@@ -18,12 +18,12 @@
     {
       "id": "group-category",
       "required": true,
-      "text": "Для каждой category посчитаны число товаров, среднее rating, сумма revenue и число товаров с is_recommended = 1."
+      "text": "Для каждой category посчитаны число товаров products, среднее rating как avg_rating и сумма revenue как total_revenue."
     },
     {
       "id": "recommended-share",
       "required": true,
-      "text": "recommended_pct — доля товаров с is_recommended = 1, в процентах."
+      "text": "recommended_pct — доля товаров с is_recommended = 1 в каждой category, в процентах. Для индикатора 0/1 допустимы 100 * AVG(is_recommended), 100 * SUM(is_recommended) / products и другие математически эквивалентные способы. Отдельное промежуточное поле количества рекомендованных товаров не требуется."
     },
     {
       "id": "sort-rating",

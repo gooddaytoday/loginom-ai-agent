@@ -67,7 +67,7 @@ def main():
    counts[case['kind']]+=1
  if not args.only:
   assert len(names)==35,('task coverage',len(names))
-  assert counts==dict(sort=35,aggregate=34,threshold=6,filter=3,column=35),('case coverage',counts)
+  assert counts==dict(sort=35,aggregate=35,threshold=6,filter=3,column=35),('case coverage',counts)
  print(str(len(names))+' tasks, '+str(sum(counts.values()))+' cases: '+json.dumps(counts,sort_keys=True))
 if __name__=='__main__':
  main()

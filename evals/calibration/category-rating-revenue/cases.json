@@ -1,8 +1,8 @@
 {
   "sources": {
-    "task.json": "e136c78a0b610a65462c33e9d6361620c1308e844a2fdd633fb6a1e9aa8e1c66",
+    "task.json": "b336b958a471bc0f3b3c2b925f8dba7944cfb4174ff4229d76253954ec346b56",
     "reference.lgp": "2fdcce94cf00f87bfeb60651737eec849108e5ee9096e493edbd0288528e96e9",
-    "SPEC.md": "17f5c038e7b45ef626488169047e2d6b1108074c225ec082d35d9230a891cb08",
+    "SPEC.md": "5bbb842be2375c5f27725b7b22db29beef6a83fa91c3716fbc492542a5612576",
     "oracle.csv": "c30d0522e4d269657d121949acdcde8eea0f7c135a7a0999c8b60ab524590414",
     "oracle.py": "8ec1b47574d3f0c24ad553efeaeca5453886fe599cacbc60ee046d4861d6d5af",
     "data/dataset.csv": "9e0707e361793045fb8c210d12172568b2f39a39159208afe526f5f8c05731a2"
@@ -78,6 +78,33 @@
       "expected_oracle_pass": false,
       "reproduce": {
         "drop_last": true
+      }
+    },
+    {
+      "id": "recommended-scale",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"recommended_pct * 100\"",
+          "to": "Expression=\"recommended_pct\"",
+          "count": 1
+        }
+      ],
+      "result_csv": "recommended-scale.csv",
+      "expected_failed": [
+        "recommended-share",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "100 * sum(float(row[\"is_recommended\"]) for row in items) / len(items)",
+            "to": "sum(float(row[\"is_recommended\"]) for row in items) / len(items)",
+            "count": 1
+          }
+        ]
       }
     }
   ]

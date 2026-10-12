@@ -224,13 +224,45 @@ test("filter near-miss is rejected by checklist even when its CSV remains correc
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("analytic corpus covers all 35 tasks and all 113 applicable defects", async () => {
+test("recommended percentage mutation preserves other metrics and fails the oracle", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-recommended-scale-"))
+  try {
+    const tasks = await loadTasks(path.join(evalsRoot, "tasks/analytic"), ["category-rating-revenue"])
+    const result = await prepareCalibrationCases(tasks, root, path.join(evalsRoot, "calibration"))
+    const entry = result.prepared.find((item) => item.mutation.id === "recommended-scale")
+    expect(entry).toBeDefined()
+    if (!entry) throw new Error("recommended-scale case is missing")
+    expect(entry.mutation.expected_failed).toEqual(["recommended-share", "result-rows"])
+    expect(entry.oracle.passed).toBe(false)
+    const xml = await Bun.file(path.join(entry.artifactDir, "unpacked/Unit_0/Unit.xml")).text()
+    expect(xml).toContain('Source="is_recommended_Avg"')
+    expect(xml).toContain('Expression="recommended_pct" Replaced="true"')
+    expect(xml).not.toContain('Expression="recommended_pct * 100"')
+    const baseline = (await Bun.file(path.join(tasks[0]!.dir, "oracle.csv")).text()).trim().split("\n")
+    const mutated = (await Bun.file(path.join(entry.artifactDir, "results/calibration.result.csv")).text()).trim().split("\n")
+    expect(mutated).toHaveLength(baseline.length)
+    expect(mutated[0]).toBe(baseline[0]!)
+    baseline.slice(1).forEach((line, index) => {
+      const expected = line.split(",")
+      const actual = mutated[index + 1]!.split(",")
+      expect(actual.slice(0, 4)).toEqual(expected.slice(0, 4))
+      expect(Number(actual[4]) * 100).toBeCloseTo(Number(expected[4]), 4)
+    })
+    const recipe = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.join(evalsRoot, "tasks/analytic"), "--only", "category-rating-revenue"], { stdout: "pipe", stderr: "pipe" })
+    const output = await new Response(recipe.stdout).text()
+    const errors = await new Response(recipe.stderr).text()
+    expect({ code: await recipe.exited, errors }).toEqual({ code: 0, errors: "" })
+    expect(output).toContain("4 cases")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("analytic corpus covers all 35 tasks and all 114 applicable defects", async () => {
   const files = await Array.fromAsync(new Bun.Glob("*/cases.json").scan(path.join(evalsRoot, "calibration")))
   const corpora = await Promise.all(files.map(async (file) => await Bun.file(path.join(evalsRoot, "calibration", file)).json() as CalibrationCorpus))
   expect(files).toHaveLength(35)
   const counts = Object.fromEntries(["sort", "aggregate", "threshold", "filter", "column"].map((kind) =>
     [kind, corpora.flatMap((corpus) => corpus.cases).filter((item) => item.kind === kind).length]))
-  expect(counts).toEqual({ sort: 35, aggregate: 34, threshold: 6, filter: 3, column: 35 })
+  expect(counts).toEqual({ sort: 35, aggregate: 35, threshold: 6, filter: 3, column: 35 })
 })
 
 test("saved CSV recipes independently reproduce the representative corpus", async () => {
