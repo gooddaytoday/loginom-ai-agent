@@ -28,7 +28,8 @@ for(const c of spec.cases){
  const positions=c.expected.ordered_events.map(e=>{const matches=r.events.flatMap((v,i)=>v===e?[i]:[]);assert.equal(matches.length,1,c.id+': unique '+e);return matches[0];});
  assert.deepEqual(positions,[...positions].sort((a,b)=>a-b),c.id+': ordering');
  if(!c.expected.ack){assert.ok(!r.events.includes('ack'));assert.ok(!r.events.includes('release'));}
- if(c.expected.native_close===0){assert.deepEqual([...r.refused_phase_attempts].sort(),['apply','configure','execute','finish'],c.id+': exercise gates, not just idle observation');}
+ // Refusal still requires attempted gates after a completed native prefix.
+ if(!c.expected.ack){assert.ok(Array.isArray(r.refused_phase_attempts),c.id+': phase attempts');assert.deepEqual([...r.refused_phase_attempts].sort(),['apply','configure','execute','finish'],c.id+': exercise gates, not just idle observation');}
  assert.equal(r.replay_attempts,0,c.id+': native replay');
  if(c.id==='confirmed-evidence-retry-no-replay')assert.equal(r.evidence_write_attempts,2,c.id);
  if(c.id==='lost-native-reply')assert.equal(r.replay_attempts,0,c.id);
