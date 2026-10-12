@@ -154,6 +154,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     if (Option.isNone(final)) throw new Error("LOGINOM_REPLY_INVALID")
     if (final.value.recoveries?.length) failure("LOGINOM_RECOVERY_REQUIRED", 4)
   } catch (error) {
+    if (sorting) {auditRefused=true; auditRejection=error; throw error}
     if (error instanceof Error && error.message === "LOGINOM_TUI_CLEANUP_FAILED") throw error
     if (error instanceof Error && error.message === "CLI_CANCELLED") {
       failure("CLI_CANCELLED", 130)
@@ -165,7 +166,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     )
   } finally {
     if (auditRefused) throw Object.assign(new Error("LOGINOM_SORTING_AUDIT_REFUSED"), {
-      failed: true, rejectedValue: auditRejection, host, owner, cleanup,
+      failed: true, rejectedValue: auditRejection, cause: auditRejection, phase: owner.audit?.phase, host, owner, cleanup,
     })
     try {
       await host.close()
