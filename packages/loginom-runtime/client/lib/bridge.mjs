@@ -8,6 +8,8 @@ import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '.
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, skillTransport, skillUri, prepareTool } from './skill.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
+import {constants,open as receiptOpen,writeFile as receiptWrite,fsync as receiptSync,close as receiptClose,rename as receiptRename,unlink as receiptUnlink} from 'node:fs';
+import {randomUUID} from 'node:crypto';
 import { join } from 'node:path';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
@@ -177,6 +179,10 @@ export async function createBridge(config, session, { browserTransport: managedB
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
+  const cleanupWriters = new Set();
+  let cleanupEvidenceBinding, cleanupPublication;
+  let cleanupPersistencePrimary;
+  const cleanupPersistenceFailures = [];
   let closing, shutdownStarted = false, shutdownStage;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -492,6 +498,115 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     });
+    async function writeCleanupReceipt(cleanup) {
+      if(confirmedCleanup){
+        cleanupEvidenceBinding ??= Object.freeze({receipt:confirmedCleanup,
+          directory:session.directory,sessionId:session.metadata.sessionId});
+        if(cleanupEvidenceBinding.receipt!==confirmedCleanup || cleanup!==confirmedCleanup
+            || cleanupEvidenceBinding.directory!==session.directory
+            || cleanupEvidenceBinding.sessionId!==session.metadata.sessionId)
+          throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
+      }
+      let phase='retained_close',primary;
+      if(cleanupPublication?.pending)throw cleanupPersistencePrimary?cleanupPersistencePrimary.value:Error('LOGINOM_CLEANUP_PUBLICATION_UNKNOWN');
+      const remember=(value,failedPhase)=>{
+        primary ??= {phase:failedPhase,value};
+        cleanupPersistencePrimary ??= primary;
+        cleanupPersistenceFailures.push({phase:failedPhase,rejection:shutdownRejection(value)});
+      };
+      const publishOperation=async invoke=>{
+        const operation={pending:true};cleanupPublication=operation;
+        let projection;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=invoke(error=>{
+            operation.pending=false;
+            if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve();
+          })}catch(value){reject(value)}
+        });
+        return Promise.all([completion,projection]);
+      };
+      const removeTemporary=async target=>{
+        try{await publishOperation(done=>receiptUnlink(target,error=>done(error?.code==='ENOENT'?null:error)))}
+        catch(value){remember(value,'temporary_unlink');throw cleanupPersistencePrimary.value}
+      };
+      const closeWriter=async file=>{
+        if(file.closeComplete)return;
+        if(file.io?.pending)throw Error('LOGINOM_CLEANUP_WRITER_IO_UNKNOWN');
+        if(file.closeStarted)throw file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+        file.closeStarted=true;
+        let projection;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=receiptClose(file.fd,error=>{
+            if(error===null||error===undefined){file.closeComplete=true;resolve()}
+            else{file.closeFailure={value:error};reject(error)}
+          })}catch(value){file.closeFailure??={value};reject(value)}
+        });
+        // Only the original native callback proves close, never fd/status or
+        // fulfillment of a returned projection. Preserve a rejected projection.
+        await Promise.all([completion,projection]);
+      };
+      for(const file of cleanupWriters){
+        if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
+          try{await closeWriter(file)}catch(value){file.closeFailure??={value};remember(value,'retained_close')}
+        }
+        if(!file.closeComplete){
+          remember(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN'),'retained_close');
+          throw cleanupPersistencePrimary.value;
+        }
+        cleanupWriters.delete(file);
+        if(file.temporary&&file.ownsTemporary)await removeTemporary(file.temporary);
+      }
+      const temporary=join(session.directory,'.package-cleanup-'+randomUUID()+'.json');
+      const attempt={created:false,published:false};
+      const persistHandle=async(path,mode,write)=>{
+        const file={fd:undefined,closeComplete:false,...(write?{temporary:path}:{})};
+        cleanupWriters.add(file);
+        const callback=invoke=>{
+          const operation={pending:true,phase};file.io=operation;
+          let projection;
+          const completion=new Promise((resolve,reject)=>{
+            try{projection=invoke((error,result)=>{
+              operation.pending=false;
+              if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve(result);
+            })}catch(value){reject(value)}
+          });
+          return Promise.all([completion,projection]).then(([result])=>result);
+        };
+        try{
+          phase=write?'file_open':'directory_open';
+          await callback(done=>receiptOpen(path,mode,0o600,(error,fd)=>{
+            file.openComplete=true;
+            if(error===null||error===undefined){file.fd=fd;if(write){file.ownsTemporary=true;attempt.created=true}}
+            else cleanupWriters.delete(file);
+            done(error,fd);
+          }));
+          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,JSON.stringify(cleanup,null,2)+'\n',done))}
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));
+        }catch(value){remember(value,phase)}
+        if(file.fd!==undefined){
+          const closePhase=write?'file_close':'directory_close';
+          try{await closeWriter(file);cleanupWriters.delete(file)}
+          catch(value){file.closeFailure??={value};remember(value,closePhase)}
+        }
+        if(primary)throw primary.value;
+        if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+      };
+      try{
+        await persistHandle(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,true);
+        phase='rename';
+        await publishOperation(done=>receiptRename(temporary,join(session.directory,'package-cleanup.json'),error=>{if(error===null||error===undefined)attempt.published=true;done(error)}));
+        await persistHandle(session.directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW,false);
+      }catch(value){
+        if(!primary)remember(value,phase);
+        if(attempt.created&&!attempt.published&&!cleanupPublication?.pending&&![...cleanupWriters].some(f=>f.temporary===temporary)){
+          try{await removeTemporary(temporary)}catch(secondary){cleanupPersistenceFailures.push({phase:'temporary_unlink',rejection:shutdownRejection(secondary)})}
+        }
+        throw cleanupPersistencePrimary.value;
+      }
+      // No marker before both writes/syncs/closes actually complete.
+      if(cleanupWriters.size)throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
+      if(confirmedCleanup)cleanupReceiptWritten=true;
+    }
     return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
       hasUnsettledWork: () => cleanupRefused || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
@@ -575,8 +690,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           // this same foreground owner. No cache is minted for unknown responses.
           if (cleanup.status==='SUCCEEDED' && !confirmedCleanup) confirmedCleanup=Object.freeze(cleanup);
           if (!confirmedCleanup || !cleanupReceiptWritten) {
-            await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
-            if (confirmedCleanup) cleanupReceiptWritten=true;
+            try {await writeCleanupReceipt(confirmedCleanup??cleanup)} catch(error) {
+              shutdownPrimary={stage:'cleanup_receipt',reason:cleanupPersistencePrimary?cleanupPersistencePrimary.value:error,
+                rejections:cleanupPersistenceFailures};
+              throw error;
+            }
           }
           await recordExecution({event:'isolated_package_cleanup', cleanup});
           if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
