@@ -178,6 +178,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
+  let nativeCleanupDispatched=false, readonlyCleanupRefusal=false;
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection, captureEvidence;
   const captureWriters=new Set(),capturePersistenceFailures=[];
   let capturePersistencePrimary,captureEvidenceBinding,captureReceiptWritten=false,captureJournalWritten=false;
@@ -246,6 +247,8 @@ export async function createBridge(config, session, { browserTransport: managedB
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(catalog.tools) }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
+      if (readonlyCleanupRefusal && !readonlyContinuation(request.params.name,request.params.arguments))
+        throw new McpError(ErrorCode.InvalidRequest,'Same-owner read-only diagnosis is unavailable');
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
       if ((cleanupRefused || captureInFlight) && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
@@ -667,6 +670,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               throw Error('LOGINOM_READINESS_IDENTITY_REQUIRED');
             cleanup=await browserGate(async()=>{
               actionRuntime.assertPreparationAllowed();
+              nativeCleanupDispatched=true;
               const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
                 code:`async page=>(${logoutReadiness.toString()})(page,${JSON.stringify(expected)})`}},undefined,{timeout:30000});
               if(response?.isError)throw Error('LOGINOM_READINESS_REPLY_INVALID');
@@ -714,6 +718,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   const tabs=[...document.querySelectorAll('[data-tid]')].filter(el=>el.getAttribute('data-tid')===o.tabTid);
                   if(tabs.length!==1 || !visible(tabs[0])) return {reason:'CURRENT_TAB_CHANGED'};
                   ${anchor}`);
+                nativeCleanupDispatched=true;
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
               });
@@ -731,6 +736,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             if (confirmedCleanup) cleanupReceiptWritten=true;
           }
           await recordExecution({event:'isolated_package_cleanup', cleanup});
+          if (!nativeCleanupDispatched && cleanup.status==='BLOCKED' && cleanup.reason==='CONFIRMED_SAVE_REQUIRED')
+            readonlyCleanupRefusal=true;
           if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
@@ -780,7 +787,18 @@ export async function createBridge(config, session, { browserTransport: managedB
       });
       return closing;
     }
-    return {server,catalog,captureAcceptance,
+    function readonlyContinuation(name,args) {
+      // This describes only a pre-native save guard on this bridge. It never
+      // classifies an unknown effect or a failed evidence writer as safe.
+      if (!readonlyCleanupRefusal || nativeCleanupDispatched || confirmedCleanup || shutdownStarted
+          || captureConsumed || captureInFlight || captureUnknown || captureWriters.size
+          || clipboardUncertain || heldLeases.size || !actionRuntime
+          || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()) return false;
+      if (name==='dock_diagnostics') return !!args && Object.keys(args).length===1 && args.checkConnections===false;
+      if (name!=='dock_workspace_observe') return false;
+      try {validateActionParameters(workspaceObserveTool.inputSchema,args??{});return true;} catch {return false;}
+    }
+    return {server,catalog,captureAcceptance,readonlyContinuation,
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};

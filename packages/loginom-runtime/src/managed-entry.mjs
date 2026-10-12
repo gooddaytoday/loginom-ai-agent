@@ -212,7 +212,7 @@ async function handle(message) {
       }
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
-      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:input.generation,chat:input.chat})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -330,6 +330,17 @@ async function handle(message) {
       return
     }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+    const original=state.startupBinding,current=state.startupOwner,originalBridge=state.bridge,originalClient=state.client,originalSession=state.session;
+    const retainedOwner=()=>state.startupBinding===original && state.startupOwner===current
+      && state.bridge===originalBridge && state.client===originalClient && state.session===originalSession
+      && !!original && original.owner===current && original.id===current?.id
+      && !!original.context && !!original.page && original.context===current.context && original.page===current.page
+      && original.account===current.account && original.origin===current.origin
+      && original.generation===current.generation && original.chat===current.chat
+      && !current.closed && !current.contextClosed && !state.bridgeCleanup;
+    if (state.readonlyRetained && (!retainedOwner()
+        || state.bridge.readonlyContinuation?.(message.input.name,message.input.arguments)!==true))
+      throw Error("LOGINOM_RECOVERY_REQUIRED")
     const controller = new AbortController()
     state.controller = controller
     try {
@@ -339,7 +350,11 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
+      const readonlyContinuation=retainedOwner() && state.bridge.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
+      if (state.readonlyRetained && !readonlyContinuation) throw Error("LOGINOM_RECOVERY_REQUIRED")
+      if (readonlyContinuation) state.readonlyRetained=true;
       send({ id: message.id, result: {
+        readonlyContinuation,
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
       } })
     } finally {

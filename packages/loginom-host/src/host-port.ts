@@ -22,10 +22,21 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       active: Set<string>
       captured: boolean
       captureRefused: boolean
+      readonlyRuntime?: Awaited<ReturnType<typeof service.runtime>>
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
+  function readonlyCall(input: Record<string, unknown>) {
+    const args=input.args;
+    if (input.name==='dock_diagnostics') return !!args && typeof args==='object'
+      && Object.keys(args).length===1 && 'checkConnections' in args && args.checkConnections===false;
+    if (input.name!=='dock_workspace_observe' || (args!==undefined && (!args || typeof args!=='object' || Array.isArray(args)))) return false;
+    const value=(args??{}) as Record<string,unknown>;
+    return Object.entries(value).every(([key,v]) => key==='scope'
+      ? ['bootstrap','all','palette','graph','dialogs','roots','wizard'].includes(v as string)
+      : ['cursor','root_ref','observation_id','storage_name'].includes(key) && typeof v==='string' && v.length>0 && v.length<=(key==='storage_name'?200:128));
+  }
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
@@ -80,6 +91,19 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
+      if (run.readonlyRuntime) {
+        if (data.method!=='call' || !readonlyCall(input) || run.calls || run.dispatching
+            || service.journal.pending().length) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        run.calls++
+        try {
+          const observed=await run.readonlyRuntime.request("call",{name:input.name,arguments:input.args})
+          if (!observed || typeof observed!=='object' || !("result" in observed)
+              || !("readonlyContinuation" in observed) || observed.readonlyContinuation!==true || service.journal.pending().length)
+            throw Error("LOGINOM_RECOVERY_REQUIRED")
+          reply({id:data.id,result:observed.result})
+        } finally {run.calls--}
+        return
+      }
       if (run.captureRefused) {
         if (data.method !== "call" || !("name" in input) || typeof input.name !== "string"
             || !["dock_diagnostics", "dock_workspace_observe", "dock_operation_inspect", "dock_node_status"].includes(input.name)
@@ -217,7 +241,16 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             !("result" in result)
           )
             throw new Error("LOGINOM_REPLY_INVALID")
-          if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
+          if (result.recoveryPending && 'readonlyContinuation' in result && result.readonlyContinuation===true
+              && readonlyCall(input) && 'activeWork' in result && result.activeWork===false) {
+            // Keep this exact runtime/lease. Settle only this completed read;
+            // no prior uncertainty or cleanup refusal is reconciled by it.
+            await service.journal.settle(recovery.id!,true)
+            run.active.delete(recovery.id!)
+            run.readonlyRuntime=runtime
+            run.lease.holdRecovery()
+            service.recoveries.set(run.chat,run.lease)
+          } else if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
             await abandon(run)
             service.markRuntimeStale(run.chat)
           }
@@ -265,7 +298,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.stopping) return state.stopping
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
-      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused))
+      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.readonlyRuntime))
         throw new Error("LOGINOM_RECOVERY_REQUIRED")
       for (const [id, run] of runs) await release(id, run)
       state.closed = true
