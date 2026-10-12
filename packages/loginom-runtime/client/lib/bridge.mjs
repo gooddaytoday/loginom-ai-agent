@@ -8,6 +8,8 @@ import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '.
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, skillTransport, skillUri, prepareTool } from './skill.mjs';
 import { readFile, writeFile, open } from 'node:fs/promises';
+import {open as receiptOpen,writeFile as receiptWrite,fsync as receiptSync,close as receiptClose,rename as receiptRename,constants as receiptFlags} from 'node:fs';
+import {randomUUID as receiptUUID} from 'node:crypto';
 import { join } from 'node:path';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
@@ -177,6 +179,11 @@ export async function createBridge(config, session, { browserTransport: managedB
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
+  const cleanupWriters = new Set();
+  let cleanupEvidenceBinding;
+  let cleanupPersistencePrimary;
+  const cleanupPersistenceFailures = [];
+  let cleanupPublication;
   let sortingResult, sortingInvalid = false, captureEvidence;
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
   let closing, shutdownStarted = false, shutdownStage;
@@ -574,6 +581,109 @@ export async function createBridge(config, session, { browserTransport: managedB
       }
       finally { captureInFlight=undefined }
     }
+    async function writeCleanupReceipt(cleanup) {
+      if(confirmedCleanup){
+        cleanupEvidenceBinding ??= Object.freeze({receipt:confirmedCleanup,
+          directory:session.directory,sessionId:session.metadata.sessionId});
+        if(cleanupEvidenceBinding.receipt!==confirmedCleanup || cleanup!==confirmedCleanup
+            || cleanupEvidenceBinding.directory!==session.directory
+            || cleanupEvidenceBinding.sessionId!==session.metadata.sessionId)
+          throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
+      }
+      let phase='retained_close',primary;
+      const remember=(value,failedPhase)=>{
+        primary ??= {phase:failedPhase,value};
+        cleanupPersistencePrimary ??= primary;
+        cleanupPersistenceFailures.push({phase:failedPhase,rejection:shutdownRejection(value)});
+      };
+      const closeWriter=async file=>{
+        if(file.closeComplete)return;
+        if(file.io?.pending)throw Error('LOGINOM_CLEANUP_WRITER_IO_UNKNOWN');
+        if(file.closeStarted)throw file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+        file.closeStarted=true;
+        let projection;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=receiptClose(file.fd,error=>{
+            if(error===null||error===undefined){file.closeComplete=true;resolve()}
+            else{file.closeFailure={value:error};reject(error)}
+          })}catch(value){file.closeFailure??={value};reject(value)}
+        });
+        // Only the original native callback proves close, never fd/status or
+        // fulfillment of a returned projection. Preserve a rejected projection.
+        await Promise.all([completion,projection]);
+      };
+      for(const file of cleanupWriters){
+        if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
+          try{await closeWriter(file)}catch(value){file.closeFailure??={value};remember(value,'retained_close')}
+        }
+        if(!file.closeComplete){
+          remember(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN'),'retained_close');
+          throw cleanupPersistencePrimary.value;
+        }
+        cleanupWriters.delete(file);
+      }
+      const persistHandle=async(path,mode,write)=>{
+        const file={fd:undefined,closeComplete:false};
+        cleanupWriters.add(file);
+        const callback=invoke=>{
+          const operation={pending:true,phase};file.io=operation;
+          let projection;
+          const completion=new Promise((resolve,reject)=>{
+            try{projection=invoke((error,result)=>{
+              operation.pending=false;
+              if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve(result);
+            })}catch(value){reject(value)}
+          });
+          return Promise.all([completion,projection]).then(([result])=>result);
+        };
+        try{
+          phase=write?'file_open':'directory_open';
+          await callback(done=>receiptOpen(path,mode,0o600,(error,fd)=>{
+            file.openComplete=true;
+            if(error===null||error===undefined)file.fd=fd;
+            else cleanupWriters.delete(file);
+            done(error,fd);
+          }));
+          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,JSON.stringify(cleanup,null,2)+'\n',done))}
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));
+        }catch(value){remember(value,phase)}
+        if(file.fd!==undefined){
+          const closePhase=write?'file_close':'directory_close';
+          try{await closeWriter(file);cleanupWriters.delete(file)}
+          catch(value){file.closeFailure??={value};remember(value,closePhase)}
+        }
+        if(primary)throw primary.value;
+        if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+      };
+      if(cleanupPublication?.rename?.pending){
+        remember(Error('LOGINOM_CLEANUP_PUBLICATION_UNKNOWN'),'publication_rename');
+        throw cleanupPersistencePrimary.value;
+      }
+      cleanupPublication ??= {renamed:false};
+      if(!cleanupPublication.written){
+        cleanupPublication.temporary=join(session.directory,'.package-cleanup.'+receiptUUID()+'.tmp');
+        await persistHandle(cleanupPublication.temporary,
+          receiptFlags.O_WRONLY|receiptFlags.O_CREAT|receiptFlags.O_EXCL|receiptFlags.O_NOFOLLOW,true);
+        cleanupPublication.written=true;
+      }
+      if(!cleanupPublication.renamed){
+        phase='publication_rename';
+        const operation=cleanupPublication.rename={pending:true};
+        let projection;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=receiptRename(cleanupPublication.temporary,join(session.directory,'package-cleanup.json'),error=>{
+            operation.pending=false;
+            if(error===null||error===undefined){cleanupPublication.renamed=true;resolve()}
+            else reject(error);
+          })}catch(value){reject(value)}
+        });
+        try{await Promise.all([completion,projection])}catch(value){remember(value,phase);throw primary.value}
+      }
+      await persistHandle(session.directory,'r',false);
+      // No marker before both writes/syncs/closes actually complete.
+      if(cleanupWriters.size)throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
+      if(confirmedCleanup)cleanupReceiptWritten=true;
+    }
     function closeBridge() {
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if(captureEvidence&&captureRejected&&!captureUnknown) return persistCapture().then(()=>{captureRejected=false;return closeBridge()});
@@ -659,8 +769,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           // this same foreground owner. No cache is minted for unknown responses.
           if (cleanup.status==='SUCCEEDED' && !confirmedCleanup) confirmedCleanup=Object.freeze(cleanup);
           if (!confirmedCleanup || !cleanupReceiptWritten) {
-            await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
-            if (confirmedCleanup) cleanupReceiptWritten=true;
+            try {await writeCleanupReceipt(confirmedCleanup??cleanup)} catch(error) {
+              shutdownPrimary={stage:'cleanup_receipt',reason:cleanupPersistencePrimary?cleanupPersistencePrimary.value:error,
+                rejections:cleanupPersistenceFailures};
+              throw error;
+            }
           }
           await recordExecution({event:'isolated_package_cleanup', cleanup});
           if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
