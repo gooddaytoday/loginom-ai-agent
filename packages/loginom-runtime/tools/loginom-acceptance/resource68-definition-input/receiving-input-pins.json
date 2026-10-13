@@ -1,0 +1,70 @@
+{
+  "sourceSHA": "742c2a306324817a5897508462b2844aa7f042a7",
+  "receivingParent": "08d29f9ab2898f3fbac92fd392c3e4868a9ddc5b",
+  "product": {
+    "arch": "x64",
+    "capabilities": [
+      "shared-oauth-v1"
+    ],
+    "channel": "dev",
+    "dependencies": {
+      "bun": "1.3.14",
+      "chromium": "1243",
+      "node": "24.19.0",
+      "playwright": "1.63.0-alpha-2026-08-31",
+      "playwrightMcp": "0.0.80"
+    },
+    "platform": "linux",
+    "sourceCommit": "8c0c6ff3970d95d8172798965de9768d632dad91",
+    "sourceDirty": false,
+    "sourceTreeSha256": "46268c8a783daca4c63e72247fc4f64d14e2362bd775b9e7710fe5e539d8594c",
+    "version": "0.0.0-dev-202610131135"
+  },
+  "nativeProvider": false,
+  "files": {
+    "packages/loginom-runtime/tools/loginom-acceptance/resource68-definition-input/early-cdp-fixture.mjs": {
+      "bytes": 12003,
+      "sha256": "95e02fd12d71ac6595a6da5939c643ea57e9c999e6600ae609f1f034faf04d09"
+    },
+    "packages/loginom-runtime/tools/loginom-acceptance/resource68-definition-input/early-cdp-intrinsic-corrective-check.mjs": {
+      "bytes": 5722,
+      "sha256": "9128e34a5f560e21a353d8f7bd05d8a54fc1ff3fc3d1e99b2ffb6815257e5d12"
+    },
+    "packages/loginom-runtime/tools/loginom-acceptance/resource68-definition-input/reviewer-intrinsic-check.mjs": {
+      "bytes": 6573,
+      "sha256": "159703385928dcbe71134f50d460a1d29f3c165817b940dd5c3fd0091004b6b0"
+    },
+    "docs/node-development/workflow/resource68-early-cdp-fixture-contract.md": {
+      "bytes": 6908,
+      "sha256": "12266d81d7613ed8af9dbc848a0c642139cd386e3e454d2ad27b9862eb71f5ff"
+    }
+  },
+  "inputs": {
+    "Loader.js": {
+      "bytes": 14073,
+      "sha256": "543fc4c07ef270ab55f1055fcaf97f8f471d308a0877a3b3aef029ac0fa61f3b"
+    },
+    "MainForm.js": {
+      "bytes": 112459,
+      "sha256": "d0b2324d7162816d675e52adc5a5674b46b635d516157ced799ea33690a3c42e"
+    },
+    "Uses.js": {
+      "bytes": 5070,
+      "sha256": "2b8598cddfd5f224b9e75806c9ba475cf1ff2ed6c37b599feb5b035be9a3dfb8"
+    },
+    "__extends.js": {
+      "bytes": 2686,
+      "sha256": "276d947e3958f6fb973e74eaeb76610fc50028fbae79e14feab8fea00052be8c"
+    },
+    "provider-Lock.js": {
+      "bytes": 22738,
+      "sha256": "e321d140d5da0ef14ab24435e9a6562c1042f2e5f789424de6d1c3dfa2af23bd"
+    }
+  },
+  "independentControls": {
+    "bytes": 6810,
+    "sha256": "887cff2b7fc60c77a36c9fb8f6641f5580e6748c78ab05f09316d76d79c0ad36"
+  },
+  "inputArchiveSHA256": "38a0f4dcf46b219254be2cd563529cd148c95fea11fd52de36fd91ea3cde0d2c",
+  "boundary": "Offline primitive/input receiving only; no original native provider/openRead or runtime PASS."
+}
