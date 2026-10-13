@@ -1,5 +1,6 @@
+import * as diagnosticFactory from '../../../packages/loginom-host/src/node-client'
 import {launchReplacementReadOnlyCaller} from '../replacement-readonly-caller'
-import {test,expect,beforeAll,afterAll} from 'bun:test'
+import {test,expect,beforeAll,afterAll,spyOn} from 'bun:test'
 import {mkdtemp,mkdir,readFile,writeFile,copyFile,cp,readdir} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join,resolve} from 'node:path'
@@ -36,7 +37,7 @@ beforeAll(async()=>{
 })
 async function manifest(items:any[]){await writeFile(join(root,'resource-manifest.json'),JSON.stringify({protocol:1,endpoint:'https://dock.invalid/mcp',nodeVersion:'24.19.0',node:'bin/node',browser:'bin/browser',files:items}))}
 const input=(dir:string)=>({node:join(root,'bin/node'),entry,root:dir,resources:root,headless:true,environment:{},packagePath})
-for(const scenario of ['valid','native-error','undefined','null','false','opening','running','pending','late-owner','missing-opening'])test('new private caller → installed host/consumer '+scenario,async()=>{
+for(const scenario of ['valid','native-error','undefined','null','false','opening','running','pending','late-owner','missing-opening','native-error-late-client'])test('new private caller → installed host/consumer '+scenario,async()=>{
  const entryPath=join(root,'runtime/src/managed-entry.mjs'),projection=await readFile(entryPath,'utf8')
  const sdk=process.env.REPLACEMENT_FIXTURE_SDK;if(!sdk)throw Error('EXPLICIT_FIXTURE_SDK_REQUIRED')
  await cp(join(runtime,'src'),join(root,'runtime/src'),{recursive:true})
@@ -46,23 +47,26 @@ for(const scenario of ['valid','native-error','undefined','null','false','openin
  await copyFile(join(runtime,'client/package.json'),join(root,'runtime/client/package.json'))
  const {symlink}=await import('node:fs/promises');await symlink(sdk,join(root,'runtime/client/node_modules'),'dir').catch(e=>{if(e.code!=='EEXIST')throw e})
  const bootstrap=await readFile(join(repo,'scripts/node-acceptance/tests/fixtures/replacement-caller-whole.mjs'),'utf8')
- await writeFile(entryPath,'import {writeFileSync as fixtureLog} from '+JSON.stringify('node:fs')+";process.on('uncaughtExceptionMonitor',e=>fixtureLog("+JSON.stringify(join(root,'whole-boot-error.txt'))+",e.stack));\n"+'const fixtureScenario='+JSON.stringify(scenario)+';const runtimeRoot='+JSON.stringify(join(root,'runtime'))+';const nativeFixture='+JSON.stringify(native)+';\n'+bootstrap)
+ await writeFile(entryPath,'import {writeFileSync as fixtureLog} from '+JSON.stringify('node:fs')+";process.on('uncaughtExceptionMonitor',e=>fixtureLog("+JSON.stringify(join(root,'whole-boot-error.txt'))+",e.stack));\n"+'const fixtureScenario='+JSON.stringify(scenario==='native-error-late-client'?'native-error':scenario)+';const runtimeRoot='+JSON.stringify(join(root,'runtime'))+';const nativeFixture='+JSON.stringify(native)+';\n'+bootstrap)
  const originalFiles=files;files=[]
  async function inventory(dir:string,prefix=''){for(const d of await readdir(dir,{withFileTypes:true})){const p=prefix+d.name;if(d.name==='node_modules'||p==='resource-manifest.json'||p.startsWith('fixture-')||p.startsWith('loaded-'))continue;if(d.isDirectory())await inventory(join(dir,d.name),p+'/');else files.push({path:p,sha256:hash(await readFile(join(dir,d.name)))})}}
  await inventory(root);await manifest(files)
  const directory=join(product,'whole-profile-'+scenario),store=connectionStore(join(directory,'connection'),cliCredentials('linux'))
  await store.stage({generation:3,revision:1,url:'https://loginom.test',username:account,apiKey:'synthetic-only',password:'synthetic-only'});await store.activate(3)
- let host:any;const owner:any={}
+ let host:any;const owner:any={};let originalRejection:any,deliveryCount=0;const foreignClient={};const launch=diagnosticFactory.launchReplacementDiagnostic;
+ const spy=scenario==='native-error-late-client'?spyOn(diagnosticFactory,'launchReplacementDiagnostic').mockImplementation(async(...args:any[])=>{const h:any=await launch(...args as [any]);const capture=h.capture;h.capture=async(run:string)=>{deliveryCount++;const value=await capture(run);originalRejection=value.rejected;owner.host=foreignClient;return value};return h}):undefined
  try {
   await launchReplacementReadOnlyCaller({product,root:directory,packagePath,run:'whole-run',session:'whole-source-session',signal:new AbortController().signal,deadline:Date.now()+60000},owner);if(owner.failed)throw owner.error;host=owner.host;expect(await owner.acquire()).toEqual({generation:3})
   const proof=JSON.parse(await readFile(join(repo,'scripts/node-acceptance/tests/fixtures/replacement-capture/native-node-context.json'),'utf8')).binding
   const call=(name:string,args:any)=>host.request('call',{run:'whole-run',name,args,userMessage:'offline fixture'})
   const request={operation_id:'whole-node',contract_revision:'1.0.0',document_id:proof.document_id,workflow_ref:{workflow_id:proof.workflow_ref.workflow_id},target:{kind:'existing',ref:proof.node,type:'transform.replace_columns'},inputs:[],mode:'exact',parameters:{},finish:'done'}
   for(const [name,args] of [['dock_prepare',{}],['dock_node_apply',request],['dock_node_wait',{operation_id:'whole-node',timeout_ms:1000}],['dock_action_run',{action_key:'package.save_checkpoint',parameters:{path:packagePath,conflict_policy:'fail'},operation_id:'fixture-save'}]] as any){const r=await call(name,args);console.log('WHOLE_STEP '+name+' '+JSON.stringify(r));expect(r.isError).toBeUndefined()}
-  const original=JSON.parse(await readFile(join(root,'runtime/fixture-original.json'),'utf8'));original.signal=new AbortController().signal;owner.pinOriginal(original);const result:any=await owner.read();console.log('WHOLE_CAPTURE '+scenario+' '+JSON.stringify(result));expect(result.cleanupComplete).toBe(false);
+  const original=JSON.parse(await readFile(join(root,'runtime/fixture-original.json'),'utf8'));original.signal=new AbortController().signal;owner.pinOriginal(original);let result:any;
+ if(scenario==='native-error-late-client'){let thrown:any;try{await owner.read()}catch(error){thrown=error};expect(thrown.message).toBe('REPLACEMENT_CALLER_OWNER_CHANGED');expect(owner.primaryFailure).toBe(originalRejection);expect(owner.error).toBe(originalRejection);expect(originalRejection.message).toBe('FIXTURE_PRIMARY');expect(originalRejection.cause).toEqual({kind:'value',value:0,is_undefined:false});expect(owner.secondaryFailures).toEqual([thrown]);expect(owner.host).toBe(foreignClient);expect(owner.request).toBe(host.request);expect(owner.captureHandle).toBe(host.capture);expect(owner.exited).toBe(host.exited);expect(deliveryCount).toBe(1);console.log('LATE_REFUSAL_CAUSE '+JSON.stringify({primary:owner.primaryFailure,secondary:thrown.message,deliveries:deliveryCount,gestures:0}));result=owner.result}
+ else result=await owner.read();console.log('WHOLE_CAPTURE '+scenario+' '+JSON.stringify(result));expect(result.cleanupComplete).toBe(false);
   if(scenario==='valid'){expect(result.diagnosticRead).toBe(true);expect(result.receipt.effect_possible).toBe(false);expect(result.receipt.admission_confirmed).toBe(false);expect(result.receipt.publication.opening_operation_id).not.toBe(result.receipt.native_before.input_port.opening_operation_id)}
   else {expect(result.refused).toBe(true);expect(result.diagnosticRead).toBeUndefined();if(scenario==='undefined')expect(result.rejectedIsUndefined).toBe(true);if(['null','false','zero','empty'].includes(scenario))expect(result.rejected).toBe(({null:null,false:false,zero:0,empty:''} as any)[scenario]);if(scenario==='native-error'){expect(result.rejected.message).toBe('FIXTURE_PRIMARY');expect(result.rejected.cause).toEqual({kind:'value',value:0,is_undefined:false})}}
-  await expect(owner.read()).rejects.toThrow('NO_RETRY');await expect(owner.close()).rejects.toThrow('NOT_VERIFIED');expect(owner.gates.native_admission).toBe('not_verified');expect(owner.host).toBe(host);await expect(host.request('release',{run:'whole-run'})).rejects.toThrow()
- }finally {await host?.close().catch((e:any)=>console.log('WHOLE_FIXTURE_RECOVERY '+e.message));if(host)await host.exited;await writeFile(entryPath,projection);files=originalFiles;await manifest(files)}
+  if(scenario==='native-error-late-client')await expect(owner.read()).rejects.toThrow('OWNER_CHANGED');else await expect(owner.read()).rejects.toThrow('NO_RETRY');await expect(owner.close()).rejects.toThrow('NOT_VERIFIED');expect(owner.gates.native_admission).toBe('not_verified');expect(owner.host).toBe(scenario==='native-error-late-client'?foreignClient:host);await expect(host.request('release',{run:'whole-run'})).rejects.toThrow()
+ }finally {spy?.mockRestore();await host?.close().catch((e:any)=>console.log('WHOLE_FIXTURE_RECOVERY '+e.message));if(host)await host.exited;await writeFile(entryPath,projection);files=originalFiles;await manifest(files)}
 },30000)
 afterAll(()=>console.log('FS_FIXTURE_RETAINED '+product))

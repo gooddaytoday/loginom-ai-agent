@@ -40,10 +40,16 @@ export async function launchReplacementReadOnlyCaller(input:any,owner:any) {
   original=value;pin={request:r,opening:o,signal:value.signal,deadline:value.deadline,sessionId:value.sessionId,requestHash:hash(r),openingHash:hash(o)};guard();owner.phase='original-pinned';
  }catch(error){fail(error);throw error}};
  owner.read=async()=>{try{guard();if(owner.failed||!original||attempted)throw Error('REPLACEMENT_CALLER_NO_RETRY');attempted=true;owner.phase='capture';
-  const result=await captureHandle(run);owner.result=result;guard();
+  const result=await captureHandle(run);owner.result=result;
+  // The original channel may have already refused before reply delivery drift.
+  // Record that observation first; it never authorizes accepting the result.
+  const refused=result&&typeof result==='object'&&result.cleanupComplete===false&&result.refused===true
+   &&(result.rejectedIsUndefined===true||Object.hasOwn(result,'rejected'));
+  if(refused)fail(result.rejectedIsUndefined===true?undefined:result.rejected);
+  guard();
   // No release/ACK/close from a diagnostic read, including a successful one.
   if(!result||typeof result!=='object'||result.cleanupComplete!==false)throw Error('REPLACEMENT_CALLER_UNCONFIRMED_RESULT');
-  if(result.refused===true){fail(result.rejectedIsUndefined===true?undefined:result.rejected);owner.phase='refused';return result}
+  if(result.refused===true){if(!refused)throw Error('REPLACEMENT_CALLER_UNCONFIRMED_RESULT');owner.phase='refused';return result}
   captureData(result);const receipt=result.receipt,p=receipt?.publication,r=original.request,o=original.opening;
   if(result.diagnosticRead!==true||receipt?.status!=='DIAGNOSTIC_READ'||receipt.effect_possible!==false||receipt.native_capture_admitted!==false||receipt.admission_confirmed!==false||receipt.settings_applied!==false||receipt.execution_started!==false
    ||!p||typeof p.owner!=='string'||!p.owner||p.account!==packagePath.split('/')[1]||p.resource_path!=='runtime/src/acceptance/replacement-input0-readonly-v1.mjs'||p.resource_sha256!==resourceHash||p.run!==run||p.chat!==createHash('sha256').update(session).digest('hex')||p.lease!==p.owner+':'+run||p.generation!==lease.generation||p.package_path!==packagePath||p.operation_id!==r.operation_id||p.document_id!==r.document_id||p.workflow_id!==r.workflow_ref.workflow_id||p.node_id!==r.target.ref.node_id
