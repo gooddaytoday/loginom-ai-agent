@@ -972,7 +972,7 @@ bun typecheck
 
   Не считать SKIP полным staging PASS. `git diff --check` обязателен.
 - [x] Закоммитить два файла: `fix(skills): prefer standard Loginom nodes over javascript`.
-- [ ] Тем же build command из Task 3 собрать новый `selection_candidate`, проверить
+- [x] Тем же build command из Task 3 собрать новый `selection_candidate`, проверить
   `verify-cli-candidate.ts`, manifest, resource inventory и skill digest.
   Сравнить с baseline: изменение policy находится в двух Product файлах, runtime,
   Node/Chromium, каталог, модель и inputs одинаковы. Различия build metadata
