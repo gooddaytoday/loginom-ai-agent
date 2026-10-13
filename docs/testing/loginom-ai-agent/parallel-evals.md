@@ -326,3 +326,9 @@ Results упорядочены по job.index; AggregateError возвращае
 всех запущенных pipelines. 7 public-interface tests/20 assertions PASS; вместе
 с admin/preflight/CI — 48 PASS/111 assertions и typecheck/diff check PASS. Это core
 очереди: реальный main/runAttempt/retry, judge gate и summary writer ещё не связаны.
+
+Повторное открытие admin journal проверяет schema, operation/identity, desired SHA
+и intent timestamp; terminal state дополнительно требует reply SHA/settledAt.
+Запись confirmed без reply evidence даёт ADMIN_JOURNAL_INVALID до mutation.
+Real pipe/fs RED/GREEN; последние 49 targeted tests/113 assertions, typecheck/
+diff check PASS. Unknown/recovery admission этим не снимается.
