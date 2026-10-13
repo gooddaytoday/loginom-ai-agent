@@ -291,7 +291,7 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
 точные колонки/порядок/значения и допустимую роль JS. Diagnostic нужен только
 для отсутствующего reference; в `buildAgentPrompt` НЕ передавать `outputMode`.
 
-- [ ] `explicit-js`: скопировать только вход `sales-by-category` и его oracle.
+- [x] `explicit-js`: скопировать только вход `sales-by-category` и его oracle.
   В исходном prompt после требования средних, перед «Упорядочь» вставить фразу
   «Агрегацию по категориям выполни узлом JavaScript»; колонки/сортировку сохранить.
   В checklist нового fixture заменить `group-category` на требование агрегации
