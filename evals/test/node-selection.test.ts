@@ -266,6 +266,28 @@ test.each(["missing-operation", "foreign-owner", "cleanup-false", "ambiguous", "
   },
 )
 
+test.each(["document", "workflow", "existing-ref", "terminal-node"])(
+  "runtime admission and terminal preserve the public apply node context: %s", (kind) => {
+    const runtime = structuredClone(pilotRuntime)
+    const admission = runtime[0]!.events.find((event) => event.phase === "node_apply_prepared")!
+    const terminal = runtime[0]!.events.find((event) => event.operation_id === admission.operation_id && event.phase === "completed")!
+    const part = structuredClone(pilotHistory.snapshot.parts.find((part) => part.tool === "loginom_dock_node_apply"
+      && part.state?.input?.operation_id === admission.operation_id)!)
+    if (kind === "document") admission.request!.document_id = "foreign-document"
+    if (kind === "workflow") admission.request!.workflow_ref.workflow_id = "foreign-workflow"
+    if (kind === "terminal-node") terminal.outcome!.output!.node!.document_id = "foreign-document"
+    if (kind === "existing-ref") {
+      admission.request!.target.kind = "existing"
+      part.state!.input!.target!.kind = "existing"
+      Object.assign(part.state!.input!.target!, { ref: terminal.outcome!.output!.node })
+      Object.assign(admission.request!.target, { ref: { ...terminal.outcome!.output!.node, node_id: "foreign-node" } })
+    }
+    const result = inspectSelectionRuntime({ runtime, parts: pilotHistory.snapshot.parts.map((entry) => entry.id === part.id ? part : entry) })
+    expect(result.runtimeSettled).toBe(false)
+    expect(result.failures).toContain("RUNTIME_APPLY_MISMATCH")
+  },
+)
+
 test("complete pilot history accepts the activation metadata update and settles historical pending replies", () => {
   expect(inspectSelectionHistory(pilotHistory)).toEqual({ historyComplete: true, failures: [] })
 })

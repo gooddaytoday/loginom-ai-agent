@@ -143,9 +143,25 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
       if (admission.phase !== "node_apply_prepared") continue
       const request = record(admission.request) ? admission.request : undefined
       const target = record(request?.target) ? request.target : undefined
-      if (typeof target?.type !== "string" || !calls.some(({ part, dockID }) => dockID === session.sessionId && record(part.state) && record(part.state.input)
-        && part.tool === "loginom_dock_node_apply" && part.state.input.operation_id === admission.operation_id
-        && record(part.state.input.target) && part.state.input.target.type === target.type)) failures.push("RUNTIME_APPLY_MISMATCH")
+      const publicApplies = calls.filter(({ part, dockID }) => dockID === session.sessionId && record(part.state) && record(part.state.input)
+        && part.tool === "loginom_dock_node_apply" && part.state.input.operation_id === admission.operation_id)
+      if (typeof target?.type !== "string" || !publicApplies.length || publicApplies.some(({ part }) => {
+        const input = record(part.state) && record(part.state.input) ? part.state.input : undefined
+        const publicTarget = record(input?.target) ? input.target : undefined
+        return typeof request?.document_id !== "string" || request.document_id !== input?.document_id
+          || !record(request.workflow_ref) || !record(input?.workflow_ref)
+          || typeof request.workflow_ref.workflow_id !== "string" || request.workflow_ref.workflow_id !== input.workflow_ref.workflow_id
+          || publicTarget?.type !== target.type || publicTarget?.kind !== target.kind
+          || !["new", "existing"].includes(String(target.kind))
+          || target.kind === "existing" && !sameNode(publicTarget?.ref, target.ref)
+      })) failures.push("RUNTIME_APPLY_MISMATCH")
+      const terminalNode = record(submitted?.node) ? submitted.node : record(outcome?.node) ? outcome.node : undefined
+      const publicTerminal = calls.filter((call) => call.dockID === session.sessionId && record(call.result)
+        && call.result.operation_id === admission.operation_id).at(-1)?.result
+      if (outcome?.status === "SUCCEEDED" && !terminalNode || terminalNode && (terminalNode.document_id !== request?.document_id
+        || !record(request?.workflow_ref) || terminalNode.workflow_id !== request.workflow_ref.workflow_id
+        || target?.kind === "existing" && !sameNode(terminalNode, target.ref)
+        || !record(publicTerminal) || !sameNode(terminalNode, publicTerminal.node))) failures.push("RUNTIME_APPLY_MISMATCH")
     }
   }
   for (const { part, result, dockID } of calls) {
