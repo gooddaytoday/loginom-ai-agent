@@ -122,7 +122,10 @@ async function main() {
     && !evidenceFailures.length && record(attempt) && attempt.cliExitCode === 0 && graph.complete && saved
     && resultVerified && oracle.passed === true && Array.isArray(attempt.collectionFailures) && !attempt.collectionFailures.length
     && (!recovery || recovery.recoveryCorrected)
-  const result = { auditStage: "complete", taskID: args.task, mode: args.mode, ...selection,
+  const auditVersion = createHash("sha256").update(Buffer.concat(await Promise.all([
+    import.meta.path, path.join(import.meta.dir, "../src/node-selection.ts"), path.join(import.meta.dir, "../src/node-selection-graph.ts"),
+  ].map((file) => Bun.file(file).bytes())))).digest("hex")
+  const result = { auditStage: "complete", auditVersion, taskID: args.task, mode: args.mode, ...selection,
     policyStatus, oraclePassed: oracle.passed, oracleError: oracle.error, oracleSha256, calculationPassed,
     historyComplete: history.historyComplete, runtimeSettled: settlement.runtimeSettled,
     identityVerified: provenance.identityVerified, graphComplete: graph.complete, packageSha256, reviewStatus, ...recovery,

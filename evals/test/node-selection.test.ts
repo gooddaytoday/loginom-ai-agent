@@ -39,6 +39,7 @@ test("offline audit certifies the complete native pilot independently of selecti
     expect(await run.exited).toBe(0)
     expect(await Bun.file(path.join(directory, "selection-audit.json")).json()).toMatchObject({
       policyStatus: "passed", oraclePassed: true, calculationPassed: true, historyComplete: true, runtimeSettled: true,
+      auditVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
     })
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
