@@ -2,6 +2,36 @@ export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "sta
 
 export type SelectionRuntime = { path: string; session: unknown; events: unknown[] }
 
+export function inspectSelectionRecovery(input: { parts: unknown[]; runtime: SelectionRuntime[] }) {
+  const calls = input.parts.flatMap((part, index) => readApply(part, input.parts).map((call) => ({ ...call, part, index })))
+  const refused = calls.filter((call) => {
+    const result = call.result
+    if (call.nodeType !== "transform.calculator" || !record(result) || result.status !== "FAILED"
+      || result.cleanup_complete !== true || !record(result.error) || result.error.code !== "NODE_APPLY_STOPPED"
+      || !record(result.error.cause) || result.error.cause.code !== "WIZARD_CALCULATOR_VALIDATION_FAILED"
+      || !call.node || !record(call.part)) return false
+    const part = call.part
+    const prepared = input.parts.slice(0, call.index).filter(record).filter((entry) => entry.sessionID === part.sessionID
+      && entry.tool === "loginom_dock_prepare").map(receipt).filter(record).at(-1)
+    return input.runtime.some((runtime) => record(runtime.session) && runtime.session.sessionId === prepared?.sessionId
+      && runtime.events.some((event) => record(event) && event.session_id === prepared?.sessionId
+        && event.operation_id === call.operationID && event.phase === "node_phase_refused" && record(event.receipt)
+        && event.receipt.verification === "calculator_syntax_rejected_draft_restored"
+        && event.receipt.status === "FAILED" && event.receipt.cleanup_complete === true && record(event.receipt.proof)
+        && sameNode(event.receipt.proof.node, call.node)))
+  })
+  const corrected = refused.find((failed) => calls.some((call) => call.index > failed.index
+    && call.nodeType === "transform.calculator" && call.succeeded && call.operationID !== failed.operationID
+    && record(call.part) && record(failed.part) && call.part.sessionID === failed.part.sessionID && sameNode(call.node, failed.node)))
+  return { recoveryObserved: refused.length > 0, recoveryCorrected: !!corrected,
+    recoveryStatus: corrected ? "corrected" : refused.length ? "blocked" : "unobserved" }
+}
+
+function sameNode(left: unknown, right: unknown) {
+  return record(left) && record(right) && ["document_id", "workflow_id", "node_id"].every((key) =>
+    typeof left[key] === "string" && left[key] === right[key])
+}
+
 export function inspectSelectionJavaScriptIdentity(input: { parts: unknown[]; nodeIDs: unknown[]; exportNode: unknown }) {
   const output = record(input.exportNode) ? input.exportNode : undefined
   const calls = input.parts.flatMap((part) => readApply(part, input.parts))
@@ -265,6 +295,7 @@ function readApply(part: unknown, parts: unknown[]) {
   const node = record(terminal?.node) ? terminal.node : undefined
   return [{
     node,
+    result: terminal,
     operationID: request?.operation_id,
     nodeType: typeof target?.type === "string" ? target.type : undefined,
     succeeded: typeof part.id === "string" && typeof part.sessionID === "string" && typeof request?.operation_id === "string"

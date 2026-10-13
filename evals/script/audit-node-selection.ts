@@ -2,7 +2,7 @@ import path from "node:path"
 import { realpath } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { parseArgs } from "node:util"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, inspectSelectionJavaScriptIdentity, readSelectionReceipt } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, inspectSelectionJavaScriptIdentity, inspectSelectionRecovery, readSelectionReceipt } from "../src/node-selection"
 import type { SelectionMode, SelectionRuntime } from "../src/node-selection"
 import { inspectSelectionGraph } from "../src/node-selection-graph"
 import { readNodeXml } from "../src/node-xml"
@@ -26,6 +26,7 @@ async function main() {
   const parts = await completeOutputs(directory, original, failures)
   const runtime = await runtimeFiles(directory, record(snapshot) ? snapshot.sessionID : undefined, failures)
   const settlement = inspectSelectionRuntime({ parts, runtime })
+  const recovery = args.mode === "standard-recovery" ? inspectSelectionRecovery({ parts, runtime }) : null
   const provenance = inspectSelectionProvenance({ snapshot: record(snapshot) ? { ...snapshot, parts } : snapshot, runtime,
     model: record(pins) ? pins.model : undefined, variant: record(pins) ? pins.variant : undefined,
     expectedSkillDigest: record(pins) ? pins.expectedSkillDigest : undefined,
@@ -120,10 +121,11 @@ async function main() {
   const calculationPassed = history.historyComplete && settlement.runtimeSettled && provenance.identityVerified
     && !evidenceFailures.length && record(attempt) && attempt.cliExitCode === 0 && graph.complete && saved
     && resultVerified && oracle.passed === true && Array.isArray(attempt.collectionFailures) && !attempt.collectionFailures.length
+    && (!recovery || recovery.recoveryCorrected)
   const result = { auditStage: "complete", taskID: args.task, mode: args.mode, ...selection,
     policyStatus, oraclePassed: oracle.passed, oracleError: oracle.error, oracleSha256, calculationPassed,
     historyComplete: history.historyComplete, runtimeSettled: settlement.runtimeSettled,
-    identityVerified: provenance.identityVerified, graphComplete: graph.complete, packageSha256, reviewStatus,
+    identityVerified: provenance.identityVerified, graphComplete: graph.complete, packageSha256, reviewStatus, ...recovery,
     failures: [...new Set([...failures, ...evidenceFailures, ...selection.failures, ...graph.failures, ...roleGraph.failures])],
   }
   await Bun.write(path.join(directory, "selection-audit.json"), JSON.stringify(result, null, 2) + "\n")

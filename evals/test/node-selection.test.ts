@@ -4,7 +4,7 @@ import path from "node:path"
 import os from "node:os"
 import { createHash } from "node:crypto"
 import { unzip } from "../src/artifact"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, inspectSelectionJavaScriptIdentity } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, inspectSelectionJavaScriptIdentity, inspectSelectionRecovery } from "../src/node-selection"
 import type { SelectionRuntime } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
@@ -162,6 +162,29 @@ test("an owned runtime JS admission cannot be hidden by a missing public apply",
   expect(result.jsCalls).toBe(1)
   expect(result.failures).toContain("JAVASCRIPT_NOT_ALLOWED")
 })
+
+test.each(["corrected", "blocked", "wrong-code", "foreign-node", "foreign-operation"])(
+  "recovery requires the native refusal and later correction on the same calculator: %s", (kind) => {
+    const runtime: SelectionRuntime[] = structuredClone(pilotRuntime)
+    const node = { document_id: "document", workflow_id: "workflow", node_id: "calculator" }
+    const request = { operation_id: "invalid-formula", document_id: node.document_id, workflow_ref: { workflow_id: node.workflow_id },
+      target: { type: "transform.calculator", kind: "existing", ref: node } }
+    const rejected = { operation_id: request.operation_id, state: "settled", status: "FAILED", cleanup_complete: true, node,
+      error: { code: "NODE_APPLY_STOPPED", cause: { code: kind === "wrong-code" ? "OTHER_ERROR" : "WIZARD_CALCULATOR_VALIDATION_FAILED" } } }
+    const part = { id: "recovery", type: "tool", tool: "loginom_dock_node_apply", sessionID: pilotHistory.snapshot.sessionID,
+      state: { status: "completed", input: request, output: JSON.stringify(rejected) } }
+    const parts: unknown[] = [...pilotHistory.snapshot.parts, part]
+    runtime[0]!.events.push({ phase: "node_phase_refused", session_id: pilotRuntime[0]!.session.sessionId,
+      operation_id: kind === "foreign-operation" ? "foreign" : request.operation_id,
+      receipt: { status: "FAILED", cleanup_complete: true, verification: "calculator_syntax_rejected_draft_restored",
+        proof: { node: { ...node, node_id: kind === "foreign-node" ? "foreign" : node.node_id } } } })
+    if (kind !== "blocked") parts.push({ ...part, id: "corrected", state: { ...part.state,
+      input: { ...request, operation_id: "corrected-formula" }, output: JSON.stringify({ ...rejected,
+        operation_id: "corrected-formula", status: "SUCCEEDED", execution: { status: "completed" }, error: null }) } })
+    expect(inspectSelectionRecovery({ parts, runtime }).recoveryStatus)
+      .toBe(["corrected", "blocked"].includes(kind) ? kind : "unobserved")
+  },
+)
 
 test.each(["missing-operation", "foreign-owner", "cleanup-false", "ambiguous", "upload-digest", "request-type"])(
   "runtime completion cannot use %s evidence",
