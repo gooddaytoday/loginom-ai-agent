@@ -1295,4 +1295,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Серия142936-072953: baseline15/18, oracle/calculation15, policy10/15 старого skill; monthly3 full PASS, risky3 в работе; candidate0/25.
+- Серия142936-072953: baseline16/18, oracle/calculation16, policy11/16 старого skill; risky3 full PASS, campaign3 в работе; candidate0/25.
