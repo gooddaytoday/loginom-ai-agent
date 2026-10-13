@@ -492,7 +492,8 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
 - [ ] Проверить `git status --short`, ветку и HEAD. Сохранить diff/hash файлов
   skill и `git worktree list`. Убедиться, что никто не меняет исходники/ветку
   во время сборки; не полагаться на старые сведения о ветке основного checkout.
-- [ ] Перед командами задать базовые переменные в Bash:
+- [ ] Сохранить базовые пути и пины серии в приватном `environment.json`.
+  Ниже Bash-эквивалент для команд сборки; wrapper получает значения из pins:
 
 ```bash
 selection_repo=/home/kiselev/.codex/worktrees/4118/loginom-ai-agent
@@ -640,7 +641,8 @@ bun script/verify-cli-candidate.ts "$selection_baseline" "$selection_repo"
   При невозможности сборки записать блокер; старый installed CLI не подменяет baseline
   текущей ветки, особенно если в нём отсутствует JavaScript.
 
-- [ ] Сохранить `baseline-pins.json`: SHA/tree/dirty, manifests, все skill file hashes,
+- [ ] Сохранить `baseline-pins.json`, закрепляющий SHA manifest с source SHA/tree/dirty
+  внутри metadata; полный skill inventory/file hashes сохранить рядом отдельно,
   модель/variant, task prompt/input/oracle hashes, Loginom version, каталог типов,
   endpoint identity без credentials, ограничения времени. До пилота сгенерировать
   и сохранить `reviewSeed`; перенести его без изменения в candidate-pins.

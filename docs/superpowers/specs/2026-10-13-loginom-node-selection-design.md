@@ -143,6 +143,9 @@ manifest, hashes и digest skill. Все 18 baseline используют это
 payload. При сборке baseline выполняются сверка с исходниками и source attestation;
 после изменения skill проверяется целостность frozen payload, а не его совпадение
 с текущим checkout. Baseline и candidate сохраняют отдельные pins.
+SHA manifest в pins связывает серию с его metadata source SHA/tree/dirty;
+полный skill inventory с hashes сохраняется рядом. Базовые пути/resources/model
+сохраняются в приватном environment.json; pins начатой серии не переписываются.
 После фиксации baseline правка skill и сборка candidate могут выполняться
 параллельно следующим baseline-попыткам. Запись candidate-исходников не должна
 совпадать по времени с их сборкой; стабильность снимка сборки проверяется.
