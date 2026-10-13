@@ -214,6 +214,17 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
           throw new Error("LOGINOM_CALL_INVALID")
         const recovery = { id: undefined as string | undefined }
+        const privateOriginal="captureAuthorization" in input;
+        const originalAuthorization=privateOriginal?input.captureAuthorization:undefined;
+        const originalRun=input.run,originalLease=run.lease,originalGeneration=run.lease.generation;
+        const assertOriginal=()=>{
+          if(state.closed || run.released || runs.get(originalRun)!==run || run.lease!==originalLease
+              || originalLease.generation!==originalGeneration || !Number.isSafeInteger(originalGeneration)
+              || originalGeneration<1 || input.name!=='dock_node_wait'
+              || !service.authorizeCapture?.(originalAuthorization,owner,originalRun,run.chat,originalLease))
+            throw Error("LOGINOM_RECOVERY_REQUIRED")
+        }
+        if(privateOriginal)assertOriginal()
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
@@ -234,6 +245,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             name: input.name,
             arguments: "args" in input ? input.args : undefined,
           })
+          if(privateOriginal)assertOriginal()
           if (
             !result ||
             typeof result !== "object" ||
@@ -242,6 +254,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             !("result" in result)
           )
             throw new Error("LOGINOM_REPLY_INVALID")
+          const replacementOriginal=privateOriginal && "replacementOriginal" in result ? result.replacementOriginal : undefined;
+          if(privateOriginal && !replacementOriginal)throw Error("LOGINOM_RECOVERY_REQUIRED")
           if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
             await abandon(run)
             service.markRuntimeStale(run.chat)
@@ -256,7 +270,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               service.recoveries.delete(run.chat)
             }
           }
-          reply({ id: data.id, result: result.result })
+          if(privateOriginal)assertOriginal()
+          reply({ id: data.id, result: result.result, ...(privateOriginal?{replacementOriginal}: {}) })
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish

@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto'
 import {resolve,join} from 'node:path'
 import {readFile} from 'node:fs/promises'
-import {launchReplacementDiagnostic} from '../../packages/loginom-host/src/node-client'
+import {launchReplacementDiagnostic,takeReplacementDiagnosticReply} from '../../packages/loginom-host/src/node-client'
 import {captureData} from '../../packages/loginom-runtime/src/retained-capture.mjs'
 
 // Private foreground client. Native Page/context/client/bridge remain exclusively
@@ -18,11 +18,12 @@ export async function launchReplacementReadOnlyCaller(input:any,owner:any) {
  const guardInput=()=>{if(keys.some(k=>input[k]!==expected[k]))throw Error('REPLACEMENT_CALLER_ORIGINAL_CHANGED');signal.throwIfAborted();if(Date.now()>=deadline)throw Error('REPLACEMENT_CALLER_DEADLINE')};
  const hash=(v:any)=>{captureData(v);return createHash('sha256').update(JSON.stringify(v)).digest('hex')};
  const fail=(error:any)=>{if(!Object.hasOwn(owner,'primaryFailure')){owner.primaryFailure=error;owner.error=error}else owner.secondaryFailures.push(error);owner.failed=true;return owner};
- let resourceHash:string;let host:any,requestHandle:any,captureHandle:any,exitHandle:any,original:any,pin:any,lease:any,leaseGeneration:number,acquired=false,attempted=false;
+ let resourceHash:string;let host:any,requestHandle:any,captureHandle:any,exitHandle:any,original:any,pin:any,lease:any,leaseGeneration:number,acquired=false,attempted=false,stockOriginal:any;
  owner.secondaryFailures=[];owner.gates=Object.freeze({native_admission:'not_verified',current_resources:'not_verified',original_native_owner:'not_verified',cleanup_before_exit:'not_verified'});
  const guard=()=>{guardInput();if(owner.host!==host||owner.request!==requestHandle||owner.captureHandle!==captureHandle||owner.exited!==exitHandle||!host?.alive)throw Error('REPLACEMENT_CALLER_OWNER_CHANGED');
   if(lease&&lease.generation!==leaseGeneration)throw Error('REPLACEMENT_CALLER_LEASE_CHANGED');
   if(original&&(original.request!==pin.request||original.opening!==pin.opening||original.signal!==pin.signal||original.deadline!==pin.deadline||original.sessionId!==pin.sessionId||hash(original.request)!==pin.requestHash||hash(original.opening)!==pin.openingHash))throw Error('REPLACEMENT_CALLER_ORIGINAL_CHANGED');
+  if(stockOriginal&&Date.now()>=stockOriginal.deadline)throw Error('REPLACEMENT_CALLER_DEADLINE');
   if(original){original.signal.throwIfAborted();if(Date.now()>=original.deadline)throw Error('REPLACEMENT_CALLER_DEADLINE')}};
  try {
   guardInput();owner.phase='factory';
@@ -33,6 +34,36 @@ export async function launchReplacementReadOnlyCaller(input:any,owner:any) {
   Object.assign(owner,{host,request:host.request,captureHandle:host.capture,exited:host.exited});requestHandle=host.request;captureHandle=host.capture;exitHandle=host.exited;guard();owner.phase='host';
  }catch(error){return fail(error)}
  owner.acquire=async()=>{try{guard();if(acquired||owner.failed)throw Error('REPLACEMENT_CALLER_NO_RETRY');acquired=true;lease=await requestHandle('acquire',{run,session});if(!lease||!Number.isSafeInteger(lease.generation)||lease.generation<1)throw Error('REPLACEMENT_CALLER_MISSING_LEASE');leaseGeneration=lease.generation;guard();owner.phase='leased';return lease}catch(error){fail(error);throw error}};
+
+ // Receive-only stock integration. The closed factory proves channel origin;
+ // correlation does not set `original`, change pinOriginal or invoke capture.
+ owner.observeStockOriginal=()=>{try{
+  guard();if(!acquired||owner.failed||stockOriginal)throw Error('REPLACEMENT_CALLER_NO_RETRY');
+  const observed=takeReplacementDiagnosticReply(host,run,'original');guard();
+  if(observed.session!==session||observed.generation!==leaseGeneration)throw Error('REPLACEMENT_CALLER_RESULT_BINDING');
+  stockOriginal=observed.envelope.original;
+  owner.stockOriginal=Object.freeze({correlation:stockOriginal,outcome:observed.envelope.outcome,messageId:observed.messageId,
+   correlation_only:true,native_admission:false,server_cancellation_verified:false,cleanupComplete:false});
+  return owner.stockOriginal;
+ }catch(error){fail(error);throw error}};
+ owner.observeStockCapture=()=>{try{
+  const observed=takeReplacementDiagnosticReply(host,run,'capture');
+  if(observed.rejected)fail(observed.error);
+  const result=observed.result;
+  const refused=result&&typeof result==='object'&&result.cleanupComplete===false&&result.refused===true
+    &&(result.rejectedIsUndefined===true||Object.hasOwn(result,'rejected'));
+  if(refused)fail(result.rejectedIsUndefined===true?undefined:result.rejected);
+  guard();if(observed.rejected)throw observed.error;
+  if(!stockOriginal||!result||result.cleanupComplete!==false)throw Error('REPLACEMENT_CALLER_UNCONFIRMED_RESULT');
+  if(refused){owner.stockResult=result;return result}
+  captureData(result);const receipt=result.receipt,p=receipt?.publication,s=stockOriginal;
+  if(result.diagnosticRead!==true||receipt?.status!=='DIAGNOSTIC_READ'||receipt.effect_possible!==false
+    ||receipt.native_capture_admitted!==false||receipt.admission_confirmed!==false||receipt.settings_applied!==false||receipt.execution_started!==false
+    ||!p||['owner','run','lease','generation','chat','account','package_path','resource_path','resource_sha256','operation_id','document_id','workflow_id','node_id','session_id','deadline','request_sha256','opening_sha256'].some(k=>p[k]!==s[k])
+    ||p.opening_operation_id!==s.outer_opening_operation_id||receipt.native_before?.input_port?.opening_operation_id!==s.native_opening_operation_id
+    ||!receipt.root||['document_id','workflow_id','node_id','session_id','account','package_path'].some(k=>receipt.root[k]!==p[k]))throw Error('REPLACEMENT_CALLER_RESULT_BINDING');
+  owner.stockResult=result;return result;
+ }catch(error){fail(error);throw error}};
  owner.pinOriginal=(value:any)=>{try{guard();if(!acquired||!lease||original||owner.failed)throw Error('REPLACEMENT_CALLER_ORIGINAL_REQUIRED');
   if(!value||Object.keys(value).sort().join(',')!=='deadline,opening,request,sessionId,signal'||!(value.signal instanceof AbortSignal)||!Number.isSafeInteger(value.deadline)||typeof value.sessionId!=='string'||!value.sessionId)throw Error('REPLACEMENT_CALLER_ORIGINAL_REQUIRED');
   const r=value.request,o=value.opening;captureData(r);captureData(o);
