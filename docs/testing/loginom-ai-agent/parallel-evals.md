@@ -332,3 +332,19 @@ Results упорядочены по job.index; AggregateError возвращае
 Запись confirmed без reply evidence даёт ADMIN_JOURNAL_INVALID до mutation.
 Real pipe/fs RED/GREEN; последние 49 targeted tests/113 assertions, typecheck/
 diff check PASS. Unknown/recovery admission этим не снимается.
+
+createJudgeGate сериализует весь judgeTask вместе с подготовкой/oracle и его retry.
+Cancelled waiter возвращает interrupted before judge/attempts=0 без child/setup;
+последующие вызовы всё ещё ждут его predecessor. Active abort не освобождает gate
+до завершения judgeTask. Finally освобождает gate также после prepare exception.
+Gate создаётся для одного run; host-global judge lease остаётся отдельной задачей.
+
+8 real fake-codex gate tests/36 assertions PASS: непересекающиеся start/end,
+cancelled B перед C, целый retry A до B, prepare exception, exit/timeout/abort и
+отсутствие погибших A в /proc после drain и начало B после completion A. Fake interval log содержит только
+PID/dir/event/epoch milliseconds. В наблюдаемом Bun hrtime оказался относительным
+к запуску процесса, поэтому межпроцессные интервалы используют Date.now и порядок
+start/end events. Изолированный child подтвердил judge CODEX_HOME без наследования
+model OAuth, agent profile, Dock/admin environment; действующая judge auth этим не
+проверялась. 82 judge/scheduler/CLI/transition tests/490 assertions, typecheck и
+diff check PASS (213.12s). Fake fixtures удалены; v2 main ещё не подключён к gate.

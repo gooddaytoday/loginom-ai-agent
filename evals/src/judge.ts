@@ -193,6 +193,27 @@ export async function judgeTask(input: {
 }
 export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0 }
 
+export function createJudgeGate() {
+  let sequence = Promise.resolve()
+  return (input: Parameters<typeof judgeTask>[0]): Promise<Judged> => {
+    const previous = sequence
+    const finished = Promise.withResolvers<void>()
+    // Cancelled waiters return early; later judges must still await their predecessor.
+    sequence = previous.then(() => finished.promise)
+    const cancelled = Promise.withResolvers<void>()
+    const abort = () => cancelled.resolve()
+    input.signal?.addEventListener("abort", abort, { once: true })
+    if (input.signal?.aborted) abort()
+    return Promise.race([previous, cancelled.promise]).then<Judged>(() => {
+      if (input.signal?.aborted) return { ok: false, error: "interrupted before judge", attempts: 0 }
+      return judgeTask(input)
+    }).finally(() => {
+      input.signal?.removeEventListener("abort", abort)
+      finished.resolve()
+    })
+  }
+}
+
 export function judgedFields(judged: Judged) {
   if (judged.ok)
     return {
