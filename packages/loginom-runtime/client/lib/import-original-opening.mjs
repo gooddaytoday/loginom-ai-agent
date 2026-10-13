@@ -103,7 +103,7 @@ export function importOpeningPage({task,mode}) {
   ||own(connection,'Session')!==r.session||Date.now()>=task.deadline)fail('CURRENT_OWNER');
  inventory();
  if(w&&(own(own(own(controller,'Node'),'data'),'node')!==r.tree||own(r.tree,'ParentNode')!==r.nodeTree
-  ||own(r.nodeTree,'ParentNode')!==r.workflow||own(r.nodeTree,'FModelNode')!==r.nodeData||own(model,'FModelNode')!==r.nodeData
+  ||own(r.nodeTree,'ParentNode')!==r.workflow||own(r.nodeTree,'FGuid')!==task.node_id||own(r.nodeTree,'FModelNode')!==r.nodeData||own(model,'FModelNode')!==r.nodeData
   ||own(own(own(model,'FView'),'el'),'dom')!==r.root))fail('FINAL_WIZARD_BINDING');
  return observation??{status:mode==='reserve'?'reserved':'completed',receipt_id:task.receipt_id,
   document_id:task.document_id,workflow_id:task.workflow_id,node_id:task.node_id,account:r.account,

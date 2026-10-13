@@ -132,3 +132,19 @@ for(const [name,mutate] of Object.entries({foreign:c=>c.publication=Object.freez
  const f=await fixture();try {const node=await f.openNode(),context=f.contextFor(node);mutate(context);assert.throws(()=>createImportPreconfigAdapter(context));assert.equal(f.calls.filter(c=>c.mode==='read').length,0);}
  finally{await f.cleanup();}
 });
+
+test('final provider GUID drift refuses before sample/record and caches refusal without reopening',async()=>{
+ const f=await fixture();try {
+  const node=await f.openNode();
+  vm.runInContext('let guidTurn=0;workspace.getActiveTab=()=>{card.Controller.Node.data.node.ParentNode.FGuid=(++guidTurn%2===1)?"original-import":"foreign";return card;}',f.native);
+  const adapter=f.adapterFor(node);
+  for(let i=0;i<2;i++)await assert.rejects(adapter.readPreconfigSample(),/FINAL_WIZARD_BINDING/);
+  assert.equal(f.calls.filter(c=>c.mode==='read').length,0);
+  assert.equal(f.events.filter(e=>e.event==='fixed_import_preconfigure_observation').length,0);
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,1);
+  assert.equal(f.operation().nodeApply.effect_possible,true);
+  assert.equal(f.operation().cleanupConfirmed,false);
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+  assert.deepEqual(f.dispatch,{configure:0,mapping:0,finish:0,execute:0});
+ }finally{await f.cleanup();}
+});
