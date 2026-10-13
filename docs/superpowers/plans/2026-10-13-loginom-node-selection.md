@@ -403,7 +403,7 @@ writer.writerows(sorted(totals.items(), key=lambda pair: (-pair[1], pair[0])))
   попыток фиксирует реально возникшие ошибки штатных узлов, последующие действия
   и отсутствие JS. Это бесплатное дополнительное покрытие, а не предположение,
   что ошибки обязательно возникнут, и не подмена ненаблюдённого diagnostic отказа.
-- [ ] Проверить загрузку всех трёх fixtures через `loadTasks`, независимые oracle,
+- [x] Проверить загрузку всех трёх fixtures через `loadTasks`, независимые oracle,
   отсутствие answers/oracle в модельных inputs. Закоммитить:
   `test(evals): add javascript exception and recovery cases`.
 
