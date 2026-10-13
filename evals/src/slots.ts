@@ -11,6 +11,24 @@ export type SlotDefinition = {
   historyDir: string
 }
 
+export type ServerIdentity = {
+  containerId: string
+  startedAt: string
+  serverEpoch: string
+  studioContainerId: string
+  studioStartedAt: string
+  configurationHash: string
+}
+
+export type SlotLease = {
+  slot: SlotDefinition
+  identity: ServerIdentity
+  receipt: string
+  token: string
+  close(): Promise<void>
+  release(cleanupReceipt: string): Promise<void>
+}
+
 export type SlotFile = {
   version: 2
   server: { container: string; studioContainer: string; url: string; network: string; alias: string; storageRoot: string; backupRoot: string }
@@ -81,11 +99,55 @@ export async function loadSlots(file: string, parallel: number, installRoot?: st
   }
   validatePaths(canonical, [await canonicalPath(path.resolve(file)), ...(installRoot ? [await canonicalPath(path.resolve(installRoot))] : [])])
   await requirePrivatePath(input.controller.adminCredentialsFile, true)
+  await Promise.all([input.controller.stateDir, input.judge.codexHome, ...(input.auth ? [input.auth.sharedDir] : []),
+    ...input.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])].map(value => requirePrivatePath(value, false)))
   await Promise.all([canonical.controller.stateDir, canonical.judge.codexHome,
     ...(canonical.auth ? [canonical.auth.sharedDir] : []), ...canonical.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])]
     .map(value => requirePrivatePath(value, false)))
   await requirePrivatePath(canonical.controller.adminCredentialsFile, true)
   return canonical
+}
+
+export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease> {
+  if (!file.slots.some(candidate => candidate.id === slot.id && candidate.username === slot.username && candidate.profileDir === slot.profileDir &&
+    candidate.workspaceRoot === slot.workspaceRoot && candidate.historyDir === slot.historyDir)) throw new EvalFailure("SLOT_NOT_CONFIGURED", 2)
+  const { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } = await import("./lease")
+  const journal = path.join(file.controller.stateDir, "run-journal.json")
+  const commandId = text(record(await Bun.file(journal).json()).commandId)
+  const resources = [] as Awaited<ReturnType<typeof acquireResourceLease>>[]
+  try {
+    for (const key of [`user:${identity.containerId}:${slot.username}:0`, `profile:${await canonicalPath(slot.profileDir)}`].sort())
+      resources.push(await acquireResourceLease({ key, lockRoot, journal, commandId, identity }))
+    const token = crypto.randomUUID()
+    const receipt = path.join(file.controller.stateDir, `slot-${slot.id}-${token}.lease.json`)
+    const manifest = { version: 2, token, slot, identity, commandId, resources: resources.map(resource => ({ receipt: resource.receipt,
+      key: resource.reservation.key, token: resource.reservation.token, revision: resource.reservation.revision })) }
+    await writeLeaseReceipt(receipt, { ...manifest, state: "retained" })
+    return { slot, identity, receipt, token, async close() { await Promise.all(resources.map(resource => resource.close())) }, async release(cleanupReceipt: string) {
+      const evidence = record(await readLeaseReceipt(cleanupReceipt))
+      if (evidence.status !== "confirmed" || evidence.slotId !== slot.id || evidence.leaseToken !== token || evidence.serverEpoch !== identity.serverEpoch ||
+        evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || evidence.archive !== "committed" ||
+        evidence.storageDeletionAllowed !== true || evidence.nextAdmissionAllowed !== true) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+      for (const resource of resources) {
+        const proof = `${receipt}.${new Bun.CryptoHasher("sha256").update(resource.reservation.key).digest("hex")}.released.json`
+        await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: resource.reservation.key, token: resource.reservation.token,
+          revision: resource.reservation.revision, cleanupReceipt, serverEpoch: identity.serverEpoch })
+        await resource.release(proof)
+      }
+      await writeLeaseReceipt(receipt, { ...manifest, state: "released", cleanupReceipt })
+    } }
+  } catch (error) {
+    // No session, process or user storage has been admitted by this function.
+    try {
+      for (const resource of resources) {
+        const proof = path.join(file.controller.stateDir, `unused-${resource.reservation.token}.json`)
+        await writeLeaseReceipt(proof, { version: 2, status: "confirmed", reason: "not-used", key: resource.reservation.key,
+          token: resource.reservation.token, revision: resource.reservation.revision, serverEpoch: identity.serverEpoch })
+        await resource.release(proof)
+      }
+    } finally { await Promise.all(resources.map(resource => resource.close())) }
+    throw error
+  }
 }
 
 async function requirePrivatePath(value: string, file: boolean): Promise<void> {

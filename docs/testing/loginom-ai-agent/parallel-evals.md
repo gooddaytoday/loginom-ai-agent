@@ -81,3 +81,27 @@ revision. Проверены `bun test test/config.test.ts test/slots.test.ts te
 77 PASS/0 FAIL, bun typecheck/git diff --check PASS. Native проверки — отдельные
 Bun процессы, временные private roots, без Docker/Loginom/admin mocks.
 SlotLease, server generation binding и полноценная recovery CLI ещё впереди.
+
+SlotLease объединяет user (full container ID + exact login/kind=0) и canonical
+profile resources в едином порядке keys. Частичный отказ выпускает только
+неиспользованные собственные reservations с durable evidence. Group receipt
+хранит полный inventory. close снимает OS guards, сохраняя retained fence;
+release требует private confirmed CleanupReceipt с leaseToken/serverEpoch и
+process/session/archive/storage/next-admission proofs. Lineage сохраняет прежние
+owner/command/identity, включая повтор recovery. Same-ID restart меняет generation
+и запрещает takeover; разные servers конфликтуют по общим profile/judge keys.
+Проверены `bun test test/config.test.ts test/slots.test.ts test/lease.test.ts`:
+89 PASS/0 FAIL, bun typecheck PASS. Full unit ещё выполняется.
+
+2026-10-13: разовый owner bootstrap выполнен через доступный sudo -n вне harness.
+/var/lib/loginom-evals/locks проверен 0700/kiselev; private parallel roots — 0700.
+Existing directories не перезаписывались. Локальные image IDs Server/Studio
+совпали с pins дизайна. Работающие dev containers не менялись. Bootstrap admin
+credential и пригодность judge/model auth этим не подтверждены.
+
+Задача 1 завершена целевыми проверками: 90 config/slots/lease tests PASS/0 FAIL,
+bun typecheck/git diff --check PASS. Последний цикл дополнительно подтверждает
+отказ release при подмене owner snapshot, даже с прежним token/revision.
+Полный unit запущен отдельно; его результат ещё не получен. Проверки генерации
+здесь используют сохранённые server identity fixtures; настоящая Docker epoch
+проверка research pair принадлежит задаче 1а. Live v2 по-прежнему закрыт.
