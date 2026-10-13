@@ -740,6 +740,12 @@ inspect после response-budget refusal). Standard group-001 останови
   ещёpending. Fullupstream после чистого privateprobe перед sourcecommit/build.
   Proof5ownrecovery2e649a27… independentlyclosed/noReinit/adminlogout/payload+raw
   unchanged; originalcleanupfalse не повышается до PASS.
+  SourceDOMreview f2a80fb9… Approved; privateproof6 Group+Save SUCCEEDED после
+  actualF3preview. Originalexit1 на private EXACT_INTEGER_REQUIRED: GroupSUM
+  Totaltype real/binary64 values17/21 и decimal1.7E+01/2.1E+01, precisionverified.
+  Ownclose/logout/ACKexit0 verified; Sortnever. Separateproof7 TDD actual028
+  limitedexact realcell assertion, producer/Sort integerguards/source unchanged.
+  FullprivateGroup+directSort/CSV/XML gate ещёpending; только после него upstream.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять

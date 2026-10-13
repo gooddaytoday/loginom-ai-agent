@@ -488,6 +488,13 @@ Source correction frozen bf5dd674…: только helper/targettest/actualtuple
 Proof5ownrecovery independently2e649a27…: exactuser92close/noReinit/adminlogout/
 37raw+56sourceClosure+4397immutableRuntime entries unchanged. Разрешённая текущая
 sourceправка отмечена отдельно; исходныйcleanupfalse сохраняется.
+Source review Approved f2a80fb9…/53focused independentPASS. Privatecandidate
+proof6 actual Group SUCCEEDED и Save SUCCEEDED; остановка EXACT_INTEGER_REQUIRED
+относится к fixture reader: Total имеет native type real, binary64 values17/21,
+decimal1.7E+01/2.1E+01 с verified precision. Sort ещёне вызван. Originalexit1 и
+реальные packageclose/logout/HostACKexit0 сохранены. Separateprivateproof7 должен
+по actual028 исправить только Group real-number assertion; не менять sourcefix,
+числа/oracle и целочисленные producer/Sort проверки. Finalnativegate pending.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

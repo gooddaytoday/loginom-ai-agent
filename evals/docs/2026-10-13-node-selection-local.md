@@ -91,6 +91,11 @@ Postreview2e649a27… completed: exactuser92close/noReinit/adminlogout,37raw/
 56sourceClosure/4397immutableRuntime paths unchanged; currentallowedsourcefix
 отдельно отмечен. SourceDOMfix bf5dd674…/218relevant tests frozen; independent
 source review/privateproof6 готовятся, fullupstream после clean nativeprobe.
+SourceDOMreview Approvedf2a80fb9… . Privateproof6 Group+Save SUCCEEDED,
+originalexit1 — privateintegerreader отказал на nativeSUM Totaltype real с
+verifiedbinary64 values17/21/decimal1.7E+01/2.1E+01. Sortnever; ownclose/logout/
+ACKexit0 verified. Separateproof7 actual028TDD exactrealassertion only; sourcebf5/
+pair47/expectedvalues не меняются, fullnative+upstream ещёpending.
 
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core

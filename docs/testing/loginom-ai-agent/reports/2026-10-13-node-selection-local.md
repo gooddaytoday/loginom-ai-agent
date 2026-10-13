@@ -156,6 +156,22 @@ SourceDOMfix frozen helperSHA
 verificationSHA `17e58845dbce2eaf36b65d75947f11627ddb080b0cb475e30f49e4f3e9929022`:
 два RED→GREEN/53focused/218relevantPASS/diff0. Изменены helper/test/actualtuple
 fixture; source review/privateproof6/native результат/upstream/commit ещёpending.
+Source review SHA `f2a80fb9c339df5afd4eb33e48398df363ea17cb39ef9bb26006344ea3e0006a`
+Approved/independent53PASS. Privateproof6 root56504exit1, resultSHA
+`d29c6a18ec51e907b334d1779f84869789aa11f8c802273a43192d7ac3ace36c`:
+raw028 Group SUCCEEDED/freshschema2rows, raw029 Save SUCCEEDED. Total native real,
+values17/21, decimal1.7E+01/2.1E+01, binary64/17_significant_digits/numbers_verified,
+sample_complete/limitations[]; privateintegerreader rejected legitimate SUM type.
+Sort не вызван. Actualcleanup/explicitLogout/HostACKexit0 verified, recovery не
+требуется. Separateproof7 меняет по actual028 только exactrealcell assertion;
+sourcebf5/immutablepair47/producerSortintegerchecks/expectedvalues остаются.
+Independent stop review SHA
+`d658d19c545a62ce9083699d99f6a8bf6d926e143afa41f5a6333ad5d40bf48a`:
+actualGroup fullpreflight select/openF3/freshcompleteSchema/Close/graphrestore
+прошёл, nativeGroupA17/B21 и Save подтверждены; integerreader mismatch воспроизведён
+offline.1259events/5sourceoverride records/58sources/12fixtures/29receipts/
+4journals/2cleanup preserved. Packageclosed/logout/nodiscard/HostACKexit0;
+Sort/export/afterXML pending, originalexit1/nonacceptance остаётся.
 
 ## Историческая пара после Join fix — допуск серии
 
