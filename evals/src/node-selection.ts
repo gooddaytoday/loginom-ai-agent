@@ -9,14 +9,18 @@ export function inspectSelection(input: {
     ["TBGJavaScriptEngine", "TBGCodeModelComponentEngine"].includes(type)).length ?? null
   const calls = input.parts.flatMap((part) => readApply(part, input.parts))
   const jsCalls = calls.filter((call) => call.nodeType === "programming.javascript").length
+  const successfulJsCalls = calls.filter((call) => call.nodeType === "programming.javascript" && call.succeeded).length
+  const standard = input.mode === "standard" || input.mode === "standard-recovery"
   return {
     jsNodes,
     jsCalls,
-    successfulJsCalls: calls.filter((call) => call.nodeType === "programming.javascript" && call.succeeded).length,
+    successfulJsCalls,
     failures: [
       ...calls.flatMap((call) => call.failure ? [call.failure] : []),
-      ...((input.mode === "standard" || input.mode === "standard-recovery") && (jsNodes || jsCalls)
+      ...(standard && (jsNodes || jsCalls)
         ? ["JAVASCRIPT_NOT_ALLOWED"] : []),
+      ...(!standard && !jsNodes ? ["JAVASCRIPT_NODE_REQUIRED"] : []),
+      ...(!standard && !successfulJsCalls ? ["JAVASCRIPT_EXECUTION_REQUIRED"] : []),
     ],
   }
 }
@@ -34,16 +38,21 @@ function readApply(part: unknown, parts: unknown[]) {
   const node = record(terminal?.node) ? terminal.node : undefined
   return [{
     nodeType: typeof target?.type === "string" ? target.type : undefined,
-    succeeded: state?.status === "completed" && terminal?.state === "settled" && terminal.status === "SUCCEEDED"
+    succeeded: typeof part.id === "string" && typeof part.sessionID === "string" && typeof request?.operation_id === "string"
+      && state?.status === "completed" && terminal?.operation_id === request.operation_id
+      && terminal?.state === "settled" && terminal.status === "SUCCEEDED"
       && terminal.cleanup_complete === true && record(terminal.execution) && terminal.execution.status === "completed"
       && node?.document_id === request?.document_id && record(request?.workflow_ref)
       && node?.workflow_id === request.workflow_ref.workflow_id && typeof node?.node_id === "string",
-    failure: typeof target?.type !== "string" || !target.type.trim() ? "TOOL_INPUT_INCOMPLETE" : undefined,
+    failure: typeof target?.type !== "string" || !target.type.trim() ? "TOOL_INPUT_INCOMPLETE"
+      : typeof part.id !== "string" || !state || !["pending", "running", "completed", "error"].includes(String(state.status))
+        ? "TOOL_EVIDENCE_INVALID" : undefined,
   }]
 }
 
 function receipt(part: Record<string, unknown>): unknown {
   if (!record(part.state)) return undefined
+  if (record(part.state.metadata) && part.state.metadata.truncated === true) return undefined
   const value = part.state.status === "error" ? part.state.error : part.state.output
   if (typeof value !== "string") return value
   try { return JSON.parse(value) as unknown } catch { return undefined }

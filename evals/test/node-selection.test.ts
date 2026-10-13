@@ -14,6 +14,27 @@ test("an admitted JavaScript apply counts as successful only after its matching 
   expect(result.failures).toEqual([])
 })
 
+test.each(["wrong-operation", "wrong-session", "failed", "ambiguous", "dirty", "truncated", "invalid-status"])(
+  "allowed JavaScript cannot pass with %s receipt evidence",
+  (kind) => {
+    const parts = structuredClone(applyWait)
+    parts[0]!.state.input.target!.type = "programming.javascript"
+    const last = parts[2]!
+    const output = JSON.parse(last.state.output) as Record<string, unknown>
+    if (kind === "wrong-operation") output.operation_id = "another-operation"
+    if (kind === "wrong-session") last.sessionID = "another-session"
+    if (kind === "failed") output.status = "FAILED"
+    if (kind === "ambiguous") output.status = "AMBIGUOUS"
+    if (kind === "dirty") output.cleanup_complete = false
+    if (kind === "truncated") last.state.metadata.truncated = true
+    if (kind === "invalid-status") parts[0]!.state.status = "invented"
+    last.state.output = JSON.stringify(output)
+    const result = inspectSelection({ mode: "explicit-js", nodeTypes: ["TBGCodeModelComponentEngine"], parts })
+    expect(result.successfulJsCalls).toBe(0)
+    expect(result.failures).toContain("JAVASCRIPT_EXECUTION_REQUIRED")
+  },
+)
+
 test.each(["pending", "running", "completed", "error"])(
   "standard rejects a JavaScript call in state %s even without a saved JS node",
   (status) => {
