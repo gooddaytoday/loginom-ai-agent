@@ -15,7 +15,7 @@ import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
 import { buildJobs, runSlotQueue } from "./scheduler"
-import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
+import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, inspectFixtureStorage, fenceFixtureStorage, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
@@ -82,7 +82,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const rubric = await rubricHash(tasks)
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
-  const slotStates = new Map<string, { state: "closed" | "quarantined"; lease_receipt: string; cleanup_receipt: string }>()
+  const slotStates = new Map<string, { state: "closed" | "quarantined"; lease_receipt: string; cleanup_receipt: string; storage_root: string; storage_leftovers: string[] | null; storage_error: string | null }>()
   const state: { stopped: string | null } = { stopped: null }
   if (fixture && !config.dryRun) {
     const contexts = await prepareFixture(config, fixture, runId, runDir)
@@ -127,7 +127,14 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
     } catch (error) { state.stopped = error instanceof AggregateError ? error.errors.map(describe).join("; ") : describe(error) }
     finally {
       for (const context of contexts) {
-        slotStates.set(context.lease.slot.id, { state: "quarantined", lease_receipt: context.lease.receipt, cleanup_receipt: context.cleanup })
+        const storage = await inspectFixtureStorage(context, runId)
+        slotStates.set(context.lease.slot.id, { state: "quarantined", lease_receipt: context.lease.receipt, cleanup_receipt: context.cleanup,
+          storage_root: context.storage.path, storage_leftovers: storage.names, storage_error: storage.error })
+        if (storage.names === null || storage.names.length) {
+          unconfirmed.add(context.lease.slot.id)
+          state.stopped ??= storage.error ?? `Slot storage not empty: ${context.lease.slot.id}`
+          await fenceFixtureStorage(context, storage).catch((error: unknown) => { state.stopped ??= describe(error) })
+        }
         if (unconfirmed.has(context.lease.slot.id)) continue
         await context.lease.release(context.cleanup).then(() => { slotStates.get(context.lease.slot.id)!.state = "closed" },
           (error: unknown) => { state.stopped ??= describe(error) })
@@ -256,7 +263,10 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
       const own = attempts.filter((item) => item.task_id === task.id)
       return { id: task.id, rubric_snapshot: rubricSnapshot(task), metrics: aggregateTask(own, config.skipJudge), attempts: own }
     }),
-    storage_leftovers: config.dryRun ? [] : await leftovers(source, runId),
+    storage_leftovers: config.dryRun ? [] : fixture
+      ? [...slotStates.values()].some(slot => slot.storage_leftovers === null) ? null
+        : [...slotStates].flatMap(([id, slot]) => slot.storage_leftovers!.map(name => `${id}/${name}`)).sort()
+      : await leftovers(source, runId),
   }
   await writeSummary(runDir, summary)
   console.log(renderReport(summary))
