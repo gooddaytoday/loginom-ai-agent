@@ -46,3 +46,19 @@ test("tags input generator and independent oracle cover varied lists and the lon
   expect(task!.outputMode).toBe("diagnostic")
   expect(task!.prompt).not.toMatch(/red|blue|153/)
 })
+
+test("recovery loads with the other local cases and independently computes only Category and Profit", async () => {
+  const tasks = await loadTasks(fixtures)
+  expect(tasks.map(task => task.id)).toEqual(["explicit-js", "recovery", "tags"])
+  const task = tasks.find(task => task.id === "recovery")!
+  const oracle = Bun.spawn(["python3", path.join(task.dir, "oracle.py"), path.join(task.dir, task.inputs[0]!)], { stdout: "pipe" })
+  const output = await new Response(oracle.stdout).text()
+  expect(await oracle.exited).toBe(0)
+  expect(output).toBe("Category,Profit\nB,62\nA,55\n")
+  expect(compareCsv(await Bun.file(path.join(task.dir, task.oracle!)).text(), output, 0).passed).toBe(true)
+  expect(tasks.every(item => item.outputMode === "diagnostic" && item.reference === "")).toBe(true)
+  expect(tasks.every(item => item.inputs.length === 1 && item.inputs[0] === "data/dataset.csv")).toBe(true)
+  expect(task.prompt).toContain("Revenue -")
+  expect(task.prompt).toContain("CSV только с колонками Category,Profit")
+  expect(task.prompt).not.toMatch(/B,62|A,55|WIZARD_CALCULATOR_VALIDATION_FAILED/)
+})
