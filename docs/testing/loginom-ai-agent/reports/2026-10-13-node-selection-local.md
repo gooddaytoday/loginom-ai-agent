@@ -592,9 +592,17 @@ refresh19:02:46.045 проверены независимо. Binding SHA
 cleanup false остаётся исходным outcome; operator capture отличается от
 acceptance entry и package caption JD отличается от несохранённого Package1.
 
-Только второй Join caption получает narrow source fix (native port1 + Join icon),
-сохраняя guards. RED→GREEN/342 targeted tests и source independent review PASS;
-общий upstream pending. После новой общей runtime-правки нужны matched builds,
+Итоговый source fix `05b645eec9` допускает обе точные известные Join роли:
+«Главная таблица» только native input0 и «Присоединяемая таблица» только input1,
+обе с единственной Join icon. Все identity/opening/index/ancestry guards сохранены.
+Actual Main caption/binding наблюдались 10 раз; hidden Main пока проверен fixture,
+поэтому live обеих скрытых ролей ещё не заявлен. 5 focused tests/32 negatives PASS;
+полный upstream 3775 total/3765 PASS/10 SKIP/0 FAIL/exit0, syntax/diff-check0 и
+независимый review Approved. Verification SHA
+`0b6f02d06403fadc7e029757a68e23329088e346d7c1936736914391aef85a90`, review SHA
+`5b44bdc9eb383a6079cae069009b5159fd1b26d6cb7ea5c777a4bd94154230a4`.
+Source SHA `80d27a8b318cc1ed800331dda82285aef4a3eab907732fe29eb52e7e036904a2`.
+Новый run `20261013T192418Z-c71363` готовится с теми же model/fixtures/seed. После новой общей runtime-правки нужны matched builds,
 native positive proof и новая полная18+25 серия. Текущие18 baseline/2 candidate
 сохраняются отдельно, ни один начатый model slot не заменяется. Skill policy
 не меняется из-за ошибки стандартного узла; это не policy revision.

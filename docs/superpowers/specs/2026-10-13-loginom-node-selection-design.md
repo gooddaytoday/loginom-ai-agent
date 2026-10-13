@@ -369,6 +369,14 @@ binding. Третий native воспроизвёл отказ и captured DOM: 
 адресно, raw failures сохранены. После общей runtime-правки обязательны новая
 matched пара и полные18+25 на ней: прежние исходы в новый denominator не переносятся.
 
+Source fix `05b645eec9` допускает только точные известные Join captions с
+native input0/input1 и единственной Join icon; identity/opening/ancestry guards
+сохранены. Main caption/binding подтверждены реальными наблюдениями, hidden Main
+геометрия пока regression fixture. 5 focused tests/32 negatives и полный upstream
+3765 PASS/10 SKIP/0 FAIL, syntax/diff-check и независимый review PASS. Новый run
+`20261013T192418Z-c71363` готовит общий runtime и отдельные skill версии; до
+модельных слотов нужны успешные live обе скрытые роли, Join output, Save/cleanup.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

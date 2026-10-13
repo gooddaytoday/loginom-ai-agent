@@ -611,12 +611,22 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   Navigation SHA `b6d9cfb3a1cdd5dee8e814768beade867ee7fabc9d2295a2747a309da3d4f839`.
   Own native3 user74 закрыт адресно по двум GUID/Save/log/admin binding;
   server close19:02:44.920Z и refreshed absence подтверждены независимо.
-- [ ] Исправить только скрытую подпись второго Join-входа по TDD; сохранить
-  ownership/GUID/opening/index/ancestry guards. Проверить actual caption/icon,
-  отрицательные случаи, нужные runtime suites и независимый review.
+- [x] Исправить скрытые фиксированные подписи обоих известных Join-входов по TDD;
+  сохранить ownership/GUID/opening/index/ancestry guards. Commit `05b645eec9`:
+  «Главная таблица» допускается только для native input0, «Присоединяемая таблица»
+  только для input1; обе требуют единственную Join icon. Actual Main caption и
+  binding подтверждены 10 наблюдениями; скрытый Main пока проверен regression
+  fixture, поэтому live proof обеих скрытых ролей остаётся следующим gate.
+  Отдельные RED→GREEN, 5 focused tests/32 negative cases PASS. Полный upstream:
+  3775 total, 3765 PASS, 10 SKIP (8 browser opt-in/2 Windows), 0 FAIL, exit0.
+  Syntax/diff-check и независимый source review Approved. Evidence
+  `join-hidden-roles-fix-verification.json` SHA256
+  `0b6f02d06403fadc7e029757a68e23329088e346d7c1936736914391aef85a90`,
+  review SHA `5b44bdc9eb383a6079cae069009b5159fd1b26d6cb7ea5c777a4bd94154230a4`.
+  Source SHA `80d27a8b318cc1ed800331dda82285aef4a3eab907732fe29eb52e7e036904a2`.
 - [ ] Собрать новую сопоставимую baseline/candidate пару с общей Join-правкой,
   теми же version/model/fixtures/seed и двумя skill версиями. Перед модельными
-  слотами выполнить native proof успешного input1/Join output/Save/cleanup.
+  слотами выполнить native proof обеих скрытых input ролей/Join output/Save/cleanup.
   Старые payload/pins/model/native outcomes не переписывать.
 - [ ] Провести новые полные18+25 и все Tasks3–6 gates на итоговых pins. Изменённый
   runtime не позволяет переносить старые baseline исходы в новый denominator:
