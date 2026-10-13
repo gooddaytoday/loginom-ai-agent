@@ -147,7 +147,7 @@
   "owner_clarification": "Asked whether this is the current backend or an older restored snapshot; request for existing SSH profile is superseded for API reads. No answer received.",
   "next_step": "Verify authoritative current backend/data/access with owner, then re-read exact expected cards and preserved history/ledgers before any coordinated continuation. Do not recreate or reassign vanished tasks automatically.",
   "automation": "lab-56-lab-63-30 remains ACTIVE; all eight done/evidence/acceptance/cleanup not verified",
-  "latest_checked_utc": "2026-10-13T05:21:50.034769+00:00",
+  "latest_checked_utc": "2026-10-13T08:24:20.055166+00:00",
   "subsequent_checks": [
     {
       "checked_utc": "2026-10-13T00:51:45.294777+00:00",
@@ -333,5 +333,17 @@
       "scenario_or_Rich_budget_charge": 0,
       "automation": "ACTIVE; all-eight completion not verified"
     }
-  ]
+  ],
+  "resolution_observation": {
+    "checked_utc": "2026-10-13T08:24:20.055166+00:00",
+    "status": "RESTORED_OBSERVED",
+    "expected_UUIDs_found": 8,
+    "LAB-55_found": true,
+    "project_issue_count": 18,
+    "no_local_configuration_or_backend_mutation": true,
+    "underlying_cause": "UNCLASSIFIED; restoration is an observation, not proof of the original cause.",
+    "receipt": "evals/docs/2026-10-13-text-import-monitor-resumption.json",
+    "historical_NOT_FOUND_receipts": "Preserved unchanged",
+    "owner_backend_clarification": "Superseded for current card reads by restored server visibility"
+  }
 }

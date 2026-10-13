@@ -1,0 +1,314 @@
+{
+  "checked_utc": "2026-10-13T08:24:20.055166+00:00",
+  "first_current_issue_read_utc": "2026-10-13T08:10:41.240523+00:00",
+  "snapshot": "evals/.bundle/text-import-monitor-20261013T081036Z",
+  "workspace_project_canonical_host_match": true,
+  "case_ids_preserved": 58,
+  "visibility": "RESTORED_OBSERVED: all eight exact UUIDs and LAB-55 readable; current project list has 18 issues. No local API/config repair performed; underlying outage cause remains unclassified.",
+  "cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "in_review",
+      "revision": 65,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-12T10:07:12+03:00"
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "blocked",
+      "revision": 149,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-12T21:34:27+03:00"
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-10T23:15:17+03:00"
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-10T23:15:05+03:00"
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-10T23:14:56+03:00"
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-10T23:14:07+03:00"
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-10T23:14:35+03:00"
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued_runs": 0,
+      "latest_root_activity": "2026-10-10T23:20:36+03:00"
+    }
+  ],
+  "workers": [
+    {
+      "id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "name": "Evaler",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    {
+      "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "name": "Rich",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    {
+      "id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+      "name": "Ben",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    }
+  ],
+  "LAB-55": {
+    "status": "in_review",
+    "revision": 16,
+    "active_queued_runs": 0,
+    "untouched": true
+  },
+  "LAB-56_owner_statement": "Owner says completed on 2026-10-13; ACCEPT/evidence/cleanup freshly corroborated. Server remains in_review, not done; no state mutation.",
+  "LAB-56_acceptance": {
+    "attachment_id": "01a12edf-8584-746b-a62e-f0db3d7717f2",
+    "manifest_sha256": "cfe057d770165013eb684a363cfb9d5a70c3aec0a38eedce1142bce530edac5f",
+    "checked_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+    "validation": "confirmed",
+    "cleanup": "confirmed",
+    "product": "PASS",
+    "report_id": "01a12edf-8658-7aa6-8336-cf4d3bfe8c22",
+    "quality": "ACCEPT",
+    "scope": "LAB-56 prepared suite and native/model admission",
+    "archive_sha256": "741b74f4c8818d2f9eda01bcc33bb57466e88f5753b62efc29438b6ab47ad4c3",
+    "internal_files_verified": 148,
+    "independent_calculation_sha256": "0505444a9c777fc5d3104b023479c46113da486b1ee33deb35b1bd049f69150c",
+    "calculation_reproduced": true,
+    "independence_native_chronology": "CONFIRMED",
+    "case_count": 58,
+    "input_count": 59,
+    "typed_tables": 49,
+    "diagnostic_contracts": 10,
+    "CLI_files_verified": 5389,
+    "source_git_files_verified": 1303,
+    "unit": {
+      "pass": 539,
+      "skip": 5,
+      "fail": 0,
+      "typecheck": "PASS"
+    },
+    "actual_model": "openai/gpt-6-luna",
+    "actual_variant": "high",
+    "admission_product": "PASS",
+    "scenario_reference_product_cold": "NOT_RUN",
+    "completion_sha256": "d35d7ca54acbae1ff14639b41155dd56b3a03631acbc78e95ec41035e658d879",
+    "internal_release_verified": true,
+    "stand": "FREE",
+    "storage_empty": true
+  },
+  "LAB-57_blocker": {
+    "code": "PINNED_CLI_PROVIDER_INPUT_SERIALIZATION_UNSUPPORTED_TSV",
+    "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+    "fingerprint": "pinned-cli:MessageV2.toModelMessages:csv-only-inline-shim:unsupported-tsv-file-part",
+    "status": "OWNER_DECISION_REQUIRED: CLI pin change, autonomy point 6",
+    "charge": 0,
+    "proposal_attachment_id": "01a13138-6bef-777d-83fc-f5a0c6a5b42a",
+    "proposal_sha256": "a5b4b73372a048dcb37b846d007f652f19c03327024f84097ef8ce620b742420",
+    "proposal_status": "NOT_APPLIED",
+    "ready_for_ben": false,
+    "owner_decision_requested_comment_id": "01a1315c-afd7-7588-a622-313a9a772eb7",
+    "proposal_revision": {
+      "commit": "d68d433bed8cc2be72eec3f590c0ffd09cc47af6",
+      "sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465",
+      "comment_id": "01a13153-b51a-7a8b-811a-3ad541305164",
+      "dry_run": "PASS exact5cd",
+      "syntax": "PASS",
+      "functional": "NOT_RUN",
+      "admission": "NOT_ADMITTED",
+      "review_sha256": "53cfe82b5485683bf5d410b2242ee5f6e696c76bac08b2651f3edd1a1c58a339",
+      "review_attachment_id": "01a13165-07b6-7bf6-a667-d3a2081cea41"
+    }
+  },
+  "LAB-57_budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "LAB-57_repeat_ledger": {
+    "authorization_comment_id": "01a12f9e-6ca3-73d7-acbf-c0180d51fef5",
+    "native_tasks_count": 10,
+    "task_ids": [
+      "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+      "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+      "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+      "01a12f9d-99bf-79a6-a978-026c32df932e",
+      "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+      "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+      "01a13004-e856-7bd2-9cc7-6f5c5b922c3d",
+      "01a13042-dc9d-72d8-b324-60d52c04ebf8",
+      "01a130cf-f462-77ae-925b-7883730d80b7",
+      "01a130ff-f583-7158-a212-250ff18600cf"
+    ],
+    "next_native_ordinal": 11,
+    "repeat_limit": 10,
+    "repeat_consumed": 2,
+    "repeat_remaining": 8,
+    "counting": "Confirmed same-cause repeats only; no precharge/reset",
+    "series_policy": "LAB-56–63: sequential independent ACCEPT/cleanup",
+    "ledger_sha256": "c18181e35692e0c14e8f3a98a96122bb3fbc7ca8fb590d7e86c5773288387ebf",
+    "pending_task_classification": "Task10 completed; new unique root charge=0; repeats remain2/10",
+    "ledger_attachment_id": "01a1315c-af02-7391-af03-c79b38c1ca40"
+  },
+  "LAB-57_stage": {
+    "authorization_comment_id": "01a130f3-a16d-719a-a3b5-1930817d7cb4",
+    "started_utc": "2026-10-12T16:40:20.846510+00:00",
+    "deadline_utc": "2026-10-12T22:40:20.846510+00:00",
+    "wall_seconds": 21600,
+    "reset_on_new_blocker_or_task": false,
+    "document_sha256": "9e8f46bcce665a2dabd4c7f6a45373e3b5b2d92acbc2403491b28c9353c500e8",
+    "cost": "Existing scenario limits; actual scenario/native worker usage attached; external billing unavailable",
+    "cold_native": "Repair verification authorized within stage; cumulative operational counters preserved",
+    "status": "BLOCKED external CLI pin; owner decision required; deadline preserved",
+    "attachment_id": "01a130ff-f467-78ef-8324-902daca43e6c"
+  },
+  "LAB-57_old_stage_expired": true,
+  "LAB-57_latest_thread_comments": [
+    {
+      "id": "01a12774-cff9-7e1d-bc84-e7ddffbd768a",
+      "parent_id": null,
+      "revision": 2,
+      "created_at": "2026-10-10T23:15:29+03:00",
+      "content_sha256": "f68bb101a5b09a2af15c79d297449987b5bf677c07d1a6196dfb641c58325102"
+    },
+    {
+      "id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+      "parent_id": "01a130ff-f560-7bab-8c79-239aa6cc7e5c",
+      "revision": 1,
+      "created_at": "2026-10-12T20:45:44+03:00",
+      "content_sha256": "b2914986197fce7838927a48601157e5143ec110456357abcd92f877b35e3789"
+    },
+    {
+      "id": "01a13153-b51a-7a8b-811a-3ad541305164",
+      "parent_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+      "revision": 1,
+      "created_at": "2026-10-12T21:15:31+03:00",
+      "content_sha256": "a1a5b5a260dccf0bf66d87af638cf687a34e5ed51639a5b71c52895e29d9f7a8"
+    },
+    {
+      "id": "01a1315c-afd7-7588-a622-313a9a772eb7",
+      "parent_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+      "revision": 1,
+      "created_at": "2026-10-12T21:25:20+03:00",
+      "content_sha256": "87713bf36ba283a86960eaf94f9a12f8c7e3c233464a23e084e291fa1810e3f1"
+    },
+    {
+      "id": "01a13165-089f-7b14-9101-2b6e1dad98ad",
+      "parent_id": "01a13153-b51a-7a8b-811a-3ad541305164",
+      "revision": 1,
+      "created_at": "2026-10-12T21:34:27+03:00",
+      "content_sha256": "80013febe5a74b684c961073e47f7c3be40f22604f1e5455bcc3304df213370c"
+    }
+  ],
+  "fresh_attachments": [
+    {
+      "attachment_id": "01a12edf-8584-746b-a62e-f0db3d7717f2",
+      "bytes": 258115,
+      "sha256": "741b74f4c8818d2f9eda01bcc33bb57466e88f5753b62efc29438b6ab47ad4c3",
+      "expected_SHA_match": true,
+      "ZIP_CRC_and_safe_paths": "PASS",
+      "ZIP_entries": 149
+    },
+    {
+      "attachment_id": "01a12eef-d750-71a6-91d1-853f9cfe370a",
+      "bytes": 1585,
+      "sha256": "e9e212a10a4ca9857547a51af6acae647803de90ff159964a23f82571a7df2aa",
+      "expected_SHA_match": null,
+      "ZIP_CRC_and_safe_paths": null,
+      "ZIP_entries": null
+    },
+    {
+      "attachment_id": "01a1315c-af02-7391-af03-c79b38c1ca40",
+      "bytes": 20297,
+      "sha256": "1d96e22234b908ad9ca9a2ad0ce7048d0bb439173fefb6895d44673c63174355",
+      "expected_SHA_match": true,
+      "ZIP_CRC_and_safe_paths": "PASS",
+      "ZIP_entries": 9
+    },
+    {
+      "attachment_id": "01a13165-07b6-7bf6-a667-d3a2081cea41",
+      "bytes": 2296,
+      "sha256": "53cfe82b5485683bf5d410b2242ee5f6e696c76bac08b2651f3edd1a1c58a339",
+      "expected_SHA_match": true,
+      "ZIP_CRC_and_safe_paths": null,
+      "ZIP_entries": null
+    }
+  ],
+  "prior_receipts_and_error_history": "Retained; current IDs, metadata and downloaded attachment bytes agree with checked historical delivery. No repeat of unchanged full native suites.",
+  "pin_approval": "No separate owner approval to change pinned CLI/runtime received; autonomy point 6 remains applicable. Existing concrete proposal is prepared, NOT_APPLIED/NOT_ADMITTED; functional/typecheck/build tests remain NOT_RUN.",
+  "old_backend_clarification": "No longer needed for reading expected cards after fresh visibility restoration; no new endpoint or credentials requested.",
+  "automation": {
+    "old_id": "lab-56-lab-63-30",
+    "old_update_result": "Automation does not exist in the app and could not be updated; no delete action performed.",
+    "new_id": "lab-56-lab-63",
+    "kind": "heartbeat",
+    "destination": "current thread",
+    "interval_minutes": 30,
+    "status": "ACTIVE",
+    "creation_confirmed": true,
+    "view_confirmed": true,
+    "prompt": "Preserves full 13 October owner request: autonomous Rich scope, six clauses, Ben independence, counter policy, quiet notifications and deletion only after all eight done/verified."
+  },
+  "worker_dispatches_or_new_routed_comments": 0,
+  "model_native_reference_product_recovery_operations": 0,
+  "Rich_budget_charge": 0,
+  "all_eight_done_verified": false,
+  "next_step": "Continue every 30 minutes with fresh API reads; await existing explicit CLI pin decision. Evaler may coordinate a new bounded stage after approval and fresh resource/dependency/cleanup checks. Do not duplicate Rich or change status/pins."
+}
