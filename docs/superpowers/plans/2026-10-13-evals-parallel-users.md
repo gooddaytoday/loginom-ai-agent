@@ -567,6 +567,8 @@ expect(agentVisiblePaths).not.toContain(otherProfile)
 
 #### После слияния shared-oauth в loginom
 
+- [x] Подзадача 7 (2026-10-14): codexInfo проверяет auth.json в том же effective judgeEnvironment, что передаётся --version. Изолированный public preflight RED принял empty judge home при наличии parent fixture auth; GREEN отвергает, родительский файл сохранён. Fixture main задаёт judge.env до judgeInfo и использует его для exec: actual fake --version RED получил null, GREEN version/exec получают exact leased home. 58 judge/preflight tests PASS/163 assertions (29.55s), parallel gate 1 PASS/13 assertions (16.34s), skip-judge occupied-home 1 PASS/2 assertions; typecheck/diff PASS. Это fixtures без настоящего Codex OAuth; private-home/live AUTH_REQUIRED admission остаётся открытым.
+
 Эти шаги снимают временную зависимость перед итоговой интеграцией evals. Они не
 разрешают переписывать текущую историю или изменять стенды в рамках подготовки
 документов.
@@ -769,4 +771,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 14. Product worktree evals-oauth@04ff82be4d: five cherry-pick -x + independent installer fix; dependency lineage/diagnosis в contract.
 15. Evals full regression: 754 PASS/12 SKIP/3 FAIL/3715 assertions (787.37s). Два lifecycle failures: narrow 3/3 pairs PASS, root cause неизвестен; третья outdated report assertion исправлена: 11 infra-retry PASS/79 assertions (53.66s), typecheck PASS. Guards не ослаблены, full PASS не заявлен.
 16. Cold parallel module: 25 PASS/160 assertions (114.56s); 36 proof versions/31 paths/43 PID:starttime, live birth matches=0. Два historical lifecycle failures не воспроизведены; PID344630 не атрибутирован. Probe/collector завершены; safe logs600 /tmp/evals-parallel-cold-signal-msu69vi4.{events,proofs}.jsonl.
-17. Task7 HTTP-only env и configured shared-dir bind проверены реальными child/bwrap FS probes (13 boundary + 25 controller PASS), без OAuth qualification. Next: judge effective env/shared auth admission и Task6 registry; источник historical PROFILE_BUSY ещё не доказан, bare unknown CLI на общем host не запускать, unknown PID не исключать.
+17. Task7 HTTP-only/configured shared-dir bind и judge effective home (version/exec/preflight) проверены child/bwrap/public fixtures, без OAuth qualification. Next: shared auth admission через public product contract и Task6 registry; historical PROFILE_BUSY ещё не доказан, bare unknown CLI на общем host не запускать, unknown PID не исключать.

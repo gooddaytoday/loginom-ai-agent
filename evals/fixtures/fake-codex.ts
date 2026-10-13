@@ -12,6 +12,8 @@ if (args.includes("--environment-probe")) {
   )
 }
 if (args.includes("--version")) {
+  if (args.includes("--version-home-file"))
+    await Bun.write(args[args.indexOf("--version-home-file") + 1]!, JSON.stringify({ codexHome: process.env.CODEX_HOME ?? null }))
   process.stdout.write("fake-codex 0.0.0\n")
   process.exit(0)
 }

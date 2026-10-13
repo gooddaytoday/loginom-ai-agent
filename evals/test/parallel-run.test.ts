@@ -170,10 +170,12 @@ test("fixture main: overlapping agents share one judge gate through actual fake-
   try {
     const input = await parallelFixture(root, ["parallel-fast", "parallel-slow"], true)
     const traceFile = path.join(root, "judge-trace.jsonl")
+    const versionHome = path.join(root, "judge-version-home.json")
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
-      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --gate-log ${traceFile} --delay-ms 5000`,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --gate-log ${traceFile} --delay-ms 5000 --version-home-file ${versionHome}`,
       JUDGE_MODEL: "gpt-6-sol", JUDGE_REASONING: "xhigh" }, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(0)
+    expect(await Bun.file(versionHome).json()).toEqual({ codexHome: input.slots.judge.codexHome })
     const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
     expect(summary.metrics.scored_count).toBe(2)
     const judges = (await Bun.file(traceFile).text()).trim().split("\n").map(line => JSON.parse(line)) as
