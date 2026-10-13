@@ -39,7 +39,7 @@
   "owner_CLI_pin_decision": "Last verified pending; no new approval inferred",
   "automation": "lab-56-lab-63-30 remains ACTIVE; all-eight completion not confirmed",
   "next_step": "Re-read current Multica state on next scheduled check; diagnose changed connectivity before any handoff or execution. Preserve prior evidence and fixed LAB-57 stage deadline.",
-  "latest_checked_utc": "2026-10-12T23:56:58.758358+00:00",
+  "latest_checked_utc": "2026-10-13T00:25:23.614988+00:00",
   "subsequent_checks": [
     {
       "checked_utc": "2026-10-12T20:21:47.151206+00:00",
@@ -166,7 +166,19 @@
       "later_server_authorization_or_extension": "UNKNOWN",
       "persistent_CLI_credentials_VPN_or_worker_changes": false,
       "scenario_or_Rich_budget_charge": 0
+    },
+    {
+      "checked_utc": "2026-10-13T00:25:23.614988+00:00",
+      "operation": "default CLI, exact issue UUIDs, workspace/project/roster and full project issue list",
+      "result": "TLS restored; all eight expected issues and LAB-55 not found; project contains four older issues. Current statuses/runs/acceptance/cleanup of expected cards unavailable.",
+      "scenario_or_Rich_budget_charge": 0,
+      "persistent_changes": false
     }
   ],
-  "existing_read_only_access_question": "Pending: user asked for existing SSH alias/profile for user@10.200.13.152, without secrets; no new access or credentials requested/installed."
+  "existing_read_only_access_question": "Superseded for API reads: HTTPS restored; current owner clarification concerns backend/data/card visibility, not SSH credentials.",
+  "TLS_resolution_observation": {
+    "checked_utc": "2026-10-13T00:25:23.614988+00:00",
+    "result": "API reachable on canonical host with default configuration; expected workspace/project and roster read successfully. TLS restoration cause not established; no persistent network changes made by monitor.",
+    "new_blocker_receipt": "evals/docs/2026-10-13-text-import-card-visibility-blocker.json"
+  }
 }

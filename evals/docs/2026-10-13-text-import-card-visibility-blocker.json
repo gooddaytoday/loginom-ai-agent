@@ -1,0 +1,150 @@
+{
+  "checked_utc": "2026-10-13T00:25:23.614988+00:00",
+  "TLS_connectivity": "RESTORED: API responses received",
+  "canonical_host_match": true,
+  "expected_workspace": "dcf616e7-66eb-470a-9b04-6462f220cf3b",
+  "observed_default_workspace": "dcf616e7-66eb-470a-9b04-6462f220cf3b",
+  "observed_project": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+  "missing_issue_reads": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "exit_code": 4,
+      "result": "not found"
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "exit_code": 4,
+      "result": "not found"
+    }
+  ],
+  "LAB-55_exit_code": 4,
+  "blocker_fingerprint": "monitor:Multica:expected-card-set-not-visible-in-confirmed-workspace-project",
+  "classification": "UNCLASSIFIED cause: data restore, backend selection or visibility/access are not yet distinguished. Not a Rich run failure.",
+  "project_title": "Loginom — eval узлов",
+  "project_issue_count": 4,
+  "project_list_has_more": false,
+  "visible_project_issues": [
+    {
+      "id": "01a116e9-6e43-779c-9445-c708b58c53bc",
+      "identifier": "LAB-26",
+      "project_id": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+      "revision": 75,
+      "status": "in_review",
+      "title": "Кросс-таблица — ещё три eval: два ключа, min/max, обновление категорий",
+      "updated_at": "2026-10-07T23:36:22+03:00",
+      "workspace_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b"
+    },
+    {
+      "id": "01a11195-6934-7d5e-9cc8-af0872512245",
+      "identifier": "LAB-17",
+      "project_id": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+      "revision": 3,
+      "status": "cancelled",
+      "title": "Кросс-таблица — независимая приёмка eval",
+      "updated_at": "2026-10-06T17:36:13+03:00",
+      "workspace_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b"
+    },
+    {
+      "id": "01a115ab-1a79-7ac6-aa72-9ad8261a71f9",
+      "identifier": "LAB-22",
+      "project_id": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+      "revision": 12,
+      "status": "done",
+      "title": "eval-tests: проверка Codex и MCP",
+      "updated_at": "2026-10-07T15:00:57+03:00",
+      "workspace_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b"
+    },
+    {
+      "id": "01a11195-66d8-746f-b02e-9a968354123b",
+      "identifier": "LAB-16",
+      "project_id": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+      "revision": 48,
+      "status": "in_review",
+      "title": "Кросс-таблица — разработка и приёмка узловых eval",
+      "updated_at": "2026-10-07T17:46:07+03:00",
+      "workspace_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b"
+    }
+  ],
+  "project_response_sha256": "bf8964da20cf13e4976b691b6b3564727aff6a809f6feedd7427450755f87a85",
+  "expected_mapping_source": "evals/docs/text-import-multica-readback.json",
+  "case_ids_preserved": 58,
+  "comments_metadata_native_runs_for_expected_cards": "UNAVAILABLE; not found does not prove done, zero active/queued, deletion or cleanup.",
+  "worker_models_observed": [
+    {
+      "id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "name": "Evaler",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "reported_status": "idle"
+    },
+    {
+      "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "name": "Rich",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "reported_status": "idle"
+    },
+    {
+      "id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+      "name": "Ben",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "reported_status": "idle"
+    }
+  ],
+  "worker_status_limitation": "Reported idle is not proof of absence of real processes/leases or orphaned work after a possible backend/data change.",
+  "last_confirmed_expected_card_state_utc": "2026-10-12T19:21:58Z",
+  "last_confirmed_Rich_repeat_consumed": 2,
+  "last_confirmed_Rich_repeat_limit": 10,
+  "recreated_cards": 0,
+  "worker_dispatches": 0,
+  "model_native_reference_product_recovery_operations": 0,
+  "shared_CLI_credentials_VPN_worker_models_or_acceptance_changed": false,
+  "known_old_stage_deadline_utc": "2026-10-12T22:40:20.846510+00:00",
+  "known_old_stage_expired": true,
+  "new_server_authorization": "UNAVAILABLE; no approval inferred",
+  "owner_clarification": "Asked whether this is the current backend or an older restored snapshot; request for existing SSH profile is superseded for API reads. No answer received.",
+  "next_step": "Verify authoritative current backend/data/access with owner, then re-read exact expected cards and preserved history/ledgers before any coordinated continuation. Do not recreate or reassign vanished tasks automatically.",
+  "automation": "lab-56-lab-63-30 remains ACTIVE; all eight done/evidence/acceptance/cleanup not verified"
+}
