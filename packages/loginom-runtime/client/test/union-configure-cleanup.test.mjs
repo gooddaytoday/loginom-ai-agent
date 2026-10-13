@@ -10,7 +10,7 @@ const deferred = () => {let resolve, reject; const promise = new Promise((a,b) =
 
 // Page/controller/native methods and logical lease are explicit doubles.
 // Receipt open/write/fsync/close/readback are real filesystem operations.
-async function fixture() {
+async function fixture(beforeMint = () => {}) {
   const directory = await mkdtemp(join(tmpdir(),'union-partial-'));
   const abort = new AbortController(), counts={close:0,read:0,write:0};
   const node = {document_id:'document',workflow_id:'workflow',node_id:'node'};
@@ -31,8 +31,10 @@ async function fixture() {
     try{await f.writeFile(JSON.stringify(event));await f.sync();}finally{await f.close();}
     return JSON.parse(await readFile(join(directory,'partial.json'),'utf8'));
   };
-  const scope=retainUnionConfigureCleanup({operation,tuple,current:()=>current,prepared,originalClose,
-    observeTerminal:async operands=>{counts.read++;assert.equal(operands.signal,abort.signal);await readHook();return terminal;},record,signal:abort.signal,deadline:1000,now:()=>clock});
+  try { beforeMint(operation); } catch(error) { await rm(directory,{recursive:true}); throw error; }
+  let scope;
+  try { scope=retainUnionConfigureCleanup({operation,tuple,current:()=>current,prepared,originalClose,
+    observeTerminal:async operands=>{counts.read++;assert.equal(operands.signal,abort.signal);await readHook();return terminal;},record,signal:abort.signal,deadline:1000,now:()=>clock}); } catch(error) { await rm(directory,{recursive:true}); throw error; }
   const primary=Error('AMBIGUOUS original',{cause:0}); scope.holdFailure(primary);
   return {operation,current,tuple,scope,counts,primary,abort,directory,
     closeHook:f=>closeHook=f, readHook:f=>readHook=f,writeHook:f=>writeHook=f,
@@ -124,3 +126,30 @@ test('changed accepted effects or pending reference refuses before callback',()=
   const original=f.operation.nodeApply.pending;f.operation.nodeApply.pending={...original};await assert.rejects(f.scope.complete());
   f.operation.nodeApply.pending=original;f.operation.nodeApply.phases[0].value.effect_possible=false;await assert.rejects(f.scope.complete());assert.equal(f.counts.close,0);
 }));
+
+test('ID drift during durable writer cannot publish witness; restored original repairs storage only',()=>control(async f=>{
+  f.writeHook(async()=>{f.operation.id='foreign-operation';});
+  await assert.rejects(f.scope.complete());assert.equal(f.scope.state.durable,false);
+  assert.equal(JSON.parse(await readFile(join(f.directory,'partial.json'))).operation_id,'original');
+  await assert.rejects(f.scope.complete());assert.deepEqual(f.counts,{close:1,read:1,write:1});
+  f.operation.id='original';f.writeHook(async()=>{});
+  assert.equal(unionCleanupWitness(await f.scope.complete(),f.operation),true);
+  assert.deepEqual(f.counts,{close:1,read:1,write:2});assert.equal(f.scope.primary,f.primary);
+}));
+test('cached receipt writer refusal rejects foreign ID and restores without Close/read replay',()=>control(async f=>{
+  const refusal=Error('fsync refusal',{cause:0});f.writeHook(async()=>{throw refusal;});
+  await assert.rejects(f.scope.complete(),e=>e===refusal);
+  f.operation.id='foreign-operation';f.writeHook(async()=>{});await assert.rejects(f.scope.complete());
+  assert.deepEqual(f.counts,{close:1,read:1,write:1});assert.equal(f.scope.secondary[0],refusal);
+  f.operation.id='original';await f.scope.complete();assert.deepEqual(f.counts,{close:1,read:1,write:2});
+  assert.equal(JSON.parse(await readFile(join(f.directory,'partial.json'))).operation_id,'original');
+}));
+test('changing both live ID and request never rebinds original ID',()=>control(async f=>{
+  f.operation.id='foreign-operation';f.operation.parameters.operation_id='foreign-operation';
+  await assert.rejects(f.scope.complete());assert.deepEqual(f.counts,{close:0,read:0,write:0});
+}));
+
+for (const id of [undefined,null,'', 'foreign-operation'])
+ test('mint refuses missing or request-mismatched original ID '+String(id),async()=>{
+  await assert.rejects(fixture(operation=>{operation.id=id;}));
+ });

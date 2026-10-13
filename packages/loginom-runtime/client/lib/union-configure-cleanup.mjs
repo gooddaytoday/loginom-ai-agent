@@ -49,6 +49,8 @@ export function retainUnionConfigureCleanup({operation, tuple, current, prepared
     || !Number.isFinite(deadline) || !signal || typeof signal.throwIfAborted !== 'function'
     || tuple.close !== originalClose || tuple.signal !== signal || tuple.deadline !== deadline
     || [current, originalClose, observeTerminal, record].some(f => typeof f !== 'function')) fail('Original Union cleanup inputs missing');
+  const operationId = operation.id;
+  if (typeof operationId !== 'string' || operation.parameters.operation_id !== operationId) fail('Original Union operation ID/request differs');
   const retained = {...tuple}, request = bytes(operation.parameters), signature = operation.signature;
   const binding = wizardCloseBinding(prepared), bindingBytes = bytes(binding);
   if (!['document_id','workflow_id','node_id'].every(k => binding.node[k] === operation.nodeApply?.node?.[k])) fail('Original prepared Union node differs');
@@ -57,7 +59,7 @@ export function retainUnionConfigureCleanup({operation, tuple, current, prepared
   const secondary = [];
   const check = () => {
     signal.throwIfAborted();
-    if (now() >= deadline || operation.signature !== signature || bytes(operation.parameters) !== request) fail('Original Union operation/deadline changed');
+    if (now() >= deadline || operation.id !== operationId || operation.signature !== signature || bytes(operation.parameters) !== request) fail('Original Union operation/deadline changed');
     const c = current();
     if (!c || keys.some(k => c[k] !== retained[k]) || c.running !== false || c.dirty !== false
       || c.writerPending !== false || c.transportUnknown !== false) fail('Original Union custody is not confirmed');
@@ -103,7 +105,7 @@ export function retainUnionConfigureCleanup({operation, tuple, current, prepared
           if (!cancelledWizardReady(observation, binding)) fail('Original Union terminal proof differs');
           terminal = observedBytes; terminalState = 'confirmed';
         }
-        receipt ??= Object.freeze({phase:'union_configure_partial_cleanup', operation_id:operation.id,
+        receipt ??= Object.freeze({phase:'union_configure_partial_cleanup', operation_id:operationId,
           signature, request_sha256:createHash('sha256').update(request).digest('hex'),
           original_outcome:JSON.parse(outcomeBytes), primary:cause(primary),
           binding:JSON.parse(bindingBytes), terminal:JSON.parse(terminal),

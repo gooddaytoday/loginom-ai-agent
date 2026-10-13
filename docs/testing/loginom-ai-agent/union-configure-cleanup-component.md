@@ -8,7 +8,7 @@ it creates no owner, lease, Page, timer, transport, or public request. Registrat
 belongs at the actual prepared wizard/controller creation, before configure.
 Required refs: owner/run/lease/generation/chat/account/session/Page/context,
 package/workflow/node/wizard/controller, original callback, signal and absolute
-deadline. Original request/signature/node and pending configure are retained.
+deadline. Original operation ID bound to request.operation_id, request/signature/node and pending configure are retained.
 Currentness includes inactive native work, known transport, no dirty wizard or
 pending writer. These predicates are refusal checks, never native authority.
 
@@ -21,13 +21,13 @@ exact durable writer acknowledgement produces an operation-bound opaque witness.
 Copied/foreign witnesses refuse. Writer failure retains confirmed callback and
 terminal proof for same-owner storage-only retry, never another Close/read.
 Callback rejection/lost terminal remains unknown; retry cannot replay either.
-All awaits recheck original tuple/signal/deadline/request/state. No outcome,
+All awaits recheck original tuple/signal/deadline/operation ID/request/state. No outcome,
 pending, cleanupConfirmed, nodeJobs, or public surface is mutated by this module.
 
 Exact remaining producer/consumer seams
 
 `node-procedure.mjs:480-503` awaits UI action transport and records its receipt;
-`workspace-ui.mjs:3712` dispatches a click and `:3885-3908` proves returned graph.
+`workspace-ui.mjs:3484` dispatches a click and `:3657-3676` proves returned graph.
 Neither retains the actual controller's FCallbackClose / CloseWizard Promise.
 `node-wizard-close.mjs:45-64` therefore cannot supply this component's original
 callback qualification. An external absent-wizard observation is insufficient.
