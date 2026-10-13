@@ -289,7 +289,7 @@ function readApply(part: unknown, parts: unknown[]) {
   const reference = record(target?.ref) ? target.ref : undefined
   const receipts = parts.filter(record).filter((candidate) => candidate.sessionID === part.sessionID
     && ["loginom_dock_node_apply", "loginom_dock_node_wait", "loginom_dock_node_resume"].includes(String(candidate.tool))
-    && record(candidate.state) && candidate.state.status === "completed" && record(candidate.state.input)
+    && record(candidate.state) && ["completed", "error"].includes(String(candidate.state.status)) && record(candidate.state.input)
     && candidate.state.input.operation_id === request?.operation_id).map(receipt).filter(record)
   const terminal = receipts.at(-1)
   const node = record(terminal?.node) ? terminal.node : undefined

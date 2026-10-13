@@ -163,7 +163,7 @@ test("an owned runtime JS admission cannot be hidden by a missing public apply",
   expect(result.failures).toContain("JAVASCRIPT_NOT_ALLOWED")
 })
 
-test.each(["corrected", "blocked", "wrong-code", "foreign-node", "foreign-operation"])(
+test.each(["corrected", "blocked", "wrong-code", "foreign-node", "foreign-operation", "error-receipt"])(
   "recovery requires the native refusal and later correction on the same calculator: %s", (kind) => {
     const runtime: SelectionRuntime[] = structuredClone(pilotRuntime)
     const node = { document_id: "document", workflow_id: "workflow", node_id: "calculator" }
@@ -173,7 +173,8 @@ test.each(["corrected", "blocked", "wrong-code", "foreign-node", "foreign-operat
       error: { code: "NODE_APPLY_STOPPED", cause: { code: kind === "wrong-code" ? "OTHER_ERROR" : "WIZARD_CALCULATOR_VALIDATION_FAILED" } } }
     const part = { id: "recovery", type: "tool", tool: "loginom_dock_node_apply", sessionID: pilotHistory.snapshot.sessionID,
       state: { status: "completed", input: request, output: JSON.stringify(rejected) } }
-    const parts: unknown[] = [...pilotHistory.snapshot.parts, part]
+    const parts: unknown[] = [...pilotHistory.snapshot.parts, kind === "error-receipt"
+      ? { ...part, state: { status: "error", input: request, error: JSON.stringify(rejected) } } : part]
     runtime[0]!.events.push({ phase: "node_phase_refused", session_id: pilotRuntime[0]!.session.sessionId,
       operation_id: kind === "foreign-operation" ? "foreign" : request.operation_id,
       receipt: { status: "FAILED", cleanup_complete: true, verification: "calculator_syntax_rejected_draft_restored",
@@ -182,7 +183,7 @@ test.each(["corrected", "blocked", "wrong-code", "foreign-node", "foreign-operat
       input: { ...request, operation_id: "corrected-formula" }, output: JSON.stringify({ ...rejected,
         operation_id: "corrected-formula", status: "SUCCEEDED", execution: { status: "completed" }, error: null }) } })
     expect(inspectSelectionRecovery({ parts, runtime }).recoveryStatus)
-      .toBe(["corrected", "blocked"].includes(kind) ? kind : "unobserved")
+      .toBe(kind === "error-receipt" ? "corrected" : ["corrected", "blocked"].includes(kind) ? kind : "unobserved")
   },
 )
 
