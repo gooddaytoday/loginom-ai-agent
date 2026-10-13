@@ -1,6 +1,6 @@
 import os from "node:os"
 import path from "node:path"
-import { lstat, mkdtemp, realpath } from "node:fs/promises"
+import { lstat, mkdtemp, readdir, realpath, unlink } from "node:fs/promises"
 import { agentCommand } from "./cli"
 import type { EvalConfig } from "./config"
 import { archiveDiagnostics } from "./diagnostics"
@@ -56,6 +56,8 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
     const contexts = []
     for (const lease of leases) {
       const slot = lease.slot
+      const storage = path.join(input.storage, slot.id)
+      const storageInfo = await lstat(storage)
       const own: EvalConfig = { ...config, profileDir: slot.profileDir, artifactSource: `dir:${path.join(input.storage, slot.id)}`,
         loginom: { ...config.loginom, url: input.file.server.url, username: slot.username },
         agent: { ...config.agent, workspaceRoot: slot.workspaceRoot } }
@@ -73,7 +75,8 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
         path.join(input.file.controller.stateDir, `${runId}-${slot.id}-initial.archive.json`))
       const cleanup = path.join(input.file.controller.stateDir, `slot-${slot.id}.cleanup.json`)
       await writeLeaseReceipt(cleanup, fixtureCleanup(lease, receipt.archive))
-      contexts.push({ config: own, command, lease, cleanup, controllerDir: input.file.controller.stateDir })
+      contexts.push({ config: own, command, lease, cleanup, controllerDir: input.file.controller.stateDir,
+        storage: { path: storage, device: storageInfo.dev, inode: storageInfo.ino } })
     }
     return contexts
   } catch (error) {
@@ -93,10 +96,43 @@ export async function finishFixtureAttempt(context: Awaited<ReturnType<typeof pr
   const archive = await mkdtemp(path.join(context.lease.slot.historyDir, `${result.task_id}-${result.attempt}-`))
   const receipt = await archiveProfileEvidence(context.config.profileDir, archive,
     path.join(context.controllerDir, `${path.basename(archive)}.archive.json`))
+  const storage = await cleanupFixtureStorage(context, result, out)
   result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
-  await writeLeaseReceipt(path.join(out, "cleanup.json"), { ...evidence, liveQualified: false, archive: receipt, result: result.environment_cleanup })
+  await writeLeaseReceipt(path.join(out, "cleanup.json"), { ...evidence, liveQualified: false, archive: receipt, storage, result: result.environment_cleanup })
   await writeLeaseReceipt(context.cleanup, fixtureCleanup(context.lease, archive))
   await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
+}
+
+export async function beginFixtureAttempt(context: Awaited<ReturnType<typeof prepareFixture>>[number]) {
+  await writeLeaseReceipt(context.cleanup, { ...fixtureCleanup(context.lease, ""), status: "pending",
+    processes: "pending", archive: "pending", storageDeletionAllowed: false, nextAdmissionAllowed: false })
+}
+
+async function cleanupFixtureStorage(context: Awaited<ReturnType<typeof prepareFixture>>[number], result: AttemptResult, out: string) {
+  const root = await lstat(context.storage.path)
+  if (!root.isDirectory() || root.dev !== context.storage.device || root.ino !== context.storage.inode ||
+    root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 || await realpath(context.storage.path) !== context.storage.path)
+    throw Error("Fixture storage identity changed")
+  if (!result.package_path) return { deleted: [] }
+  const prefix = `eval-${path.basename(path.dirname(path.dirname(out)))}-${result.task_id}-${result.attempt}`
+  const names = [path.basename(result.package_path), ...await readdir(path.join(out, "artifact/results"))]
+  const files = await Promise.all(names.map(async name => {
+    if (path.basename(name) !== name || !name.startsWith(`${prefix}.`) && !name.startsWith(`${prefix}-`))
+      throw Error("Fixture artifact ownership unconfirmed")
+    const file = path.join(context.storage.path, name)
+    const info = await lstat(file)
+    if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1) throw Error("Fixture artifact identity changed")
+    const copy = name === path.basename(result.package_path!) ? path.join(out, "artifact/package.lgp") : path.join(out, "artifact/results", name)
+    const digest = (target: string) => Bun.file(target).bytes().then(bytes => new Bun.CryptoHasher("sha256").update(bytes).digest("hex"))
+    if (await digest(file) !== await digest(copy)) throw Error("Fixture artifact content changed")
+    return { file, device: info.dev, inode: info.ino, name }
+  }))
+  for (const file of files) {
+    const current = await lstat(file.file)
+    if (current.dev !== file.device || current.ino !== file.inode) throw Error("Fixture artifact identity changed")
+    await unlink(file.file)
+  }
+  return { deleted: files.map(file => file.name) }
 }
 
 function fixtureCleanup(lease: SlotLease, archivePath: string) {

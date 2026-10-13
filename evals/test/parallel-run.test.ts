@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
+import { existsSync, readFileSync, watch } from "node:fs"
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
@@ -64,6 +65,62 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
       const cleanup = await Bun.file(path.join(input.slots.controller.stateDir, `slot-${slot.id}.cleanup.json`)).json()
       expect(cleanup).toMatchObject({ status: "confirmed", liveQualified: false, archive: "committed" })
     }
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: removes only its artifacts after the profile archive is durably committed", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-storage-order-"))
+  try {
+    const input = await fixture(root, ["parallel-fast"], true)
+    const storage = path.join(root, "storage/a")
+    await Bun.write(path.join(storage, "foreign.lgp"), "foreign evidence")
+    const deletions: boolean[] = []
+    const watcher = watch(storage, (_event, name) => {
+      if (!name?.startsWith("eval-") || existsSync(path.join(storage, name))) return
+      deletions.push(Array.from(new Bun.Glob("*.archive.json").scanSync(input.slots.controller.stateDir)).some(file => {
+        const manifest = JSON.parse(readFileSync(path.join(input.slots.controller.stateDir, file), "utf8"))
+        return manifest.status === "committed" && manifest.roots.some((row: { name: string }) => row.name === "data/loginom-ai-agent.db")
+      }))
+    })
+    try {
+      const run = await main(["--tasks", path.join(root, "tasks"), "--skip-judge"], input.env,
+        { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+      expect(run.code).toBe(0)
+      expect(await readdir(storage)).toEqual(["foreign.lgp"])
+      expect(deletions).toEqual([true])
+      expect(await Bun.file(path.join(storage, "foreign.lgp")).text()).toBe("foreign evidence")
+      const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+      expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "completed", environment_cleanup: { status: "confirmed" } })
+    } finally { watcher.close() }
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: a changed artifact retains its fence and invalidates the earlier cleanup receipt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-storage-changed-"))
+  try {
+    const input = await fixture(root, ["parallel-fast"], true)
+    const traceFile = path.join(root, "judge-trace.jsonl")
+    const pending = main(["--tasks", path.join(root, "tasks")], { ...input.env,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --gate-log ${traceFile} --delay-ms 1000`,
+      JUDGE_MODEL: "gpt-6-sol" }, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const deadline = Date.now() + 10_000
+    while (!await Bun.file(traceFile).exists()) {
+      if (Date.now() > deadline) throw Error("Judge start not observed")
+      await Bun.sleep(10)
+    }
+    const storage = path.join(root, "storage/a")
+    const file = (await readdir(storage)).find(name => name.startsWith("eval-"))!
+    await Bun.write(path.join(storage, file), "changed evidence")
+    const run = await pending
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "completed", judge_status: "scored", environment_cleanup: { status: "failed" } })
+    expect(await Bun.file(path.join(storage, file)).text()).toBe("changed evidence")
+    const cleanup = await Bun.file(path.join(input.slots.controller.stateDir, "slot-a.cleanup.json")).json()
+    expect(cleanup.nextAdmissionAllowed).toBe(false)
+    expect(cleanup.storageDeletionAllowed).toBe(false)
+    const leaseFile = (await readdir(input.slots.controller.stateDir)).find(name => name.endsWith(".lease.json"))!
+    expect((await Bun.file(path.join(input.slots.controller.stateDir, leaseFile)).json()).state).toBe("retained")
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
