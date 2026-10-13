@@ -41,6 +41,18 @@ test("both Join data inputs need exactly one source on the exported ancestry", a
   expect(inspectSelectionGraph(competing, "standard").complete).toBe(false)
 })
 
+test("full audit requires lineage from an unambiguous confirmed input import", async () => {
+  const xml = await reference("sales-by-category")
+  const imported = xml.nodes.find((node) => node.type === "TBGImportTextFile")!
+  expect(inspectSelectionGraph(xml, "standard", []).complete).toBe(false)
+  expect(inspectSelectionGraph(xml, "standard", ["unconfirmed"]).complete).toBe(false)
+  expect(inspectSelectionGraph(xml, "standard", [imported.id]).complete).toBe(true)
+  const ambiguous = structuredClone(xml)
+  ambiguous.nodes.push({ ...structuredClone(imported), scope: "Unit_1/Unit.xml:0" })
+  expect(inspectSelectionGraph(ambiguous, "standard", [imported.id]).complete).toBe(false)
+  expect(inspectSelectionGraph(ambiguous, "standard", [`${imported.scope}/${imported.id}`]).complete).toBe(true)
+})
+
 async function reference(id: string) {
   const root = await mkdtemp(path.join(tmpdir(), "selection-graph-"))
   try {

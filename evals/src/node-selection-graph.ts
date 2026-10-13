@@ -9,6 +9,17 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
   const outputs = new Set(["DataSet", "DataSource", "DataSourceElse"])
   const parameters = new Set(["Variables", "ControlVariables", "Connection"])
   const nodes = new Map(xml.nodes.map((node) => [`${node.scope}/${node.id}`, node]))
+  const imports = new Set(importedNodeIDs === undefined
+    ? xml.nodes.filter((node) => node.type === "TBGImportTextFile").map((node) => `${node.scope}/${node.id}`)
+    : importedNodeIDs.flatMap((id) => {
+      const matches = xml.nodes.filter((node) => node.id === id || `${node.scope}/${node.id}` === id)
+      if (matches.length !== 1 || matches[0]!.type !== "TBGImportTextFile") {
+        failures.add("GRAPH_IMPORT_IDENTITY_UNCONFIRMED")
+        return []
+      }
+      return [`${matches[0]!.scope}/${matches[0]!.id}`]
+    }))
+  if (!imports.size) failures.add("GRAPH_IMPORT_IDENTITY_UNCONFIRMED")
   const incoming = new Map<string, string[]>()
   if (!xml.nodes.some((node) => node.type === "TBGImportTextFile") ||
     !xml.nodes.some((node) => node.type === "TBGExportTextFile")) failures.add("GRAPH_IMPORT_EXPORT_REQUIRED")
@@ -39,7 +50,7 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
     if (visiting.has(key)) { failures.add("GRAPH_DATA_CYCLE"); return false }
     if (visited.has(key)) return visited.get(key)!
     const node = nodes.get(key)!
-    if (node.type === "TBGImportTextFile") return true
+    if (node.type === "TBGImportTextFile") return imports.has(key)
     const ports = Object.entries(node.inputs).filter(([, name]) => inputs.has(name))
     if (!ports.length) { failures.add("GRAPH_IMPORT_LINEAGE_REQUIRED"); return false }
     visiting.add(key)
