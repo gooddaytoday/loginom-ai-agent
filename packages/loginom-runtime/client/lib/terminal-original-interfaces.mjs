@@ -1,6 +1,9 @@
 // Fixed private same-Page/typed-handle component; never a tool or Save grant.
+import {checkTerminalOriginalPacket,queryTerminalOriginalPacket,readTerminalOriginalPacket} from './terminal-original-packet.mjs';
 export function retainTerminalOriginalInterfaces({original, current, definitions, sourceInputs,
-  signal, deadline, record, now = Date.now}) {
+  signal, deadline, record, now = Date.now,packet}) {
+  const packetScope=Object.freeze({});
+  if(packet!==undefined)checkTerminalOriginalPacket(packet,original,packetScope);
   const refuse = (message, cause) => {throw new Error('TERMINAL_INTERFACE_'+message, {cause});};
   const data = (object, key) => {
     for (let p=object; p; p=Object.getPrototypeOf(p)) {
@@ -45,7 +48,9 @@ export function retainTerminalOriginalInterfaces({original, current, definitions
   let readPromise, writePromise, facts, token, ended=false, readState='not_started', writeState='not_started';
   let failed=false, primary; const secondary=[];
   const check=()=>{
-    if (ended) refuse('ENDED'); signal.throwIfAborted();
+    if (ended) refuse('ENDED');
+    if(packet!==undefined)checkTerminalOriginalPacket(packet,original,packetScope);
+    signal.throwIfAborted();
     if (now()>=deadline) refuse('DEADLINE');
     const c=current();
     if (!c || keys.some(k=>data(c,k)!==retained[k])||data(c,'signal')!==signal||data(c,'deadline')!==deadline
@@ -79,9 +84,11 @@ export function retainTerminalOriginalInterfaces({original, current, definitions
         const actual=[...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
         check(); if(actual!==hash)refuse('SOURCE_PIN',name);
       }
-      check();const connected=await readers.get_Connected.call(retained.fileStorage);check();
+      check();const connected=await (packet===undefined?readers.get_Connected.call(retained.fileStorage)
+        :readTerminalOriginalPacket(packet,'get_Connected'));check();
       if(connected!==true)refuse('DISCONNECTED',connected);
-      const support=await query.call(retained.packageProxy,type); check();
+      const support=await (packet===undefined?query.call(retained.packageProxy,type)
+        :queryTerminalOriginalPacket(packet,query,type)); check();
       // A returned raw proxy is retained, never reconstructed from IDs or sent
       // across public IPC. Its interface reply is not a serializer/content proof.
       if (!support || typeof support!=='object') refuse('SUPPORT_UNKNOWN',support);
@@ -91,7 +98,8 @@ export function retainTerminalOriginalInterfaces({original, current, definitions
       proxyBindings.push({proxy:support,native,session:retained.nativeSession,owner:proxyBindings[0].owner,id:proxyBindings[0].id,method:supportMethod});
       const observed={get_Connected:connected};
       for(const method of methods.slice(1)) {
-        check();observed[method]=await readers[method].call(retained.fileStorage);check();
+        check();observed[method]=await (packet===undefined?readers[method].call(retained.fileStorage)
+          :readTerminalOriginalPacket(packet,method));check();
         if(method==='get_IsOwnCurrentDirectory'&&observed[method]!==true)refuse('NON_PERSONAL',observed[method]);
       }
       if(typeof observed.get_CurrentDirectory!=='string'||!observed.get_CurrentDirectory
