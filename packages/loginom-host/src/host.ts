@@ -17,9 +17,15 @@ export async function createLoginomHost(options: {
   strictRecovery?: boolean
   // Acceptance-only forwarding of the existing managed shutdown binding.
   acceptanceCleanupPackage?: string
-  acceptanceCapture?: { authorization: string; packagePath: string }
+  acceptanceCapture?: { authorization: string; packagePath: string; harness?: "import-before-configure-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  // Retain the accepted private grant before any startup await. The caller's
+  // mutable options cannot change the kind/package/authorization later.
+  const acceptedCapture = options.acceptanceCapture
+  options = { ...options, acceptanceCapture: acceptedCapture && Object.freeze({ ...acceptedCapture }) }
+  if (options.acceptanceCapture?.harness !== undefined && options.acceptanceCapture.harness !== "import-before-configure-v1")
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
@@ -186,6 +192,7 @@ export async function createLoginomHost(options: {
       if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
       const bound=chat?captures.get(chat):undefined
       return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
+        && bound.harness===(options.acceptanceCapture.harness??"calculator-grouped-before-done-v1")
         && bound.expires>Date.now() && captureLeases.get(chat!)===lease
         && generations.get(bound.generation)?.connection.username===bound.account
         && !lost.has(chat!) && !stale.has(chat!)
@@ -197,7 +204,7 @@ export async function createLoginomHost(options: {
           || captures.size !== 0
           || !options.acceptanceCapture.packagePath.startsWith(`/${current.connection.username}/`))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
-      captures.set(chat, { revision: 1, harness: "calculator-grouped-before-done-v1", owner, run,
+      captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
         packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+600000 })
       captureLeases.set(chat,lease)
