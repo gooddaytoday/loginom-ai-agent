@@ -4,7 +4,7 @@ import path from "node:path"
 import os from "node:os"
 import { createHash } from "node:crypto"
 import { unzip } from "../src/artifact"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, inspectSelectionJavaScriptIdentity } from "../src/node-selection"
 import type { SelectionRuntime } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
@@ -184,6 +184,22 @@ test("an admitted JavaScript apply counts as successful only after its matching 
   expect(result.successfulJsCalls).toBe(1)
   expect(result.failures).toEqual([])
 })
+
+test.each(["valid", "wrong-existing-ref", "foreign-workflow", "duplicate-xml-id", "different-xml-node"])(
+  "successful JS belongs to the unique saved node and exported workflow: %s", (kind) => {
+    const parts: unknown[] = structuredClone(applyWait)
+    const node = JSON.parse(applyWait[2]!.state.output).node as Record<string, unknown>
+    parts[0] = { ...applyWait[0], state: { ...applyWait[0]!.state, input: { ...applyWait[0]!.state.input,
+      target: { kind: "existing", type: "programming.javascript", ref: { ...node,
+        node_id: kind === "wrong-existing-ref" ? "different-node" : node.node_id } },
+    } } }
+    const nodeIDs = kind === "duplicate-xml-id" ? [node.node_id, node.node_id]
+      : [kind === "different-xml-node" ? "different-node" : node.node_id]
+    expect(inspectSelectionJavaScriptIdentity({ parts, nodeIDs,
+      exportNode: { ...node, workflow_id: kind === "foreign-workflow" ? "foreign-workflow" : node.workflow_id },
+    })).toBe(kind === "valid")
+  },
+)
 
 test.each(["wrong-operation", "wrong-session", "failed", "ambiguous", "dirty", "truncated", "invalid-status"])(
   "allowed JavaScript cannot pass with %s receipt evidence",

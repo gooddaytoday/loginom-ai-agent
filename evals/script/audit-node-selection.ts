@@ -2,7 +2,7 @@ import path from "node:path"
 import { realpath } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { parseArgs } from "node:util"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, readSelectionReceipt } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, inspectSelectionJavaScriptIdentity, readSelectionReceipt } from "../src/node-selection"
 import type { SelectionMode, SelectionRuntime } from "../src/node-selection"
 import { inspectSelectionGraph } from "../src/node-selection-graph"
 import { readNodeXml } from "../src/node-xml"
@@ -96,9 +96,10 @@ async function main() {
     && await hash(resultFile) === output.sha256 && (await Bun.file(resultFile).bytes()).length === output.bytes
   if (!resultVerified) failures.push("RESULT_RECEIPT_UNVERIFIED")
   const allowed = args.mode === "explicit-js" || args.mode === "capability-gap"
-  if (allowed && xml && !("invalid" in xml) && applied.filter((call) => call.type === "programming.javascript")
-    .some((call) => !xml.nodes.some((node) => node.id === call.node.node_id
-      && ["TBGCodeModelComponentEngine", "TBGJavaScriptEngine"].includes(node.type)))) failures.push("JAVASCRIPT_IDENTITY_UNVERIFIED")
+  if (allowed && (!xml || "invalid" in xml || !inspectSelectionJavaScriptIdentity({ parts,
+    nodeIDs: xml.nodes.filter((node) => ["TBGCodeModelComponentEngine", "TBGJavaScriptEngine"].includes(node.type)).map((node) => node.id),
+    exportNode: applied.filter((call) => call.type === "exports.text").at(-1)?.node,
+  }))) failures.push("JAVASCRIPT_IDENTITY_UNVERIFIED")
   const packageSha256 = exists ? await hash(path.join(artifactDir, "package.lgp")) : null
   const review = await json(path.join(directory, "graph-review.json"))
   const reviewed = inspectSelectionReview({ review, mode: args.mode, sessionID: record(snapshot) ? snapshot.sessionID : undefined, packageSha256 })

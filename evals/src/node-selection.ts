@@ -2,6 +2,15 @@ export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "sta
 
 export type SelectionRuntime = { path: string; session: unknown; events: unknown[] }
 
+export function inspectSelectionJavaScriptIdentity(input: { parts: unknown[]; nodeIDs: unknown[]; exportNode: unknown }) {
+  const output = record(input.exportNode) ? input.exportNode : undefined
+  const calls = input.parts.flatMap((part) => readApply(part, input.parts))
+    .filter((call) => call.nodeType === "programming.javascript" && call.succeeded)
+  return input.nodeIDs.length === 1 && calls.length > 0 && !!output
+    && calls.every((call) => call.node?.node_id === input.nodeIDs[0]
+      && call.node?.document_id === output.document_id && call.node?.workflow_id === output.workflow_id)
+}
+
 export function inspectSelectionReview(input: { review: unknown; mode: SelectionMode; sessionID: unknown; packageSha256: unknown }) {
   if (input.mode === "standard" && input.review == null) return { reviewStatus: "not-required" }
   const value = input.review
@@ -236,6 +245,7 @@ function readApply(part: unknown, parts: unknown[]) {
   const state = record(part.state) ? part.state : undefined
   const request = record(state?.input) ? state.input : undefined
   const target = record(request?.target) ? request.target : undefined
+  const reference = record(target?.ref) ? target.ref : undefined
   const receipts = parts.filter(record).filter((candidate) => candidate.sessionID === part.sessionID
     && ["loginom_dock_node_apply", "loginom_dock_node_wait", "loginom_dock_node_resume"].includes(String(candidate.tool))
     && record(candidate.state) && candidate.state.status === "completed" && record(candidate.state.input)
@@ -243,13 +253,16 @@ function readApply(part: unknown, parts: unknown[]) {
   const terminal = receipts.at(-1)
   const node = record(terminal?.node) ? terminal.node : undefined
   return [{
+    node,
     nodeType: typeof target?.type === "string" ? target.type : undefined,
     succeeded: typeof part.id === "string" && typeof part.sessionID === "string" && typeof request?.operation_id === "string"
       && state?.status === "completed" && terminal?.operation_id === request.operation_id
       && terminal?.state === "settled" && terminal.status === "SUCCEEDED"
       && terminal.cleanup_complete === true && record(terminal.execution) && terminal.execution.status === "completed"
       && node?.document_id === request?.document_id && record(request?.workflow_ref)
-      && node?.workflow_id === request.workflow_ref.workflow_id && typeof node?.node_id === "string",
+      && node?.workflow_id === request.workflow_ref.workflow_id && typeof node?.node_id === "string"
+      && (target?.kind === "new" || target?.kind === "existing" && reference
+        && ["document_id", "workflow_id", "node_id"].every((key) => reference[key] === node[key])),
     failure: typeof target?.type !== "string" || !target.type.trim() ? "TOOL_INPUT_INCOMPLETE"
       : typeof part.id !== "string" || !state || !["pending", "running", "completed", "error"].includes(String(state.status))
         ? "TOOL_EVIDENCE_INVALID" : undefined,
