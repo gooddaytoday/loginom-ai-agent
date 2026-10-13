@@ -355,7 +355,7 @@ writer.writerows(sorted(counts.items()))
   отсутствие фиксированного числа позиций, меток и готовых агрегатов. Отчёт
   не заявляет live-проверку переноса сохранённого графа на другой вход.
 
-- [ ] Создать recovery input:
+- [x] Создать recovery input:
 
 ```csv
 Category,Revenue,Cost
