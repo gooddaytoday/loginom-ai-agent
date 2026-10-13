@@ -213,13 +213,13 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
           // The original inline CSV remains in user.parts for Loginom admission.
           // Non-UTF8 bytes cannot be sent as a provider file part or decoded as text.
           if (
-            part.mime === "text/csv" &&
             part.url.startsWith("data:") &&
-            part.filename?.toLowerCase().endsWith(".csv")
+            ((part.mime === "text/csv" && part.filename?.toLowerCase().endsWith(".csv")) ||
+              (part.mime === "text/tab-separated-values" && part.filename?.toLowerCase().endsWith(".tsv")))
           ) {
             userMessage.parts.push({
               type: "text",
-              text: `[CSV attachment: ${JSON.stringify(part.filename)} (${part.mime}). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]`,
+              text: `[${part.mime === "text/csv" ? "CSV" : "TSV"} attachment: ${JSON.stringify(part.filename)} (${part.mime}). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]`,
             })
           } else if (options?.stripMedia && isMedia(part.mime)) {
             userMessage.parts.push({

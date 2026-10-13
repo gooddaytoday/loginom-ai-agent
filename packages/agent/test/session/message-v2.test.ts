@@ -1806,3 +1806,38 @@ describe("session.message-v2.latest", () => {
     expect(state.tasks[0]).toMatchObject({ type: "subtask", prompt: "inspect" })
   })
 })
+
+
+describe("TSV byte-preserving provider proposal", () => {
+  test("TSV inline UTF16LE retains original bytes and uses a provider text descriptor", async () => {
+    const bytes = Buffer.from("//4YBDQENQQ9BEIEOAREBDgEOgQwBEIEPgRABAkAHQQwBDcEMgQwBD0EOAQ1BAkAIQRDBDwEPAQwBAkAFAQwBEIEMAQJACIENQQ6BEEEQgQNAAoAMAAwADAAMQAJAB8EQAQ4BDIENQRCBAkAMQAyAC4AMgA1AAkAMgAwADIANgAtADEAMAAtADAANQAJAA0ACgAwADAAMAAyAAkAHAQ4BEAECQAwAAkAMgAwADIANgAtADEAMAAtADAANgAJAD8ADQAKADAAMAAwADMACQAuBD0EOAQ6BD4ENAQJAC0AMgAuADUACQAyADAAMgA2AC0AMQAwAC0AMAA3AAkAIgBsAGUAZgB0AAkAcgBpAGcAaAB0ACAAIgAiAHEAdQBvAHQAZQBkACIAIgAiAA0ACgA=", "base64")
+    expect(bytes.length).toBe(302)
+    expect(Array.from(bytes.slice(0, 2))).toEqual([255, 254])
+    expect(new Bun.CryptoHasher("sha256").update(bytes).digest("hex")).toBe("9cd38e66c97356d2b768f7d212a9772c720e0365f83375dba7a37ba58e795a04")
+    for (const filename of ["control-utf16le.tsv", "control-utf16le.TSV"]) {
+      const input: SessionV1.WithParts[] = [{ info: userInfo("tsv-user"), parts: [{ ...basePart("tsv-user", "file-1"), type: "file", mime: "text/tab-separated-values", filename, url: `data:text/tab-separated-values;base64,${Buffer.from(bytes).toString("base64")}` }] }]
+      const original = structuredClone(input)
+      expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([{ role: "user", content: [{ type: "text", text: `[TSV attachment: ${JSON.stringify(filename)} (text/tab-separated-values). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]` }] }])
+      expect(input).toStrictEqual(original)
+      const file = input[0].parts[0]
+      if (file.type !== "file") throw new Error("Original file part lost")
+      expect(Buffer.from(file.url.split(",")[1], "base64")).toEqual(Buffer.from(bytes))
+    }
+  })
+  test("TSV negatives preserve remote, file URL, mismatched MIME, suffix and absent filename", async () => {
+    for (const file of [
+      { mime: "text/tab-separated-values", filename: "remote.tsv", url: "https://example.com/remote.tsv" },
+      { mime: "text/tab-separated-values", filename: "local.tsv", url: "file:///tmp/original.tsv" },
+      { mime: "application/pdf", filename: "wrong.tsv", url: "data:application/pdf;base64,YQ==" },
+      { mime: "text/csv", filename: "wrong.tsv", url: "data:text/csv;base64,YQ==" },
+      { mime: "text/tab-separated-values", filename: "wrong.csv", url: "data:text/tab-separated-values;base64,YQ==" },
+      { mime: "text/tab-separated-values", filename: undefined, url: "data:text/tab-separated-values;base64,YQ==" },
+    ]) {
+      const input: SessionV1.WithParts[] = [{ info: userInfo("tsv-negative"), parts: [{ ...basePart("tsv-negative", "file-2"), type: "file", ...file }] }]
+      const original = structuredClone(input)
+      const output = await MessageV2.toModelMessages(input, model)
+      expect(output).toStrictEqual([{ role: "user", content: [{ type: "file", mediaType: file.mime, filename: file.filename, data: file.url }] }])
+      expect(input).toStrictEqual(original)
+    }
+  })
+})
