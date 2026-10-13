@@ -489,7 +489,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
   жизненный цикл CLI/SQLite/copy-out проверяется самим пилотом, без отдельной
   выдуманной копии runtime и без дополнительного аналитического прогона.
 
-- [ ] Проверить `git status --short`, ветку и HEAD. Сохранить diff/hash файлов
+- [x] Проверить `git status --short`, ветку и HEAD. Сохранить diff/hash файлов
   skill и `git worktree list`. Убедиться, что никто не меняет исходники/ветку
   во время сборки; не полагаться на старые сведения о ветке основного checkout.
 - [ ] Сохранить базовые пути и пины серии в приватном `environment.json`.
