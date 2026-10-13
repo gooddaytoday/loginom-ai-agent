@@ -292,7 +292,7 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
 - [x] Повторить offline-аудит пилота окончательным аудитором и зафиксировать
   его версию. Новая версия аудита перепроверяет все уже собранные попытки;
   model/skill digest попытки при этом не меняется, данные не подменяются.
-- [ ] Закоммитить только новые audit/runbook файлы:
+- [x] Закоммитить только новые audit/runbook файлы:
   `test(evals): audit standard node selection from saved evidence`.
 
 ## Task 2: Точные дополнительные сценарии и независимые oracle
