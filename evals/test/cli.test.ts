@@ -86,6 +86,13 @@ test("agentCommand: v2 slots force HTTP-only transport despite inherited WebSock
   expect(agentCommand(loadConfig(["--dry-run"], {}), {}).env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBeUndefined()
 })
 
+test("agentCommand: only configured slot auth can grant the shared directory", () => {
+  const config = loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" })
+  const inherited = { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: "/untrusted/inherited" }
+  expect(agentCommand({ ...config, auth: { sharedDir: "/private/shared" } }, inherited).env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR).toBe("/private/shared")
+  expect(agentCommand(config, inherited).env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR).toBeUndefined()
+})
+
 test("agentCommand: management children receive HTTP-only mode without inherited credentials", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-http-only-"))
   try {

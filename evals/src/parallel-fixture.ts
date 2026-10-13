@@ -63,7 +63,7 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
       const slot = lease.slot
       const storage = path.join(input.storage, slot.id)
       const storageInfo = await lstat(storage)
-      const own: EvalConfig = { ...config, profileDir: slot.profileDir, artifactSource: `dir:${path.join(input.storage, slot.id)}`,
+      const own: EvalConfig = { ...config, auth: input.file.auth, profileDir: slot.profileDir, artifactSource: `dir:${path.join(input.storage, slot.id)}`,
         loginom: { ...config.loginom, url: input.file.server.url, username: slot.username },
         agent: { ...config.agent, workspaceRoot: slot.workspaceRoot } }
       const stateFile = path.join(input.file.controller.stateDir, `fixture-${slot.id}.json`)
