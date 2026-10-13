@@ -40,7 +40,7 @@ try {
  assert.ok(getterProperties.internalProperties.some(p=>p.name==='[[Scopes]]'));
  result={kind:'private-own-V8-scope-acquisition',pass:true,source_sha256:createHash('sha256').update(bytes).digest('hex'),
   exact_export_reference_held:true,lexical_getter_reference_held:true,default_cache_observed:'undefined_before_first_call',
-  scope_refs_serialized:false,functions_invoked:0,inspector_listening_socket:false,
+  scope_refs_serialized:false,target_callbacks_invoked:0,inspector_listening_socket:false,
   native_Page:false,original_startup_owner:false,original_completion_refs:false,
   supported_Resource68_provider:false,Chromium_Page_scope_qualification:'NOT_VERIFIED',
   doubles:['VM realm instead of Page','__extends transpiler helper']};
