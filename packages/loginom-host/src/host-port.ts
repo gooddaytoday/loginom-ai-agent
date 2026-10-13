@@ -229,8 +229,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
           await service.runtime(run.lease.generation, run.chat)
+          if(privateOriginal)assertOriginal()
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
+          if(privateOriginal)assertOriginal()
           const runtime = await service.runtime(run.lease.generation, run.chat).catch(async (error: unknown) => {
             // Exit can land during journal.begin. A relaunch-limit refusal from
             // this lookup precedes dispatch, so settle only this unused admission.
@@ -241,6 +243,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             throw error
           })
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+          if(privateOriginal)assertOriginal()
           const result = await runtime.request("call", {
             name: input.name,
             arguments: "args" in input ? input.args : undefined,
