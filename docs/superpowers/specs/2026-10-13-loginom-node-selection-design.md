@@ -912,3 +912,13 @@ originalcleanupfalse сохранён. Неизвестный user97 завер�
 23:19:16Z; root его не закрывал и ownership не утверждает. LastSave036 readback
 7f377888… подтвердил full savedJScomponent/source/schema equal после Group/Sort.
 Sourcefix ещё не завершён; commonruntime change потребует новой matched пары и18+25.
+
+Source Export caption fix завершён: workspaceUI1d7f27a7… содержит один alias
+для verified logical input0; actualfixturea2f562ad…/test994249ab… дали RED→GREEN
+и15negativevariants.350focusedPASS/verificationa8fc54e1…, independent09e5c7f9…
+Approved. Root pinnedNode24.19 fullupstream3830tests/3820PASS/0FAIL/10SKIP/exit0,
+verificationc67cde34…; три source hashes проверены повторно после suite.
+Proof10 recovery independentlyf85a02cf… подтверждён,1993raw/4729resources unchanged,
+full savedJScomponent equal; currentworkspaceUI изменён только намеренной правкой,
+old80d27immutable цел. Ordinary rebuilt nativeExport/CSV и новая matched18+25
+по-прежнему обязательны. Sourcefix не меняет skill/policy/Protocol/publicJSdeny.

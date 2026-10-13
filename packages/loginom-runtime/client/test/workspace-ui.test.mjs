@@ -3656,6 +3656,84 @@ test('hidden Join caption cannot replace native identity, opening or visible anc
   }
 });
 
+async function exportInputPortOverflowFixture() {
+  const {exportInputPortOverflow}=await import('./export-input-port-overflow.fixture.mjs');
+  const {page,wizard,panel,crumbs}=await inputPortContextFixture();
+  page.context.innerWidth=exportInputPortOverflow.viewport.width;page.context.innerHeight=exportInputPortOverflow.viewport.height;
+  panel.box=exportInputPortOverflow.panel;
+  for(const [i,crumb] of crumbs.entries()) {
+    const captured=exportInputPortOverflow.crumbs[i];
+    crumb.attrs['data-tid']=captured.tid;crumb.ownText=captured.label;crumb.box=captured.rect;
+    if(!captured.visible)crumb.style.display='none';
+    for(const icon of crumb.children)icon.box={x:crumb.box.x+6,y:crumb.box.y+3,width:18,height:18};
+  }
+  // Model the external native cache; execute the real prepared-context reader.
+  class PackageTreeNode{};class WorkFlowTreeNode{};class ModelNodeTreeNode{};
+  class ModelInputPortsTreeNode{};class ModelPortTreeNode{};class WizardTreeNode{};class WizardModelComponentForm{};
+  const packageNode=new PackageTreeNode(),workflow=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
+  const nodeTree=Object.assign(new ModelNodeTreeNode(),{ParentNode:workflow,FGuid:'export-node',FModelNode:{}});
+  const group=Object.assign(new ModelInputPortsTreeNode(),{ParentNode:nodeTree});
+  const portTree=Object.assign(new ModelPortTreeNode(),{ParentNode:group,FIndex:1,FModelNodePort:{}});
+  const wizardTree=Object.assign(new WizardTreeNode(),{ParentNode:portTree});
+  const model=Object.assign(new WizardModelComponentForm(),{FModelSocket:{},FView:{el:{dom:wizard}}});
+  const node={FGuid:nodeTree.FGuid,data:nodeTree.FModelNode},port={FGuid:'export-input',parent:node,data:portTree.FModelNodePort,FPortIndex:1};
+  const opening={phase:'verified',direction:'input',document_id:'doc',workflow_id:'flow',node_id:node.FGuid,
+    wizard:model,nodeTree,portTree,workflow,packageNode,node,port,nodeData:node.data,portData:port.data,portGuid:port.FGuid,
+    nativeIndex:1,portIndex:0,enginePort:model.FModelSocket,operation_id:'export-open'};
+  const preparation={document:page.document,id:'doc',receipts:new Map([['prepare',{
+    phase:'verified',workflowId:'flow',tab:page.tab,packageNode,nodeTargetWorkflowNode:workflow}]]),
+    inputPortOpenReceipts:new Map([['export-open',opening]])};
+  page.context.__loginomDockPreparationV1=preparation;
+  Object.assign(page.app,{PackageTreeNode,WorkFlowTreeNode,ModelNodeTreeNode,ModelInputPortsTreeNode,ModelPortTreeNode,WizardTreeNode,
+    Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:wizardTree}},FController:model}})}}}}}});
+  const binding={document_id:'doc',node:{document_id:'doc',workflow_id:'flow',node_id:node.FGuid},
+    workflow_ref:{workflow_id:'flow',prefix:'MF;TF-5',tab_tid:page.tab.getAttribute('data-tid'),
+      navigation_path:crumbs.slice(0,5).map(c=>({tid:c.getAttribute('data-tid'),label:c.textContent.trim()}))}};
+  return {page,crumbs,panel,opening,preparation,binding,expectedPort:exportInputPortOverflow.inputPort};
+}
+
+test('owned text export input observes its actual hidden data-source caption',async()=>{
+  const {page,binding,expectedPort}=await exportInputPortOverflowFixture();
+  const full=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
+  assert.equal(full.output.wizard.input_port_context.status,'observed');
+  assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных');
+  assert.deepEqual(full.output.prepared_node_context.input_port,expectedPort);
+  const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
+  assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);
+  assert.deepEqual(page.events,[]);
+});
+
+test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
+  for(const mode of ['unbound','missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine',
+    'wrong_port','wrong_caption','foreign_path','duplicate_crumb','duplicate_panel','hidden_panel','missing_icon','sensitive']) {
+    const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
+    if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+    if(mode==='duplicate_opening')preparation.inputPortOpenReceipts.set('other',{...opening});
+    if(mode==='foreign_node')opening.node.FGuid='foreign';
+    if(mode==='foreign_port')opening.port.FGuid='foreign';
+    if(mode==='foreign_workflow')opening.workflow={};
+    if(mode==='foreign_engine')opening.enginePort={};
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='wrong_caption')for(const crumb of crumbs.slice(7)) {
+      crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Источник_данных','Источник_данных_2');
+      if(crumb===crumbs[7])crumb.ownText='Источник данных 2';
+    }
+    if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+    if(mode==='duplicate_crumb')page.add('a',crumbs[7].getAttribute('data-tid'),crumbs[7].ownText,crumbs[7].box,panel);
+    if(mode==='duplicate_panel')page.add('div',panel.getAttribute('data-tid'),'',panel.box);
+    if(mode==='hidden_panel')panel.style.display='none';
+    if(mode==='missing_icon')crumbs[8].children[0].remove();
+    if(mode==='sensitive')crumbs[7].attrs['aria-label']='password';
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    if(['missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine'].includes(mode))
+      assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+    else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('input port context rejects foreign duplicated hidden and incomplete breadcrumb evidence',async()=>{
   for(const mode of ['wrong_wizard','hidden','duplicate','duplicate_panel','foreign','wrong_folder','caption_number','broken_chain','clipped','missing_icon','hidden_icon','foreign_tab','bounded']){
     const {page}=await inputPortContextFixture(mode),r=await page.observe();assert.notEqual(r.wizard.input_port_context?.status,'observed',mode);

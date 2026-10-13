@@ -701,12 +701,17 @@ inspect после response-budget refusal). Standard group-001 останови
   Это sourcefix completion; обычная пересобранная nativeприёмка/CSV остаются
   следующей незакрытой задачей. Отдельный Export input-context blocker не
   разрешает ослаблять guards или переходить на JS.
-- [ ] По actual ExportSort tuple исправить распознавание скрытой подписи
+- [x] По actual ExportSort tuple исправить распознавание скрытой подписи
   «Источник данных» только для verified prepared input port0. Сохранить native
   owner/opening, exact navigation chain/TID/icons/sensitivity/uniqueness и общий
   JS UI deny. Нужны public observation RED→GREEN на sanitized actual fixture,
   foreign/duplicate/unbound/wrong-port/wrong-caption negatives, focused/runtime
   suites и independent review. Ordinary rebuilt Export/CSV остаётся отдельным gate.
+  Source1d7f27a7…: один alias для logical input0, test994249ab…/actualfixturea2f562ad…;
+  RED→GREEN и15negativevariants/350focusedPASS, independent09e5c7f9… Approved.
+  Pinned Node24.19 fullupstream3830tests/3820PASS/0FAIL/10SKIP/exit0,
+  rootverificationc67cde34… . Эта sourcecompletion не закрывает ordinarynative
+  или18+25; исходный diagnosticfailure468c4235…/cleanupfalse сохранён.
 - [ ] Собрать новую matched baseline/candidate пару с этой общей runtime-правкой,
   прежними version/model/fixtures/seed/двумя skill версиями. Native без LLM
   подтвердить JS→Group и JS→newSort→Export, сохранённый пакет/выход/cleanup,
@@ -1587,3 +1592,13 @@ originalcleanupfalse сохранён. Неизвестный user97 завер�
 23:19:16Z; root его не закрывал и ownership не утверждает. LastSave036 readback
 7f377888… подтвердил full savedJScomponent/source/schema equal после Group/Sort.
 Sourcefix ещё не завершён; commonruntime change потребует новой matched пары и18+25.
+
+Source Export caption fix завершён: workspaceUI1d7f27a7… содержит один alias
+для verified logical input0; actualfixturea2f562ad…/test994249ab… дали RED→GREEN
+и15negativevariants.350focusedPASS/verificationa8fc54e1…, independent09e5c7f9…
+Approved. Root pinnedNode24.19 fullupstream3830tests/3820PASS/0FAIL/10SKIP/exit0,
+verificationc67cde34…; три source hashes проверены повторно после suite.
+Proof10 recovery independentlyf85a02cf… подтверждён,1993raw/4729resources unchanged,
+full savedJScomponent equal; currentworkspaceUI изменён только намеренной правкой,
+old80d27immutable цел. Ordinary rebuilt nativeExport/CSV и новая matched18+25
+по-прежнему обязательны. Sourcefix не меняет skill/policy/Protocol/publicJSdeny.
