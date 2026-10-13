@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 3/18, oracle/calculation 3;
+серия `20261013T142936Z-072953`: завершены baseline 4/18, oracle/calculation 4;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -183,13 +183,25 @@ oracle, calculation/history/runtime/identity/graph/export identity true, failure
 Package SHA `f2f13e6958323961bd6f74122db0e5b287a71b124ef72e663320e5507c57a35a`.
 Обе ранее исправленные runtime boundaries прошли в текущей сопоставимой серии;
 исходные отказы сохранены. Это третий baseline, candidate ещё не выполнялся.
-Следующий risky-approved-claims/1 запущен.
+Следующий risky-approved-claims/1 завершился, исход ниже.
 
 Независимый `collector-fix-lock-review.json` SHA
 `ec2ee550f2ed7a8605ecb2d111b23e596e0e3304eca4dff325b1e4a603636323`
 подтвердил byte-equal historical lock, committed runner/test, прежние pins,
 auditVersion и task/prompt/input/oracle bindings. Полные payload inventories
 не повторялись; сверены прежние attestation и critical payload hashes.
+
+## Risky-approved-claims третьей серии
+
+Session `ses_eca13c7e1ffeH14ploooTK0n9G`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI 460.428 секунды, timeout false. JS nodes/calls 0/0, сплошной oracle и полный
+audit PASS: calculation/history/runtime/identity/graph/export true, failures [].
+Package SHA `9dc6980b08cbe131d5fcc2f8ec515e92fac7cd0b665c8a681d64c336ad9f1f63`.
+Первый фильтр NOT_APPLIED/REQUEST_REJECTED из-за Unsupported node label,
+effect_possible false, cleanup true. Агент исправил название и повторил стандартный
+фильтр с новым operation ID; успешные фильтрация/группировка/сортировка/экспорт
+подтверждены. Это естественная ошибка baseline, не замена обязательного recovery
+candidate. Следующий campaign-roi-by-channel/1 запущен; candidate 0/25.
 
 ## Native proof исправления дат
 

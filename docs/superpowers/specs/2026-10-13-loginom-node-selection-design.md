@@ -4,7 +4,7 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Текущая серия `20261013T142936Z-072953`: завершены baseline 3/18, oracle/calculation 3;
+Текущая серия `20261013T142936Z-072953`: завершены baseline 4/18, oracle/calculation 4;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
@@ -266,7 +266,10 @@ history/runtime/identity/graph/export identity; JS nodes/calls 2/2 и единс
 калькулятор, группировка, сортировка и экспорт, no JS. Сплошной oracle и полный
 audit PASS, cleanup подтверждён. Это live-проверка текущего общего runtime и
 runner после collector fix. Независимая сверка collector addendum/pins PASS;
-начат risky-approved-claims/1, candidate 0/25, полная приёмка ещё впереди.
+risky-approved-claims/1 также прошёл full audit/CLI cleanup без JS. Ошибка
+названия фильтра была отклонена до browser effect, исправлена новым operation ID
+на стандартном узле и сохранена в истории. Начат campaign-roi-by-channel/1,
+candidate 0/25, полная приёмка ещё впереди.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
