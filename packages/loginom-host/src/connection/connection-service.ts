@@ -4,6 +4,7 @@ import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
+import { hostError } from "../errors"
 
 export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void> }
 export type ConnectionRuntime = {
@@ -66,8 +67,9 @@ export async function connectionService(
           state.handle = handle
           state.phase = state.pending ? "pending" : "ready"
         },
-        () => {
+        (error) => {
           state.phase = "recoverable-error"
+          state.failure = hostError(error)
         },
       )
       .finally(() => {
