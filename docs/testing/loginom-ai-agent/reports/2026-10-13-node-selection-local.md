@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 13/18, oracle/calculation 13;
+серия `20261013T142936Z-072953`: завершены baseline 14/18, oracle/calculation 14;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -338,6 +338,17 @@ runtime/identity/graph/export true, failures []. Package SHA
 `608ce38c6b0a1d5f013e99eeeedefebcb011f59aa498a92f3c6c8a6406cb174a`.
 Все три sales baseline успешны без JS. Всего 13/18, policy 9/13, JS6/6/6;
 следующий abc-pareto-groups/3 запущен, candidate 0/25.
+
+## ABC/3
+
+Session `ses_ec9b742dbffed3h1gEHM1LxaMi`: CLI exit 0, wrapper exit 1,
+cleanupConfirmed true, CLI 369.017 секунды, timeout false. JS nodes/calls/successful
+calls 2/2/2; oracle/calculation/history/runtime/identity/graph/export true.
+Единственный отказ JAVASCRIPT_NOT_ALLOWED. Package SHA
+`98190084e2374d4e88ee02b84b2486e366cb21e96ef7d20aedeb9a924b07de38`.
+Все три ABC расчётно успешны; original ABC/1 collection failure и ABC/2 prior
+settlement assessment сохранены отдельно. Всего 14/18, policy 9/14, JS8/8/8;
+следующий monthly-demand/3 запущен, candidate 0/25.
 
 ## Native proof исправления дат
 
