@@ -1,5 +1,6 @@
 import path from "node:path"
-import { readdir, realpath } from "node:fs/promises"
+import { confirmedProfileArchive } from "./profile-archive"
+import { readdir } from "node:fs/promises"
 import cases from "./text-import-cases.json"
 import { evalsRoot } from "./config"
 import type { EvalConfig } from "./config"
@@ -23,14 +24,8 @@ export async function validateTextImportAttempt(taskDir: string, attemptDir: str
 }
 
 /** Preserve raw native events, including refusals. Requested settings are never observations. */
-export async function collectTextImportEvidence(attemptDir: string, profileDir: string) {
-  const cleanup = await Bun.file(path.join(attemptDir, "cleanup.json")).json() as {
-    result?: { status?: string }; stages?: { stage: string; status: string; path?: string }[]
-  }
-  const archive = cleanup.stages?.find(stage => stage.stage === "profile_history" && stage.status === "confirmed")?.path
-  if (cleanup.result?.status !== "confirmed" || !archive ||
-    !archive.startsWith(path.resolve(profileDir) + ".history" + path.sep) || await realpath(archive) !== archive)
-    throw Error("text import evidence requires own confirmed history archive")
+export async function collectTextImportEvidence(attemptDir: string, profileDir: string, historyDir = path.resolve(profileDir) + ".history") {
+  const archive = await confirmedProfileArchive(attemptDir, profileDir, historyDir)
   const files: { source: string; sha256: string; events: unknown[] }[] = []
   async function visit(directory: string) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {

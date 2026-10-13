@@ -1,13 +1,11 @@
 import path from "node:path"
-import { readdir, realpath } from "node:fs/promises"
+import { readdir } from "node:fs/promises"
 import { createHash } from "node:crypto"
+import { confirmedProfileArchive } from "./profile-archive"
 
 /** Export observed native inventories after cleanup; never manufacture a numeric mask from function names. */
-export async function collectNodeNativeEvidence(attemptDir:string, profileDir:string) {
-  const cleanup=await Bun.file(path.join(attemptDir,"cleanup.json")).json()
-  const archive=cleanup.stages?.find((s:{stage:string;status:string})=>s.stage==="profile_history" && s.status==="confirmed")?.path
-  if(cleanup.result?.status!=="confirmed" || typeof archive!=="string" || !archive.startsWith(path.resolve(profileDir)+".history"+path.sep) || await realpath(archive)!==archive)
-    throw Error("native evidence requires own confirmed history archive")
+export async function collectNodeNativeEvidence(attemptDir:string, profileDir:string, historyDir = path.resolve(profileDir)+".history") {
+  const archive=await confirmedProfileArchive(attemptDir,profileDir,historyDir)
   const observations=new Map<string,unknown>()
   const localVariables: unknown[] = []
   async function visit(directory:string) {
@@ -31,5 +29,5 @@ export async function collectNodeNativeEvidence(attemptDir:string, profileDir:st
     }
   }
   await visit(archive)
-  await Bun.write(path.join(attemptDir,"native-crosstable.json"), JSON.stringify({version:1,observations:[...observations.values()],local_variable_observations:localVariables},null,2)+"\n")
+  await Bun.write(path.join(attemptDir,"native-crosstable.json"), JSON.stringify({version:1,archive,observations:[...observations.values()],local_variable_observations:localVariables},null,2)+"\n")
 }

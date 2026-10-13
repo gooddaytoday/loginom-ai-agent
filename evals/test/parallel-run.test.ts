@@ -5,43 +5,15 @@ import { existsSync, readFileSync, watch } from "node:fs"
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
-import type { SlotFile } from "../src/slots"
+import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
 
-async function fixture(root: string, taskIds = ["parallel-fast", "parallel-slow"], withArtifact = false) {
-  const slots: SlotFile = {
-    version: 2,
-    server: { container: "fixture-server", studioContainer: "fixture-studio", url: "http://127.0.0.1/app/",
-      network: "fixture-network", alias: "fixture-server", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" },
-    controller: { stateDir: path.join(root, "controller"), adminCredentialsFile: path.join(root, "unused-admin.json") },
-    judge: { codexHome: path.join(root, "judge") },
-    slots: ["a", "b"].map(id => ({ id, username: `eval-${id}`, profileDir: path.join(root, `profile-${id}`),
-      workspaceRoot: path.join(root, `work-${id}`), historyDir: path.join(root, `history-${id}`) })),
-  }
-  const lockRoot = path.join(root, "locks")
-  const storage = path.join(root, "storage")
-  await Promise.all([lockRoot, storage, slots.controller.stateDir, slots.judge.codexHome,
-    ...slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir, path.join(storage, slot.id)])]
-    .map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
-  await Promise.all(slots.slots.map(slot => Bun.write(path.join(slot.profileDir, "data/auth.json"), '{"fake":{"type":"api","key":"fixture"}}')))
-  await Promise.all(taskIds.map(async id => {
-    await Bun.write(path.join(root, "tasks", id, "spec.md"), "Fixture diagnostic")
-    if (withArtifact) {
-      await Bun.write(path.join(root, "tasks", id, "reference.lgp"), Bun.file(path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")))
-      await Bun.write(path.join(root, "tasks", id, "parallel-package.json"), "{}")
-    }
-    await Bun.write(path.join(root, "tasks", id, "task.json"), JSON.stringify({ id, title: id, prompt: id,
-      ...(withArtifact ? { reference: "reference.lgp", inputs: ["parallel-package.json"] } : { output_mode: "diagnostic" }),
-      spec: "spec.md", expected_output: "diagnostic", checklist: [{ id: "diagnostic", text: "Returns diagnostic", weight: 1, required: true }] }))
-  }))
-  return { slots, lockRoot, env: { EVAL_CLI_MODE: "fake", EVAL_ARTIFACT_SOURCE: `dir:${storage}`,
-    EVAL_AGENT_MODEL: "fake/fake-model", LOGINOM_DOCK_API_KEY: "fixture-dock", EVAL_RESULTS_DIR: path.join(root, "results") } }
-}
+
 
 test("fixture main: independent slot pipelines cross rounds and archive evidence before reuse", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-main-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--repeat", "2", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(0)
@@ -72,7 +44,7 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
 test("fixture main: removes only its artifacts after the profile archive is durably committed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-storage-order-"))
   try {
-    const input = await fixture(root, ["parallel-fast"], true)
+    const input = await parallelFixture(root, ["parallel-fast"], true)
     const storage = path.join(root, "storage/a")
     await Bun.write(path.join(storage, "foreign.lgp"), "foreign evidence")
     const deletions: boolean[] = []
@@ -99,7 +71,7 @@ test("fixture main: removes only its artifacts after the profile archive is dura
 test("fixture main: a changed artifact retains its fence and invalidates the earlier cleanup receipt", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-storage-changed-"))
   try {
-    const input = await fixture(root, ["parallel-fast"], true)
+    const input = await parallelFixture(root, ["parallel-fast"], true)
     const traceFile = path.join(root, "judge-trace.jsonl")
     const pending = main(["--tasks", path.join(root, "tasks")], { ...input.env,
       EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --gate-log ${traceFile} --delay-ms 1000`,
@@ -127,7 +99,7 @@ test("fixture main: a changed artifact retains its fence and invalidates the ear
 test("fixture main: overlapping agents share one judge gate through actual fake-codex processes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-main-"))
   try {
-    const input = await fixture(root, ["parallel-fast", "parallel-slow"], true)
+    const input = await parallelFixture(root, ["parallel-fast", "parallel-slow"], true)
     const traceFile = path.join(root, "judge-trace.jsonl")
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
       EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --gate-log ${traceFile} --delay-ms 5000`,
@@ -158,7 +130,7 @@ test("fixture main: overlapping agents share one judge gate through actual fake-
 test("fixture main: overlapping writable results are rejected before any admission or dispatch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-overlap-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     await expect(main(["--dry-run", "--tasks", path.join(root, "tasks"), "--parallel", "2"],
       { ...input.env, EVAL_RESULTS_DIR: input.slots.slots[0]!.profileDir },
       { fixture: { slots: input.slots, lockRoot: input.lockRoot } })).rejects.toThrow("FIXTURE_ROOT_OVERLAP")
@@ -171,7 +143,7 @@ test("fixture main: overlapping writable results are rejected before any admissi
 test("fixture main: dry-run builds the round-major plan without processes, leases or profile mutations", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-plan-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     const run = await main(["--dry-run", "--tasks", path.join(root, "tasks"), "--parallel", "2", "--repeat", "2"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     const planned = await Bun.file(path.join(run.runDir!, "fixture-plan.json")).json()
@@ -194,7 +166,7 @@ test("fixture main: dry-run builds the round-major plan without processes, lease
 test("fixture main: a finished controller releases its SIGINT handler", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-signal-release-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     const before = process.listenerCount("SIGINT")
     await main(["--dry-run", "--tasks", path.join(root, "tasks")], input.env,
       { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
@@ -205,7 +177,7 @@ test("fixture main: a finished controller releases its SIGINT handler", async ()
 test("fixture main: failed profile admission also releases its SIGINT handler", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-signal-failure-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     await rm(path.join(input.slots.slots[0]!.profileDir, "data/auth.json"))
     const before = process.listenerCount("SIGINT")
     await expect(main(["--tasks", path.join(root, "tasks"), "--skip-judge"], input.env,
@@ -217,7 +189,7 @@ test("fixture main: failed profile admission also releases its SIGINT handler", 
 
 test("fixture main: a competing controller cannot overwrite the admitted controller journal", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-journal-"))
-  const input = await fixture(root, ["parallel-slow"])
+  const input = await parallelFixture(root, ["parallel-slow"])
   const argv = ["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"]
   const options = { fixture: { slots: input.slots, lockRoot: input.lockRoot } }
   const pending = main(argv, input.env, options)
@@ -241,9 +213,9 @@ test("fixture main: a competing controller cannot overwrite the admitted control
 
 test("fixture main: shared judge home conflicts across servers before any agent dispatch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-shared-judge-"))
-  const a = await fixture(await mkdtemp(path.join(root, "server-a-")), ["parallel-slow"], true)
+  const a = await parallelFixture(await mkdtemp(path.join(root, "server-a-")), ["parallel-slow"], true)
   const bRoot = await mkdtemp(path.join(root, "server-b-"))
-  const b = await fixture(bRoot, ["parallel-fast"], true)
+  const b = await parallelFixture(bRoot, ["parallel-fast"], true)
   b.slots.judge.codexHome = a.slots.judge.codexHome
   const env = { EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" }
   const aRoot = path.dirname(a.slots.controller.stateDir)
@@ -265,7 +237,7 @@ test("fixture main: shared judge home conflicts across servers before any agent 
 
 test("fixture main: skip-judge does not acquire an occupied judge home", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-no-judge-"))
-  const input = await fixture(root, ["parallel-fast"])
+  const input = await parallelFixture(root, ["parallel-fast"])
   const journal = path.join(root, "holder.json")
   await writeLeaseReceipt(journal, { commandId: "holder" })
   const lease = await acquireJudgeLease({ codexHome: input.slots.judge.codexHome, journal, commandId: "holder", lockRoot: input.lockRoot })
@@ -279,7 +251,7 @@ test("fixture main: skip-judge does not acquire an occupied judge home", async (
 test("fixture main: failed model admission releases its unused judge reservation", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-unused-judge-"))
   try {
-    const input = await fixture(root, ["parallel-fast"], true)
+    const input = await parallelFixture(root, ["parallel-fast"], true)
     await rm(path.join(input.slots.slots[0]!.profileDir, "data/auth.json"))
     await expect(main(["--tasks", path.join(root, "tasks")], { ...input.env,
       EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" },
@@ -295,7 +267,7 @@ test("fixture main: failed model admission releases its unused judge reservation
 test("fixture main: unknown judge cleanup stops assignments while the other active slot drains", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-unknown-"))
   try {
-    const input = await fixture(root, ["parallel-fast", "parallel-slow", "parallel-z-next"], true)
+    const input = await parallelFixture(root, ["parallel-fast", "parallel-slow", "parallel-z-next"], true)
     const slowFile = path.join(root, "tasks/parallel-slow/task.json")
     await Bun.write(slowFile, JSON.stringify({ ...await Bun.file(slowFile).json(), inputs: [] }))
     const pending = main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
@@ -326,7 +298,7 @@ test("fixture main: unknown judge cleanup stops assignments while the other acti
 
 test("fixture main: consecutive interrupted parallel runs drain both slots and retain interruption metadata", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-interruption-"))
-  const input = await fixture(root, ["parallel-slow"])
+  const input = await parallelFixture(root, ["parallel-slow"])
   const payload = path.join(root, "input.json")
   await Bun.write(payload, JSON.stringify({ ...input, root }))
   const script = path.join(root, "controller.ts")
@@ -380,7 +352,7 @@ process.exit(0)
 test("fixture main: binary/source modes and ordinary CLI cannot acquire synthetic admission", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-mode-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     for (const mode of ["binary", "source"]) await expect(main(["--dry-run", "--parallel", "2"],
       { ...input.env, EVAL_CLI_MODE: mode, EVAL_CLI_BIN: "/usr/bin/false" },
       { fixture: { slots: input.slots, lockRoot: input.lockRoot } })).rejects.toThrow("FIXTURE_MODE")
@@ -396,7 +368,7 @@ test("fixture main: binary/source modes and ordinary CLI cannot acquire syntheti
 test("fixture main: a shared profile is rejected across all configured slots before reads or writes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-shared-"))
   try {
-    const input = await fixture(root)
+    const input = await parallelFixture(root)
     input.slots.slots[1]!.profileDir = input.slots.slots[0]!.profileDir
     await expect(main(["--dry-run"], input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } }))
       .rejects.toThrow("SLOT_PATH_OVERLAP")
@@ -408,7 +380,7 @@ test("fixture main: a shared profile is rejected across all configured slots bef
 test("fixture main: one infra retry keeps the same slot and archives the initial attempt", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-retry-"))
   try {
-    const input = await fixture(root, ["parallel-infra-retry", "parallel-slow"])
+    const input = await parallelFixture(root, ["parallel-infra-retry", "parallel-slow"])
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(0)
@@ -436,7 +408,7 @@ test("fixture main: one infra retry keeps the same slot and archives the initial
 test("fixture main: cleanup failure quarantines one slot while the healthy slot drains and releases", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-quarantine-"))
   try {
-    const input = await fixture(root, ["parallel-cleanup-failure", "parallel-fast", "parallel-fast-next", "parallel-fast-last"])
+    const input = await parallelFixture(root, ["parallel-cleanup-failure", "parallel-fast", "parallel-fast-next", "parallel-fast-last"])
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(1)
@@ -458,7 +430,7 @@ test("fixture main: cleanup failure quarantines one slot while the healthy slot 
 test("fixture main: a common archive writer failure stops new assignments and drains the active slot", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-writer-"))
   try {
-    const input = await fixture(root, ["parallel-infra-retry", "parallel-slow", "parallel-z-next"])
+    const input = await parallelFixture(root, ["parallel-infra-retry", "parallel-slow", "parallel-z-next"])
     const pending = main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     const deadline = Date.now() + 10_000
@@ -490,7 +462,7 @@ test("fixture main: a common archive writer failure stops new assignments and dr
 test("fixture main: quarantine of all slots leaves the remaining jobs unmeasured", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-all-quarantined-"))
   try {
-    const input = await fixture(root, ["parallel-cleanup-failure"])
+    const input = await parallelFixture(root, ["parallel-cleanup-failure"])
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--repeat", "3", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(1)
@@ -507,7 +479,7 @@ test("fixture main: quarantine of all slots leaves the remaining jobs unmeasured
 test("fixture main: clean stop releases the stopped slot and lets the other slot finish", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-clean-stop-"))
   try {
-    const input = await fixture(root, ["parallel-a-stop", "parallel-fast", "parallel-fast-next"])
+    const input = await parallelFixture(root, ["parallel-a-stop", "parallel-fast", "parallel-fast-next"])
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(1)

@@ -132,7 +132,9 @@ export async function finishFixtureAttempt(context: Awaited<ReturnType<typeof pr
     path.join(context.controllerDir, `${path.basename(archive)}.archive.json`))
   const storage = await cleanupFixtureStorage(context, result, out)
   result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
-  await writeLeaseReceipt(path.join(out, "cleanup.json"), { ...evidence, liveQualified: false, archive: receipt, storage, result: result.environment_cleanup })
+  await writeLeaseReceipt(path.join(out, "cleanup.json"), { ...evidence, liveQualified: false, archive: receipt, storage, result: result.environment_cleanup,
+    stages: [...["processes", "diagnostics", "writer", "ready"].map(stage => ({ stage, status: "confirmed" })),
+      { stage: "profile_history", status: "confirmed", path: archive }] })
   await writeLeaseReceipt(context.cleanup, fixtureCleanup(context.lease, archive))
   await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
 }

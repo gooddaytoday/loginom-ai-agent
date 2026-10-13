@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { collectNodeNativeEvidence } from "../src/node-native"
+import { archiveProfileEvidence } from "../src/profile-archive"
 test("сохраняются последние реальные native observations из собственного cleanup history archive",async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),"node-native-"))
  try {
@@ -33,5 +34,19 @@ test("owned local variable native step is retained with source provenance after 
   expect(proof.local_variable_observations).toHaveLength(1)
   expect(proof.local_variable_observations[0].output.variables[0].id).toBe(17)
   expect(proof.local_variable_observations[0].source_sha256).toMatch(/^[a-f0-9]{64}$/)
+ } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test("native evidence: a configured archive is bound to its original profile manifest", async () => {
+ const root=await mkdtemp(path.join(os.tmpdir(),"node-native-slot-owner-"))
+ try {
+  const profile=path.join(root,"profile-a"), other=path.join(root,"profile-b"), history=path.join(root,"history-a"), archive=path.join(history,"attempt"), controller=path.join(root,"controller"), attempt=path.join(root,"attempt")
+  await Promise.all([profile,other,archive,controller].map(directory=>mkdir(directory,{recursive:true,mode:0o700})))
+  await Bun.write(path.join(profile,"runtime/execution-events.jsonl"),JSON.stringify({operation_id:"observed",phase:"node_observation_completed",outcome:{status:"SUCCEEDED",output:{node_crosstable:{verified:true,inventory_complete:true,node_context:{verified:true},input_fields:[]}}}})+"\n")
+  const receipt=await archiveProfileEvidence(profile,archive,path.join(controller,"archive.json"))
+  await Bun.write(path.join(attempt,"cleanup.json"),JSON.stringify({result:{status:"confirmed"},archive:receipt,stages:[{stage:"profile_history",status:"confirmed",path:archive}]}))
+  await collectNodeNativeEvidence(attempt,profile,history)
+  expect((await Bun.file(path.join(attempt,"native-crosstable.json")).json()).observations).toHaveLength(1)
+  await expect(collectNodeNativeEvidence(attempt,other,history)).rejects.toThrow("archive profile identity")
  } finally {await rm(root,{recursive:true,force:true})}
 })

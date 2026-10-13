@@ -65,6 +65,26 @@ export async function archiveProfileEvidence(profile: string, archive: string, j
   return { version: 1, status: "committed", archive, journal }
 }
 
+export async function confirmedProfileArchive(attemptDir: string, profileDir: string, historyDir = path.resolve(profileDir) + ".history") {
+  const cleanup = await Bun.file(path.join(attemptDir, "cleanup.json")).json() as {
+    result?: { status?: string }; stages?: { stage: string; status: string; path?: string }[];
+    archive?: { status?: string; archive?: string; journal?: string }
+  }
+  const archive = cleanup.stages?.find(stage => stage.stage === "profile_history" && stage.status === "confirmed")?.path
+  if (cleanup.result?.status !== "confirmed" || !archive || !archive.startsWith(path.resolve(historyDir) + path.sep) || await realpath(archive) !== archive)
+    throw Error("native evidence requires own confirmed history archive")
+  if (cleanup.archive || path.resolve(historyDir) !== path.resolve(profileDir) + ".history") {
+    if (cleanup.archive?.status !== "committed" || cleanup.archive.archive !== archive || !cleanup.archive.journal)
+      throw Error("archive profile identity unconfirmed")
+    const manifest = await readLeaseReceipt(cleanup.archive.journal)
+    if (!manifest || typeof manifest !== "object" || !("kind" in manifest) || manifest.kind !== "profile-archive" ||
+      !("status" in manifest) || manifest.status !== "committed" || !("profile" in manifest) || manifest.profile !== path.resolve(profileDir) ||
+      !("archive" in manifest) || manifest.archive !== archive)
+      throw Error("archive profile identity differs")
+  }
+  return archive
+}
+
 async function validateTarget(directory: string, roots: Manifest["roots"], relative = "") {
   await Promise.all((await readdir(directory)).map(async name => {
     const key = path.join(relative, name)

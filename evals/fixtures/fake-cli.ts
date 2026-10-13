@@ -5,6 +5,15 @@ import { appendFile, chmod, mkdir, rm } from "node:fs/promises"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 const packageFixture = command === "run" && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-package.json")
+if (command === "run" && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-native.json")) {
+  const state = await Bun.file(process.env.EVAL_FAKE_STATE_FILE!).json() as { username: string }
+  await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "loginom/runtime/generations/1/chats/same-session/attempts/same-attempt/execution-events.jsonl"),
+    JSON.stringify({ operation_id: "same-operation", recorded_at: new Date().toISOString(), phase: "node_observation_completed",
+      outcome: { status: "SUCCEEDED", output: { node_crosstable: { verified: true, inventory_complete: true,
+        node_context: { verified: true, document_id: "same-document", workflow_id: "same-workflow", node_id: "same-node" },
+        input_fields: [{ name: state.username, functions: 1 }] } } } }) + "\n")
+  await Bun.sleep(300)
+}
 const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
 const infraRetry = command === "run" && (process.env.EVAL_TASK_ID?.startsWith("infra-retry-") || process.env.EVAL_TASK_ID === "parallel-infra-retry")
 const launch = infraRetry ? await (async () => {
