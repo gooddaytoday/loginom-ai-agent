@@ -1,5 +1,62 @@
 export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "standard-recovery"
 
+export type SelectionRuntime = { path: string; session: unknown; events: unknown[] }
+
+export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: SelectionRuntime[] }) {
+  const failures: string[] = []
+  const prepared = input.parts.filter(record).filter((part) => part.tool === "loginom_dock_prepare").map(receipt).filter(record)
+  const calls = input.parts.filter(record).filter((part) => typeof part.tool === "string" && part.tool.startsWith("loginom_")
+    && record(part.state) && record(part.state.input)).map((part) => ({ part, result: receipt(part) }))
+  if (!input.runtime.length) failures.push("RUNTIME_MISSING")
+  for (const runtime of input.runtime) {
+    const session = record(runtime.session) ? runtime.session : undefined
+    const events = runtime.events.filter(record)
+    if (!session || typeof session.sessionId !== "string" || events.length !== runtime.events.length
+      || !events.length || events.some((event) => event.session_id !== session.sessionId)
+      || !prepared.some((result) => result.prepared === true && result.sessionId === session.sessionId)) {
+      failures.push("RUNTIME_IDENTITY_INVALID")
+      continue
+    }
+    const admitted = events.filter((event) => ["prepared", "node_apply_prepared", "artifact_delivery_prepared"].includes(String(event.phase)))
+    for (const admission of admitted) {
+      if (typeof admission.operation_id !== "string") { failures.push("RUNTIME_OPERATION_INVALID"); continue }
+      const terminals = events.filter((event) => event.operation_id === admission.operation_id
+        && ["completed", "reconciled", "artifact_delivery_completed", "artifact_delivery_rejected", "artifact_delivery_not_applied"].includes(String(event.phase)))
+      const last = terminals.at(-1)
+      const outcome = record(last?.outcome) ? last.outcome : record(last?.result) ? last.result : undefined
+      const submitted = record(outcome?.output) ? outcome.output : undefined
+      // Native upload submission remains ambiguous until the owning delivery
+      // verifies exactly those bytes. The public delivery result closes it.
+      const verifiedUpload = admission.action_key === "artifact.upload" && outcome?.status === "AMBIGUOUS"
+        && outcome.cleanup_complete === true && submitted && events.some((event) => {
+          const result = record(event.result) ? event.result : undefined
+          return event.phase === "artifact_delivery_completed" && result?.status === "SUCCEEDED"
+            && result.cleanup_complete === true && result.upload_completion_verified === true
+            && result.upload_operation_id === admission.operation_id
+            && ["destination", "bytes", "sha256"].every((key) => result[key] === submitted[key])
+        })
+      if (!verifiedUpload && (!outcome || !["SUCCEEDED", "FAILED", "NOT_APPLIED"].includes(String(outcome.status))
+        || outcome.cleanup_complete !== true || outcome.state === "running")) failures.push("RUNTIME_OPERATION_UNSETTLED")
+      if (admission.phase !== "node_apply_prepared") continue
+      const request = record(admission.request) ? admission.request : undefined
+      const target = record(request?.target) ? request.target : undefined
+      if (typeof target?.type !== "string" || !calls.some(({ part }) => record(part.state) && record(part.state.input)
+        && part.tool === "loginom_dock_node_apply" && part.state.input.operation_id === admission.operation_id
+        && record(part.state.input.target) && part.state.input.target.type === target.type)) failures.push("RUNTIME_APPLY_MISMATCH")
+    }
+  }
+  for (const { part, result } of calls) {
+    if (!record(part.state) || !record(part.state.input)) continue
+    if (!/^loginom_dock_(node_apply|node_wait|node_resume|node_read|artifact_deliver|action_run|operation_inspect)$/.test(String(part.tool))) continue
+    if (!record(result) || typeof result.operation_id !== "string") { failures.push("TOOL_RECEIPT_INCOMPLETE"); continue }
+    const terminal = calls.filter((call) => call.part.sessionID === part.sessionID && record(call.result)
+      && call.result.operation_id === result.operation_id).at(-1)?.result
+    if (!record(terminal) || terminal.state === "running" || terminal.cleanup_complete !== true
+      || !["SUCCEEDED", "FAILED", "NOT_APPLIED"].includes(String(terminal.status))) failures.push("TOOL_OPERATION_UNSETTLED")
+  }
+  return { runtimeSettled: failures.length === 0, failures: [...new Set(failures)] }
+}
+
 export function inspectSelectionHistory(input: { snapshot: unknown; events: unknown[] }) {
   const snapshot = record(input.snapshot) ? input.snapshot : undefined
   const failures: string[] = []
@@ -102,7 +159,14 @@ function receipt(part: Record<string, unknown>): unknown {
   if (record(part.state.metadata) && part.state.metadata.truncated === true) return undefined
   const value = part.state.status === "error" ? part.state.error : part.state.output
   if (typeof value !== "string") return value
-  try { return JSON.parse(value) as unknown } catch { return undefined }
+  try {
+    const values: unknown[] = value.split(/\n\s*\n/).map((text) => JSON.parse(text) as unknown)
+    const first = values[0]
+    if (!record(first) || values.slice(1).some((extra) => !record(extra)
+      || !["dock_saved_package_state", "dock_outcome_verification"].includes(String(extra.kind))
+      || (extra.operation_id ?? extra.save_operation_id) !== first.operation_id)) return undefined
+    return first
+  } catch { return undefined }
 }
 
 function record(value: unknown): value is Record<string, unknown> {

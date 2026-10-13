@@ -1,0 +1,4682 @@
+[
+  {
+    "path": "fixture-runtime-attempt",
+    "session": {
+      "sessionId": "identity-27",
+      "skillRevision": "74cc9ac0b5a22724909bd1ba3123e8f6e3abedbe85a3b87dee6596119bbfb340",
+      "toolCatalogSha256": "5f241ad836d3f683e7b582461eb465475619a802b6f133b75ecae5febde2f1a8",
+      "capabilityAbi": 1,
+      "executorRevision": "1.3.0",
+      "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+      "actionCatalogDigest": "bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09",
+      "selectorCatalogDigest": "32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba",
+      "e2eCommit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+      "actionManifestDigest": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+      "catalogLifecycleStatus": "candidate",
+      "acceptanceVerified": false,
+      "acceptanceDigest": null,
+      "compatibilityProfile": {
+        "profile_id": "loginom-7.4.2-linux-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "linux",
+        "browser": "chromium"
+      }
+    },
+    "events": [
+      {
+        "recorded_at": "2026-10-13T10:23:07.038Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "phase": "artifact_delivery_prepared",
+        "operation_id": "deliver-dataset-1",
+        "internal_provenance": "artifact_delivery_v1",
+        "artifact_id": "runtime-identity-1",
+        "destination": "/user/8bce3c7ea2f36b0e889fe080b7459ae28e79ebb177221034ea3b616868c579b2-0-dataset.csv",
+        "bytes": 22195,
+        "sha256": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8",
+        "overwrite": "reject",
+        "deadline_at": 1791887047038
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:07.447Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:nav1",
+        "action_key": "ui.act",
+        "action_revision": "1",
+        "phase": "prepared",
+        "deadline_at": 1791887017447
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:07.615Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:nav1",
+        "action_key": "ui.act",
+        "action_revision": "1",
+        "phase": "completed",
+        "deadline_at": 1791887017447,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "ui.act",
+          "action_revision": "1",
+          "operation_id": "deliver-dataset-1:nav1",
+          "phase": "completed",
+          "effect_possible": true,
+          "output": {
+            "origin": "http://localhost/",
+            "authenticated": true,
+            "loginom_build": "7.4.2",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-2",
+              "prefix": "MF;TF-2"
+            },
+            "graph_identity": {
+              "status": "unobserved"
+            },
+            "active_tab_ref": "ui-runtime-identity-2-108",
+            "active_identity": "",
+            "package_identity": null,
+            "geometry": {
+              "device_pixel_ratio": 1,
+              "viewport": {
+                "width": 1280,
+                "height": 800
+              },
+              "screen": {
+                "width": 1280,
+                "height": 800,
+                "x": 10,
+                "y": 10
+              },
+              "visual_viewport": {
+                "width": 1280,
+                "height": 800,
+                "scale": 1,
+                "offset_left": 0,
+                "offset_top": 0
+              }
+            },
+            "file_storage": {
+              "status": "unobserved",
+              "directory": null,
+              "listing_complete": false,
+              "reason": "storage_container_not_observed"
+            },
+            "wizard": {
+              "status": "absent"
+            },
+            "wizard_pending_owner": {
+              "status": "unobserved"
+            },
+            "workflow_navigation": {
+              "status": "unobserved"
+            },
+            "navigation_context": {
+              "status": "unobserved"
+            },
+            "node_context": {
+              "status": "unobserved",
+              "opening_verified": false
+            },
+            "table_settings": {
+              "status": "unobserved",
+              "settings_applied": false,
+              "result_complete": false,
+              "execution_verified": false
+            },
+            "table_coverage": {
+              "status": "unobserved",
+              "complete_result_verified": false
+            },
+            "process_console": {
+              "status": "unobserved",
+              "top_groups": [],
+              "rows": [],
+              "top_level_complete": false,
+              "details_complete": false,
+              "execution_verified": false,
+              "owner_verified": false
+            },
+            "dom_epoch": {
+              "document": "runtime-identity-2",
+              "revision": 341
+            },
+            "observation_root": {
+              "ref": "ui-runtime-identity-2-6",
+              "identity": {
+                "anchor_tid": "MF;cntMain;tlbMainToolbar",
+                "path": []
+              },
+              "detail_scope": "elements_and_cells",
+              "global_scan": false,
+              "global_guards": "fixed_native_queries"
+            },
+            "scan": {
+              "complete": true,
+              "mutation_counts": {
+                "cursor_style": 0,
+                "other_style": 124,
+                "attributes": 25,
+                "child_list": 1,
+                "text": 0,
+                "other": 0,
+                "unclassified": 191,
+                "ignored_cursor_blink": 0
+              },
+              "visited_elements": 78,
+              "detail_elements": 62,
+              "max_elements": 6000,
+              "max_work": 250000,
+              "max_ms": 500
+            },
+            "nodes": [],
+            "links": [],
+            "workarea": null,
+            "ui": {
+              "elements": [
+                {
+                  "ref": "ui-runtime-identity-2-98",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnAvatar",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnAvatar",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnAvatar",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-99",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnPackagesMenu",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnPackagesMenu",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnPackagesMenu",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 48,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-100",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnNavigator",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnNavigator",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnNavigator",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 96,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-101",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnWebService",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnWebService",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnWebService",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 144,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-102",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnScheduler",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnScheduler",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnScheduler",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 192,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-103",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnFilestorage",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnFilestorage",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnFilestorage",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 240,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-104",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnProgress",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnProgress",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnProgress",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 712,
+                    "width": 48,
+                    "height": 48
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                },
+                {
+                  "ref": "ui-runtime-identity-2-105",
+                  "tid": "MF;cntMain;tlbMainToolbar;btnExpandCollapse",
+                  "identity": {
+                    "anchor_tid": "MF;cntMain;tlbMainToolbar;btnExpandCollapse",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "",
+                  "scope": "global",
+                  "signature": {
+                    "tag": "a",
+                    "tid": "MF;cntMain;tlbMainToolbar;btnExpandCollapse",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "body",
+                        "tid": "MF",
+                        "anchor_tid": "MF",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 760,
+                    "width": 48,
+                    "height": 28
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                }
+              ],
+              "dialogs": [],
+              "messages": [],
+              "masks": [
+                {
+                  "ref": "ui-runtime-identity-2-107",
+                  "kind": "busy",
+                  "target_tid": "MF",
+                  "dialog_ref": null,
+                  "text": "Загрузка",
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1280,
+                    "height": 800
+                  }
+                }
+              ],
+              "table_cells": [],
+              "truncated": {
+                "elements": true,
+                "nodes": true,
+                "links": true,
+                "ports": true,
+                "dialogs": false,
+                "messages": true,
+                "masks": false,
+                "table_cells": true
+              }
+            },
+            "gesture_applied": true,
+            "verification_required": true
+          },
+          "error": null,
+          "cleanup_complete": true
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:08.100Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:nav2",
+        "action_key": "ui.act",
+        "action_revision": "1",
+        "phase": "prepared",
+        "deadline_at": 1791887018100
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:08.224Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:nav2",
+        "action_key": "ui.act",
+        "action_revision": "1",
+        "phase": "completed",
+        "deadline_at": 1791887018100,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "ui.act",
+          "action_revision": "1",
+          "operation_id": "deliver-dataset-1:nav2",
+          "phase": "completed",
+          "effect_possible": true,
+          "output": {
+            "origin": "http://localhost/",
+            "authenticated": true,
+            "loginom_build": "7.4.2",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-2",
+              "prefix": "MF;TF-2"
+            },
+            "graph_identity": {
+              "status": "unobserved"
+            },
+            "active_tab_ref": "ui-runtime-identity-2-108",
+            "active_identity": "Файлы",
+            "package_identity": null,
+            "geometry": {
+              "device_pixel_ratio": 1,
+              "viewport": {
+                "width": 1280,
+                "height": 800
+              },
+              "screen": {
+                "width": 1280,
+                "height": 800,
+                "x": 10,
+                "y": 10
+              },
+              "visual_viewport": {
+                "width": 1280,
+                "height": 800,
+                "scale": 1,
+                "offset_left": 0,
+                "offset_top": 0
+              }
+            },
+            "file_storage": {
+              "status": "observed",
+              "directory": "/",
+              "display_path": "/Файлы",
+              "navigation_root": "Файлы",
+              "navigation_identity": {
+                "anchor_tid": "MF;TF-2;NavigationBar;NavigationPanel",
+                "path": []
+              },
+              "source": "visible_breadcrumbs",
+              "listing_complete": false
+            },
+            "wizard": {
+              "status": "absent"
+            },
+            "wizard_pending_owner": {
+              "status": "unobserved"
+            },
+            "workflow_navigation": {
+              "status": "unobserved"
+            },
+            "navigation_context": {
+              "status": "unobserved"
+            },
+            "node_context": {
+              "status": "unobserved",
+              "opening_verified": false
+            },
+            "table_settings": {
+              "status": "unobserved",
+              "settings_applied": false,
+              "result_complete": false,
+              "execution_verified": false
+            },
+            "table_coverage": {
+              "status": "unobserved",
+              "complete_result_verified": false
+            },
+            "process_console": {
+              "status": "unobserved",
+              "top_groups": [],
+              "rows": [],
+              "top_level_complete": false,
+              "details_complete": false,
+              "execution_verified": false,
+              "owner_verified": false
+            },
+            "dom_epoch": {
+              "document": "runtime-identity-2",
+              "revision": 1532
+            },
+            "observation_root": {
+              "ref": "ui-runtime-identity-2-112",
+              "identity": {
+                "anchor_tid": "MF;TF-2;FileStorageForm;colName_user",
+                "path": []
+              },
+              "detail_scope": "elements_and_cells",
+              "global_scan": false,
+              "global_guards": "fixed_native_queries"
+            },
+            "scan": {
+              "complete": true,
+              "mutation_counts": {
+                "cursor_style": 0,
+                "other_style": 276,
+                "attributes": 288,
+                "child_list": 27,
+                "text": 2,
+                "other": 0,
+                "unclassified": 939,
+                "ignored_cursor_blink": 0
+              },
+              "visited_elements": 27,
+              "detail_elements": 3,
+              "max_elements": 6000,
+              "max_work": 250000,
+              "max_ms": 500
+            },
+            "nodes": [],
+            "links": [],
+            "workarea": null,
+            "ui": {
+              "elements": [
+                {
+                  "ref": "ui-runtime-identity-2-112",
+                  "tid": "MF;TF-2;FileStorageForm;colName_user",
+                  "identity": {
+                    "anchor_tid": "MF;TF-2;FileStorageForm;colName_user",
+                    "path": []
+                  },
+                  "kind": "control",
+                  "role": null,
+                  "label": "user",
+                  "scope": "workflow",
+                  "storage_entry": {
+                    "row_ref": "ui-runtime-identity-2-113",
+                    "selected": true,
+                    "kind": "folder"
+                  },
+                  "signature": {
+                    "tag": "td",
+                    "tid": "MF;TF-2;FileStorageForm;colName_user",
+                    "role": null,
+                    "type": null,
+                    "name": null,
+                    "label": "user",
+                    "dialog_ref": null,
+                    "scroll": null,
+                    "check_state": null
+                  },
+                  "enabled": true,
+                  "visible": true,
+                  "interaction": {
+                    "state": "point_not_observed",
+                    "point": null,
+                    "covering": [
+                      {
+                        "tag": "div",
+                        "tid": "MF;TF-2;FileStorageForm",
+                        "anchor_tid": "MF;TF-2;FileStorageForm",
+                        "role": null
+                      }
+                    ]
+                  },
+                  "bounding_box": {
+                    "x": 379,
+                    "y": 177,
+                    "width": 400,
+                    "height": 23
+                  },
+                  "allowed_actions": [
+                    "click",
+                    "double_click",
+                    "right_click",
+                    "press",
+                    "drag"
+                  ]
+                }
+              ],
+              "dialogs": [],
+              "messages": [],
+              "masks": [
+                {
+                  "ref": "ui-runtime-identity-2-107",
+                  "kind": "busy",
+                  "target_tid": "MF",
+                  "dialog_ref": null,
+                  "text": "Загрузка",
+                  "bounding_box": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1280,
+                    "height": 800
+                  }
+                },
+                {
+                  "ref": "ui-runtime-identity-2-114",
+                  "kind": "busy",
+                  "target_tid": "MF;TF-2;FileStorageForm",
+                  "dialog_ref": null,
+                  "text": "Загрузка",
+                  "bounding_box": {
+                    "x": 48,
+                    "y": 71,
+                    "width": 1232,
+                    "height": 729
+                  }
+                }
+              ],
+              "table_cells": [
+                {
+                  "text": "user",
+                  "row": null,
+                  "column": null
+                }
+              ],
+              "truncated": {
+                "elements": true,
+                "nodes": true,
+                "links": true,
+                "ports": true,
+                "dialogs": false,
+                "messages": true,
+                "masks": false,
+                "table_cells": true
+              }
+            },
+            "gesture_applied": true,
+            "verification_required": true
+          },
+          "error": null,
+          "cleanup_complete": true
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:09.331Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:upload",
+        "action_key": "artifact.upload",
+        "action_revision": "1",
+        "phase": "prepared",
+        "deadline_at": 1791887019331
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:09.545Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:upload",
+        "action_key": "artifact.upload",
+        "action_revision": "1",
+        "phase": "completed",
+        "deadline_at": 1791887019331,
+        "outcome": {
+          "status": "AMBIGUOUS",
+          "action_key": "artifact.upload",
+          "action_revision": "1",
+          "operation_id": "deliver-dataset-1:upload",
+          "phase": "submitted",
+          "effect_possible": true,
+          "cleanup_complete": true,
+          "output": {
+            "upload_submitted": true,
+            "artifact_id": "runtime-identity-1",
+            "upload_grant_id": "runtime-identity-3",
+            "destination": "/user/8bce3c7ea2f36b0e889fe080b7459ae28e79ebb177221034ea3b616868c579b2-0-dataset.csv",
+            "bytes": 22195,
+            "sha256": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8",
+            "verification_required": true
+          },
+          "error": {
+            "code": "UPLOAD_SERVER_VERIFICATION_REQUIRED",
+            "message": "UPLOAD_SERVER_VERIFICATION_REQUIRED"
+          }
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:09.558Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "deliver-dataset-1:upload",
+        "action_key": "artifact.upload",
+        "action_revision": "1",
+        "phase": "reconciled",
+        "deadline_at": 1791887019331,
+        "outcome": {
+          "status": "AMBIGUOUS",
+          "action_key": "artifact.upload",
+          "action_revision": "1",
+          "operation_id": "deliver-dataset-1:upload",
+          "phase": "submitted",
+          "effect_possible": true,
+          "cleanup_complete": true,
+          "output": {
+            "upload_submitted": true,
+            "artifact_id": "runtime-identity-1",
+            "upload_grant_id": "runtime-identity-3",
+            "destination": "/user/8bce3c7ea2f36b0e889fe080b7459ae28e79ebb177221034ea3b616868c579b2-0-dataset.csv",
+            "bytes": 22195,
+            "sha256": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8",
+            "verification_required": true
+          },
+          "error": {
+            "code": "UPLOAD_SERVER_VERIFICATION_REQUIRED",
+            "message": "UPLOAD_SERVER_VERIFICATION_REQUIRED"
+          }
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:10.975Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "phase": "artifact_delivery_completed",
+        "operation_id": "deliver-dataset-1",
+        "internal_provenance": "artifact_delivery_v1",
+        "result": {
+          "status": "SUCCEEDED",
+          "upload_operation_id": "deliver-dataset-1:upload",
+          "destination": "/user/8bce3c7ea2f36b0e889fe080b7459ae28e79ebb177221034ea3b616868c579b2-0-dataset.csv",
+          "bytes": 22195,
+          "sha256": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8",
+          "verification_id": "deliver-dataset-1:verify",
+          "cleanup_complete": true,
+          "upload_completion_verified": true
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:19.691Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "import-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "prepared",
+        "deadline_at": 1791887599691
+      },
+      {
+        "recorded_at": "2026-10-13T10:23:19.700Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "import-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_apply_prepared",
+        "signature": "e2090d7f5ea85969e6a07cfaed43ee88975337f9cdc2b3a2a4f672133b5b0fd0",
+        "request": {
+          "operation_id": "import-sales-1",
+          "contract_revision": "1.0.0",
+          "document_id": "identity-28",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+            "prefix": "MF;TF-1",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                "label": "Package1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ],
+            "workflow_id": "identity-28-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "imports.text",
+            "label": "Транзакции продаж"
+          },
+          "inputs": [],
+          "mode": "delimited",
+          "parameters": {
+            "source": {
+              "artifact_id": "runtime-identity-1",
+              "upload_operation_id": "deliver-dataset-1:upload",
+              "bytes": 22195,
+              "sha256": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8"
+            },
+            "settings": {
+              "source": {
+                "encoding": "UTF-8",
+                "rows_to_skip": 0,
+                "first_line_as_title": true,
+                "source_path": "/user/8bce3c7ea2f36b0e889fe080b7459ae28e79ebb177221034ea3b616868c579b2-0-dataset.csv"
+              },
+              "format": {
+                "delimiter": ",",
+                "decimal_separator": ".",
+                "null_marker": "",
+                "text_qualifier": "\""
+              },
+              "columns": [
+                {
+                  "label": "transaction_id",
+                  "data_kind": "Непрерывный",
+                  "used": true,
+                  "name": "transaction_id",
+                  "type": "integer"
+                },
+                {
+                  "label": "category",
+                  "data_kind": "Дискретный",
+                  "used": true,
+                  "name": "category",
+                  "type": "string"
+                },
+                {
+                  "label": "region",
+                  "data_kind": "Дискретный",
+                  "used": true,
+                  "name": "region",
+                  "type": "string"
+                },
+                {
+                  "label": "quantity",
+                  "data_kind": "Непрерывный",
+                  "used": true,
+                  "name": "quantity",
+                  "type": "integer"
+                },
+                {
+                  "label": "unit_price",
+                  "data_kind": "Непрерывный",
+                  "used": true,
+                  "name": "unit_price",
+                  "type": "real"
+                },
+                {
+                  "label": "date",
+                  "data_kind": "Дискретный",
+                  "used": true,
+                  "name": "date",
+                  "type": "string"
+                },
+                {
+                  "label": "total",
+                  "data_kind": "Непрерывный",
+                  "used": true,
+                  "name": "total",
+                  "type": "real"
+                }
+              ]
+            }
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 5,
+            "require_exact_numbers": true
+          },
+          "mappings": [],
+          "budgets": {
+            "configure_ms": 600000,
+            "execute_ms": 120000,
+            "total_ms": 600000
+          }
+        },
+        "deadline_at": 1791887599700
+      },
+      {
+        "recorded_at": "2026-10-13T10:24:41.286Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "import-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "completed",
+        "deadline_at": 1791887599700,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "node.apply",
+          "action_revision": "1.0.0",
+          "operation_id": "import-sales-1",
+          "phase": "node_ready",
+          "effect_possible": true,
+          "cleanup_complete": true,
+          "output": {
+            "operation_id": "import-sales-1",
+            "status": "SUCCEEDED",
+            "effect_possible": true,
+            "phases": [
+              {
+                "phase": "source",
+                "receipt_id": "import-sales-1:source",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "workflow",
+                "receipt_id": "import-sales-1:workflow",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "target",
+                "receipt_id": "import-sales-1:target",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "input_mapping",
+                "receipt_id": "import-sales-1:input_mapping",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "open",
+                "receipt_id": "import-sales-1:open",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "configure",
+                "receipt_id": "import-sales-1:configure",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "output_mapping",
+                "receipt_id": "import-sales-1:output_mapping",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "finish",
+                "receipt_id": "import-sales-1:finish",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "execute",
+                "receipt_id": "import-sales-1:execute",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "read",
+                "receipt_id": "import-sales-1:read",
+                "status": "verified",
+                "effect_possible": true
+              }
+            ],
+            "node": {
+              "document_id": "identity-28",
+              "workflow_id": "identity-28-1",
+              "node_id": "identity-48"
+            },
+            "execution": {
+              "status": "completed",
+              "execution_id": "identity-28:1025:1"
+            },
+            "output": {
+              "verified": true,
+              "cleanup_complete": true,
+              "effect_possible": true,
+              "status": "partial",
+              "execution_id": "identity-28:1025:1",
+              "evidence_ref": "import-sales-1:read",
+              "ports": [
+                {
+                  "port": 0,
+                  "port_guid": "runtime-identity-4",
+                  "fresh": true,
+                  "freshness_basis": "new_bound_table_after_verified_node_execution",
+                  "execution_id": "identity-28:1025:1",
+                  "table": {
+                    "view_guid": "runtime-identity-5",
+                    "port_guid": "runtime-identity-4",
+                    "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                  },
+                  "schema": [
+                    {
+                      "index": 0,
+                      "name": "transaction_id",
+                      "label": "transaction_id",
+                      "type": "integer",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;transaction_id",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 1,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;category",
+                      "data_kind": "Дискретный"
+                    },
+                    {
+                      "index": 2,
+                      "name": "region",
+                      "label": "region",
+                      "type": "string",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;region",
+                      "data_kind": "Дискретный"
+                    },
+                    {
+                      "index": 3,
+                      "name": "quantity",
+                      "label": "quantity",
+                      "type": "integer",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;quantity",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 4,
+                      "name": "unit_price",
+                      "label": "unit_price",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;unit_price",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 5,
+                      "name": "date",
+                      "label": "date",
+                      "type": "string",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;date",
+                      "data_kind": "Дискретный"
+                    },
+                    {
+                      "index": 6,
+                      "name": "total",
+                      "label": "total",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;total",
+                      "data_kind": "Непрерывный"
+                    }
+                  ],
+                  "row_count": 500,
+                  "sample": [
+                    [
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "1",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "1"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Books",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "South",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "2",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "2"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 62.78,
+                        "decimal": "6.278E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "6,278E+01"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "2024-01-01",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 125.56,
+                        "decimal": "1.2556E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,2556E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "2",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "2"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Sports",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "West",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "15",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "15"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 50.55,
+                        "decimal": "5.055E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "5,055E+01"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "2024-01-02",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 758.25,
+                        "decimal": "7.5825E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "7,5825E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "3",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "3"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Food",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "West",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "8",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "8"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 13.21,
+                        "decimal": "1.321E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,321E+01"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "2024-01-03",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 105.68,
+                        "decimal": "1.0568E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0568E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "4",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "4"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Sports",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "North",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "8",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "8"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 8.49,
+                        "decimal": "8.49E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "8,49E+00"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "2024-01-04",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 67.92,
+                        "decimal": "6.792E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "6,792E+01"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "5",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "5"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Sports",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "South",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "17",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "17"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 197.61,
+                        "decimal": "1.9761E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,9761E+02"
+                      },
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "2024-01-05",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 3359.37,
+                        "decimal": "3.35937E+03",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "3,35937E+03"
+                      }
+                    ]
+                  ],
+                  "sample_rows": 5,
+                  "sample_complete": false,
+                  "precision": {
+                    "numbers_verified": true,
+                    "limitations": [],
+                    "strings": "cached UI text; source completeness requires independent audit"
+                  },
+                  "table_schema_id": "table-schema-1",
+                  "filter_enabled": false
+                }
+              ],
+              "table_creation": {
+                "table": {
+                  "view_guid": "runtime-identity-5",
+                  "port_guid": "runtime-identity-4",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "port": 0,
+                "port_guid": "runtime-identity-4",
+                "created": true
+              },
+              "format_proof": {
+                "table": {
+                  "view_guid": "runtime-identity-5",
+                  "port_guid": "runtime-identity-4",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "fields": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "transaction_id",
+                    "type": "integer",
+                    "label": "transaction_id",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 0,
+                      "key": "transaction_id",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "category",
+                    "type": "string",
+                    "label": "category"
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "region",
+                    "type": "string",
+                    "label": "region"
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "quantity",
+                    "type": "integer",
+                    "label": "quantity",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 3,
+                      "key": "quantity",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "unit_price",
+                    "type": "real",
+                    "label": "unit_price",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 4,
+                      "key": "unit_price",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 5,
+                    "definition_index": 5,
+                    "key": "date",
+                    "type": "string",
+                    "label": "date"
+                  },
+                  {
+                    "index": 6,
+                    "definition_index": 6,
+                    "key": "total",
+                    "type": "real",
+                    "label": "total",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 6,
+                      "key": "total",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  }
+                ],
+                "numeric_formats": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "transaction_id",
+                    "type": "integer",
+                    "label": "transaction_id",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 0,
+                      "key": "transaction_id",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "quantity",
+                    "type": "integer",
+                    "label": "quantity",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 3,
+                      "key": "quantity",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "unit_price",
+                    "type": "real",
+                    "label": "unit_price",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 4,
+                      "key": "unit_price",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 6,
+                    "definition_index": 6,
+                    "key": "total",
+                    "type": "real",
+                    "label": "total",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 6,
+                      "key": "total",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  }
+                ],
+                "datetime_formats": [],
+                "original_formats": [
+                  {
+                    "index": 0,
+                    "key": "transaction_id",
+                    "type": "integer",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "key": "quantity",
+                    "type": "integer",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "key": "unit_price",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 6,
+                    "key": "total",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  }
+                ],
+                "restored": false,
+                "default_datetime_restoration": [],
+                "dialog_readback_verified": true,
+                "format_application_pending": false,
+                "values_verified": false
+              },
+              "format_restoration": {
+                "table": {
+                  "view_guid": "runtime-identity-5",
+                  "port_guid": "runtime-identity-4",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "restored": true,
+                "fields": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "transaction_id",
+                    "type": "integer",
+                    "label": "transaction_id",
+                    "mask": ""
+                  },
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "category",
+                    "type": "string",
+                    "label": "category"
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "region",
+                    "type": "string",
+                    "label": "region"
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "quantity",
+                    "type": "integer",
+                    "label": "quantity",
+                    "mask": ""
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "unit_price",
+                    "type": "real",
+                    "label": "unit_price",
+                    "mask": ""
+                  },
+                  {
+                    "index": 5,
+                    "definition_index": 5,
+                    "key": "date",
+                    "type": "string",
+                    "label": "date"
+                  },
+                  {
+                    "index": 6,
+                    "definition_index": 6,
+                    "key": "total",
+                    "type": "real",
+                    "label": "total",
+                    "mask": ""
+                  }
+                ],
+                "default_datetime_restoration": []
+              },
+              "read_settings": {
+                "table": {
+                  "view_guid": "runtime-identity-5",
+                  "port_guid": "runtime-identity-4",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "filter_enabled": false,
+                "filter_setting": {
+                  "enabled": {
+                    "status": "observed",
+                    "value": false,
+                    "enabled": true,
+                    "owner_ref": "ui-runtime-identity-2-1608",
+                    "state_source": "loginom_ext",
+                    "display_ref": "ui-runtime-identity-2-1609"
+                  },
+                  "predicate_coverage": "complete_empty",
+                  "predicates_complete": true,
+                  "effective_filter_verified": false,
+                  "rendered_row_count": 0,
+                  "grid_ref": "ui-runtime-identity-2-1616",
+                  "container_ref": "ui-runtime-identity-2-1628"
+                },
+                "null_display": true,
+                "type_icons": true,
+                "settings_applied": true
+              },
+              "workflow_return": {
+                "verified": true,
+                "source_table": {
+                  "view_guid": "runtime-identity-5",
+                  "port_guid": "runtime-identity-4",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "node_context": {
+                  "verified": true,
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-48",
+                  "surface": "graph",
+                  "tid": "MF;TF-1;Graph;Транзакции_продаж",
+                  "locked": false
+                },
+                "workflow_path": [
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                    "label": ""
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                    "label": "Пакеты"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                    "label": "Package1"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                    "label": "Модуль1"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                    "label": "Сценарий"
+                  }
+                ],
+                "execution_started": false,
+                "reopen_performed": false
+              }
+            },
+            "package_saved": false,
+            "cleanup_complete": true,
+            "warnings": [],
+            "configuration": {
+              "status": "applied",
+              "readback": {
+                "kind": "text_import",
+                "scope": "observed_before_verified_finish",
+                "node": {
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-48"
+                },
+                "receipt_ids": [
+                  "import-sales-1:configure",
+                  "import-sales-1:output_mapping",
+                  "import-sales-1:finish"
+                ],
+                "values_are": "observed_ui_values",
+                "source": {
+                  "source_path": "/user/8bce3c7ea2f36b0e889fe080b7459ae28e79ebb177221034ea3b616868c579b2-0-dataset.csv",
+                  "connection": "Локальное",
+                  "encoding": "UTF-8 (65001)",
+                  "rows_to_skip": "0",
+                  "first_line_as_title": true
+                },
+                "format": {
+                  "delimiter": ",",
+                  "text_qualifier": "\"",
+                  "null_marker": "",
+                  "decimal_separator": ".",
+                  "multiple_delimiters": false,
+                  "date_format": "Не задано (dd/mm/yyyy)",
+                  "date_separator": "Не задано (.)"
+                },
+                "columns": [
+                  {
+                    "index": 0,
+                    "name": "transaction_id",
+                    "label": "transaction_id",
+                    "type": "integer",
+                    "data_kind": "Непрерывный",
+                    "used": true
+                  },
+                  {
+                    "index": 1,
+                    "name": "category",
+                    "label": "category",
+                    "type": "string",
+                    "data_kind": "Дискретный",
+                    "used": true
+                  },
+                  {
+                    "index": 2,
+                    "name": "region",
+                    "label": "region",
+                    "type": "string",
+                    "data_kind": "Дискретный",
+                    "used": true
+                  },
+                  {
+                    "index": 3,
+                    "name": "quantity",
+                    "label": "quantity",
+                    "type": "integer",
+                    "data_kind": "Непрерывный",
+                    "used": true
+                  },
+                  {
+                    "index": 4,
+                    "name": "unit_price",
+                    "label": "unit_price",
+                    "type": "real",
+                    "data_kind": "Непрерывный",
+                    "used": true
+                  },
+                  {
+                    "index": 5,
+                    "name": "date",
+                    "label": "date",
+                    "type": "string",
+                    "data_kind": "Дискретный",
+                    "used": true
+                  },
+                  {
+                    "index": 6,
+                    "name": "total",
+                    "label": "total",
+                    "type": "real",
+                    "data_kind": "Непрерывный",
+                    "used": true
+                  }
+                ],
+                "output_mapping": {
+                  "port": 0,
+                  "autosync": true,
+                  "fields": [
+                    {
+                      "index": 0,
+                      "name": "transaction_id",
+                      "label": "transaction_id",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "source_name": "transaction_id"
+                    },
+                    {
+                      "index": 1,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "category"
+                    },
+                    {
+                      "index": 2,
+                      "name": "region",
+                      "label": "region",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "region"
+                    },
+                    {
+                      "index": 3,
+                      "name": "quantity",
+                      "label": "quantity",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "source_name": "quantity"
+                    },
+                    {
+                      "index": 4,
+                      "name": "unit_price",
+                      "label": "unit_price",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "unit_price"
+                    },
+                    {
+                      "index": 5,
+                      "name": "date",
+                      "label": "date",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "date"
+                    },
+                    {
+                      "index": 6,
+                      "name": "total",
+                      "label": "total",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "total"
+                    }
+                  ]
+                },
+                "package_persistence_verified": false
+              }
+            },
+            "checkpoint_kind": "local_node_checkpoint",
+            "persisted_package_verified": false
+          },
+          "error": null
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:24:46.643Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "group-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "prepared",
+        "deadline_at": 1791887686642
+      },
+      {
+        "recorded_at": "2026-10-13T10:24:46.651Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "group-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_apply_prepared",
+        "signature": "3d92e129b5200334a72476e70667b9e65618c868dad5e2df67a98fa635b4f064",
+        "request": {
+          "operation_id": "group-sales-1",
+          "contract_revision": "1.0.0",
+          "document_id": "identity-28",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+            "prefix": "MF;TF-1",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                "label": "Package1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ],
+            "workflow_id": "identity-28-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "transform.group_data",
+            "label": "Показатели по категориям"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "identity-28",
+                "workflow_id": "identity-28-1",
+                "node_id": "identity-48"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "aggregate",
+          "parameters": {
+            "group_by": [
+              {
+                "kind": "input_field",
+                "name": "category"
+              }
+            ],
+            "measures": [
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "transaction_id"
+                },
+                "function": "count",
+                "name": "transactions",
+                "label": "transactions"
+              },
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "total"
+                },
+                "function": "sum",
+                "name": "revenue",
+                "label": "revenue"
+              },
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "quantity"
+                },
+                "function": "avg",
+                "name": "avg_quantity",
+                "label": "avg_quantity"
+              },
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "unit_price"
+                },
+                "function": "avg",
+                "name": "avg_unit_price",
+                "label": "avg_unit_price"
+              }
+            ]
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          },
+          "mappings": [],
+          "budgets": {
+            "configure_ms": 600000,
+            "execute_ms": 120000,
+            "total_ms": 600000
+          }
+        },
+        "deadline_at": 1791887686651
+      },
+      {
+        "recorded_at": "2026-10-13T10:26:23.477Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "group-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "completed",
+        "deadline_at": 1791887686651,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "node.apply",
+          "action_revision": "1.0.0",
+          "operation_id": "group-sales-1",
+          "phase": "node_ready",
+          "effect_possible": true,
+          "cleanup_complete": true,
+          "output": {
+            "operation_id": "group-sales-1",
+            "status": "SUCCEEDED",
+            "effect_possible": true,
+            "phases": [
+              {
+                "phase": "source",
+                "receipt_id": "group-sales-1:source",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "workflow",
+                "receipt_id": "group-sales-1:workflow",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "target",
+                "receipt_id": "group-sales-1:target",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "input_mapping",
+                "receipt_id": "group-sales-1:input_mapping",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "open",
+                "receipt_id": "group-sales-1:open",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "configure",
+                "receipt_id": "group-sales-1:configure",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "node_finish",
+                "receipt_id": "group-sales-1:node_finish",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "output_mapping",
+                "receipt_id": "group-sales-1:output_mapping",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "finish",
+                "receipt_id": "group-sales-1:finish",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "execute",
+                "receipt_id": "group-sales-1:execute",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "read",
+                "receipt_id": "group-sales-1:read",
+                "status": "verified",
+                "effect_possible": true
+              }
+            ],
+            "node": {
+              "document_id": "identity-28",
+              "workflow_id": "identity-28-1",
+              "node_id": "identity-61"
+            },
+            "execution": {
+              "status": "completed",
+              "execution_id": "identity-28:1025:3"
+            },
+            "output": {
+              "verified": true,
+              "cleanup_complete": true,
+              "effect_possible": true,
+              "status": "complete",
+              "execution_id": "identity-28:1025:3",
+              "evidence_ref": "group-sales-1:read",
+              "ports": [
+                {
+                  "port": 0,
+                  "port_guid": "runtime-identity-6",
+                  "fresh": true,
+                  "execution_id": "identity-28:1025:3",
+                  "table": {
+                    "view_guid": "runtime-identity-7",
+                    "port_guid": "runtime-identity-6",
+                    "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                  },
+                  "schema": [
+                    {
+                      "index": 0,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;category",
+                      "data_kind": "Дискретный"
+                    },
+                    {
+                      "index": 1,
+                      "name": "transactions",
+                      "label": "transactions",
+                      "type": "integer",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;transactions",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 2,
+                      "name": "revenue",
+                      "label": "revenue",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;revenue",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 3,
+                      "name": "avg_quantity",
+                      "label": "avg_quantity",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;avg_quantity",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 4,
+                      "name": "avg_unit_price",
+                      "label": "avg_unit_price",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;avg_unit_price",
+                      "data_kind": "Непрерывный"
+                    }
+                  ],
+                  "row_count": 5,
+                  "sample": [
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Books",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "112",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "112"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 113886.53000000003,
+                        "decimal": "1.1388653000000003E+05",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,1388653000000003E+05"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 9.714285714285714,
+                        "decimal": "9.714285714285714E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,714285714285714E+00"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 104.03285714285713,
+                        "decimal": "1.0403285714285713E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0403285714285713E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Sports",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "93",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "93"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 103694.28999999995,
+                        "decimal": "1.0369428999999995E+05",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0369428999999995E+05"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 10.709677419354838,
+                        "decimal": "1.0709677419354838E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0709677419354838E+01"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 105.62774193548384,
+                        "decimal": "1.0562774193548384E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0562774193548384E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Food",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "91",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "91"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 79839.41999999997,
+                        "decimal": "7.983941999999997E+04",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "7,983941999999997E+04"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 8.56043956043956,
+                        "decimal": "8.56043956043956E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "8,56043956043956E+00"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 99.9812087912088,
+                        "decimal": "9.99812087912088E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,99812087912088E+01"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Clothing",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "95",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "95"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 90462.70999999999,
+                        "decimal": "9.046270999999999E+04",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,046270999999999E+04"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 9.115789473684211,
+                        "decimal": "9.115789473684211E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,115789473684211E+00"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 104.08431578947364,
+                        "decimal": "1.0408431578947364E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0408431578947364E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Electronics",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "109",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "109"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 128603.14000000003,
+                        "decimal": "1.2860314000000003E+05",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,2860314000000003E+05"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 10.614678899082568,
+                        "decimal": "1.0614678899082568E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0614678899082568E+01"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 106.90532110091742,
+                        "decimal": "1.0690532110091742E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0690532110091742E+02"
+                      }
+                    ]
+                  ],
+                  "sample_rows": 5,
+                  "sample_complete": true,
+                  "precision": {
+                    "numbers_verified": true,
+                    "limitations": [],
+                    "strings": "cached UI text; source completeness requires independent audit"
+                  },
+                  "table_schema_id": "table-schema-2",
+                  "filter_enabled": false
+                }
+              ],
+              "table_creation": {
+                "table": {
+                  "view_guid": "runtime-identity-7",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "port": 0,
+                "port_guid": "runtime-identity-6",
+                "created": true
+              },
+              "format_proof": {
+                "table": {
+                  "view_guid": "runtime-identity-7",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "fields": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "category",
+                    "type": "string",
+                    "label": "category"
+                  },
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "label": "transactions",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 1,
+                      "key": "transactions",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "label": "revenue",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 2,
+                      "key": "revenue",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "label": "avg_quantity",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 3,
+                      "key": "avg_quantity",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "label": "avg_unit_price",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 4,
+                      "key": "avg_unit_price",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  }
+                ],
+                "numeric_formats": [
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "label": "transactions",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 1,
+                      "key": "transactions",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "label": "revenue",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 2,
+                      "key": "revenue",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "label": "avg_quantity",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 3,
+                      "key": "avg_quantity",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "label": "avg_unit_price",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 4,
+                      "key": "avg_unit_price",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  }
+                ],
+                "datetime_formats": [],
+                "original_formats": [
+                  {
+                    "index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  }
+                ],
+                "restored": false,
+                "default_datetime_restoration": [],
+                "dialog_readback_verified": true,
+                "format_application_pending": false,
+                "values_verified": false
+              },
+              "format_restoration": {
+                "table": {
+                  "view_guid": "runtime-identity-7",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "restored": true,
+                "fields": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "category",
+                    "type": "string",
+                    "label": "category"
+                  },
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "label": "transactions",
+                    "mask": ""
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "label": "revenue",
+                    "mask": ""
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "label": "avg_quantity",
+                    "mask": ""
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "label": "avg_unit_price",
+                    "mask": ""
+                  }
+                ],
+                "default_datetime_restoration": []
+              },
+              "read_settings": {
+                "table": {
+                  "view_guid": "runtime-identity-7",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "filter_enabled": false,
+                "filter_setting": {
+                  "enabled": {
+                    "status": "observed",
+                    "value": false,
+                    "enabled": true,
+                    "owner_ref": "ui-runtime-identity-2-3203",
+                    "state_source": "loginom_ext",
+                    "display_ref": "ui-runtime-identity-2-3204"
+                  },
+                  "predicate_coverage": "complete_empty",
+                  "predicates_complete": true,
+                  "effective_filter_verified": false,
+                  "rendered_row_count": 0,
+                  "grid_ref": "ui-runtime-identity-2-3211",
+                  "container_ref": "ui-runtime-identity-2-3223"
+                },
+                "null_display": true,
+                "type_icons": true,
+                "settings_applied": true
+              },
+              "workflow_return": {
+                "verified": true,
+                "source_table": {
+                  "view_guid": "runtime-identity-7",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "node_context": {
+                  "verified": true,
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-61",
+                  "surface": "graph",
+                  "tid": "MF;TF-1;Graph;Показатели_по_категориям",
+                  "locked": false
+                },
+                "workflow_path": [
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                    "label": ""
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                    "label": "Пакеты"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                    "label": "Package1"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                    "label": "Модуль1"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                    "label": "Сценарий"
+                  }
+                ],
+                "execution_started": false,
+                "reopen_performed": false
+              }
+            },
+            "package_saved": false,
+            "cleanup_complete": true,
+            "warnings": [],
+            "configuration": {
+              "status": "applied",
+              "readback": {
+                "kind": "grouping",
+                "scope": "observed_before_verified_finish",
+                "values_are": "observed_ui_values",
+                "node": {
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-61"
+                },
+                "receipt_ids": [
+                  "group-sales-1:input_mapping",
+                  "group-sales-1:configure",
+                  "group-sales-1:node_finish",
+                  "group-sales-1:output_mapping",
+                  "group-sales-1:finish"
+                ],
+                "mode": "aggregate",
+                "group_by": [
+                  {
+                    "name": "category",
+                    "label": "category",
+                    "type": "string",
+                    "order": 0
+                  }
+                ],
+                "measures": [
+                  {
+                    "name": "transaction_id",
+                    "label": "transaction_id",
+                    "type": "integer",
+                    "order": 0,
+                    "functions": 2
+                  },
+                  {
+                    "name": "total",
+                    "label": "total",
+                    "type": "real",
+                    "order": 1,
+                    "functions": 1
+                  },
+                  {
+                    "name": "quantity",
+                    "label": "quantity",
+                    "type": "integer",
+                    "order": 2,
+                    "functions": 16
+                  },
+                  {
+                    "name": "unit_price",
+                    "label": "unit_price",
+                    "type": "real",
+                    "order": 3,
+                    "functions": 16
+                  }
+                ],
+                "options": {
+                  "pedDimCache": {
+                    "value": true,
+                    "switch_pressed": false
+                  },
+                  "pedSortResult": {
+                    "value": false,
+                    "switch_pressed": false
+                  }
+                },
+                "input_mapping": {
+                  "port": 0,
+                  "autosync": true,
+                  "fields": [
+                    {
+                      "index": 0,
+                      "name": "transaction_id",
+                      "label": "transaction_id",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "source_name": "transaction_id"
+                    },
+                    {
+                      "index": 1,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "category"
+                    },
+                    {
+                      "index": 2,
+                      "name": "region",
+                      "label": "region",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "region"
+                    },
+                    {
+                      "index": 3,
+                      "name": "quantity",
+                      "label": "quantity",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "source_name": "quantity"
+                    },
+                    {
+                      "index": 4,
+                      "name": "unit_price",
+                      "label": "unit_price",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "unit_price"
+                    },
+                    {
+                      "index": 5,
+                      "name": "date",
+                      "label": "date",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "date"
+                    },
+                    {
+                      "index": 6,
+                      "name": "total",
+                      "label": "total",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "total"
+                    }
+                  ]
+                },
+                "output_mapping": {
+                  "port": 0,
+                  "autosync": true,
+                  "fields": [
+                    {
+                      "index": 0,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "excluded": false,
+                      "source_name": "category"
+                    },
+                    {
+                      "index": 1,
+                      "name": "transactions",
+                      "label": "transactions",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "transaction_id_Count"
+                    },
+                    {
+                      "index": 2,
+                      "name": "revenue",
+                      "label": "revenue",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "total_Sum"
+                    },
+                    {
+                      "index": 3,
+                      "name": "avg_quantity",
+                      "label": "avg_quantity",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "quantity_Avg"
+                    },
+                    {
+                      "index": 4,
+                      "name": "avg_unit_price",
+                      "label": "avg_unit_price",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "unit_price_Avg"
+                    }
+                  ]
+                },
+                "package_persistence_verified": false
+              }
+            },
+            "checkpoint_kind": "local_node_checkpoint",
+            "persisted_package_verified": false
+          },
+          "error": null
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:26:27.179Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "sort-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "prepared",
+        "deadline_at": 1791887787179
+      },
+      {
+        "recorded_at": "2026-10-13T10:26:27.186Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "sort-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_apply_prepared",
+        "signature": "facda2d26238ace518f4c67bbb15f6759f207584d8e29b3420415c59b804c8be",
+        "request": {
+          "operation_id": "sort-sales-1",
+          "contract_revision": "1.0.0",
+          "document_id": "identity-28",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+            "prefix": "MF;TF-1",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                "label": "Package1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ],
+            "workflow_id": "identity-28-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "transform.sorting",
+            "label": "По убыванию выручки"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "identity-28",
+                "workflow_id": "identity-28-1",
+                "node_id": "identity-61"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "keys",
+          "parameters": {
+            "keys": [
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "revenue"
+                },
+                "direction": "DESC"
+              }
+            ]
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          },
+          "mappings": [],
+          "budgets": {
+            "configure_ms": 600000,
+            "execute_ms": 120000,
+            "total_ms": 600000
+          }
+        },
+        "deadline_at": 1791887787186
+      },
+      {
+        "recorded_at": "2026-10-13T10:27:24.181Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "sort-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "completed",
+        "deadline_at": 1791887787186,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "node.apply",
+          "action_revision": "1.0.0",
+          "operation_id": "sort-sales-1",
+          "phase": "node_ready",
+          "effect_possible": true,
+          "cleanup_complete": true,
+          "output": {
+            "operation_id": "sort-sales-1",
+            "status": "SUCCEEDED",
+            "effect_possible": true,
+            "phases": [
+              {
+                "phase": "source",
+                "receipt_id": "sort-sales-1:source",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "workflow",
+                "receipt_id": "sort-sales-1:workflow",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "target",
+                "receipt_id": "sort-sales-1:target",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "input_mapping",
+                "receipt_id": "sort-sales-1:input_mapping",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "open",
+                "receipt_id": "sort-sales-1:open",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "configure",
+                "receipt_id": "sort-sales-1:configure",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "node_finish",
+                "receipt_id": "sort-sales-1:node_finish",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "output_mapping",
+                "receipt_id": "sort-sales-1:output_mapping",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "finish",
+                "receipt_id": "sort-sales-1:finish",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "execute",
+                "receipt_id": "sort-sales-1:execute",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "read",
+                "receipt_id": "sort-sales-1:read",
+                "status": "verified",
+                "effect_possible": true
+              }
+            ],
+            "node": {
+              "document_id": "identity-28",
+              "workflow_id": "identity-28-1",
+              "node_id": "identity-74"
+            },
+            "execution": {
+              "status": "completed",
+              "execution_id": "identity-28:1025:5"
+            },
+            "output": {
+              "verified": true,
+              "cleanup_complete": true,
+              "effect_possible": true,
+              "status": "complete",
+              "execution_id": "identity-28:1025:5",
+              "evidence_ref": "sort-sales-1:read",
+              "ports": [
+                {
+                  "port": 0,
+                  "port_guid": "runtime-identity-6",
+                  "fresh": true,
+                  "execution_id": "identity-28:1025:5",
+                  "table": {
+                    "view_guid": "runtime-identity-8",
+                    "port_guid": "runtime-identity-6",
+                    "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                  },
+                  "schema": [
+                    {
+                      "index": 0,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;category",
+                      "data_kind": "Дискретный"
+                    },
+                    {
+                      "index": 1,
+                      "name": "transactions",
+                      "label": "transactions",
+                      "type": "integer",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;transactions",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 2,
+                      "name": "revenue",
+                      "label": "revenue",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;revenue",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 3,
+                      "name": "avg_quantity",
+                      "label": "avg_quantity",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;avg_quantity",
+                      "data_kind": "Непрерывный"
+                    },
+                    {
+                      "index": 4,
+                      "name": "avg_unit_price",
+                      "label": "avg_unit_price",
+                      "type": "real",
+                      "header_tid": "MF;TF-1;ViewsForm;BrowseView;normalHeaderCt;avg_unit_price",
+                      "data_kind": "Непрерывный"
+                    }
+                  ],
+                  "row_count": 5,
+                  "sample": [
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Electronics",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "109",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "109"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 128603.14000000003,
+                        "decimal": "1.2860314000000003E+05",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,2860314000000003E+05"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 10.614678899082568,
+                        "decimal": "1.0614678899082568E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0614678899082568E+01"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 106.90532110091742,
+                        "decimal": "1.0690532110091742E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0690532110091742E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Books",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "112",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "112"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 113886.53000000003,
+                        "decimal": "1.1388653000000003E+05",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,1388653000000003E+05"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 9.714285714285714,
+                        "decimal": "9.714285714285714E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,714285714285714E+00"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 104.03285714285713,
+                        "decimal": "1.0403285714285713E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0403285714285713E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Sports",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "93",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "93"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 103694.28999999995,
+                        "decimal": "1.0369428999999995E+05",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0369428999999995E+05"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 10.709677419354838,
+                        "decimal": "1.0709677419354838E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0709677419354838E+01"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 105.62774193548384,
+                        "decimal": "1.0562774193548384E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0562774193548384E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Clothing",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "95",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "95"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 90462.70999999999,
+                        "decimal": "9.046270999999999E+04",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,046270999999999E+04"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 9.115789473684211,
+                        "decimal": "9.115789473684211E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,115789473684211E+00"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 104.08431578947364,
+                        "decimal": "1.0408431578947364E+02",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "1,0408431578947364E+02"
+                      }
+                    ],
+                    [
+                      {
+                        "type": "string",
+                        "is_null": false,
+                        "value": "Food",
+                        "representation": "cached_display_text",
+                        "precision": "display_text"
+                      },
+                      {
+                        "type": "integer",
+                        "is_null": false,
+                        "value": "91",
+                        "representation": "decimal_integer",
+                        "precision": "exact_integer",
+                        "display_text": "91"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 79839.41999999997,
+                        "decimal": "7.983941999999997E+04",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "7,983941999999997E+04"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 8.56043956043956,
+                        "decimal": "8.56043956043956E+00",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "8,56043956043956E+00"
+                      },
+                      {
+                        "type": "real",
+                        "is_null": false,
+                        "value": 99.9812087912088,
+                        "decimal": "9.99812087912088E+01",
+                        "representation": "binary64",
+                        "precision": "17_significant_digits",
+                        "display_text": "9,99812087912088E+01"
+                      }
+                    ]
+                  ],
+                  "sample_rows": 5,
+                  "sample_complete": true,
+                  "precision": {
+                    "numbers_verified": true,
+                    "limitations": [],
+                    "strings": "cached UI text; source completeness requires independent audit"
+                  },
+                  "table_schema_id": "table-schema-3",
+                  "filter_enabled": false
+                }
+              ],
+              "table_creation": {
+                "table": {
+                  "view_guid": "runtime-identity-8",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "port": 0,
+                "port_guid": "runtime-identity-6",
+                "created": true
+              },
+              "format_proof": {
+                "table": {
+                  "view_guid": "runtime-identity-8",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "fields": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "category",
+                    "type": "string",
+                    "label": "category"
+                  },
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "label": "transactions",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 1,
+                      "key": "transactions",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "label": "revenue",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 2,
+                      "key": "revenue",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "label": "avg_quantity",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 3,
+                      "key": "avg_quantity",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "label": "avg_unit_price",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 4,
+                      "key": "avg_unit_price",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  }
+                ],
+                "numeric_formats": [
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "label": "transactions",
+                    "mask": "0",
+                    "verified_format": {
+                      "index": 1,
+                      "key": "transactions",
+                      "type": "integer",
+                      "mask": "0",
+                      "representation": "standard_integer"
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "label": "revenue",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 2,
+                      "key": "revenue",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "label": "avg_quantity",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 3,
+                      "key": "avg_quantity",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "label": "avg_unit_price",
+                    "mask": "0.################E+00",
+                    "verified_format": {
+                      "index": 4,
+                      "key": "avg_unit_price",
+                      "type": "real",
+                      "mask": "0.################E+00",
+                      "representation": "custom"
+                    }
+                  }
+                ],
+                "datetime_formats": [],
+                "original_formats": [
+                  {
+                    "index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "settings": {
+                      "formatting": true,
+                      "custom": true,
+                      "format_string": "",
+                      "thousands": false,
+                      "scientific": false,
+                      "decimal_digits": "",
+                      "currency": ""
+                    }
+                  }
+                ],
+                "restored": false,
+                "default_datetime_restoration": [],
+                "dialog_readback_verified": true,
+                "format_application_pending": false,
+                "values_verified": false
+              },
+              "format_restoration": {
+                "table": {
+                  "view_guid": "runtime-identity-8",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "restored": true,
+                "fields": [
+                  {
+                    "index": 0,
+                    "definition_index": 0,
+                    "key": "category",
+                    "type": "string",
+                    "label": "category"
+                  },
+                  {
+                    "index": 1,
+                    "definition_index": 1,
+                    "key": "transactions",
+                    "type": "integer",
+                    "label": "transactions",
+                    "mask": ""
+                  },
+                  {
+                    "index": 2,
+                    "definition_index": 2,
+                    "key": "revenue",
+                    "type": "real",
+                    "label": "revenue",
+                    "mask": ""
+                  },
+                  {
+                    "index": 3,
+                    "definition_index": 3,
+                    "key": "avg_quantity",
+                    "type": "real",
+                    "label": "avg_quantity",
+                    "mask": ""
+                  },
+                  {
+                    "index": 4,
+                    "definition_index": 4,
+                    "key": "avg_unit_price",
+                    "type": "real",
+                    "label": "avg_unit_price",
+                    "mask": ""
+                  }
+                ],
+                "default_datetime_restoration": []
+              },
+              "read_settings": {
+                "table": {
+                  "view_guid": "runtime-identity-8",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "filter_enabled": false,
+                "filter_setting": {
+                  "enabled": {
+                    "status": "observed",
+                    "value": false,
+                    "enabled": true,
+                    "owner_ref": "ui-runtime-identity-2-4321",
+                    "state_source": "loginom_ext",
+                    "display_ref": "ui-runtime-identity-2-4322"
+                  },
+                  "predicate_coverage": "complete_empty",
+                  "predicates_complete": true,
+                  "effective_filter_verified": false,
+                  "rendered_row_count": 0,
+                  "grid_ref": "ui-runtime-identity-2-4329",
+                  "container_ref": "ui-runtime-identity-2-4341"
+                },
+                "null_display": true,
+                "type_icons": true,
+                "settings_applied": true
+              },
+              "workflow_return": {
+                "verified": true,
+                "source_table": {
+                  "view_guid": "runtime-identity-8",
+                  "port_guid": "runtime-identity-6",
+                  "table_tid": "MF;TF-1;ViewsForm;BrowseView"
+                },
+                "node_context": {
+                  "verified": true,
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-74",
+                  "surface": "graph",
+                  "tid": "MF;TF-1;Graph;По_убыванию_выручки",
+                  "locked": false
+                },
+                "workflow_path": [
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                    "label": ""
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                    "label": "Пакеты"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                    "label": "Package1"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                    "label": "Модуль1"
+                  },
+                  {
+                    "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                    "label": "Сценарий"
+                  }
+                ],
+                "execution_started": false,
+                "reopen_performed": false
+              }
+            },
+            "package_saved": false,
+            "cleanup_complete": true,
+            "warnings": [],
+            "configuration": {
+              "status": "applied",
+              "readback": {
+                "kind": "sorting",
+                "scope": "observed_before_verified_finish",
+                "values_are": "observed_ui_values",
+                "node": {
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-74"
+                },
+                "receipt_ids": [
+                  "sort-sales-1:input_mapping",
+                  "sort-sales-1:configure",
+                  "sort-sales-1:node_finish",
+                  "sort-sales-1:output_mapping",
+                  "sort-sales-1:finish"
+                ],
+                "mode": "keys",
+                "keys": [
+                  {
+                    "name": "revenue",
+                    "label": "revenue",
+                    "type": "real",
+                    "order": 0,
+                    "direction": "DESC",
+                    "case_sensitive": true
+                  }
+                ],
+                "comparison": {
+                  "mode": "user_locale",
+                  "locale": null,
+                  "locale_verified": false,
+                  "case_insensitivity": "locale_dependent"
+                },
+                "options": {
+                  "chkLocaleAware": {
+                    "value": true,
+                    "switch_pressed": false
+                  },
+                  "chkBufferWhole": {
+                    "value": false,
+                    "switch_pressed": false
+                  },
+                  "cbxMaxThreadCount": {
+                    "value": 0,
+                    "switch_pressed": false
+                  }
+                },
+                "input_mapping": {
+                  "port": 0,
+                  "autosync": true,
+                  "fields": [
+                    {
+                      "index": 0,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "category"
+                    },
+                    {
+                      "index": 1,
+                      "name": "transactions",
+                      "label": "transactions",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "source_name": "transactions"
+                    },
+                    {
+                      "index": 2,
+                      "name": "revenue",
+                      "label": "revenue",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "revenue"
+                    },
+                    {
+                      "index": 3,
+                      "name": "avg_quantity",
+                      "label": "avg_quantity",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "avg_quantity"
+                    },
+                    {
+                      "index": 4,
+                      "name": "avg_unit_price",
+                      "label": "avg_unit_price",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "avg_unit_price"
+                    }
+                  ]
+                },
+                "output_mapping": {
+                  "port": 0,
+                  "autosync": true,
+                  "fields": [
+                    {
+                      "index": 0,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "excluded": false,
+                      "source_name": "category"
+                    },
+                    {
+                      "index": 1,
+                      "name": "transactions",
+                      "label": "transactions",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "transactions"
+                    },
+                    {
+                      "index": 2,
+                      "name": "revenue",
+                      "label": "revenue",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "revenue"
+                    },
+                    {
+                      "index": 3,
+                      "name": "avg_quantity",
+                      "label": "avg_quantity",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "avg_quantity"
+                    },
+                    {
+                      "index": 4,
+                      "name": "avg_unit_price",
+                      "label": "avg_unit_price",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "excluded": false,
+                      "source_name": "avg_unit_price"
+                    }
+                  ]
+                },
+                "package_persistence_verified": false
+              }
+            },
+            "checkpoint_kind": "local_node_checkpoint",
+            "persisted_package_verified": false
+          },
+          "error": null
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:27:31.519Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "export-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "prepared",
+        "deadline_at": 1791887851519
+      },
+      {
+        "recorded_at": "2026-10-13T10:27:31.528Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "export-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_apply_prepared",
+        "signature": "fdde67bf43508d34a149736f406493dc17358f81d20a601f6b75fcee1878359c",
+        "request": {
+          "operation_id": "export-sales-1",
+          "contract_revision": "1.0.0",
+          "document_id": "identity-28",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+            "prefix": "MF;TF-1",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                "label": "Package1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ],
+            "workflow_id": "identity-28-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "exports.text",
+            "label": "CSV по категориям"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "identity-28",
+                "workflow_id": "identity-28-1",
+                "node_id": "identity-74"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "delimited",
+          "parameters": {
+            "encoding": "UTF-8",
+            "delimiter": ",",
+            "header": "names",
+            "bom": false,
+            "line_ending": "LF",
+            "decimal_separator": ".",
+            "null_marker": "",
+            "text_qualifier": "\"",
+            "destination": "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1.result.csv",
+            "overwrite": "reject"
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [],
+            "sample_rows": 0,
+            "require_exact_numbers": false
+          },
+          "mappings": [],
+          "budgets": {
+            "configure_ms": 600000,
+            "execute_ms": 120000,
+            "total_ms": 600000
+          }
+        },
+        "deadline_at": 1791887851528
+      },
+      {
+        "recorded_at": "2026-10-13T10:28:07.877Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "export-sales-1",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "completed",
+        "deadline_at": 1791887851528,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "node.apply",
+          "action_revision": "1.0.0",
+          "operation_id": "export-sales-1",
+          "phase": "node_ready",
+          "effect_possible": true,
+          "cleanup_complete": true,
+          "output": {
+            "operation_id": "export-sales-1",
+            "status": "SUCCEEDED",
+            "effect_possible": true,
+            "phases": [
+              {
+                "phase": "source",
+                "receipt_id": "export-sales-1:source",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "workflow",
+                "receipt_id": "export-sales-1:workflow",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "target",
+                "receipt_id": "export-sales-1:target",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "input_mapping",
+                "receipt_id": "export-sales-1:input_mapping",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "open",
+                "receipt_id": "export-sales-1:open",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "configure",
+                "receipt_id": "export-sales-1:configure",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "output_mapping",
+                "receipt_id": "export-sales-1:output_mapping",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "finish",
+                "receipt_id": "export-sales-1:finish",
+                "status": "verified",
+                "effect_possible": true
+              },
+              {
+                "phase": "execute",
+                "receipt_id": "export-sales-1:execute",
+                "status": "verified",
+                "effect_possible": false
+              },
+              {
+                "phase": "read",
+                "receipt_id": "export-sales-1:read",
+                "status": "verified",
+                "effect_possible": true
+              }
+            ],
+            "node": {
+              "document_id": "identity-28",
+              "workflow_id": "identity-28-1",
+              "node_id": "identity-83"
+            },
+            "execution": {
+              "status": "completed",
+              "execution_id": "identity-28:1025:7"
+            },
+            "output": {
+              "verified": true,
+              "cleanup_complete": true,
+              "effect_possible": true,
+              "status": "complete",
+              "ports": [],
+              "execution_id": "identity-28:1025:7",
+              "evidence_ref": "export-sales-1:read",
+              "file_artifacts": [
+                {
+                  "artifact_id": "runtime-identity-9",
+                  "destination": "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1.result.csv",
+                  "bytes": 391,
+                  "sha256": "86846451580c41ce2710d792f8908924a2c31ae3e5f849d019b81689afabddb0",
+                  "execution_id": "identity-28:1025:7",
+                  "verification_id": "export-sales-1:export-download",
+                  "freshness_basis": "native_absence_check_and_completed_execution"
+                }
+              ]
+            },
+            "package_saved": false,
+            "cleanup_complete": true,
+            "warnings": [],
+            "configuration": {
+              "status": "applied",
+              "readback": {
+                "kind": "text_export",
+                "scope": "observed_before_verified_finish",
+                "node": {
+                  "document_id": "identity-28",
+                  "workflow_id": "identity-28-1",
+                  "node_id": "identity-83"
+                },
+                "receipt_ids": [
+                  "export-sales-1:input_mapping",
+                  "export-sales-1:configure",
+                  "export-sales-1:finish"
+                ],
+                "values_are": "observed_ui_values",
+                "destination": "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1.result.csv",
+                "settings": {
+                  "destination": "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1.result.csv",
+                  "text_qualifier": "\"",
+                  "decimal_separator": ".",
+                  "date_separator": "",
+                  "time_separator": "",
+                  "true_value": "True",
+                  "false_value": "False",
+                  "null_marker": "",
+                  "date_format": "",
+                  "time_format": "",
+                  "delimiter": ",",
+                  "encoding": 65001,
+                  "bom": false,
+                  "line_ending": 0,
+                  "header": 1
+                },
+                "input_mapping": {
+                  "port": 0,
+                  "autosync": true,
+                  "fields": [
+                    {
+                      "index": 0,
+                      "name": "category",
+                      "label": "category",
+                      "type": "string",
+                      "data_kind": "Дискретный",
+                      "source_name": "category"
+                    },
+                    {
+                      "index": 1,
+                      "name": "transactions",
+                      "label": "transactions",
+                      "type": "integer",
+                      "data_kind": "Непрерывный",
+                      "source_name": "transactions"
+                    },
+                    {
+                      "index": 2,
+                      "name": "revenue",
+                      "label": "revenue",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "revenue"
+                    },
+                    {
+                      "index": 3,
+                      "name": "avg_quantity",
+                      "label": "avg_quantity",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "avg_quantity"
+                    },
+                    {
+                      "index": 4,
+                      "name": "avg_unit_price",
+                      "label": "avg_unit_price",
+                      "type": "real",
+                      "data_kind": "Непрерывный",
+                      "source_name": "avg_unit_price"
+                    }
+                  ]
+                },
+                "package_persistence_verified": false
+              }
+            },
+            "checkpoint_kind": "local_node_checkpoint",
+            "persisted_package_verified": false
+          },
+          "error": null
+        }
+      },
+      {
+        "recorded_at": "2026-10-13T10:28:12.782Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "save-sales-package-1",
+        "action_key": "package.save_checkpoint",
+        "action_revision": "2",
+        "phase": "prepared",
+        "deadline_at": 1791887472782
+      },
+      {
+        "recorded_at": "2026-10-13T10:28:14.870Z",
+        "session_id": "identity-27",
+        "runtime_revision": "94213c091deea4ee77e9a710413539b40548699a18b3e0a84f92aa7724e3840e",
+        "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+        "target": {
+          "profile_id": "loginom-7.4.2-linux-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "linux",
+          "browser": "chromium"
+        },
+        "operation_id": "save-sales-package-1",
+        "action_key": "package.save_checkpoint",
+        "action_revision": "2",
+        "phase": "completed",
+        "deadline_at": 1791887472782,
+        "outcome": {
+          "status": "SUCCEEDED",
+          "action_key": "package.save_checkpoint",
+          "action_revision": "2",
+          "operation_id": "save-sales-package-1",
+          "phase": "verified",
+          "effect_possible": true,
+          "output": {
+            "package_ref": {
+              "kind": "package",
+              "path": "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1.lgp",
+              "active_identity": "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1.lgp"
+            },
+            "reopened": false,
+            "workflow_preserved": true,
+            "save_completed": true,
+            "persisted_content_verified": false,
+            "workflow_continuations": [
+              {
+                "document_id": "identity-28",
+                "workflow_ref": {
+                  "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+                  "prefix": "MF;TF-1",
+                  "workflow_id": "identity-28-1",
+                  "navigation_path": [
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                      "label": ""
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                      "label": "Пакеты"
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>node_selection_20261013T093809Z_f5d429_sales_by_category_baseline_1",
+                      "label": "node_selection_20261013T093809Z_f5d429_sales_by_category_baseline_1"
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>node_selection_20261013T093809Z_f5d429_sales_by_category_baseline_1>Модуль1",
+                      "label": "Модуль1"
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>node_selection_20261013T093809Z_f5d429_sales_by_category_baseline_1>Модуль1>Сценарий",
+                      "label": "Сценарий"
+                    }
+                  ]
+                },
+                "previous_workflow_ref": {
+                  "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+                  "prefix": "MF;TF-1",
+                  "workflow_id": "identity-28-1",
+                  "navigation_path": [
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                      "label": ""
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                      "label": "Пакеты"
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                      "label": "Package1"
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                      "label": "Модуль1"
+                    },
+                    {
+                      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                      "label": "Сценарий"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "error": null,
+          "cleanup_complete": true
+        }
+      }
+    ]
+  }
+]

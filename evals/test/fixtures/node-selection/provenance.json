@@ -11,5 +11,22 @@
     "snapshotSha256": "df0e2c47752b0541697e321e8f31b32ef0987a9ed13dbbba24cb0d77c816cd1a",
     "eventsSha256": "9dd2a3948412c5a2a471bd9830c638d1c8b37d0c91acf6e8815af7e912ae47c5",
     "sanitization": "Consistent identity replacement; non-tool prose, bundled skill/read contents, nonreceipt display metadata and local filesystem paths removed. Original tool inputs/output receipts, statuses, times, activation and duplicate events retained."
+  },
+  "pilotRuntime": {
+    "sourceFiles": [
+      {
+        "path": "session.json",
+        "sha256": "1e41bbd8feea7c2af3c5f6ff3cce61d7f8791840c79a8e32f4d92feca530a959"
+      },
+      {
+        "path": "terminal-close.jsonl",
+        "sha256": "1edb0d09c7689d158ffbd2c0f6a7b0546f390d8c1907780bc57acbee71683985"
+      },
+      {
+        "path": "execution-events.jsonl",
+        "sha256": "4535a8f2e25c7e549135b84583d5cb5b2cd81455a72a2a14d1475fe537d2d56d"
+      }
+    ],
+    "projection": "Admitted and terminal/reconciled operation records only; UI checkpoints/parameters/trace omitted. Runtime identity/catalog metadata retained. UUIDs anonymized consistently with history fixture."
   }
 }
