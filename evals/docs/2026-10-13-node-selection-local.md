@@ -39,6 +39,12 @@ PublicJS guards/skill не менялись. Новый run203142 готовит
 immutablepins/admission и модельные18+25 ещёpending. Старый current-run192418
 не является разрешением продолжать остановленные model slots.
 
+Новая пара203142 построена/verify0 на общемdd8d480706, runtime47b871…/288 equal,
+baseline exactold2skills/candidate current2skills. Wholepair/pins independent
+Approved (47f9f35b…/305a8573…); новый immutable locke6eedea2…,
+43unique18+25slots/unchanged72+2/model/seed/tasks/0oldoutcomes. Native prerequisites
+и admissionpending: пока не запускать ни baseline, ни candidate этой пары.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1

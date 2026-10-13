@@ -1,6 +1,8 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
-Статус: приёмка не завершена. Серия192418-c71363 остановлена после2baseline/0candidate: salesPASS, ABC group-target runtime blocker.
+Статус: приёмка не завершена. Новая пара203142-5bf175 статически проверена;
+native prerequisites pending, новых model attempts0. Серия192418-c71363
+остановлена после2baseline/0candidate: salesPASS, ABC group-target runtime blocker.
 Independent paired/pins/native core подтверждены, model acceptance pending.
 Full private native driver exit1 сохранён отдельно от подтверждённого core.
 
@@ -18,7 +20,29 @@ ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; can
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
-## Новая пара после Join fix — допуск серии
+## Подготовка новой пары203142 после managed JS preview fix
+
+Общий source `dd8d480706e4f2a391524f2dee05818bdd41e2cc`, version0.1.17/prod;
+baseline source dirty только двумя exact old skill файлами, candidate clean.
+Оба build/verify exit0, baseline verify выполнен до restore skill. Raw
+attestation JSON сохранён без изменений. Manifest SHA baseline
+`c04abca3e1f323ee742ed61ccd26ce4fea2c7ff8a45586aa1451312c17580331`, candidate
+`77f51a21b0168f4b380fda930e61ef506238e28ba04371b1f9587b609a2e69d0`.
+Immutable pins SHA baseline `9cb0c002fa64ed50c7a81a5da1b5309ac7935f919cc7f75e563b8330bea622e5`,
+candidate `6f34460ba8d6e3b1b6251bbf944f767de141dfeae14a810a45842b8fbe5ad02c`.
+Runtime revision `47b87152dba39d7449f9669e5ea7c4d1f38cfed89c919f67dc2c146af0086a14`,
+288filescommon. Independent pair review SHA
+`47f9f35b0577c9ba17be85f46f6fc39fdf518cca05b66c9708f1ce9fe7f4e953`:
+5726CLI entries/4729resource entries обеих фаз, SHA/modes/symlinks/source tree
+PASS; compiledCLI/runtime/deps equal, разница2skills+3metadata.
+Pins review SHA `305a8573b5cc516cc485a1fb5a0241fc6f060b1b1ef9df8dc2b2ef5aa1b6454e`:
+actual selectionAttempt/loadTasks43unique свободныхslots18+25, unchanged72+2
+sources/model/seed/task/input/oracle/audit2654, oldOutcomesTransferred0.
+Lock SHA `e6eedea28a4c6fba1e38fc66091951e3d56706a386314042199c6b8a967c2fc4`.
+Native JS→Group/directJS→newSort, обе Join hiddenroles, actual catalog/schema
+binding и model18+25 pending. current-run остаётся192418 до нового допуска.
+
+## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;
 baseline source dirty только двумя прежними skill файлами, candidate clean.

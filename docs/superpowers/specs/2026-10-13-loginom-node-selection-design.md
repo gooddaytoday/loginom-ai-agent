@@ -417,6 +417,16 @@ Native port selection==[port.FCell] пока fixture-only: новая matched п
 actual JS→Group/directJS→newSort и обе Join hiddenroles, затем полные18+25 pending.
 Исходные2baseline192418 сохраняются отдельно; предыдущие18 также не переносятся.
 
+Новая matched пара203142 статически Approved: sourcedd8d480706, baseline dirty
+только2oldskills/candidate clean, обаbuild/verify0, runtime47b871…/288 equal.
+Manifest baselinec04abca3…/candidate77f51a21…, pins9cb0c002…/6f34460b…,
+effective locke6eedea2… . Independent5726/4729inventory/hash/modes/source-tree
+PASS, разница2skills+3metadata;43unique slots18+25 и unchanged72+2/audit2654/
+model/seed/tasks. Native/catalog/schema/model gates pending; current-run192418
+ещё не переключён. Приватный Join fixture делает initial ownSave до imports,
+laterreplace; это диагностическая поправка после observed stale navigation,
+не изменение public node-read API. Его actual newlive покаpending.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.
