@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle/calculation 8;
+серия `20261013T142936Z-072953`: завершены baseline 9/18, oracle/calculation 9;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -285,6 +285,16 @@ collector projection); CLI/wrapper/blocker не подменены. У семи 
 auditVersion, у ABC/2 — successfulJS 1→2, runtime/calculation true и сняты три
 settlement errors. Pins/model/tasks/oracle и build metadata прежние.
 Повторных тестов/audits и semantic review reviewer не делал. Monthly-demand/2 запущен.
+
+## Monthly-demand/2 на финальном аудиторе
+
+Session `ses_ec9e08ac3ffelGiTyxf3V91hSd`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI 562.562 секунды, timeout false. JS nodes/calls 0/0; oracle/calculation/history/
+runtime/identity/graph/export true, failures []. AuditVersion `2654bfc1…`.
+Package SHA `4265528b5bd90861aaad00e5e0da3aa889a1d728a092ec6b864387b8f5599941`.
+Стандартная цепочка включает reform_columns для целочисленного promo_days;
+inputs/model/oracle прежние. Завершены 9/18 baseline, policy старого skill 6/9;
+следующий risky-approved-claims/2 запущен, candidate 0/25.
 
 ## Native proof исправления дат
 

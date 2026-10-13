@@ -4,7 +4,7 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Текущая серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle/calculation 8;
+Текущая серия `20261013T142936Z-072953`: завершены baseline 9/18, oracle/calculation 9;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
@@ -302,6 +302,9 @@ calls. Original attempt/outcomes/raw и предыдущие оценки поб
 prior audits неизменны, новые оценки и locks/pins/Session/package bindings
 подтверждены. У семи изменился только auditVersion; остальные изменения только
 у ABC/2 и касаются подтверждённого settlement. Начат monthly-demand/2.
+Monthly-demand/2 также прошёл CLI/wrapper0 и full audit/cleanup без JS на
+auditVersion `2654bfc1…`; использованы стандартные узлы, включая reform_columns.
+Начат risky-approved-claims/2; candidate по-прежнему 0/25.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
