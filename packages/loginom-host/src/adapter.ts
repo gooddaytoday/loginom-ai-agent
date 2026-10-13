@@ -4,6 +4,7 @@ export * as LoginomHost from "./adapter"
 import { originalUnionInvocation } from "../../loginom-runtime/client/lib/union-invocation.mjs"
 
 import { randomUUID } from "node:crypto"
+import { types } from "node:util"
 import { transport, type Port } from "./transport"
 
 type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }> }
@@ -37,10 +38,11 @@ export async function acquire(session: string) {
       return connection.request("tools", { run })
     },
     async call(name: string, args: unknown, userMessage: string, signal?: AbortSignal, packet?: unknown) {
-      const target = args && typeof args === "object" ? Object.getOwnPropertyDescriptor(args, "target") : undefined
-      const kind = target && "value" in target && target.value && typeof target.value === "object"
-        ? Object.getOwnPropertyDescriptor(target.value, "type") : undefined
-      const union = name === "dock_node_apply" && kind && "value" in kind && kind.value === "transform.union_data"
+      // Read only plain data descriptors; never let serialization classify a
+      // getter/Proxy differently. The snapshot belongs to us, not the caller.
+      const snapshot = name === "dock_node_apply" ? nodeApplySnapshot(args) : undefined
+      const bytes = snapshot === undefined ? undefined : JSON.stringify(snapshot)
+      const union = name === "dock_node_apply" && snapshot?.target?.type === "transform.union_data"
       if (packet !== undefined || union) {
         // Consume the upstream brand before queue admission. IPC's generation-only
         // acquire reply is not the original acquired tuple/currentness provider.
@@ -65,7 +67,9 @@ export async function acquire(session: string) {
       try {
         if (queue.released || signal?.aborted) throw new Error("LOGINOM_RUN_ABORTED")
         signal?.addEventListener("abort", abort, { once: true })
-        return await connection.request("call", { run, name, args, userMessage })
+        if (name === "dock_node_apply" && JSON.stringify(nodeApplySnapshot(args)) !== bytes)
+          throw Error("UNION_INVOCATION_BINDING_CHANGED")
+        return await connection.request("call", { run, name, args: name === "dock_node_apply" ? snapshot : args, userMessage })
       } finally {
         signal?.removeEventListener("abort", abort)
         next.resolve()
@@ -80,4 +84,30 @@ export async function acquire(session: string) {
   }
   owner?.leases.add(lease)
   return lease
+}
+
+// A closed JSON operand for node.apply. Building from descriptors avoids invoking
+// caller accessors/toJSON; retained bytes detect queue-time replacement/drift.
+function nodeApplySnapshot(value: unknown, ancestors = new Set<object>()): any {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (!value || typeof value !== "object" || types.isProxy(value) || ancestors.has(value))
+    throw Error("UNION_INVOCATION_CLASSIFICATION_UNSUPPORTED")
+  const array = Array.isArray(value), prototype = Object.getPrototypeOf(value)
+  if (prototype !== (array ? Array.prototype : Object.prototype) && !(prototype === null && !array))
+    throw Error("UNION_INVOCATION_CLASSIFICATION_UNSUPPORTED")
+  const keys = Reflect.ownKeys(value), copy: any = array ? [] : Object.create(null)
+  const entries = array ? keys.filter(key => key !== "length") : keys
+  if (array && (entries.length !== (value as unknown[]).length || entries.some((key, i) => key !== String(i))))
+    throw Error("UNION_INVOCATION_CLASSIFICATION_UNSUPPORTED")
+  ancestors.add(value)
+  try {
+    for (const key of entries) {
+      const field = Object.getOwnPropertyDescriptor(value, key)
+      if (typeof key !== "string" || !field?.enumerable || !Object.hasOwn(field, "value"))
+        throw Error("UNION_INVOCATION_CLASSIFICATION_UNSUPPORTED")
+      Object.defineProperty(copy, key, { value: nodeApplySnapshot(field.value, ancestors), enumerable: true, writable: true, configurable: true })
+    }
+  } finally { ancestors.delete(value) }
+  return copy
 }
