@@ -1,5 +1,6 @@
 import {assertCaptureOwner,capturePublication,assertCapturePublication,freezeCaptureResult} from '../../src/retained-capture.mjs';
 import {captureImportPreconfig,validateCaptureResult} from '../../src/acceptance/import-preconfig-adapter-v1.mjs';
+import {captureData} from '../../src/retained-capture.mjs';
 import {open as captureOpen,writeFile as captureWrite,fsync as captureSync,close as captureClose} from 'node:fs';
 import {originalPrepareLenderForSession} from '../../src/original-prepare-lender.mjs';
 import {qualifyPreReadyRead} from "../../src/qualified-pre-ready.mjs";
@@ -141,6 +142,8 @@ function shutdownRejection(value) {
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture, authenticatedReadiness } = {}) {
+  const importAdmission=acceptanceCapture ? Object.freeze({binding:acceptanceCapture.binding,registration:acceptanceCapture.registration,
+    retained:acceptanceCapture.retained,harness:acceptanceCapture.harness}) : undefined;
   if(acceptanceCapture?.binding?.harness==='field-parameters-preservation-v1'&&config.mode!=='executor-replay')throw Error('LOGINOM_FP_EXECUTOR_REQUIRED');
   const prepareLender=originalPrepareLenderForSession(session);
   const lenderObserved=work=>prepareLender ? prepareLender.observed(work) : work();
@@ -651,6 +654,39 @@ export async function createBridge(config, session, { browserTransport: managedB
         assertCaptureEvidenceBinding();
       }
     }
+    // Closed retained-owner caller; never an MCP tool or a node_apply alias.
+    function assertImportAdmission(signal) {
+      const a=importAdmission,r=a?.retained,b=a?.binding;
+      signal?.throwIfAborted();
+      if(!a || acceptanceCapture.binding!==b || acceptanceCapture.retained!==r
+          || acceptanceCapture.registration!==a.registration || acceptanceCapture.harness!==a.harness
+          || b?.harness!=='import-before-configure-v1' || a.harness!==captureImportPreconfig
+          || !Object.isFrozen(a.registration) || a.registration.mode!=='readonly'
+          || a.registration.validate!==validateCaptureResult || a.registration.resource!==r?.resource
+          || r.resource.path!=='runtime/src/acceptance/import-preconfig-adapter-v1.mjs'
+          || r.binding!==b || r.session!==session || r.runtime.bridge!==bridge
+          || !Object.isFrozen(r.runtime) || signal!==r.state.controller?.signal)
+        throw Error('LOGINOM_IMPORT_CALLER_ADMISSION');
+      assertCaptureOwner(r);
+      const prepared=session.metadata.workspacePreparation;
+      if(shutdownStarted || cleanupRefused || clipboardUncertain || heldLeases.size
+          || session.metadata.workspaceReady!==true || b.session!==session.metadata.sessionId
+          || !prepared?.attempted || prepared.state?.status!=='READY' || prepared.state.authenticated!==true
+          || prepared.state.target_verified!==true || prepared.state.document_id===undefined
+          || prepared.state.loginom_account!==b.account || prepared.state.package_ref?.path!==b.packagePath
+          || !prepared.state.workflow_ref?.tab_tid || session.metadata.targetIdentity?.loginom_build!=='7.4.2')
+        throw Error('LOGINOM_IMPORT_CALLER_PREPARATION');
+      return prepared;
+    }
+    function openImportPreconfig(request,{signal,retained}={}) {
+      assertImportAdmission(signal);
+      if(retained!==importAdmission.retained || captureConsumed || captureInFlight)
+        throw Error('LOGINOM_IMPORT_CALLER_ADMISSION');
+      captureData(request);
+      // Original per-call creation/provider is not supplied by this constructor.
+      // Admission and readiness never grant permission to open a native wizard.
+      throw Error('IMPORT_ORIGINAL_PROVIDER_CREATION_PACKET_UNAVAILABLE');
+    }
     async function captureAcceptance({signal} = {}) {
       const binding = acceptanceCapture?.binding;
       if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
@@ -1122,7 +1158,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         return Object.freeze({kind:'PRE_READY_CLOSED_READ',ready:false,cleanupComplete:false,observation:result.output});
       } finally {preReadyReading=false}
     }
-    const bridge={server,catalog,captureAcceptance,readPreReady,
+    const bridge={server,catalog,captureAcceptance,openImportPreconfig,readPreReady,
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};
