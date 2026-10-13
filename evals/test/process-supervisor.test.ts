@@ -8,6 +8,33 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
+test("supervisor streams repeated pipe exchanges and confirms process exit", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stream-transport-"))
+  const input = new TransformStream<Uint8Array, Uint8Array>()
+  const output = new TransformStream<Uint8Array, Uint8Array>()
+  const writer = input.writable.getWriter()
+  const reader = output.readable.getReader()
+  const abort = new AbortController()
+  const pending = superviseProcess({
+    cmd: [process.execPath, "-e", 'const {createInterface}=await import("node:readline");for await(const line of createInterface({input:process.stdin})){await Bun.sleep(50);process.stdout.write(line+"\\n")}'],
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5_000,
+    stdin: input.readable, stdout: output.writable, signal: abort.signal,
+  })
+  try {
+    for (const line of ["first", "second", "third"]) {
+      await writer.write(new TextEncoder().encode(line + "\n"))
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe(line + "\n")
+    }
+    await writer.close()
+    expect((await reader.read()).done).toBe(true)
+    const run = await pending
+    expect(run.stdout).toBe("")
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, observation_mode: "continuous" })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { abort.abort(); await reader.cancel(); await pending; await rm(root, { recursive: true, force: true }) }
+}, 10_000)
+
 test("supervisor retains the live launcher until the terminated CLI exit receipt is observed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-exit-receipt-"))
   try {
@@ -22,6 +49,25 @@ test("supervisor retains the live launcher until the terminated CLI exit receipt
     expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 45_000)
+
+test("supervisor bounds a stalled pipe consumer after its owned process exits", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stream-stalled-"))
+  const blocked = Promise.withResolvers<void>()
+  const pending = superviseProcess({
+    cmd: [process.execPath, "-e", 'process.stdout.write("ready\\n"); await Bun.sleep(50)'],
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 1_000,
+    stdout: new WritableStream<Uint8Array>({ write() { return blocked.promise } }),
+  })
+  try {
+    const settled = await Promise.race([pending.then(() => true), Bun.sleep(2_500).then(() => false)])
+    blocked.resolve()
+    const run = await pending
+    expect(settled).toBe(true)
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup).toMatchObject({ status: "failed", capture_complete: false, error: "Output transport deadline exceeded" })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { blocked.resolve(); await pending; await rm(root, { recursive: true, force: true }) }
+}, 5_000)
 
 test("trusted unit: native commands cannot request observation after exit", async () => {
   await expect(superviseProcess({ cmd: [process.execPath, "-e", "process.exit(0)"], cwd: evalsRoot,
