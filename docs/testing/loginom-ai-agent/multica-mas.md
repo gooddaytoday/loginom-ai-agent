@@ -153,6 +153,6 @@ Checkpoint карточки — не больше 20 коротких строк
 - Регистратура: поручение01a1359b-3805, linked run01a1359b-381d; final bundle delta01a135b3-518d; основной срез8карточек уже сверён оператором.
 - LAB72: owner approval recovery доставлен прежнему run; факт доставки отдельно от Save/cleanup.
 - LAB73: original reproducer67bd independent28+28PASS; единственный receiving01a135c0-a0a1 реально продолжает работу.
-- LAB72: taskc312f6 independent preparationPASS; final requirements у прежнего Генератора, ресурсный допуск отдельно.
-- Следующий шаг: итог отдельного Registry pass/final requirements72; полная приёмка/merge/release вне объёма.
+- LAB72: taskc312f6 independent preparationPASS; final requirements599397e4/readback verified, ресурсный допуск отдельно.
+- Следующий шаг: итог отдельного Registry pass и безопасные технические продолжения; полная приёмка/merge/release вне объёма.
 - Подробный [отчёт и ограничения](multica-workflow-v3.md).
