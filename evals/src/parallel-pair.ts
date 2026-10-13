@@ -8,6 +8,16 @@ export const pairImages = {
   studio: "sha256:69ce44ac1002dea3d3a78b5e35eb9175a352530ecd3f05bdb727d63895004e28",
 }
 
+export function reconcilePairResource(name: string, purpose: "acceptance" | "research", nonce: string,
+  snapshots: { Id: string; Name: string; Labels: Record<string, string> }[], expectedId?: string) {
+  if (!snapshots.length && !expectedId) return undefined
+  const item = snapshots[0]
+  if (snapshots.length !== 1 || !item || !/^[a-f0-9]{64}$/.test(item.Id) || item.Name.replace(/^\//, "") !== name ||
+    item.Labels?.["loginom.evals.kind"] !== "users" || item.Labels?.["loginom.evals.purpose"] !== purpose ||
+    item.Labels?.["loginom.evals.nonce"] !== nonce || (expectedId && item.Id !== expectedId)) throw new EvalFailure("PAIR_OWNERSHIP", 2)
+  return item.Id
+}
+
 export function planPair(server: SlotFile["server"], purpose: "acceptance" | "research", nonce: string) {
   const url = URL.parse(server.url)
   if (!url || url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) || url.port === "0" || url.username || url.password || url.hash || url.search ||
