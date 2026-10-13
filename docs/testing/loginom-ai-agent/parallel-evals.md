@@ -382,3 +382,26 @@ positive setup→status→reuse вызвал один setup. 8 v2 cases/32 asser
 config tests/366 assertions, typecheck/diff check PASS (32.65s). Private fixtures
 удалены. Durable prepare intent, actual connection/session и user/ACL qualification
 не подменяются этой проверкой сохранённых settings.
+
+archiveProfileEvidence(profile, archive, journal) — новый файловый примитив v2
+в profile-archive.ts. Caller предварительно держит profile lease и выбирает private
+archive target/controller journal; этот примитив не выдаёт lease/readiness и не
+делает server delete. Reuses exported profileHistory/assertProfileSettled; legacy
+archiveProfileHistory сохраняет прежние semantics/default.
+
+До rename сохраняется durable intent с root inode/device и recursive content/type/
+mode/UID hashes. Preflight согласует source/target каждого root, запрещает ambiguity,
+changed profile/target и symlink ancestors. Затем fsync moved files/dirs, source/
+target parents, archive tree/root parent, private committed receipt. Recovery
+использует те же manifest/target; committed reuse проверяет data/root и не создаёт
+пустой новый manifest. Ошибка сохраняет originals/partial archive и intent.
+
+11 real fs/process tests/69 assertions PASS. SIGKILL: child останавливается реальным
+SIGSTOP по fs.watch первого rename, проверены T-state, частичный перенос и intent;
+SIGKILL и новый процесс завершают тот же архив (44 roots). Проверены DB/WAL/SHM,
+inputs, I/O failure+reconciliation, чужой target, symlink parent, hardlink, changed
+archive/root, живой env-only writer, dot/leading/space/tab/newline/Unicode names и
+symlink-object без чтения target. Fixture hashes/inodes реально проверяются;
+внутренних mocks нет. 80 archive/profile tests/267 assertions, typecheck/diff check
+PASS (40.10s). New private fixtures/processes удалены; cleanupSlot/recover/main и
+server close/backup/delete/release пока не подключены к этому примитиву.
