@@ -701,6 +701,11 @@ inspect после response-budget refusal). Standard group-001 останови
   corefixture использует прежний Save послеcompletedimports, не делает emptySave
   и standalone stale postSave rereads. ExactfreshJoinoutput projections проверяют
   исходныеvalues; обаhiddenroles/output/Save/cleanup gates не меняются.
+  Первый privateJS downstream тоже stoppedexit1 до Group/Sort: actualroots32/92
+  с nextcursor, fixture преждевременно искалuniqueGraphroot. Import/JS/Save/
+  beforefullXML и actualclose/logout/ACKexit0 verified; originalb274cbb2… preserved,
+  independentstop3fea73a4… . Separateproof-2 actual021TDD roots pagination fix
+  Approved0da15709…; runtime/pins unchanged, native branches ещёpending.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять

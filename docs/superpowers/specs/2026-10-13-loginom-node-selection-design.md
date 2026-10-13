@@ -435,6 +435,13 @@ completedimports и оба actualhiddenroles/freshJoinoutput/Save/cleanup; stand
 postSave source reread не требуется и не заявляется. Сохранность численных inputs
 проверяет exact freshJoinprojection. Pair/pins/runtime не меняются, это не modelslot.
 
+Первый privateJS downstream203142 выполнил import/JS/Save/beforefullXML, затем
+остановился до Group/Sort из-за непрочитанной roots pagination (actual32/92 с
+next_cursor). Originalexit1/b274cbb2… сохранён, actualclose/logout/ACKexit0 verified.
+Отдельный private proof-2 по TDD читает все roots pages до выбора Graph ref;
+sameobservationID/revision/bounded16, затем отдельные details pages. Static review
+Approved0da15709…; actual managed preview/native selection по-прежнемуpending.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

@@ -51,6 +51,12 @@ ownpackageclose/logout/ACKexit0 подтверждены, исходныйexit1 
 corefixture использует Save послеcompletedimports, без emptySave/standalone
 stale inputrereads; обязательные hiddenroles/output/Save/cleanup сохраняются.
 
+PrivateJS203142/1 остановился до Group/Sort: fixture не прочитал roots cursor
+после первой страницы32/92. Import/JS/Save/beforefullXML verified, actualclose/
+logout/ACKexit0 complete; originalexit1 сохранён. Separateproof-2 paginates roots
+и details independently с sameID/revision/bounded16; staticApproved0da15709…,
+mandatorynative branches pending. Не менять frozenпару/pins или старыеoutcomes.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1

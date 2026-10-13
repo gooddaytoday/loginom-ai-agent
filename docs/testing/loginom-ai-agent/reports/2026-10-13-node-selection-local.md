@@ -58,6 +58,22 @@ stale postSave rereads из него исключаются. Сохраннос�
 проверяется их проекциями в точном fresh Join output; standalone reread не заявляется.
 Runtime/build/pins/43modelslots прежние, model acceptance ещёpending.
 
+Первый privateJS downstream exit1 после successful import/JS/двухSave и
+проверенного beforepackage(full JS Component/source/declared schema). Проверка
+generic guard остановилась на `EXACT_DELIVERED_GRAPH_ROOT_REQUIRED`: actual
+public roots page offset0/returned32/total92 имела next_cursor, но fixture искал
+Graph root до чтения остальных страниц. Downstream/genericdeny/managedpreview
+ещё не запускались. Actual ownpackageclose/logout/nodiscard и transportACK/exit0
+подтверждены; исходный result SHA
+`b274cbb2af43ece8237d21db31e2615ea548e2551ab0fb9d8d11f5bc7af40443` не меняется.
+Independent stop review SHA
+`3fea73a46586b2c9f661a8d375d93a4059018a4c301c077e1c52e6f4c574308f`:
+21receipts/3runtime hashes/53sources/beforefullXML/exactrows unchanged.
+Отдельный privateJS proof-2 исправляет только roots pagination на actual021
+fixture (5Bun+1Python/typecheck0, independent5Bun+6protocol cases PASS).
+Review SHA `0da1570936587e0504fd442c7b61ec1ee1971555c97b355111d6b226ab416efa`;
+его live и mandatory JS→Group/directSort gates ещёpending, Product/pins unchanged.
+
 ## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;
