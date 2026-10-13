@@ -41,6 +41,21 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
+test("fixture main: singleton storage metadata names its root while parallel runs keep roots per slot", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-storage-metadata-"))
+  try {
+    const input = await parallelFixture(root, ["parallel-fast"])
+    for (const parallel of [1, 2]) {
+      const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", String(parallel), "--skip-judge", "--dry-run"], input.env,
+        { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+      const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+      expect(summary.loginom.storage_dir).toBe(parallel === 1 ? path.join(root, "storage/a") : null)
+      expect(summary.slots?.map(slot => slot.storage_root)).toEqual(input.slots.slots.slice(0, parallel).map(slot => path.join(root, "storage", slot.id)))
+      expect(summary.slots?.every(slot => slot.state === "planned" && slot.liveQualified === false)).toBe(true)
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("fixture main: reports slot-owned leftovers and retains only the affected slot fence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-leftovers-"))
   try {
