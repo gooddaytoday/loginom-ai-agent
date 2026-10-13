@@ -122,6 +122,11 @@ Independent stop review SHA
 `56da0b1375992bc207c066b9dcc2351adc436ff1b5149f70673f775f761c8ca2`:
 53sources/23raw/3journals/catalog/fullXML-before/exactJSrows проверены;
 точный conjunct остаётся UNKNOWN, административное восстановление отдельно.
+Independent recovery review SHA
+`f81ff164799032b1315b28987754b2bb2e5006ee554f147660e6a84d7bd5a14d`:
+ownuser90 closed21:44:11.150Z безreinit, ownadmin91 closed21:44:42.264Z;
+other3inventory rows сохранены,30protectedraw/source+5runtime files unchanged,
+PID189026 отсутствует/.writer absent. Исходныйcleanupfalse не повышается до PASS.
 
 ## Историческая пара после Join fix — допуск серии
 

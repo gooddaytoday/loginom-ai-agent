@@ -469,6 +469,9 @@ Privateproof-5 собирается только для диагностики: 
 получает bounded tuple в error.message того же guard, без изменения predicate/
 жестов/control flow и без дополнительного browser call. Он instrumented, не
 является приёмкой immutable runtime; Product/runtime/pins пока не меняются.
+Ownrecovery независимо подтверждён f81ff164…: точный user90 closed21:44:11.150Z,
+admin91 closed21:44:42.264Z, нет повторного init/чужих session closures; оригинальный
+cleanupfalse сохранён, исходные30raw/source evidence и5runtime files неизменны.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

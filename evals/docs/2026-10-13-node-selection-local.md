@@ -76,6 +76,9 @@ Ownuser90 initialization21:39:48.808Z/nativeGUID bound, rootclosed/admin2freshab
 logout/MCPexit0, writerabsent. Exactcompoundpredicate требует отдельного bounded
 diagnostic tuple из того же failing inspect; privateproof-5 явноinstrumented,
 guard/controlflow/Product/pins неизменны. Не запускать модельные18+25 до gatePASS.
+Independentrecovery f81ff164… подтвердил exactuser90close/noReinit/adminlogout/
+сохранностьotherrows/raw/source и отсутствие PID/.writer; originalcleanupfalse
+остаётся исходным failed outcome.
 
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
