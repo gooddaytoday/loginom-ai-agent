@@ -1,0 +1,604 @@
+{
+  "version": 1,
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "verified_utc": "2026-10-13T13:04:21.763820+00:00",
+  "server_checked_utc": "2026-10-13T12:56:40.839737+00:00",
+  "cards": {
+    "LAB-56": {
+      "status": "in_review",
+      "revision": 65,
+      "phase": "in_review",
+      "active": [],
+      "unchanged_acceptance_archive_sha256": "741b74f4c8818d2f9eda01bcc33bb57466e88f5753b62efc29438b6ab47ad4c3"
+    },
+    "LAB-57": {
+      "status": "in_progress",
+      "revision": 185,
+      "phase": "rich",
+      "active": [
+        {
+          "id": "01a1354a-2d97-7c10-a457-2f63f376d31a",
+          "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+          "status": "running",
+          "started_at": "2026-10-13T15:45:31+03:00"
+        }
+      ]
+    },
+    "LAB-58": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-59": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-60": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-61": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-62": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-63": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    }
+  },
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "online",
+    "last_seen_at": "2026-10-13T15:56:18+03:00",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+  },
+  "worker_settings": {
+    "Rich": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "working"
+    },
+    "Ben": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    "Evaler": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    }
+  },
+  "report_id": "01a13531-4696-77e1-b450-e5bcc94a3f56",
+  "archive": {
+    "attachment_id": "01a13531-4640-79bb-982e-96001bbf7f47",
+    "bytes": 620239,
+    "sha256": "c982cb66ee30ed34ce018833fd10c5440196de9568b8e69fbf577460e72dbb2c",
+    "manifest_sha256": "6ccc63d613c6f13090bd9931fa0a9d445d980ea7afbcc5b765ade7ff591b1403",
+    "payload_files_verified": 106,
+    "regular_members_including_manifest": 107,
+    "safe_paths_no_links": true
+  },
+  "settlement": {
+    "original_unit_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+    "approval_comment": "01a134f8-c627-7845-9d3d-b203ec9af889",
+    "proposal_sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+    "started_utc": "2026-10-13T11:21:48Z",
+    "finished_utc": "2026-10-13T11:33:38Z",
+    "operator_deadline_utc": "2026-10-13T11:51:48Z",
+    "status": "ABANDONED_INTEGRITY_VERIFIED",
+    "whole_lease_bytes_identity_guard_preserved": true,
+    "once_consumed": true,
+    "genuine_free_at_settlement": true,
+    "historical_unit": "ERROR / cleanup UNKNOWN; not rewritten"
+  },
+  "new_unit": {
+    "pass": 533,
+    "skip": 15,
+    "fail": 0,
+    "typecheck": "PASS",
+    "released_utc": "2026-10-13T11:49:48.129Z",
+    "completion_sha256": "24e46832c2de4e2ab0996300cff7f06c172d23eaaf83e4d02bbe9bd9eca12171"
+  },
+  "candidate_cli": {
+    "source_verification": {
+      "candidate_sha": "d73a13fabf358d281942f7885ba7afe7b007423b",
+      "parent_sha": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+      "approved_patch_sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465",
+      "files": [
+        {
+          "path": "packages/agent/src/session/message-v2.ts",
+          "bytes": 26563,
+          "sha256": "adcb5c6c73c21e0fefee5e0a93cd62fe399bbec80f25f409474e4797191ea554",
+          "exact_match_approved_patch_on_base": true
+        },
+        {
+          "path": "packages/agent/test/session/message-v2.test.ts",
+          "bytes": 54841,
+          "sha256": "149c6fa7de3a242ef146471efb75a9c18b36910a5008f920e3a8748b443903e6",
+          "exact_match_approved_patch_on_base": true
+        }
+      ],
+      "only_approved_two_files_changed": true,
+      "root_tests_or_native_calls": 0
+    },
+    "version": "0.1.17-lab57.tsv.d73a13fa",
+    "manifest_sha256": "fb984e9becfbf0979a7712265916c7253b01843b2238ed9fe0f893ad09a612b0",
+    "binary_sha256": "a0b9be76107d82575ba28d348e60ac4f2497a608252552895a6131bca9a2029a",
+    "installation_files_verified": 5389,
+    "delivered_tests": {
+      "addressed_RED_GREEN": "verified receipts",
+      "agent_functional_pass": 629,
+      "host_functional_pass": 5,
+      "agent_host_typecheck": "PASS",
+      "supervised_build_archive_roundtrip": "PASS"
+    },
+    "native_admission": "NOT_READY",
+    "official_pin_adoption": "NOT_CONFIRMED"
+  },
+  "blocker": {
+    "code": "PROFILE_NOT_READY",
+    "attempt_utc": "2026-10-13T11:56:11Z",
+    "location": "pinned node-eval-ops.ts management view gate",
+    "confirmed_argument_gap": "status/check omit supported --headless; CLI default headed, host display absent",
+    "underlying_exception": "UNKNOWN; management stdout/exit/view not retained",
+    "causality": "headed invocation is a hypothesis, not proven root cause",
+    "same_cause_charge": 0,
+    "native_READY": false
+  },
+  "current_lease": {
+    "code": "PINNED_PREFLIGHT_PROFILE_NOT_READY",
+    "report_id": "01a13531-4696-77e1-b450-e5bcc94a3f56",
+    "root": "UNCLASSIFIED; missing management view/exit/trace",
+    "current_owner_task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+    "current_phase": "eval",
+    "current_acquiredAt": "2026-10-13T11:53:15.320Z",
+    "configSha256": "f76b3a6a3a2d28c10b255ef5e9e7542f931f2f55708958f2af3ff9dcfe87b264",
+    "release": "BUSY; no eval completion",
+    "charge": 0,
+    "ready_for_ben": false
+  },
+  "budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "rich_repeat_accounting": {
+    "limit": 10,
+    "consumed": 3,
+    "remaining": 7,
+    "current_successful_operator_and_unclassified_preflight_charge": 0,
+    "ledger_sha256": "3f6a8ef298ced4176c0d14e7eff0c5c240b9d79fe44568f85a8784659a9029c4",
+    "no_total_native_run_limit": true,
+    "history_preserved": true
+  },
+  "autonomous_stage": {
+    "authorization_comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "stage_id": "LAB57-RICH-TSV-PIN-01a13471",
+    "started_utc": "2026-10-13T09:33:29.538616+00:00",
+    "deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+    "wall_seconds": 21600,
+    "reset_on_new_blocker_or_task": false,
+    "document_sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147",
+    "cost": "Cumulative scenario/repeat limits; usage recorded, billing unknown",
+    "cold_native": "Repair verification authorized,8/7/5 retained",
+    "status": "Offline proposal; original deadline",
+    "attachment_id": "01a134a1-0ef2-738e-9504-3b7038f6fdf0"
+  },
+  "offline_dispatch": {
+    "comment_id": "01a1354a-2d80-715f-9da0-1fda4d43f0fe",
+    "task_id": "01a1354a-2d97-7c10-a457-2f63f376d31a",
+    "scope_sha256": "afbee582619728dbadf5b49587b7860c6b2c3e5abf25294cf0f43b674e95de8e",
+    "zip_sha256": "cb7bb70328116c7ebc4aae91ebc9c95dd42f6d557f1c840284470c520c32b209",
+    "zip_files_verified": 8,
+    "manifest_selfcopy_verified": true,
+    "deadline_utc": "2026-10-13T13:19:44.642626Z",
+    "maximum_seconds": 2700,
+    "server_adoption_authorized": false,
+    "active_Rich_no_duplicate": true
+  },
+  "monitor_actions": {
+    "read_only_cli_queries": true,
+    "native_model_reference_product_recovery_calls": 0,
+    "server_lease_mutations": 0,
+    "worker_dispatches": 0,
+    "isolated_offline_patch_preparation": "COMPLETED: exact89b source79327cf5; full suite578PASS/9SKIP/0FAIL/typecheckPASS",
+    "independent_Ben_ACCEPT": "NOT_CONFIRMED",
+    "all_eight_done": false,
+    "automation": "lab-56-lab-63 ACTIVE"
+  },
+  "offline_scope_files_verified": 8,
+  "verification_methods": [
+    "Archive members paths/types and payload byte/SHA verification",
+    "Exact candidate Git source compared with owner-approved patch applied to immutable5cd",
+    "Safe operator/unit/build/process receipts checked; root did not execute those native actions",
+    "Fresh server status/active runs/comments/Evaler metadata; LAB62 successful read-only retry",
+    "Offline scope ZIP CRC/path/no-link and 8/8 manifest byte/SHA verification"
+  ],
+  "offline_helper_proposal": {
+    "source_base": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+    "source_sha": "79327cf562af45da254c8598c4e875754fd13e0e",
+    "branch": "preflight-headless",
+    "source_tree_clean": true,
+    "patch_file": "evals/docs/proposals/2026-10-13-preflight-headless.patch",
+    "patch_sha256": "6d17f5d63aaf86cbaf74ead4927ed87a74c9cbd1ff2654a4b8c806cf6ec3359a",
+    "patch_bytes": 15412,
+    "only_four_eval_files_changed": [
+      "evals/fixtures/fake-cli.ts",
+      "evals/src/node-eval-ops.ts",
+      "evals/src/profile.ts",
+      "evals/test/profile.test.ts"
+    ],
+    "checks": {
+      "version": 1,
+      "source_base": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+      "prepared_utc": "2026-10-13T13:10:46.223892+00:00",
+      "status": "OFFLINE_PASS_WITH_EXISTING_SKIPS",
+      "checks": {
+        "mechanical_green": {
+          "log_sha256": "e7f59bb81bfb70f18ac074e6a3f2383e6e520aba7ac6697da15f8b0edcc5c253",
+          "log_bytes": 9450,
+          "counts": {
+            "pass": 68,
+            "skip": 6,
+            "fail": 0
+          },
+          "meaning": "Legacy argv extracted without behavior change; existing tests remained green"
+        },
+        "headless_red": {
+          "log_sha256": "f29797a589fd4c81837370b6f4a53282fcd3a6aba33b7f540a22da0bee97cc54",
+          "log_bytes": 854,
+          "counts": {
+            "pass": 0,
+            "fail": 1
+          },
+          "meaning": "Real fake child exited1 with legacy status argv lacking --headless; expected exit0 assertion failed"
+        },
+        "headless_green": {
+          "log_sha256": "6520ec4375c16b8d215aec4840296b83ccf49b28c0cfbcc60978d99556b6e326",
+          "log_bytes": 269,
+          "counts": {
+            "pass": 1,
+            "fail": 0
+          }
+        },
+        "diagnostic_red": {
+          "log_sha256": "2ce215cb7841edab81d05e8db54da35c124ce4e3e9c1d082725668568a880574",
+          "log_bytes": 1179,
+          "counts": {
+            "pass": 0,
+            "fail": 1
+          },
+          "meaning": "Real management process completed; public result.json read failed ENOENT before production change"
+        },
+        "diagnostic_green": {
+          "log_sha256": "672a9aeff6199ab1099fb8b9feb1cb0f030daa41f6a422eff29720c93367485a",
+          "log_bytes": 258,
+          "counts": {
+            "pass": 1,
+            "fail": 0
+          }
+        },
+        "unknown_and_cleanup_negative": {
+          "log_sha256": "46ffc5ec944f22087cffd1ed81454d34023438620f00830c8e90d4b2141cf316",
+          "log_bytes": 378,
+          "counts": {
+            "pass": 2,
+            "fail": 0
+          },
+          "meaning": "Unrecognized command/state/failure/code/recoveries excluded; cleanup still rejects replaced writer and preserves replacement guard"
+        },
+        "typecheck": {
+          "log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+          "log_bytes": 15,
+          "counts": {}
+        }
+      },
+      "native_ready": "NOT_RUN",
+      "server_installation": "NOT_APPLIED",
+      "live_model_reference_product_recovery_calls": 0,
+      "criteria_or_budget_changes": false,
+      "full_suite": {
+        "command": "bun test",
+        "cwd": "evals",
+        "exit_code": 0,
+        "counts": {
+          "pass": 578,
+          "skip": 9,
+          "fail": 0
+        },
+        "test_files": 51,
+        "duration_seconds": 657.64,
+        "log_sha256": "6d0fedb5f0d3a1a68762b47bfadc70f91850d0b3ba1cd27a3191963e9c950f5b",
+        "log_bytes": 198782,
+        "skip_titles": [
+          "writer-release settlement creates a separate fresh two-pass proof without changing the original error",
+          "writer-release settlement refuses a changed writer and unknown runtime directory",
+          "owned registration release admits only its exact lease-local attested settlement",
+          "writer-release settlement binds immutable source/admission and refuses altered proof before recovery reservation",
+          "baseline writer settlements preserve separate executions without resetting the same source",
+          "fixed unit commands produce process proof and release only after actual profile and storage checks",
+          "baseline cleanup verification binds its execution and checks actual archives, profiles and isolated storage",
+          "real harness summary format releases a measured product FAIL and rejects missing process proof",
+          "owned registration releases the attested original marker with an already absent writer"
+        ]
+      },
+      "baseline_skips_reason": "Existing browser-busy guards prevent six Docker/browser-dependent cases while foreign Chrome is running; guards not bypassed",
+      "independent_acceptance": "NOT_CONFIRMED; Ben final review remains required",
+      "finished_utc": "2026-10-13T13:12:50.131033+00:00",
+      "typecheck": {
+        "command": "bun typecheck",
+        "cwd": "evals",
+        "exit_code": 0
+      },
+      "diff_check": "PASS",
+      "limitations": [
+        "Nine existing browser/ownership-dependent checks skipped by their environment guards; no bypass/foreign process stop",
+        "Fake-mode supervised child processes are real, but native stand READY is NOT_RUN",
+        "Original PROFILE_NOT_READY underlying exception remains unclassified",
+        "No installed supplement/pin/lease/budget/model changes; active Rich offline task not duplicated"
+      ]
+    },
+    "server_application": "NOT_APPLIED",
+    "server_pin_adoption": "NOT_AUTHORIZED",
+    "current_Rich_task_not_duplicated": true,
+    "source_published_to_origin": true,
+    "relationship": "Additional isolated regression/reference patch; not chosen instead of Rich delivery, not server-installed"
+  },
+  "latest_Rich_offline_proposal": {
+    "report_id": "01a13562-9da0-7c32-bf96-75b42e8bf004",
+    "parent_id": "01a1354a-2d80-715f-9da0-1fda4d43f0fe",
+    "worker_task_id": "01a1354a-2d97-7c10-a457-2f63f376d31a",
+    "source_sha": "d633e57d3d62be4aaf9a0c8a3452983e91e94efe",
+    "source_base": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+    "source_parent_exact": true,
+    "branch": "rich-ops-proposal",
+    "patch_sha256": "ffbb6a7dc8ce9fc1d72f89a79a5fd2dfef5dcd7ede4d0b7f4c0876b79eccf53e",
+    "independent_apply_to_base_matches_published_files": 9,
+    "source_manifest_files_checked_against_Git": 755,
+    "archive_sha256": "0c1417d17931a87e067b9d478b01c10ec1b09ec6183e934f5d80e0e30c8e49cc",
+    "archive_bytes": 144985,
+    "manifest_sha256": "a5db9e692414f6a16613d54c52defb08f073777743e9bcdf20bb12a9fdedf2f3",
+    "payload_files_verified": 91,
+    "manifest_selfcopy_exact": true,
+    "safe_paths_no_links": true,
+    "checks": [
+      {
+        "check": "red",
+        "exitCode": 1,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {
+          "pass": 0,
+          "fail": 1
+        },
+        "result_sha256": "1fdde0461caa7df7327eb79aef7e42f12e6999aa0c44e36a33a937fc5172981e"
+      },
+      {
+        "check": "red-headless",
+        "exitCode": 1,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {
+          "pass": 0,
+          "fail": 2
+        },
+        "result_sha256": "f9741738c15dc3efb7c95c908d3870a96e85bd67f0ff66a01ef4f8be47870d6a"
+      },
+      {
+        "check": "addressed-final",
+        "exitCode": 0,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {
+          "pass": 43,
+          "fail": 0
+        },
+        "result_sha256": "e2edc32420162c8f324f89fcae93bc0d82ea11996b00b71cd85a3eb34a289616"
+      },
+      {
+        "check": "legacy-lease-gates",
+        "exitCode": 0,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {
+          "pass": 15,
+          "fail": 0
+        },
+        "result_sha256": "991ec6386a713662d8755868c715fdb6f585217a5afc661724e334f493385750"
+      },
+      {
+        "check": "legacy-preflight-gates",
+        "exitCode": 0,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {
+          "pass": 10,
+          "fail": 0
+        },
+        "result_sha256": "ab6fd1f09ed0f2f86d45914f7a82a1787cf2f5944bebb663f853620b183e6d58"
+      },
+      {
+        "check": "legacy-management",
+        "exitCode": 0,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {
+          "pass": 3,
+          "fail": 0
+        },
+        "result_sha256": "e4be8306173eb6c12a9041c4b3e1e63ddc6f06aaddffdd307d927e171819071b"
+      },
+      {
+        "check": "typecheck-final",
+        "exitCode": 0,
+        "timedOut": false,
+        "interrupted": false,
+        "process_cleanup": "confirmed",
+        "capture_complete": true,
+        "counts": {},
+        "result_sha256": "45ebd6383653dc467bc775673fd44a50a95e884b09226dd80127de30caa973c4"
+      }
+    ],
+    "claimed_final_addressed_plus_gate_checks": 71,
+    "status": "PREPARED / NOT_APPLIED",
+    "native_GREEN": "NOT_RUN",
+    "current_lease": "BUSY unchanged; prior original-unit once consumed",
+    "settlement_proposal": "NOT_APPLIED; abbreviated bindings explicitly are not execution authority; exact operator scope/identities/hashes needed before owner approval",
+    "installed_pin_adoption_authorized": false,
+    "current_Evaler_task": "01a13562-9dbd-77bd-89f7-df4cf2542101",
+    "monitor_handoff": "DEFERRED: Evaler already running review; no duplicate routed mention/worker",
+    "verified_utc": "2026-10-13T13:24:21.573503+00:00"
+  },
+  "followup_server_read": {
+    "checked_utc": "2026-10-13T13:14:50.646750Z",
+    "revision": 189,
+    "status": "in_progress",
+    "active": [
+      {
+        "task_id": "01a13562-9dbd-77bd-89f7-df4cf2542101",
+        "agent": "Evaler",
+        "status": "running"
+      }
+    ]
+  },
+  "final_server_read": {
+    "checked_utc": "2026-10-13T13:26:50.007013+00:00",
+    "cards": {
+      "LAB-56": {
+        "status": "in_review",
+        "revision": 65,
+        "phase": "in_review",
+        "active": [],
+        "unchanged_independent_acceptance_cleanup": true
+      },
+      "LAB-57": {
+        "status": "blocked",
+        "revision": 189,
+        "phase": "rich",
+        "active": [
+          {
+            "id": "01a13562-9dbd-77bd-89f7-df4cf2542101",
+            "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+            "status": "running",
+            "started_at": "2026-10-13T16:10:56+03:00"
+          }
+        ]
+      },
+      "LAB-58": {
+        "status": "in_progress",
+        "revision": 9,
+        "phase": "admission",
+        "active": [],
+        "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+      },
+      "LAB-59": {
+        "status": "in_progress",
+        "revision": 9,
+        "phase": "admission",
+        "active": [],
+        "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+      },
+      "LAB-60": {
+        "status": "in_progress",
+        "revision": 9,
+        "phase": "admission",
+        "active": [],
+        "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+      },
+      "LAB-61": {
+        "status": "in_progress",
+        "revision": 9,
+        "phase": "admission",
+        "active": [],
+        "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+      },
+      "LAB-62": {
+        "status": "in_progress",
+        "revision": 9,
+        "phase": "admission",
+        "active": [],
+        "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+      },
+      "LAB-63": {
+        "status": "in_progress",
+        "revision": 9,
+        "phase": "admission",
+        "active": [],
+        "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+      }
+    },
+    "runtime": {
+      "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+      "name": "Codex (eval-tests)",
+      "status": "online",
+      "last_seen_at": "2026-10-13T16:26:48+03:00",
+      "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+    },
+    "LAB-55": {
+      "status": "in_review",
+      "revision": 16,
+      "active": []
+    },
+    "Rich14": "completed2026-10-13T16:10:55+03:00, error null",
+    "Evaler_review": "running; no duplicate monitor handoff"
+  },
+  "automation_persistence": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "same_schedule_name_kind": true,
+    "updated_prompt_readback_exact": true,
+    "delete_condition_all_eight_done": false
+  }
+}

@@ -1,0 +1,229 @@
+diff --git a/evals/fixtures/fake-cli.ts b/evals/fixtures/fake-cli.ts
+index 172b3f4c8..8573161ea 100644
+--- a/evals/fixtures/fake-cli.ts
++++ b/evals/fixtures/fake-cli.ts
+@@ -76,6 +76,16 @@ if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
+ if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
+ 
+ if (command === "loginom") {
++  if (process.env.EVAL_FAKE_REQUIRE_HEADLESS === "1") {
++    if (!Bun.argv.includes("--headless")) {
++      process.stdout.write(JSON.stringify({ state: "recoverable-error", failure: "LOGINOM_BROWSER_START_FAILED" }) + "\n")
++      process.exit(1)
++    }
++    if (sub === "check") {
++      process.stdout.write(JSON.stringify({ ok: true, code: "LOGINOM_CONNECTION_VALID" }) + "\n")
++      process.exit(0)
++    }
++  }
+   if (process.env.EVAL_FAKE_ENFORCE_WRITER && await Bun.file(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")).exists()) {
+     process.stderr.write("PROFILE_BUSY\n")
+     process.exit(3)
+diff --git a/evals/src/node-eval-ops.ts b/evals/src/node-eval-ops.ts
+index dab958aeb..7c549e269 100644
+--- a/evals/src/node-eval-ops.ts
++++ b/evals/src/node-eval-ops.ts
+@@ -260,13 +260,13 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
+     const admission = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, containerId: storage.containerId, configSha256: configDigest(config),
+       profiles: Object.values(config.roles).flatMap(roleProfiles), checkedAt: new Date().toISOString() }
+     await writeFile(path.join(admissionRoot, "admission.json"), JSON.stringify(admission), { mode: 0o600 })
+-    const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
++    const view = parseView((await management(command, nodePreflightCommand("status"))).stdout)
+     if (view?.state !== "ready" || view.recoveries?.length) throw new NodeOpsFailure("PROFILE_NOT_READY")
+     // Validate Loginom credentials, websocket and licence with the installed product's real browser.
+     // No run/model command is admitted here, and no settings or credentials are replaced.
+     const workdir = await mkdtemp(path.join(nodeRole(config, lease.role).workRoots[0]!, ".ops-check-"))
+     const checkDir = await nodeProcessOutput(config, lease, "native-check")
+-    const cmd = [...command.cmd, "loginom", "check", "--format", "json"]
++    const cmd = [...command.cmd, ...nodePreflightCommand("check")]
+     const boundary = await sandboxCommand({ cmd, profileDir: current.profileDir, workdir, env: command.env })
+     const check = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir: current.profileDir, outDir: checkDir, timeoutMs: 120_000 })
+     await verifyProcesses(check.processCleanup, lease)
+@@ -288,6 +288,10 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
+   })
+ }
+ 
++export function nodePreflightCommand(operation: "status" | "check") {
++  return ["loginom", operation, "--headless", "--format", "json"]
++}
++
+ async function assertOriginalAdmission(config: NodeOpsConfig, lease: NodeStandLease) {
+   const admission = await readPrivateJson(path.join(directory(config), "admission.json")).catch(() => undefined) as
+     { owner?: NodeStandOwner; acquiredAt?: string; containerId?: string; profiles?: string[]; configSha256?: string } | undefined
+diff --git a/evals/src/profile.ts b/evals/src/profile.ts
+index 3be481aa2..30b62a968 100644
+--- a/evals/src/profile.ts
++++ b/evals/src/profile.ts
+@@ -1,5 +1,5 @@
+ import path from "node:path"
+-import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises"
++import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises"
+ import { repoRoot, type EvalConfig } from "./config"
+ import type { AgentCommand } from "./cli"
+ import { EvalFailure } from "./fail"
+@@ -96,7 +96,11 @@ export async function management(command: AgentCommand, args: string[], stdin?:
+   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
+   const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
+     env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
+-  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
++  if (out) {
++    // Persist the terminal diagnosis even when the existing cleanup gate rejects the attempt.
++    await writeFile(path.join(out, "result.json"), JSON.stringify(managementOutcome(args, result), null, 2), { mode: 0o600, flag: "wx" })
++    await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
++  }
+   if (result.processCleanup.status !== "confirmed")
+     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
+   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
+@@ -106,6 +110,31 @@ export async function management(command: AgentCommand, args: string[], stdin?:
+   return result
+ }
+ 
++function managementOutcome(args: string[], result: Awaited<ReturnType<typeof superviseProcess>>) {
++  const parsed = parseJson(result.stdout.trim().split("\n").at(-1) ?? "")
++  const view = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : undefined
++  const state = typeof view?.state === "string" && ["unconfigured", "ready", "pending", "starting", "recoverable-error"].includes(view.state)
++    ? view.state : null
++  const failures = ["LOGINOM_STORE_READ_FAILED", "LOGINOM_STORE_WRITE_FAILED", "LOGINOM_RUNTIME_START_FAILED",
++    "LOGINOM_KNOWLEDGE_AUTH_FAILED", "LOGINOM_BROWSER_START_FAILED", "LOGINOM_CONNECTION_CHECK_FAILED"]
++  const failure = typeof view?.failure === "string" && failures.includes(view.failure) ? view.failure : null
++  const code = typeof view?.code === "string" && [...failures, "LOGINOM_CONNECTION_VALID", "LOGINOM_REPLY_INVALID",
++    "CLI_ARGUMENT_INVALID", "LOGINOM_CONFIG_REQUIRED", "LOGINOM_RECOVERY_REQUIRED"].includes(view.code) ? view.code : null
++  const family = args[0] === "loginom" ? "loginom" : null
++  const operation = family && ["status", "check", "setup", "recover", "cancel-pending"].includes(args[1] ?? "") ? args[1] : null
++  return { version: 1, command: { family, operation, unrecognized: !family || !operation },
++    exitCode: result.exitCode, timedOut: result.timedOut, interrupted: result.interrupted,
++    capture_complete: result.processCleanup.capture_complete, cleanup_status: result.processCleanup.status,
++    stdout_present: result.stdout.length > 0, stderr_present: result.stderr.length > 0,
++    stdout_bytes: Buffer.byteLength(result.stdout), stderr_bytes: Buffer.byteLength(result.stderr),
++    reply_present: view !== undefined, view_state: state, view_failure: failure, view_code: code,
++    recovery_count: Array.isArray(view?.recoveries) ? view.recoveries.length : null,
++    unrecognized_state: view?.state !== undefined && state === null,
++    unrecognized_failure: view?.failure !== undefined && failure === null,
++    unrecognized_code: view?.code !== undefined && code === null,
++    unrecognized_recoveries: view?.recoveries !== undefined && !Array.isArray(view.recoveries) }
++}
++
+ export async function managementRuntimeDirectories(command: AgentCommand) {
+   if (!command.cleanupDir) return []
+   const directories = await readdir(command.cleanupDir).catch((error: NodeJS.ErrnoException) => {
+diff --git a/evals/test/profile.test.ts b/evals/test/profile.test.ts
+index 9c2c803d1..8fac0d84f 100644
+--- a/evals/test/profile.test.ts
++++ b/evals/test/profile.test.ts
+@@ -1,6 +1,6 @@
+ import { expect, test } from "bun:test"
+ import path from "node:path"
+-import { mkdir, mkdtemp, readFile, stat, symlink, writeFile, rm } from "node:fs/promises"
++import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile, rm } from "node:fs/promises"
+ import os from "node:os"
+ import { spawn } from "node:child_process"
+ import { loadConfig, repoRoot } from "../src/config"
+@@ -9,6 +9,7 @@ import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth,
+ import { EvalFailure } from "../src/fail"
+ import { writerIdentity } from "../src/process-supervisor"
+ import { Database } from "bun:sqlite"
++import { nodePreflightCommand } from "../src/node-eval-ops"
+ 
+ test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
+   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
+@@ -68,6 +69,20 @@ const fakeProfile = async (env: Record<string, string> = {}) => {
+   return { config, command: { ...command, env: { ...command.env, ...env } }, profileDir }
+ }
+ 
++test("preflight: status и check выбирают headless через реальные management процессы", async () => {
++  const context = await fakeProfile({ EVAL_FAKE_REQUIRE_HEADLESS: "1" })
++  try {
++    const status = await management(context.command, nodePreflightCommand("status"))
++    expect(status.exitCode).toBe(0)
++    expect(JSON.parse(status.stdout).state).toBe("ready")
++    expect(status.processCleanup.status).toBe("confirmed")
++    const check = await management(context.command, nodePreflightCommand("check"))
++    expect(check.exitCode).toBe(0)
++    expect(JSON.parse(check.stdout)).toEqual({ ok: true, code: "LOGINOM_CONNECTION_VALID" })
++    expect(check.processCleanup.status).toBe("confirmed")
++  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
++})
++
+ test("management: закрывает собственный detached host и сохраняет ready", async () => {
+   const context = await fakeProfile()
+   const pidFile = path.join(context.profileDir, "management-child.pid")
+@@ -120,6 +135,79 @@ test("management: сохраняет отдельное процессное д
+   expect(result.exitCode).toBe(0)
+ })
+ 
++test("management: сохраняет private terminal outcome отказа без sensitive view и argv", async () => {
++  const context = await fakeProfile()
++  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-outcome-"))
++  const file = path.join(out, "view.json")
++  const view = { state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED", code: "LOGINOM_RUNTIME_START_FAILED",
++    recoveries: ["private-recovery-id"], password: "private-password", token: "private-token", url: "https://private.example" }
++  await writeFile(file, JSON.stringify(view))
++  try {
++    const result = await management({ ...context.command, cleanupDir: out, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: file } },
++      ["loginom", "status", "--headless", "--format", "json", "private-argv"], "private-stdin")
++    expect(JSON.parse(result.stdout)).toEqual(view)
++    const directories = (await readdir(out, { withFileTypes: true })).filter((entry) => entry.isDirectory())
++    expect(directories).toHaveLength(1)
++    const receipt = path.join(out, directories[0]!.name, "result.json")
++    const text = await readFile(receipt, "utf8")
++    expect(JSON.parse(text)).toMatchObject({ command: { family: "loginom", operation: "status", unrecognized: false },
++      exitCode: 0, timedOut: false, interrupted: false, capture_complete: true, cleanup_status: "confirmed",
++      view_state: "recoverable-error", view_failure: "LOGINOM_RUNTIME_START_FAILED", view_code: "LOGINOM_RUNTIME_START_FAILED",
++      recovery_count: 1, stdout_bytes: Buffer.byteLength(result.stdout), stderr_bytes: 0 })
++    expect((await stat(receipt)).mode & 0o777).toBe(0o600)
++    for (const secret of ["private-password", "private-token", "private.example", "private-recovery-id", "private-argv", "private-stdin"])
++      expect(text).not.toContain(secret)
++  } finally {
++    await rm(out, { recursive: true, force: true })
++    await rm(context.profileDir, { recursive: true, force: true })
++  }
++})
++
++test("management: неизвестные command/state/failure/code не копируются в outcome", async () => {
++  const context = await fakeProfile()
++  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-unknown-"))
++  const file = path.join(out, "view.json")
++  await writeFile(file, JSON.stringify({ state: "private-state", failure: "private-failure", code: "private-code", recoveries: "private-recovery" }))
++  try {
++    await management({ ...context.command, cleanupDir: out, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: file } },
++      ["loginom", "private-operation"])
++    const directory = (await readdir(out, { withFileTypes: true })).find((entry) => entry.isDirectory())!
++    const text = await readFile(path.join(out, directory.name, "result.json"), "utf8")
++    expect(JSON.parse(text)).toMatchObject({ command: { family: "loginom", operation: null, unrecognized: true },
++      view_state: null, view_failure: null, view_code: null, recovery_count: null,
++      unrecognized_state: true, unrecognized_failure: true, unrecognized_code: true, unrecognized_recoveries: true })
++    expect(text).not.toContain("private-")
++    await management({ ...context.command, cleanupDir: out }, ["private-family", "private-operation"])
++    const other = (await readdir(out, { withFileTypes: true })).filter((entry) => entry.isDirectory() && entry.name !== directory.name)
++    const otherText = await readFile(path.join(out, other[0]!.name, "result.json"), "utf8")
++    expect(JSON.parse(otherText).command).toEqual({ family: null, operation: null, unrecognized: true })
++    expect(otherText).not.toContain("private-")
++  } finally {
++    await rm(out, { recursive: true, force: true })
++    await rm(context.profileDir, { recursive: true, force: true })
++  }
++})
++
++test("management: cleanup rejection сохраняет terminal outcome и заменённый writer guard", async () => {
++  const context = await fakeProfile({ EVAL_FAKE_CHANGED_WRITER: "1" })
++  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-rejected-"))
++  try {
++    await expect(management({ ...context.command, cleanupDir: out }, ["loginom", "status", "--format", "json"]))
++      .rejects.toThrow("Management cleanup failed: Writer identity changed")
++    const directories = await readdir(out)
++    expect(directories).toHaveLength(1)
++    const receipt = path.join(out, directories[0]!, "result.json")
++    expect(await Bun.file(receipt).json()).toMatchObject({ exitCode: 0, capture_complete: true,
++      cleanup_status: "failed", view_state: "ready", timedOut: false, interrupted: false })
++    expect((await stat(receipt)).mode & 0o777).toBe(0o600)
++    expect(await Bun.file(path.join(context.profileDir, ".writer/owner")).text()).toBe("replacement")
++  } finally {
++    await rm(out, { recursive: true, force: true })
++    await rm(context.profileDir, { recursive: true, force: true })
++    await rm(`${context.profileDir}.process-group`, { force: true })
++  }
++})
++
+ for (const key of ["LOGINOM_AI_AGENT_CLI_PROFILE", "LOGINOM_AI_AGENT_CLI_ROOT"]) {
+   test(`releaseStaleWriter: живой env-only owner ${key} без регистрации сохраняет guard`, async () => {
+     const profile = await mkdtemp(path.join(os.tmpdir(), "evals-env-owner-"))

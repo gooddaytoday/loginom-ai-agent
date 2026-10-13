@@ -399,6 +399,196 @@
       "monitor_model_reference_product_cold_recovery_or_system_mutations": 0,
       "all_eight_done_verified": false,
       "next_step": "Current Rich performs the already-authorized exact bounded exception; no duplicate/permission reask; verify real separate settlement/FREE/unit/CLI/Ben evidence on delivery."
+    },
+    {
+      "checked_utc": "2026-10-13T12:56:40.839737+00:00",
+      "read_retry": {
+        "LAB-62": "first CLI read failed exit2; read-only retry succeeded 2026-10-13T12:59:50Z"
+      },
+      "cards": {
+        "LAB-56": {
+          "status": "in_review",
+          "revision": 65,
+          "phase": "in_review",
+          "active": [],
+          "unchanged_acceptance_archive_sha256": "741b74f4c8818d2f9eda01bcc33bb57466e88f5753b62efc29438b6ab47ad4c3"
+        },
+        "LAB-57": {
+          "status": "in_progress",
+          "revision": 185,
+          "phase": "rich",
+          "active": [
+            {
+              "id": "01a1354a-2d97-7c10-a457-2f63f376d31a",
+              "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+              "status": "running",
+              "started_at": "2026-10-13T15:45:31+03:00"
+            }
+          ]
+        },
+        "LAB-58": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-59": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-60": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-61": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-62": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-63": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        }
+      },
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "name": "Codex (eval-tests)",
+        "status": "online",
+        "last_seen_at": "2026-10-13T15:56:18+03:00",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+      },
+      "worker_settings": {
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "status": "working"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "status": "idle"
+        },
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "status": "idle"
+        }
+      },
+      "verification_file": "2026-10-13-text-import-settlement-cli-blocked-verification.json",
+      "settlement": "ABANDONED verified; old ERROR/UNKNOWN preserved; once consumed",
+      "CLI_candidate": "d73a13fabf358d281942f7885ba7afe7b007423b built/tested; native NOT_READY",
+      "new_blocker": "PROFILE_NOT_READY underlying cause UNCLASSIFIED; explicit headless missing, stdout/exit/view missing",
+      "repeat_consumed": 3,
+      "offline_Rich_task": "01a1354a-2d97-7c10-a457-2f63f376d31a",
+      "monitor_dispatches": 0,
+      "all_eight_done": false
+    },
+    {
+      "checked_utc": "2026-10-13T13:26:50.007013+00:00",
+      "cards": {
+        "LAB-56": {
+          "status": "in_review",
+          "revision": 65,
+          "phase": "in_review",
+          "active": [],
+          "unchanged_independent_acceptance_cleanup": true
+        },
+        "LAB-57": {
+          "status": "blocked",
+          "revision": 189,
+          "phase": "rich",
+          "active": [
+            {
+              "id": "01a13562-9dbd-77bd-89f7-df4cf2542101",
+              "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+              "status": "running",
+              "started_at": "2026-10-13T16:10:56+03:00"
+            }
+          ]
+        },
+        "LAB-58": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-59": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-60": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-61": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-62": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-63": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        }
+      },
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "name": "Codex (eval-tests)",
+        "status": "online",
+        "last_seen_at": "2026-10-13T16:26:48+03:00",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+      },
+      "latest_Rich_report": "01a13562-9da0-7c32-bf96-75b42e8bf004",
+      "Rich_proposal_source": "d633e57d3d62be4aaf9a0c8a3452983e91e94efe",
+      "archive_payloads_verified": 91,
+      "Git_source_files_verified": 755,
+      "worker_green_pass": 71,
+      "local_reference_patch": "79327cf562af45da254c8598c4e875754fd13e0e;578PASS/9SKIP/typecheckPASS",
+      "repeat_consumed": 3,
+      "monitor_dispatches": 0,
+      "stand_lease_mutations": 0,
+      "all_eight_done": false,
+      "remaining_scope": "New helper pin adoption + exact current preflight-only lease settlement; NOT_APPLIED, no new owner approval inferred"
     }
   ]
 }
