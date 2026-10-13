@@ -586,7 +586,7 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   и model-free status/check0 (Help ready/browser verified) подтверждены.
   Evidence `forensic/server-session-binding.json`, `profile-recovery.json`,
   `profile-management-verification.json`. Original cleanup false не переименован.
-- [ ] Выполнить отдельный deterministic native diagnostic без LLM, с неизменными
+- [x] Выполнить отдельный deterministic native diagnostic без LLM, с неизменными
   candidate resources и явно отдельным instrumented entry для fixed read-only
   NavigationPanel capture. Сохранить actual input1 caption/visibility/bounds/icon
   и подтвердить failed predicate до минимальной TDD-правки, если она нужна.
@@ -601,7 +601,27 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   Оба original native failures сохранены; исправляется только diagnostic guard
   по TDD (6tests/typecheck/independent review PASS), Product/candidate не меняются.
   Own native2 user72 адресно закрыт по GUID/Save/log/admin binding. Третий native
-  начат в новом каталоге; actual DOM cause ещё не подтверждён. Этот пункт открыт.
+  воспроизвёл отказ и получил DOM: crumbs7 «Присоединяемая таблица» и8 «Настройка»
+  display:none/rect0, 9 crumbs, первые7 видимы. Hidden caption predicate допускает
+  только generic input label; port.label пустая, input1 context unobserved.
+  Native owner/GUID/input1/opening и43 failed polls связаны; это instrumented
+  source diagnostic с отдельным package caption JD, не итоговая acceptance.
+  Evidence `forensic/join-hidden-input-diagnosis.json`, SHA256
+  `db5fc0e30f2353fb2f49578a8cc72600542220cf7e4f276327e192aa432c2e7b`,
+  Navigation SHA `b6d9cfb3a1cdd5dee8e814768beade867ee7fabc9d2295a2747a309da3d4f839`.
+  Own native3 user74 закрыт адресно по двум GUID/Save/log/admin binding;
+  server close19:02:44.920Z и refreshed absence подтверждены независимо.
+- [ ] Исправить только скрытую подпись второго Join-входа по TDD; сохранить
+  ownership/GUID/opening/index/ancestry guards. Проверить actual caption/icon,
+  отрицательные случаи, нужные runtime suites и независимый review.
+- [ ] Собрать новую сопоставимую baseline/candidate пару с общей Join-правкой,
+  теми же version/model/fixtures/seed и двумя skill версиями. Перед модельными
+  слотами выполнить native proof успешного input1/Join output/Save/cleanup.
+  Старые payload/pins/model/native outcomes не переписывать.
+- [ ] Провести новые полные18+25 и все Tasks3–6 gates на итоговых pins. Изменённый
+  runtime не позволяет переносить старые baseline исходы в новый denominator:
+  прежние18 baseline/2 candidate этой серии сохранить как диагностическую серию.
+  Это необходимая общая runtime-правка, не policy revision и не замена model slot.
 
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 

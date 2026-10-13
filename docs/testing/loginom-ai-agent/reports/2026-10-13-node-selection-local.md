@@ -572,6 +572,33 @@ Admin logout18:53:18.557/MCP exit0, own native процессов нет, guard 
 начат в `join-native-diagnostic-3`; Product/candidate/resources/pins неизменны.
 Это source diagnostic, не модельная попытка и не acceptance.
 
+## Join diagnostic/3: фактический DOM и failed predicate
+
+Native3 воспроизвёл AMBIGUOUS/input_mapping, captured NavPanel без DOM-мутирования.
+9 breadcrumbs: первые7 внутри панели и visible, crumbs7 «Присоединяемая таблица»
+и8 «Настройка» display:none/rect0. Node icon joindata, port tunedatasourcesocketdef,
+wizard icon правильный; current predicate для hidden input допускает лишь
+«Входной источник данных», поэтому port.label пустая. Prepared own input1,
+GUID54ae…, opening join-repro:n26 и43 failed readiness samples подтверждены.
+Native result SHA `5c9e2601e20c4527f6572415a05544ba9e0bfb4b2d4c7771418a4c8ce072118e`,
+Nav SHA `b6d9cfb3a1cdd5dee8e814768beade867ee7fabc9d2295a2747a309da3d4f839`;
+`join-hidden-input-diagnosis.json` SHA
+`db5fc0e30f2353fb2f49578a8cc72600542220cf7e4f276327e192aa432c2e7b`.
+
+Own user74 закрыт19:02:44.920 UTC; fresh server log и admin absence после
+refresh19:02:46.045 проверены независимо. Binding SHA
+`8ce8ccc714a18b60bfc2118c8e72bfaa5c6e94e495d5a924a754677b34548430`;
+1824 original files unchanged. Admin logout19:03:17.386/MCP exit0. Native
+cleanup false остаётся исходным outcome; operator capture отличается от
+acceptance entry и package caption JD отличается от несохранённого Package1.
+
+Только второй Join caption получает narrow source fix (native port1 + Join icon),
+сохраняя guards. RED→GREEN/342 targeted tests и source independent review PASS;
+общий upstream pending. После новой общей runtime-правки нужны matched builds,
+native positive proof и новая полная18+25 серия. Текущие18 baseline/2 candidate
+сохраняются отдельно, ни один начатый model slot не заменяется. Skill policy
+не меняется из-за ошибки стандартного узла; это не policy revision.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.

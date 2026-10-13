@@ -362,7 +362,12 @@ refresh absence подтверждены. Exact guard архивирован п�
 Оба исходных native failures сохранены, original model slot не повторяется.
 Fixed read-only capture guard исправлен TDD (6tests/review PASS), own page/URL
 и fixedargs сохраняются. Native2 user72 адресно закрыт по GUID/Save/log/admin
-binding; третий native начат в новом каталоге. Product runtime не менялся.
+binding. Третий native воспроизвёл отказ и captured DOM: скрытые crumbs7
+«Присоединяемая таблица» и8 «Настройка» не проходят generic hidden-caption guard;
+43 polls связаны с own input1/GUID/opening. Source-причина подтверждена,
+минимальная TDD-правка runtime проходит проверки. Own native3 user74 закрыт
+адресно, raw failures сохранены. После общей runtime-правки обязательны новая
+matched пара и полные18+25 на ней: прежние исходы в новый denominator не переносятся.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
