@@ -130,7 +130,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         // journal or mint another mutation admission from this observation.
         run.calls++
         try {
-          const runtime = await service.runtime(run.lease.generation, run.chat)
+          const runtime = run.captureRuntime
+          if(!runtime) throw Error("LOGINOM_RECOVERY_REQUIRED")
           const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined})
           if (!observed || typeof observed !== "object" || !("result" in observed)) throw Error("LOGINOM_REPLY_INVALID")
           reply({id:data.id,result:observed.result})

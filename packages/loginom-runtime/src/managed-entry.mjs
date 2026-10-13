@@ -401,8 +401,12 @@ async function handle(message) {
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
+      // Read invocation and parse are one owned await; propagation must not
+      // relabel their rejection as a guard or erase an equal late secondary.
+      const browserConfig = await observed(Promise.resolve().then(async () =>
+        JSON.parse(await readFile(session.browserConfig, "utf8"))))
       state.browserServer = await observed(createConnection(
-        JSON.parse(await readFile(session.browserConfig, "utf8")),
+        browserConfig,
         async () => authenticated.context,
       ))
       state.controlledStartup?.guard();assertStartup();
