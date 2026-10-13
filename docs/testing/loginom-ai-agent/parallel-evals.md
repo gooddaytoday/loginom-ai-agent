@@ -118,3 +118,20 @@ Docker argv фиксируют image IDs и ownership labels, отдельную
 только loopback Studio port; небезопасные routes/dev network/nonce/ID отклоняются.
 Marker v2 начинает с пустого owned inventory до фактической подготовки users.
 Create/destroy/reconciliation/readServerIdentity и real integration ещё впереди.
+
+Повтор frozen full unit на f8c31e6006: 587 PASS/3 SKIP/0 FAIL, 590 tests/51 files
+(467.41s), exit 0; после него bun typecheck PASS. Narrow owner-snapshot case
+независимым collector — 5/5 PASS на неизменном SHA. Текущий код не имеет
+воспроизводимого отказа; старый mixed-source run не служит проверкой коммита.
+Cache explanation остаётся выводом из времени редактирования/раннего import,
+не наблюдением внутреннего кэша Bun. Сами assertions и runtime не ослаблялись.
+
+Permanent RPC sources готовы в /home/kiselev/.local/state/loginom-evals/parallel/studio-source:
+bg.model.rpc.js, bg.server.rpc.js, bg.model.js и inventory.json (image/path/SHA).
+Pinned Studio image проверен по существующему контейнеру: initial-content не
+изменён (docker diff), relevant mounts отсутствуют; контейнер использован только
+для чтения. Remote/tmp/local SHA совпали; сохранённые files read-back PASS.
+Image 69ce44ac1002 полный ID указан в inventory. Source SHA: 53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f,
+e80d141da198b7800c3d212a534eb70bf0853a8dd0dd6381793291532f16ace3,
+d3ab87a3aca82985d41a8b9d4b3502c9d8d662204c67c07fb3ff2156d802407a.
+/tmp originals и чужие artefacts сохранены; own copy-temp удалён.
