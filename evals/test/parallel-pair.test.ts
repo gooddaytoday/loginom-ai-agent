@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { planPair, usersMarker } from "../src/parallel-pair"
+import { planPair, serverEpoch, usersMarker } from "../src/parallel-pair"
 
 const server = { container: "loginom-evals-users", studioContainer: "loginom-evals-studio", network: "loginom-evals-users",
   alias: "loginom-server-7.4.2-test", url: "http://127.0.0.1:32771/app/", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" }
@@ -33,4 +33,28 @@ test("users marker: shortened IDs and invalid ownership nonces are refused", () 
   expect(() => usersMarker("short-id", nonce)).toThrow("PAIR_MARKER")
   expect(() => usersMarker("a".repeat(64), "0".repeat(36))).toThrow("PAIR_MARKER")
   expect(() => planPair(server, "acceptance", "0".repeat(36))).toThrow("PAIR_CONFIGURATION")
+})
+
+test("server epoch: stable daemon snapshot is reusable, restart with same ID changes epoch", () => {
+  const snapshot = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", hostBootId: nonce,
+    daemonExe: "/app/loginomd", daemonCmdline: "/app/loginomd\0", daemonStat: `1 (loginomd) S ${Array(18).fill("0").join(" ")} 12345` }
+  expect(serverEpoch(snapshot)).toMatch(/^[a-f0-9]{64}$/)
+  expect(serverEpoch({ ...snapshot })).toBe(serverEpoch(snapshot))
+  expect(serverEpoch({ ...snapshot, startedAt: "2026-10-13T11:00:00Z" })).not.toBe(serverEpoch(snapshot))
+})
+
+test("server epoch: unreadable or unknown daemon identity is refused", () => {
+  const snapshot = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", hostBootId: nonce,
+    daemonExe: "/app/loginomd", daemonCmdline: "/app/loginomd\0--run\0-workdir=/workdir\0", daemonStat: `1 (loginomd) S ${Array(18).fill("0").join(" ")} 12345` }
+  const invalid = [{ containerId: "server" }, { startedAt: "invalid" }, { hostBootId: "" }, { daemonExe: "/bin/sh" },
+    { daemonCmdline: "/bin/sh\0" }, { daemonStat: "unreadable" }, { daemonStat: snapshot.daemonStat.replace("12345", "unknown") }]
+  invalid.forEach(change => expect(() => serverEpoch({ ...snapshot, ...change })).toThrow("SERVER_IDENTITY_UNVERIFIED"))
+})
+
+test("server epoch: volatile stat fields preserve epoch while daemon starttime or host boot changes it", () => {
+  const snapshot = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", hostBootId: nonce,
+    daemonExe: "/app/loginomd", daemonCmdline: "/app/loginomd\0--run\0-workdir=/workdir\0", daemonStat: `1 (loginomd worker) S ${Array(18).fill("0").join(" ")} 12345` }
+  expect(serverEpoch({ ...snapshot, daemonStat: snapshot.daemonStat.replace(") S 0", ") R 99") })).toBe(serverEpoch(snapshot))
+  expect(serverEpoch({ ...snapshot, daemonStat: snapshot.daemonStat.replace("12345", "12346") })).not.toBe(serverEpoch(snapshot))
+  expect(serverEpoch({ ...snapshot, hostBootId: "22222222-2222-4222-8222-222222222222" })).not.toBe(serverEpoch(snapshot))
 })
