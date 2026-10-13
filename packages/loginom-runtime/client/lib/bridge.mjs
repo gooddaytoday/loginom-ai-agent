@@ -199,7 +199,12 @@ export async function createBridge(config, session, { browserTransport: managedB
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, knownSecrets: [config.apiKey] });
   try {
-    const connections = await lenderObserved(()=>Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]));
+    const connections = await lenderObserved(async()=>{
+      const results=await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]);
+      const failure=results.find(result=>result.status==='rejected');
+      if(failure)throw failure.reason;
+      return results;
+    });
     const failed = connections.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
     const [remoteTools, browserTools] = await lenderObserved(()=>Promise.all([readCatalog(remote), readCatalog(browser)]));
