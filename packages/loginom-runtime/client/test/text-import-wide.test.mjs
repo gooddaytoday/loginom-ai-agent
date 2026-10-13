@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta,ImportColumnCountError,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
-function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null,fillChange=null}={}) {
+function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,dateFormat=null,dateValue='Не задано (dd/mm/yyyy)',editorChange=null,fillChange=null}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
   cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map(p=>[p,p+':'+index]))}));
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
@@ -12,17 +12,23 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
   columns:columns.map(c=>({name:c.name,label:editLabels?'Label'+c.index:c.label,type:c.type,data_kind:c.data_kind,used:true}))};
  let marker=nullMarker===null?'NULL':'?',opened=false,selected=false;
  if(nullMarker!==null)parameters.format.null_marker=nullMarker;
+ let date=dateValue,dateOpened=false;
+ if(dateFormat!==null)parameters.format.date_format=dateFormat;
  const request={target:{kind:'new'},parameters:{settings:parameters},mappings:[]},budget=textImportStepBudget(request);
  let stage='text_import_file',steps=0,editor,initialSweep=false,gestures=0;
  const reads=[],performed=[];
  const check=()=>{assert.ok(++steps<=budget,'fixed procedure exhausted its schema allowance');};
  const values=o=>Object.fromEntries(Object.entries(o).map(([k,value])=>[k,{status:'observed',truncated:false,value}]));
  const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
-  import_source:{fields:values({...parameters.source,encoding:'UTF-8 (65001)',rows_to_skip:'0'})},settings:{fields:{...values(parameters.format),null_marker:{status:'observed',truncated:false,value:marker,owner_ref:'marker-owner',input_ref:selected&&optionMode==='replaced_input'?'foreign-input':'marker-input'}}},
+  import_source:{fields:values({...parameters.source,encoding:'UTF-8 (65001)',rows_to_skip:'0'})},settings:{fields:{...values(parameters.format),null_marker:{status:'observed',truncated:false,value:marker,owner_ref:'marker-owner',input_ref:selected&&optionMode==='replaced_input'?'foreign-input':'marker-input'},
+   ...(dateFormat===null?{}:{date_format:{status:'observed',truncated:false,value:date,enabled:true,read_only:false,owner_ref:'date-owner',input_ref:'date-input',native_max_length_utf16:null}})}},
   ...(editor?{import_column_editor:{...editor}}:{}),
   import_columns:{initial_layout:{status:'rendered_definition_layout'},fields:columns.slice(offset,offset+8),
    page:{status:'complete_definition_page',schema_id:'wide',offset,limit:8,returned:Math.min(8,count-offset),total_columns:count,next_offset:offset+8<count?offset+8:null}}},
-  ui:{elements:[...(nullMarker===null?[]:[{ref:'marker-input',tid:'marker-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}]),...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:['scroll_horizontal'],bounding_box:{x:0,width:800}}, {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'}})))]}});
+  ui:{elements:[...(dateFormat===null?[]:[
+   {ref:'date-picker',wizard_combo:{kind:'picker',field:{scope:'import_format',name:'date_format',owner_ref:'date-owner',input_ref:'date-input',root_ref:'wizard-ref'}}},
+   ...(dateOpened?[{ref:'date-option',wizard_combo:{kind:'option',label:dateFormat,field:{scope:'import_format',name:'date_format',owner_ref:'date-owner',input_ref:optionMode==='foreign_input'?'foreign-input':'date-input',root_ref:'wizard-ref'}}}]:[])
+  ]),...(nullMarker===null?[]:[{ref:'marker-input',tid:'marker-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}]),...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:['scroll_horizontal'],bounding_box:{x:0,width:800}}, {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'}})))]}});
  const channel={observe:async options=>{
   check();const offset=options.importColumnPage?.offset??0;reads.push({condition:options.condition,offset});
   if(options.condition==='complete import definition page at 0'&&initialSweep&&drift)columns.at(-1).used=false;
@@ -32,6 +38,8 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
  },act:async action=>{
   check();gestures++;
   if(action.verb==='wizard_step'){stage=action.expected_stage;return;}
+  if(action.verb==='click'&&action.ref==='date-picker'){dateOpened=true;return;}
+  if(action.verb==='select_wizard_option'&&action.ref==='date-option'){date=dateFormat;dateOpened=false;return;}
   if(action.verb==='click'&&action.ref==='marker-picker'){opened=true;return;}
   if(action.verb==='select_wizard_option'){assert.equal(action.ref,'option-'+nullMarker);marker=optionMode==='bad_readback'?'null':nullMarker;opened=false;selected=true;return;}
   if(action.verb==='set_wizard_field'&&action.ref==='marker-input'){assert.equal(action.text,nullMarker);marker=action.text;return;}
@@ -119,6 +127,26 @@ test('complete narrow definitions do not require a data scroller on empty input'
   const copy=structuredClone(state);change(copy);assert.equal(importFieldHasCompleteLayout(copy,target),false);
  }
  assert.equal(importFieldHasCompleteLayout(state,{...target,interaction:{state:'point_not_observed'}}),false);
+});
+
+test('date format selects yyyy/mm/dd from the native unspecified default',async()=>{
+ const f=fixture(1,{dateFormat:'yyyy/mm/dd'});
+ const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
+ assert.equal(result.verified,true);
+ assert.equal(result.format.fields.date_format.value,'yyyy/mm/dd');
+ assert.equal(f.gestures,3,'only Next, native picker and exact option were applied');
+});
+test('date format refuses an option bound to another input without typing fallback',async()=>{
+ const f=fixture(1,{dateFormat:'yyyy/mm/dd',optionMode:'foreign_input'});
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner),/Exact import format option unavailable or ambiguous/);
+ assert.equal(f.gestures,2,'only Next and native picker were applied');
+});
+test('date format already selected requires no format gesture',async()=>{
+ const f=fixture(1,{dateFormat:'yyyy/mm/dd',dateValue:'yyyy/mm/dd'});
+ const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
+ assert.equal(result.verified,true);
+ assert.equal(result.format.fields.date_format.value,'yyyy/mm/dd');
+ assert.equal(f.gestures,1,'only source-to-format Next was applied');
 });
 
 for(const marker of ['NULL','null'])test('Null marker selects exact native option '+marker,async()=>{

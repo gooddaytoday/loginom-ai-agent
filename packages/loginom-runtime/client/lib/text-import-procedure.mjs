@@ -424,18 +424,18 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     }
     // Native editable combo resolves typed NULL to the first case-insensitive
     // match (null) on blur. Select the exact observed built-in, never retype it.
-    if (name === 'date_separator' || name === 'null_marker' && ['null', 'NULL'].includes(text)) {
+    if (name === 'date_format' || name === 'date_separator' || name === 'null_marker' && ['null', 'NULL'].includes(text)) {
       const label=name==='date_separator'?{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[text]:text;
       const rootRef = s.wizard.root_ref;
       const owns = e => e.wizard_combo?.field && (e.wizard_combo.field.scope ?? 'import_format') === 'import_format'
         && e.wizard_combo.field.name === name && e.wizard_combo.field.owner_ref === f.owner_ref
         && e.wizard_combo.field.root_ref === rootRef;
-      const picker = name==='date_separator'?textImportFormatChoice(s,name,'picker'):
+      const picker = name!=='null_marker'?textImportFormatChoice(s,name,'picker'):
         one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='picker'),'Exact Null marker picker unavailable');
       await act(s, {verb:'click', ref:picker.ref});
       s = await read('text_import_format', 'exact Null marker option visible', state =>
         state.ui.elements.filter(e => owns(e) && e.wizard_combo.kind === 'option' && e.wizard_combo.label === label).length === 1);
-      const option = name==='date_separator'?textImportFormatChoice(s,name,'option',label):
+      const option = name!=='null_marker'?textImportFormatChoice(s,name,'option',label):
         one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===label),'Exact Null marker option unavailable');
       await act(s, {verb:'select_wizard_option', ref:option.ref});
       const after = field(await read('text_import_format', 'exact Null marker applied', state =>
