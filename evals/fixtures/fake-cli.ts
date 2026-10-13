@@ -4,6 +4,7 @@ import { appendFile, chmod, mkdir, rm } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
+const packageFixture = command === "run" && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-package.json")
 const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
 const infraRetry = command === "run" && (process.env.EVAL_TASK_ID?.startsWith("infra-retry-") || process.env.EVAL_TASK_ID === "parallel-infra-retry")
 const launch = infraRetry ? await (async () => {
@@ -121,7 +122,7 @@ if (command === "run" && /^parallel-/.test(process.env.EVAL_TASK_ID ?? "")) {
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), JSON.stringify({ task: process.env.EVAL_TASK_ID, workdir, profile, launch: launch ?? 1 }))
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db-wal"), "fixture WAL")
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db-shm"), "fixture SHM")
-  await Bun.sleep(process.env.EVAL_TASK_ID === "parallel-slow" ? 3_000 : 20)
+  await Bun.sleep(process.env.EVAL_TASK_ID === "parallel-slow" ? 3_000 : packageFixture ? 300 : 20)
   await Bun.write(path.join(workdir, "parallel-trace.json"), JSON.stringify({ pid: process.pid, profile, startedAt, finishedAt: Date.now() }))
 }
 
@@ -146,6 +147,14 @@ const id = infraRetry ? launch === 1 ? "host-timeout" : retryOutcomes[process.en
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
 process.stdout.write(await chosen.text())
+if (packageFixture) {
+  const packagePath = Bun.argv.at(-1)?.match(/Сохрани готовый пакет как `([^`]+)`/)?.[1]
+  if (!packagePath || !process.env.EVAL_FAKE_SLOT_STORAGE) throw Error("Fixture package destination required")
+  await Bun.write(path.join(process.env.EVAL_FAKE_SLOT_STORAGE, path.basename(packagePath)),
+    Bun.file(path.join(import.meta.dir, "storage/fixture-group-sum-qty.lgp")))
+  process.stdout.write(JSON.stringify({ type: "tool_use", sessionID: "ses_fixture03", part: { type: "tool", tool: "loginom_dock_action_run",
+    state: { status: "completed", input: { action_key: "package.save_as" }, output: JSON.stringify({ package_ref: { path: packagePath } }) } } }) + "\n")
+}
 if (process.env.EVAL_FAKE_HANG_AFTER_EVENTS) {
   process.on("SIGINT", () => {})
   await Bun.sleep(120_000)

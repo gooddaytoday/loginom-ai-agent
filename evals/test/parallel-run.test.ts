@@ -6,7 +6,7 @@ import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
 import type { SlotFile } from "../src/slots"
 
-async function fixture(root: string, taskIds = ["parallel-fast", "parallel-slow"]) {
+async function fixture(root: string, taskIds = ["parallel-fast", "parallel-slow"], withArtifact = false) {
   const slots: SlotFile = {
     version: 2,
     server: { container: "fixture-server", studioContainer: "fixture-studio", url: "http://127.0.0.1/app/",
@@ -24,8 +24,13 @@ async function fixture(root: string, taskIds = ["parallel-fast", "parallel-slow"
   await Promise.all(slots.slots.map(slot => Bun.write(path.join(slot.profileDir, "data/auth.json"), '{"fake":{"type":"api","key":"fixture"}}')))
   await Promise.all(taskIds.map(async id => {
     await Bun.write(path.join(root, "tasks", id, "spec.md"), "Fixture diagnostic")
+    if (withArtifact) {
+      await Bun.write(path.join(root, "tasks", id, "reference.lgp"), Bun.file(path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")))
+      await Bun.write(path.join(root, "tasks", id, "parallel-package.json"), "{}")
+    }
     await Bun.write(path.join(root, "tasks", id, "task.json"), JSON.stringify({ id, title: id, prompt: id,
-      output_mode: "diagnostic", spec: "spec.md", expected_output: "diagnostic", checklist: [{ id: "diagnostic", text: "Returns diagnostic", weight: 1, required: true }] }))
+      ...(withArtifact ? { reference: "reference.lgp", inputs: ["parallel-package.json"] } : { output_mode: "diagnostic" }),
+      spec: "spec.md", expected_output: "diagnostic", checklist: [{ id: "diagnostic", text: "Returns diagnostic", weight: 1, required: true }] }))
   }))
   return { slots, lockRoot, env: { EVAL_CLI_MODE: "fake", EVAL_ARTIFACT_SOURCE: `dir:${storage}`,
     EVAL_AGENT_MODEL: "fake/fake-model", LOGINOM_DOCK_API_KEY: "fixture-dock", EVAL_RESULTS_DIR: path.join(root, "results") } }
@@ -59,6 +64,35 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
       const cleanup = await Bun.file(path.join(input.slots.controller.stateDir, `slot-${slot.id}.cleanup.json`)).json()
       expect(cleanup).toMatchObject({ status: "confirmed", liveQualified: false, archive: "committed" })
     }
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: overlapping agents share one judge gate through actual fake-codex processes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-main-"))
+  try {
+    const input = await fixture(root, ["parallel-fast", "parallel-slow"], true)
+    const traceFile = path.join(root, "judge-trace.jsonl")
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --gate-log ${traceFile} --delay-ms 5000`,
+      JUDGE_MODEL: "gpt-6-sol", JUDGE_REASONING: "xhigh" }, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.metrics.scored_count).toBe(2)
+    const judges = (await Bun.file(traceFile).text()).trim().split("\n").map(line => JSON.parse(line)) as
+      { kind: string; pid: number; at: string; codexHome: string }[]
+    expect(judges.map(item => item.kind)).toEqual(["start", "end", "start", "end"])
+    expect(Number(judges[2]!.at)).toBeGreaterThanOrEqual(Number(judges[1]!.at))
+    expect(judges[0]!.pid).not.toBe(judges[2]!.pid)
+    expect(judges.every(item => item.codexHome === input.slots.judge.codexHome)).toBe(true)
+    const agents = await Promise.all(summary.tasks.map(async task => {
+      const attempt = task.attempts[0]!
+      const slot = input.slots.slots.find(slot => slot.id === attempt.slot_id)!
+      expect(attempt).toMatchObject({ status: "completed", judge_status: "scored", environment_cleanup: { status: "confirmed" } })
+      expect(attempt.package_path).toStartWith(`/${slot.username}/eval-`)
+      return await Bun.file(path.join(slot.workspaceRoot, summary.run_id, task.id, "1/parallel-trace.json")).json() as { startedAt: number; finishedAt: number }
+    }))
+    expect(agents[0]!.startedAt).toBeLessThan(agents[1]!.finishedAt)
+    expect(agents[1]!.startedAt).toBeLessThan(agents[0]!.finishedAt)
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
