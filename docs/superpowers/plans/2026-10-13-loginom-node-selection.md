@@ -842,7 +842,7 @@ export async function writeAttemptPrompt(tasksDirectory: string, taskID: string,
   fixtures; четвёртый `outputMode` сюда не передаётся. Не передавать модели
   helper, task.json, SPEC, reference или oracle.
 
-- [ ] Выполнить каждую попытку отдельным процессом, последовательно.
+- [x] Выполнить каждую попытку отдельным процессом, последовательно.
   Python-supervisor владеет PID CLI и реализует deadline независимо от
   ожидающего агента. Сам блок запускать через exec с выдачей управления не реже
   60 секунд, чтобы получать прогресс и сообщения пользователя:
