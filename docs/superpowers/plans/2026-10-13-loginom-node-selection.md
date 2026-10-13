@@ -949,7 +949,7 @@ JavaScript используй только для этого остатка ил
 - [x] Проверить текст на противоречия с canvas/browser/sources references.
   Не добавлять unit-тесты, проверяющие буквальное совпадение текста запрета:
   реальную политику доказывают live-сценарии и аудит, целостность — staging tests.
-- [ ] Из `packages/loginom-host` выполнить существующие целевые проверки:
+- [x] Из `packages/loginom-host` выполнить существующие целевые проверки:
 
 ```bash
 LOGINOM_AI_AGENT_TEST_NODE="$selection_node" bun test test/bundled-skills.test.ts
