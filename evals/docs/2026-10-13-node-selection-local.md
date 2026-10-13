@@ -45,6 +45,12 @@ Approved (47f9f35b…/305a8573…); новый immutable locke6eedea2…,
 43unique18+25slots/unchanged72+2/model/seed/tasks/0oldoutcomes. Native prerequisites
 и admissionpending: пока не запускать ни baseline, ни candidate этой пары.
 
+PrivateJoin203142/1 остановился до создания import0: initial emptySave прошёл,
+workflow_continuations:[], затем stalePackage1 navigation/NOT_APPLIED. Реальные
+ownpackageclose/logout/ACKexit0 подтверждены, исходныйexit1 сохранён. Отдельный
+corefixture использует Save послеcompletedimports, без emptySave/standalone
+stale inputrereads; обязательные hiddenroles/output/Save/cleanup сохраняются.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1

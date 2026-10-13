@@ -42,6 +42,22 @@ Lock SHA `e6eedea28a4c6fba1e38fc66091951e3d56706a386314042199c6b8a967c2fc4`.
 Native JS→Group/directJS→newSort, обе Join hiddenroles, actual catalog/schema
 binding и model18+25 pending. current-run остаётся192418 до нового допуска.
 
+Actual candidate describe probe203142 exit0:16raw replies/15standard schemas,
+Host closeACK/exit0, explicitLogoutfalse(no package). Первый новый private Join
+driver exit1 до создания первого import: initial empty-draftSave SUCCEEDED,
+workflow_continuations:[], следующий shortworkflowId остался с navigationPackage1
+и дал NOT_APPLIED/effectfalse/cleanuptrue, `Prepared workflow navigation changed`.
+Это ошибка дополнительного privatefixture шага, не модельный слот/JSruntimefix.
+Own emptypackage закрыт с actual package_closed/logged_outtrue/nodiscard и
+transportACK/exit0/nosignal. Original result не меняется; его старое поле
+explicitLogoutVerified:false не переписывается — actual cleanup receipt проверен
+отдельно. Diagnosis SHA `4b39b1d9b0032f5ab3357e4be66435dd2250928cf9c1d31e971cc30c8db7495e`.
+Отдельный минимальный Join core fixture сохранит Save после completed imports,
+оба hiddenroles/fresh exact output/Save/cleanup; initial emptySave и standalone
+stale postSave rereads из него исключаются. Сохранность входных значений
+проверяется их проекциями в точном fresh Join output; standalone reread не заявляется.
+Runtime/build/pins/43modelslots прежние, model acceptance ещёpending.
+
 ## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;

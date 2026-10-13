@@ -694,6 +694,13 @@ inspect после response-budget refusal). Standard group-001 останови
   прежними version/model/fixtures/seed/двумя skill версиями. Native без LLM
   подтвердить JS→Group и JS→newSort→Export, сохранённый пакет/выход/cleanup,
   generic JS gestures remain denied и обе hidden Join роли на новой сборке.
+  Новая пара203142 static/pins Approved, модели ещё0. Первый privateJoin exit1
+  до import0: extra initial emptySave вернул workflow_continuations:[], поэтому
+  shortworkflowId остался stalePackage1. Actualpackageclose/logout/ACKexit0
+  подтверждены, diagnosis4b39b1d9…; originalexit1 сохранён. Отдельный минимальный
+  corefixture использует прежний Save послеcompletedimports, не делает emptySave
+  и standalone stale postSave rereads. ExactfreshJoinoutput projections проверяют
+  исходныеvalues; обаhiddenroles/output/Save/cleanup gates не меняются.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять

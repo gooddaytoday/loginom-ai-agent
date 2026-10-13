@@ -427,6 +427,14 @@ model/seed/tasks. Native/catalog/schema/model gates pending; current-run192418
 laterreplace; это диагностическая поправка после observed stale navigation,
 не изменение public node-read API. Его actual newlive покаpending.
 
+Actual203142 initial emptySave succeeded с workflow_continuations:[], а import0
+NOT_APPLIED/effectfalse/cleanuptrue до nodecreation из-за stalePackage1 path.
+Этот privatefixture exit1 сохранён, package_closed/logged_out/HostACKexit0 реально
+подтверждены. Следующий отдельный corefixture использует прежний Save после
+completedimports и оба actualhiddenroles/freshJoinoutput/Save/cleanup; standalone
+postSave source reread не требуется и не заявляется. Сохранность численных inputs
+проверяет exact freshJoinprojection. Pair/pins/runtime не меняются, это не modelslot.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.
