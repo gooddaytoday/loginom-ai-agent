@@ -1096,3 +1096,13 @@ ownadmin98 logout/MCPexit0 подтверждены. Это не recoveryPASS: o
 изоляцию без изменения user97. Model calls по паре203142 остаются0.
 Условная новая matched пара225648-cc76ca собирается параллельно на общем
 committed source3a33edcae8; текущий stopped pointer192418 не меняется.
+
+Proof9 original0547cd7e…/root7470exit3: Group/directSort/Save прошли,
+обязательный ExportSort AMBIGUOUS/input_mapping до CSV. Cleanup/logout/ACKfalse
+сохранены. LastSave036 readback f4313494… подтвердил полное равенство JS
+component/source/declaredschema после обеих ветвей; это не CSV/finalgate.
+Теперь Export blocker воспроизведён на обязательной ветви; нужен bounded readonly
+capture точного native predicate перед surgical TDD fix. Product guards/skill
+не менять по предположениям. Пара225648 source3a33/runtimef262e52c… собрана/
+bothverify0, но остаётся условной: commonruntime fix потребует следующую пару
+и полные18+25. Ownproof9 recovery проверяется отдельно, unknownuser97 сохраняется.
