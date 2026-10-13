@@ -1023,6 +1023,13 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - [ ] До tags-попыток сверить реальный каталог с обоснованием Task 2. Если
   появилось стандартное split-to-rows, не провоцировать JS и не подменять критерий;
   остановить приёмку этой ветви с точным расхождением и пересмотреть fixture.
+  Статическая часть сверки candidate завершена: пять файлов контрактов совпали
+  с baseline и исходниками, проверены экспорты 16 типов и релевантные схемы.
+  Evidence: `candidate-gap-attestation.json` в текущем private run,
+  SHA256 `0d2bdcdb35e8c5d8af595cc19cb34424998a368c163dd7f094bd22935a01c0aa`.
+  `static-gap-supported` не закрывает эту задачу: фактические
+  `prepare.knowledge.node_types` / `action_describe.parameter_schema` ещё
+  не получены в candidate Session; live-доступность и поведение модели не проверены.
 - [ ] Выполнить tags 3 раза. Должен получиться локальный JS для разворачивания,
   затем стандартные группировка, сортировка и экспорт. Проверить код JS и
   отсутствие захардкоженных меток/числа позиций/готовых агрегатов.
@@ -1142,7 +1149,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Root: 95 tests/219 assertions PASS, typecheck/diff-check PASS; acceptance-lock.json закрепляет 72 файла.
 - Baseline ABC/1: CLI exit 1, cleanup unconfirmed, 1 JS apply; модельный слот сохраняется.
 - Candidate собран/verify PASS; digest `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
-- Candidate pins готовы: first wave 9, всего 25, исходный reviewSeed сохранён.
+- Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Пользователь разрешил адресное восстановление после Loginom-проверки; server session mapping/admin view пока нет.
 - .writer сохранён; все own процессы завершены, новые CLI run не запускаются.
 - Следующий шаг: проверить Loginom и восстановить профиль; далее monthly-demand/1 и остальные 16 baseline.

@@ -23,6 +23,17 @@ Baseline и candidate собраны и проверены. Node/Bun/Chromium de
 различия Product-исходников между payload commits — ровно два skill-файла.
 Время сборки исходники были заморожены. `acceptance-lock.json` закрепляет 72 файла.
 
+Статические tags-контракты candidate сверены: пять файлов побайтно совпали с
+baseline и исходниками, проверены экспорты 16 типов узлов и релевантные схемы.
+Генератор, цикл и dynamic split-to-rows не объявлены. Статус
+`static-gap-supported` относится к требованию общего разворачивания списков
+произвольной длины, не к невозможности всех мыслимых композиций. Evidence:
+`candidate-gap-attestation.json` в private run, SHA256
+`0d2bdcdb35e8c5d8af595cc19cb34424998a368c163dd7f094bd22935a01c0aa`.
+Фактические `prepare.knowledge.node_types` и `action_describe.parameter_schema`
+ещё нужно сверить в candidate Session до tags; live-доступность и поведение
+модели эта проверка не подтверждает. CLI, профиль и браузер не запускались.
+
 Audit version: `1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d`.
 Baseline skill digest: `74cc9ac0b5a22724909bd1ba3123e8f6e3abedbe85a3b87dee6596119bbfb340`.
 Candidate skill digest: `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
