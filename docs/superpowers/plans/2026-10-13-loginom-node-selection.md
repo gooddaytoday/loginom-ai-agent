@@ -513,7 +513,7 @@ if [ "$selection_check_exit" -ne 0 ]; then exit "$selection_check_exit"; fi
   read-only copy-out, а не доказательством соответствия профилю. Перед каждой
   следующей попыткой повторять headless status и проверку writer/cleanup.
 
-- [ ] Получить username/folder из публичного status, не из `cli-profile.json`
+- [x] Получить username/folder из публичного status, не из `cli-profile.json`
   (там только marker). Успешный JSON — сам View без обёртки:
 
 ```bash
