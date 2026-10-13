@@ -128,6 +128,25 @@ ownuser90 closed21:44:11.150Z безreinit, ownadmin91 closed21:44:42.264Z;
 other3inventory rows сохранены,30protectedraw/source+5runtime files unchanged,
 PID189026 отсутствует/.writer absent. Исходныйcleanupfalse не повышается до PASS.
 
+Instrumentedproof-5 root56624exit3, resultSHA
+`e2c41540b0b6a644a66015cc3519b0401bca961c1450090b2faf81a3c4ea6406`:
+actualraw023 содержит полный preview-tuple-v1 до усечённого stack. Native
+type/subtype1/nativeIndex0/portIndex0, selectedcount1/s0Porttrue;
+sameShape/Port/Data/Cell=true, sameElement=false, oldElementConnected=false,
+currentElementConnected=true. Единственный сработавший conjunct — сохранённый
+DOM portElement identity после native redraw. F3/Groupcreation/Sort отсутствуют,
+originalcleanupfalse/HostACKfalse сохранены. SourceTDDfix в работе: повторно
+подтверждать текущий own DOM после select и использовать его для F3, сохраняя
+прочие guards. Privatecandidate proof перед пересборкой не является final gate.
+Ownuser92/init21:58:53.562Z/nativeGUID bound, rootclosed/freshabsence2/adminlogout
+22:03:20.891Z/MCP90801exit0; независимый postclosure review ещёpending.
+Independent stop review SHA
+`991cdcc922e53166edcb4fbb378f697a2b368461f0ec98f785abea18ce788a02`:
+56sources/10testfixtures/23raw/4journals/895events сохранены; exact original/
+rewritten outgoing code восстановлен offline из actualtask/transport/storage
+binding и совпал с instrumentation record. Остальные compoundguard conditions
+не сработали; конкретный DOM identity conjunct подтверждён.
+
 ## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;

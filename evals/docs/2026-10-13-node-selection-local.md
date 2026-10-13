@@ -80,6 +80,14 @@ Independentrecovery f81ff164… подтвердил exactuser90close/noReinit/a
 сохранностьotherrows/raw/source и отсутствие PID/.writer; originalcleanupfalse
 остаётся исходным failed outcome.
 
+Instrumentedproof-5 isolated actualDOMredraw: sameElement=false/oldDisconnected/
+currentConnected при sameNativeShape/Port/Data/Cell и selectedownport. Original
+exit3/cleanupfalse preserved, F3/Group/Sort не выполнялись; это не gatePASS.
+SourceTDDfix сохраняет native/owner/pre-gesture guards и должен обновить verified
+privateDOMticket после select для F3. Сначала отдельный privatecandidate native
+probe; после успешного sourcefix нужна новая immutablematchedпара и её finalgate.
+Rootownuser92closed/admin2freshabsence/logout/MCPexit0; postreviewpending.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1

@@ -473,6 +473,16 @@ Ownrecovery независимо подтверждён f81ff164…: точны�
 admin91 closed21:44:42.264Z, нет повторного init/чужих session closures; оригинальный
 cleanupfalse сохранён, исходные30raw/source evidence и5runtime files неизменны.
 
+Instrumentedproof-5 установил точный conjunct по actual tuple: после возврата
+click selected=[ownPort.FCell], type/subtype1/nativeIndex0/portIndex0,
+sameShape/Port/Data/Cell=true; sameElement=false, oldElementConnected=false,
+currentElementConnected=true. Исходный guard отклоняет заменённый DOM-элемент,
+хотя native identity остаётся прежней. Originalexit3/cleanupfalse/ACKfalse сохранён;
+это диагностическое наблюдение, не приёмочный PASS. Surgical source TDD fix
+должен разрешить только подтверждённую post-select замену отсоединённого DOM
+при прежних native/owner/selection checks и адресовать F3 текущему verified port.
+До жеста/при foreign selection/native changes/connected old swap отказ остаётся.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

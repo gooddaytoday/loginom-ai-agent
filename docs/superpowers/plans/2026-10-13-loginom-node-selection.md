@@ -728,6 +728,13 @@ inspect после response-budget refusal). Standard group-001 останови
   tuple установить причину перед surgicalTDDfix; не ослаблять ownership по догадке.
   Independentownrecovery f81ff164… подтвердил exactserver closure/noReinit,
   сохранностьraw/source/others; originalcleanupfalse неизменён.
+  Instrumentedproof-5 root56624exit3 изолировалconjunct: sameElement=false,
+  oldElementConnected=false/current=true при прежних nativeShape/Port/Data/Cell
+  и selected=[ownPort.FCell]. Result e2c41540…/originalcleanupfalse preserved,
+  не acceptancePASS. SourceTDDfix должен обновить privateDOMticket после полного
+  postselect owner/native/selection/hitpoint validation и F3currentelement;
+  преджестовые/foreign/connected swap guards сохраняются. Перед новой дорогой
+  matchedсборкой проверить candidate source в отдельном явно private nativeproof.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять
