@@ -1,6 +1,10 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
-Статус: приёмка не завершена. Исходная серия `20261013T093809Z-f5d429`
+Статус: приёмка не завершена. Новая пара192418-c71363 допущена к полной18+25
+после independent paired/pins/native core проверки; model acceptance pending.
+Full private native driver exit1 сохранён отдельно от подтверждённого core.
+
+Исторически: Исходная серия `20261013T093809Z-f5d429`
 остановлена после трёх baseline; её результаты сохранены отдельно. Пользователь
 поручил самостоятельно устранять блокеры: дефект `imports.text.date_format`
 исправлен по TDD в `263df9620`, 144 теста PASS. После проверки отсутствия
@@ -14,7 +18,7 @@ ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; can
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
-## Новая пара после Join fix — подготовка
+## Новая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;
 baseline source dirty только двумя прежними skill файлами, candidate clean.
@@ -40,9 +44,34 @@ typecheck0, independent static review Approved. Новых model calls нет.
 Первый build остановился до mkdtemp из-за отсутствующего собственного parent
 каталога; original stderr/stdout сохранены `.missing-parent`. После mkdir build
 успешен. Это operator build incident, не модельная попытка.
-Допуск серии всё ещё требует independent pair/pins review и успешного native
-Join proof обеих реальных скрытых ролей, результата, Save/cleanup.
-`current-run.txt` пока указывает на исторический142936 run; новый не допущен.
+Independent pair/pins Approved: review SHA3a8996bf… и9f8b6a84… . Native
+canonical core подтверждён независимо: обе реальные скрытые роли с same native
+node/GUID/opening brackets, Join SUCCEEDED, exact2rows [1,5,15]/[1,10,15],
+Save SUCCEEDED; Docker readback SHA6212e48d… содержит2imports/Join/2links/noJS.
+Package cleanup реально package_closed/logged_out true, discardfalse;
+transport closed ACK/exit0/nosignal. Review SHA
+`0e622b9d3cea7ba935dbdaf6ad3857c42a95ea9874f2664c6ccff7d111d89422`.
+
+Full private driver остаётся diagnostic-stopped/exit1: optional reread import0
+вернул NOT_APPLIED/NODE_APPLY_STOPPED из-за retained workflow navigation Package1
+после Save renameJD8179e022. Параметр source_operation_id валиден, effectfalse/
+cleanuptrue; неизменность input после Join не подтверждена. Diagnosis SHA
+`fbdc61b655cbbe866f23252aee3f26d84fe76eabee6bf32826a66d4bab15a588`.
+Original result SHA
+`f505d53c6008abc97ebcec214a899d5cc5c23b61c8115a05043b3030c89ccf8b` неизменён.
+Это не весь driver PASS: обязательный plan/spec core аттестован отдельно.
+Новый live не повторяется ради optional проверки; Product/pair/runtime не меняются.
+
+Actual gap prerequisite complete: newprepare baee2503… и describe ae898537…,
+разные Sessions/same immutable runtime/catalog/handlers;15cache keys пересчитаны
+после skillRevision null→ff18… . Attestation SHA
+`c485ce087dc6ff9495c9ca1caf7eda7731828c717ef6aa89761936be98ae58f6`.
+Pending predecessor сохранён;1241probe/2837native files unchanged. Tags/calculation/
+role review ещёpending; per-node limits не являются global/fixed151 proof.
+
+`current-run.txt` теперь192418, series-admission SHA
+`d42bccf0c4b94ec77813955e3586a886af7ed15ce8f348ab0689868dc0ff28c0`.
+Модельная baseline начинается заново; historical18+2 не включены в новые слоты.
 
 ## Историческая вторая сопоставимая пара
 

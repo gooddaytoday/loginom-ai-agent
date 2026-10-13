@@ -377,10 +377,19 @@ native input0/input1 и единственной Join icon; identity/opening/anc
 `20261013T192418Z-c71363` готовит общий runtime и отдельные skill версии; до
 модельных слотов нужны успешные live обе скрытые роли, Join output, Save/cleanup.
 
-Новые payload/pins192418 готовы: общий source05b645eec9, обе sourceverify0,
-старые skills/datasets/model/seed неизменны. Independent pair/pins review и
-native Join positive proof ещё gates. Новый model-free describe probe15 схем
-завершился ACK/exit0; связь с actual prepare новой сборки ещё pending.
+Новые payload/pins192418 допущены: общий source05b645eec9, обе sourceverify0,
+старые skills/datasets/model/seed неизменны, independent pair/pins Approved.
+Native canonical core подтверждён независимо: реальные hidden Main0/Joined1,
+SUCCEEDED Join/exact rows, Save/persisted graph и package_closed/logged_out true,
+transport ACK/exit0. Full private driver exit1/diagnostic-stopped сохранён:
+дополнительный reread импорта использовал retained Package1 после Save rename;
+effectfalse/cleanuptrue, inputsUnchanged не проверено. Этот дополнительный отказ
+не повышен в успех и не служит основанием менять skill/runtime данной пары.
+Обязательный core отдельно аттестован в live-independent-review SHA0e622b9d… .
+Actual prepare новой candidate16types связан с describe15schemas/cache/handlers;
+gap attestation c485ce08… поддерживает known-standard capability gap, а не
+невозможность произвольной композиции151элемента. Model acceptance ещёpending.
+Текущий run192418 требует полный новый denominator18+25.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

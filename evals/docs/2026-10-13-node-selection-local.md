@@ -27,7 +27,16 @@ Container ID, сеть и UserStorage проверены read-only, public routi
  версии skill не запускаются. До model dispatch инцидент не занимает слот;
 после dispatch провал сохраняется в знаменателе.
 
-Текущая серия — `20261013T142936Z-072953`; `20261013T132356Z-0a3983` остановлена
+Текущая серия — `20261013T192418Z-c71363`, общий source05b645eec9. Обе сборки
+sourceverify0, independent pair/pins Approved; native canonical Join core
+подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1
+на дополнительном stale retained import reread сохранён, inputsUnchanged не
+подтверждено. Review SHA0e622b9d…; actual newprepare/15schema gap attestation
+SHAc485ce08… . Новый полный denominator18+25, прежние исходы не переносятся.
+
+Историческая серия `20261013T142936Z-072953` дала baseline18 oracle/calculation,
+policy12/18 старого skill, JS9; candidate2 начаты, sales PASS/ABC Join blocked.
+`20261013T132356Z-0a3983` остановлена
 после двух baseline и сохранена отдельно. Исходная `20261013T093809Z-f5d429`
 остановлена после трёх baseline и сохранена отдельно. Пользователь поручил
 самостоятельно устранять блокеры; необходимый общий runtime-дефект

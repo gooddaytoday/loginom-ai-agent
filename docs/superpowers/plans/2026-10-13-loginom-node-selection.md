@@ -624,10 +624,20 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   `0b6f02d06403fadc7e029757a68e23329088e346d7c1936736914391aef85a90`,
   review SHA `5b44bdc9eb383a6079cae069009b5159fd1b26d6cb7ea5c777a4bd94154230a4`.
   Source SHA `80d27a8b318cc1ed800331dda82285aef4a3eab907732fe29eb52e7e036904a2`.
-- [ ] Собрать новую сопоставимую baseline/candidate пару с общей Join-правкой,
-  теми же version/model/fixtures/seed и двумя skill версиями. Перед модельными
-  слотами выполнить native proof обеих скрытых input ролей/Join output/Save/cleanup.
-  Старые payload/pins/model/native outcomes не переписывать.
+- [x] Собрать новую сопоставимую baseline/candidate пару с общей Join-правкой,
+  теми же version/model/fixtures/seed и двумя skill версиями. Run192418-c71363,
+  общий source05b645eec9, обе sourceverify0; независимые pair/pins review Approved,
+  5725/5725 files обоих payload, runtime c9bab236… одинаков, 43 пустых unique slots.
+  Actual native core независимо подтверждён: скрытые Main0/Joined1 с GUID/opening,
+  Join SUCCEEDED/exact rows [1,5,15]/[1,10,15], Save и persisted3nodes/2links/noJS,
+  package_closed/logged_out true, transport ACK/exit0. Review SHA256
+  `0e622b9d3cea7ba935dbdaf6ad3857c42a95ea9874f2664c6ccff7d111d89422`.
+  Full private driver остаётся diagnostic-stopped/exit1: extra post-Save import0
+  reread отвергнут до эффекта из-за retained workflow path Package1 после rename.
+  Unchanged-input reread НЕ подтверждён; raw result SHA f505d53c… сохранён.
+  Это отдельная scoped attestation обязательного core, не переписывание failure.
+  Новая series-admission SHA `d42bccf0c4b94ec77813955e3586a886af7ed15ce8f348ab0689868dc0ff28c0`;
+  current-run переключён на192418. Старые payload/pins/model/native outcomes сохранены.
 - [ ] Провести новые полные18+25 и все Tasks3–6 gates на итоговых pins. Изменённый
   runtime не позволяет переносить старые baseline исходы в новый denominator:
   прежние18 baseline/2 candidate этой серии сохранить как диагностическую серию.
@@ -1375,3 +1385,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Серия142936-072953: baseline18/18, oracle/calculation18, policy12/18 старого skill, JS9/9/9; independent machine review18 PASS (baseline-final-review.json); candidate2/25 начаты: sales1 PASS JS0, ABC1 runtime-blocked join/input_mapping, cleanupfalse, callsJS0. Серияpaused, diagnosis/ownrecovery; повторызакрыты.
 
 - Новая пара192418-c71363 собрана/verify0 из общего05b645eec9; immutablepins43слота и effectiveaudit2654… закреплены. Независимый pair/pins review и nativebothhiddenroles proof pending; model0/current-run ещё historical142936. Новыйdescribeprobe15схем ACK/exit0, actualprepare/gapbinding pending.
+- Новая192418-c71363 допущена к новой полной18+25: paired/pins/nativecore Approved; fullprivate driverexit1 сохранён (extra stale retained reread). Новая actualgapattestation c485ce08… completed, tags/model ещёpending; historical18+2 не переносятся.
