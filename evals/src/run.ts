@@ -43,6 +43,12 @@ export async function main(argv: string[], env: Record<string, string | undefine
 }
 
 async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeof validateFixture>>) {
+  const controller = new AbortController()
+  const removeSigint = installSigint(controller)
+  return executeRunBody(config, fixture, controller).finally(removeSigint)
+}
+
+async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<typeof validateFixture>> | undefined, controller: AbortController) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   if (!config.skipJudge && tasks.some(task => task.outputMode === "diagnostic"))
     throw new EvalFailure("diagnostic tasks require --skip-judge", 2)
@@ -50,8 +56,6 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
   const environment = fixture
     ? { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
     : await preflight(config, source)
-  const controller = new AbortController()
-  installSigint(controller)
   const startedAt = new Date()
   const runDir = await reserveRunDirectory(config.resultsDir,
     `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`)
@@ -475,14 +479,16 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
 }
 
 export function installSigint(controller: AbortController) {
-  process.on("SIGINT", () => {
+  const handler = () => {
     if (controller.signal.aborted) {
       console.error("\nПовторный Ctrl+C — немедленный выход без summary.")
       process.exit(130)
     }
     console.error("\nCtrl+C: останавливаю текущую попытку и дописываю summary. Ещё раз Ctrl+C — выход немедленно.")
     controller.abort()
-  })
+  }
+  process.on("SIGINT", handler)
+  return () => { process.off("SIGINT", handler) }
 }
 
 export const stamp = (date: Date) =>
