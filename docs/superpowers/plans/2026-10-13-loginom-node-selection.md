@@ -642,9 +642,10 @@ bun script/verify-cli-candidate.ts "$selection_baseline" "$selection_repo"
   текущей ветки, особенно если в нём отсутствует JavaScript.
 
 - [ ] Сохранить `baseline-pins.json`, закрепляющий SHA manifest с source SHA/tree/dirty
-  внутри metadata; полный skill inventory/file hashes сохранить рядом отдельно,
-  модель/variant, task prompt/input/oracle hashes, Loginom version, каталог типов,
-  endpoint identity без credentials, ограничения времени. До пилота сгенерировать
+  внутри metadata. Рядом сохранить полный skill inventory/file hashes и каталог
+  типов с Loginom version. Pins также закрепляют модель/variant,
+  task prompt/input/oracle hashes, endpoint identity без credentials и ограничения
+  времени. До пилота сгенерировать
   и сохранить `reviewSeed`; перенести его без изменения в candidate-pins.
   Подтвердить наличие
   `programming.javascript` в baseline: иначе ноль JS не проверяет выбор модели.
@@ -1132,5 +1133,6 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
 - Первый pre-dispatch OAuth 401 сохранён как incident; авторизация по коду завершилась exit 0.
-- Пилот sales-by-category/1: CLI exit 0, oracle PASS, артефакты сохранены; полный audit 1B ещё идёт.
+- Пилот sales-by-category/1: CLI exit 0; native offline audit PASS, включая oracle/history/runtime/graph.
+- Audit 1B ещё завершает guards исключений/review; пилот будет перепроверен финальной версией offline.
 - Следующий шаг: завершить audit/graph TDD и offline-пилот; затем 17 baseline и candidate build.
