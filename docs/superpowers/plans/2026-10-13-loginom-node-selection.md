@@ -91,7 +91,7 @@
   Граф стандартного успеха проверяется машинно; роль JS, аномалии и выборку
   стандартных успехов проверяет независимый reviewer по Task 6.
 
-- [ ] Зафиксировать формат `<attempt>/attempt.json` в runbook. Обязательные поля:
+- [x] Зафиксировать формат `<attempt>/attempt.json` в runbook. Обязательные поля:
   `sessionID`, `cliExitCode`, `mode`, `taskID`, `model`, `variant`,
   `expectedSkillDigest`, `packagePath`, `resultPath`, `startedAt`, `finishedAt`,
   `binaryManifestSha256`, `modelStarted`, `timedOut`, `interruptSentAt`.
