@@ -10,5 +10,11 @@
     "sourceDirty": false,
     "manifestSha256": "fb984e9becfbf0979a7712265916c7253b01843b2238ed9fe0f893ad09a612b0",
     "binarySha256": "a0b9be76107d82575ba28d348e60ac4f2497a608252552895a6131bca9a2029a"
+  },
+  {
+    "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "sourceDirty": false,
+    "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454"
   }
 ]

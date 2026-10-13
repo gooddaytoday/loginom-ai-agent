@@ -48,9 +48,10 @@
       "source": "LAB57 authored CLI compatibility adaptation",
       "source_base": "49522d83318bac29779e497798becb2f799bc84e",
       "adaptations": [
-        "bind separate exact5cd and approved d73 prefix without changing upstream source/original hashes"
+        "bind separate exact5cd and approved d73 prefix without changing upstream source/original hashes",
+        "diagnostic-only startup failure projection pin; runtime manifest remains byte-identical to d73"
       ],
-      "sha256": "ce6028e91cec4fd0bb9270e54880ad1ce5d328610729ebccf56110d7f914e19f"
+      "sha256": "8a4b10194310a5b405fd468c2afac5ca8eed5147dd3eef4d33d399ed2cb252ad"
     }
   ]
 }

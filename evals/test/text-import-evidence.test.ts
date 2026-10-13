@@ -406,6 +406,18 @@ test("cold preparation rejects dirty/unknown/mismatched tuples without creating 
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+test("cold preparation binds diagnostic-only startup CLI without changing runtime/oracle data", async () => {
+  const f = await positiveFixture()
+  try {
+    const pin = { sourceCommit: "d6fc9c9b7b499d0a182c972815913b541e4cb81b", sourceDirty: false,
+      manifestSha256: "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+      binarySha256: "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454" }
+    const cold = path.join(f.root, "startup-pin-cold")
+    await prepareTextImportCold(f.task, f.attempt, cold, "/eval/result.lgp", pin)
+    expect(await Bun.file(path.join(cold, "preparation.json")).json()).toMatchObject({ cli_sha: pin.sourceCommit, cli_pin: pin, runtime: "NOT_RUN" })
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("cold preparation binds the exact saved package and independent typed expectations without running Loginom", async () => {
   const f = await positiveFixture()
   try {
