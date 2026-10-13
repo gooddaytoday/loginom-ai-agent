@@ -1,9 +1,29 @@
 import { expect, test } from "bun:test"
-import { planPair, serverEpoch, usersMarker } from "../src/parallel-pair"
+import { planPair, reconcilePairResource, serverEpoch, usersMarker } from "../src/parallel-pair"
 
 const server = { container: "loginom-evals-users", studioContainer: "loginom-evals-studio", network: "loginom-evals-users",
   alias: "loginom-server-7.4.2-test", url: "http://127.0.0.1:32771/app/", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" }
 const nonce = "11111111-1111-4111-8111-111111111111"
+
+test("pair reconciliation: an unknown create reply adopts only the single intended full ID", () => {
+  const snapshot = [{ Id: "a".repeat(64), Name: `/${server.container}`, Labels: {
+    "loginom.evals.kind": "users", "loginom.evals.purpose": "research", "loginom.evals.nonce": nonce,
+  } }]
+  expect(reconcilePairResource(server.container, "research", nonce, snapshot)).toBe("a".repeat(64))
+  expect(reconcilePairResource(server.container, "research", nonce, [])).toBeUndefined()
+  expect(reconcilePairResource(server.container, "research", nonce, snapshot, "a".repeat(64))).toBe("a".repeat(64))
+  expect(() => reconcilePairResource(server.container, "research", nonce, snapshot, "b".repeat(64))).toThrow("PAIR_OWNERSHIP")
+})
+
+test("pair reconciliation: foreign labels, missing owned ID and duplicate network names are refused", () => {
+  const item = { Id: "a".repeat(64), Name: server.network, Labels: {
+    "loginom.evals.kind": "users", "loginom.evals.purpose": "research", "loginom.evals.nonce": nonce,
+  } }
+  expect(() => reconcilePairResource(server.network, "research", nonce, [item, { ...item, Id: "b".repeat(64) }])).toThrow("PAIR_OWNERSHIP")
+  expect(() => reconcilePairResource(server.network, "research", nonce, [], item.Id)).toThrow("PAIR_OWNERSHIP")
+  expect(() => reconcilePairResource(server.network, "acceptance", nonce, [item])).toThrow("PAIR_OWNERSHIP")
+  expect(() => reconcilePairResource(server.network, "research", nonce, [{ ...item, Labels: {} }])).toThrow("PAIR_OWNERSHIP")
+})
 
 test("pair plan: one private network, no server ports and loopback Studio on the configured port", () => {
   const plan = planPair(server, "acceptance", nonce)

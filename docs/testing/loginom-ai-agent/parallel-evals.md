@@ -150,3 +150,8 @@ Read-only dev observation подтвердило pinned image entrypoint
 [/app/loginomd,--run,-workdir=/workdir], PID1 exe/cmdline — /app/loginomd.
 Восемь pair/CI tests, bun typecheck/git diff --check PASS. Docker adapter
 readServerIdentity и research restart integration ещё не реализованы.
+
+Pure reconciliation unknown create принимает только единственный полный ID с
+точным именем и kind/purpose/nonce из сохранённого намерения. Отсутствующий ранее
+подтверждённый ID, чужие labels и дублирующееся имя network дают PAIR_OWNERSHIP.
+Девять pair tests и typecheck PASS; Docker поведение этим unit не квалифицировано.
