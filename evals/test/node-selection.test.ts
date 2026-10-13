@@ -59,6 +59,33 @@ test("offline audit refuses an oracle whose bytes differ from the pinned task", 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("the receipt for an earlier exporter cannot certify a replaced exporter in the saved package", async () => {
+  const directory = await pilotDirectory()
+  try {
+    const mutation = Bun.spawn(["python3", "-c", `import sys, zipfile, pathlib, xml.etree.ElementTree as ET
+package = pathlib.Path(sys.argv[1])
+with zipfile.ZipFile(package) as source:
+    entries = {name: source.read(name) for name in source.namelist()}
+unit = "Unit_0/Unit.xml"
+root = ET.fromstring(entries[unit])
+exported = next(item for item in root.findall(".//WorkFlow/Nodes/Item") if item.find("./Component/Engine").get("{http://www.w3.org/2001/XMLSchema-instance}type") == "TBGExportTextFile")
+entries[unit] = entries[unit].replace(exported.get("Guid").encode(), b"replacement-exporter")
+with zipfile.ZipFile(package, "w") as target:
+    for name, content in entries.items(): target.writestr(name, content)
+(pathlib.Path(sys.argv[2]) / unit).write_bytes(entries[unit])`, path.join(directory, "artifact/package.lgp"), path.join(directory, "artifact/unpacked")],
+      { stdout: "pipe", stderr: "pipe" })
+    expect(await mutation.exited).toBe(0)
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(2)
+    const result = await Bun.file(path.join(directory, "selection-audit.json")).json()
+    expect(result.graphComplete).toBe(true)
+    expect(result.oraclePassed).toBe(true)
+    expect(result.calculationPassed).toBe(false)
+    expect(result.failures).toContain("EXPORT_IDENTITY_UNVERIFIED")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test.each(["verified", "corrupt", "unknown-entry"])("truncated tool output requires its complete verified manifest: %s", async (kind) => {
   const directory = await pilotDirectory()
   try {

@@ -89,17 +89,22 @@ async function main() {
   const exports = applied.flatMap((call) => call.type === "exports.text" && record(call.value.output)
     && Array.isArray(call.value.output.file_artifacts) ? call.value.output.file_artifacts.filter(record).filter((file) =>
       record(attempt) && file.destination === attempt.resultPath && record(call.value.execution)
-      && file.execution_id === call.value.execution.execution_id) : [])
-  const output = exports.at(-1)
+      && file.execution_id === call.value.execution.execution_id).map((file) => ({ file, node: call.node })) : [])
+  const selectedExport = exports.at(-1)
+  const output = selectedExport?.file
+  const exportNodes = xml && !("invalid" in xml) && selectedExport
+    ? xml.nodes.filter((node) => node.id === selectedExport.node.node_id) : []
+  const exportIdentityVerified = exportNodes.length === 1 && exportNodes[0]!.type === "TBGExportTextFile"
+  if (xml && !("invalid" in xml) && selectedExport && !exportIdentityVerified) failures.push("EXPORT_IDENTITY_UNVERIFIED")
   const resultName = record(attempt) && typeof attempt.resultPath === "string" ? path.basename(attempt.resultPath) : undefined
   const resultFile = resultName ? path.join(artifactDir, "results", resultName) : undefined
-  const resultVerified = !!output && digest(output.sha256) && !!resultFile && await Bun.file(resultFile).exists()
+  const resultVerified = exportIdentityVerified && !!output && digest(output.sha256) && !!resultFile && await Bun.file(resultFile).exists()
     && await hash(resultFile) === output.sha256 && (await Bun.file(resultFile).bytes()).length === output.bytes
   if (!resultVerified) failures.push("RESULT_RECEIPT_UNVERIFIED")
   const allowed = args.mode === "explicit-js" || args.mode === "capability-gap"
   if (allowed && (!xml || "invalid" in xml || !inspectSelectionJavaScriptIdentity({ parts,
     nodeIDs: xml.nodes.filter((node) => ["TBGCodeModelComponentEngine", "TBGJavaScriptEngine"].includes(node.type)).map((node) => node.id),
-    exportNode: applied.filter((call) => call.type === "exports.text").at(-1)?.node,
+    exportNode: selectedExport?.node,
   }))) failures.push("JAVASCRIPT_IDENTITY_UNVERIFIED")
   const packageSha256 = exists ? await hash(path.join(artifactDir, "package.lgp")) : null
   const review = await Bun.file(path.join(directory, "graph-review.json")).exists()
@@ -129,7 +134,7 @@ async function main() {
   const result = { auditStage: "complete", auditVersion, taskID: args.task, mode: args.mode, ...selection,
     policyStatus, oraclePassed: oracle.passed, oracleError: oracle.error, oracleSha256, calculationPassed,
     historyComplete: history.historyComplete, runtimeSettled: settlement.runtimeSettled,
-    identityVerified: provenance.identityVerified, graphComplete: graph.complete, packageSha256, reviewStatus, ...recovery,
+    identityVerified: provenance.identityVerified, graphComplete: graph.complete, exportIdentityVerified, packageSha256, reviewStatus, ...recovery,
     failures: [...new Set([...failures, ...evidenceFailures, ...selection.failures, ...graph.failures, ...roleGraph.failures])],
   }
   await Bun.write(path.join(directory, "selection-audit.json"), JSON.stringify(result, null, 2) + "\n")
