@@ -1,19 +1,19 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка full8: 2026-10-13T13:33:11.703900+00:00; LAB56 in_review65, LAB57 followup14:22:55UTC in_progress203/Rich15, LAB58–63 in_progress9/no runs; LAB55 in_review16/no runs.
-- Runtime online/same daemon; owner approval01a13591-5d06 verified; Evaler ACK01a1359b-d1a9. Rich15/01a1359b-d1cd running17:17:47+03; no duplicate.
-- lab-56-lab-63 ACTIVE каждые30мин, сохранение/readback prompt проверены. Все8 done=false; статусы done не менялись.
-- LAB56: owner сообщил выполнено; ACCEPT/evidence/cleanup подтверждены, серверный in_review65 сохраняется. LAB58–63 ждут LAB57 ACCEPT/cleanup.
-- Original unit: ABANDONED 11:21:48→11:33:38UTC, entire lease bytes/identities/guard сохранены, FREE проверен; once consumed. Old ERROR/cleanup UNKNOWN не переписаны.
-- Новый unit:533PASS/15SKIP/0FAIL, typecheckPASS, genuine completion/release11:49:48UTC.
-- TSV CLI d73a13fabf358d281942f7885ba7afe7b007423b: exact approved2-file patch на5cd; RED/GREEN, functional629+5/typecheck/build/archive/5389hashes проверены. Native NOT_READY.
-- PROFILE_NOT_READY11:56UTC: implicit headed status/check и lost stdout/exit/view подтверждены; нижняя причина UNCLASSIFIED/charge0, headed причинность не доказана.
-- Current eval lease task01a134fd-ee87/acquired11:53:15.320Z/configf76b3a6a…b264 BUSY, guard0/no completion. Old original-unit approval к нему не относится; lease не менялся.
-- Rich proposal d633e57d3d62be4aaf9a0c8a3452983e91e94efe от exact89b: report01a13562-9da0; archive91/91, Git755/755, independent apply9/9 проверены.
-- Его supervised RED1+2 fail, GREEN43+15+10+3=71PASS/typecheck/capture/cleanup confirmed. PREPARED/NOT_APPLIED; Native GREEN NOT_RUN.
-- Дополнительный root patch79327cf562af45da254c8598c4e875754fd13e0e в preflight-headless:578PASS/9existingSKIP/0FAIL/typecheckPASS; clean/pushed. Это reference patch, не замена Rich/не installed.
-- Installed pins5cd/89b и skill/runtime/models/defaults прежние. Owner разрешил оба действия; exact planbd00fb53+policy743f98ac verified. Effective metadata time gates SUPERSEDED; handoffdd7dd51d/9payload verified. Actual install/archive ещё pending.
-- References1/1/2/1/1/1 из3; product0/repeat1; cold8calls/7launch/5completed; admission3/3 и wrapper1/1 exhausted; recovery0. Новых scenario/probe/model calls нет.
-- Repeats3/10/remaining7; dispatch не списан, successful/unclassified charge0. Вся history/ledger сохранена; native total10 cap нет.
-- Owner13Oct снял30min/45min/6h и общий deadline18:33МСК: больше не применять. Старые timing receipts исторические; технические process timeouts/once/cleanup сохраняются.
-- Новый bundleccdf404f…8827/manifest44083a8f…320e 755/755 и checkpointa7fc8a60…d458 9/9 проверены; current lease64512:14429666/owner2771446a…4981. Receipt:ops-pin-and-delegation-approval-receipt.json. Следующий шаг: active Rich штатно проводит allowed helper/admission/archive→FREE→unit/native READY; вопросы решает Codex-координатор без пользователя до всех8 complete; Ben/all8done pending.
+- Проверка full8: 2026-10-13T14:36:52.385467+00:00; LAB56 in_review65, LAB57 in_progress203/Rich15 running, LAB58–63 in_progress9/admission/no runs; statuses/active/queued/metadata/comments прочитаны заново.
+- Runtime online/same daemon; Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 проверены; Rich15/01a1359b-d1cd running с17:17:47+03, единственный active/queued в восьми карточках.
+- Latest stage comment01a1359b-d1a9/17:12:46+03 unchanged; новых stage replies/evidence нет. lab-56-lab-63 ACTIVE каждые30мин; все8 done=false; серверные мутации мониторинга0.
+- LAB56: owner сообщил выполнено; independent ACCEPT/evidence/cleanup ранее проверены; fresh metadata byte-identical, сервер in_review65. LAB58–63 ждут LAB57 ACCEPT/cleanup.
+- Original interrupted unit целиком ABANDONED с integrity/FREE; once consumed; старый ERROR/cleanup UNKNOWN сохранён. Последующий genuine unit533PASS/15SKIP/typecheck/RELEASED11:49UTC.
+- TSV CLI d73a13fabf358d281942f7885ba7afe7b007423b: exact approved2-file patch на5cd; RED/GREEN, functional629+5/typecheck/build/archive/5389hashes ранее проверены; native admission NOT_READY в опубликованном receipt.
+- Исторический PROFILE_NOT_READY11:56UTC: implicit headed status/check и lost stdout/exit/view подтверждены; нижняя причина UNCLASSIFIED/charge0, headed причинность не доказана.
+- Current preflight-only eval lease task01a134fd-ee87/acquired11:53:15.320Z/configf76b3a6a…b264 был BUSY/no completion; approved ENTIRE archive assigned, свежего actual archive/FREE receipt пока нет.
+- Rich helper d633e57d3d62be4aaf9a0c8a3452983e91e94efe от exact89b: report01a13562-9da0; archive91/91, Git755/755, independent apply9/9 и bundleccdf404f/755 ранее проверены.
+- Его supervised RED1+2 fail, GREEN43+15+10+3=71PASS/typecheck/capture/cleanup confirmed. Adoption AUTHORIZED; actual installation/native GREEN нового этапа ещё не подтверждены.
+- Metadata Evaler receipt14:11UTC: helper AUTHORIZED_NOT_INSTALLED, archive ASSIGNED_NOT_CONFIRMED_EXECUTED; это сохранённый receipt, не текущая проверка live stand. Active Rich не дублировался.
+- Owner approval01a13591-5d06 и ACK01a1359b-d1a9 verified; exact planbd00fb53+policy743f98ac/handoffdd7dd51d 9payload verified; human_approval_gate=false, wall_time_gates=SUPERSEDED.
+- References1/1/2/1/1/1 из3; product0/repeat1; cold8calls/7launch/5complete, admission3/3, wrapper1/1, recovery0 по latest Evaler receipt; history/allowances не сброшены.
+- Repeats3/10/remaining7; active dispatch не precharged, unknown/unique/success charge0; общего native10 cap нет. Лимитные ресурсные решения при необходимости принимает координатор.
+- Owner13Oct снял30min/45min/6h и общий deadline18:33МСК: не применять. Старые timing receipts исторические; технические timeouts/once/integrity/cleanup guards сохраняются.
+- Дополнительный monitor source79327cf562af45da254c8598c4e875754fd13e0e/preflight-headless:578PASS/9SKIP/typecheckPASS; reference patch, не выбран вместо Rich и не установлен.
+- Мониторинг не расходовал live/model/probe/test бюджеты; следующий шаг: читать отчет Rich о helper/archive→FREE→native READY→pilot. Все оставшиеся owner вопросы решает координатор сам до всех8 complete; Ben/all8done pending.
