@@ -8,7 +8,8 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953` готовится; native overflow proof и сборки впереди.
+серия `20261013T142936Z-072953` готовится; обе сборки/pins и native overflow proof
+проверены, модельные слоты ещё не запускались.
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
@@ -86,6 +87,24 @@ Native DOM style/class в историческом incident не сохране�
 Guard архивирован после проверки own процессов, nonce/mtime в own CLI window;
 исторические hashes/cleanup=false не изменены. `user:20` и `user:23` не трогали,
 admin logout проверен. Серия stopped 2/18 сохранена отдельно от следующей полной.
+
+## Native proof обоих исправлений на третьей паре
+
+Host без LLM выполнил импорт `EventDate,Amount` и declared JS (passthrough даты,
+Amount+1). Native операции SUCCEEDED/cleanup true, Save и package close/logout
+подтверждены. Строгий offline audit проверил actual DataSet+hidden overflow marker,
+GUID/index/opening ID и последующий Close/graph verification. JS output: две строки,
+целые значения 11/21 exact, календарные даты 13–14.10.2026. Import retains display
+precision limitations; JS local datetime/millisecond/timezone unspecified.
+
+Исходный native driver exit 1 не скрыт и не переписан: он ожидал одинаковое
+display date в discrete import и continuous JS. Save предшествовал assertions,
+finally подтвердил package cleanup, ACK и runtime exit 0. Native не повторялся.
+Независимая проверка 25 evidence hashes и 287 runtime sources, затем root offline
+verification завершились exit 0. Evidence в третьем run:
+`native-proof-offline-review.json`, `native-proof-offline-verify.py`, исходные
+`native-proof.{ts,stdout.txt,stderr.txt}` и receipts. Persisted reopen, обычный
+CLI teardown и модельная политика этим smoke не подтверждаются.
 
 ## Native proof исправления дат
 

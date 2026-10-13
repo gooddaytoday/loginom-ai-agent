@@ -485,9 +485,16 @@ Offline crossed regression подтвердил отсутствие dataset ico
   менять. RED на публичном capability, GREEN на матрице 28 случаев двух типов,
   полные workspace-ui + node-wizard-close 310/310 PASS, independent review PASS.
   Изменены только одна строка runtime и существующая тестовая матрица.
-- [ ] Подтвердить native hidden dataset output mapping/Close, output и Save/cleanup
+- [x] Подтвердить native hidden dataset output mapping/Close, output и Save/cleanup
   через настоящий Host без LLM; убедиться, что проверена overflow-ветка.
   Сохранить ограничения и отдельно проверить даты в общем smoke, если требуется.
+  Комбинированный Host smoke в `142936-072953` выполнил импорт дат, declared JS,
+  output mapping/Close, Save и cleanup/logout. Строгий offline review + root verify
+  exit 0 подтвердили точный DataSet+overflow marker, GUID/opening/index binding,
+  два целых результата 11/21 и календарные даты 13–14.10.2026. Driver exit 1
+  сохранён: он ошибочно ожидал одинаковый display у discrete import и continuous
+  JS datetime. Import display precision ограничена; JS local datetime без timezone.
+  Native не повторялся, persisted reopen и ordinary CLI teardown не заявляются.
 - [ ] Собрать новую сопоставимую пару в собственном общем build worktree с обоими
   runtime fixes, прежними version/resources/двумя skill версиями. Закрепить новые
   pins `20261013T142936Z-072953`, подтвердить полные inventories и источник.

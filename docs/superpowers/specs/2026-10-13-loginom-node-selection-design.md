@@ -216,6 +216,17 @@ review PASS. Серия `20261013T132356Z-0a3983` остановлена 2/18, c
 остановленных серий не включаются в неё. Собственные ненужные build artifacts
 периодически удаляются после сохранения evidence; другие агенты не затрагиваются.
 
+Native proof обеих правок выполнен через Host на новой baseline-сборке: импорт
+дат и declared JS завершились, mapping закрыт, Save/package cleanup/logout
+подтверждены. Сохранённый журнал содержит DataSetOutputSocketWizard и точный
+native_opening_bound_toolbar_overflow с совпадающими GUID/index/opening ID,
+последующим Close/graph verification и terminal JS success. Независимый offline
+review и root повторная offline verification exit 0 подтвердили 11/21, обе
+календарные даты и 25 evidence/287 runtime file hashes. Исходный driver exit 1
+остаётся историческим: неверное сравнение display date в discrete/continuous
+полях. Импорт сохраняет display precision limitation; JS timezone unspecified.
+Это native proof, не модельный eval и не проверка повторного открытия пакета.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.
