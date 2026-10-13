@@ -1162,8 +1162,11 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   Evidence: `candidate-gap-attestation.json` в текущем private run,
   SHA256 `0d2bdcdb35e8c5d8af595cc19cb34424998a368c163dd7f094bd22935a01c0aa`.
   `static-gap-supported` не закрывает эту задачу: фактические
-  `prepare.knowledge.node_types` / `action_describe.parameter_schema` ещё
-  не получены в candidate Session; live-доступность и поведение модели не проверены.
+  `prepare.knowledge.node_types` ещё не получен в candidate model Session.
+  Native candidate Host schema probe получил 16 типов и 15 стандартных
+  `action_describe.parameter_schema`, raw receipts и ACK/exit0; отдельные
+  prepare/package/model calls отсутствуют, explicit logout не подтверждён.
+  До tags связать успешный actual prepare с этими схемами той же immutable сборки.
 - [ ] Выполнить tags 3 раза. Должен получиться локальный JS для разворачивания,
   затем стандартные группировка, сортировка и экспорт. Проверить код JS и
   отсутствие захардкоженных меток/числа позиций/готовых агрегатов.
@@ -1295,4 +1298,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Серия142936-072953: baseline18/18, oracle/calculation18, policy12/18 старого skill, JS9/9/9; independent machine review18 PASS (baseline-final-review.json); candidate0/25.
+- Серия142936-072953: baseline18/18, oracle/calculation18, policy12/18 старого skill, JS9/9/9; independent machine review18 PASS (baseline-final-review.json); candidate0/25, sales1 первой волны запущен.

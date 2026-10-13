@@ -404,6 +404,29 @@ Task 3: 18 пакетов/CSV привязаны к own Save/Export receipts; SH
 
 Task 3 завершён: 18 слотов в исходном порядке, oracle/calculation18, policy12, JS9/9/9; final audit2654bfc1 и addenda, исходные outcomes сохранены.
 
+## Подготовка первой candidate-волны
+
+Final static review двух skill-файлов и контракта аудита — Approved-static-only,
+findings []. Candidate digest `ff18dc5f…`, auditVersion `2654bfc1…`, pins и source
+соответствуют закреплённой сборке. Evidence `final-static-review.json`, SHA256
+`964fb9e87222f680b55994f10650359b2ce521630ecc47b553ebb70929d1c2a2`.
+Live semantic review этим не закрыт.
+
+Single native candidate schema probe через настоящий Host без LLM — exit 0:
+16 available types, 15 стандартных parameter_schema, raw receipts и candidate
+resource handshake сохранены; Host close ACK/exit0. Evidence
+`candidate-schema-probe/result.json`, SHA256
+`6c82026fb8103030ce72d656f507f48db7bcc1ca9b38818c57eacd5d764a0980`.
+Штатный authenticated startup выполнен; prepare/admit/package/model calls 0.
+Explicit Loginom logout и actual prepare catalog этим probe не подтверждаются.
+Private driver прошёл TDD (2 tests/4 assertions), typecheck и independent review
+перед запуском. Для tags остаётся связать реальные схемы с successful candidate
+prepare. Первый candidate sales-by-category/1 запущен; completed candidate 0/25.
+
+Baseline: 7111.472 секунды суммарного CLI-времени, среднее 395.082 секунды.
+Ориентир первой волны — 59.3 минуты модельных процессов, всех 25 — 2.74 часа
+плюс сбор артефактов/review; сроки не гарантированы.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.

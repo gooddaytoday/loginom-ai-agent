@@ -6,9 +6,12 @@
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
 Текущая серия `20261013T142936Z-072953`: завершены baseline 18/18, oracle/calculation 18;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
-Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
+Candidate payload собран и проверен; первая sales-by-category/1 запущена,
+completed candidate 0/25.
 Статические контракты candidate для tags сверены с baseline и исходниками;
-фактический `prepare`-каталог и `parameter_schema` ещё не проверены live.
+реальные 15 стандартных `parameter_schema` получены native Host probe candidate
+без LLM (ACK/exit0). Successful `prepare`-каталог candidate ещё предстоит связать
+с этими схемами до tags; explicit logout этого schema probe не проверен.
 Адресное offline-восстановление выполнено после проверки Loginom. По точному
 GUID собственного ABC-узла подтверждены серверная сессия и её автоматическое
 закрытие; актуальный admin-диспетчер через Playwright MCP подтвердил отсутствие
