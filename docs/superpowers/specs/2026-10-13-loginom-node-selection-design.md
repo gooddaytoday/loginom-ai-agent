@@ -482,6 +482,12 @@ currentElementConnected=true. Исходный guard отклоняет заме
 должен разрешить только подтверждённую post-select замену отсоединённого DOM
 при прежних native/owner/selection checks и адресовать F3 текущему verified port.
 До жеста/при foreign selection/native changes/connected old swap отказ остаётся.
+Source correction frozen bf5dd674…: только helper/targettest/actualtuple fixture,
+два RED→GREEN/218relevant tests PASS; source review/privatecandidate nativeprobe
+ещёpending. Final upstream и matchedbuild следуют после чистого privateprobe.
+Proof5ownrecovery independently2e649a27…: exactuser92close/noReinit/adminlogout/
+37raw+56sourceClosure+4397immutableRuntime entries unchanged. Разрешённая текущая
+sourceправка отмечена отдельно; исходныйcleanupfalse сохраняется.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

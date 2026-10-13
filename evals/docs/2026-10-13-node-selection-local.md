@@ -87,6 +87,10 @@ SourceTDDfix сохраняет native/owner/pre-gesture guards и должен 
 privateDOMticket после select для F3. Сначала отдельный privatecandidate native
 probe; после успешного sourcefix нужна новая immutablematchedпара и её finalgate.
 Rootownuser92closed/admin2freshabsence/logout/MCPexit0; postreviewpending.
+Postreview2e649a27… completed: exactuser92close/noReinit/adminlogout,37raw/
+56sourceClosure/4397immutableRuntime paths unchanged; currentallowedsourcefix
+отдельно отмечен. SourceDOMfix bf5dd674…/218relevant tests frozen; independent
+source review/privateproof6 готовятся, fullupstream после clean nativeprobe.
 
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core

@@ -146,6 +146,16 @@ Independent stop review SHA
 rewritten outgoing code восстановлен offline из actualtask/transport/storage
 binding и совпал с instrumentation record. Остальные compoundguard conditions
 не сработали; конкретный DOM identity conjunct подтверждён.
+Independent proof5 recovery review SHA
+`2e649a27d3713d2db1941f9dd663bc805abf0fa1809808b4c618cc7ff9c4bacd`:
+user92 closed22:03:06.753Z безreinit, admin93 closed22:03:20.811Z, UI login/MCP0
+bound;37raw/56sourceClosure/4397immutableRuntime paths unchanged. Текущая
+разрешённая sourceправка отдельно отмечена; originalcleanupfalse сохранён.
+SourceDOMfix frozen helperSHA
+`bf5dd67412b86f04c33ac03272b39509a2bcc5a56d3aa3000da6ad64b2116289`,
+verificationSHA `17e58845dbce2eaf36b65d75947f11627ddb080b0cb475e30f49e4f3e9929022`:
+два RED→GREEN/53focused/218relevantPASS/diff0. Изменены helper/test/actualtuple
+fixture; source review/privateproof6/native результат/upstream/commit ещёpending.
 
 ## Историческая пара после Join fix — допуск серии
 

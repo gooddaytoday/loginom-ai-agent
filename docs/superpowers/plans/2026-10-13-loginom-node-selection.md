@@ -735,6 +735,11 @@ inspect после response-budget refusal). Standard group-001 останови
   postselect owner/native/selection/hitpoint validation и F3currentelement;
   преджестовые/foreign/connected swap guards сохраняются. Перед новой дорогой
   matchedсборкой проверить candidate source в отдельном явно private nativeproof.
+  SourceDOMfix frozen bf5dd674… (helper/test/actualtuplefixture only), два RED→GREEN,
+  218relevantPASS, verification17e58845…; independent source review и privateproof6
+  ещёpending. Fullupstream после чистого privateprobe перед sourcecommit/build.
+  Proof5ownrecovery2e649a27… independentlyclosed/noReinit/adminlogout/payload+raw
+  unchanged; originalcleanupfalse не повышается до PASS.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять
