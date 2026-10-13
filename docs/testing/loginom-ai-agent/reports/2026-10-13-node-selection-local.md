@@ -277,7 +277,14 @@ Original inventory SHA `361a0dc13228d7b0fa4fb437635031ddebcbbfb7601bdf96ee7554ae
 Итог: oracle/calculation 8/8, policy 5/8, JS nodes/calls/successful calls 5/5/5.
 ABC/2 теперь runtimeSettled/calculation true, единственный отказ JAVASCRIPT_NOT_ALLOWED;
 исходный wrapper1/calculationfalse отдельно сохранён. Повтора модели нет.
-Независимый review reassessment идёт; monthly-demand/2 запущен.
+Независимый review reassessment PASS, findings 0; receipt SHA
+`2298dca182655fc5a7406148a9e6f0d832e18aab96c664cbaf3b8ec87ab27084`.
+96 protected original files и восемь prior audits сохранили hashes. Новые
+attempt metadata побайтно равны prior assessment (ABC/1 сохраняет explicit
+collector projection); CLI/wrapper/blocker не подменены. У семи изменился только
+auditVersion, у ABC/2 — successfulJS 1→2, runtime/calculation true и сняты три
+settlement errors. Pins/model/tasks/oracle и build metadata прежние.
+Повторных тестов/audits и semantic review reviewer не делал. Monthly-demand/2 запущен.
 
 ## Native proof исправления дат
 

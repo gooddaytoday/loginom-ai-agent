@@ -298,7 +298,10 @@ Runtime, skill, payload и pins прежние. Новый auditVersion
 oracle/calculation 8/8, standard policy 5/8 старого skill, JS 5 nodes/calls/successful
 calls. Original attempt/outcomes/raw и предыдущие оценки побайтно сохранены;
 только ABC/2 получил ранее недостающий settlement и расчётный PASS. Повтор модели
-не выполнялся. Независимая сверка reassessment идёт, начат monthly-demand/2.
+не выполнялся. Независимая сверка reassessment PASS: 96 protected files и восемь
+prior audits неизменны, новые оценки и locks/pins/Session/package bindings
+подтверждены. У семи изменился только auditVersion; остальные изменения только
+у ABC/2 и касаются подтверждённого settlement. Начат monthly-demand/2.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

@@ -552,11 +552,16 @@ runtime явно предложил operation_inspect; его resolved/verified 
   `settlement-fix-lock.json` закрепляет auditVersion
   `2654bfc1c61d4d0ecc73c7a6f4fa9613b5d5244ea83a7fdb8712be2ed452e445`;
   historical locks/pins неизменны, 70 прежних hashes и два исправленных файла.
-- [ ] Переоценить все восемь уже начатых baseline одной финальной версией аудита
+- [x] Переоценить все восемь уже начатых baseline одной финальной версией аудита
   в отдельных проекциях. Сохранить original CLI/wrapper/attempt и prior audit
   hashes, подтвердить отсутствие model rerun и неизменность входов/пакетов.
   Независимо проверить новые оценки/lock; продолжить ту же серию без пересборки
   runtime/payload и без повторного занятия прежних модельных слотов.
+  Все восемь переоценены отдельно: oracle/calculation 8/8, policy 5/8, JS 5/5/5.
+  Independent review PASS: 96 protected files и восемь прежних audits неизменны;
+  у семи меняется только auditVersion, у ABC/2 подтверждён retained settlement.
+  Original CLI/wrapper/attempt не переписаны, модель не повторялась. Новые оценки
+  и `settlement-reassessment-review.json` сохранены; monthly-demand/2 выполняется.
 
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
