@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 2/18, oracle/calculation 2;
+серия `20261013T142936Z-072953`: завершены baseline 3/18, oracle/calculation 3;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -173,6 +173,23 @@ PASS, actual 68 parts дают 16 managed calls без ошибок; испор�
 Независимый `forensic/copyout-recovery-review.json` подтвердил 11 original hashes,
 21 shared evidence file и все 14 ZIP members; pure audit/oracle повторно прошли.
 Изменения проекции исчерпываются двумя receipt paths и явным collectorRecovery.
+
+## Monthly-demand третьей серии
+
+Session `ses_eca1a7be2ffejnqGRJRYOiKoix`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI время 392.816 секунды, timeout false. Стандартные импорт дат, калькулятор
+месяца, группировка, сортировка и экспорт; JS nodes/calls 0/0. Audit PASS: весь
+oracle, calculation/history/runtime/identity/graph/export identity true, failures [].
+Package SHA `f2f13e6958323961bd6f74122db0e5b287a71b124ef72e663320e5507c57a35a`.
+Обе ранее исправленные runtime boundaries прошли в текущей сопоставимой серии;
+исходные отказы сохранены. Это третий baseline, candidate ещё не выполнялся.
+Следующий risky-approved-claims/1 запущен.
+
+Независимый `collector-fix-lock-review.json` SHA
+`ec2ee550f2ed7a8605ecb2d111b23e596e0e3304eca4dff325b1e4a603636323`
+подтвердил byte-equal historical lock, committed runner/test, прежние pins,
+auditVersion и task/prompt/input/oracle bindings. Полные payload inventories
+не повторялись; сверены прежние attestation и critical payload hashes.
 
 ## Native proof исправления дат
 
