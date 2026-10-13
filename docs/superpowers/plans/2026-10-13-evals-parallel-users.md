@@ -574,7 +574,7 @@ expect(agentVisiblePaths).not.toContain(otherProfile)
 
 В `judge.ts` добавить `createJudgeGate(): (input: Parameters<typeof judgeTask>[0]) => Promise<Judged>`. Один gate создаётся на run и охватывает весь `judgeTask`, включая его внутренний retry. Он не сериализует агентов, не создаёт отдельный pool/очередь судей и не освобождает ожидающий слот.
 
-- [ ] RED: точный порядок очереди и отсутствие барьера:
+- [x] RED: точный порядок очереди и отсутствие барьера:
 
 ```ts
 expect(buildJobs(["slow", "fast"], 2)).toEqual([
@@ -586,6 +586,7 @@ expect(buildJobs(["slow", "fast"], 2)).toEqual([
 ```
 
 - [ ] Запустить `bun test test/scheduler.test.ts` (RED); GREEN: очередь резервирует индекс синхронно до await; результат кладётся по `job.index`, не в `attempts[attempts.length - 1]`. Ожидать завершение всех pipeline при любом rejection; один итоговый writer summary.
+- [x] Подзадача 8: public buildJobs/runSlotQueue (независима от bootstrap) — round-major, synchronous reservation, stable results by index, no round barrier, slot quarantine/all-quarantined/unassigned, abort before/during dispatch, drain всех active pipelines перед AggregateError. 7 public-interface RED/GREEN tests; вместе с admin/preflight/CI 48 PASS/111 assertions и typecheck PASS. Callback описывает весь pipeline; реальный runAttempt/retry/summary writer и judge gate ещё не подключены.
 - [ ] Дополнить fake-cli сценариями `parallel-slow`, `parallel-fast`, `parallel-infra-retry`, `parallel-cleanup-failure`. Задержки и контрольные выходы задаются по существующему `EVAL_TASK_ID`, переустановленному после фильтра; не полагаться на отфильтрованные env. Fake judge использует существующий `EVAL_JUDGE_COMMAND`.
 - [ ] Через публичный `main` доказать временными метками: fast attempt 2 начинает работу до завершения slow attempt 1; retry исходной logical attempt остаётся на том же slot_id и архивирует `infra_retry.initial`; history/workspaces не пересекаются. Пользователь, профиль и context не создаются заново между попытками.
 - [ ] Реализовать отдельный fixture admission для `main(argv, env, { fixture: { slots, lockRoot } })`: третий аргумент — только программный test seam, production entrypoints его не принимают из argv/env/config. Допустим лишь `EVAL_CLI_MODE=fake` + `EVAL_ARTIFACT_SOURCE=dir:<temp-root>`; slots имеют отдельные реальные temp profile/work/history/storage roots, синтетическую server identity и те же lease/scheduler/report/archive функции. Под slot artifact source выбирается `<temp-root>/<slot_id>`, scopes не пересекаются. Ни Docker, ни admin, ни bwrap не вызываются; fixture receipt явно `liveQualified=false`. Binary/source mode с этим аргументом, fixture-marker из обычного CLI и общий writable root двух слотов отвергаются. Dry-run валидирует/строит jobs без claims о readiness. Так очередь тестируется без fake-admin и без shared OAuth кандидата.
@@ -726,4 +727,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
 7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
 8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
-9. 1а: factory/identity, full unit 595/3skip/0fail, Docker 24 assertions PASS; admin bootstrap blocked. Task 2: selector/codec/verifier/journal/Node bridge, 3 rejection integration/17 assertions, 41 targeted и 21 supervisor tests/typecheck PASS. Далее независимые fixture/profile/queue шаги и live qualification после bootstrap; identity unsupported.
+9. 1а: factory/identity, full unit 595/3skip/0fail, Docker 24 assertions PASS; admin bootstrap blocked. Task 2: Node bridge/journal, 3 rejection integration/17 assertions, 21 supervisor tests PASS. Task 8: pure queue 7 tests; 48 targeted/typecheck PASS. Далее profile/judge gate и реальные lifecycle/admission после bootstrap; identity unsupported.
