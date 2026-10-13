@@ -216,3 +216,11 @@ breaking commit не установлен и bisect не требуется. slo
 post-suite typecheck PASS. Factory source/test SHA до/после совпали. Private
 factory-unit-receipt.json сохранён в evidence; временный logfile удалён после
 сохранения результата. Три прежних skipped checks остаются непроверенными.
+
+Task 2 pure selector: ServerSession/selectOwnedSessions реализованы отдельными
+RED→GREEN циклами. Возвращается свежая observed row, только при recorded remoteKey,
+userKey/username/serverEpoch; mismatches и duplicate identities дают отказ.
+Username/display name не заменяет identity. 4 selector tests, вместе с pair/CI
+16 PASS; typecheck/diff check PASS. Это сравнение доверенных проекций, не proof
+production session identity и не разрешение CloseSession. Driver, JSONL codec,
+live composite identity race qualification и административные операции впереди.
