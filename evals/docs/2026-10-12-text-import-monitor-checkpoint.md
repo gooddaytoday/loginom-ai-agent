@@ -1,8 +1,8 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка full8: 2026-10-13T14:36:52.385467+00:00; LAB56 in_review65, LAB57 in_progress203/Rich15 running, LAB58–63 in_progress9/admission/no runs; statuses/active/queued/metadata/comments прочитаны заново.
-- Runtime online/same daemon; Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 проверены; Rich15/01a1359b-d1cd running с17:17:47+03, единственный active/queued в восьми карточках.
-- Latest stage comment01a1359b-d1a9/17:12:46+03 unchanged; новых stage replies/evidence нет. lab-56-lab-63 ACTIVE каждые30мин; все8 done=false; серверные мутации мониторинга0.
+- Проверка full8: 2026-10-13T15:02:26.291841+00:00; LAB56 in_review65, LAB57 in_progress203/Rich15 running, LAB58–63 in_progress9/admission/no runs; fresh statuses/active/queued/metadata/comments, metadata всех8 unchanged.
+- Runtime online/same daemon; Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 проверены; Rich15/01a1359b-d1cd running с17:17:47+03, единственный active/queued; progress156/tool_result15:00:46UTC, не execution receipt.
+- Latest stage comment01a1359b-d1a9/17:12:46+03 unchanged; новых replies/evidence нет. Два transient read failures после адресного reread resolved; full8 complete. lab-56-lab-63 ACTIVE/30мин; все8 done=false; server mutations0.
 - LAB56: owner сообщил выполнено; independent ACCEPT/evidence/cleanup ранее проверены; fresh metadata byte-identical, сервер in_review65. LAB58–63 ждут LAB57 ACCEPT/cleanup.
 - Original interrupted unit целиком ABANDONED с integrity/FREE; once consumed; старый ERROR/cleanup UNKNOWN сохранён. Последующий genuine unit533PASS/15SKIP/typecheck/RELEASED11:49UTC.
 - TSV CLI d73a13fabf358d281942f7885ba7afe7b007423b: exact approved2-file patch на5cd; RED/GREEN, functional629+5/typecheck/build/archive/5389hashes ранее проверены; native admission NOT_READY в опубликованном receipt.
