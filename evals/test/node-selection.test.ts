@@ -3,10 +3,16 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { unzip } from "../src/artifact"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
 import pilotRuntime from "./fixtures/node-selection/pilot-runtime.json"
+
+test("pilot policy evidence binds the actual model, activated bundled skill and runtime catalog", () => {
+  expect(inspectSelectionProvenance({ snapshot: pilotHistory.snapshot, runtime: pilotRuntime,
+    model: "openai/gpt-6-sol-fast", variant: "medium", expectedSkillDigest: pilotRuntime[0]!.session.skillRevision,
+  })).toEqual({ identityVerified: true, failures: [] })
+})
 
 test("the pilot settles its own admitted operations including independently verified delivery", () => {
   const result = inspectSelectionRuntime({ parts: pilotHistory.snapshot.parts, runtime: pilotRuntime })

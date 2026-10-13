@@ -2,6 +2,43 @@ export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "sta
 
 export type SelectionRuntime = { path: string; session: unknown; events: unknown[] }
 
+export function inspectSelectionProvenance(input: {
+  snapshot: unknown; runtime: SelectionRuntime[]; model: unknown; variant: unknown; expectedSkillDigest: unknown
+}) {
+  const failures: string[] = []
+  const snapshot = record(input.snapshot) ? input.snapshot : undefined
+  const messages = Array.isArray(snapshot?.messages) ? snapshot.messages.filter(record).filter((message) => message.role === "assistant") : []
+  if (!messages.length || typeof input.model !== "string" || typeof input.variant !== "string"
+    || messages.some((message) => `${message.providerID}/${message.modelID}` !== input.model || message.variant !== input.variant))
+    failures.push("MODEL_UNVERIFIED")
+  const parts = Array.isArray(snapshot?.parts) ? snapshot.parts.filter(record) : []
+  if (typeof input.expectedSkillDigest !== "string" || !/^[a-f0-9]{64}$/.test(input.expectedSkillDigest)
+    || !parts.some((part) => part.tool === "skill" && record(part.state) && part.state.status === "completed"
+      && record(part.state.input) && part.state.input.name === "loginom-automation" && record(part.state.metadata)
+      && record(part.state.metadata.activation) && part.state.metadata.activation.name === "loginom-automation"
+      && part.state.metadata.activation.profile === "loginom-automation"
+      && part.state.metadata.activation.digest === input.expectedSkillDigest)) failures.push("SKILL_DIGEST_UNVERIFIED")
+  const preparations = parts.filter((part) => part.tool === "loginom_dock_prepare").map(receipt).filter(record)
+  if (!preparations.length || !input.runtime.length) failures.push("CATALOG_UNVERIFIED")
+  for (const prepared of preparations) {
+    const knowledge = record(prepared.knowledge) ? prepared.knowledge : undefined
+    const manifest = record(knowledge?.session_manifest) ? knowledge.session_manifest : undefined
+    const catalog = Array.isArray(knowledge?.node_types) ? knowledge.node_types.filter(record) : []
+    if (prepared.prepared !== true || prepared.source !== "bundled" || prepared.skillRevision !== input.expectedSkillDigest
+      || !manifest || !catalog.length || !catalog.some((node) => node.type === "programming.javascript")
+      || !input.runtime.some((runtime) => {
+        const session = record(runtime.session) ? runtime.session : undefined
+        if (!session) return false
+        return session.sessionId === prepared.sessionId && session.skillRevision === input.expectedSkillDigest
+          && ["actionCatalogDigest", "selectorCatalogDigest", "actionManifestDigest"].every((key) =>
+            typeof manifest[key] === "string" && /^[a-f0-9]{64}$/.test(manifest[key]) && session[key] === manifest[key])
+          && ["capabilityAbi", "executorRevision", "actionCatalogVersion", "compatibilityProfile"].every((key) =>
+            manifest[key] !== undefined && JSON.stringify(session[key]) === JSON.stringify(manifest[key]))
+      })) failures.push("CATALOG_UNVERIFIED")
+  }
+  return { identityVerified: failures.length === 0, failures: [...new Set(failures)] }
+}
+
 export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: SelectionRuntime[] }) {
   const failures: string[] = []
   const prepared = input.parts.filter(record).filter((part) => part.tool === "loginom_dock_prepare").map(receipt).filter(record)
