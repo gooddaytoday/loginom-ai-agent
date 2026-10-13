@@ -53,7 +53,8 @@ test("pair plan: one private network, no server ports and loopback Studio on the
 test("pair plan: unsafe routes, dev network and ambiguous names fail before Docker", () => {
   const invalid = [{ url: "http://10.200.2.58:32771/app/" }, { url: "https://127.0.0.1:32771/app/" },
     { url: "http://127.0.0.1:0/app/" }, { url: "invalid" }, { network: "loginom-net" },
-    { studioContainer: server.container }, { container: "--privileged" }]
+    { studioContainer: server.container }, { container: "--privileged" },
+    { url: "http://127.0.0.1:32771/wrong/" }, { alias: "another-backend" }]
   invalid.forEach(change => expect(() => planPair({ ...server, ...change }, "research", nonce)).toThrow("PAIR_CONFIGURATION"))
 })
 

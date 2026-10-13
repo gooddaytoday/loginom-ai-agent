@@ -25,7 +25,8 @@ export function reconcilePairResource(name: string, purpose: "acceptance" | "res
 
 export function planPair(server: SlotFile["server"], purpose: "acceptance" | "research", nonce: string) {
   const url = URL.parse(server.url)
-  if (!url || url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) || url.port === "0" || url.username || url.password || url.hash || url.search ||
+  if (!url || url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) || url.pathname !== "/app/" ||
+    server.alias !== "loginom-server-7.4.2-test" || url.port === "0" || url.username || url.password || url.hash || url.search ||
     server.network === "loginom-net" || server.container === server.studioContainer ||
     [server.container, server.studioContainer, server.network, server.alias].some(name => !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(name)) ||
     !["acceptance", "research"].includes(purpose) || !ownerNonce.test(nonce)) throw new EvalFailure("PAIR_CONFIGURATION", 2)
