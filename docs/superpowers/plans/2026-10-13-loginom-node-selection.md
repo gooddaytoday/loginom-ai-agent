@@ -535,16 +535,18 @@ selection_username="${selection_identity[0]}"
 selection_folder="${selection_identity[1]}"
 ```
 
-- [ ] Зафиксировать модель и variant, которыми проверяется skill: взять текущую
-  доступную модель профиля, проверить через штатные `models`, явно передавать её
+- [ ] Зафиксировать модель и variant, которыми проверяется skill: взять указанную
+  пользователем модель, проверить через штатные `models`, явно передавать её
   во все run. Сохранить provider/model, variant и фактические model metadata
   созданных сообщений. Не менять модель между baseline/candidate и не считать
-  модель судьи моделью агента. Исходная рекомендация при доступности —
-  `openai/gpt-6.1-sol` / `medium`; отсутствие доступа — причина выбрать доступную
-  модель до начала обеих серий, а не заменять её посреди сравнения.
+  модель судьи моделью агента. Пользователь для реализации выбрал gpt-6-sol,
+  medium, fast. Alias `openai/gpt-6-sol-fast` сохраняет API model gpt-6-sol и
+  запрашивает serviceTier=priority. Публичный каталог фиксируется по SHA в
+  `frozen-models.json` и передаётся обеим сериям через MODELS_PATH. Недоступность
+  выбранной модели — блокер; замена без указания пользователя не допускается.
 
 ```bash
-selection_model=openai/gpt-6.1-sol
+selection_model=openai/gpt-6-sol-fast
 selection_variant=medium
 ```
 
