@@ -142,3 +142,11 @@ package fixture: unit выполняется, семь integration modules не 
 RED без исключений дал exit 1; GREEN — exit 0. Пять ci-boundary/parallel-pair
 tests и bun typecheck/git diff --check PASS. Этот fixture не подменяет Docker,
 Loginom или admin adapter; живые проверки остаются отдельными integration files.
+
+Epoch core проверен: versioned SHA-256 full container ID/StartedAt/host boot ID/
+daemon PID 1/starttime. /proc stat comm может содержать пробелы; volatile CPU/state
+не меняют epoch. Malformed stats, unknown exe/cmdline/ID/boot запрещают identity.
+Read-only dev observation подтвердило pinned image entrypoint
+[/app/loginomd,--run,-workdir=/workdir], PID1 exe/cmdline — /app/loginomd.
+Восемь pair/CI tests, bun typecheck/git diff --check PASS. Docker adapter
+readServerIdentity и research restart integration ещё не реализованы.

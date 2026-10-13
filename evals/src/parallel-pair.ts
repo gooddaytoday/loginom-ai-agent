@@ -27,3 +27,13 @@ export function usersMarker(containerId: string, nonce: string) {
   return { kind: "loginom-evals-users" as const, version: 2 as const, container_id: containerId, owner_nonce: nonce,
     roots: ["/workdir/UserStorage", "/workdir/SessionBackup"], inventory: [] as { username: string; storage_dir: string; owner_nonce: string }[] }
 }
+
+export function serverEpoch(input: { containerId: string; startedAt: string; hostBootId: string; daemonExe: string; daemonCmdline: string; daemonStat: string }) {
+  const starttime = input.daemonStat.slice(input.daemonStat.lastIndexOf(")") + 2).trim().split(/\s+/)[19]
+  if (!/^[a-f0-9]{64}$/.test(input.containerId) || !Number.isFinite(Date.parse(input.startedAt)) || !ownerNonce.test(input.hostBootId) ||
+    input.daemonExe !== "/app/loginomd" || input.daemonCmdline.split("\0")[0] !== "/app/loginomd" ||
+    !/^1 \([^\n]*\) [A-Z] /.test(input.daemonStat) || !starttime || !/^\d+$/.test(starttime) || BigInt(starttime) <= 0n)
+    throw new EvalFailure("SERVER_IDENTITY_UNVERIFIED", 2)
+  return new Bun.CryptoHasher("sha256").update(JSON.stringify({ version: 1, containerId: input.containerId, startedAt: input.startedAt,
+    hostBootId: input.hostBootId, daemonPid: 1, daemonStarttime: starttime })).digest("hex")
+}
