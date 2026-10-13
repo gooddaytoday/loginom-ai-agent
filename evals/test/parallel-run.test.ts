@@ -62,7 +62,7 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
       expect(await Bun.file(path.join(slot.profileDir, "data/loginom-ai-agent.db")).exists()).toBe(false)
       const archives = await readdir(slot.historyDir)
       expect(archives.length).toBeGreaterThan(1)
-      const cleanup = await Bun.file(path.join(input.slots.controller.stateDir, `slot-${slot.id}.cleanup.json`)).json()
+      const cleanup = await Bun.file(summary.slots!.find(row => row.id === slot.id)!.cleanup_receipt!).json()
       expect(cleanup).toMatchObject({ status: "confirmed", liveQualified: false, archive: "committed" })
     }
   } finally { await rm(root, { recursive: true, force: true }) }
@@ -77,7 +77,7 @@ test("fixture main: removes only its artifacts after the profile archive is dura
     const deletions: boolean[] = []
     const watcher = watch(storage, (_event, name) => {
       if (!name?.startsWith("eval-") || existsSync(path.join(storage, name))) return
-      deletions.push(Array.from(new Bun.Glob("*.archive.json").scanSync(input.slots.controller.stateDir)).some(file => {
+      deletions.push(Array.from(new Bun.Glob("**/*.archive.json").scanSync(input.slots.controller.stateDir)).some(file => {
         const manifest = JSON.parse(readFileSync(path.join(input.slots.controller.stateDir, file), "utf8"))
         return manifest.status === "committed" && manifest.roots.some((row: { name: string }) => row.name === "data/loginom-ai-agent.db")
       }))
@@ -116,11 +116,10 @@ test("fixture main: a changed artifact retains its fence and invalidates the ear
     const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
     expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "completed", judge_status: "scored", environment_cleanup: { status: "failed" } })
     expect(await Bun.file(path.join(storage, file)).text()).toBe("changed evidence")
-    const cleanup = await Bun.file(path.join(input.slots.controller.stateDir, "slot-a.cleanup.json")).json()
+    const cleanup = await Bun.file(summary.slots![0]!.cleanup_receipt!).json()
     expect(cleanup.nextAdmissionAllowed).toBe(false)
     expect(cleanup.storageDeletionAllowed).toBe(false)
-    const leaseFile = (await readdir(input.slots.controller.stateDir)).find(name => name.endsWith(".lease.json"))!
-    expect((await Bun.file(path.join(input.slots.controller.stateDir, leaseFile)).json()).state).toBe("retained")
+    expect((await Bun.file(summary.slots![0]!.lease_receipt!).json()).state).toBe("retained")
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
@@ -214,6 +213,30 @@ test("fixture main: failed profile admission also releases its SIGINT handler", 
     expect(await readdir(input.slots.slots[0]!.workspaceRoot)).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("fixture main: a competing controller cannot overwrite the admitted controller journal", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-journal-"))
+  const input = await fixture(root, ["parallel-slow"])
+  const argv = ["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"]
+  const options = { fixture: { slots: input.slots, lockRoot: input.lockRoot } }
+  const pending = main(argv, input.env, options)
+  try {
+    const deadline = Date.now() + 10_000
+    while (!await Bun.file(path.join(input.slots.slots[0]!.profileDir, "data/loginom-ai-agent.db")).exists()) {
+      if (Date.now() > deadline) throw Error("Fixture dispatch not observed")
+      await Bun.sleep(10)
+    }
+    const journals = await Array.fromAsync(new Bun.Glob("**/run-journal.json").scan({ cwd: input.slots.controller.stateDir, absolute: true }))
+    expect(journals).toHaveLength(1)
+    const admitted = await Bun.file(journals[0]!).text()
+    await expect(main(argv, input.env, options)).rejects.toThrow("BUSY")
+    expect(await Bun.file(journals[0]!).text()).toBe(admitted)
+    const run = await pending
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts).toHaveLength(1)
+  } finally { await pending; await rm(root, { recursive: true, force: true }) }
+}, 30_000)
 
 test("fixture main: consecutive interrupted parallel runs drain both slots and retain interruption metadata", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-interruption-"))
@@ -338,8 +361,7 @@ test("fixture main: cleanup failure quarantines one slot while the healthy slot 
       .toMatchObject([0, 1, 2].map(() => ({ slot_id: "b", status: "completed", environment_cleanup: { status: "confirmed" } })))
     expect(summary.metrics.total).toBe(4)
     expect(summary.metrics.environment_cleanup_error_count).toBe(1)
-    const leases = await Promise.all((await readdir(input.slots.controller.stateDir)).filter(name => name.endsWith(".lease.json"))
-      .map(name => Bun.file(path.join(input.slots.controller.stateDir, name)).json()))
+    const leases = await Promise.all(summary.slots!.map(slot => Bun.file(slot.lease_receipt!).json()))
     expect(leases.find(lease => lease.slot.id === "a").state).toBe("retained")
     expect(leases.find(lease => lease.slot.id === "b").state).toBe("released")
     expect(await Bun.file(path.join(input.slots.slots[0]!.profileDir, ".writer/owner")).exists()).toBe(true)
@@ -391,8 +413,7 @@ test("fixture main: quarantine of all slots leaves the remaining jobs unmeasured
     expect(summary.metrics.total).toBe(2)
     expect(summary.metrics.environment_cleanup_error_count).toBe(2)
     expect(await Bun.file(path.join(run.runDir!, "parallel-cleanup-failure/3/prompt.txt")).exists()).toBe(false)
-    const leases = await Promise.all((await readdir(input.slots.controller.stateDir)).filter(name => name.endsWith(".lease.json"))
-      .map(name => Bun.file(path.join(input.slots.controller.stateDir, name)).json()))
+    const leases = await Promise.all(summary.slots!.map(slot => Bun.file(slot.lease_receipt!).json()))
     expect(leases.map(lease => lease.state)).toEqual(["retained", "retained"])
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
@@ -408,8 +429,7 @@ test("fixture main: clean stop releases the stopped slot and lets the other slot
     expect(summary.tasks[0]!.attempts[0]).toMatchObject({ slot_id: "a", status: "harness_error", environment_cleanup: { status: "confirmed" } })
     expect(summary.tasks.slice(1).flatMap(task => task.attempts).map(result => result.slot_id)).toEqual(["b", "b"])
     expect(summary.slots?.map(slot => slot.state)).toEqual(["closed", "closed"])
-    const leases = await Promise.all((await readdir(input.slots.controller.stateDir)).filter(name => name.endsWith(".lease.json"))
-      .map(name => Bun.file(path.join(input.slots.controller.stateDir, name)).json()))
+    const leases = await Promise.all(summary.slots!.map(slot => Bun.file(slot.lease_receipt!).json()))
     expect(leases.map(lease => lease.state)).toEqual(["released", "released"])
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)

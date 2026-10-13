@@ -82,7 +82,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const rubric = await rubricHash(tasks)
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
-  const slotStates = new Map<string, "closed" | "quarantined">()
+  const slotStates = new Map<string, { state: "closed" | "quarantined"; lease_receipt: string; cleanup_receipt: string }>()
   const state: { stopped: string | null } = { stopped: null }
   if (fixture && !config.dryRun) {
     const contexts = await prepareFixture(config, fixture, runId, runDir)
@@ -125,9 +125,9 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
     } catch (error) { state.stopped = error instanceof AggregateError ? error.errors.map(describe).join("; ") : describe(error) }
     finally {
       for (const context of contexts) {
-        slotStates.set(context.lease.slot.id, "quarantined")
+        slotStates.set(context.lease.slot.id, { state: "quarantined", lease_receipt: context.lease.receipt, cleanup_receipt: context.cleanup })
         if (unconfirmed.has(context.lease.slot.id)) continue
-        await context.lease.release(context.cleanup).then(() => slotStates.set(context.lease.slot.id, "closed"),
+        await context.lease.release(context.cleanup).then(() => { slotStates.get(context.lease.slot.id)!.state = "closed" },
           (error: unknown) => { state.stopped ??= describe(error) })
       }
       await Promise.all(contexts.map(context => context.lease.close()))
@@ -197,7 +197,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const summary: RunSummary = {
     run_id: runId,
     ...(fixture ? { slots: fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
-      liveQualified: false, state: config.dryRun ? "planned" as const : slotStates.get(slot.id)! })) } : {}),
+      liveQualified: false, ...(config.dryRun ? { state: "planned" as const } : slotStates.get(slot.id)!) })) } : {}),
     label: config.label,
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
