@@ -13,6 +13,20 @@ test("all six native reference graphs are complete, including the first-last-tou
   }
 })
 
+test("data links require existing endpoints in their own scope and the correct port direction", async () => {
+  const xml = await reference("sales-by-category")
+  for (const change of ["source-node", "source-port", "target-direction", "foreign-scope", "unknown-port"]) {
+    const altered = structuredClone(xml)
+    const link = altered.links[0]!
+    if (change === "source-node") link.source.NodeGuid = "missing"
+    if (change === "source-port") link.source.PortGuid = "missing"
+    if (change === "target-direction") link.target = { ...link.source }
+    if (change === "foreign-scope") link.scope = "foreign"
+    if (change === "unknown-port") altered.nodes[0]!.outputs[link.source.PortGuid!] = "UnknownTable"
+    expect(inspectSelectionGraph(altered, "standard").complete).toBe(false)
+  }
+})
+
 async function reference(id: string) {
   const root = await mkdtemp(path.join(tmpdir(), "selection-graph-"))
   try {
