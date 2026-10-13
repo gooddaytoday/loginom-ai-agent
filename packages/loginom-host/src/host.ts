@@ -20,6 +20,10 @@ export async function createLoginomHost(options: {
   acceptanceCapture?: { authorization: string; packagePath: string; harness?: "import-before-configure-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  // Retain the accepted private grant before any startup await. The caller's
+  // mutable options cannot change the kind/package/authorization later.
+  const acceptedCapture = options.acceptanceCapture
+  options = { ...options, acceptanceCapture: acceptedCapture && Object.freeze({ ...acceptedCapture }) }
   if (options.acceptanceCapture?.harness !== undefined && options.acceptanceCapture.harness !== "import-before-configure-v1")
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   const root = options.root
