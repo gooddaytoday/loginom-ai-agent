@@ -862,7 +862,7 @@ docker cp "$selection_container:$selection_storage/$selection_csv_name" \
   использовать только `unzip` в новом собственном `artifact/unpacked` (функция
   предварительно удаляет dest); записать SHA256. `cleanupArtifact` и
   `checkIsolatedStorage` не вызывать: первое удаляет файлы, второе требует стенд.
-- [ ] Сначала запустить только `sales-by-category`, baseline attempt 1, через
+- [x] Сначала запустить только `sales-by-category`, baseline attempt 1, через
   wrapper. Сохранить полный evidence даже при incomplete; завершить Task 1B
   на его фактическом формате и повторить только offline-аудит. Пилот остаётся
   первым из 18 baseline даже при расчётном провале. Если model dispatch не
