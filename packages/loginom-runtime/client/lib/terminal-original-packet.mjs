@@ -13,6 +13,30 @@ const ownerKeys=['owner','run','lease','generation','chat','document','documentI
   'session','operation','operationId','page','context','gate','signal','deadline','refusal','path'];
 const nativeKeys=['currentUser','fileStorage','nativeSession'];
 const safeKeys=['pending','running','unknown','writerPending','dirty','targetSelected'];
+const originalMapGet=Map.prototype.get;
+function retainReceiptReader(receipts) {
+  const chain=[];
+  for(let object=receipts;object;object=Object.getPrototypeOf(object)) {
+    const descriptor=Object.getOwnPropertyDescriptor(object,'get');
+    chain.push({object,prototype:Object.getPrototypeOf(object),descriptor});
+    if(descriptor) {
+      if(!('value' in descriptor)||descriptor.value!==originalMapGet)fail('RECEIPT_READER');
+      break;
+    }
+  }
+  if(!chain.at(-1)?.descriptor)fail('RECEIPT_READER');
+  const reader=chain.at(-1).descriptor.value;
+  const check=()=>{
+    for(const entry of chain) {
+      const descriptor=Object.getOwnPropertyDescriptor(entry.object,'get'),original=entry.descriptor;
+      if(Object.getPrototypeOf(entry.object)!==entry.prototype
+        ||(original?(!descriptor||!('value' in descriptor)||descriptor.value!==reader
+          ||descriptor.writable!==original.writable||descriptor.enumerable!==original.enumerable
+          ||descriptor.configurable!==original.configurable):descriptor!==undefined))fail('RECEIPT_READER');
+    }
+  };
+  return {check,read:key=>{check();return Reflect.apply(reader,receipts,[key])}};
+}
 function take(object,keys){return Object.fromEntries(keys.map(key=>[key,data(object,key)]))}
 function same(object,values){if(Object.keys(values).some(key=>!Object.is(data(object,key),values[key])))fail('REPLACED')}
 function graph(objects){
@@ -77,7 +101,8 @@ export function captureTerminalInitialCustody({custody,native,loaded,preparation
   if(typeof messageMethod!=='function')fail('DEPENDENCY');
   const preparationRefs=take(preparation,['document','id','receipts']);
   if(preparationRefs.document!==owner.document||preparationRefs.id!==owner.documentId)fail('INITIAL_PROVENANCE');
-  const prior=preparationRefs.receipts.get(owner.operationId);
+  const receiptReader=retainReceiptReader(preparationRefs.receipts);
+  const prior=receiptReader.read(owner.operationId);
   if(prior&&(data(prior,'phase')!=='reserved'||Object.hasOwn(prior,'terminalOriginalCreation')))fail('LATE_INITIAL');
   const nativeBinding=nativeKeys.slice(0,2).map(key=>{
     const proxy=nativeRefs[key],identity=data(proxy,'$');
@@ -90,13 +115,13 @@ export function captureTerminalInitialCustody({custody,native,loaded,preparation
     AbortSignal.prototype.throwIfAborted.call(owner.signal);
     if(data(owner.signal,'throwIfAborted')!==AbortSignal.prototype.throwIfAborted)fail('SIGNAL_METHOD');
     if(Date.now()>=owner.deadline)fail('DEADLINE');
-    same(custody,owner);same(native,nativeRefs);same(preparation,preparationRefs);load.check();same(nativeRefs.nativeSession,dependency);
+    same(custody,owner);same(native,nativeRefs);same(preparation,preparationRefs);receiptReader.check();load.check();same(nativeRefs.nativeSession,dependency);
     same(owner.page,pageMethods);if(pageMethods.url.call(owner.page)!==originalUrl)fail('PAGE_URL');
     if(data(dependency.$M,'GetDynamicData')!==messageMethod)fail('DEPENDENCY');
     for(const entry of nativeBinding){if(data(entry.proxy,'$')!==entry.identity||data(entry.proxy,'$S')!==nativeRefs.nativeSession)fail('FOREIGN_SESSION');same(entry.identity,entry.values)}
     if(safeKeys.some(key=>data(custody,key)!==false))fail('UNSETTLED');
   };
-  check();const token=Object.freeze({});initials.set(token,{owner,nativeRefs,load,custody,preparation,prior,check});return token;
+  check();const token=Object.freeze({});initials.set(token,{owner,nativeRefs,load,custody,preparation,prior,receiptReader,check});return token;
 }
 export function bindTerminalCreationPacket(initial,preparation,receipt) {
   const start=initials.get(initial);if(!start)fail('INITIAL');start.check();
@@ -106,7 +131,7 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
   const creation=data(receipt,'terminalOriginalCreation');
   if(!Object.isFrozen(creation)||data(receipt,'phase')!=='verified'
     ||data(preparation,'document')!==start.owner.document||data(preparation,'id')!==start.owner.documentId
-    ||data(preparation,'receipts').get(start.owner.operationId)!==receipt)fail('CREATION');
+    ||start.receiptReader.read(start.owner.operationId)!==receipt)fail('CREATION');
   const values=take(creation,['document','documentId','request','operationId','sessionId','tab','packageNode',
     'packageProxy','connection','nativeSession','account','path']);
   if(values.document!==start.owner.document||values.documentId!==start.owner.documentId
@@ -124,7 +149,7 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
     if(data(receipt,'terminalOriginalCreation')!==creation||data(receipt,'phase')!=='verified'
       ||data(receipt,'tab')!==values.tab||data(receipt,'packageNode')!==values.packageNode
       ||data(receipt,'request')!==values.request||data(preparation,'document')!==values.document
-      ||data(preparation,'id')!==values.documentId||data(preparation,'receipts').get(values.operationId)!==receipt)fail('CREATION_REPLACED');
+      ||data(preparation,'id')!==values.documentId||start.receiptReader.read(values.operationId)!==receipt)fail('CREATION_REPLACED');
     same(creation,values);
     if(data(values.packageNode,'Package')!==proxy||data(values.connection,'Session')!==values.nativeSession
       ||data(values.connection,'UserName')!==values.account||data(proxy,'$')!==identity
@@ -153,7 +178,7 @@ export async function prepareTerminalOriginalPacket(initial,input) {
   entry.preparing=Promise.resolve().then(async()=>{
     entry.check();const prepared=await prepareWorkspace(entry.owner.page,options,initial);entry.check();
     if(prepared.status!=='READY'||prepared.document_id!==entry.owner.documentId||prepared.loginom_account!==entry.owner.account)fail('PREPARATION');
-    const receipt=entry.preparation.receipts.get(entry.owner.operationId);
+    const receipt=entry.receiptReader.read(entry.owner.operationId);
     entry.completedReceipt=receipt;
     return bindTerminalCreationPacket(initial,entry.preparation,receipt);
   }).catch(error=>{entry.preparationRejected=true;throw error});

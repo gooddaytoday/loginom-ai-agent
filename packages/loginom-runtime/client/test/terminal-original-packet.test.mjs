@@ -53,6 +53,47 @@ async function setup(budget=60000,beforeInitial){
  } catch(error){await native.cleanup();throw error}
 }
 async function control(fn){const f=await setup();try{await fn(f)}finally{await f.native.drain();await f.native.cleanup()}}
+const replaceReceiptReader=(map,variant)=>{
+ if(variant==='foreign')Object.defineProperty(map,'get',{value:()=>undefined,configurable:true});
+ if(variant==='shadow')Object.defineProperty(map,'get',{value:Map.prototype.get,configurable:true});
+ if(variant==='missing')Object.setPrototypeOf(map,null);
+ if(variant==='prototype')Object.setPrototypeOf(map,Object.create(Map.prototype));
+};
+for(const variant of ['foreign','shadow','missing','prototype']) {
+ test('receipt reader custody before admission: '+variant,()=>control(async f=>{
+  replaceReceiptReader(f.preparation.receipts,variant);
+  assert.throws(()=>f.build(),/RECEIPT_READER/);assert.deepEqual(f.native.calls,[]);assert.equal(f.writes(),0);
+ }));
+ test('receipt reader custody after pending909: '+variant,()=>control(async f=>{
+  const scope=f.build();f.native.queryReply(p=>{f.native.hold();return p});const work=scope.read();
+  while(f.native.calls.length<3)await new Promise(r=>setImmediate(r));
+  replaceReceiptReader(f.preparation.receipts,variant);await f.native.drain();
+  await assert.rejects(work,/RECEIPT_READER/);assert.deepEqual(f.native.calls,[907,0,909]);assert.equal(f.writes(),0);
+ }));
+}
+for(const variant of ['foreign','missing','accessor'])test('initial reader qualification: '+variant,async()=>{
+ let getterCalls=0;
+ await assert.rejects(setup(60000,({preparation})=>{
+  if(variant==='accessor')Object.defineProperty(preparation.receipts,'get',{get(){getterCalls++;return Map.prototype.get}});
+  else replaceReceiptReader(preparation.receipts,variant);
+ }),/RECEIPT_READER/);
+ assert.equal(getterCalls,0);
+});
+test('retained own data reader descriptor flags cannot drift',()=>control(async f=>{
+ // A new own descriptor is already a shadow even with the retained reader.
+ Object.defineProperty(f.preparation.receipts,'get',{value:Map.prototype.get,writable:false});
+ assert.throws(()=>f.build(),/RECEIPT_READER/);assert.equal(f.writes(),0);
+}));
+for(const value of [Error('original reader drift failure',{cause:0}),undefined,null,false,0,''])
+ test('raw first task rejection survives receipt reader accessor drift: '+String(value),()=>control(async f=>{
+  let getterCalls=0;const scope=f.build();f.native.queryReply(p=>{f.native.hold();return p});const work=scope.read();
+  while(f.native.calls.length<3)await new Promise(r=>setImmediate(r));
+  Object.defineProperty(f.preparation.receipts,'get',{get(){getterCalls++;return Map.prototype.get}});
+  f.native.fail(value);await f.native.drain();
+  let caught=false;try{await work}catch(error){caught=true;assert.equal(error,value)}
+  assert.ok(caught);assert.equal(scope.primary,value);assert.equal(getterCalls,0);
+  assert.deepEqual(f.native.calls,[907,0,909]);assert.equal(f.writes(),0);
+ }));
 test('production preparation -> branded initial packet -> original task completion -> component',()=>control(async f=>{
  const creation=f.receipt.terminalOriginalCreation;
  assert.equal(creation.tab,f.receipt.tab);assert.equal(creation.packageNode,f.receipt.packageNode);
@@ -197,3 +238,32 @@ test('Page document replacement refuses before packet use',()=>control(async f=>
  const scope=f.build();f.loaded.global.document={};assert.throws(()=>scope.read(),/DOCUMENT_REPLACED/);
  assert.deepEqual(f.native.calls,[]);
 }));
+
+// Independent P2 assertions preserved verbatim; setup uses the production producer.
+test('receipt Map get accessor after preparation refuses before component admission without invocation',async()=>{
+  const f=await setup();let getterCalls=0,admitted=false;
+  try {
+    Object.defineProperty(f.preparation.receipts,'get',{configurable:true,get(){getterCalls++;return Map.prototype.get;}});
+    try {f.build();admitted=true;} catch {}
+    console.log(JSON.stringify({case:'after_preparation',getterCalls,admitted,nativeCalls:f.native.calls,writes:f.writes()}));
+    assert.equal(getterCalls,0,'data-only receipt qualification must not invoke a substituted getter');
+    assert.equal(admitted,false,'accessor drift must refuse component binding');
+  } finally {await f.native.drain();await f.native.cleanup();}
+});
+
+test('receipt Map get accessor during original pending909 refuses without further dispatch',async()=>{
+  const f=await setup();let getterCalls=0,rejected=false,work;
+  try {
+    const scope=f.build();f.native.queryReply(p=>{f.native.hold();return p});work=scope.read();
+    const limit=Date.now()+5000;
+    while(f.native.calls.length<3&&Date.now()<limit)await new Promise(r=>setImmediate(r));
+    assert.deepEqual(f.native.calls,[907,0,909]);
+    Object.defineProperty(f.preparation.receipts,'get',{configurable:true,get(){getterCalls++;return Map.prototype.get;}});
+    await f.native.drain();
+    try {await work;} catch {rejected=true;}
+    console.log(JSON.stringify({case:'pending909',getterCalls,rejected,nativeCalls:f.native.calls,writes:f.writes()}));
+    assert.equal(getterCalls,0,'post-await custody checks must not call a replaced getter');
+    assert.equal(rejected,true,'changed receipt reader must refuse the original continuation');
+    assert.deepEqual(f.native.calls,[907,0,909]);
+  } finally {await f.native.drain();if(work)await work.catch(()=>{});await f.native.cleanup();}
+});

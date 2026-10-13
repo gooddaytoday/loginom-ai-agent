@@ -1,6 +1,13 @@
 Original terminal packet producer contract (CODE/OFFLINE)
 
 Base883c933685475b9f5adb7778b419c9d65a403455, PR49; terminal author70.
+The receipt Map reader is qualified before creation and retained privately with
+its original descriptor holder, flags and prototype chain. Custody checks reject
+accessors, missing/foreign readers, shadows or descriptor drift without invoking
+them; membership reads call only the retained original reader on the original
+Map. Relevant pre/post-await checks retain this qualification. Raw first task
+failure and the existing abort/deadline priorities remain unchanged.
+
 Paths/hunks: workspace.mjs first verified preparation receipt, fixed private
 original-custody checks around existing preparation awaits, and shared options
 validation (ordinary serialized preparation supplies no private packet);
