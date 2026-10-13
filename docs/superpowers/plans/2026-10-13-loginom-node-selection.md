@@ -681,7 +681,7 @@ bun script/verify-cli-candidate.ts "$selection_baseline" "$selection_repo"
   При невозможности сборки записать блокер; старый installed CLI не подменяет baseline
   текущей ветки, особенно если в нём отсутствует JavaScript.
 
-- [ ] Сохранить `baseline-pins.json`, закрепляющий SHA manifest с source SHA/tree/dirty
+- [x] Сохранить `baseline-pins.json`, закрепляющий SHA manifest с source SHA/tree/dirty
   внутри metadata. Рядом сохранить полный skill inventory/file hashes и каталог
   типов с Loginom version. Pins также закрепляют модель/variant,
   task prompt/input/oracle hashes, endpoint identity без credentials и ограничения
@@ -695,6 +695,12 @@ bun script/verify-cli-candidate.ts "$selection_baseline" "$selection_repo"
   После изменения исходников baseline больше не сверять с текущим checkout через
   `verify-cli-candidate`: это ожидаемо даст SOURCE_MISMATCH. Проверять его
   неизменность по сохранённому attestation, manifest/inventory и skill digest.
+  Новые immutable pins готовы в run `20261013T132356Z-0a3983`; независимая проверка
+  72/72 source hashes, 43 уникальных слотов и обоих payload PASS. Все task/model/seed
+  поля сохранены, новые пути/manifest SHA привязаны отдельно. Фактический baseline
+  Host prepare подтвердил build 7.4.2 и 16 типов, включая `programming.javascript`.
+  Тот же изолированный профиль/config и CLI не подключают внешний skill или Codex MCP;
+  административный Playwright работает отдельно от оценочных процессов.
 
 **Внутренние шаги wrapper.** Далее приведены готовые фрагменты и точные правила
 для реализации одного файла. При выполнении серии оператор вызывает только
@@ -1175,7 +1181,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Collector реализован TDD; cleanup guard `d73fa9def`, независимое review проведено.
 - Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
-- Новая matched пара: `20261013T132356Z-0a3983`, source `6768520a0`; build/inventory/native proof PASS, далее full18+25.
+- Текущий run `20261013T132356Z-0a3983`, source6768520a0: build/native proof/pins PASS, sales baseline1 запущен.
 - Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
@@ -1188,4 +1194,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Исходная серия stopped 3/18: date_format TDD в 263df9620; новые build/native proof PASS, full18+25 пока не начаты.
+- Исходная серия stopped 3/18 сохранена отдельно; новая полная18+25 серия начата, candidate ждёт baseline.

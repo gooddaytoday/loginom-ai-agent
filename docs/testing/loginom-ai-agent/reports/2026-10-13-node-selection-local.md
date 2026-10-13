@@ -5,7 +5,8 @@
 поручил самостоятельно устранять блокеры: дефект `imports.text.date_format`
 исправлен по TDD в `263df9620`, 144 теста PASS. После проверки отсутствия
 собственных Loginom-сессий адресно архивирован также guard monthly.
-Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline 0/18, candidate 0/25;
+Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline sales/1 в работе,
+завершённых baseline 0/18, candidate 0/25;
 обе сборки и deterministic native proof проверены. Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
@@ -26,6 +27,13 @@ Node/Chromium побайтно одинаковы. Разница build-inputs �
 представления import paths; входные inventories и outputs совпадают.
 Private evidence: `baseline-attestation.json`, `candidate-attestation.json`,
 обе skill inventories и `pair-independent-review.json` в новом run.
+
+Immutable baseline/candidate pins проверены независимо: 43 уникальных слота,
+72/72 source lock hashes PASS; task/model/seed fields неизменны. Frozen models
+и исторический lock сохранены побайтно; новая привязка — в
+`pins-preparation-review.json`. Actual baseline native prepare подтвердил build
+7.4.2 и 16 типов с доступным `programming.javascript` (`baseline-catalog-attestation.json`).
+`current-run.txt` переключён на новый run; первый `sales-by-category/1` запущен.
 
 ## Native proof исправления дат
 
