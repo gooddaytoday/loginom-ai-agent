@@ -242,8 +242,8 @@ peer, без реализации Loginom RPC/пользователей. Дет
 реальных pipe bytes доказывает UTF-8 framing; wire events доказывают single flight.
 С selector: 14 admin tests; pair/CI вместе — 26 PASS, typecheck/diff check PASS.
 Это transport qualification, не admin/browser readiness. Runtime verifier,
-driver и durable intent добавлены следующими шагами ниже; dispose ack/process
-proof и live RPC ещё предстоят. Full unit factory не включает этот codec.
+driver, durable intent и dispose ack/process proof добавлены следующими шагами
+ниже; live RPC ещё предстоят. Full unit factory не включает этот codec.
 
 verifyAdminRuntime реализован в preflight. До запуска проверяет CLI artifact
 format/source/target, весь declared/actual inventory, SHA-256, modes/links и
@@ -295,3 +295,26 @@ mutation replay; inspect/dispose разрешены для read-back/закры�
 persistence либо подмена journal directory дают unknown, прежний intent и чужие
 данные сохраняются. Пять real-pipe/filesystem RED/GREEN tests; 41 admin/preflight/
 CI tests и typecheck PASS. Это не reconciliation proof и не server cleanup fence.
+
+openLoginomAdmin теперь связывает verified installed Node с journaled channel и
+continuous supervisor. Context/profile/journal создаются private отдельно от
+слотов; RPC serialized, Docker identity сверяется до init/операций и после успешного
+init. Public AdminConnection пока fail-closed для неквалифицированной session
+identity/user mutations. Общий controller lease/ownership admission добавляет
+следующая задача; adapter сам не заменяет server fence.
+
+Dispose требует data.disposed=true, EOF, exitCode=0 и confirmed/capture_complete
+process proof; idempotent promise сохраняет единственный результат. После ack
+закрывается stdin, затем ожидается supervisor и лишь потом отменяется reader:
+преждевременная отмена stdout ошибочно давала Output transport failed. Continuous
+supervisor допускает lifetime без общего timer (null); RPC deadlines и abort
+остаются ограниченными. Реальный regression: 21 tests/99 assertions (97.39s) PASS.
+
+Actual Node/Docker bridge rejection: 3 integration tests/17 assertions PASS
+(19.49s). Собственная disposable pair; missing credential/parent даёт private code,
+init not_applied и dispose confirmed, durable connection receipt/command journals
+проверены, two-pass owned_remaining=0, bundled Node identity присутствует, browser
+bindings пусты. Stale epoch отвергается до создания context. Собственные Docker/
+temp artifacts удалены после проверки. 41 targeted tests, typecheck, Node --check
+и diff check PASS. Это отрицательная квалификация до browser launch; bootstrap,
+положительный admin login/RPC, crash registry и live acceptance ещё не доказаны.

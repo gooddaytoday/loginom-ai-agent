@@ -30,3 +30,8 @@ Driver rejection integration отдельно квалифицировала mal
 credential и несовпадение runtime hash до browser launch. Format-only canary
 временный fixture не использовался для Loginom auth и удалён; постоянные
 bootstrap credentials не создавались. Browser/readonly RPC пути ещё не проверены.
+
+Bun→Node→supervisor bridge прошёл отрицательную интеграцию на собственной
+disposable pair: 3 tests/17 assertions, init not_applied, dispose confirmed и
+continuous process absence proof. Это позволяет продолжать независимый код,
+но не снимает bootstrap blocker и не доказывает browser/admin readiness.
