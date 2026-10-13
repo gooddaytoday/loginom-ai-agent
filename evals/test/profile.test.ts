@@ -42,6 +42,52 @@ test("archiveProfileHistory: история каждой попытки сохр
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
+test("archiveProfileHistory: explicit slot history root receives evidence while profile settings remain", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-"))
+  const profile = path.join(dir, "profile")
+  const history = path.join(dir, "slot-history")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true, mode: 0o700 })
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "history-bytes")
+    await Bun.write(path.join(profile, "cli-profile.json"), "settings")
+    const archive = await archiveProfileHistory(profile, "slot-a-1", history)
+    expect(path.dirname(archive)).toBe(history)
+    expect(await Bun.file(path.join(archive, "data/loginom-ai-agent.db")).text()).toBe("history-bytes")
+    expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).exists()).toBe(false)
+    expect(await Bun.file(path.join(profile, "cli-profile.json")).text()).toBe("settings")
+    expect(await Bun.file(`${profile}.history`).exists()).toBe(false)
+    await assertProfileClean(profile)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test.each(["same", "inside", "ancestor"] as const)("archiveProfileHistory: %s root refuses before moving history", async kind => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-overlap-"))
+  const profile = path.join(dir, "profile")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true, mode: 0o700 })
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "preserve-history")
+    const history = kind === "same" ? profile : kind === "inside" ? path.join(profile, "history") : dir
+    await expect(archiveProfileHistory(profile, "slot-a-1", history)).rejects.toThrow("PROFILE_HISTORY_ROOT")
+    expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).text()).toBe("preserve-history")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("archiveProfileHistory: symlink parent refuses before creating an archive in its target", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-alias-"))
+  const profile = path.join(dir, "profile")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true, mode: 0o700 })
+    await mkdir(path.join(dir, "other"), { mode: 0o700 })
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "preserve-history")
+    await Bun.write(path.join(dir, "other/control"), "preserve-other")
+    await symlink(path.join(dir, "other"), path.join(dir, "alias"))
+    await expect(archiveProfileHistory(profile, "slot-a-1", path.join(dir, "alias/history"))).rejects.toThrow("PROFILE_HISTORY_ROOT")
+    expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).text()).toBe("preserve-history")
+    expect(await Bun.file(path.join(dir, "other/control")).text()).toBe("preserve-other")
+    expect(await Bun.file(path.join(dir, "other/history")).exists()).toBe(false)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
 test.each(["loginom/recovery/operation.json", "loginom/connection/pending.json", ".writer/owner"])(
   "archiveProfileHistory: незавершённое состояние %s запрещает перенос БД", async (pending) => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-pending-"))

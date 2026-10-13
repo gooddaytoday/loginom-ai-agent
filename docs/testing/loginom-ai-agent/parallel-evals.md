@@ -348,3 +348,12 @@ start/end events. Изолированный child подтвердил judge CO
 model OAuth, agent profile, Dock/admin environment; действующая judge auth этим не
 проверялась. 82 judge/scheduler/CLI/transition tests/490 assertions, typecheck и
 diff check PASS (213.12s). Fake fixtures удалены; v2 main ещё не подключён к gate.
+
+archiveProfileHistory получил optional historyDir; legacy default вычисляется от
+canonical profile, как прежде. Explicit root должен быть абсолютным/canonical с
+существующим canonical parent и не пересекаться с profile. Same/inside/ancestor и
+symlink parent отвергаются PROFILE_HISTORY_ROOT до mkdir/перемещений, история и
+чужой sentinel сохраняются. 5 новых real-fs RED/GREEN cases; 9 archive tests/35
+assertions, полный profile suite 61 PASS/166 assertions (25.32s), typecheck/diff
+check PASS. Новый slot caller/sandbox ещё не связан; rollback legacy архива не
+заменяет durable move journal и SIGKILL reconciliation из задачи 5.
