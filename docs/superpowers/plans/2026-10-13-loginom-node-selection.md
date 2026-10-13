@@ -884,7 +884,7 @@ docker cp "$selection_container:$selection_storage/$selection_csv_name" \
 полного baseline ждать не требуется. Produced —
 новый skill digest, доставляемый существующим staging одинаково CLI/Desktop.
 
-- [ ] Вставить непосредственно перед чтением workflow в `SKILL.md`:
+- [x] Вставить непосредственно перед чтением workflow в `SKILL.md`:
 
 ```markdown
 ## Выбор узлов
