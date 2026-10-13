@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { reserveAttempt, selectionAttempt } from "../script/run-node-selection-attempt"
+import { reserveAttempt, runSelectionAttempt, selectionAttempt } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -34,6 +34,25 @@ test("reserving an existing slot refuses a rerun and preserves its evidence", as
     await Bun.write(path.join(plan.directory, "sentinel.txt"), "original evidence")
     await expect(reserveAttempt(plan)).rejects.toThrow("SELECTION_SLOT_EXISTS")
     expect(await Bun.file(path.join(plan.directory, "sentinel.txt")).text()).toBe("original evidence")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("failed payload preflight preserves an incident and does not consume the model slot", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-preflight-test-"))
+  try {
+    const value = { ...pins(), resultsRoot: path.join(root, "results"), workspaceRoot: path.join(root, "inputs"), payload: path.join(root, "payload") }
+    await Bun.write(path.join(value.payload, "cli-manifest.json"), "changed payload")
+    const file = path.join(root, "pins.json")
+    await Bun.write(file, JSON.stringify(value))
+    const result = await runSelectionAttempt(file, "sales-by-category", 1)
+    expect(result.exitCode).toBe(3)
+    expect(result.modelStarted).toBe(false)
+    expect(result.blocker).toBe("SELECTION_MANIFEST_MISMATCH")
+    expect(result.evidence).toContain("/incidents/")
+    expect((await Bun.file(path.join(result.evidence, "attempt.json")).json()).modelStarted).toBe(false)
+    expect(await Bun.file(path.join(value.resultsRoot, "baseline/sales-by-category/1/attempt.json")).exists()).toBe(false)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

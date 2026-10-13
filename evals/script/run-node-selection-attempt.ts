@@ -1,5 +1,6 @@
 import path from "node:path"
 import { mkdir, mkdtemp } from "node:fs/promises"
+import { createHash } from "node:crypto"
 import type { SelectionMode } from "../src/node-selection"
 
 export type SelectionPins = {
@@ -75,6 +76,19 @@ export async function reserveAttempt(plan: ReturnType<typeof selectionAttempt>) 
   const workspace = await mkdtemp(path.join(plan.workspace, "inputs-"))
   await mkdir(path.join(plan.directory, "artifact/results"), { recursive: true, mode: 0o700 })
   return { ...plan, workspace }
+}
+
+export async function runSelectionAttempt(pinsFile: string, taskID: string, number: number) {
+  if (!absolute(pinsFile)) throw Error("SELECTION_PINS_PATH_INVALID")
+  const plan = selectionAttempt(await Bun.file(pinsFile).json() as unknown, taskID, number)
+  await mkdir(path.join(plan.pins.resultsRoot, "incidents"), { recursive: true, mode: 0o700 })
+  const evidence = await mkdtemp(path.join(plan.pins.resultsRoot, "incidents", `${plan.prefix}-`))
+  const result = { exitCode: 3, evidence, modelStarted: false, blocker: "SELECTION_DISPATCH_NOT_IMPLEMENTED" }
+  const manifest = await Bun.file(path.join(plan.pins.payload, "cli-manifest.json")).bytes()
+  if (createHash("sha256").update(manifest).digest("hex") !== plan.pins.manifestSha256)
+    result.blocker = "SELECTION_MANIFEST_MISMATCH"
+  await Bun.write(path.join(evidence, "attempt.json"), JSON.stringify(result, null, 2) + "\n")
+  return result
 }
 
 function record(value: unknown): value is Record<string, unknown> {
