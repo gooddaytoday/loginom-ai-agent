@@ -8,6 +8,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostError } from "./errors"
+import { retainFPStartup } from "./fp-startup-control"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -15,6 +16,7 @@ const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
 const state: {
   starting?: Promise<void>
+  fpStartup?: ReturnType<typeof retainFPStartup>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
   port?: ReturnType<typeof loginomHostPort>
   stopping?: Promise<void>
@@ -72,6 +74,11 @@ async function dispatch(message: unknown) {
   const input = "input" in message ? message.input : undefined
   try {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+    if (message.method === "readonly.preReady.cancel" && input && typeof input === "object" && "phase" in input && input.phase === "startup") {
+      if (!state.fpStartup?.cancel(input)) throw Error("LOGINOM_HANDSHAKE_INVALID")
+      reply({id: message.id, result: {accepted: true, pending: state.fpStartup.pending, nativeCancellationConfirmed: false}})
+      return
+    }
     if (message.method === "start") {
       if (state.starting || state.host) throw new Error("LOGINOM_HANDSHAKE_INVALID")
       if (
@@ -103,6 +110,10 @@ async function dispatch(message: unknown) {
           || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
           || capture.packagePath.split("/").some(x => x === "." || x === "..")))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
+      const fpStartup = capture && typeof capture === "object" && "harness" in capture && capture.harness === "field-parameters-preservation-v1"
+        ? retainFPStartup(message as unknown as Parameters<typeof retainFPStartup>[0], input as unknown as Parameters<typeof retainFPStartup>[1]) : undefined
+      state.fpStartup = fpStartup
+      fpStartup?.guard()
       const options = {
         root: input.root,
         acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "field-parameters-preservation-v1" } | undefined,
@@ -113,13 +124,25 @@ async function dispatch(message: unknown) {
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }
+      const guardFPStartup = () => {
+        fpStartup?.guard()
+        if (fpStartup && (options.root !== input.root || options.resources !== input.resources
+            || options.headless !== input.headless || options.acceptanceCapture !== capture
+            || options.strictRecovery !== ("strictRecovery" in input && input.strictRecovery === true)
+            || options.acceptanceCleanupPackage !== ("acceptanceCleanupPackage" in input ? input.acceptanceCleanupPackage : undefined)))
+          throw Error("LOGINOM_HANDSHAKE_INVALID")
+      }
+      guardFPStartup()
       state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
+        guardFPStartup()
         state.port = loginomHostPort(port, host)
         await host.settled()
+        guardFPStartup()
       })
-      await state.starting
+      try { await state.starting; guardFPStartup() }
+      finally { fpStartup?.settle() }
       if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
@@ -143,7 +166,8 @@ async function dispatch(message: unknown) {
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
-    reply({ id: message.id, error: hostError(error) })
+    if (message.method === "start" && state.fpStartup) reply({id: message.id, rejection: closeRejection(error)})
+    else reply({ id: message.id, error: hostError(error) })
   }
 }
 
