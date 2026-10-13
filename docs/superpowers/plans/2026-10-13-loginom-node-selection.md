@@ -563,6 +563,26 @@ runtime явно предложил operation_inspect; его resolved/verified 
   Original CLI/wrapper/attempt не переписаны, модель не повторялась. Новые оценки
   и `settlement-reassessment-review.json` сохранены; monthly-demand/2 выполняется.
 
+## Предпосылка продолжения: второй вход стандартного Соединения
+
+Candidate ABC/1 серии `20261013T142936Z-072953` остановился без JS на
+`abc-join-2/input_mapping`, CLI1/wrapper3/cleanup false. Это runtime-блокер,
+не основание менять policy skill или заменять начатую модельную попытку.
+
+- [x] Установить точный механизм отказа по own runtime/public receipts и source.
+  Corrected request валиден; native input1 mapping и owner verified. Все 44
+  финальных polling samples имеют enabled/visible Done, но input_port_context
+  unobserved и finish_wizard не разрешён. `calculator done available` — общая
+  метка finishWizard; конфигурация/Execute Join ещё не достигнуты. Exact DOM
+  conjunct/caption отсутствует в сохранённом trace и пока не доказан.
+  Evidence `candidate/abc-pareto-groups/1/forensic/join-diagnosis.json`, SHA256
+  `5bd0562275400f8cd4be775795da17807fb93a2a1dbc2204907635ddaf218b2c`.
+- [ ] Выполнить отдельный deterministic native diagnostic без LLM, с неизменными
+  candidate resources и явно отдельным instrumented entry для fixed read-only
+  NavigationPanel capture. Сохранить actual input1 caption/visibility/bounds/icon
+  и подтвердить failed predicate до минимальной TDD-правки, если она нужна.
+  Diagnostic не входит в модельные слоты/acceptance; исходная попытка сохраняется.
+
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
 **Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под

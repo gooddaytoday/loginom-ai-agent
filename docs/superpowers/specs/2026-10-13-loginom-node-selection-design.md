@@ -342,6 +342,13 @@ Task 3: 18 пакетов/CSV привязаны к own Save/Export receipts; SH
 
 Task 3 завершён: 18 слотов в исходном порядке, oracle/calculation18, policy12, JS9/9/9; final audit2654bfc1 и addenda, исходные outcomes сохранены.
 
+Candidate ABC/1 остановился на стандартном Join/input1: request и native mapping
+валидны, но input_port_context unobserved не разрешает finish_wizard. Кнопка Done
+enabled/visible во всех 44 финальных polls; конкретный breadcrumb DOM conjunct
+не сохранён. Это не подтверждённый capability gap и не повод менять skill.
+Для причины готовится отдельный native diagnostic без LLM с fixed read-only
+NavigationPanel capture; immutable candidate и original model slot не меняются.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

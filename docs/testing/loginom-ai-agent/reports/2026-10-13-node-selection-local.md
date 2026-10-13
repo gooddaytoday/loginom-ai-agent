@@ -472,6 +472,19 @@ audit не заявляется. Evidence `candidate/abc-pareto-groups/1/`. Live
 нарушение политики и не основание менять skill. Проверка причины и собственная
 server-session recovery выполняются отдельно; исходные outcomes не переписываются.
 
+## Join forensic
+
+`forensic/join-diagnosis.json` SHA256
+`5bd0562275400f8cd4be775795da17807fb93a2a1dbc2204907635ddaf218b2c`:
+corrected request и оба upstream preflight valid; input1 native mapping/owner
+verified. Во всех 44 финальных polls Done visible/enabled, но input_port_context
+unobserved, finish_wizard отсутствует. Input0 в том же runtime был observed
+с caption «Главная таблица». Exact breadcrumb DOM второго входа не сериализован:
+конкретный failed conjunct пока не доказан, product patch преждевременен.
+Сохранённые source/runtime hashes сверены с immutable candidate. Отдельный
+instrumented diagnostic с fixed read-only NavigationPanel capture готовится
+без LLM и без изменения acceptance payload.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.
