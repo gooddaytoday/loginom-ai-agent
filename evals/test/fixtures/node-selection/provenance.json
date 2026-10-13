@@ -28,5 +28,8 @@
       }
     ],
     "projection": "Admitted and terminal/reconciled operation records only; UI checkpoints/parameters/trace omitted. Runtime identity/catalog metadata retained. UUIDs anonymized consistently with history fixture."
+  },
+  "pilotPackage": {
+    "projection": "Native pilot XML members only, node/document GUIDs consistently anonymized to history; binary execution payload omitted. Used solely by the real XML inspector, never executed."
   }
 }

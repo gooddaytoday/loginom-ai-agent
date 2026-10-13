@@ -2,12 +2,58 @@ import { expect, test } from "bun:test"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
+import { createHash } from "node:crypto"
 import { unzip } from "../src/artifact"
 import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance } from "../src/node-selection"
 import type { SelectionRuntime } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
 import pilotRuntime from "./fixtures/node-selection/pilot-runtime.json"
+
+test("offline audit certifies the complete native pilot independently of selection policy", async () => {
+  const directory = await pilotDirectory()
+  try {
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(0)
+    expect(await Bun.file(path.join(directory, "selection-audit.json")).json()).toMatchObject({
+      policyStatus: "passed", oraclePassed: true, calculationPassed: true, historyComplete: true, runtimeSettled: true,
+    })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+async function pilotDirectory() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-complete-"))
+  await mkdir(path.join(directory, "artifact/results"), { recursive: true })
+  await Bun.write(path.join(directory, "parts.json"), JSON.stringify(pilotHistory.snapshot))
+  await Bun.write(path.join(directory, "events.jsonl"), pilotHistory.events.map((event) => JSON.stringify(event)).join("\n"))
+  await Bun.write(path.join(directory, "tool-outputs.json"), "[]")
+  const manifests = []
+  for (const runtime of pilotRuntime) {
+    const relative = `runtime/generations/1/chats/${createHash("sha256").update(pilotHistory.snapshot.sessionID).digest("hex")}/attempts/fixture-attempt`
+    await mkdir(path.join(directory, relative), { recursive: true })
+    for (const [name, content] of [["session.json", JSON.stringify(runtime.session)],
+      ["execution-events.jsonl", runtime.events.map((event) => JSON.stringify(event)).join("\n")]]) {
+      await Bun.write(path.join(directory, relative, name!), content!)
+      manifests.push({ path: `${relative}/${name}`, sha256: createHash("sha256").update(content!).digest("hex") })
+    }
+  }
+  await Bun.write(path.join(directory, "runtime-journals.json"), JSON.stringify(manifests))
+  const prefix = "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1"
+  const pinned = { model: "openai/gpt-6-sol-fast", variant: "medium", expectedSkillDigest: pilotRuntime[0]!.session.skillRevision }
+  await Bun.write(path.join(directory, "pins.json"), JSON.stringify({ ...pinned, manifestSha256: "b".repeat(64),
+    tasks: { "sales-by-category": { inputHashes: { "dataset.csv": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8" } } },
+  }))
+  await Bun.write(path.join(directory, "attempt.json"), JSON.stringify({ ...pinned, binaryManifestSha256: "b".repeat(64),
+    sessionID: pilotHistory.snapshot.sessionID, cliExitCode: 0, taskID: "sales-by-category", mode: "standard",
+    packagePath: prefix + ".lgp", resultPath: prefix + ".result.csv", collectionFailures: [],
+  }))
+  await Bun.write(path.join(directory, "artifact/package.lgp"), Bun.file("test/fixtures/node-selection/pilot-package.lgp"))
+  await unzip(path.join(directory, "artifact/package.lgp"), path.join(directory, "artifact/unpacked"))
+  await Bun.write(path.join(directory, "artifact/results", path.basename(prefix) + ".result.csv"),
+    Bun.file("test/fixtures/node-selection/pilot-result.csv"))
+  return directory
+}
 
 test.each(["source", "context"])("owned %s reads settle using their own contract without an apply status", (kind) => {
   const runtime: SelectionRuntime[] = structuredClone(pilotRuntime)
@@ -136,7 +182,7 @@ test("a malformed target type cannot establish a non-JavaScript call", () => {
   expect(result.failures).toContain("TOOL_INPUT_INCOMPLETE")
 })
 
-test("pilot audit reads real native XML and oracle but does not certify unfinished evidence checks", async () => {
+test("native XML and oracle alone do not certify incomplete session evidence", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-"))
   try {
     await mkdir(path.join(directory, "artifact/results"), { recursive: true })
@@ -155,7 +201,7 @@ test("pilot audit reads real native XML and oracle but does not certify unfinish
     expect(await run.exited).toBe(2)
     expect(await Bun.file(path.join(directory, "selection-audit.json")).json()).toMatchObject({
       jsNodes: 0, jsCalls: 0, oraclePassed: true, policyStatus: "incomplete", calculationPassed: false,
-      historyComplete: false, runtimeSettled: false, failures: ["AUDIT_NOT_FINALIZED"],
+      historyComplete: false, runtimeSettled: false,
     })
   } finally {
     await rm(directory, { recursive: true, force: true })

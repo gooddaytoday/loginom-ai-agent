@@ -224,7 +224,8 @@ function readApply(part: unknown, parts: unknown[]) {
   }]
 }
 
-function receipt(part: Record<string, unknown>): unknown {
+export function readSelectionReceipt(part: unknown): unknown {
+  if (!record(part)) return undefined
   if (!record(part.state)) return undefined
   if (record(part.state.metadata) && part.state.metadata.truncated === true) return undefined
   const value = part.state.status === "error" ? part.state.error : part.state.output
@@ -238,6 +239,8 @@ function receipt(part: Record<string, unknown>): unknown {
     return first
   } catch { return undefined }
 }
+
+function receipt(part: Record<string, unknown>): unknown { return readSelectionReceipt(part) }
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
