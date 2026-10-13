@@ -108,10 +108,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         run.calls++
         let id: string | undefined
         try {
-          const runtime = await service.runtime(run.lease.generation, run.chat)
-          run.captureRuntime=runtime
           const captureRun=input.run, authorization=input.authorization
+          const captureLease=run.lease, captureGeneration=captureLease.generation
+          const assertCaptureGeneration=()=>{
+            if(state.closed || run.released || runs.get(captureRun)!==run || run.lease!==captureLease
+                || !Number.isSafeInteger(captureGeneration) || captureGeneration<1
+                || captureLease.generation!==captureGeneration)
+              throw Error("LOGINOM_RECOVERY_REQUIRED")
+          }
+          const runtime = await service.runtime(captureGeneration, run.chat)
+          run.captureRuntime=runtime
           const assertCapture=()=>{
+            assertCaptureGeneration()
             if(state.closed || run.released || runs.get(captureRun)!==run
                 || !service.authorizeCapture?.(authorization,owner,captureRun,run.chat,run.lease))
               throw Error("LOGINOM_RECOVERY_REQUIRED")
@@ -131,7 +139,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             return
           }
           await runtime.close()
+          // Runtime exit legitimately updates lost/currentness; the original
+          // lease generation must still hold before settlement and reply.
+          assertCaptureGeneration()
           await service.journal.settle(id, true)
+          assertCaptureGeneration()
           run.active.delete(id)
           reply({ id: data.id, result })
         } catch (error) {
