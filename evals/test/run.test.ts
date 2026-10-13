@@ -97,6 +97,7 @@ test("main --dry-run --repeat 2: статусы по фикстурам, поп�
     const byTask = Object.fromEntries(summary.tasks.map((task) => [task.id, task]))
     const attempts = byTask["group-sum-qty"]!.attempts
     expect(attempts.map((item) => item.status)).toEqual(["completed", "completed"])
+    expect(attempts.map((item) => item.slot_id)).toEqual(["default", "default"])
     expect(attempts[0]!.artifact_origin).toBe("receipt")
     expect(attempts[0]!.judge_status).toBe("skipped")
     expect(Object.keys(attempts[0]!).includes("stop")).toBe(false)

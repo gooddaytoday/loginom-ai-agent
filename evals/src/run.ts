@@ -274,7 +274,7 @@ export async function runAttempt(input: {
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base: AttemptResult = {
     ...emptyResult(input.task.id, input.attempt, input.profileRecovered),
-    slot_id: input.slotId ?? "legacy",
+    slot_id: input.slotId ?? "default",
     ...(input.initialInfraAttempt ? { infra_retry: { initial: input.initialInfraAttempt } } : {}),
   }
   return attemptBody(input, base).catch(async (error: unknown) => {
