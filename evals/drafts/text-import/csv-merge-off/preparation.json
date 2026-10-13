@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/csv/csv-merge-off",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1733,
+      "sha256": "a132b4d097811fdb291c80f4cd6b166b039cf961be0c9d2a97c32c1ee073b9ec"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3952,
+      "sha256": "328b5277558d97dc93897acd69e9fc359a699809930c2e3d313cacaee6f17027"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5309,
+      "sha256": "841bdad9ad3069aadffd62224f597a7a4d7449b17a09c1eeed3ee9beddf6bbc5"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3835,
+      "sha256": "a69ecce582925339c8255f79459b0688c7146f1149d0ac288bf01e327b9ab741"
+    },
+    {
+      "path": "data/merge_off.csv",
+      "bytes": 188,
+      "sha256": "8f0e40c946b3b722144bee7dcf78d2252c8b999132e5d0b89b843894f6ef8b74"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1867,
+      "sha256": "2eb83c918a42b97b2becd523f51c2e3682a35a06f52000d2191d2ec8fa5e7af6"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

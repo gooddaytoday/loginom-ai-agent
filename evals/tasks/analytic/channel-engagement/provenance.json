@@ -1,0 +1,62 @@
+{
+  "task_id": "channel-engagement",
+  "dataset_sha256": {
+    "dataset.csv": "0eef4cfbe24e5ac4bcb33be3e902ccd0c9f0a6136f2be92935d75a206b4f5f9a"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "95f64bf0068137ca66411b0c58f38d4fab552477e8944ec9134ffa3092fb5770"
+  },
+  "reference_sha256": "a6b6f2cf23e8e774a291af01b24e6b053039ddff38dfd007a2638e48102f3f65",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-channel-engagement-3.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/e6050604aeab6348069f4b37ba2cc11d5ad65abc45e7eee27c8f3374e0910256-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": true,
+    "hint": "Подсказка: до группировки умножь engagement_rate на 100 и в группировке возьми простое среднее этой колонки — это avg_engagement_pct. Не взвешивай по views. Не открывай список выходных колонок калькулятора и не исключай поля. Не читай локальными инструментами каталог профиля и пути /user.",
+    "session_id": "ses_f0366048effex7FQmIIHSUamZr",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T15:32:17+03:00",
+    "duration_s": 600,
+    "tokens": {
+      "input": 54690,
+      "output": 3008,
+      "reasoning": 247
+    },
+    "tool_calls": 21,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-channel-engagement-3.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task56-telegram-bot"
+}

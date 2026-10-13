@@ -1,0 +1,12 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGCrossTabEngine",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  }
+}

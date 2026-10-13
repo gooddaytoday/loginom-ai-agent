@@ -1,5 +1,21 @@
 # Eval-прогоны Loginom AI Agent: дизайн MVP
 
+## Утверждённый контракт compare — 2026-10-05
+
+Для реализации compare приоритет имеет [утверждённый контракт](2026-10-05-evals-compare-verdict-design.md)
+и [план выполнения](../plans/2026-10-05-evals-compare-verdict.md).
+Единица сравнения — задача: равные веса, три отдельные оси completion/oracle/structure,
+pass^1/pass^k, консервативные границы Hoeffding с confidence=0.95 и margin=0.5,
+три verdict плюс отдельный non-inferiority и наблюдаемый guard 3/3 → 0/3.
+Старые неизвестные поля и неполное происхождение оценки не доказывают сравнимость.
+Structural score требует полной явной axis-разметки и сохранённого snapshot;
+evaluation_contract_hash фиксирует рубрику, судью и порог каждой оценки.
+Этот раздел заменяет прежнее ограничение «статистический вердикт не вычисляется».
+Реализация в ветке `compare-verdict` проверена 2026-10-05: 285 тестов,
+typecheck и 880 000 offline-сравнений. Подробные результаты и ограничения —
+в [checkpoint реализации](../plans/2026-10-05-evals-compare-verdict.md).
+Новый live baseline после axis-разметки не выполнен.
+
 Пользователь подтвердил 18 сентября 2026: нужна система eval-прогонов, которая между изменениями кода агента отвечает на вопрос «агент стал строить сценарии Loginom лучше или хуже». Приоритет — минимально работающая метрика как можно скорее. Весь код живёт в `evals/`; остальной репозиторий не меняется, кроме одной ссылки в module map корневого `AGENTS.md`. Реализация ведётся строго через TDD (skill `tdd`: одна проверка поведения → минимальная реализация → следующая).
 
 Решения brainstorming 18.09.2026:
@@ -66,6 +82,184 @@ Dock (OpenViking):
 
 ## Статусы, оценка и метрики
 
+### Изоляция неудачной попытки — 2026-10-02
+
+Код реализации ограничен `evals/`. Неудачная `AMBIGUOUS`-операция не
+восстанавливается внутри продуктового runtime и не объявляется отменённой или
+успешной. Обычный бюджет попытки неизменен; раннего прерывания и автоматического
+повтора по AMBIGUOUS нет. Следующий кейс допускается только после подтверждённого
+завершения локальных процессов предыдущей попытки и подготовки eval-профиля.
+
+`AttemptResult.environment_cleanup` — необязательный совместимый объект:
+`{status: "confirmed" | "failed" | "not_run", evidence: string | null,
+error: string | null}`. Отсутствие поля в историческом отчёте означает «не
+проверялось». `cleanup_error` сохраняет прежний смысл ошибки удаления storage
+артефакта. `environment_cleanup_error_count` и
+`environment_cleanup_checked_count` считаются независимо от качества, по всем
+попыткам, включая interrupted. Cleanup не меняет status, score, pass,
+oracle_pass, failure_kind и знаменатели качества. Пересудейство сохраняет его.
+
+`runAgent` и management используют общий supervisor Linux subreaper + `/proc` без
+новых зависимостей. Собственный процесс определяется по UID, PID/starttime,
+PPID, PGID/SID и наблюдённому происхождению. Chromium дополнительно требует
+точного executable выбранного bundle и нового собственного browser-profile.
+До запуска сохраняется baseline; scanner работает не реже чем каждые 100 мс.
+Окно запуска Chromium опрашивается каждые 10 мс без очереди устаревших scans:
+Chromium может заменить argv за десятки миллисекунд. Exact binding сохраняется
+как birth-bound receipt, полные argv/environment в доказательства не входят.
+Каждый CLI запускается отдельным Linux subreaper (Bun FFI, libc `prctl`), который
+сохраняет наблюдаемую ancestry при double-fork helpers и закрывается последним.
+Одноразовая команда передаётся через частный capsule и удаляется до dispatch;
+авторизация setup передаётся только stdin. Единственный ledger связывает identity, origin и admission pending/allowed/refused.
+Origins — launcher, проверенный CLI, parent либо subreaper. PGID/SID сохраняются
+для аудита и свежих проверок, но не присваивают процесс.
+Adopted процесс с потерянной parent chain не становится обычным разрешённым
+descendant: при выбранном browser он остаётся pending до проверки CLI identity
+либо browser/helper admission. Неизвестный executable вне bundle и его потомки
+также запрещают сигнал и переход, даже без наблюдённой связи с конкретным browser.
+Наблюдённые origins и два финальных прохода сохраняются в процессном доказательстве. После browser
+binding обычный интервал возвращается к 100 мс; новое окно запуска требует
+ускоренного наблюдения тем же observer. Перед
+сигналом identity и участники группы проверяются заново. Legacy numeric PGID,
+имя процесса, одиночный argv/cwd match не разрешают kill. Неизвестный owner,
+unreadable relevant identity, changed identity или непроверенный browser/helper
+означают failed cleanup, без завершения чужих процессов. Linux private
+eval-profile не используется одновременно ручным CLI/Desktop.
+
+На timeout/abort SIGINT grace остаётся 30 с, затем SIGTERM 5 с и SIGKILL;
+подтверждение cleanup ограничено 60 с. Два пустых прохода через 100 мс
+подтверждают отсутствие наблюдённых own процессов и релевантных blockers.
+Отдельный эксклюзивный harness lease не занимает продуктовый `.writer`.
+Lease привязан к realpath профиля; существующий symlink и прямой путь имеют
+один lease и одну process-group регистрацию. Канонический путь используется
+в CLI environment и во всём конвейере проверки, writer release и pruning.
+Stale writer удаляется только после process proof и проверки неизменных inode
+и owner. Все setup/status/recover также должны завершиться подтверждённо.
+
+Перед acknowledge/pruning сохраняются redacted execution-events только из
+собственных runtime-каталогов, перечень и SHA256 файлов. Auth/config/browser
+profile не архивируются. Ошибка архива запрещает prune и следующий кейс.
+Проверка подключения использует тот же формат attempts в namespace `validation`;
+точный binding требует нового наблюдённого каталога и того же origin/executable.
+Наблюдённые пути сохраняются в receipt после удаления validation chat продуктом.
+Validation не создаёт execution journal; его уже удалённый временный каталог
+отмечается в manifest `removed_validation_directories`. Исчезновение обычного
+`runtime` до архива остаётся ошибкой. Pruning принимает только точные собственные
+attempts обоих namespaces, не долговечные настройки или профиль браузера целиком.
+Подробности сохраняются в `cleanup.json`. Partial capture явно обозначается;
+закрытие pipe не доказывает завершение процесса. Исходные events/run/result
+сохраняются даже при ошибке cleanup; она не превращает no_artifact/failed/timeout
+в infra_error или пустой harness_error. Cleanup выполняется также перед stop
+по exit 2/3. Failed cleanup пишет result, summary/report и stopped_reason,
+возвращает код 1 и не запускает следующий кейс. Guard/ledger/runtime остаются.
+
+Confirmed означает только локальное завершение и готовность профиля. Это не
+доказательство rollback или освобождения серверной сессии Loginom. `/proc`
+ledger ограничен наблюдаемой моделью launcher; сомнение приводит к stop.
+Harness lease не даёт атомарного handoff с неподчиняющимся внешним CLI.
+Независимые process audits выполняются в том же PID namespace, что launcher:
+отсутствие host PID в отдельном sandbox namespace не является process proof.
+
+Приёмка защиты перехода завершена 2026-10-02 на harness `a2bf34b77` и неизменном
+установленном CLI 0.1.17: 228 tests pass, typecheck/diff-check pass; control
+no_artifact → completed с проверенными A=15/B=25, адресные budget/low-liquidity
+no_artifact с confirmed cleanup и прежними quality scores=0. Подробные pins,
+процессные/архивные доказательства и пределы — в
+[отчёте приёмки](../../testing/loginom-ai-agent/reports/2026-10-02-evals-cleanup-acceptance.md).
+Восстановление AMBIGUOUS внутри прежней Session этим контрактом не реализовано.
+
+### Уточнение контракта стабилизации — 2026-10-01
+
+Следующие правила уточняют прежний MVP-контракт и имеют приоритет над его
+описаниями ниже:
+
+- `infra_error` — известная ошибка запуска Loginom/профиля до создания сессии,
+  без вызовов инструментов и расхода токенов. Отсутствие сессии само по себе
+  не позволяет скрывать неизвестную ошибку агента. Инфраструктурная попытка
+  сохраняется с `score/pass = null`, судья пропущен.
+- После `infra_error` harness один раз повторяет ту же задачу с тем же номером
+  попытки, prompt, workspace и именем пакета. Повтор разрешён только после
+  существующей подтверждённой очистки процессов, освобождения собственного
+  stale `.writer` и проверки готовности профиля; failed cleanup останавливает
+  прогон. Ctrl+C до повтора запрещает новый запуск. `no_artifact`, `failed`,
+  `timeout`, `harness_error` и `interrupted` автоматически не повторяются.
+- На повторе обычные поля `<task>/<attempt>/result.json` и единственной записи
+  `tasks[].attempts[]` описывают последний запуск. Необязательный
+  `infra_retry: { initial: AttemptResult }` хранит исходный `infra_error` с его
+  cleanup и телеметрией; исходные файлы переносятся в
+  `<task>/<attempt>/infra-error/` до нового запуска, а `result.json` копируется:
+  корневой результат остаётся доступным и при Ctrl+C во время архива.
+  При чтении summary вложенный `initial` проходит проверку формы AttemptResult
+  и соответствует исходному `infra_error` той же задачи и номера попытки,
+  без вложенного повтора; некорректные данные дают exit 2. Повторный `infra_error`
+  завершает эту попытку без третьего запуска. Качество считается по последнему
+  результату; исходный сбой не становится дополнительной quality-попыткой.
+  `infra_error_count` и cleanup-счётчики учитывают оба запуска; затраты и
+  длительность сохраняют действующее исключение `interrupted` из spend.
+  Report показывает оба исхода. `--judge-only` сохраняет
+  `infra_retry.initial` и пересуживает только последний запуск. Старые результаты
+  без `infra_retry` сохраняют прежний смысл; исторические файлы не мигрируются.
+- `interrupted`, `harness_error`, `infra_error` не входят в знаменатель метрик
+  качества и разброс баллов; их число выводится отдельно. Ошибка судьи с
+  `pass = null` не входит в знаменатель `pass_rate`. Если oracle уже доказал
+  неверный результат, сохраняется `pass = false` даже при ошибке судьи;
+  `score = null` и `judge_status: error` сохраняют факт отказа судьи. Реальные затраты и
+  длительность непрерванных запусков сохраняются и при сбое инфраструктуры.
+- `pass` требует порога баллов и прохождения всех пунктов
+  `required: true` и `requires_result_file`. Необязательный `required` — строго
+  boolean, по умолчанию false; входит в хеш рубрики. Импорт, расчёты, условия,
+  сортировка и экспорт существующих core/analytic-задач обязательны: правильный
+  CSV не компенсирует неверные настройки графа. При наличии `oracle.csv` полная
+  детерминированная сверка экспортного CSV обязательна. Колонки сопоставляются
+  по точным именам (регистр и пробелы значимы), порядок колонок не проверяется;
+  недостающая, лишняя или повторяющаяся колонка — провал с перечислением имён.
+  Число и порядок строк и текстовые значения совпадают; числа сравниваются по
+  абсолютному допуску `oracle_tolerance` (неотрицательное число, по умолчанию `0.01`).
+  Результат записывается отдельно в `oracle_pass`/`oracle_error`. В калибровке
+  positive с oracle и near-miss проверяют синтетический CSV без исполнения агента;
+  result/run-пункты исключены только согласно разделу «Калибровка судьи».
+- Непройденная калибровка сохраняет отчёт и завершается кодом 1.
+- Агент получает явный `--variant` из `EVAL_AGENT_VARIANT` (`default`, если
+  не задан). Summary фиксирует переданный вариант; CLI пока не возвращает
+  подтверждение фактически выбранного reasoning в JSON-событиях.
+- В binary-режиме идентичность агента берётся из разрешённого пути, SHA256
+  бинарника и соседнего `cli-manifest.json`; git harness записывается отдельно.
+  Хеш входов включает неизменяемый шаблон хвоста промпта; хеш рубрики включает
+  oracle и его допуск; судья фиксирует также SHA256 JSON-схемы вердикта.
+  Сохраняются эффективные лимиты времени задач и ревизия skill из квитанций.
+- `compare` проверяет также variant, схему судьи и лимиты задач. Идентичность
+  агента — сравниваемая величина, её изменение допускается. Старые прогоны
+  с неизвестными полями явно обозначаются. Таблица показывает наблюдаемые
+  знаковые дельты; она не доказывает улучшение или регрессию. Неравное или
+  неполное покрытие задач сопровождается предупреждением.
+- Каталоги без `task.json` пропускаются с предупреждением; явно выбранная
+  отсутствующая задача и невалидный существующий `task.json` остаются ошибками.
+  `--judge-only` восстанавливает каталог задач из сохранённого конфига, если
+  пользователь не передал `--tasks`. После пересудейства фактический каталог
+  рубрики сохраняется в `summary.config.tasks_dir` для следующих запусков;
+  исходный `config.json` и `agent_inputs_hash` сохраняют происхождение артефактов.
+  Попытки с `judge_status: skipped` или `no_artifact`, для которых нет артефакта,
+  получают `oracle_pass = false` при наличии oracle в текущей рубрике и `null` без него.
+  Исключённые infra/harness/interrupted попытки и отменённое пересудейство
+  остаются без изменения оценки.
+- Процессы попытки запускаются в отдельной группе. Harness ждёт завершения
+  всей группы перед снятием `.writer`; guard живого процесса не удаляется.
+  На Linux дополнительно проверяются владельцы по `/proc` (env/cwd) текущего UID;
+  незарегистрированный host с неопределённым владельцем блокирует очистку.
+  Незарегистрированные процессы не завершаются по совпадению строки argv.
+  Восстановление записывается у текущей попытки, включая последнюю. Runtime
+  attempts очищаются только после сохранения результатов и recovery, при
+  подтверждённо свободном eval-профиле. Авторизация и БД сессий сохраняются.
+  Полный preflight требует не менее 1 GiB свободного места на файловых системах
+  evals и workspace; лимит CLI заканчивается при exit, cleanup имеет свой бюджет.
+- Поиск пакета ограничен именами текущей eval-попытки; квитанции читаются из
+  последовательности JSON-документов. Файлы вне пространства имён попытки
+  не удаляются. Ошибка распаковщика отличается от невалидного пакета агента.
+
+Произвольная генерация новых near-miss, статистический критерий решения и
+`--resume` остаются отдельными расширениями стабилизации. Подготовка закреплённого
+корпуса точными XML-заменами реализована отдельно; см. «Калибровка судьи».
+
 Единица измерения — **попытка** (`attempt`): один запуск агента на одной задаче. Прогон с `--repeat N` содержит `N × tasks` попыток.
 
 Статус попытки определяется в одном месте (`cli.ts` → `run.ts`) по единой таблице:
@@ -105,7 +299,7 @@ Dock (OpenViking):
 
 `evals/tasks/<id>/`:
 
-- `task.json` — `id`, `title`, `prompt` (краткая формулировка для агента), `inputs` (относительные пути данных, передаются через `--file`; может быть пустым — тогда `--file` не передаётся), `reference` (`reference.lgp`), `spec` (`SPEC.md`), `checklist` (массив `{id, text, weight?, requires_result_file?}`; вес по умолчанию 1; `requires_result_file` по умолчанию `false` — помечает пункты, проверяемые по файлу экспорта, и исключает их из чеклиста при `--calibrate`; входит в `rubric_hash` как часть `checklist`), `expected_output` (текстовое описание oracle, например «2 строки: A=15, B=25»), `timeout_ms` (необязательно).
+- `task.json` — `id`, `title`, `prompt` (краткая формулировка для агента), `inputs` (относительные пути данных, передаются через `--file`; может быть пустым — тогда `--file` не передаётся), `reference` (`reference.lgp`), `spec` (`SPEC.md`), `checklist` (массив `{id, text, weight?, requires_result_file?}`; вес по умолчанию 1; `requires_result_file` по умолчанию `false` — помечает пункты, проверяемые по файлу экспорта, и исключает их при `--calibrate` только для чужого эталона или positive без oracle; входит в `rubric_hash` как часть `checklist`), `expected_output` (текстовое описание oracle, например «2 строки: A=15, B=25»), `timeout_ms` (необязательно).
 - `SPEC.md` — полное ТЗ; перенос README из `agent-validation`.
 - `reference.lgp`, `data/*` — копии из `agent-validation`, чтобы eval был воспроизводим по SHA этого репозитория.
 
@@ -140,7 +334,9 @@ evals/
     run.ts                   entry: прогон (диспетчер режимов --judge-only / --calibrate)
     rejudge.ts               режим --judge-only
     calibrate.ts             режим --calibrate
-    compare.ts               entry: сравнение двух прогонов
+    compare.ts               entry: Markdown и CLI сравнения двух прогонов
+    compare-analysis.ts      task-paired quality, reliability, coverage и verdict
+    evaluation.ts            rubric snapshot и fingerprint контракта оценки
     fail.ts                  EvalFailure с кодом выхода
     judge-prompt.md          шаблон инструкции судьи
     verdict.schema.json      JSON-схема ответа судьи
@@ -157,7 +353,7 @@ evals/
   results/<run-id>/          gitignored
 ```
 
-Runtime-зависимостей нет: Bun built-ins и внешние команды `docker`, `codex`, `unzip`, `git`, `pgrep`. Dev-зависимости (`typescript`, `@types/bun`) ставятся `bun install` внутри `evals/` — отдельный `evals/bun.lock`; каталог не входит в workspaces корня, root `package.json` не меняется. Команды выполняются из `evals/`: `bun run src/run.ts ...`, `bun test`, `bun typecheck`; Bun сам подхватывает `evals/.env`.
+Runtime-зависимостей нет: Bun built-ins и внешние команды `docker`, `codex`, `unzip`, `git`, `pgrep`; подготовка near-miss дополнительно требует `zip` и `xmllint`. Dev-зависимости (`typescript`, `@types/bun`) ставятся `bun install` внутри `evals/` — отдельный `evals/bun.lock`; каталог не входит в workspaces корня, root `package.json` не меняется. Команды выполняются из `evals/`: `bun run src/run.ts ...`, `bun test`, `bun typecheck`; Bun сам подхватывает `evals/.env`.
 
 Переменные `.env` (в `.env.example` — выбранные значения):
 
@@ -192,10 +388,11 @@ Runtime-зависимостей нет: Bun built-ins и внешние ком�
 - `profile.ts`: `ensureProfile(config) → { dir, cliEnv }` — создаёт профиль первой management-командой, выполняет `setup --stdin-json`, пишет `config/loginom-ai-agent.json` (`permission: {"loginom_*": "allow"}` и блок провайдера из `.env`, если задан); `assertAuth(profile, model)` — провайдер модели должен присутствовать в `$PROFILE/data/auth.json` либо быть описан блоком провайдера в конфиге, иначе печатается точная команда `providers login` для этого профиля и выход 2; `releaseStaleWriter(profile)` — снимает `.writer`, только если `pgrep -f <dir профиля>` пуст; `recoverIfNeeded(profile) → { recovered: boolean, view }` — `loginom status --format json`; при непустых `recoveries` выполняет `loginom recover --acknowledge --format json` и повторяет `status`. Успех — `recoveries` пусты и `state = ready` (с `recovered = true`, если acknowledge выполнялся); транзитное `starting` ожидается повторными `status` до 10 с; любое другое состояние после повтора (`recoverable-error`, `pending`, недоступный Loginom) — отказ восстановления с текстом `state`/`failure` в причине остановки прогона.
 - `cli.ts`: `runAgent({ command, env, model, prompt, files, workdir, timeoutMs, outDir, signal }) → AgentRun`, где `AgentRun = { exitCode, timedOut, interrupted, durationMs, sessionId?, saveReceipts: string[], nodeReceipts: string[], actionManifestSha256?, finalText?, cost, tokens, errors: string[], failureKind?, counters: { toolCalls, loginomToolCalls, toolErrors, memoryToolCalls } }`. Чистая `parseEvents(lines) → …` используется тестами. `command` для `source` — `bun run src/standalone.ts` с cwd `packages/agent`; для `binary` — `EVAL_CLI_BIN`; для `fake` — `bun fixtures/fake-cli.ts` с `EVAL_TASK_ID` в окружении. `signal` — AbortSignal harness'а для Ctrl+C.
 - `artifact.ts`: `fetchArtifact({ source, candidates, resultPattern, since, outDir }) → Artifact | undefined`, где `Artifact = { origin: "receipt" | "instructed" | "scan", packagePath, localLgp, unpackedDir, resultFiles: string[], ambiguous: string[] }`; `cleanupArtifact({ source, artifact })` удаляет из хранилища ровно те файлы, которые были скопированы (`packagePath` и `resultFiles`), ничего по маске. `source` — `docker` (`docker exec ls`, `docker cp`, `docker exec rm -f`) или `dir:<path>` (`/<username>/<имя>` → `<path>/<имя>`; для `dir:` очистка не выполняется). Игнорирует `.~lgp`; при `scan` берёт новейший `.lgp` с mtime позже `since`, остальные кандидаты перечисляет в `ambiguous`. После `unzip -o -q` проверяет наличие `Unit_*/Unit.xml`.
-- `judge.ts`: `judgeTask({ task, run?, artifact, outDir, judge, signal }) → Judged | JudgeError`, где `Judged = { verdict, score, pass, items, attempts: 1 | 2 }`. `judgeTask` сам вызывает `scoreVerdict` и повторяет `codex exec` один раз при ненулевом выходе, таймауте, невалидном JSON или `ScoreError`; `EVAL_JUDGE_TIMEOUT_MS` действует на каждый вызов. `run` отсутствует при калибровке — тогда `agent-final-message.md`, `tools-summary.md`, `node-readbacks.md` содержат заглушку «недоступно: калибровка». Чистая `scoreVerdict(checklist, verdict) → { score, pass, items } | ScoreError` тестируется отдельно.
+- `judge.ts`: `judgeTask({ task, run?, artifact, outDir, judge, signal }) → Judged | JudgeError`, где `Judged = { verdict, score, structural_score, pass, items, attempts: 1 | 2 }`. `judgeTask` сам вызывает `scoreVerdict` и повторяет `codex exec` один раз при ненулевом выходе, таймауте, невалидном JSON или `ScoreError`; `EVAL_JUDGE_TIMEOUT_MS` действует на каждый вызов. `run` отсутствует при калибровке — тогда `agent-final-message.md`, `tools-summary.md`, `node-readbacks.md` содержат заглушку «недоступно: калибровка». Чистая `scoreVerdict(checklist, verdict, threshold) → { score, structural_score, pass, items } | ScoreError` тестируется отдельно.
 - `report.ts`: чистые `aggregate(attempts, config) → Metrics` и `aggregateTask(attempts) → TaskMetrics`; `writeSummary(runDir, summary)`; `renderReport(summary) → string`.
 - `run.ts`: preflight → профиль → цикл попыток → summary. Код выхода 0 при завершённом или прерванном по Ctrl+C прогоне независимо от метрик, 2 при отказе preflight/конфигурации/профильного блока, 1 при остановке прогона из-за `harness_error` с остановкой или аварии harness.
-- `compare.ts`: чистая `compare(a, b) → string` и entry `compare.ts <run-a> <run-b>`.
+- `compare-analysis.ts`: чистая `analyzeComparison(a,b,options?)`; validated JSON input через `parseComparisonSummary`.
+- `compare.ts`: `compare(a,b,options?) → string` и entry `compare.ts <run-a> <run-b> [--margin 0.5] [--confidence 0.95] [--k 3]`.
 
 ## Конвейер прогона
 
@@ -253,7 +450,24 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 
 ## Калибровка судьи
 
-`run.ts --calibrate` проверяет рубрику и судью до трат на агента, без Loginom и docker. Для каждой задачи создаются две синтетические попытки в `results/<run-id>-calibrate/<task-id>/{positive,negative}/`: `positive` — артефакт = распакованный собственный `reference.lgp`; `negative` — артефакт = `reference.lgp` следующей задачи по кругу (при одной задаче `negative` пропускается). `agent-final-message.md`, `tools-summary.md`, `node-readbacks.md` содержат пометку «недоступно: калибровка», файлы результата отсутствуют. Судья вызывается как обычно. В каталоге калибровки пишутся `config.json` и `calibration.json` (структурированный аналог отчёта: `judge.*`, `rubric_hash`, по задачам `positive_score`/`negative_score` и пункты); обычный `summary.json` не создаётся — калибровка не является прогоном и в `compare` не участвует. Отчёт `calibration.md`: таблица задач с `positive_score` и `negative_score`; ожидание — `positive ≥ 90` и `negative ≤ 40` (пороги в конфиге `EVAL_CALIBRATION_POSITIVE_MIN`/`EVAL_CALIBRATION_NEGATIVE_MAX`); нарушение — предупреждение с именами пунктов, на которых судья ошибся. Пункт о файле результата в `positive` ожидаемо непройден (эталон файл не содержит) — рубрика калибровки учитывает это, исключая пункты с `requires_result_file: true` из чеклиста для калибровки; поле необязательное в `task.json`, по умолчанию `false`.
+run.ts --calibrate проверяет судью без агента, Loginom и docker. Positive с oracle получает синтетический CSV из oracle; проверяются result-пункты, requires_run исключены. Без oracle сохраняется прежнее исключение result-пунктов. Negative — следующий чужой эталон, result/run-пункты исключены; при одной задаче он пропускается. Пороги positive ≥90 и negative ≤40 сохраняются.
+
+Корпус evals/calibration/<task-id>/cases.json описывает источники (относительный путь → SHA256), случаи {id, kind, edits: [{file, from, to, count}], result_csv, expected_failed, expected_oracle_pass}. kind: sort/aggregate/threshold/filter/column. CSV и рецепты независимого пересчёта (reproduce: точные python_edits и/или sort/drop_last/exclude_channel) версионируются рядом. Проверка script/check-calibration-corpus.py воспроизводит исходный oracle и все мутанты в временных копиях, проверяет XML и неизменность топологии; Python при самой калибровке не нужен. Обязательные исходные хэши: task.json, reference, spec, inputs и oracle; corpus также закрепляет oracle.py. Источники, ID, пути, замены и фактический oracle проверяются до вызовов судьи; повреждение корпуса — EvalFailure/exit 2. Случаи готовятся из собственного reference, архив пересобирается; ожидания не передаются судье. calibrate(config, corpusDir?) сохраняет CLI и допускает отдельный каталог корпуса для проверок публичного интерфейса.
+
+После всех XML-замен каждого случая изменённые файлы проверяются системным `xmllint --nonet --noout` до пересборки ZIP и вызовов судьи. Ошибка XML или отсутствие `xmllint` — EvalFailure/exit 2; отказ судьи по всем пунктам из-за повреждённого XML не может засчитываться как обнаруженный near-miss. Задачи без случаев корпуса не требуют `zip`/`xmllint`.
+
+Near-miss требует провала всех expected_failed и совпадения oracle с expected_oracle_pass. Score не заменяет эти условия. calibration.json содержит calibration_hash, near_miss_coverage и строки с case_id, expected_failed, expected_oracle_pass, oracle_pass/error, expectations_met; calibration.md показывает те же проверки. Промахи/ошибки судьи дают exit 1 после отчёта, успешная калибровка — exit 0. summary.json не создаётся. Неописанные задачи сохраняют старую калибровку и явно имеют нулевое покрытие near-miss.
+
+Приёмка 2026-10-06: все 35 analytic-задач и 113 мутаций, **183/183**,
+gpt-6-astra/high, один промпт, exit 0, без ошибок и предупреждений. Positive —
+100/oracle=true, foreign — 0–33, все near-miss удовлетворяют обоим ожиданиям.
+Промпт требует проверки каждой части составного пункта и настроек отбора
+на всём пути к экспорту; совпадающий CSV не доказывает правильность условия XML.
+Рубрики, пороги и ожидания при настройке промпта не ослабляются; после изменения
+промпта весь набор выполняется заново.
+[Отчёт с SHA и хэшами](../../testing/loginom-ai-agent/reports/2026-10-06-calibration-near-miss.md)
+подтверждает сохранённые синтетические артефакты, без выполнения пакетов в Loginom
+и без нового baseline агента.
 
 ## Отчёты и сравнение
 
@@ -261,7 +475,7 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 
 `report.md`: метрики шапкой (с `scored_count`/`excluded_count`, `failure_kinds`, `memory_tool_calls`); таблица задач с агрегатами и разбросом (`min_score`–`max_score`, `completed/attempts`); таблица попыток (статус, код, `failure_kind`, score, pass, длительность, стоимость, строка резюме судьи); раздел отказов с именами ошибок из событий (в том числе `CLI_PERMISSION_REJECTED` и провайдерные отдельно) и первыми строками stderr; предупреждение, если `memory_tool_calls > 0`; раздел «Остатки в хранилище» — файлы `eval-<run-id>-*`, которые harness видел (`docker exec ls` в конце прогона), но не удалял, с готовой командой очистки.
 
-`compare.ts <run-a> <run-b>`: проверка сравнимости и окружения; предупреждение о неполном покрытии, если у одного из прогонов `interrupted: true` или `stopped_reason` (разный `total`); дельты метрик; таблица по задачам «completion a → b», «mean_score a → b» с ▲/▼ и разброс; `repeat` обоих прогонов в шапке. Результат в stdout и `results/compare-<a>-vs-<b>.md`.
+`compare.ts <run-a> <run-b> [--margin 0.5] [--confidence 0.95] [--k 3]`: проверка сравнимости, окружения и покрытия; task-paired completion/oracle/structure с интервалом, verdict и отдельным NI; pass^1/pass^k и observed guard; справочные дельты и разброс. Результат в stdout и `results/compare-<a>-vs-<b>.md`; входы не изменяются. Ошибка аргументов/summary — exit 2, штатный отчёт — exit 0. Сериализованные snapshot и evaluation provenance описаны в новом контракте выше.
 
 ## Обработка ошибок
 
@@ -327,3 +541,7 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 
 - 2026-09-18: brainstorming и grilling завершены, решения зафиксированы выше; спека прошла ревью. Реализация не начата.
 - 2026-09-18: план реализации записан: [часть 1 — фундамент](../plans/2026-09-18-evals-mvp.md) (задачи 1–5: скелет, конфиг, задачи, CLI, артефакт, отчёт) и [часть 2 — оркестратор, судья, режимы, приёмка](../plans/2026-09-18-evals-mvp-part2.md) (задачи 6–11). Разработка по `/tdd`.
+- 2026-09-18: задачи 1–10 и 11.1–11.2 реализованы в `evals/` (ветка `loginom`, `a9df2ebc1..f739c1f5d`), каждая прошла task-review с исправлениями; финальный whole-branch review закрыт (6 Important + 5 отложенных пунктов исправлены). `cd evals && bun typecheck && bun test` — 95 тестов зелёные.
+- 2026-09-18: приёмка п. 1 (`--dry-run --repeat 2`) PASS. Приёмка п. 2 (`--calibrate` живым судьёй `gpt-6-astra`/high) PASS: positive 100/100/100, negative 0/0/0 при порогах 90/40, ~40 с на вызов; рубрика заморожена как baseline.
+- 2026-09-18: приёмка п. 3 сначала отложена из-за стенда `7.5.0-alpha+build.41839` (`UI_BUILD_MISMATCH` против требуемого `7.4.2`). По ходу починены dev-bundle (`resource-manifest.json`, полная копия ресурсов Desktop) и засев каталога моделей в режиме `source`.
+- 2026-09-22: приёмка п. 3–5 закрыта. Стенд — job 1324502 ветки `7.4.2-test`, контейнер `loginom-server-7.4.2-test`. Страница `http://localhost/app/?testable=true` уже отдавала `bg.app.Version` ровно `7.4.2` (подмена строки в клиенте не потребовалась) и имела `data-tid`. Агент `xiaomi-token-plan-sgp/mimo-v2.6-pro` (source, git `5c294179a`), судья `gpt-6-astra`/high (codex-cli 0.153.4). Run `20260922-112519-5c294179a`, `--repeat 3 --label baseline`: completion_rate 0 (0/9), mean_score 0, pass_rate 0, failure_kinds recovery=6 и permission=3, tool_calls 631, около 26 мин. По задачам `calc-data-double`, `filter-active-rows`, `group-sum-qty`: min_score–max_score 0–0, completed/attempts 0/3. Пакетов `.lgp` нет. `--judge-only` на этом run-id дал те же score при замороженной рубрике; `summary.prev.json` лежит рядом с `summary.json`. `verdict.prev.json` не создавался: вердиктов не было. Ориентир шума записан в `evals/README.md`. Рубрика, `SPEC.md` и checklist не менялись.

@@ -1,0 +1,56 @@
+{
+  "id": "basket-category-width",
+  "title": "Ширина корзины и возвраты",
+  "prompt": "В прикреплённом файле dataset.csv — 500 заказов. Колонки: order_id, has_electronics, has_clothing, has_books, has_home, has_sports, total_items, order_value, returned. Каждый флаг has_* равен 0 или 1. category_count — сумма этих пяти флагов. returned равен 1, если заказ вернули, и 0 иначе. Построй в Loginom сценарий, который для каждого category_count считает число заказов, среднее order_value и return_pct — долю возвратов в процентах. Упорядочь category_count по возрастанию как число, от 0 до 5. Выгрузи один текстовый CSV с разделителем запятая и колонками category_count, orders, avg_order_value, return_pct. Значения не округляй.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "6 строк, category_count от 0 до 5. Ширина 0: orders=53, return_pct≈16.981132. Ширина 5: orders=5, return_pct=20. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; используются колонки пять флагов has_*, order_value и returned.",
+      "required": true
+    },
+    {
+      "id": "width",
+      "text": "category_count — сумма пяти флагов has_electronics, has_clothing, has_books, has_home и has_sports.",
+      "required": true
+    },
+    {
+      "id": "group-width",
+      "text": "Для каждого category_count посчитаны число заказов и среднее order_value.",
+      "required": true
+    },
+    {
+      "id": "return-share",
+      "text": "return_pct — доля заказов с returned = 1, в процентах.",
+      "required": true
+    },
+    {
+      "id": "sort-width",
+      "text": "До экспорта category_count упорядочен по возрастанию как число, от 0 до 5.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки category_count, orders, avg_order_value, return_pct. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 6 строк данных и 4 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ncategory_count,orders,avg_order_value,return_pct\n0,53,2593.831509,16.981132\n1,130,2583.669462,15.384615\n2,164,2583.295671,9.146341\n3,102,2397.148431,18.627451\n4,46,2472.026304,13.043478\n5,5,2559.226,20",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

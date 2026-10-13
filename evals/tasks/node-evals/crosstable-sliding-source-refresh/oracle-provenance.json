@@ -1,0 +1,13 @@
+{
+  "source_attachment_sha256": "2c3b17f1de317edf4cd9ce51d4b0b49488a650402966a8535062e0b34cbd11f1",
+  "computed_before_builder": true,
+  "sha256": {
+    "oracle.py": "6db6702b440e9c6a6bd5022f2c77c6a8ffc895e60697d6e07eabdc1565827cbc",
+    "initial-oracle.csv": "0baa4325e6b7d33ade72559d03ad7050135d481d02b4d543ab1d213123792daf",
+    "acceptance.json": "ebe1abc01a04ff511c803ef05d2f63f8b60fca7a5ef9ddcb69f1b62dca5ec01c",
+    "oracle.csv": "3277a0215bc654a610e07d536fde864a75a9371ef5ce7e5cb65ab61bcb5d5ef0",
+    "task.json": "b2c8ff49d91a36f680942d8a9f9eb20e64024929047b77d0bc18b4ec4c6b85f5",
+    "data/sales-initial.csv": "5a5ba125f17d901b35b48b3eddc6ff25d92f59b65c66d333451e0be2f036fb2a",
+    "data/sales-updated.csv": "a6d8b0540ef31597877930683071bbe290780df50b7beedd2770887fb04a4fff"
+  }
+}

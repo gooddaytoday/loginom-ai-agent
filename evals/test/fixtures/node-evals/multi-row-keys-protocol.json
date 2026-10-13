@@ -1,0 +1,374 @@
+[
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_1178463dd001KRz4RV0NbCcFWz",
+      "tool": "loginom_dock_artifact_deliver",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "deliver-sales-multikey-001",
+          "artifact_id": "fd6e3452-cb8f-4cf0-b8c5-0afd0ace727b",
+          "upload_grant_id": "0513ab2a-950b-46e3-a51e-ffb39a0af503",
+          "budget_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"deliver-sales-multikey-001\",\"state\":\"settled\",\"status\":\"SUCCEEDED\",\"cleanup_complete\":true,\"output\":{\"status\":\"SUCCEEDED\",\"upload_operation_id\":\"deliver-sales-multikey-001:upload\",\"destination\":\"/user/b361335be5fddf623f4e255ffc409acaeb77ee03a93325f5ee82969d3354e8ee-0-sales.csv\",\"bytes\":93,\"sha256\":\"26d9ccdb028a1b8ad3662025f6b8d451e2d5e4dbb59874aef781f89caa399790\",\"verification_id\":\"deliver-sales-multikey-001:verify\",\"cleanup_complete\":true,\"upload_completion_verified\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_artifact_deliver",
+        "time": {
+          "start": 1791395914733,
+          "end": 1791395917445
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117847a36001Sev6FHA6mXZnmL",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-multikey-001",
+          "contract_revision": "1.0.0",
+          "document_id": "1a5350fc-66af-438e-84c7-2de5ff0262de",
+          "workflow_ref": {
+            "workflow_id": "1a5350fc-66af-438e-84c7-2de5ff0262de-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "imports.text",
+            "label": "Импорт sales.csv"
+          },
+          "inputs": [],
+          "mode": "delimited",
+          "parameters": {
+            "source": {
+              "artifact_id": "fd6e3452-cb8f-4cf0-b8c5-0afd0ace727b",
+              "upload_operation_id": "deliver-sales-multikey-001:upload",
+              "bytes": 93,
+              "sha256": "26d9ccdb028a1b8ad3662025f6b8d451e2d5e4dbb59874aef781f89caa399790"
+            },
+            "settings": {
+              "source": {
+                "source_path": "/user/b361335be5fddf623f4e255ffc409acaeb77ee03a93325f5ee82969d3354e8ee-0-sales.csv",
+                "encoding": "UTF-8",
+                "rows_to_skip": 0,
+                "first_line_as_title": true
+              },
+              "format": {
+                "delimiter": ",",
+                "decimal_separator": ".",
+                "null_marker": "",
+                "text_qualifier": "\""
+              },
+              "columns": [
+                {
+                  "name": "Region",
+                  "label": "Region",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Month",
+                  "label": "Month",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Category",
+                  "label": "Category",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Amount",
+                  "label": "Amount",
+                  "type": "real",
+                  "data_kind": "Непрерывный",
+                  "used": true
+                }
+              ]
+            }
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-multikey-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791395941279,
+          "end": 1791395941351
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_11784d911001FALivxItMCv4Bq",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-multikey-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-multikey-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"32632336-4f65-4390-87ff-a97fd62ebde2\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:1\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_import\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"32632336-4f65-4390-87ff-a97fd62ebde2\"},\"receipt_ids\":[\"import-sales-multikey-001:configure\",\"import-sales-multikey-001:output_mapping\",\"import-sales-multikey-001:finish\"],\"values_are\":\"observed_ui_values\",\"source\":{\"source_path\":\"/user/b361335be5fddf623f4e255ffc409acaeb77ee03a93325f5ee82969d3354e8ee-0-sales.csv\",\"connection\":\"Локальное\",\"encoding\":\"UTF-8 (65001)\",\"rows_to_skip\":\"0\",\"first_line_as_title\":true},\"format\":{\"delimiter\":\",\",\"text_qualifier\":\"\\\"\",\"null_marker\":\"\",\"decimal_separator\":\".\"},\"columns\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":1,\"name\":\"Month\",\"label\":\"Month\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":2,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":3,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"used\":true}],\"output_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"Month\",\"label\":\"Month\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Month\"},{\"index\":2,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Category\"},{\"index\":3,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"Amount\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"import-sales-multikey-001:read\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:1\",\"ports\":[{\"port\":0,\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"fresh\":true,\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:1\",\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":1,\"name\":\"Month\",\"label\":\"Month\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":2,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":3,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\"}],\"row_count\":7,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":10,\"decimal\":\"1E+01\",\"representation\":\"binary64\",\"display_text\":\"1E+01\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":5,\"decimal\":\"5E+00\",\"representation\":\"binary64\",\"display_text\":\"5E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":7,\"decimal\":\"7E+00\",\"representation\":\"binary64\",\"display_text\":\"7E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M2\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":3,\"decimal\":\"3E+00\",\"representation\":\"binary64\",\"display_text\":\"3E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M2\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":2,\"decimal\":\"2E+00\",\"representation\":\"binary64\",\"display_text\":\"2E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":4,\"decimal\":\"4E+00\",\"representation\":\"binary64\",\"display_text\":\"4E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":6,\"decimal\":\"6E+00\",\"representation\":\"binary64\",\"display_text\":\"6E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}]],\"sample_rows\":7,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[],\"strings\":\"cached UI text; source completeness requires independent audit\"},\"table\":{\"view_guid\":\"ca5e776a-f43b-4365-acf5-4a448ec01b74\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}}],\"format_restoration\":{\"restored\":true,\"table\":{\"view_guid\":\"ca5e776a-f43b-4365-acf5-4a448ec01b74\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}},\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791395945749,
+          "end": 1791395989946
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_11785b62f001dKV0A45jiB9dpD",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "crosstable-sales-multikey-001",
+          "contract_revision": "1.0.0",
+          "document_id": "1a5350fc-66af-438e-84c7-2de5ff0262de",
+          "workflow_ref": {
+            "workflow_id": "1a5350fc-66af-438e-84c7-2de5ff0262de-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "transform.cross_table",
+            "label": "Кросс-таблица Region Month"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "1a5350fc-66af-438e-84c7-2de5ff0262de",
+                "workflow_id": "1a5350fc-66af-438e-84c7-2de5ff0262de-1",
+                "node_id": "32632336-4f65-4390-87ff-a97fd62ebde2"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "pivot",
+          "parameters": {
+            "row_keys": [
+              {
+                "kind": "input_field",
+                "name": "Region"
+              },
+              {
+                "kind": "input_field",
+                "name": "Month"
+              }
+            ],
+            "column": {
+              "kind": "input_field",
+              "name": "Category"
+            },
+            "facts": [
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "Amount"
+                },
+                "functions": [
+                  "sum"
+                ]
+              }
+            ],
+            "category_mode": "fixed",
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "limit": 0,
+            "unique_names": true
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true,
+            "coverage": "full"
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"crosstable-sales-multikey-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791396017328,
+          "end": 1791396017396
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_11786056a001ppClSdo6hxjC0g",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "crosstable-sales-multikey-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"crosstable-sales-multikey-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"a10e24cb-e155-46c6-adde-71155b9f996d\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:3\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"crosstable\",\"scope\":\"observed_before_verified_finish\",\"values_are\":\"observed_ui_values\",\"node\":{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"a10e24cb-e155-46c6-adde-71155b9f996d\"},\"receipt_ids\":[\"crosstable-sales-multikey-001:input_mapping\",\"crosstable-sales-multikey-001:configure\",\"crosstable-sales-multikey-001:node_finish\",\"crosstable-sales-multikey-001:output_mapping\",\"crosstable-sales-multikey-001:finish\",\"crosstable-sales-multikey-001:execute\",\"crosstable-sales-multikey-001:read\"],\"mode\":\"pivot\",\"category_mode\":\"fixed\",\"row_keys\":[{\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"order\":0},{\"name\":\"Month\",\"label\":\"Month\",\"type\":\"string\",\"order\":1}],\"column\":{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\"},\"columns\":[{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"order\":0}],\"facts\":[{\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"order\":0,\"functions\":[\"sum\"]}],\"options\":{\"separator\":\"|\",\"unique_names\":true,\"limit\":0,\"min_values\":0,\"min_values_by_dimension\":[{\"field\":\"Category\",\"value\":0}],\"variable_bindings\":{},\"include_null\":false,\"include_other\":false},\"output_scope\":\"observed_after_verified_execution\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:3\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A\",\"label\":\"A\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B\",\"label\":\"B\",\"type\":\"real\"}],\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"crosstable-sales-multikey-001:read\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:3\",\"ports\":[{\"port\":0,\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"fresh\":true,\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:3\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A\",\"label\":\"A\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B\",\"label\":\"B\",\"type\":\"real\"}],\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\"},{\"index\":1,\"name\":\"Month\",\"label\":\"Month\",\"type\":\"string\"},{\"index\":2,\"name\":\"A\",\"label\":\"A\",\"type\":\"real\"},{\"index\":3,\"name\":\"B\",\"label\":\"B\",\"type\":\"real\"}],\"row_count\":3,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"}},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4d31\"}},{\"type\":\"real\",\"value\":\"15\",\"decimal\":\"15\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002e40\",\"bits\":64}},{\"type\":\"real\",\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64}}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"}},{\"type\":\"string\",\"value\":\"M2\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4d32\"}},{\"type\":\"real\",\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64}},{\"type\":\"real\",\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64}}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"}},{\"type\":\"string\",\"value\":\"M1\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4d31\"}},{\"type\":\"real\",\"value\":\"4\",\"decimal\":\"4\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001040\",\"bits\":64}},{\"type\":\"real\",\"value\":\"6\",\"decimal\":\"6\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001840\",\"bits\":64}}]],\"sample_rows\":3,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"],\"strings\":\"exact_native\"},\"exact_table\":{\"rows\":[[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"},\"value\":\"N\",\"representation\":\"native_string\"},{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4d31\"},\"value\":\"M1\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002e40\",\"bits\":64},\"value\":\"15\",\"decimal\":\"15\",\"representation\":\"binary64_decimal\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64},\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\"}],[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"},\"value\":\"N\",\"representation\":\"native_string\"},{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4d32\"},\"value\":\"M2\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64},\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64},\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\"}],[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"},\"value\":\"S\",\"representation\":\"native_string\"},{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4d31\"},\"value\":\"M1\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001040\",\"bits\":64},\"value\":\"4\",\"decimal\":\"4\",\"representation\":\"binary64_decimal\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001840\",\"bits\":64},\"value\":\"6\",\"decimal\":\"6\",\"representation\":\"binary64_decimal\"}]],\"complete\":true},\"read_coverage\":{\"cells_read\":12,\"rows_read\":3,\"columns_read\":4,\"table_complete\":true},\"read_consistency\":{\"kind\":\"observed_local\",\"changed\":false,\"exclusive_operation\":true,\"stability_basis\":\"owned_static_completed_fixture\",\"atomic_snapshot\":false,\"unobserved_aba_excluded\":false},\"cell_precision\":{\"cells\":\"exact_native\",\"temporal\":\"native_serial_only\"},\"binding\":{\"read_id\":\"native-6f730cf62179e417583d01291ec300d6cb431c3e8fcfdd8b\",\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"package_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"a10e24cb-e155-46c6-adde-71155b9f996d\",\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"execution\":{\"status\":\"completed\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:3\"}},\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"]}],\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791396022742,
+          "end": 1791396063404
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_11786e92a001OODB1Vd0HrbjiX",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "export-sales-multikey-001",
+          "contract_revision": "1.0.0",
+          "document_id": "1a5350fc-66af-438e-84c7-2de5ff0262de",
+          "workflow_ref": {
+            "workflow_id": "1a5350fc-66af-438e-84c7-2de5ff0262de-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "exports.text",
+            "label": "Экспорт результата CSV"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "1a5350fc-66af-438e-84c7-2de5ff0262de",
+                "workflow_id": "1a5350fc-66af-438e-84c7-2de5ff0262de-1",
+                "node_id": "a10e24cb-e155-46c6-adde-71155b9f996d"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "delimited",
+          "parameters": {
+            "destination": "/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.result.csv",
+            "overwrite": "reject",
+            "encoding": "UTF-8",
+            "delimiter": ",",
+            "header": "names",
+            "bom": false,
+            "line_ending": "LF",
+            "text_qualifier": "\"",
+            "decimal_separator": ".",
+            "null_marker": ""
+          },
+          "finish": "execute",
+          "read": {
+            "ports": []
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"export-sales-multikey-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791396094555,
+          "end": 1791396094620
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_11787330e001i8LsDHx1ymx8Oy",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "export-sales-multikey-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"export-sales-multikey-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"059c4aff-c8c2-41de-bfa4-d97c512a64ec\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:4\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_export\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"node_id\":\"059c4aff-c8c2-41de-bfa4-d97c512a64ec\"},\"receipt_ids\":[\"export-sales-multikey-001:input_mapping\",\"export-sales-multikey-001:configure\",\"export-sales-multikey-001:finish\"],\"values_are\":\"observed_ui_values\",\"destination\":\"/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.result.csv\",\"settings\":{\"destination\":\"/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.result.csv\",\"text_qualifier\":\"\\\"\",\"decimal_separator\":\".\",\"date_separator\":\"\",\"time_separator\":\"\",\"true_value\":\"True\",\"false_value\":\"False\",\"null_marker\":\"\",\"date_format\":\"\",\"time_format\":\"\",\"delimiter\":\",\",\"encoding\":65001,\"bom\":false,\"line_ending\":0,\"header\":1},\"input_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"Month\",\"label\":\"Month\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Month\"},{\"index\":2,\"name\":\"A\",\"label\":\"A\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"A\"},{\"index\":3,\"name\":\"B\",\"label\":\"B\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"B\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"export-sales-multikey-001:read\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:4\",\"ports\":[],\"file_artifacts\":[{\"artifact_id\":\"bfdf3932-a253-4cb3-9255-aa2e902506ff\",\"destination\":\"/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.result.csv\",\"bytes\":45,\"sha256\":\"b27728feadb7e45bcb685d9bc5d2e37e9a1d79944b59d699dbc7a4e9046132e3\",\"execution_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de:145:4\",\"verification_id\":\"export-sales-multikey-001:export-download\",\"freshness_basis\":\"native_absence_check_and_completed_execution\"}]},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791396099901,
+          "end": 1791396122332
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117879bce001IkIrUJmOsbQBx1",
+      "tool": "loginom_dock_action_run",
+      "state": {
+        "status": "completed",
+        "input": {
+          "action_key": "package.save_checkpoint",
+          "parameters": {
+            "path": "/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.lgp",
+            "conflict_policy": "fail"
+          },
+          "operation_id": "save-sales-multikey-001"
+        },
+        "output": "{\"status\":\"SUCCEEDED\",\"action_key\":\"package.save_checkpoint\",\"action_revision\":\"2\",\"operation_id\":\"save-sales-multikey-001\",\"phase\":\"verified\",\"effect_possible\":true,\"output\":{\"package_ref\":{\"kind\":\"package\",\"path\":\"/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.lgp\",\"active_identity\":\"/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.lgp\"},\"reopened\":false,\"workflow_preserved\":true,\"save_completed\":true,\"persisted_content_verified\":false,\"workflow_continuations\":[{\"document_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de\",\"workflow_ref\":{\"tab_tid\":\"MF;cntMain;cntWorkspace;Workspace;t.br;tb-1\",\"prefix\":\"MF;TF-1\",\"workflow_id\":\"1a5350fc-66af-438e-84c7-2de5ff0262de-1\",\"navigation_path\":[{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер\",\"label\":\"\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты\",\"label\":\"Пакеты\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_lab26_builder_crosstable_multi_row_keys_2_crosstable_multi_row_keys_2\",\"label\":\"eval_lab26_builder_crosstable_multi_row_keys_2_crosstable_multi_row_keys_2\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_lab26_builder_crosstable_multi_row_keys_2_crosstable_multi_row_keys_2>Модуль1\",\"label\":\"Модуль1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_lab26_builder_crosstable_multi_row_keys_2_crosstable_multi_row_keys_2>Модуль1>Сценарий\",\"label\":\"Сценарий\"}]}}],\"reporting_constraints\":[\"Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.\",\"Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу.\"]},\"error\":null,\"cleanup_complete\":true,\"result_version\":\"user-v1\"}\n\n{\"kind\":\"dock_saved_package_state\",\"save_operation_id\":\"save-sales-multikey-001\",\"package_path\":\"/user/eval-lab26-builder-crosstable-multi-row-keys-2-crosstable-multi-row-keys-2.lgp\",\"modified\":false,\"persisted_content_verified\":false}\n\n{\"kind\":\"dock_outcome_verification\",\"schema_version\":1,\"operation_id\":\"save-sales-multikey-001\",\"action_key\":\"package.save_checkpoint\",\"receipt_sha256\":\"bbac233545eac9cc15eef04ed4380362ef50c13a4483ba246fed3e5922befe79\",\"gesture\":{\"state\":\"not_proven\"},\"domain_effect\":{\"state\":\"verified\",\"kind\":\"persist\"},\"observation\":{\"state\":\"not_provided\",\"completeness\":\"not_proven\",\"limitations\":[]},\"settings\":{\"state\":\"not_checked\"},\"data\":{\"state\":\"not_checked\"},\"goal\":{\"state\":\"not_verified\",\"obligations\":[]}}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_action_run",
+        "time": {
+          "start": 1791396128841,
+          "end": 1791396131252
+        }
+      }
+    }
+  }
+]

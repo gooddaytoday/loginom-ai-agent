@@ -77,12 +77,30 @@ async function executeProfile(
       delete process.env[key]
     })
   Object.assign(process.env, environment, { LOGINOM_AI_AGENT_CHANNEL: channel })
-  // The callback must finish backend/host cleanup before returning. Rejection keeps
-  // the guard: a failed cleanup is not evidence that another writer can safely start.
-  await execute(args, profile.paths)
-  if (temporary) {
-    await fs.unlink(path.join(temporary, "tmp"))
-    await fs.rmdir(temporary)
+  // Only the private launcher's acknowledged cleanup can release a failed start.
+  // Other callback failures retain the guard for offline recovery.
+  const failure = await execute(args, profile.paths).catch(async (error: unknown) => {
+    const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
+    if (!(error instanceof NodeHostStartupError)) throw error
+    if (error.cleanupError !== undefined) process.stderr.write("LOGINOM_HOST_CLEANUP_FAILED\n")
+    if (!error.cleanupConfirmed) throw error
+    return error
+  })
+  try {
+    if (temporary) {
+      await fs.unlink(path.join(temporary, "tmp"))
+      await fs.rmdir(temporary)
+    }
+    await profile.release()
+  } catch (error) {
+    if (!failure) throw error
+    const { NodeHostStartupError } = await import("@loginom-ai-agent/loginom-host/node-client")
+    process.stderr.write(
+      error instanceof Error && error.message === "PROFILE_OWNER_CHANGED"
+        ? "PROFILE_OWNER_CHANGED\n"
+        : "LOGINOM_HOST_CLEANUP_FAILED\n",
+    )
+    throw new NodeHostStartupError(failure.cause, false, error)
   }
-  await profile.release()
+  if (failure) throw failure
 }

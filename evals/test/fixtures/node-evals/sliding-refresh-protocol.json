@@ -1,0 +1,529 @@
+[
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a1400c001fyE2cnoGbusnAa",
+      "tool": "loginom_dock_artifact_deliver",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "deliver-sales-initial-001",
+          "artifact_id": "245a418b-0e4e-44df-b3fb-a8a55372bc23",
+          "upload_grant_id": "cbff0f48-2fd6-4dd8-9958-6bdd903974b2",
+          "budget_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"deliver-sales-initial-001\",\"state\":\"settled\",\"status\":\"SUCCEEDED\",\"cleanup_complete\":true,\"output\":{\"status\":\"SUCCEEDED\",\"upload_operation_id\":\"deliver-sales-initial-001:upload\",\"destination\":\"/user/959f17d33f9adff0b786168d3c3c981b70eb13f58a56a772bd7ed68930e03fcd-0-sales-initial.csv\",\"bytes\":48,\"sha256\":\"5a5ba125f17d901b35b48b3eddc6ff25d92f59b65c66d333451e0be2f036fb2a\",\"verification_id\":\"deliver-sales-initial-001:verify\",\"cleanup_complete\":true,\"upload_completion_verified\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_artifact_deliver",
+        "time": {
+          "start": 1791397806096,
+          "end": 1791397808785
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a1634e001ZQF2jEA6aMqNsJ",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-initial-001",
+          "contract_revision": "1.0.0",
+          "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+          "workflow_ref": {
+            "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "imports.text",
+            "label": "Продажи CSV"
+          },
+          "inputs": [],
+          "mode": "delimited",
+          "parameters": {
+            "source": {
+              "artifact_id": "245a418b-0e4e-44df-b3fb-a8a55372bc23",
+              "upload_operation_id": "deliver-sales-initial-001:upload",
+              "bytes": 48,
+              "sha256": "5a5ba125f17d901b35b48b3eddc6ff25d92f59b65c66d333451e0be2f036fb2a"
+            },
+            "settings": {
+              "source": {
+                "source_path": "/user/959f17d33f9adff0b786168d3c3c981b70eb13f58a56a772bd7ed68930e03fcd-0-sales-initial.csv",
+                "encoding": "UTF-8",
+                "rows_to_skip": 0,
+                "first_line_as_title": true
+              },
+              "format": {
+                "delimiter": ",",
+                "decimal_separator": ".",
+                "null_marker": "",
+                "text_qualifier": "\""
+              },
+              "columns": [
+                {
+                  "name": "Region",
+                  "label": "Region",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Category",
+                  "label": "Category",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Amount",
+                  "label": "Amount",
+                  "type": "real",
+                  "data_kind": "Непрерывный",
+                  "used": true
+                }
+              ]
+            }
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-initial-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791397821294,
+          "end": 1791397821347
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a1868a001lG0ceBP92Fpg0q",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-initial-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-initial-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"2a702403-ace2-4e8c-a2b9-d1326b5eb38a\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:1\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_import\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"2a702403-ace2-4e8c-a2b9-d1326b5eb38a\"},\"receipt_ids\":[\"import-sales-initial-001:configure\",\"import-sales-initial-001:output_mapping\",\"import-sales-initial-001:finish\"],\"values_are\":\"observed_ui_values\",\"source\":{\"source_path\":\"/user/959f17d33f9adff0b786168d3c3c981b70eb13f58a56a772bd7ed68930e03fcd-0-sales-initial.csv\",\"connection\":\"Локальное\",\"encoding\":\"UTF-8 (65001)\",\"rows_to_skip\":\"0\",\"first_line_as_title\":true},\"format\":{\"delimiter\":\",\",\"text_qualifier\":\"\\\"\",\"null_marker\":\"\",\"decimal_separator\":\".\"},\"columns\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"used\":true}],\"output_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Category\"},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"Amount\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"import-sales-initial-001:read\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:1\",\"ports\":[{\"port\":0,\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"fresh\":true,\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:1\",\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\"}],\"row_count\":4,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":10,\"decimal\":\"1E+01\",\"representation\":\"binary64\",\"display_text\":\"1E+01\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":7,\"decimal\":\"7E+00\",\"representation\":\"binary64\",\"display_text\":\"7E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":3,\"decimal\":\"3E+00\",\"representation\":\"binary64\",\"display_text\":\"3E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":2,\"decimal\":\"2E+00\",\"representation\":\"binary64\",\"display_text\":\"2E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}]],\"sample_rows\":4,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[],\"strings\":\"cached UI text; source completeness requires independent audit\"},\"table\":{\"view_guid\":\"b694fa7f-7889-4b5e-8ca6-e1911f36653e\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}}],\"format_restoration\":{\"restored\":true,\"table\":{\"view_guid\":\"b694fa7f-7889-4b5e-8ca6-e1911f36653e\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}},\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791397824571,
+          "end": 1791397870594
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a243ee001bmMGu5MJWFnzGp",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "cross-sales-sliding-001",
+          "contract_revision": "1.0.0",
+          "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+          "workflow_ref": {
+            "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "transform.cross_table",
+            "label": "Продажи по регионам — скользящая"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+                "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1",
+                "node_id": "2a702403-ace2-4e8c-a2b9-d1326b5eb38a"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "pivot",
+          "parameters": {
+            "row_keys": [
+              {
+                "kind": "input_field",
+                "name": "Region"
+              }
+            ],
+            "column": {
+              "kind": "input_field",
+              "name": "Category"
+            },
+            "facts": [
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "Amount"
+                },
+                "functions": [
+                  "sum"
+                ]
+              }
+            ],
+            "category_mode": "sliding",
+            "min_values": 0,
+            "limit": 0,
+            "unique_names": true,
+            "separator": "|"
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true,
+            "coverage": "full"
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"cross-sales-sliding-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791397877529,
+          "end": 1791397877575
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a25f5b001l50eJBI0YRo2Y5",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "cross-sales-sliding-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"cross-sales-sliding-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"964e0e80-1df5-413e-8541-463ff6b21853\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:3\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"crosstable\",\"scope\":\"observed_before_verified_finish\",\"values_are\":\"observed_ui_values\",\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"964e0e80-1df5-413e-8541-463ff6b21853\"},\"receipt_ids\":[\"cross-sales-sliding-001:input_mapping\",\"cross-sales-sliding-001:configure\",\"cross-sales-sliding-001:node_finish\",\"cross-sales-sliding-001:output_mapping\",\"cross-sales-sliding-001:finish\",\"cross-sales-sliding-001:execute\",\"cross-sales-sliding-001:read\"],\"mode\":\"pivot\",\"category_mode\":\"sliding\",\"row_keys\":[{\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"order\":0}],\"column\":{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\"},\"columns\":[{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"order\":0}],\"facts\":[{\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"order\":0,\"functions\":[\"sum\"]}],\"options\":{\"separator\":\"|\",\"unique_names\":true,\"limit\":0,\"min_values\":0,\"min_values_by_dimension\":[{\"field\":\"Category\",\"value\":0}],\"variable_bindings\":{},\"include_null\":false,\"include_other\":false},\"output_scope\":\"observed_after_verified_execution\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:3\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A\",\"label\":\"A\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B\",\"label\":\"B\",\"type\":\"real\"}],\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"cross-sales-sliding-001:read\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:3\",\"ports\":[{\"port\":0,\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"fresh\":true,\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:3\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A\",\"label\":\"A\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B\",\"label\":\"B\",\"type\":\"real\"}],\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\"},{\"index\":1,\"name\":\"A\",\"label\":\"A\",\"type\":\"real\"},{\"index\":2,\"name\":\"B\",\"label\":\"B\",\"type\":\"real\"}],\"row_count\":2,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"}},{\"type\":\"real\",\"value\":\"10\",\"decimal\":\"10\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002440\",\"bits\":64}},{\"type\":\"real\",\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64}}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"}},{\"type\":\"real\",\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64}},{\"type\":\"real\",\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64}}]],\"sample_rows\":2,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"],\"strings\":\"exact_native\"},\"exact_table\":{\"rows\":[[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"},\"value\":\"N\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002440\",\"bits\":64},\"value\":\"10\",\"decimal\":\"10\",\"representation\":\"binary64_decimal\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64},\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\"}],[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"},\"value\":\"S\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64},\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64},\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\"}]],\"complete\":true},\"read_coverage\":{\"cells_read\":6,\"rows_read\":2,\"columns_read\":3,\"table_complete\":true},\"read_consistency\":{\"kind\":\"observed_local\",\"changed\":false,\"exclusive_operation\":true,\"stability_basis\":\"owned_static_completed_fixture\",\"atomic_snapshot\":false,\"unobserved_aba_excluded\":false},\"cell_precision\":{\"cells\":\"exact_native\",\"temporal\":\"native_serial_only\"},\"binding\":{\"read_id\":\"native-1e8ad8b2c34b7542d7d7d9445934cbc2cd807d4761a7c6aa\",\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"package_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"964e0e80-1df5-413e-8541-463ff6b21853\",\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"execution\":{\"status\":\"completed\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:3\"}},\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"]}],\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791397880039,
+          "end": 1791397922092
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a32c95001g9svpwAs8ye7eB",
+      "tool": "loginom_dock_artifact_deliver",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "deliver-sales-updated-001",
+          "artifact_id": "b08018af-da9e-4a31-8b1d-28ad56e24ca1",
+          "upload_grant_id": "ec8364c3-199a-4a0b-b502-53f0527b3cc8",
+          "budget_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"deliver-sales-updated-001\",\"state\":\"settled\",\"status\":\"SUCCEEDED\",\"cleanup_complete\":true,\"output\":{\"status\":\"SUCCEEDED\",\"upload_operation_id\":\"deliver-sales-updated-001:upload\",\"destination\":\"/user/959f17d33f9adff0b786168d3c3c981b70eb13f58a56a772bd7ed68930e03fcd-1-sales-updated.csv\",\"bytes\":48,\"sha256\":\"a6d8b0540ef31597877930683071bbe290780df50b7beedd2770887fb04a4fff\",\"verification_id\":\"deliver-sales-updated-001:verify\",\"cleanup_complete\":true,\"upload_completion_verified\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_artifact_deliver",
+        "time": {
+          "start": 1791397933378,
+          "end": 1791397935958
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a345cf001tMa66StzaIybEc",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-update-001",
+          "contract_revision": "1.0.0",
+          "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+          "workflow_ref": {
+            "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1"
+          },
+          "target": {
+            "kind": "existing",
+            "type": "imports.text",
+            "ref": {
+              "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+              "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1",
+              "node_id": "2a702403-ace2-4e8c-a2b9-d1326b5eb38a"
+            }
+          },
+          "inputs": [],
+          "mode": "delimited",
+          "parameters": {
+            "source": {
+              "artifact_id": "b08018af-da9e-4a31-8b1d-28ad56e24ca1",
+              "upload_operation_id": "deliver-sales-updated-001:upload",
+              "bytes": 48,
+              "sha256": "a6d8b0540ef31597877930683071bbe290780df50b7beedd2770887fb04a4fff"
+            },
+            "settings": {
+              "source": {
+                "source_path": "/user/959f17d33f9adff0b786168d3c3c981b70eb13f58a56a772bd7ed68930e03fcd-1-sales-updated.csv"
+              }
+            }
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-update-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791397946479,
+          "end": 1791397946525
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a36df7001BUqxpaqXVMZPQp",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-update-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-update-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"2a702403-ace2-4e8c-a2b9-d1326b5eb38a\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:4\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_import\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"2a702403-ace2-4e8c-a2b9-d1326b5eb38a\"},\"receipt_ids\":[\"import-sales-update-001:configure\",\"import-sales-update-001:output_mapping\",\"import-sales-update-001:finish\"],\"values_are\":\"observed_ui_values\",\"source\":{\"source_path\":\"/user/959f17d33f9adff0b786168d3c3c981b70eb13f58a56a772bd7ed68930e03fcd-1-sales-updated.csv\",\"connection\":\"Локальное\",\"encoding\":\"UTF-8 (65001)\",\"rows_to_skip\":\"0\",\"first_line_as_title\":true},\"format\":{\"delimiter\":\"Запятая\",\"text_qualifier\":\"Двойная кавычка (\\\")\",\"null_marker\":\"Пустая строка\",\"decimal_separator\":\"Точка (.)\"},\"columns\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"used\":true}],\"output_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Category\"},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"Amount\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"import-sales-update-001:read\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:4\",\"ports\":[{\"port\":0,\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"fresh\":true,\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:4\",\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\"}],\"row_count\":4,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":11,\"decimal\":\"1.1E+01\",\"representation\":\"binary64\",\"display_text\":\"1,1E+01\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"C\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":4,\"decimal\":\"4E+00\",\"representation\":\"binary64\",\"display_text\":\"4E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":6,\"decimal\":\"6E+00\",\"representation\":\"binary64\",\"display_text\":\"6E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"C\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":8,\"decimal\":\"8E+00\",\"representation\":\"binary64\",\"display_text\":\"8E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}]],\"sample_rows\":4,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[],\"strings\":\"cached UI text; source completeness requires independent audit\"},\"table\":{\"view_guid\":\"0aa1c0df-efbd-48bf-9681-a6192c3afe93\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView-1\"}}],\"format_restoration\":{\"restored\":true,\"table\":{\"view_guid\":\"0aa1c0df-efbd-48bf-9681-a6192c3afe93\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView-1\"}},\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791397949223,
+          "end": 1791397996533
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a4324e0019eG56zm071z7SL",
+      "tool": "loginom_dock_node_read",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "read-cross-sales-updated-001",
+          "source_operation_id": "cross-sales-sliding-001",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"read-cross-sales-updated-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_read",
+        "time": {
+          "start": 1791398000019,
+          "end": 1791398000074
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a4417d001ASd9HS85Drz0vL",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "read-cross-sales-updated-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"read-cross-sales-updated-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"964e0e80-1df5-413e-8541-463ff6b21853\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:6\"},\"package_saved\":false,\"configuration\":{\"status\":\"not_requested\"},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"read-cross-sales-updated-001:read\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:6\",\"ports\":[{\"port\":0,\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"fresh\":true,\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:6\",\"category_fields\":[{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B\",\"label\":\"B\",\"type\":\"real\"},{\"category\":\"C\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"C\",\"label\":\"C\",\"type\":\"real\"}],\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\"},{\"index\":1,\"name\":\"B\",\"label\":\"B\",\"type\":\"real\"},{\"index\":2,\"name\":\"C\",\"label\":\"C\",\"type\":\"real\"}],\"row_count\":2,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":11,\"decimal\":\"1.1E+01\",\"representation\":\"binary64\",\"display_text\":\"1,1E+01\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"real\",\"value\":4,\"decimal\":\"4E+00\",\"representation\":\"binary64\",\"display_text\":\"4E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":6,\"decimal\":\"6E+00\",\"representation\":\"binary64\",\"display_text\":\"6E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"real\",\"value\":8,\"decimal\":\"8E+00\",\"representation\":\"binary64\",\"display_text\":\"8E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false}]],\"sample_rows\":2,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[],\"strings\":\"cached UI text; source completeness requires independent audit\"},\"table\":{\"view_guid\":\"e01298dc-58d8-47d5-a7b4-2b5916afe9f3\",\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}}],\"format_restoration\":{\"restored\":true,\"table\":{\"view_guid\":\"e01298dc-58d8-47d5-a7b4-2b5916afe9f3\",\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}},\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791398003526,
+          "end": 1791398028478
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a4c875001037dQzwwSblz3P",
+      "tool": "loginom_dock_node_apply",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "export-sales-final-001",
+          "contract_revision": "1.0.0",
+          "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+          "workflow_ref": {
+            "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "exports.text",
+            "label": "Итог CSV"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "8fc43733-608d-4e7d-898b-181974847f0f",
+                "workflow_id": "8fc43733-608d-4e7d-898b-181974847f0f-1",
+                "node_id": "964e0e80-1df5-413e-8541-463ff6b21853"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "delimited",
+          "parameters": {
+            "destination": "/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.result.csv",
+            "overwrite": "reject",
+            "encoding": "UTF-8",
+            "delimiter": ",",
+            "header": "names",
+            "bom": false,
+            "line_ending": "LF",
+            "text_qualifier": "\"",
+            "decimal_separator": ".",
+            "null_marker": ""
+          },
+          "finish": "execute",
+          "read": {
+            "ports": []
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"export-sales-final-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791398042292,
+          "end": 1791398042384
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a4e6d7001RtejzoJfxNakvC",
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "export-sales-final-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"export-sales-final-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"b2955759-553b-48bf-a424-19fc2266ef75\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:8\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_export\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"node_id\":\"b2955759-553b-48bf-a424-19fc2266ef75\"},\"receipt_ids\":[\"export-sales-final-001:input_mapping\",\"export-sales-final-001:configure\",\"export-sales-final-001:finish\"],\"values_are\":\"observed_ui_values\",\"destination\":\"/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.result.csv\",\"settings\":{\"destination\":\"/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.result.csv\",\"text_qualifier\":\"\\\"\",\"decimal_separator\":\".\",\"date_separator\":\"\",\"time_separator\":\"\",\"true_value\":\"True\",\"false_value\":\"False\",\"null_marker\":\"\",\"date_format\":\"\",\"time_format\":\"\",\"delimiter\":\",\",\"encoding\":65001,\"bom\":false,\"line_ending\":0,\"header\":1},\"input_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"B\",\"label\":\"B\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"B\"},{\"index\":2,\"name\":\"C\",\"label\":\"C\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"C\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"export-sales-final-001:read\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:8\",\"ports\":[],\"file_artifacts\":[{\"artifact_id\":\"1a20da79-9a27-4190-9be3-21c77bd03333\",\"destination\":\"/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.result.csv\",\"bytes\":24,\"sha256\":\"3277a0215bc654a610e07d536fde864a75a9371ef5ce7e5cb65ab61bcb5d5ef0\",\"execution_id\":\"8fc43733-608d-4e7d-898b-181974847f0f:145:8\",\"verification_id\":\"export-sales-final-001:export-download\",\"freshness_basis\":\"native_absence_check_and_completed_execution\"}]},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791398045796,
+          "end": 1791398071117
+        }
+      }
+    }
+  },
+  {
+    "type": "tool_use",
+    "part": {
+      "id": "prt_117a55415001JJCoP3mVTY32k9",
+      "tool": "loginom_dock_action_run",
+      "state": {
+        "status": "completed",
+        "input": {
+          "action_key": "package.save_checkpoint",
+          "operation_id": "save-sales-refresh-final-001",
+          "parameters": {
+            "path": "/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.lgp",
+            "conflict_policy": "fail"
+          }
+        },
+        "output": "{\"status\":\"SUCCEEDED\",\"action_key\":\"package.save_checkpoint\",\"action_revision\":\"2\",\"operation_id\":\"save-sales-refresh-final-001\",\"phase\":\"verified\",\"effect_possible\":true,\"output\":{\"package_ref\":{\"kind\":\"package\",\"path\":\"/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.lgp\",\"active_identity\":\"/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.lgp\"},\"reopened\":false,\"workflow_preserved\":true,\"save_completed\":true,\"persisted_content_verified\":false,\"workflow_continuations\":[{\"document_id\":\"8fc43733-608d-4e7d-898b-181974847f0f\",\"workflow_ref\":{\"tab_tid\":\"MF;cntMain;cntWorkspace;Workspace;t.br;tb-1\",\"prefix\":\"MF;TF-1\",\"workflow_id\":\"8fc43733-608d-4e7d-898b-181974847f0f-1\",\"navigation_path\":[{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер\",\"label\":\"\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты\",\"label\":\"Пакеты\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_lab26_builder_crosstable_sliding_source_refresh_1_crosstable_sliding_source_refresh_1\",\"label\":\"eval_lab26_builder_crosstable_sliding_source_refresh_1_crosstable_sliding_source_refresh_1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_lab26_builder_crosstable_sliding_source_refresh_1_crosstable_sliding_source_refresh_1>Модуль1\",\"label\":\"Модуль1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_lab26_builder_crosstable_sliding_source_refresh_1_crosstable_sliding_source_refresh_1>Модуль1>Сценарий\",\"label\":\"Сценарий\"}]}}],\"reporting_constraints\":[\"Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.\",\"Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу.\"]},\"error\":null,\"cleanup_complete\":true,\"result_version\":\"user-v1\"}\n\n{\"kind\":\"dock_saved_package_state\",\"save_operation_id\":\"save-sales-refresh-final-001\",\"package_path\":\"/user/eval-lab26-builder-crosstable-sliding-source-refresh-1-crosstable-sliding-source-refresh-1.lgp\",\"modified\":false,\"persisted_content_verified\":false}\n\n{\"kind\":\"dock_outcome_verification\",\"schema_version\":1,\"operation_id\":\"save-sales-refresh-final-001\",\"action_key\":\"package.save_checkpoint\",\"receipt_sha256\":\"d7808b87033ba4b96df85104e71dd6a96a197d81bcb9da8e9be54aacfd8cf7e2\",\"gesture\":{\"state\":\"not_proven\"},\"domain_effect\":{\"state\":\"verified\",\"kind\":\"persist\"},\"observation\":{\"state\":\"not_provided\",\"completeness\":\"not_proven\",\"limitations\":[]},\"settings\":{\"state\":\"not_checked\"},\"data\":{\"state\":\"not_checked\"},\"goal\":{\"state\":\"not_verified\",\"obligations\":[]}}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_action_run",
+        "time": {
+          "start": 1791398074395,
+          "end": 1791398076937
+        }
+      }
+    }
+  }
+]

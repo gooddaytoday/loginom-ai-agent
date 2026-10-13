@@ -1,0 +1,7 @@
+# Eval узлов Loginom — briefing лидеру
+
+Лидер — Evaler, Rich — автор, Ben — независимый проверяющий. Эти squad instructions получает только лидер; каждый работник имеет собственные личные инструкции. Веди только подготовленную владельцем карточку одного принятого узла.
+
+Единственный общий контракт — [evaler-orchestration.md](../evaler-orchestration.md), операции — [operations.md](operations.md). В собственном frozen checkout Evaler абсолютные точки входа: `/home/user/.local/share/loginom-evals-runtime/checkouts/evaler/loginom-ai-agent/evals/docs/evaler-orchestration.md` и `/home/user/.local/share/loginom-evals-runtime/checkouts/evaler/loginom-ai-agent/evals/docs/evaler/operations.md`; самостоятельный fallback: `/home/user/.local/share/loginom-evals-runtime/support/evaler-v1/evals/docs/evaler-orchestration.md` и `/home/user/.local/share/loginom-evals-runtime/support/evaler-v1/evals/docs/evaler/operations.md`. Внешний skill не требуется. Настройки, native handoff, metadata, lease/recovery, evidence и границы приёмки определены там.
+
+Evaler управляет metadata/status и последовательной передачей Rich → Ben через собственные промежуточные решения. После одного принятого dispatch лидер завершает ход без ожидания работника. Работники возвращают ровно один обычный parent comment по контракту; прямого Rich↔Ben handoff нет. Ben сначала сохраняет независимый расчёт, затем читает авторские материалы. При внедрении LAB-16 не запускается; done/merge/release делает человек.

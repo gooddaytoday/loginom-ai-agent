@@ -1,0 +1,55 @@
+{
+  "id": "first-last-touch",
+  "title": "Первое и последнее касание по каналам",
+  "prompt": "В прикреплённом файле dataset.csv — 500 конверсий. Колонки: conversion_id, touchpoint_1, touchpoint_2, touchpoint_3, conversion_value, conversion_type, customer_segment, days_to_convert. Строка None в touchpoint_2 или touchpoint_3 означает, что касания не было; это не название канала. Последнее касание — последний из touchpoint_1, touchpoint_2, touchpoint_3, который не равен None. Если touchpoint_2 равен None, а touchpoint_3 заполнен, последним считается touchpoint_3. Построй в Loginom сценарий, который для каждого канала считает четыре показателя: first_touch_conversions — число конверсий, где touchpoint_1 равен каналу; first_touch_value — сумма conversion_value этих конверсий; last_touch_conversions — число конверсий, где последнее касание равно каналу; last_touch_value — сумма conversion_value этих конверсий. Канал None в результат не включай. Упорядочь каналы по убыванию first_touch_conversions. Выгрузи один текстовый CSV с разделителем запятая и колонками channel, first_touch_conversions, first_touch_value, last_touch_conversions, last_touch_value.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "5 строк по убыванию первых касаний: Facebook, Google Ads, Direct, Organic Search, Email. Facebook: 129, 322092.72, 113, 274708.28. Email: 82, 210509.48, 95, 242114.23. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; touchpoint_1, touchpoint_2 и touchpoint_3 — текст, conversion_value — число.",
+      "required": true
+    },
+    {
+      "id": "last-touch",
+      "text": "Последнее касание — последний из трёх touchpoint, не равный строке None; путь, где touchpoint_2 равен None, а touchpoint_3 заполнен, получает последним touchpoint_3.",
+      "required": true
+    },
+    {
+      "id": "two-aggregates",
+      "text": "По каждому каналу посчитаны число и сумма conversion_value отдельно для touchpoint_1 и отдельно для последнего касания; канал None отсутствует.",
+      "required": true
+    },
+    {
+      "id": "sort-first",
+      "text": "До экспорта строки упорядочены по first_touch_conversions по убыванию.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки channel, first_touch_conversions, first_touch_value, last_touch_conversions, last_touch_value. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; обе сводки соединены по каналу, нет несвязанных узлов."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 5 строк данных и 5 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nchannel,first_touch_conversions,first_touch_value,last_touch_conversions,last_touch_value\nFacebook,129,322092.72,113,274708.28\nGoogle Ads,105,278103.47,95,229528.22\nDirect,94,237863.13,92,239980.96\nOrganic Search,90,206777.54,105,269014.65\nEmail,82,210509.48,95,242114.23",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/regressions/initial-incomplete-settings",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2320,
+      "sha256": "95ddce9b86d1f0f5ba4422ef0a158a96ed4151a733c7f93599595fbcf5cf53f4"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 2174,
+      "sha256": "a4a6b06b420728b2516be26809d6e9b63267d1eb0ef66277018e6b4593a07311"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 6588,
+      "sha256": "8a0b6bb99f25fc5dca8636269270d8f526210b7299605f47e91789d61dd3f94b"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3981,
+      "sha256": "fe64d4a3c6f91a7b9d8d4f8155b3307b8a3babe434f1a4ccdb38f7690c7a2c03"
+    },
+    {
+      "path": "data/comma_utf8.txt",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 990,
+      "sha256": "d57f1836cfa311318deb0e6247be19aefe00f46908d3a0eb7004e6da30076f38"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 568,
+      "sha256": "4b6a61e4c17f7fb7ef4aaf87bc739d3f3dadc3fa8dc2027e0ceb6dd7e00ec3d0"
+    }
+  ],
+  "adaptations": [
+    "removed corrective columns hint and positive lifecycle"
+  ],
+  "runtime": "NOT_RUN"
+}

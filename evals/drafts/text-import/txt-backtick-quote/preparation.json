@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/txt/txt-backtick-quote",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1750,
+      "sha256": "1ca384edaccdc8d2f171f058e034bad4f6202fc2ea23015f9196c40cc3035438"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3902,
+      "sha256": "ed76f106fe7337861312b9044fd997f047140a3de6fb844d70383c35826bd3c1"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5261,
+      "sha256": "8f29d3efabae48dee95113b560c814afeb4a65fe0480fa25d0caeeb12d5ad23e"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3771,
+      "sha256": "bf7e7d3d8e4632b7f18dd4d2e477c6728066ed645bb9f49584090944312717ee"
+    },
+    {
+      "path": "data/backtick_quote.txt",
+      "bytes": 200,
+      "sha256": "cc0dfcc437dbb75eab166f593104df83b23c7daf4d3dd1a5f3c0dedfe7295f0a"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1877,
+      "sha256": "b6b956abb33ba18848f526c38da5a08dd8ca75b4c34255bcef8b36aa3a378e13"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

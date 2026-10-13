@@ -1,0 +1,7 @@
+treatment_group,dosage_mg,patients,avg_improvement
+Placebo,50,51,23.456863
+Placebo,100,49,19.814286
+Placebo,200,46,18.208696
+Treatment,50,39,37.505128
+Treatment,100,57,38.096491
+Treatment,200,58,35.710345

@@ -1,0 +1,7 @@
+{
+  "id": "crosstable-column-cartesian",
+  "input": "Region,Category,Channel,Amount\nN,A,web,10\nN,A,web,5\nN,B,shop,7\nS,A,web,3\nS,B,shop,2\n",
+  "oracle": "Region,A_web,A_shop,B_web,B_shop\nN,15,,,7\nS,3,,,2\n",
+  "result_basename": "eval-reference-crosstable-column-cartesian-1-crosstable-column-cartesian-1.result.csv",
+  "source": "actual builder protocol; outputs checked against pre-builder independent oracle"
+}

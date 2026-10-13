@@ -1,0 +1,84 @@
+# Исполнение минимальных правок LAB-31
+
+Назначение владельца: crosstable-coverage → evals; F3 для полного наблюдённого имени; owned recovery registration/harness; безопасная диагностика dispatch; strict recovered_author → Ben. Product prompt/oracle/критерии и бюджеты сохраняются.
+
+## Pins до слияния
+
+- evals: 919ba97888444dbaa4bbaafa08b3decf8b25940e; origin/evals после fetch: b31ebe7d0bf5cd2cb1116ccdb90df65cd8578c2c.
+- Принятая crosstable-coverage: 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; историческая приёмка относится только к ней.
+- Перенесены только d2348afd1cc71e8eb0e30efc66dc2c05c8483a1c и f3a78b9040ab85e1f84e75f43a2f5970ba2ccfb6 из baseline-runtime (адаптация Rich/Ben profiles).
+
+## Последовательность
+
+1. Слияние четырёх кейсов: выполнено без конфликтов.
+2. TDD F3: полное имя + Output_Data-N; чужие порты/связи/дети, wizard, неоднозначность, stale.
+3. TDD recovery: settlement → registration verification до reservation → одна recovery → архив/cleanup → harness retirement → stand release. Private receipt связывает owner/запуск; unknown/foreign сохраняет lease.
+4. TDD handoff: Evaler verified recovered_author resolution receipt; только Rich → Ben; исторический ERROR сохраняется; Ben ERROR запрещает ACCEPT.
+5. Reference минимальная диагностика до повторных попыток; один ограниченный немодельный provider probe после headers timeout.
+6. Runtime/evals tests/typecheck; immutable CLI/harness/skill manifest/pins; немодельные native execute/read/export/save/cold и recovery/admission на свободном stand.
+
+## Общие ресурсы
+
+LAB-55 и соседний агент 01a10b2c-f744-7552-a6e6-338f31569ef3 используют live-ресурсы. Их профили/контейнеры/pins не менять. Пока окно занято, локальные проверки и staging. Чужие untracked docs/local.env сохранены.
+
+## Проверки исходников
+
+- `crosstable-coverage` 958b7aaac… слита в `evals` (merge 1a92fc01e); четыре кейса сохранены. Исторический ACCEPT относится к 958b7aaac….
+- F3: 4a8e4983c; точные full-label/ref/stale/wizard/foreign/link/child guards. Дополнительная native link регрессия: e15d41a04, 43 executor PASS.
+- Handoff: 26533f1eb; 23 PASS, ERROR Ben/incomplete/stale/unknown блокируются, duplicate не будит Ben повторно.
+- Provider probe: ad98e7c98; 2 PASS; HEAD один, 5 секунд, без generation/redirect/fallback; новый receipt не обходит once по source.
+- Recovery: e76296d79; 26 адресных тестов. Обычная немодельная recovery → release → следующий admission прошла в Docker network-none fixture; ERROR неизменен, registration/harness снимаются по проверенному evidence.
+- Host full evals: 496 PASS/5 SKIP/8 FAIL (закрытый stand/foreign Chromium и inaccessible foreign CLI PID). Guards сохранены. Full evals в отдельном PID namespace: **512 PASS, 0 FAIL**, 47 файлов; `bun typecheck` PASS.
+- Full client runtime, pinned Node 24.19.0: **2545 PASS, 0 FAIL, 10 SKIP** (platform/opt-in browser). Skill memory-policy/provider/bubblewrap регрессии сохранены и проходят.
+
+## Дополнительная подтверждённая гонка
+
+Изолированный полный набор воспроизвёл потерю настоящего exit receipt после SIGTERM CLI: subreaper записывал exit_code=143, но supervisor завершал launcher до чтения receipt. Новый RED-тест воспроизвёл exitCode=-1. Supervisor теперь ждёт receipt при живой проверенной identity launcher в пределах прежнего пятисекундного остатка и общего cleanup-бюджета. После исправления supervisor/transition/sandbox: 41 PASS, typecheck PASS. Sandbox-тест проверяет недоступность внешнего файла через /proc/PID/root; наличие самого root в повторно использованном PID namespace не означает утечку.
+
+## Связь после полного native-чтения
+
+Установленный CLI 0.1.18-lab31.1 подтвердил F3/full read автоматически названной Кросс-таблицы (10 точных ячеек). Следующая связь к экспорту отказала до drag с CAPABILITY_ERROR / Unsafe Loginom selector parameter: общий encoder запрещал `;` даже внутри полного наблюдённого native имени. RED executor-тест воспроизвёл FAILED вместо SUCCEEDED. Resolver теперь сначала получает текущий owned graph и сохраняет `;` только при точном совпадении полного node_label с наблюдённым именем. Суффиксы портов, чужие/неизвестные имена, опасные символы, неоднозначность, workflow/DOM freshness и native link context остаются закрытыми. Явный новый label с `;` по-прежнему NOT_APPLIED; публичная схема не меняется. Executor: 43 PASS; полный runtime и новый immutable CLI проверены отдельно. Первый native отказ сохраняется; это немодельная регрессия, не повтор product eval.
+
+## Ошибка изоляции немодельного fixture
+
+В первом frontend `server.json` имел `wsproxy=auto`: Loginom сначала выбирал прямой ws://127.0.0.1:8080/ws/, а не отдельный proxy. Фактический маршрут зафиксирован после cold read-only отказа. Поэтому первоначальные native attempts сохранены с invalid isolated-stand provenance; их нельзя использовать как подтверждение cleanup отдельного backend. На собственном frontend установлен поддерживаемый `wsproxy=true` с readback, затем наблюдены только ws://127.0.0.1:32770/app/ws/ и собственный физический storage. Неверная ручная passwordless-конфигурация собственного образа заменена штатно сгенерированным Users.cfg; raw auth/config остаются private. Адреса созданных при неверном маршруте файлов записаны в отдельный residual ledger, очистка отложена до освобождения общего backend другим агентом. Общий сервер не перезапускался, чужие процессы не завершались.
+
+После подтверждения освобождения ресурсов соседним агентом пять собственных common файлов удалены адресно: перед мутацией повторно сверены SHA256, regular/non-symlink file identity и две свежие проверки отсутствия собственных процессов. Два последующих чтения подтвердили отсутствие этих файлов и прежний StartedAt общего сервера. Package lock к этому моменту уже отсутствовал; его не удаляли, отсутствие подтверждено дважды отдельно. Никаких новых UI/model запусков или изменений чужих profiles/leases/files. Первоначальные deferred receipts остаются историческими; окончательное разрешение — в cleanup-resolution supplement.
+
+## Установленный комплект и немодельная проверка
+
+Чистый CLI `0.1.18-lab31.2` собран официальным build-cli из e15d41a047598edb8cb5dabae6c28f30ac037440. Harness и skill 1.0.5 закреплены отдельно на 6150a3c0b7569e09e81728f0d16f634c13a8d77f. Build manifest, SHA256 всех архивов, skill manifest/ссылки и readback распаковки проверены. Комплект лежит в ignored `evals/.bundle/lab31-fixes-e15d41a04/`; `release-pins.json` имеет STAGED_ONLY. LAB-55, исторические результаты и действующие installation pins не переключались. Новая независимая приёмка Ben этого комплекта не выполнялась.
+
+На собственном backend с подтверждённым ws route installed CLI прошёл import → execute → полный native read 10 ячеек автоматически названной Кросс-таблицы → export → save. Все бизнес-значения, NULL и native bytes сверены с oracle, рассчитанным до действий. Cold public CLI full-read отказал до выполнения с требованием same-session byte-verified import: guard сохранён, этот этап не заявляется PASS.
+
+Cold saved-graph проверен через установленный runtime без перенастройки: новый документ, прежние GUID, подтверждённая новая native execution group, неизменный граф и LGP, вновь созданный CSV со всеми ожидаемыми значениями; F3 порта имени с несколькими `;` прошёл. CSV SHA256 215a01645a1d794c35a67a9e78d082647c0f18bcd9af094371e550ad83a1fccb; неизменный LGP SHA256 6ca1886b789dd135d9ddf4c0bd699eb0dd5eeb2f37ad2a8f645ddbbe026d9303. Сохраняются no_server_snapshot/unobserved_aba_risk. Это проверка реализации без модели, не повтор product eval.
+
+Перед cold graph собственный пустой package lock оставил read-only toast. После минимальной диагностики, двух свежих проверок отсутствия своих процессов, сверки package hash/empty lock/container identity выполнена адресная очистка только этого lock. Отдельный тест обычного recovery → release → следующий admission уже покрывает такой lock ledger и удаление собственных registration/harness. Это Docker network-none fixture с немодельным management CLI, не installed-native recovery приёмка.
+
+14 немодельных попыток учтены в attempt ledger, включая NOT_STARTED, первоначальные ошибки test adapter и неверного маршрута. Подготовлены 31 безопасный history/event файл с original/private и safe SHA256; raw auth/env/browser DB исключены. Собственные два контейнера и сеть удалены после архивирования storage/history; две проверки подтвердили отсутствие контейнеров/сети, финальные две проверки — отсутствие своих CLI/browser процессов обоих frozen кандидатов. Исторический writer marker setup, не дошедшего до dispatch, сохранён: его не удаляли по PID/возрасту, профиль не переиспользуется. Общие residual files из ошибочного маршрута очищены после освобождения ресурса, подтверждение доставлено отдельным supplement.
+
+## Доставка
+
+Комплект доставлен через существующий SSH ControlMaster в новый private каталог `/home/user/.local/share/loginom-evals-runtime/staging/lab31-fixes-e15d41a04`. На сервере совпали sizes/SHA256 10 entries bundle manifest; readback CLI metadata (5406 manifest entries), всех 16 файлов skill и всех 206 файлов evidence прошёл. `delivery-readback.json` сохранён на сервере и локально в комплекте. Bundle manifest SHA256 df6651550fa85ec9945610dd991f66a6fae754d9a816b5908d8a585067543c2e. Это доставка/readback, не native проверка сервера; active pins/lease/profiles и модели не менялись.
+
+Дополнительный read-only ownership supplement подтвердил пять common residual файлов: четыре CSV по исходным hashes и LGP по save receipt, ровно трём созданным native GUID и пути собственного input CSV. Текущие bytes архивированы; удаление допускает только свежую сверку тех же hashes после освобождения общего backend. Supplement archive SHA256 961357d14fd4701756c28ef307447ed4377c771c0cf616f2807ff5f66588198b, manifest d80dcfc4a47916eeaaa6c1c0db355960f99c22755a35f93b5fcf6dc3f278d6b8; локальный и server readback PASS. Backend не мутировался.
+
+Окончательный cleanup-resolution архив SHA256 1f2af3fbf79b3f7e2f022d03fb40d88401bbd33dbc44e0926654ee343a91468c, manifest f6a5c0307d1356e8888902f9a6b02545f1039ea10489be08e875a705726506e3. Он доставлен в тот же staging; локальный и server SHA256/readback PASS. Исходные три поставки и первый verification archive неизменны.
+
+Окончательный `final-bundle-manifest.json` SHA256 7a5fa9c8b97dc839b9276a277f43e25db2fa44d87fd5dff94810f17f55614dbc проверен на сервере по всем 17 entries. `FINAL-STATUS.md` явно отделяет первоначальный deferred snapshot от подтверждённого cleanup. Activation остаётся STAGED_ONLY.
+
+## Checkpoint
+
+- Code SHA: e15d41a047598edb8cb5dabae6c28f30ac037440; принятые четыре case dirs побайтно соответствуют 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
+- CLI 0.1.18-lab31.2 archive SHA256: 788a1f14649180b07beeafd4b45660e978fa96e70a2279cdfd49810a1f984f1b.
+- Harness 6150a3c0b archive SHA256: d03d7d88fd39e55fbc3e194f3c4786e24cfc997fac7528f5e848d145ebd52170.
+- Skill 1.0.5/6150a3c0b archive SHA256: 84b5a106196f53cb1adc3eda95d13bb4b9a8fd35f09fb936797acecd72ff011e; manifest fe0a9e987bc803f7e028ae5e1160a60fcfe317e989211503455549f63731f39b.
+- Checks: evals 512 PASS/0 FAIL в PID namespace; typecheck PASS; client runtime 2545 PASS/0 FAIL/10 SKIP.
+- Installed fresh full read/export/save PASS; cold saved graph/CSV/F3 PASS. Public CLI cold full read — guarded refusal, не PASS.
+- Lifecycle recovery/release/next admission PASS в nonmodel fixture; installed-native recovery не заявляется проверенным.
+- Evidence archive SHA256: 5119416ff5fac0f745a076de6deb3b1c99952abba4a253696e61acd274dda92e; manifest 02aa709969af929d4dea1d44ca6d7c8b1cc137b98a5299e2a9b0687671d58f18; readback/secret scan PASS.
+- Доставлено в runtime staging/lab31-fixes-e15d41a04; server manifest/archive/readback PASS, activation STAGED_ONLY.
+- Final bundle manifest SHA256: 7a5fa9c8b97dc839b9276a277f43e25db2fa44d87fd5dff94810f17f55614dbc, все 17 entries совпали на сервере.
+- Cleanup: свои контейнеры/сеть/processes и пять common residual файлов CONFIRMED; package lock отсутствует. Cleanup supplement 1f2af3fbf79b3f7e2f022d03fb40d88401bbd33dbc44e0926654ee343a91468c, server readback PASS.
+- Ограничения: STAGED_ONLY, Ben комплекта ещё не принимал; исторический NOT_STARTED private writer marker оставлен, профиль не используется; provider/product FAIL остаются возможны.
+- Следующий шаг: после освобождения runtime stand переключить только будущие назначения по новым pins; LAB-55 и исторические результаты сохранить.

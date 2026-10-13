@@ -1,0 +1,335 @@
+import { expect, test } from "bun:test"
+import path from "node:path"
+import os from "node:os"
+import { cp, mkdir, mkdtemp, rm, stat } from "node:fs/promises"
+import { spawn } from "node:child_process"
+import { evalsRoot, repoRoot } from "../src/config"
+import { sandboxCommand } from "../src/sandbox"
+
+const builder = path.join(evalsRoot, "skills/loginom-node-eval-case/scripts/reference-attempt.ts")
+
+async function fixture(id: string) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "node-skill-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ result: { revision: "fixture" } }) })
+  const draft = path.join(root, id)
+  await cp(path.join(evalsRoot, "tasks/group-sum-qty"), draft, { recursive: true })
+  await rm(path.join(draft, "reference.lgp"))
+  const raw = await Bun.file(path.join(draft, "task.json")).json()
+  await Bun.write(path.join(draft, "task.json"), JSON.stringify({ ...raw, id }))
+  const env = { ...process.env, AGENT_REPO: repoRoot,
+    EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model", EVAL_AGENT_VARIANT: "default",
+    EVAL_PROFILE_DIR: path.join(root, "profile"), EVAL_WORKSPACE_ROOT: path.join(root, "work"),
+    EVAL_RESULTS_DIR: path.join(root, "results"), EVAL_TASK_TIMEOUT_MS: "10000",
+    EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`,
+    LOGINOM_DOCK_API_KEY: "fixture-key", LOGINOM_URL: `http://127.0.0.1:${server.port}`,
+    LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+    EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture",
+    EVAL_AGENT_PROVIDER_API_KEY: "fixture-provider", EVAL_AGENT_PROVIDER_MODEL_ID: "model" }
+  return { root, draft, env, async close() { server.stop(true); await rm(root, { recursive: true, force: true }) } }
+}
+
+async function execute(draft: string, env: Record<string, string | undefined>, attempt = "1") {
+  const run = Bun.spawn([process.execPath, builder, draft, attempt], { env, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([run.exited, new Response(run.stdout).text(), new Response(run.stderr).text()])
+  return { code, stdout, stderr }
+}
+
+async function nativeFixture(id: string, nativeFile: string, outcome = "completed") {
+  const f = await fixture(id)
+  const checkout = path.join(f.root, "checkout")
+  await cp(path.join(evalsRoot, "src"), path.join(checkout, "evals/src"), { recursive: true })
+  await cp(path.join(evalsRoot, "fixtures"), path.join(checkout, "evals/fixtures"), { recursive: true })
+  const native = await Bun.file(path.join(evalsRoot, "test/fixtures/node-evals", nativeFile)).json() as {
+    observations: { operation_id: string; recorded_at?: string; node_crosstable: unknown }[]
+    local_variable_observations?: { operation_id: string; internal_operation_id: string; action_key: string; output: unknown }[]
+  }
+  const events = [
+    ...native.observations.map(observation => ({ operation_id: observation.operation_id,
+      recorded_at: observation.recorded_at, phase: "node_observation_completed",
+      outcome: { status: "SUCCEEDED", output: { node_crosstable: observation.node_crosstable } } })),
+    ...(native.local_variable_observations ?? []).map(observation => ({ operation_id: observation.operation_id,
+      internal_operation_id: observation.internal_operation_id, phase: "node_step_completed",
+      outcome: { status: "SUCCEEDED", cleanup_complete: true, action_key: observation.action_key, output: observation.output } })),
+  ].map(event => JSON.stringify(event)).join("\n") + "\n"
+  const fake = path.join(checkout, "evals/fixtures/fake-cli.ts")
+  // Only the private fake process is adapted; supervisor, archive and collector remain the real harness.
+  await Bun.write(fake, `if (Bun.argv[2] === "run") {
+    process.env.EVAL_FAKE_RUNTIME_EVENTS = await Bun.file(new URL("native-events.jsonl", import.meta.url)).text()
+    ${outcome === "unknown-cleanup" ? 'process.env.EVAL_FAKE_CHANGED_WRITER = "1"' : ""}
+  }\n` + await Bun.file(fake).text())
+  await Bun.write(path.join(checkout, "evals/fixtures/native-events.jsonl"), events)
+  await cp(path.join(evalsRoot, "fixtures/fake/group-sum-qty.jsonl"), path.join(checkout, `evals/fixtures/fake/${id}.jsonl`))
+  if (outcome === "failed") await Bun.write(path.join(checkout, `evals/fixtures/fake/${id}.exit`), "1")
+  f.env.AGENT_REPO = checkout
+  f.env.EVAL_ARTIFACT_SOURCE = `dir:${path.join(checkout, "evals/fixtures/storage")}`
+  return { ...f, native }
+}
+
+test("node skill: completed CrossTable references collect native proof from their own confirmed archive", async () => {
+  for (const [id, nativeFile] of [
+    ["crosstable-string-counts-null", "string-counts-native.json"],
+    ["crosstable-column-cartesian", "cartesian-native.json"],
+    ["crosstable-multi-facts", "multi-facts-native.json"],
+    ["crosstable-local-variable-bindings", "bindings-native.json"],
+    ["crosstable-min-max", "min-max-native.json"],
+  ] as const) {
+    const f = await nativeFixture(id, nativeFile)
+    try {
+      const run = await execute(f.draft, f.env)
+      expect(run.stderr).toBe("")
+      expect(run.code).toBe(0)
+      const report = JSON.parse(run.stdout)
+      expect(report.result).toMatchObject({ status: "completed", environment_cleanup: { status: "confirmed" } })
+      const file = Bun.file(path.join(report.attempt_dir, "native-crosstable.json"))
+      expect(await file.exists()).toBe(true)
+      const proof = await file.json()
+      expect(proof.observations.map((observation: { node_crosstable: unknown }) => observation.node_crosstable))
+        .toEqual(f.native.observations.map(observation => observation.node_crosstable))
+      expect(proof.local_variable_observations.map((observation: { output: unknown }) => observation.output))
+        .toEqual((f.native.local_variable_observations ?? []).map(observation => observation.output))
+      const cleanup = await Bun.file(path.join(report.attempt_dir, "cleanup.json")).json()
+      const archive = cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history").path
+      for (const observation of [...proof.observations, ...proof.local_variable_observations])
+        expect(observation.source_sha256).toBe(new Bun.CryptoHasher("sha256")
+          .update(await Bun.file(path.join(archive, observation.source)).bytes()).digest("hex"))
+      expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+    } finally { await f.close() }
+  }
+}, 90000)
+
+test("node skill: failed CrossTable reference keeps observations archived without publishing native proof", async () => {
+  const f = await nativeFixture("crosstable-string-counts-null", "string-counts-native.json", "failed")
+  try {
+    const run = await execute(f.draft, f.env)
+    expect(run.stderr).toBe("")
+    expect(run.code).toBe(1)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "failed", environment_cleanup: { status: "confirmed" } })
+    expect(await Bun.file(path.join(report.attempt_dir, "native-crosstable.json")).exists()).toBe(false)
+    const cleanup = await Bun.file(path.join(report.attempt_dir, "cleanup.json")).json()
+    const archive = cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history").path
+    const journal = path.join(archive, "loginom/runtime/generations/1/chats/fake/attempts")
+    expect(await Array.fromAsync(new Bun.Glob("*/execution-events.jsonl").scan(journal))).toHaveLength(1)
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: unconfirmed CrossTable cleanup retains lease and does not publish native proof", async () => {
+  const f = await nativeFixture("crosstable-column-cartesian", "cartesian-native.json", "unknown-cleanup")
+  try {
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(2)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "completed", environment_cleanup: { status: "failed" } })
+    expect(await Bun.file(path.join(report.attempt_dir, "native-crosstable.json")).exists()).toBe(false)
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(true)
+    expect(await Bun.file(path.join(report.attempt_dir, "result.json")).json()).toEqual(report.result)
+  } finally { await f.close() }
+}, 30000)
+
+async function readSandboxSettings(root: string, profile: string, file = "loginom-ai-agent.json") {
+  const installation = await mkdtemp(path.join(root, "probe-installation-"))
+  const workspace = await mkdtemp(path.join(root, "probe-workspace-"))
+  await mkdir(path.join(installation, "bin"), { recursive: true })
+  await cp("/usr/bin/python3", path.join(installation, "bin/cli"), { dereference: true })
+  await Bun.write(path.join(installation, "cli-manifest.json"), "{}")
+  const boundary = await sandboxCommand({
+    cmd: [path.join(installation, "bin/cli"), "-c",
+      "import os,pathlib,sys; print((pathlib.Path(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE'])/'config'/sys.argv[1]).read_text())", file],
+    profileDir: profile, workdir: workspace, env: { LOGINOM_AI_AGENT_CLI_PROFILE: profile },
+  })
+  const run = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), {
+    cwd: boundary.cwd, env: boundary.env, stdio: ["ignore", "pipe", "pipe", "ignore"],
+  })
+  const [output, error, code] = await Promise.all([Array.fromAsync(run.stdout!), Array.fromAsync(run.stderr!),
+    new Promise<number | null>(resolve => run.once("close", resolve))])
+  expect(Buffer.concat(error).toString()).toBe("")
+  expect(code).toBe(0)
+  return JSON.parse(Buffer.concat(output).toString())
+}
+
+test("node skill: memory write denials reach the sandbox through the prepared profile", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json"), JSON.stringify({
+      permission: { loginom_remember: "allow", "loginom_*": "allow", loginom_dock_action_run: "deny", read: "allow" }, instructions: ["retain this setting"],
+    }))
+    expect((await execute(f.draft, f.env)).code).toBe(0)
+    const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR)
+    expect(settings.instructions).toEqual(["retain this setting"])
+    expect(settings.permission["loginom_*"]).toBe("allow")
+    expect(settings.permission.loginom_dock_action_run).toBe("deny")
+    expect(settings.permission.read).toBe("allow")
+    for (const tool of ["loginom_remember", "loginom_write", "loginom_edit", "loginom_add_resource", "loginom_forget"])
+      expect(settings.permission[tool]).toBe("deny")
+    // Permission rules use their last match; a general allow must precede the exact denials.
+    expect(Object.keys(settings.permission).indexOf("loginom_*")).toBeLessThan(Object.keys(settings.permission).indexOf("loginom_remember"))
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: assigned provider overrides stale profile settings inside the sandbox", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json"), JSON.stringify({
+      provider: { fake: { options: { baseURL: "http://stale", apiKey: "stale-key" } }, retained: { name: "retained" } },
+    }))
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(0)
+    const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR)
+    expect(settings.provider.fake.options.baseURL).toBe(f.env.EVAL_AGENT_PROVIDER_BASE_URL)
+    expect(settings.provider.fake.options.apiKey).toBe(f.env.EVAL_AGENT_PROVIDER_API_KEY)
+    expect(settings.provider.fake.models[f.env.EVAL_AGENT_PROVIDER_MODEL_ID].id).toBe(f.env.EVAL_AGENT_PROVIDER_MODEL_ID)
+    expect(settings.provider.retained.name).toBe("retained")
+    expect((await stat(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json"))).mode & 0o777).toBe(0o600)
+    expect(run.stdout).not.toContain(f.env.EVAL_AGENT_PROVIDER_API_KEY)
+    const report = JSON.parse(run.stdout)
+    expect(await Bun.file(path.join(report.run_dir, "config.json")).text()).not.toContain(f.env.EVAL_AGENT_PROVIDER_API_KEY)
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: all loaded JSON and JSONC settings preserve the assigned sandbox policy", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
+    const file = path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json")
+    await Bun.write(file, JSON.stringify({ permission: { loginom_remember: "allow", "loginom_*": "allow" }, instructions: ["keep JSON"] }))
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/config.json"), JSON.stringify({ permission: { loginom_write: "allow", "loginom_*": "deny" } }))
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.jsonc"),
+      '{ // prepared profile\n "permission": {"loginom_remember": "allow", "loginom_*": "allow", "loginom_re*": "allow",}, "instructions": ["keep JSONC"],}')
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(0)
+    const loaded = []
+    for (const name of ["config.json", "loginom-ai-agent.json", "loginom-ai-agent.jsonc"]) {
+      const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR, name)
+      loaded.push(settings.permission)
+      expect(settings.permission.loginom_remember).toBe("deny")
+      expect(settings.permission.loginom_write).toBe("deny")
+      expect(settings.provider.fake.options.baseURL).toBe(f.env.EVAL_AGENT_PROVIDER_BASE_URL)
+      expect(Object.keys(settings.permission).indexOf("loginom_*")).toBeLessThan(Object.keys(settings.permission).indexOf("loginom_remember"))
+      if (name !== "config.json") expect(settings.instructions).toEqual([name.endsWith("jsonc") ? "keep JSONC" : "keep JSON"])
+    }
+    // For these flat string rules the product merge preserves earlier key positions.
+    const effective = Object.keys(Object.assign({}, ...loaded))
+    expect(effective.indexOf("loginom_re*")).toBeLessThan(effective.indexOf("loginom_remember"))
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: draft without reference runs one fake attempt and archives cleanup", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await Bun.write(path.join(f.draft, "expected-initial.csv"), "Key,Value\nN,3\n")
+    const run = await execute(f.draft, f.env)
+    expect(run.stderr).toBe("")
+    expect(run.code).toBe(0)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ task_id: "group-sum-qty", attempt: 1, status: "completed",
+      environment_cleanup: { status: "confirmed" }, judge_status: "skipped" })
+    expect(report.source_unchanged).toBe(true)
+    expect((await Bun.file(path.join(report.run_dir, "source-hashes.json")).json())["expected-initial.csv"]).toMatch(/^[a-f0-9]{64}$/)
+    expect(await Bun.file(path.join(report.attempt_dir, "artifact/package.lgp")).exists()).toBe(true)
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+    expect(await Bun.file(path.join(f.draft, "reference.lgp")).exists()).toBe(false)
+    const saved = await Bun.file(path.join(report.run_dir, "builder-result.json")).text()
+    const duplicate = await execute(f.draft, f.env)
+    expect(duplicate.code).toBe(2)
+    expect(duplicate.stderr).toContain("EEXIST")
+    expect(await Bun.file(path.join(report.run_dir, "builder-result.json")).text()).toBe(saved)
+    const fourth = await execute(f.draft, f.env, "4")
+    expect(fourth.code).toBe(2)
+    expect(fourth.stderr).toContain("<1|2|3>")
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: diagnostic reference attempt collects its own import journal without requiring LGP", async () => {
+  const f = await fixture("txt-ambiguous-headers")
+  try {
+    const file = path.join(f.draft, "task.json")
+    const raw = await Bun.file(file).json()
+    await Bun.write(file, JSON.stringify({ ...raw, output_mode: "diagnostic", reference: undefined }))
+    const run = await execute(f.draft, f.env)
+    expect(run.stderr).toBe("")
+    expect(run.code).toBe(0)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "completed", package_path: null, environment_cleanup: { status: "confirmed" } })
+    expect(await Bun.file(path.join(report.attempt_dir, "native-import.json")).exists()).toBe(true)
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: failed measurement is preserved and confirmed cleanup releases profile", async () => {
+  const f = await fixture("filter-active-rows")
+  try {
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(1)
+    expect(JSON.parse(run.stdout).result).toMatchObject({ status: "failed", exit_code: 1,
+      environment_cleanup: { status: "confirmed" } })
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: unknown cleanup retains profile lease and measured outcome", async () => {
+  const f = await fixture("a-cleanup-failure")
+  try {
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(2)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "no_artifact", environment_cleanup: { status: "failed" } })
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(true)
+    expect(await Bun.file(path.join(report.attempt_dir, "result.json")).json()).toEqual(report.result)
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: Ctrl+C preserves interruption and runs cleanup", async () => {
+  const f = await fixture("a-ready-timeout")
+  try {
+    const run = Bun.spawn([process.execPath, builder, f.draft, "1"], { env: f.env, stdout: "pipe", stderr: "pipe" })
+    const events = path.join(f.root, "results/reference-a-ready-timeout-1/a-ready-timeout/1/events.jsonl")
+    const deadline = Date.now() + 10000
+    while (!(await Bun.file(events).exists()) && Date.now() < deadline) await Bun.sleep(50)
+    await Bun.sleep(1200)
+    run.kill("SIGINT")
+    const [code, stdout, stderr] = await Promise.all([run.exited, new Response(run.stdout).text(), new Response(run.stderr).text()])
+    expect(code).toBe(2)
+    expect(stderr).toContain("Ctrl+C")
+    const report = JSON.parse(stdout)
+    expect(report.result).toMatchObject({ status: "interrupted", interrupted: true })
+    expect(await Bun.file(path.join(report.attempt_dir, "cleanup.json")).exists()).toBe(true)
+  } finally { await f.close() }
+}, 60000)
+
+test("node skill: standalone checker accepts explicit package and CSV", async () => {
+  const caseDir = path.join(evalsRoot, "tasks/node-evals/crosstable-fixed-sum")
+  const run = Bun.spawn(["python3", path.join(evalsRoot, "skills/loginom-node-eval-case/scripts/check_reference.py"),
+    caseDir, path.join(caseDir, "reference.lgp"), path.join(caseDir, "oracle.csv")],
+    { env: { ...process.env, AGENT_REPO: repoRoot }, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([run.exited, new Response(run.stdout).text(), new Response(run.stderr).text()])
+  expect(stderr).toBe("")
+  expect(code).toBe(0)
+  expect(JSON.parse(stdout).pass).toBe(true)
+})
+
+test("node skill: checker rejects a changed CSV and a wrong node", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "node-skill-check-"))
+  try {
+    const caseDir = path.join(evalsRoot, "tasks/node-evals/crosstable-fixed-sum")
+    await cp(caseDir, root, { recursive: true })
+    const csv = path.join(root, "changed.csv")
+    const oracle = await Bun.file(path.join(root, "oracle.csv")).text()
+    await Bun.write(csv, oracle.replace(/\d/, "9"))
+    async function check(result: string) {
+      const run = Bun.spawn(["python3", path.join(evalsRoot, "skills/loginom-node-eval-case/scripts/check_reference.py"),
+        root, path.join(root, "reference.lgp"), result], { env: { ...process.env, AGENT_REPO: repoRoot }, stdout: "pipe", stderr: "pipe" })
+      const [code, stdout] = await Promise.all([run.exited, new Response(run.stdout).text()])
+      return { code, report: JSON.parse(stdout) }
+    }
+    const changed = await check(csv)
+    expect(changed.code).toBe(1)
+    expect(changed.report.pass).toBe(false)
+    const acceptance = await Bun.file(path.join(root, "acceptance.json")).json()
+    await Bun.write(path.join(root, "acceptance.json"), JSON.stringify({ ...acceptance, required_type_fragments: ["DefinitelyWrongNode"] }))
+    const wrongNode = await check(path.join(root, "oracle.csv"))
+    expect(wrongNode.code).toBe(1)
+    expect(wrongNode.report.problems.join(" ")).toContain("DefinitelyWrongNode")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

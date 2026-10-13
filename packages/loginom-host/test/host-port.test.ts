@@ -555,7 +555,7 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
   }
 }, 15000)
 
-test.each(["after-call", "during-admission", "strict-before-dispatch"])(
+test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-before-dispatch"])(
   "a chat runtime restarts at most twice in one turn: %s",
   async (exitAt) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -583,7 +583,14 @@ test.each(["after-call", "during-admission", "strict-before-dispatch"])(
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ action }) + '\\n');
-      if (action === 'kill') { process.kill(process.pid, 'SIGKILL'); return; }
+      if (action === 'kill') {
+        if (${JSON.stringify(exitAt)} === 'disconnect-before-exit') {
+          process.disconnect();
+          setTimeout(() => process.kill(process.pid, 'SIGKILL'), 50);
+          return;
+        }
+        process.kill(process.pid, 'SIGKILL'); return;
+      }
       process.send({id:m.id,result:{result:{action},recoveryPending:false,activeWork:false}});
     });
   `,
@@ -641,6 +648,13 @@ test.each(["after-call", "during-admission", "strict-before-dispatch"])(
     })
     const call = (run: string, action: string) =>
       client.request("call", { run, name: "dock_node_wait", args: { action }, userMessage: "original" })
+    const killRuntime = async () => {
+      const runtime = await host.runtime(1, createHash("sha256").update("chat").digest("hex"))
+      await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      // IPC disconnect can reject the call before the process actually exits.
+      // Replacement preparation requires the Host to observe that exit first.
+      await runtime.exited
+    }
     try {
       await waitForKnowledge(host)
       expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
@@ -654,15 +668,15 @@ test.each(["after-call", "during-admission", "strict-before-dispatch"])(
         expect(await call("one", "finish")).toEqual({ action: "finish" })
         return
       }
-      await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      await killRuntime()
       await prepareRun(client, "one")
-      await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      await killRuntime()
       await prepareRun(client, "one")
       if (exitAt === "during-admission") {
         admission.exit = true
         await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
       }
-      if (exitAt === "after-call") await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      if (exitAt === "after-call" || exitAt === "disconnect-before-exit") await killRuntime()
       await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
       await expect(prepareRun(client, "one")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
       expect(

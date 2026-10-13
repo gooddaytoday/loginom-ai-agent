@@ -1,0 +1,134 @@
+import { expect, test } from "bun:test"
+import path from "node:path"
+import os from "node:os"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { main, stamp } from "../src/run"
+import { evalsRoot } from "../src/config"
+
+const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("--calibrate: совпавшее время не перезаписывает прежнюю калибровку", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-calibration-collision-"))
+  try {
+    const now = Date.now()
+    const previous = Array.from({ length: 41 }, (_, index) => path.join(directory, "results",
+      `${stamp(new Date(now + (index - 20) * 1000))}-calibrate`))
+    await Promise.all(previous.map(async (dir) => {
+      await mkdir(dir, { recursive: true })
+      await Bun.write(path.join(dir, "config.json"), "previous config")
+      await Bun.write(path.join(dir, "calibration.json"), "previous calibration")
+    }))
+    const result = await main(["--calibrate", "--only", "group-sum-qty"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge, EVAL_RESULTS_DIR: path.join(directory, "results"),
+    })
+    expect(result.code).toBe(0)
+    expect(previous).not.toContain(result.runDir)
+    expect((await Bun.file(path.join(result.runDir, "calibration.json")).json()).run_id).toBe(path.basename(result.runDir))
+    await Promise.all(previous.map(async (dir) => {
+      expect(await Bun.file(path.join(dir, "config.json")).text()).toBe("previous config")
+      expect(await Bun.file(path.join(dir, "calibration.json")).text()).toBe("previous calibration")
+    }))
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
+
+test("--calibrate: выполненные пороги оставляют нулевой код", async () => {
+  const originalModel = process.env.JUDGE_MODEL
+  const originalCommand = process.env.EVAL_JUDGE_COMMAND
+  process.env.JUDGE_MODEL = "fake"
+  process.env.EVAL_JUDGE_COMMAND = fakeJudge
+  let runDir: string | undefined
+  try {
+    const result = await main(["--calibrate", "--only", "group-sum-qty"])
+    runDir = result.runDir
+    expect(result.code).toBe(0)
+    expect((await Bun.file(path.join(result.runDir, "calibration.json")).json()).warnings).toEqual([])
+  } finally {
+    if (originalModel === undefined) delete process.env.JUDGE_MODEL
+    else process.env.JUDGE_MODEL = originalModel
+    if (originalCommand === undefined) delete process.env.EVAL_JUDGE_COMMAND
+    else process.env.EVAL_JUDGE_COMMAND = originalCommand
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+  }
+})
+
+test("--calibrate: positive/negative для каждой задачи, предупреждение когда negative слишком высок", async () => {
+  const originalModel = process.env.JUDGE_MODEL
+  const originalCommand = process.env.EVAL_JUDGE_COMMAND
+  const originalVerdict = process.env.FAKE_CODEX_VERDICT
+  const originalExit = process.env.FAKE_CODEX_EXIT
+  const originalFlaky = process.env.FAKE_CODEX_FLAKY_MARKER
+  process.env.JUDGE_MODEL = "fake"
+  process.env.EVAL_JUDGE_COMMAND = fakeJudge
+  delete process.env.FAKE_CODEX_VERDICT
+  delete process.env.FAKE_CODEX_EXIT
+  delete process.env.FAKE_CODEX_FLAKY_MARKER
+  let runDir: string | undefined
+  try {
+    const result = await main(["--calibrate"])
+    runDir = result.runDir
+    expect(result.code).toBe(1)
+    const calibration = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(calibration.rows).toHaveLength(6)
+    expect(calibration.rows.filter((row: { kind: string }) => row.kind === "positive").every((row: { score: number }) => row.score === 100)).toBe(true)
+    // fake-судья ставит 100 всем, поэтому negative выше порога 40 — три предупреждения
+    expect(calibration.warnings).toHaveLength(3)
+    expect(await Bun.file(path.join(result.runDir, "calibration.md")).exists()).toBe(true)
+    expect(await Bun.file(path.join(result.runDir, "summary.json")).exists()).toBe(false)
+    const checklist = await Bun.file(path.join(result.runDir, "group-sum-qty", "positive", "judge", "checklist.json")).json()
+    expect(checklist).not.toContainEqual(expect.objectContaining({ id: "result-rows" }))
+    expect(checklist).not.toContainEqual(expect.objectContaining({ id: "honest-report" }))
+  } finally {
+    if (originalModel === undefined) delete process.env.JUDGE_MODEL
+    else process.env.JUDGE_MODEL = originalModel
+    if (originalCommand === undefined) delete process.env.EVAL_JUDGE_COMMAND
+    else process.env.EVAL_JUDGE_COMMAND = originalCommand
+    if (originalVerdict === undefined) delete process.env.FAKE_CODEX_VERDICT
+    else process.env.FAKE_CODEX_VERDICT = originalVerdict
+    if (originalExit === undefined) delete process.env.FAKE_CODEX_EXIT
+    else process.env.FAKE_CODEX_EXIT = originalExit
+    if (originalFlaky === undefined) delete process.env.FAKE_CODEX_FLAKY_MARKER
+    else process.env.FAKE_CODEX_FLAKY_MARKER = originalFlaky
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+  }
+}, 120_000)
+
+test("--calibrate: сбой судьи сохраняет диагностику и возвращает ненулевой код", async () => {
+  const originalModel = process.env.JUDGE_MODEL
+  const originalCommand = process.env.EVAL_JUDGE_COMMAND
+  const originalVerdict = process.env.FAKE_CODEX_VERDICT
+  const originalExit = process.env.FAKE_CODEX_EXIT
+  const originalFlaky = process.env.FAKE_CODEX_FLAKY_MARKER
+  process.env.JUDGE_MODEL = "fake"
+  process.env.EVAL_JUDGE_COMMAND = fakeJudge
+  delete process.env.FAKE_CODEX_VERDICT
+  delete process.env.FAKE_CODEX_EXIT
+  delete process.env.FAKE_CODEX_FLAKY_MARKER
+  const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-bad-ref-"))
+  let runDir: string | undefined
+  try {
+    await cp(path.join(evalsRoot, "tasks"), tasksDir, { recursive: true })
+    await cp(path.join(evalsRoot, "fixtures", "storage", "not-a-package.lgp"), path.join(tasksDir, "group-sum-qty", "reference.lgp"))
+    const result = await main(["--calibrate", "--tasks", tasksDir])
+    runDir = result.runDir
+    expect(result.code).toBe(1)
+    const calibration = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    const row = calibration.rows.find((item: { task: string; kind: string }) => item.task === "group-sum-qty" && item.kind === "positive")
+    expect(row).toMatchObject({ score: null })
+    expect(row.error).toBeTruthy()
+    expect(row.error).toContain("group-sum-qty")
+    expect(calibration.warnings.some((warning: string) => warning.includes("group-sum-qty"))).toBe(true)
+  } finally {
+    if (originalModel === undefined) delete process.env.JUDGE_MODEL
+    else process.env.JUDGE_MODEL = originalModel
+    if (originalCommand === undefined) delete process.env.EVAL_JUDGE_COMMAND
+    else process.env.EVAL_JUDGE_COMMAND = originalCommand
+    if (originalVerdict === undefined) delete process.env.FAKE_CODEX_VERDICT
+    else process.env.FAKE_CODEX_VERDICT = originalVerdict
+    if (originalExit === undefined) delete process.env.FAKE_CODEX_EXIT
+    else process.env.FAKE_CODEX_EXIT = originalExit
+    if (originalFlaky === undefined) delete process.env.FAKE_CODEX_FLAKY_MARKER
+    else process.env.FAKE_CODEX_FLAKY_MARKER = originalFlaky
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+    await rm(tasksDir, { recursive: true, force: true })
+  }
+}, 120_000)

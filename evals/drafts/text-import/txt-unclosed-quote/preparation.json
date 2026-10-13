@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/txt/txt-unclosed-quote",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1749,
+      "sha256": "c59165932c293bab679e770073469ccf94793705a49e28891cff4a673ca941b4"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 1218,
+      "sha256": "b334dd7a3ea05050806fabb9663b9b27288ddce916feece45b329c8b2e9476c9"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5875,
+      "sha256": "affeb5a6da5efbcc004c5d728a71bb8e18d4c350029c215c3ccb2537a7640b3c"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3734,
+      "sha256": "e1fc5ee52f0f53b0b4136d8970df6b64e8d2af38468f09bb4e0042611951df8d"
+    },
+    {
+      "path": "data/unclosed_quote.txt",
+      "bytes": 36,
+      "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 1132,
+      "sha256": "9a1abb337cc8645ff6569873b635e5380e18139eea63dae404e1b61fe2c69249"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 658,
+      "sha256": "fe6ac6e6d98cfd006e7599c353f924c8e0ef862643ed94f0e3193a2dd52a5d72"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

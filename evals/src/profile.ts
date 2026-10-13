@@ -1,0 +1,453 @@
+import path from "node:path"
+import os from "node:os"
+import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises"
+import { repoRoot, type EvalConfig } from "./config"
+import type { AgentCommand } from "./cli"
+import { EvalFailure } from "./fail"
+import { groupProcesses } from "./process-group"
+import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
+import { archiveDiagnostics } from "./diagnostics"
+import { sandboxCommand, assertNoDebuggers } from "./sandbox"
+
+type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
+
+const retainedProfileFiles = new Set([
+  "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
+  "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "cache/models.json", "state/model.json",
+])
+
+// Retain exact settings files, never whole data/cache/loginom directories.
+async function profileHistory(profile: string, directory = profile): Promise<string[]> {
+  return (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async (entry) => {
+    const file = path.join(directory, entry.name)
+    const relative = path.relative(profile, file)
+    if (retainedProfileFiles.has(relative)) {
+      if (!entry.isFile() || entry.isSymbolicLink()) throw new EvalFailure("Постоянный файл профиля не является обычным файлом", 2)
+      return []
+    }
+    if ([...retainedProfileFiles].some((name) => name.startsWith(relative + "/"))) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) throw new EvalFailure("Каталог настроек профиля имеет неверный тип", 2)
+      return profileHistory(profile, file)
+    }
+    if (entry.isDirectory() && !(await readdir(file)).length) return []
+    return [file]
+  }))).flat()
+}
+
+export async function assertProfileClean(profileDir: string) {
+  const profile = await realpath(profileDir)
+  await assertProfileSettled(profile)
+  if ((await profileHistory(profile)).length)
+    throw new EvalFailure("В доступном профиле осталась история; admission запрещён", 2)
+}
+
+async function assertProfileSettled(profile: string) {
+  const recovery = await readdir(path.join(profile, "loginom/recovery")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  const pending = await lstat(path.join(profile, "loginom/connection/pending.json")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (recovery.some((name) => /\.(json|tmp)$/.test(name)) || pending || await writerIdentity(profile) || !await waitProfileIdle(profile, 1_000))
+    throw new EvalFailure("Профиль имеет незавершённое состояние; перенос/admission запрещён", 2)
+}
+
+/** Move every attempt's durable evidence outside the single mounted profile. */
+export async function archiveProfileHistory(profileDir: string, archiveId: string) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(archiveId)) throw new EvalFailure("Неверный ID архива профиля", 2)
+  const profile = await realpath(profileDir)
+  await assertProfileSettled(profile)
+  const files = await profileHistory(profile)
+  const root = `${profile}.history`
+  await mkdir(root, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
+  const info = await lstat(root)
+  if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0)
+    throw new EvalFailure("Архив профиля не является закрытым каталогом", 2)
+  const archive = await mkdtemp(path.join(root, `${archiveId}-`))
+  const moved: { source: string; destination: string }[] = []
+  try {
+    for (const file of files) {
+      const destination = path.join(archive, path.relative(profile, file))
+      await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 })
+      const before = await lstat(file)
+      await rename(file, destination)
+      moved.push({ source: file, destination })
+      const after = await lstat(destination)
+      if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size)
+        throw new EvalFailure("Перенос истории профиля не подтверждён", 2)
+    }
+    await assertProfileClean(profile)
+    return archive
+  } catch (error) {
+    // A failed move must not split a database from its WAL/SHM at next admission.
+    for (const file of moved.reverse()) await rename(file.destination, file.source)
+    throw error
+  }
+}
+
+const exists = (file: string) =>
+  stat(file).then(
+    () => true,
+    () => false,
+  )
+
+export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
+  const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
+  if (out) await mkdir(out, { recursive: true, mode: 0o700 })
+  const workdir = command.mode === "binary" && args[0] === "loginom" && args[1] === "check"
+    ? await mkdtemp(path.join(os.tmpdir(), "evals-management-check-")) : undefined
+  if (workdir) await assertNoDebuggers()
+  const boundary = workdir ? await sandboxCommand({ cmd: [...command.cmd, ...args],
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir, env: command.env }) : undefined
+  const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: boundary?.cwd ?? command.cwd,
+    env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
+  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
+  if (result.processCleanup.status !== "confirmed")
+    throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
+  if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
+    await archiveDiagnostics(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.runtimeDirectories, out, command.cleanupSecrets)
+  if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
+    await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
+  if (workdir) await rm(workdir, { recursive: true })
+  return { ...result, evidenceDir: out }
+}
+
+export async function managementRuntimeDirectories(command: AgentCommand) {
+  if (!command.cleanupDir) return []
+  const directories = await readdir(command.cleanupDir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  return (await Promise.all(directories.map(async (directory) => {
+    const receipt = (await Bun.file(path.join(command.cleanupDir!, directory, "cleanup.json")).json()).processes as ProcessCleanup
+    if (receipt.status !== "confirmed") throw Error("Management process cleanup unconfirmed")
+    if (!(await Bun.file(path.join(command.cleanupDir!, directory, "diagnostics/manifest.json")).exists()))
+      throw Error("Management diagnostic archive missing")
+    return receipt.runtimeDirectories
+  }))).flat()
+}
+
+export function parseView(text: string): View | undefined {
+  const lines = text.trim().split("\n")
+  const parsed = parseJson(lines[lines.length - 1] ?? "")
+  return typeof parsed === "object" && parsed !== null && typeof (parsed as View).state === "string"
+    ? (parsed as View)
+    : undefined
+}
+
+// Guard снимаем только когда ни один процесс не ссылается на профиль (Chromium держит путь в argv).
+export async function releaseStaleWriter(profileDir: string, expected?: WriterIdentity | null, registration?: OwnedRegistration) {
+  const profile = await canonicalProfilePath(profileDir)
+  const writer = path.join(profile, ".writer")
+  const busy = await profileProcesses(profile)
+  if (busy.trim()) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.trim()}`, 2)
+  if (registration) {
+    if (profile !== profileDir || await writerIdentity(profile)) throw new EvalFailure("Registration profile/writer changed", 2)
+    await verifyOwnedRegistration(profile, registration)
+    // Only the exact attested file. The native caller must durably spend its once allowance first.
+    await unlink(`${profile}.process-group`)
+    return true
+  }
+  if (!(await exists(writer))) return false
+  if (expected !== undefined && JSON.stringify(await writerIdentity(profile)) !== JSON.stringify(expected))
+    throw new EvalFailure("Writer identity changed before release", 1)
+  await rm(`${profile}.process-group`, { force: true })
+  await rm(writer, { recursive: true, force: true })
+  return true
+}
+
+export async function waitProfileIdle(profileDir: string, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs
+  let empty = 0
+  while (Date.now() < deadline) {
+    empty = (await profileProcesses(profileDir)).trim() ? 0 : empty + 1
+    if (empty === 2) return true
+    await Bun.sleep(Math.min(100, Math.max(0, deadline - Date.now())))
+  }
+  return false
+}
+
+// Зарегистрированная группа включает host даже после завершения родительского CLI.
+async function profileProcesses(profileDir: string) {
+  const profile = await canonicalProfilePath(profileDir)
+  const marker = Bun.file(`${profile}.process-group`)
+  const group = (await marker.exists()) ? Number((await marker.text()).trim()) : undefined
+  if (group !== undefined && (!Number.isInteger(group) || group <= 0))
+    throw new EvalFailure(`Некорректная группа процессов профиля ${profileDir}`, 2)
+  const tracked = group === undefined ? [] : await groupProcesses(group)
+  const pattern = `${profile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
+  const result = await Bun.$`pgrep -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
+  if (result.exitCode > 1) throw new EvalFailure(`pgrep завершился кодом ${result.exitCode}`, 2)
+  const owners = await linuxProfileOwners(profile)
+  return [...tracked.map(String), ...owners.map(String), result.text().trim()].filter(Boolean).join("\n")
+}
+
+async function canonicalProfilePath(profileDir: string) {
+  return realpath(profileDir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return path.resolve(profileDir)
+    throw error
+  })
+}
+
+// CLI хранит профиль только в env, а runtime — в cwd; argv не доказывает idle.
+async function linuxProfileOwners(profileDir: string) {
+  if (process.platform !== "linux") return []
+  const { readFile, readlink } = await import("node:fs/promises")
+  const canonical = await canonicalProfilePath(profileDir)
+  const readable = <T>(operation: Promise<T>, known: boolean) => operation.catch((error: NodeJS.ErrnoException) => {
+    if (!known && ["EACCES", "EPERM"].includes(error.code ?? "")) return undefined
+    throw error
+  })
+  const processes = await Promise.all((await readdir("/proc")).filter((pid) => /^\d+$/.test(pid)).map(async (pid) => {
+    try {
+      if ((await stat(`/proc/${pid}`)).uid !== process.getuid?.()) return undefined
+      const status = await readFile(`/proc/${pid}/stat`, "utf8")
+      const fields = status.slice(status.lastIndexOf(")") + 2).split(" ")
+      if (["Z", "X"].includes(fields[0] ?? "")) return undefined
+      const named = status.slice(status.indexOf("(") + 1, status.lastIndexOf(")")).startsWith("loginom-ai-")
+      const args = ((await readable(readFile(`/proc/${pid}/cmdline`, "utf8"), named)) ?? "").split("\0")
+      const host = args.slice(1).some((arg) => path.basename(arg) === "node-host.mjs")
+      const cli = path.basename(args[0] ?? "") === "loginom-ai-agent-cli" || args.slice(1).some((arg) =>
+        arg === "src/standalone.ts" || arg.endsWith("/packages/agent/src/standalone.ts"))
+      const desktop = /^loginom-ai-agent(-dev|-beta)?$/.test(path.basename(args[0] ?? ""))
+      const known = named || host || cli || desktop
+      const environment = ((await readable(readFile(`/proc/${pid}/environ`, "utf8"), known)) ?? "").split("\0")
+      const roots = environment.flatMap((entry) => {
+        if (!/^LOGINOM_AI_AGENT_CLI_(PROFILE|ROOT)=/.test(entry)) return []
+        return [entry.slice(entry.indexOf("=") + 1)]
+      })
+      const canonicalRoots = await Promise.all(roots.map((root) => realpath(root).catch(() => undefined)))
+      const cwd = await readable(readlink(`/proc/${pid}/cwd`), known)
+      return {
+        pid: Number(pid), parent: Number(fields[1]),
+        owns: canonicalRoots.includes(canonical) || roots.includes(canonical) || cwd === canonical || cwd?.startsWith(`${canonical}${path.sep}`),
+        identified: canonicalRoots.some((root) => root !== undefined),
+        host, cli, desktop,
+      }
+    } catch (error) {
+      if (["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")) return undefined
+      throw new EvalFailure(`Не удалось проверить владельца профиля, PID ${pid}`, 2)
+    }
+  }))
+  const live = processes.filter((entry) => entry !== undefined)
+  return live.filter((entry) => {
+    if (entry.owns || (entry.cli && !entry.identified)) return true
+    if (!entry.host || entry.identified) return false
+    const parent = live.find((candidate) => candidate.pid === entry.parent)
+    // Без env host не раскрывает root; только живой известный parent доказывает чужой профиль.
+    return !parent || (!parent.identified && !parent.desktop)
+  }).map((entry) => entry.pid)
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
+export function agentConfigJson(config: EvalConfig) {
+  const provider = config.agent.provider
+  return {
+    permission: { "loginom_*": "allow" },
+    ...(provider
+      ? {
+          provider: {
+            [provider.id]: {
+              name: provider.id,
+              id: provider.id,
+              env: [],
+              npm: "@ai-sdk/openai-compatible",
+              models: {
+                [provider.modelId]: {
+                  id: provider.modelId,
+                  name: provider.modelId,
+                  attachment: false,
+                  reasoning: false,
+                  temperature: false,
+                  tool_call: true,
+                  release_date: "2025-01-01",
+                  limit: { context: 200_000, output: 32_000 },
+                  cost: { input: 0, output: 0 },
+                  options: {},
+                },
+              },
+              options: { apiKey: provider.apiKey, baseURL: provider.baseUrl },
+            },
+          },
+        }
+      : {}),
+  }
+}
+
+export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
+  await mkdir(config.profileDir, { recursive: true, mode: 0o700 })
+  // Native embeds the product snapshot; source mode has no catalogue without this seed.
+  const modelsCache = path.join(config.profileDir, "cache", "models.json")
+  if (config.agent.cliMode === "source" && !(await exists(modelsCache))) {
+    await mkdir(path.join(config.profileDir, "cache"), { recursive: true, mode: 0o700 })
+    await Bun.write(modelsCache, Bun.file(path.join(repoRoot, "packages", "product", "models.json")))
+  }
+  const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+  const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
+  if (fresh) {
+    const setup = await management(
+      command,
+      ["loginom", "setup", "--stdin-json", "--format", "json"],
+      JSON.stringify({
+        url: config.loginom.url,
+        username: config.loginom.username,
+        password: config.loginom.password,
+        apiKey: config.dock.apiKey,
+      }),
+    )
+    const secrets = [config.dock.apiKey, config.loginom.password].filter((s) => s.length > 0)
+    if (secrets.some((secret) => setup.stdout.includes(secret) || setup.stderr.includes(secret)))
+      throw new EvalFailure("Секрет попал в вывод loginom setup", 2)
+    if (setup.exitCode !== 0)
+      throw new EvalFailure(`loginom setup завершился кодом ${setup.exitCode}:\n${setup.stderr.trim()}`, 2)
+  }
+  await Bun.write(
+    path.join(config.profileDir, "config", "loginom-ai-agent.json"),
+    JSON.stringify(agentConfigJson(config), null, 2),
+  )
+  return { fresh }
+}
+
+export async function assertAuth(config: EvalConfig, command: AgentCommand) {
+  const providerId = config.agent.model.split("/")[0] ?? ""
+  if (config.agent.provider?.id === providerId) return
+  const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
+  const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
+  if (providerId in entries) return
+  const envLine = Object.entries(command.env)
+    .filter(([key]) => key.startsWith("LOGINOM_AI_AGENT_CLI_"))
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ")
+  throw new EvalFailure(
+    `Нет авторизации провайдера "${providerId}" в eval-профиле ${config.profileDir}.\n` +
+      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} providers login\n` +
+      "или задайте EVAL_AGENT_PROVIDER_* в evals/.env.",
+    2,
+  )
+}
+
+export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
+  const first = await status(command, exitCode)
+  const acknowledged = Boolean(first.recoveries?.length)
+  if (acknowledged) {
+    const recover = await management(command, ["loginom", "recover", "--acknowledge", "--format", "json"])
+    if (recover.exitCode !== 0)
+      throw new EvalFailure(`loginom recover завершился кодом ${recover.exitCode}:\n${recover.stderr.trim()}`, exitCode)
+  }
+  const restored = acknowledged ? await status(command, exitCode) : first
+  // Each standalone status has its own Help startup. Polling another process
+  // cannot finish that startup; an explicit check proves readiness in one host.
+  const checked = restored.state === "starting" && restored.hasApiKey === true && !restored.failure && !restored.recoveries?.length
+    ? await checkStarting(command, exitCode) : false
+  const view = checked ? restored : await settle(command, restored, exitCode)
+  if ((view.state !== "ready" && !checked) || view.recoveries?.length || view.failure)
+    throw new EvalFailure(
+      `Профиль Loginom не готов: state=${view.state} failure=${view.failure ?? "—"} recoveries=${view.recoveries?.length ?? 0}` +
+        (view.state === "unconfigured" ? " — выполните `--reset-profile` или проверьте LOGINOM_DOCK_API_KEY" : ""),
+      exitCode,
+    )
+  return { recovered: acknowledged, view }
+}
+
+async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
+  const result = await management(command, ["loginom", "check", "--format", "json"])
+  const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as
+    { ok?: unknown; code?: unknown; help?: { state?: unknown } } | null | undefined
+  if (result.exitCode !== 0 || result.sandboxError || result.timedOut || result.interrupted ||
+    receipt?.ok !== true || receipt.code !== "LOGINOM_CONNECTION_VALID" || receipt.help?.state !== "ready")
+    throw new EvalFailure("loginom check не подтвердил готовность Help в текущем CLI-процессе", exitCode)
+  await assertProfileSettled(command.env.LOGINOM_AI_AGENT_CLI_PROFILE!)
+  if (result.evidenceDir) await Bun.write(path.join(result.evidenceDir, "connection-check.json"),
+    JSON.stringify({ ok: receipt.ok, code: receipt.code, help: { state: receipt.help.state } }, null, 2))
+  return true
+}
+
+export async function resetProfile(config: EvalConfig) {
+  const busy = await profileProcesses(config.profileDir)
+  if (busy.trim()) throw new EvalFailure(`Нельзя сбросить профиль: занят процессами\n${busy.trim()}`, 2)
+  await rm(config.profileDir, { recursive: true, force: true })
+}
+
+// Вызывается после recovery и копирования артефактов; долговечные stores лежат вне attempts.
+export async function pruneRuntimeAttempts(profileDir: string, owned?: string[]) {
+  const { lstat } = await import("node:fs/promises")
+  const entries = (directory: string) =>
+    readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return []
+      throw error
+    })
+  if ((await entries(path.join(profileDir, "loginom", "recovery"))).some((entry) => /\.(json|tmp)$/.test(entry.name)))
+    throw new EvalFailure("Нельзя очистить runtime attempts: pending recovery", 2)
+  if (await exists(path.join(profileDir, "loginom", "connection", "pending.json")))
+    throw new EvalFailure("Нельзя очистить runtime attempts: pending connection", 2)
+  await releaseStaleWriter(profileDir, owned ? null : undefined)
+  if (owned) {
+    const canonical = await realpath(profileDir)
+    for (const directory of [...new Set(owned)]) {
+      if (!/^loginom\/(runtime|validation)\/generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+$/.test(path.relative(canonical, directory)))
+        throw Error("Pruning ownership path differs")
+      const actual = await realpath(directory).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined
+        throw error
+      })
+      if (!actual) continue
+      if (actual !== directory) throw Error("Pruning runtime path identity differs")
+      await rm(directory, { recursive: true })
+      await rmdir(path.dirname(directory)).catch((error: NodeJS.ErrnoException) => {
+        if (!["ENOTEMPTY", "ENOENT"].includes(error.code ?? "")) throw error
+      })
+    }
+    return owned.length
+  }
+  const directoryInfo = (directory: string) =>
+    lstat(directory).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+  const roots = await Promise.all([
+    profileDir, path.join(profileDir, "loginom"), path.join(profileDir, "loginom", "runtime"),
+  ].map(directoryInfo))
+  if (roots.some((info) => !info?.isDirectory() || info.isSymbolicLink())) return 0
+  const directories = async (directory: string) => {
+    const info = await directoryInfo(directory)
+    if (!info?.isDirectory() || info.isSymbolicLink()) return []
+    return (await entries(directory))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(directory, entry.name))
+  }
+  const generations = await directories(path.join(profileDir, "loginom", "runtime", "generations"))
+  const chats = (await Promise.all(generations.map((generation) => directories(path.join(generation, "chats"))))).flat()
+  const attempts = (await Promise.all(chats.map(directories)))
+    .flat()
+    .filter((directory) => path.basename(directory) === "attempts")
+  await Promise.all(attempts.map((directory) => rm(directory, { recursive: true, force: true })))
+  return attempts.length
+}
+
+async function status(command: AgentCommand, exitCode: 1 | 2) {
+  const out = await management(command, ["loginom", "status", "--format", "json"])
+  const view = parseView(out.stdout)
+  if (!view)
+    throw new EvalFailure(
+      `loginom status не вернул состояние (код ${out.exitCode}):\n${out.stdout.trim()}\n${out.stderr.trim()}`,
+      exitCode,
+    )
+  return view
+}
+
+// starting — транзитное состояние сразу после setup; ждём до 10 с повторными status.
+async function settle(command: AgentCommand, view: View, exitCode: 1 | 2, deadline = Date.now() + 10_000): Promise<View> {
+  if (view.state !== "starting" || view.failure || view.recoveries?.length || Date.now() >= deadline) return view
+  await Bun.sleep(1_000)
+  return settle(command, await status(command, exitCode), exitCode, deadline)
+}

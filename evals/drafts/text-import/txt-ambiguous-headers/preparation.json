@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/txt/txt-ambiguous-headers",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1758,
+      "sha256": "321282c258f999c5105fc0f70bf1c43f5ed68f3ad47ee348ce849980df2c6701"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 1331,
+      "sha256": "f18e54f5384a01db1e971cfa33b83f687824d9301fe115b72c13bc88b7afc580"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5950,
+      "sha256": "4fd497a31a4d2e944fc3c36f8b7b1118ed6c9322cecd6a0e1edcf0b515c33604"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3840,
+      "sha256": "368482720a1f491101cf65c6455336e40e4cb431cbba7b0be8e4f394d467a3cb"
+    },
+    {
+      "path": "data/ambiguous_headers.txt",
+      "bytes": 23,
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 1139,
+      "sha256": "71664e77e5e9516f885791d72e7046bb9b9ad4bb582cff42090dab3b2b7f8607"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 680,
+      "sha256": "d588295ddbdc622ebc45526e42d7e417f88046c3aa74f4c58dc6388e5799f549"
+    }
+  ],
+  "adaptations": [
+    "removed create/execute/save lifecycle from request rejection"
+  ],
+  "runtime": "NOT_RUN"
+}

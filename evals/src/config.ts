@@ -9,26 +9,15 @@ const cliModes = ["source", "binary", "fake"] as const
 type Env = Record<string, string | undefined>
 
 export function loadConfig(argv: string[], env: Env = process.env) {
-  const { values } = parseArgs({
-    args: argv,
-    strict: true,
-    options: {
-      only: { type: "string" },
-      tasks: { type: "string" },
-      label: { type: "string" },
-      repeat: { type: "string" },
-      "timeout-ms": { type: "string" },
-      "skip-judge": { type: "boolean", default: false },
-      "keep-storage": { type: "boolean", default: false },
-      "judge-only": { type: "string" },
-      calibrate: { type: "boolean", default: false },
-      "reset-profile": { type: "boolean", default: false },
-      "dry-run": { type: "boolean", default: false },
-    },
-  })
+  const values = parseEvalArgs(argv)
   const dryRun = values["dry-run"]
   const judgeOnly = values["judge-only"]
   const calibrate = values.calibrate
+  if (judgeOnly !== undefined && values["skip-judge"]) throw new EvalFailure("Несовместимые флаги: --judge-only и --skip-judge", 2)
+  if (judgeOnly !== undefined && dryRun) throw new EvalFailure("Несовместимые флаги: --judge-only и --dry-run", 2)
+  if (calibrate && values["skip-judge"]) throw new EvalFailure("Несовместимые флаги: --calibrate и --skip-judge", 2)
+  if (calibrate && dryRun) throw new EvalFailure("Несовместимые флаги: --calibrate и --dry-run", 2)
+  if (judgeOnly !== undefined && calibrate) throw new EvalFailure("Несовместимые флаги: --judge-only и --calibrate", 2)
   // Режимы без агента не требуют Loginom/Dock/модели агента.
   const agentless = dryRun || judgeOnly !== undefined || calibrate
   const needsJudge = !dryRun && !values["skip-judge"]
@@ -48,6 +37,11 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       throw new EvalFailure(`${name}: ожидается положительное целое, получено "${raw}"`, 2)
     return parsed
   }
+  const threshold = (name: string, raw: string | undefined, fallback: number) => {
+    const parsed = positive(name, raw, fallback)
+    if (parsed > 100) throw new EvalFailure(`${name}: ожидается целое от 1 до 100, получено "${raw}"`, 2)
+    return parsed
+  }
   const providerId = env.EVAL_AGENT_PROVIDER_ID
   return {
     dryRun,
@@ -58,6 +52,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       .map((id) => id.trim())
       .filter(Boolean),
     tasksDir: path.resolve(evalsRoot, values.tasks ?? "tasks"),
+    tasksDirExplicit: values.tasks !== undefined,
     label: values.label ?? null,
     repeat: positive("--repeat", values.repeat ?? env.EVAL_REPEAT, 1),
     timeoutMs: values["timeout-ms"] === undefined ? undefined : positive("--timeout-ms", values["timeout-ms"], 0),
@@ -66,26 +61,27 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     resetProfile: values["reset-profile"],
     taskTimeoutMs: positive("EVAL_TASK_TIMEOUT_MS", env.EVAL_TASK_TIMEOUT_MS, 900_000),
     judgeTimeoutMs: positive("EVAL_JUDGE_TIMEOUT_MS", env.EVAL_JUDGE_TIMEOUT_MS, 300_000),
-    passThreshold: positive("EVAL_PASS_THRESHOLD", env.EVAL_PASS_THRESHOLD, 70),
+    passThreshold: threshold("EVAL_PASS_THRESHOLD", env.EVAL_PASS_THRESHOLD, 70),
     calibration: {
-      positiveMin: positive("EVAL_CALIBRATION_POSITIVE_MIN", env.EVAL_CALIBRATION_POSITIVE_MIN, 90),
-      negativeMax: positive("EVAL_CALIBRATION_NEGATIVE_MAX", env.EVAL_CALIBRATION_NEGATIVE_MAX, 40),
+      positiveMin: threshold("EVAL_CALIBRATION_POSITIVE_MIN", env.EVAL_CALIBRATION_POSITIVE_MIN, 90),
+      negativeMax: threshold("EVAL_CALIBRATION_NEGATIVE_MAX", env.EVAL_CALIBRATION_NEGATIVE_MAX, 40),
     },
-    profileDir: path.join(evalsRoot, ".profile", "agent"),
-    resultsDir: path.join(evalsRoot, "results"),
+    profileDir: path.resolve(evalsRoot, env.EVAL_PROFILE_DIR ?? ".profile/agent"),
+    resultsDir: path.resolve(evalsRoot, env.EVAL_RESULTS_DIR ?? "results"),
     loginom: {
       url: env.LOGINOM_URL ?? "http://localhost/app/",
-      username: env.LOGINOM_USERNAME ?? "user",
+      username: dryRun ? "user" : env.LOGINOM_USERNAME ?? "user",
       password: env.LOGINOM_PASSWORD ?? "",
       container: env.LOGINOM_CONTAINER ?? "loginom-server-master",
       storageDir: env.LOGINOM_STORAGE_DIR ?? "/workdir/UserStorage/user",
     },
     dock: {
-      apiKey: required("LOGINOM_DOCK_API_KEY", !agentless),
+      apiKey: agentless ? "" : required("LOGINOM_DOCK_API_KEY", true),
       baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org",
     },
     agent: {
       model: required("EVAL_AGENT_MODEL", !agentless) || "fake/fake-model",
+      variant: env.EVAL_AGENT_VARIANT?.trim() || "default",
       cliMode: mode,
       cliBin: env.EVAL_CLI_BIN,
       bundle: path.resolve(evalsRoot, env.EVAL_CLI_BUNDLE ?? ".bundle"),
@@ -111,3 +107,27 @@ export function loadConfig(argv: string[], env: Env = process.env) {
 }
 
 export type EvalConfig = ReturnType<typeof loadConfig>
+
+function parseEvalArgs(argv: string[]) {
+  try {
+    return parseArgs({
+      args: argv,
+      strict: true,
+      options: {
+        only: { type: "string" },
+        tasks: { type: "string" },
+        label: { type: "string" },
+        repeat: { type: "string" },
+        "timeout-ms": { type: "string" },
+        "skip-judge": { type: "boolean", default: false },
+        "keep-storage": { type: "boolean", default: false },
+        "judge-only": { type: "string" },
+        calibrate: { type: "boolean", default: false },
+        "reset-profile": { type: "boolean", default: false },
+        "dry-run": { type: "boolean", default: false },
+      },
+    }).values
+  } catch (error) {
+    throw new EvalFailure(`Неверные аргументы: ${error instanceof Error ? error.message : String(error)}`, 2)
+  }
+}

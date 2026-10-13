@@ -1,0 +1,151 @@
+vacancy_id,title,specialization,experience_level,salary_from,salary_to,salary_gross,employer_name,city,response_rate,days_open,application_count,salary_avg
+1,vacancy_1,Design,3-6 years,178180,179267,1,Company_D,Yekaterinburg,0.14,34,15,178723.5
+2,vacancy_2,Marketing,3-6 years,50287,238261,1,Company_E,Moscow,0.19,23,70,144274.0
+3,vacancy_3,Data Science,6-10 years,72337,442221,1,Company_C,Novosibirsk,0.34,50,95,257279.0
+4,vacancy_4,Product,6-10 years,201738,438767,1,Company_D,Yekaterinburg,0.23,42,18,320252.5
+5,vacancy_5,Product,1-3 years,297667,231004,1,Company_E,Remote,0.05,24,1,264335.5
+6,vacancy_6,Backend,6-10 years,182233,153687,1,Company_E,Yekaterinburg,0.29,56,9,167960.0
+7,vacancy_7,Design,3-6 years,295889,430456,1,Company_C,Novosibirsk,0.46,49,49,363172.5
+8,vacancy_8,Sales,6-10 years,150667,207615,1,Company_C,Moscow,0.42,13,80,179141.0
+9,vacancy_9,Sales,3-6 years,140071,493120,1,Company_B,Novosibirsk,0.42,56,11,316595.5
+10,vacancy_10,Product,1-3 years,148064,127564,0,Company_D,Moscow,0.41,18,69,137814.0
+11,vacancy_11,Marketing,10+ years,219823,390979,1,Company_D,SPb,0.2,54,21,305401.0
+12,vacancy_12,Data Science,1-3 years,263135,107697,1,Company_C,Moscow,0.39,13,31,185416.0
+13,vacancy_13,Data Science,6-10 years,156511,180165,1,Company_E,SPb,0.11,49,83,168338.0
+14,vacancy_14,Product,3-6 years,270461,304994,1,Company_C,SPb,0.35,37,0,287727.5
+15,vacancy_15,Frontend,3-6 years,195830,157823,0,Company_E,Moscow,0.34,43,53,176826.5
+16,vacancy_16,Design,1-3 years,246852,109615,1,Company_E,Remote,0.06,39,57,178233.5
+17,vacancy_17,Data Science,3-6 years,296686,498276,0,Company_C,Kazan,0.4,42,69,397481.0
+18,vacancy_18,Product,1-3 years,53178,492643,1,Company_A,Moscow,0.46,17,82,272910.5
+19,vacancy_19,Data Science,No experience,81831,176436,1,Company_D,Yekaterinburg,0.17,15,17,129133.5
+20,vacancy_20,Sales,1-3 years,183248,291591,1,Company_E,Remote,0.42,18,5,237419.5
+21,vacancy_21,Product,No experience,153306,482706,1,Company_E,Remote,0.09,23,44,318006.0
+22,vacancy_22,Design,10+ years,214726,433261,1,Company_A,Yekaterinburg,0.32,54,96,323993.5
+23,vacancy_23,Product,10+ years,207699,134782,1,Company_B,Kazan,0.27,51,22,171240.5
+24,vacancy_24,Backend,1-3 years,233622,178533,1,Company_A,Remote,0.3,30,22,206077.5
+25,vacancy_25,Product,6-10 years,162025,340011,1,Company_A,SPb,0.47,58,25,251018.0
+26,vacancy_26,Product,1-3 years,225982,289327,1,Company_E,Kazan,0.44,34,76,257654.5
+27,vacancy_27,Marketing,3-6 years,140417,172684,0,Company_D,Yekaterinburg,0.4,58,6,156550.5
+28,vacancy_28,Sales,6-10 years,239323,357165,0,Company_A,Kazan,0.17,4,78,298244.0
+29,vacancy_29,Design,10+ years,216494,315356,1,Company_B,Moscow,0.46,3,43,265925.0
+30,vacancy_30,Marketing,3-6 years,61984,441702,1,Company_C,Kazan,0.09,7,26,251843.0
+31,vacancy_31,Product,6-10 years,139312,316621,1,Company_A,SPb,0.43,56,25,227966.5
+32,vacancy_32,Design,1-3 years,242458,335295,0,Company_A,Moscow,0.2,18,96,288876.5
+33,vacancy_33,Backend,10+ years,133291,443566,1,Company_B,Novosibirsk,0.07,42,78,288428.5
+34,vacancy_34,Design,No experience,57135,351435,1,Company_D,Yekaterinburg,0.35,7,35,204285.0
+35,vacancy_35,Data Science,3-6 years,50320,357424,0,Company_A,Yekaterinburg,0.15,40,54,203872.0
+36,vacancy_36,Marketing,3-6 years,284030,368782,1,Company_A,Kazan,0.16,6,63,326406.0
+37,vacancy_37,Design,3-6 years,275243,399563,1,Company_D,Remote,0.19,22,90,337403.0
+38,vacancy_38,Sales,1-3 years,202756,133377,1,Company_B,Moscow,0.08,58,56,168066.5
+39,vacancy_39,Backend,10+ years,236985,206244,1,Company_A,Novosibirsk,0.13,1,68,221614.5
+40,vacancy_40,DevOps,1-3 years,138774,274188,1,Company_D,Moscow,0.05,4,60,206481.0
+41,vacancy_41,Product,3-6 years,202961,313363,0,Company_A,Yekaterinburg,0.25,46,1,258162.0
+42,vacancy_42,Design,1-3 years,276921,123382,1,Company_C,Moscow,0.09,49,54,200151.5
+43,vacancy_43,Product,1-3 years,148071,346375,1,Company_E,Novosibirsk,0.36,52,96,247223.0
+44,vacancy_44,Frontend,3-6 years,229971,287135,1,Company_C,Remote,0.16,50,79,258553.0
+45,vacancy_45,Data Science,3-6 years,191842,253466,1,Company_A,Kazan,0.47,43,86,222654.0
+46,vacancy_46,Marketing,1-3 years,220393,429933,1,Company_B,SPb,0.44,29,37,325163.0
+47,vacancy_47,Data Science,1-3 years,267034,334318,1,Company_E,Moscow,0.18,21,79,300676.0
+48,vacancy_48,Frontend,3-6 years,159863,472778,0,Company_C,SPb,0.4,26,77,316320.5
+49,vacancy_49,Frontend,6-10 years,91777,231936,1,Company_D,Yekaterinburg,0.41,14,28,161856.5
+50,vacancy_50,Marketing,6-10 years,96250,461716,1,Company_B,Kazan,0.49,9,25,278983.0
+51,vacancy_51,Design,No experience,123034,223664,1,Company_C,Kazan,0.32,59,34,173349.0
+52,vacancy_52,Frontend,1-3 years,154940,252027,1,Company_D,Moscow,0.09,47,78,203483.5
+53,vacancy_53,DevOps,1-3 years,90130,472818,0,Company_A,Remote,0.34,12,66,281474.0
+54,vacancy_54,Product,No experience,263003,203533,1,Company_D,Kazan,0.33,42,86,233268.0
+55,vacancy_55,Product,3-6 years,230418,443989,1,Company_C,Moscow,0.34,51,28,337203.5
+56,vacancy_56,Backend,3-6 years,183609,347997,1,Company_C,Moscow,0.19,56,33,265803.0
+57,vacancy_57,Sales,1-3 years,265834,169590,1,Company_A,SPb,0.44,51,96,217712.0
+58,vacancy_58,Frontend,1-3 years,65216,489919,1,Company_D,Kazan,0.48,6,40,277567.5
+59,vacancy_59,Frontend,No experience,134149,428615,0,Company_D,Moscow,0.15,20,40,281382.0
+60,vacancy_60,DevOps,6-10 years,53009,405442,1,Company_A,SPb,0.09,24,22,229225.5
+61,vacancy_61,Data Science,10+ years,139904,344936,0,Company_D,Novosibirsk,0.14,27,70,242420.0
+62,vacancy_62,Data Science,1-3 years,210399,148924,1,Company_A,SPb,0.42,38,2,179661.5
+63,vacancy_63,Product,1-3 years,195281,109726,0,Company_B,SPb,0.35,8,57,152503.5
+64,vacancy_64,Product,6-10 years,229515,291896,0,Company_C,Moscow,0.34,1,31,260705.5
+65,vacancy_65,Design,10+ years,65029,140542,1,Company_B,Yekaterinburg,0.23,54,30,102785.5
+66,vacancy_66,Marketing,3-6 years,248685,134753,1,Company_E,Yekaterinburg,0.31,49,81,191719.0
+67,vacancy_67,Sales,No experience,260515,441932,1,Company_E,Remote,0.19,49,42,351223.5
+68,vacancy_68,DevOps,No experience,238069,383460,1,Company_E,Yekaterinburg,0.26,24,6,310764.5
+69,vacancy_69,Marketing,3-6 years,152171,333979,1,Company_A,SPb,0.41,47,0,243075.0
+70,vacancy_70,Marketing,1-3 years,164456,184698,1,Company_D,Remote,0.49,7,60,174577.0
+71,vacancy_71,Backend,No experience,112559,378104,1,Company_B,Moscow,0.47,19,13,245331.5
+72,vacancy_72,Marketing,3-6 years,114892,130791,0,Company_B,Kazan,0.47,22,51,122841.5
+73,vacancy_73,Backend,No experience,120409,387360,1,Company_B,SPb,0.23,57,95,253884.5
+74,vacancy_74,Marketing,6-10 years,189707,426571,1,Company_B,SPb,0.26,55,5,308139.0
+75,vacancy_75,DevOps,1-3 years,83065,474614,1,Company_E,Remote,0.37,35,9,278839.5
+76,vacancy_76,Backend,No experience,292471,173290,0,Company_B,Moscow,0.46,30,70,232880.5
+77,vacancy_77,Data Science,3-6 years,170544,147014,0,Company_D,Novosibirsk,0.11,29,89,158779.0
+78,vacancy_78,Backend,1-3 years,157340,235150,0,Company_E,SPb,0.19,22,97,196245.0
+79,vacancy_79,Backend,10+ years,83783,150519,1,Company_B,Novosibirsk,0.11,11,29,117151.0
+80,vacancy_80,DevOps,3-6 years,84152,366186,1,Company_A,Novosibirsk,0.33,20,99,225169.0
+81,vacancy_81,DevOps,1-3 years,108741,149052,0,Company_C,Yekaterinburg,0.19,29,20,128896.5
+82,vacancy_82,Backend,6-10 years,157049,114389,1,Company_C,Moscow,0.2,51,59,135719.0
+83,vacancy_83,Sales,1-3 years,232574,458105,1,Company_C,Novosibirsk,0.08,41,80,345339.5
+84,vacancy_84,Frontend,10+ years,79092,168111,1,Company_E,Moscow,0.21,42,96,123601.5
+85,vacancy_85,Sales,1-3 years,198725,467202,1,Company_B,Yekaterinburg,0.44,34,73,332963.5
+86,vacancy_86,DevOps,3-6 years,279071,455859,0,Company_E,Moscow,0.15,1,62,367465.0
+87,vacancy_87,Sales,No experience,280636,412877,1,Company_D,SPb,0.36,31,41,346756.5
+88,vacancy_88,Sales,3-6 years,221541,396898,1,Company_A,Novosibirsk,0.33,30,50,309219.5
+89,vacancy_89,Design,6-10 years,136483,448030,1,Company_A,Moscow,0.44,48,63,292256.5
+90,vacancy_90,Design,6-10 years,171585,257753,1,Company_C,Kazan,0.11,18,75,214669.0
+91,vacancy_91,Data Science,1-3 years,109754,189524,0,Company_C,Moscow,0.49,55,55,149639.0
+92,vacancy_92,Marketing,1-3 years,211050,443150,1,Company_C,Novosibirsk,0.31,58,79,327100.0
+93,vacancy_93,Backend,6-10 years,137592,386848,0,Company_B,Yekaterinburg,0.5,17,40,262220.0
+94,vacancy_94,Frontend,10+ years,144543,194913,1,Company_D,Yekaterinburg,0.46,38,31,169728.0
+95,vacancy_95,Data Science,No experience,93169,194108,1,Company_D,Novosibirsk,0.15,14,14,143638.5
+96,vacancy_96,Backend,3-6 years,229359,354803,0,Company_D,SPb,0.08,23,61,292081.0
+97,vacancy_97,Sales,1-3 years,104745,369637,1,Company_D,SPb,0.17,25,26,237191.0
+98,vacancy_98,DevOps,6-10 years,160168,169639,0,Company_C,Yekaterinburg,0.29,15,27,164903.5
+99,vacancy_99,Design,No experience,163985,331452,1,Company_A,Yekaterinburg,0.13,46,80,247718.5
+100,vacancy_100,Product,1-3 years,55543,416527,1,Company_C,Novosibirsk,0.13,56,63,236035.0
+101,vacancy_101,Frontend,6-10 years,237464,234066,1,Company_D,SPb,0.26,22,58,235765.0
+102,vacancy_102,Sales,No experience,71067,300352,1,Company_C,Yekaterinburg,0.06,3,57,185709.5
+103,vacancy_103,Product,3-6 years,101033,409378,1,Company_D,SPb,0.1,56,1,255205.5
+104,vacancy_104,Design,3-6 years,95256,228674,1,Company_E,Yekaterinburg,0.24,55,35,161965.0
+105,vacancy_105,Sales,1-3 years,271705,105594,1,Company_A,Moscow,0.08,19,70,188649.5
+106,vacancy_106,Marketing,1-3 years,289455,336907,1,Company_E,Kazan,0.23,57,12,313181.0
+107,vacancy_107,Marketing,3-6 years,290120,369515,0,Company_B,Remote,0.26,44,14,329817.5
+108,vacancy_108,Product,1-3 years,250417,147315,1,Company_C,Moscow,0.25,34,88,198866.0
+109,vacancy_109,DevOps,3-6 years,203263,314636,0,Company_B,Remote,0.44,35,86,258949.5
+110,vacancy_110,Sales,6-10 years,136803,227251,1,Company_C,Yekaterinburg,0.29,50,59,182027.0
+111,vacancy_111,Backend,6-10 years,253814,332520,0,Company_E,Kazan,0.26,1,21,293167.0
+112,vacancy_112,Sales,1-3 years,168843,179526,0,Company_D,Kazan,0.23,52,62,174184.5
+113,vacancy_113,DevOps,1-3 years,267665,343459,1,Company_D,Yekaterinburg,0.42,21,89,305562.0
+114,vacancy_114,Sales,1-3 years,78992,247698,1,Company_C,Yekaterinburg,0.45,29,96,163345.0
+115,vacancy_115,Product,1-3 years,293122,448149,1,Company_D,SPb,0.43,6,74,370635.5
+116,vacancy_116,DevOps,3-6 years,262603,337330,0,Company_E,Yekaterinburg,0.35,37,73,299966.5
+117,vacancy_117,Design,3-6 years,98803,205573,1,Company_D,Novosibirsk,0.11,1,24,152188.0
+118,vacancy_118,Frontend,No experience,159975,237900,1,Company_E,Yekaterinburg,0.17,51,47,198937.5
+119,vacancy_119,DevOps,No experience,244549,419658,1,Company_B,Novosibirsk,0.07,1,42,332103.5
+120,vacancy_120,Sales,1-3 years,194282,335707,0,Company_E,Yekaterinburg,0.47,27,37,264994.5
+121,vacancy_121,Design,3-6 years,264401,283736,1,Company_A,SPb,0.35,21,40,274068.5
+122,vacancy_122,Frontend,1-3 years,76270,248955,0,Company_A,Novosibirsk,0.39,53,44,162612.5
+123,vacancy_123,Marketing,3-6 years,243080,274131,1,Company_A,Moscow,0.19,16,87,258605.5
+124,vacancy_124,Backend,1-3 years,186269,274004,1,Company_C,Novosibirsk,0.43,44,39,230136.5
+125,vacancy_125,Product,6-10 years,294929,438130,1,Company_C,SPb,0.17,59,96,366529.5
+126,vacancy_126,Sales,6-10 years,57452,448103,1,Company_C,Remote,0.05,54,16,252777.5
+127,vacancy_127,Sales,1-3 years,91486,364179,1,Company_E,Novosibirsk,0.22,40,87,227832.5
+128,vacancy_128,Marketing,1-3 years,64859,209767,1,Company_C,Yekaterinburg,0.31,26,56,137313.0
+129,vacancy_129,Backend,3-6 years,208308,117241,1,Company_B,Yekaterinburg,0.27,16,1,162774.5
+130,vacancy_130,Marketing,1-3 years,212971,152975,1,Company_A,Remote,0.44,28,95,182973.0
+131,vacancy_131,Data Science,3-6 years,82083,254226,1,Company_E,SPb,0.1,1,61,168154.5
+132,vacancy_132,Marketing,6-10 years,117708,156396,1,Company_A,Kazan,0.3,36,87,137052.0
+133,vacancy_133,Design,3-6 years,161462,218920,1,Company_C,Yekaterinburg,0.28,10,8,190191.0
+134,vacancy_134,Frontend,6-10 years,197735,294999,1,Company_E,Moscow,0.18,43,67,246367.0
+135,vacancy_135,Sales,1-3 years,143076,186226,1,Company_D,SPb,0.42,17,80,164651.0
+136,vacancy_136,Marketing,1-3 years,299737,184719,1,Company_B,Novosibirsk,0.39,57,16,242228.0
+137,vacancy_137,Sales,6-10 years,69053,163014,0,Company_C,Novosibirsk,0.38,59,49,116033.5
+138,vacancy_138,DevOps,1-3 years,192157,139346,1,Company_C,Moscow,0.44,23,93,165751.5
+139,vacancy_139,Backend,3-6 years,211636,170411,1,Company_B,Yekaterinburg,0.38,7,39,191023.5
+140,vacancy_140,Marketing,1-3 years,139745,285550,0,Company_B,SPb,0.15,44,57,212647.5
+141,vacancy_141,Frontend,No experience,240167,243326,0,Company_D,Moscow,0.37,53,74,241746.5
+142,vacancy_142,Design,10+ years,119517,286806,1,Company_C,Yekaterinburg,0.19,7,84,203161.5
+143,vacancy_143,Data Science,1-3 years,202225,438585,1,Company_C,SPb,0.16,44,20,320405.0
+144,vacancy_144,Sales,10+ years,186319,146121,1,Company_A,Novosibirsk,0.08,15,17,166220.0
+145,vacancy_145,Backend,10+ years,191625,312490,0,Company_E,SPb,0.38,34,54,252057.5
+146,vacancy_146,Product,6-10 years,201883,422341,1,Company_E,Remote,0.37,46,28,312112.0
+147,vacancy_147,Frontend,3-6 years,276453,184577,0,Company_A,Kazan,0.16,45,23,230515.0
+148,vacancy_148,Product,3-6 years,187207,456778,1,Company_E,SPb,0.39,4,73,321992.5
+149,vacancy_149,Frontend,6-10 years,186645,349106,0,Company_B,Kazan,0.46,14,16,267875.5
+150,vacancy_150,Frontend,1-3 years,299891,462355,0,Company_E,SPb,0.1,14,17,381123.0

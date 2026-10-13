@@ -1,0 +1,171 @@
+{
+  "id": "missing-source-path-correction",
+  "title": "Отсутствие source_path → исправление того же узла",
+  "group": "regressions",
+  "eval_status": "NOT_RUN",
+  "case_readiness": "OFFLINE_VALIDATED",
+  "runner_adaptation": "NOT_IMPLEMENTED",
+  "historical_evidence": "HISTORICAL_SCOPED_SEQUENCE_PASS_NEW_EVAL_NOT_RUN",
+  "inputs": [
+    {
+      "path": "data/comma_utf8.txt",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+      "encoding": "utf-8",
+      "bom": false
+    }
+  ],
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": ",",
+      "text_qualifier": "\"",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "columns": [
+    {
+      "name": "Id",
+      "label": "Идентификатор",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Name",
+      "label": "Название",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Amount",
+      "label": "Сумма",
+      "type": "real",
+      "data_kind": "Непрерывный",
+      "used": true
+    },
+    {
+      "name": "Date",
+      "label": "Дата",
+      "type": "datetime",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Note",
+      "label": "Текст",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ],
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "stages": [
+    {
+      "stage": 1,
+      "request": "source_path omitted",
+      "expected": "settled known refusal; Execute not requested; owned cleanup; same unlocked target returned"
+    },
+    {
+      "stage": 2,
+      "request": "existing target; full correct source/format/columns; source_path from original delivery",
+      "expected": "fresh full final table, persistence and cleanup"
+    }
+  ],
+  "expected": [
+    "expected/final.json",
+    "expected/outcome.json",
+    "expected/OUTCOME.md"
+  ],
+  "oracle_recipe": [
+    {
+      "input": "data/comma_utf8.txt",
+      "expected": "expected/final.json",
+      "parse": {
+        "source": {
+          "name": "comma_utf8.txt",
+          "bytes": 200,
+          "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+          "encoding": "utf-8",
+          "bom": false
+        },
+        "settings": {
+          "source": {
+            "encoding": "65001",
+            "rows_to_skip": 0,
+            "first_line_as_title": true
+          },
+          "format": {
+            "delimiter": ",",
+            "text_qualifier": "\"",
+            "decimal_separator": ".",
+            "null_marker": "?",
+            "multiple_delimiters": false,
+            "date_format": "yyyy/mm/dd",
+            "date_separator": "-"
+          }
+        },
+        "columns": [
+          {
+            "name": "Id",
+            "label": "Идентификатор",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Name",
+            "label": "Название",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Amount",
+            "label": "Сумма",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "name": "Date",
+            "label": "Дата",
+            "type": "datetime",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Note",
+            "label": "Текст",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ],
+        "source_headers": [
+          "Идентификатор",
+          "Название",
+          "Сумма",
+          "Дата",
+          "Текст"
+        ]
+      }
+    }
+  ],
+  "privacy": "synthetic"
+}

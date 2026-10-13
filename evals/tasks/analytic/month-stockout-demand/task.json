@@ -1,0 +1,56 @@
+{
+  "id": "month-stockout-demand",
+  "title": "Спрос и дефицит по месяцам",
+  "prompt": "В прикреплённом файле dataset.csv — 180 строк запасов. Колонки: inventory_id, month, month_num, product, stock_level, demand, reorder_point, holding_cost, stockout. month — текстовое имя месяца. month_num во всех строках равен 12 и месяцем не является, его не используй. stockout равен 1, если был дефицит, и 0 иначе. Построй в Loginom сценарий, который для каждого month считает число строк, сумму demand, число строк с stockout = 1 и долю таких строк в процентах stockout_pct. Упорядочь месяцы по убыванию суммы demand. Выгрузи один текстовый CSV с разделителем запятая и колонками month, records, total_demand, stockout_records, stockout_pct. Значения не округляй.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "12 строк. Первая — May, total_demand=12699. Последняя — Dec, total_demand=5288. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; используются колонки month, demand и stockout."
+    },
+    {
+      "id": "month-text",
+      "required": true,
+      "text": "Ключ группировки — исходная текстовая колонка month. Колонка month_num не является ключом группировки и не заменяет имена месяцев."
+    },
+    {
+      "id": "group-month",
+      "required": true,
+      "text": "Для каждого month посчитаны число строк, сумма demand и число строк с stockout = 1."
+    },
+    {
+      "id": "stockout-share",
+      "required": true,
+      "text": "stockout_pct — доля строк с stockout = 1, в процентах."
+    },
+    {
+      "id": "sort-demand",
+      "required": true,
+      "text": "До экспорта месяцы упорядочены по убыванию суммы demand."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки month, records, total_demand, stockout_records, stockout_pct. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "weight": 2,
+      "requires_result_file": true,
+      "text": "Файл результата содержит ровно 12 строк данных и 5 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nmonth,records,total_demand,stockout_records,stockout_pct\nMay,21,12699,12,57.142857\nJan,15,9191,9,60\nJul,15,8907,7,46.666667\nJun,17,8898,12,70.588235\nFeb,16,8894,8,50\nSep,17,8830,13,76.470588\nApr,13,7726,7,53.846154\nNov,16,7655,8,50\nOct,14,6928,7,50\nAug,11,6076,6,54.545455\nMar,12,5615,7,58.333333\nDec,13,5288,6,46.153846"
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

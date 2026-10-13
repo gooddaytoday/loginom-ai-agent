@@ -1,0 +1,113 @@
+{
+  "run_id": "20261012-100954-calibrate",
+  "judge": {
+    "backend": "codex",
+    "codex_version": "codex-cli 0.157.0",
+    "model": "gpt-6-astra",
+    "reasoning": "high",
+    "prompt_sha256": "6562edddd63d38ab7e8400795c6d1f1198bf2551e2b35baffe0b464248ab6daa",
+    "schema_sha256": "f7341e870bf242d31fce9d8d4c1cf79a239bf34e39860496acdb9d956ba7709a"
+  },
+  "rubric_hash": "95d4889858ca33dc0b4046c7758bc041799943aa1fdc3c3a55bba7cef3d0fda3",
+  "thresholds": {
+    "positiveMin": 90,
+    "negativeMax": 40
+  },
+  "calibration_hash": "e2ac02772186d91c2233440076e0dea9661057ddd33840ca5c037bcbbee091ff",
+  "near_miss_coverage": {
+    "category-rating-revenue": 4
+  },
+  "rows": [
+    {
+      "task": "category-rating-revenue",
+      "kind": "positive",
+      "reference": "category-rating-revenue",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-rating",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-rating",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_revenue: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"recommended_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "recommended-scale",
+      "expected_failed": [
+        "recommended-share",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка recommended_pct: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "recommended-share",
+        "result-rows"
+      ],
+      "error": null
+    }
+  ],
+  "warnings": []
+}

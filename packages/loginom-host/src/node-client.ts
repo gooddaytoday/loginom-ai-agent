@@ -3,55 +3,71 @@ import { isAbsolute } from "node:path"
 import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
+import { hostError } from "./errors"
 
 export class NodeHostStartupError extends Error {
   constructor(
     cause: unknown,
     readonly cleanupConfirmed: boolean,
+    readonly cleanupError?: unknown,
   ) {
-    super(cause instanceof Error ? cause.message : "LOGINOM_HOST_REQUEST_FAILED", { cause })
+    super(
+      cause instanceof Error && ["LOGINOM_HOST_TIMEOUT", "LOGINOM_ABSOLUTE_PATH_REQUIRED"].includes(cause.message)
+        ? cause.message
+        : hostError(cause),
+      { cause },
+    )
     this.name = "NodeHostStartupError"
   }
 }
 
-export async function launchNodeHost(input: {
-  node: string
-  entry: string
-  root: string
-  resources: string
-  headless: boolean
-  environment?: NodeJS.ProcessEnv
-  strictRecovery?: boolean
-}) {
+export async function launchNodeHost(
+  input: {
+    node: string
+    entry: string
+    root: string
+    resources: string
+    headless: boolean
+    environment?: NodeJS.ProcessEnv
+    strictRecovery?: boolean
+  },
+  timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
+) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new NodeHostStartupError(new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED"), true)
   const environment = runtimeEnvironment(input.environment ?? process.env)
-  const child = await Promise.resolve()
-    .then(() =>
-      fork(input.entry, [], {
+  const child = (() => {
+    try {
+      return fork(input.entry, [], {
         execPath: input.node,
         execArgv: ["--use-system-ca"],
         env: environment,
         stdio: ["ignore", "ignore", "ignore", "ipc"],
-      }),
-    )
-    .catch((error: unknown) => {
+      })
+    } catch (error) {
       throw new NodeHostStartupError(error, true)
-    })
+    }
+  })()
   const events = new EventEmitter()
-  const state = { closed: false, spawnFailed: false, closing: undefined as Promise<void> | undefined }
+  const state = {
+    closed: false,
+    spawned: child.pid !== undefined,
+    noProcess: false,
+    closing: undefined as Promise<void> | undefined,
+  }
+  child.once("spawn", () => {
+    state.spawned = true
+  })
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => {
       closePort()
       resolve({ code, signal })
     })
-    child.once("error", () => {
+    child.on("error", () => {
       closePort()
-      // An IPC/send error after spawn is not evidence that the process exited.
-      if (child.pid === undefined) {
-        state.spawnFailed = true
-        resolve({ code: 1, signal: null })
-      }
+      if (state.spawned || child.pid !== undefined) return
+      state.noProcess = true
+      resolve({ code: 1, signal: null })
     })
   })
   function closePort() {
@@ -81,25 +97,52 @@ export async function launchNodeHost(input: {
     start() {},
   }
   const client = transport(port)
+  function waitForExit(timeout: number) {
+    return new Promise<Awaited<typeof exited> | undefined>((resolve) => {
+      const timer = setTimeout(() => resolve(undefined), Math.max(0, timeout))
+      void exited.then((outcome) => {
+        clearTimeout(timer)
+        resolve(outcome)
+      })
+    })
+  }
   function close() {
     if (state.closing) return state.closing
     state.closing = (async () => {
-      const result = await client.request("close", {}, 30_000).catch(() => undefined)
-      const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
+      const deadline = Date.now() + (timing.teardown ?? 60_000)
+      const gracefulDeadline = Math.min(deadline, Date.now() + (timing.close ?? 30_000))
       try {
-        const outcome = await exited
+        const result = await client
+          .request("close", {}, Math.max(0, gracefulDeadline - Date.now()))
+          .catch(() => undefined)
+        const graceful = await waitForExit(gracefulDeadline - Date.now())
+        if (state.noProcess) return
+        const outcome =
+          graceful ??
+          (await (async () => {
+            await Promise.resolve()
+              .then(() => child.kill("SIGTERM"))
+              .catch(() => false)
+            const terminated = await waitForExit(Math.min(timing.terminate ?? 5000, deadline - Date.now()))
+            if (terminated) return terminated
+            await Promise.resolve()
+              .then(() => child.kill("SIGKILL"))
+              .catch(() => false)
+            return waitForExit(deadline - Date.now())
+          })())
+        // Exit after a signal bounds teardown but cannot certify resource cleanup.
         if (
-          !state.spawnFailed &&
-          (!result ||
-            typeof result !== "object" ||
-            !("closed" in result) ||
-            result.closed !== true ||
-            outcome.code !== 0 ||
-            outcome.signal)
+          !graceful ||
+          !result ||
+          typeof result !== "object" ||
+          !("closed" in result) ||
+          result.closed !== true ||
+          !outcome ||
+          outcome.code !== 0 ||
+          outcome.signal
         )
           throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
       } finally {
-        clearTimeout(timer)
         client.close()
       }
     })()
@@ -117,7 +160,7 @@ export async function launchNodeHost(input: {
       },
       // Restored startup acknowledges local activation independently of the Help catalog.
       // Preserve the bounded private-host budget; explicit Help preflight is a separate request.
-      180_000,
+      timing.start ?? 180_000,
     )
     .then((ready) => {
       if (
@@ -131,14 +174,13 @@ export async function launchNodeHost(input: {
         ready.pid !== child.pid
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
-      return ready
     })
     .catch(async (error: unknown) => {
-      const cleanupConfirmed = await close().then(
-        () => true,
-        () => false,
+      const cleanup = await close().then(
+        () => undefined,
+        (failure: unknown) => failure,
       )
-      throw new NodeHostStartupError(error, cleanupConfirmed)
+      throw new NodeHostStartupError(error, cleanup === undefined, cleanup)
     })
   return {
     port,

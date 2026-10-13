@@ -1,0 +1,3 @@
+`fixed-sum.xml` is native XML from the first accepted CrossTable reference, used only by local validator tests. `fixed-sum-protocol.json` is its reduced public tool protocol fixture: only upload/apply/wait/save fields needed for validation, without messages, diagnostics, auth or profile data. Tests create real temporary ZIP/XML/CSV files and mutate protocol fields. These files are never inputs to evaluated models.
+
+The reconfigure tests construct the same public protocol with arbitrary document/workflow/node IDs, pending apply and terminal receipts. They check ordering, owner changes, stale execution, incomplete reads, duplicate/conflicting delivery, and independent node_read execution. No internal harness or browser methods are mocked.

@@ -1,0 +1,62 @@
+{
+  "task_id": "category-promo-demand",
+  "dataset_sha256": {
+    "dataset.csv": "1bf670c944185fce3a09aaff7bb70601424fa3ff46ac61f6ac0114d84478a569"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "965ba333860451ca97eda616f9bc621bfe8e3731121327ad77c38d483cc67b5e"
+  },
+  "reference_sha256": "a8e75216c142515bfc2777aa51aafef4647010c9b01971db1b7e588e5016ee23",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-category-promo-demand-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/ce804c261a5a0f3136ce5f2b92165f92498a897077dd1b2e4f91389aa358800a-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ef36f6aa2ffe0bxxTRXqL0ftWD",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-05T17:55:56+03:00",
+    "duration_s": 522,
+    "tokens": {
+      "input": 55423,
+      "output": 3057,
+      "reasoning": 760
+    },
+    "tool_calls": 24,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-category-promo-demand-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task16-price-elasticity"
+}
