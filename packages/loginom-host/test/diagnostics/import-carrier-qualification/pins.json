@@ -1,0 +1,101 @@
+{
+  "process": "node-orchestration-v3/MAS-artifacts-v1",
+  "commonSource": "abeb9c741ae2854168900fa26918eccff5aa0c63",
+  "commonProduct": "3f33a42ef346a0253bb2b374413f506cd64f2d6e",
+  "consumer": "dcf28c047396adcbdb645bdb3552d079c1c0768e",
+  "caller": "f4215c3910ee4a019df46c9d4e7b717cd94e9025",
+  "generation": "7dd74b848e58a55a3e1c6a6aa1c13b5868745ac3",
+  "registration": "4cca0970ee55d48f5bc42d305a4117db8c4be6a9",
+  "fixedRoute": {
+    "purpose": "import-before-configure-v1",
+    "resource": "runtime/src/acceptance/import-preconfig-adapter-v1.mjs",
+    "export": "captureImportPreconfig",
+    "mode": "readonly"
+  },
+  "commonFiles": {
+    "packages/loginom-host/src/node-client.ts": {
+      "bytes": 12327,
+      "sha256": "07803dfed0050425ab12b1ba597284238f25ed0310b0d2aefc3b5ae6bd2dcb14"
+    },
+    "packages/loginom-host/src/node-entry.ts": {
+      "bytes": 13650,
+      "sha256": "df5006f007dd50c7cc7553bb54ebcccbef6bfefb4d33870137cd1ebb097cbd39"
+    },
+    "packages/loginom-host/src/host.ts": {
+      "bytes": 15287,
+      "sha256": "2760d6931aaad1566bb93ffe203d7dc02f44d44865549df3bab81b93ebaf9735"
+    },
+    "packages/loginom-host/src/host-port.ts": {
+      "bytes": 18529,
+      "sha256": "a772823ad4f67e2200f407ce0d732e7655a3f457be6beb78288852f5a822984e"
+    },
+    "packages/loginom-host/src/supervisor.ts": {
+      "bytes": 12267,
+      "sha256": "965f311b0fe96408adc2991afb0ac8e91c0729b3e3ce6269bf5ed3969a596dfd"
+    },
+    "packages/loginom-runtime/src/start-input.mjs": {
+      "bytes": 3911,
+      "sha256": "84f233fd1a9b9122e77439f16e42e184f9be1cf05dca3637ce6bb82824ee3251"
+    },
+    "packages/loginom-runtime/src/managed-entry.mjs": {
+      "bytes": 31520,
+      "sha256": "f84d2a7243e0ca38055c07906efe267c21cf1f68f4c0ea0a9c6d8598b484b5b4"
+    },
+    "packages/loginom-runtime/client/lib/bridge.mjs": {
+      "bytes": 74036,
+      "sha256": "475ed98b77076518b0418586b1551952ad2924ad17f17e3eaa36cb933e15235e"
+    },
+    "packages/loginom-runtime/client/lib/executor.mjs": {
+      "bytes": 194003,
+      "sha256": "b3932815f9640fbc1be445962862ddc474e047a8fffba65b3a4fb8b1a4c0508d"
+    }
+  },
+  "consumerFiles": {
+    "packages/loginom-runtime/src/acceptance/import-preconfig-adapter-v1.mjs": {
+      "bytes": 9008,
+      "sha256": "eb03516d40d5b6c5d7ccfd0fbfc997dae074d036dffb24777e5bec0b36dd1ec3",
+      "blob": "d28b26635f89b2d2e050472fe4b81fed5be4b0e9"
+    },
+    "packages/loginom-runtime/src/retained-capture.mjs": {
+      "bytes": 6609,
+      "sha256": "7913ee2b6a9bccd4ca934d83624bf9236fd58c7b7f115599952461ea8e8bc086",
+      "blob": "b5533ba9d0b98788fefccb060f0fb9e37c677dd2"
+    },
+    "packages/loginom-runtime/client/lib/import-original-opening.mjs": {
+      "bytes": 8795,
+      "sha256": "86d6da5c3e5f5991fc8714dad0ba89dafb21a403336856b0f4522ab630b4ecee",
+      "blob": "398d777779b464c9893ed0a5dfea362eb57530b5"
+    },
+    "docs/node-development/nodes/join/receiving/preconfig/original-clean-binding-map.md": {
+      "bytes": 6705,
+      "sha256": "fc7c45faa0e42cff9c37666c59e8d68a520eea9e04a6f5166fa8a17af67b8fc7",
+      "blob": "5047a239d48d6d338df573af714f4555af71a146"
+    },
+    "packages/loginom-runtime/src/managed-entry.mjs": {
+      "bytes": 20256,
+      "sha256": "98151e91c7d283937ee59f9ba55ea3c0bb936f1a2289524cd4fe3909fec73f22",
+      "blob": "ea0a8e1c9d0f71b06291ed9bc781c693d7d4a325"
+    },
+    "packages/loginom-runtime/src/start-input.mjs": {
+      "bytes": 2393,
+      "sha256": "aed9cba6e3af265ea28a3b366298a356cebcdbba25c8031c71b55f423675264c",
+      "blob": "4f341f75fc1f0824bdf3bdbcceb93cb93a4675d5"
+    },
+    "packages/loginom-runtime/client/lib/bridge.mjs": {
+      "bytes": 70340,
+      "sha256": "bd2f48072fb38033ea9c0a696a70a4f1b0cebc1bdb38b6997789dc4d8a05e998",
+      "blob": "dae8b7f2b9b4172780618e378a217656472c9525"
+    },
+    "packages/loginom-runtime/client/lib/executor.mjs": {
+      "bytes": 201281,
+      "sha256": "9a88a5ee8d6162728a362fd204ecc66a42e52ee234ff7d39c1014988ac569a9e",
+      "blob": "955fa3bd95c970c7e438a7240262e239978054ad"
+    },
+    "packages/loginom-runtime/src/private-capture-resource.mjs": {
+      "bytes": 2657,
+      "sha256": "d41e042ca5a4542ae4e5553beffa3248bce8f5edb72cf18726c41951b0e6a829",
+      "blob": "6430390938b95857ec6ae4b1a1fb7c4ef6aae89a"
+    }
+  },
+  "authority": false
+}
