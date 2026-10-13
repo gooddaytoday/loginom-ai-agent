@@ -10,6 +10,33 @@ import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test("preflight: parent auth cannot admit an empty explicit judge home", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-home-"))
+  try {
+    const desktop = path.join(root, "parent-home")
+    const judge = path.join(root, "judge-home")
+    const binary = path.join(root, "codex")
+    const observed = path.join(root, "version-home")
+    await Promise.all([desktop, judge].map(dir => mkdir(dir, { mode: 0o700 })))
+    await writeFile(path.join(desktop, "auth.json"), "{}", { mode: 0o600 })
+    await writeFile(binary, '#!/bin/sh\nprintf "%s" "$CODEX_HOME" > "$PROBE_JUDGE_HOME_FILE"\nprintf "fake-codex 0.0.0\\n"\n', { mode: 0o700 })
+    const child = Bun.spawn([process.execPath, "-e", `
+      import { loadConfig } from ${JSON.stringify(path.join(evalsRoot, "src/config.ts"))};
+      import { preflight } from ${JSON.stringify(path.join(evalsRoot, "src/preflight.ts"))};
+      import { parseArtifactSource } from ${JSON.stringify(path.join(evalsRoot, "src/artifact.ts"))};
+      const config = loadConfig(["--judge-only", "fixture"], { JUDGE_MODEL: "fake" });
+      config.judge = { ...config.judge, command: [${JSON.stringify(binary)}], env: { CODEX_HOME: ${JSON.stringify(judge)} } };
+      try { await preflight(config, parseArtifactSource("docker", config.loginom)); console.log(JSON.stringify({ admitted: true })); }
+      catch (error) { console.log(JSON.stringify({ admitted: false, error: error.message })); }
+    `], { env: { ...process.env, CODEX_HOME: desktop, PROBE_JUDGE_HOME_FILE: observed }, stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(JSON.parse(stdout)).toEqual({ admitted: false, error: `Нет входа Codex: отсутствует ${path.join(judge, "auth.json")}. Выполните: codex login` })
+    expect(await Bun.file(observed).text()).toBe(judge)
+    expect(await Bun.file(path.join(desktop, "auth.json")).text()).toBe("{}")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 async function runtimeFixture(directory = os.tmpdir()) {
   const root = await mkdtemp(path.join(directory, "evals-admin-runtime-"))
   const executable = Buffer.alloc(64)

@@ -19,10 +19,11 @@ import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, inspectF
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
-  const config = loadConfig(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env)
+  const config: EvalConfig = loadConfig(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env)
   const fixture = options?.fixture ? await validateFixture(config, options.fixture, env) : undefined
   if (fixture) {
     config.artifactSource = `dir:${fixture.storage}`
+    config.judge.env = { CODEX_HOME: fixture.file.judge.codexHome }
     return executeRun(config, fixture)
   }
   if (config.judgeOnly !== undefined) {
@@ -74,7 +75,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
         reasoning: config.judge.reasoning,
         timeoutMs: config.judgeTimeoutMs,
         passThreshold: config.passThreshold,
-        ...(fixture ? { env: { CODEX_HOME: fixture.file.judge.codexHome } } : {}),
+        env: config.judge.env,
       }
     : undefined
   const judgeGate = createJudgeGate()

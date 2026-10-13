@@ -224,10 +224,11 @@ export async function gitInfo() {
 }
 
 async function codexInfo(judge: Pick<JudgeSettings, "command" | "env">) {
-  const version = await Bun.$`${judge.command} --version`.env(judgeEnvironment(judge.env)).quiet().nothrow()
+  const env = judgeEnvironment(judge.env)
+  const version = await Bun.$`${judge.command} --version`.env(env).quiet().nothrow()
   if (version.exitCode !== 0)
     throw new EvalFailure(`Судья недоступен: ${judge.command.join(" ")} --version → код ${version.exitCode}`, 2)
-  const home = process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex")
+  const home = env.CODEX_HOME ?? path.join(os.homedir(), ".codex")
   if (path.basename(judge.command[0] ?? "") === "codex" && !(await Bun.file(path.join(home, "auth.json")).exists()))
     throw new EvalFailure(`Нет входа Codex: отсутствует ${path.join(home, "auth.json")}. Выполните: codex login`, 2)
   return { version: version.text().trim() }
