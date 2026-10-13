@@ -77,6 +77,8 @@ async function main() {
   const oracle = await checkOracle(task, artifactDir)
   const oracleSha256 = task.oracle ? await hash(path.join(task.dir, task.oracle)) : null
   if (oracle.passed === null) failures.push("ORACLE_MISSING")
+  if (!record(pinnedTask) || !digest(pinnedTask.oracleSha256) || oracleSha256 !== pinnedTask.oracleSha256)
+    failures.push("ORACLE_PIN_MISMATCH")
   const saved = receipts.some(({ part, value }) => part.tool === "loginom_dock_action_run" && record(part.state)
     && record(part.state.input) && ["package.save_as", "package.save_checkpoint"].includes(String(part.state.input.action_key))
     && record(value) && value.status === "SUCCEEDED" && value.cleanup_complete === true && record(value.output)

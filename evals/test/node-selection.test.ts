@@ -22,6 +22,21 @@ test("offline audit certifies the complete native pilot independently of selecti
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("offline audit refuses an oracle whose bytes differ from the pinned task", async () => {
+  const directory = await pilotDirectory()
+  try {
+    const pins = await Bun.file(path.join(directory, "pins.json")).json()
+    pins.tasks["sales-by-category"].oracleSha256 = "0".repeat(64)
+    await Bun.write(path.join(directory, "pins.json"), JSON.stringify(pins))
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(2)
+    const result = await Bun.file(path.join(directory, "selection-audit.json")).json()
+    expect(result.calculationPassed).toBe(false)
+    expect(result.failures).toContain("ORACLE_PIN_MISMATCH")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 async function pilotDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-complete-"))
   await mkdir(path.join(directory, "artifact/results"), { recursive: true })
@@ -42,7 +57,8 @@ async function pilotDirectory() {
   const prefix = "/user/node-selection-20261013T093809Z-f5d429-sales-by-category-baseline-1"
   const pinned = { model: "openai/gpt-6-sol-fast", variant: "medium", expectedSkillDigest: pilotRuntime[0]!.session.skillRevision }
   await Bun.write(path.join(directory, "pins.json"), JSON.stringify({ ...pinned, manifestSha256: "b".repeat(64),
-    tasks: { "sales-by-category": { inputHashes: { "dataset.csv": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8" } } },
+    tasks: { "sales-by-category": { oracleSha256: "ba7e5d7f0d7e3c1f2483505483ec8ce8d2f3bcdbb52686cb9814f4ea496ba115",
+      inputHashes: { "dataset.csv": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8" } } },
   }))
   await Bun.write(path.join(directory, "attempt.json"), JSON.stringify({ ...pinned, binaryManifestSha256: "b".repeat(64),
     sessionID: pilotHistory.snapshot.sessionID, cliExitCode: 0, taskID: "sales-by-category", mode: "standard",
