@@ -259,3 +259,25 @@ wrong ELF, external symlink, checkout bundle. Fixture binaries не исполн
 diff check PASS. Новый verifier реально проверил установленный prod CLI 0.1.17;
 manifest SHA 797c018f95255f805fa1ee05a2ef4d69e44c723f5b1cd3e0772bbee73855fed8 совпал
 с прежним private inventory receipt. Browser/admin/model не запускались.
+
+Node-driver добавлен в script/loginom-admin-driver.mjs. Протокол allowlist/serial
+requests, safe codes, private credential reader; payload init передаёт только
+credential path. Resource/manifest/process.execPath/Chromium hash и package
+resolution проверяются до launchPersistentContext. Init использует pinned
+Studio selectors Логин/Пароль/Войти и проверяет exact username/IsAdmin; inspector
+написан по сохранённому GetSessionsManager/UpdateSessionInfos/SessionInfo RPC.
+Эти положительные browser/RPC пути пока не квалифицированы: bootstrap отсутствует.
+
+Real bundled Node rejection integration: 2 PASS/7 assertions (3.04s), generic
+execution, dispose без context, missing/malformed credential и mismatch runtime
+hash. Canary credentials — только временный format fixture; auth/browser не
+вызывались, profile не создан, stdout/stderr без canary. Node --check PASS;
+36 preflight/admin/CI tests, typecheck/diff check PASS. Integration исключён из
+unit CI, явный flag EVAL_ADMIN_INTEGRATION=1. Это не full trusted adapter acceptance.
+
+ManagedSessionInfo.Count по source — число пакетов, не active operations.
+Driver возвращает rawSessions/packageCount и activeOperations=null; composite
+identity пока sessionIdentityQualified=false. CloseSession возвращает
+SESSION_IDENTITY_UNSUPPORTED, user mutations — ADMIN_CAPABILITY_UNSUPPORTED.
+Положительные gate/race tests, journal/supervisor bridge и AdminConnection ещё
+предстоят; v2 live admission остаётся закрытым.
