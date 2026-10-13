@@ -29,7 +29,6 @@ if (library.symbols.prctl(36, 1, 0, 0, 0) !== 0) {
   process.exit(2)
 }
 library.close()
-await record({ ready: true })
 process.on("SIGINT", () => {})
 // Keep the kernel ancestry boundary until the supervisor finishes scans.
 setInterval(() => {}, 1000)
@@ -57,7 +56,7 @@ if (admitted.sandbox) {
   status.once("error", () => { void record({ sandbox_error: "SANDBOX_STATUS_UNAVAILABLE" }) })
   status.once("end", () => { if (pending.trim()) void record({ sandbox_error: "SANDBOX_STATUS_INVALID" }) })
 }
-child.once("spawn", () => { void record({ cli_pid: child.pid! }) })
+child.once("spawn", () => { void record({ ready: true, cli_pid: child.pid! }) })
 child.once("error", () => { void record({ error: "CLI_LAUNCH_FAILED", exit_code: 2 }).then(() => process.exit(2)) })
 child.once(admitted.sandbox ? "close" : "exit", (code, signal) => { void record({ cli_pid: child.pid!,
   exit_code: code ?? (signal ? 128 + constants.signals[signal] : -1) }) })
