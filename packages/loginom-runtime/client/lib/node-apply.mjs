@@ -118,10 +118,13 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false}) {
+  signal, stopSignal, now=Date.now, resume=false, importPreconfig=false}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
+  requireValue(!importPreconfig || !resume && request.target.kind==='existing' && request.target.type==='imports.text'
+    && request.inputs.length===0 && request.mappings.length===0 && request.finish==='close'
+    && request.read.ports.length===0, 'Fixed existing Import opening required');
   const separateOutput=handler.output_wizard==='separate';
   requireValue(!separateOutput||request.finish==='close'||typeof drivers.finishGraph==='function','Separate output wizard requires a graph finish driver');
   const signature=hash({request,handler_revision:handler.revision,...(separateOutput?{output_wizard:'separate'}:{})});
@@ -159,7 +162,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   }
   const context=()=>({operation_id:operation.id,document_id:request.document_id,workflow_ref:request.workflow_ref,
     node:state.node,execution:state.execution,deadline:state.deadline,signal,stopSignal});
-  const check=()=>{signal?.throwIfAborted();requireValue(now()<state.deadline,'node.apply total deadline elapsed');};
+  const check=()=>{signal?.throwIfAborted();if(importPreconfig)operation.importPreconfigAssert();requireValue(now()<state.deadline,'node.apply total deadline elapsed');};
   const phase=async(name,call,{budget=request.budgets.configure_ms,mutation=true,verify=()=>{}}={})=>{
     const prior=state.phases.find(p=>p.phase===name);
     if(prior)return structuredClone(prior.value);
@@ -184,7 +187,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     catch(error){
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
-      const refusal=error.nodePhaseRefusal;
+      const refusal=error?.nodePhaseRefusal;
       if(name==='read'&&['transform.cross_table','transform.collapse_columns'].includes(request.target.type)
         &&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&verifiedNativeReadRefusal(refusal,state.node,state.execution,request.read)){
@@ -247,7 +250,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;
       }
-      const pause=error.nodeExecutionWaitPause;
+      const pause=error?.nodeExecutionWaitPause;
       if(name==='execute'&&signal?.aborted&&!stopSignal?.aborted
         &&pause?.read_only===true&&pause.cleanup_complete===true
         &&pause.execution_id===state.execution.execution_id&&state.execution.status==='pending'
@@ -266,8 +269,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }
     requireValue(value?.verified===true && value.cleanup_complete===true, 'Node phase did not verify '+name);
     verify(value);
+    if(importPreconfig)check();
     const receipt={phase:name,receipt_id:pending.receipt_id,status:'verified',effect_possible:value.effect_possible===true,value:structuredClone(value)};
     await acknowledge({phase:'node_phase_completed',signature,receipt});
+    if(importPreconfig)check();
     // Anticipated mutation is uncertainty until the verified receipt arrives.
     // A proven unchanged workflow must not turn a later pre-target refusal into
     // an ambiguous configuration effect.
@@ -293,8 +298,18 @@ export async function applyNode({request, operation, handlers, drivers, record,
     operation.captureNode=state.node;
     const readingOnly=request.mode===NODE_READ_MODE;
     if(!readingOnly){
-    await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
+    if(!importPreconfig)await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>drivers.openWizard(ctx));
+    if(importPreconfig) {
+      // Opening is a completed effect, not a configured node or a rollback.
+      // The original operation and wizard remain retained for one fixed read.
+      requireValue(operation.captureOpening?.value?.native_opening?.status==='completed', 'Original Import opening missing');
+      return {operation_id:operation.id,status:'FAILED',preconfig_opening:true,settings_applied:false,
+        phases:state.phases.map(({value,...p})=>structuredClone(p)),node:structuredClone(state.node),
+        execution:structuredClone(state.execution),output:structuredClone(state.output),package_saved:false,warnings:[],
+        effect_possible:state.effect_possible,cleanup_complete:false,pending_phase:null,
+        error:{code:'IMPORT_PRECONFIG_ONLY',message:'Original wizard opened; configure/finish/execute not dispatched'}};
+    }
     await phase('configure',ctx=>handler.configure(ctx,request.parameters,drivers));
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
@@ -362,6 +377,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    if(importPreconfig)operation.importPreconfigFailure??={value:error};
     // No automatic rollback and no repetition of an unknown upload/run/save.
     // status/wait/inspect remain the responsibility of the owning runtime.
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
@@ -378,8 +394,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
           :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
-      pending_phase:state.pending?.phase??null,error:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
-        ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
+      pending_phase:state.pending?.phase??null,error:{code:'NODE_APPLY_STOPPED',message:String(error?.message??error).slice(0,1000),
+        ...(typeof error?.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
 }

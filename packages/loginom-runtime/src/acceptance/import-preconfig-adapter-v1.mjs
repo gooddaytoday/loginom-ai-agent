@@ -2,7 +2,7 @@
 // installed by this module. No user path, settings setter or dispatch factory.
 import {captureImport} from './import-before-configure-v1.mjs';
 import {createImportCleanModel,readImportCleanFacts} from './import-clean-model-v1.mjs';
-import {assertCaptureOwner,assertCapturePublication,captureData} from '../retained-capture.mjs';
+import {assertCaptureOwner,assertCapturePublication,captureData,capturePublication} from '../retained-capture.mjs';
 import {validatePreparedNodeContext} from '../../client/lib/node-context.mjs';
 export const captureMode='readonly';
 export const IMPORT_ADAPTER_PATH='runtime/src/acceptance/import-preconfig-adapter-v1.mjs';
@@ -27,6 +27,21 @@ export function validateCaptureResult(receipt,{retained,node,publication}) {
 }
 
 export function createImportPreconfigAdapter({retained,node,publication,identity,browser,record,runtime,signal}) {
+ if(node?.preconfig===true) {
+  const current=()=>{
+   assertCaptureOwner(retained);node.assertCurrent();
+   const expected=capturePublication(retained,node,identity);captureData(publication);
+   if(!Object.isFrozen(publication)||Object.keys(expected).length!==Object.keys(publication).length
+     ||Object.keys(expected).some(k=>expected[k]!==publication[k])
+     ||node.owner!==retained||node.identity!==identity||node.signal!==signal||runtime!==node.runtime
+     ||runtime.assertImportPreconfigIdle(node)!==true)
+    throw Error('LOGINOM_IMPORT_PRECONFIG_ORIGINAL_OPENING');
+  };
+  current();
+  return Object.freeze({async readPreconfigSample(){current();const result=await node.readPreconfigSample();current();
+    validateCaptureResult(result,{retained,node,publication});return result;},
+   requestReadonlyClose(){current();throw Error('CONFIRMED_SAVE_REQUIRED');}});
+ }
  const binding=retained?.binding,session=retained?.session;
  need(binding?.harness===harness&&retained.resource.path===IMPORT_ADAPTER_PATH,'FIXED_RESOURCE');
  need(typeof browser?.callTool==='function'&&typeof record==='function'&&Object.isFrozen(publication),'PRIVATE_SEAMS');
