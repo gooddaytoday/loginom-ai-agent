@@ -87,14 +87,21 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
         slots: contexts.map(context => context.lease.slot.id), signal: controller.signal,
         async execute(slotId, job) {
           const context = contexts.find(context => context.lease.slot.id === slotId)!
-          const { result, stop } = await runAttempt({ config: context.config, command: context.command,
-            source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
-            task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
-            signal: controller.signal, profileRecovered: false, slotId, judge: settings,
-            skipJudge: config.skipJudge, evaluationHash })
-          attempts[job.index] = result
-          await finishFixtureAttempt(context, result, path.join(runDir, job.taskId, String(job.attempt)))
-          return { result, quarantine: stop }
+          const out = path.join(runDir, job.taskId, String(job.attempt))
+          const perform = async (initialInfraAttempt?: AttemptResult) => {
+            const completed = await runAttempt({ config: context.config, command: context.command,
+              source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
+              task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
+              signal: controller.signal, profileRecovered: false, slotId, judge: settings,
+              initialInfraAttempt, skipJudge: config.skipJudge, evaluationHash })
+            attempts[job.index] = completed.result
+            await finishFixtureAttempt(context, completed.result, out)
+            return { result: completed.result, quarantine: completed.stop }
+          }
+          const first = await perform()
+          if (first.result.status !== "infra_error" || first.quarantine || controller.signal.aborted) return first
+          await archiveInfraAttempt(out)
+          return perform(first.result)
         } })
       if (queued.quarantined.length) state.stopped = `Stopped slots: ${queued.quarantined.join(", ")}`
       for (const context of contexts) await context.lease.release(context.cleanup)
