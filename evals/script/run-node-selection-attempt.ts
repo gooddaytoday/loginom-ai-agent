@@ -282,15 +282,19 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       result.calculationPassed = report.calculationPassed === true && !result.collectionFailures.length
     }
     if (result.collectionFailures.length && result.exitCode === 0) result.exitCode = 2
-    if (result.cliExitCode === 130 && !result.timedOut) result.exitCode = 130
   } catch (error) {
     result.blocker = error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "SELECTION_COLLECTION_FAILED"
     result.exitCode = result.modelStarted === false || ["CLI_EXIT_UNCONFIRMED", "SELECTION_CLEANUP_UNCONFIRMED", "PROFILE_BUSY"].includes(result.blocker) ? 3 : 2
     if (result.blocker === "SELECTION_SLOT_EXISTS") result.exitCode = 2
   }
+  result.exitCode = selectionExitCode(result)
   result.finishedAt = new Date().toISOString()
   await save()
   return result
+}
+
+export function selectionExitCode(result: { exitCode: number; cliExitCode: number | null; timedOut: boolean }) {
+  return result.cliExitCode === 130 && !result.timedOut && result.exitCode !== 3 ? 130 : result.exitCode
 }
 
 function readSnapshot(filename: string, sessionID: string) {

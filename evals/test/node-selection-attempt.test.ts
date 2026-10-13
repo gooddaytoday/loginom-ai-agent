@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { reserveAttempt, runSelectionAttempt, selectionAttempt } from "../script/run-node-selection-attempt"
+import { reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -30,6 +30,12 @@ test("the verified local Docker container name may contain version dots", () => 
   const input = pins()
   input.container.name = "loginom-server-7.4.2-test"
   expect(selectionAttempt(input, "sales-by-category", 1).pins.container.name).toBe("loginom-server-7.4.2-test")
+})
+
+test("a confirmed cancellation preserves exit 130 when evidence is incomplete", () => {
+  expect(selectionExitCode({ exitCode: 2, cliExitCode: 130, timedOut: false })).toBe(130)
+  expect(selectionExitCode({ exitCode: 2, cliExitCode: 130, timedOut: true })).toBe(2)
+  expect(selectionExitCode({ exitCode: 3, cliExitCode: 130, timedOut: false })).toBe(3)
 })
 
 test("reserving an existing slot refuses a rerun and preserves its evidence", async () => {
