@@ -59,6 +59,25 @@ test("fixture main: reports slot-owned leftovers and retains only the affected s
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
+test("fixture main: unresolved storage prevents a second admission on the same slot", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-storage-admission-"))
+  try {
+    const input = await parallelFixture(root, ["parallel-storage-leftover"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--repeat", "2", "--skip-judge"], input.env,
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts).toHaveLength(1)
+    expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "completed", environment_cleanup: { status: "failed" } })
+    expect(await Bun.file(path.join(input.slots.slots[0]!.workspaceRoot, summary.run_id, "parallel-storage-leftover/2/parallel-trace.json")).exists()).toBe(false)
+    const cleanup = await Bun.file(path.join(run.runDir!, "parallel-storage-leftover/1/cleanup.json")).json()
+    expect(cleanup.archive).toMatchObject({ status: "committed" })
+    expect(cleanup.stages).toContainEqual(expect.objectContaining({ stage: "profile_history", status: "confirmed" }))
+    const receipt = await Bun.file(summary.slots![0]!.cleanup_receipt!).json()
+    expect(receipt).toMatchObject({ status: "failed", archive: "committed", nextAdmissionAllowed: false, storageDeletionAllowed: false })
+    expect(run.code).toBe(1)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("fixture main: failed listing of one slot yields aggregate null and preserves healthy detail", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-listing-failure-"))
   try {
