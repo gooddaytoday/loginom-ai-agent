@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, symlink } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
@@ -77,6 +77,27 @@ test("agentCommand: fake-режим указывает на fixtures/fake-cli.ts
     "LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG",
     "LOGINOM_AI_AGENT_PURE",
   ])
+})
+
+test("agentCommand: v2 slots force HTTP-only transport despite inherited WebSocket opt-in", () => {
+  const config = loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" })
+  const command = agentCommand(config, { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" })
+  expect(command.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBe("false")
+  expect(agentCommand(loadConfig(["--dry-run"], {}), {}).env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBeUndefined()
+})
+
+test("agentCommand: management children receive HTTP-only mode without inherited credentials", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-http-only-"))
+  try {
+    const command = agentCommand({ ...loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" }), profileDir: root },
+      { PATH: process.env.PATH, LOGINOM_PASSWORD: "private-canary", LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" })
+    const file = path.join(root, "observed.jsonl")
+    const child = Bun.spawn([...command.cmd, "loginom", "status"], { cwd: command.cwd,
+      env: { ...command.env, EVAL_FAKE_MANAGEMENT_ENV_FILE: file }, stdout: "ignore", stderr: "pipe" })
+    const output = await Promise.all([child.exited, new Response(child.stderr).text()])
+    expect(output).toEqual([0, ""])
+    expect(JSON.parse((await Bun.file(file).text()).trim())).toEqual({ sub: "status", httpOnly: "false", passwordPresent: false })
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test("agentCommand: из env-override выкидывает LOGINOM_/EVAL_/JUDGE_/FAKE_CODEX_ и оставляет PATH", () => {

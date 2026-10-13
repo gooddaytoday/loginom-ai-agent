@@ -8,6 +8,30 @@ import { evalsRoot } from "../src/config"
 import { superviseProcess } from "../src/process-supervisor"
 import { statusFor } from "../src/report"
 
+test("sandboxCommand: the isolated child receives the explicit HTTP-only switch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-http-only-"))
+  try {
+    await Promise.all([mkdir(path.join(root, "installation/bin"), { recursive: true }), mkdir(path.join(root, "profile")), mkdir(path.join(root, "workspace"))])
+    await cp("/usr/bin/python3", path.join(root, "installation/bin/cli"), { dereference: true })
+    await Bun.write(path.join(root, "installation/cli-manifest.json"), "{}")
+    const boundary = await sandboxCommand({
+      cmd: [path.join(root, "installation/bin/cli"), "-c", "import json,os; print(json.dumps({'http_only':os.getenv('LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS'),'secret':os.getenv('LOGINOM_PASSWORD')}))"],
+      profileDir: path.join(root, "profile"), workdir: path.join(root, "workspace"),
+      env: { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false", LOGINOM_PASSWORD: "canary-private" },
+    })
+    const proc = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), { cwd: boundary.cwd, env: boundary.env, stdio: ["ignore", "pipe", "pipe", "ignore"] })
+    const output = await Promise.all([Array.fromAsync(proc.stdout!), Array.fromAsync(proc.stderr!), new Promise<number | null>(resolve => proc.once("close", resolve))])
+    expect(output[2]).toBe(0)
+    expect(Buffer.concat(output[1]).toString()).toBe("")
+    expect(JSON.parse(Buffer.concat(output[0]).toString())).toEqual({ http_only: "false", secret: null })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("sandboxCommand: an explicit WebSocket opt-in is refused before filesystem admission", async () => {
+  await expect(sandboxCommand({ cmd: ["/missing/binary"], profileDir: "/missing/profile", workdir: "/missing/workspace",
+    env: { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" } })).rejects.toThrow("HTTP-only")
+})
+
 test("sandboxCommand: proxy включает штатный Node env proxy независимо от окружения вызывающего процесса", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-proxy-"))
   try {

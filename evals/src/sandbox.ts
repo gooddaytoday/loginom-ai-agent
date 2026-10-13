@@ -13,6 +13,8 @@ export class SandboxFailure extends EvalFailure {
 export async function sandboxCommand(input: {
   cmd: string[]; profileDir: string; workdir: string; env: Record<string, string | undefined>
 }) {
+  if (input.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== undefined && input.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== "false")
+    throw new SandboxFailure("HTTP-only transport requires an explicit false switch")
   if (process.platform !== "linux" || !Bun.which("bwrap"))
     throw new EvalFailure("Изоляция eval требует Linux и bubblewrap; неизолированный запуск запрещён", 2)
   const binary = await realpath(Bun.which(input.cmd[0]!) ?? input.cmd[0]!)
@@ -34,7 +36,7 @@ export async function sandboxCommand(input: {
     cmd.push("--ro-bind", await realpath(file), file)
   cmd.push("--", binary, ...input.cmd.slice(1))
   const inherited = Object.fromEntries(Object.entries(input.env).flatMap(([name, value]) =>
-    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT))$/.test(name)
+    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT|EXPERIMENTAL_WEBSOCKETS))$/.test(name)
       ? [[name, value]] : []))
   // Bundled Node needs this startup switch to use the inherited proxy settings.
   if (Object.entries(inherited).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))
