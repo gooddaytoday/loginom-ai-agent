@@ -71,3 +71,12 @@ test('actual fixed processor getter source is retained; replaced/unknown getters
 test('initial copied data-message holder cannot qualify original typed creation',()=>{
  const f=fixture();try{f.input.processor={message:f.input.processor.message};assert.throws(()=>f.acquire(),/PROCESSOR/);assert.equal(f.calls,0)}finally{f.close()}
 });
+
+test('SDK creation refuses operation-ID rebirth before packet/deadline mint; distinct creation remains valid',()=>{
+ const f=fixture();try{const p=f.acquire(),deadline=p.facts().deadline;f.request.operation_id='replacement';assert.throws(()=>f.acquire(),/BINDING_CHANGED/);assert.equal(p.facts().deadline,deadline);assert.equal(f.calls,0);
+  f.request.operation_id='original';assert.equal(f.acquire(),p);
+  const nextOptions={toolCallId:'distinct-call',abortSignal:f.controller.signal},nextRequest={...f.request,operation_id:'distinct-operation'};
+  const next=acquire(retainUnionInvocation,f.definition,f.owner,f.input,f.user,nextRequest,nextOptions);assert.notEqual(next,p);assert.equal(next.facts().budget_ms,p.facts().budget_ms);
+  const copiedOptions={...f.options};assert.throws(()=>acquire(retainUnionInvocation,f.definition,f.owner,f.input,f.user,{...f.request},copiedOptions),/DUPLICATE_CHANGED/);assert.equal(f.calls,0);
+ }finally{f.close()}
+});

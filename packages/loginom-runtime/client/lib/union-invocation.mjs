@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-const records=new WeakMap(),owners=new WeakMap(),carriers=new WeakMap(),processors=new WeakMap();
+const records=new WeakMap(),owners=new WeakMap(),carriers=new WeakMap(),processors=new WeakMap(),creations=new WeakMap(),sdkCalls=new WeakMap();
 const descriptor=Object.getOwnPropertyDescriptor;
 const aborted=descriptor(AbortSignal.prototype,'aborted').get,reason=descriptor(AbortSignal.prototype,'reason').get;
 const wall=Date.now,mono=performance.now.bind(performance);
@@ -40,6 +40,10 @@ export function retainUnionInvocation(source){
  const owner=data(source,'owner'),sessionInput=data(source,'sessionInput'),session=data(sessionInput,'session'),processor=data(sessionInput,'processor'),message=processorMessage(processor),user=data(source,'user');
  const generation=data(owner,'generation'),call=data(owner,'call'),callId=data(options,'toolCallId');
  need(Number.isSafeInteger(generation)&&generation>0&&typeof call==='function'&&typeof callId==='string'&&callId.length>0,'UNION_INVOCATION_OWNER_UNKNOWN');
+ // SDK creation is immutable even when request.operation_id is corrupted.
+ // Check retained options identity/toolCallId BEFORE operation lookup or clock mint.
+ const prior=creations.get(options)||sdkCalls.get(owner)?.get(callId);
+ if(prior){prior.guard();need(prior.facts.owner===owner&&prior.options===options&&prior.request===request&&prior.definition===definition&&prior.user===user&&prior.sessionInput===sessionInput,'UNION_INVOCATION_DUPLICATE_CHANGED');return prior.packet;}
  const operation=data(request,'operation_id'),sessionId=data(session,'id'),messageId=data(message,'id'),userMessage=data(user,'id');
  need([operation,sessionId,messageId,userMessage].every(x=>typeof x==='string'&&x.length>0),'UNION_INVOCATION_CREATION_UNKNOWN');
  const schema=data(definition,'inputSchema'),required=data(schema,'required'),schemaDigest=digest(required),signature=digest(request);
@@ -78,6 +82,6 @@ export function retainUnionInvocation(source){
   },
   facts(){return {deadline,budget_ms:budget,pending:!!promise&&!settled,failed:!!first,first,secondary:[...secondary],nativeAuthority:false,creationAuthority:false,releaseAuthority:false}}
  });
- const record={source,request,options,definition,user,sessionInput,guard,packet,facts};guard();records.set(packet,record);calls.set(operation,record);return packet;
+ const record={source,request,options,definition,user,sessionInput,guard,packet,facts};guard();records.set(packet,record);calls.set(operation,record);creations.set(options,record);let sdk=sdkCalls.get(owner);if(!sdk){sdk=new Map();sdkCalls.set(owner,sdk)}sdk.set(callId,record);return packet;
 }
 export function originalUnionInvocation(packet,owner){const record=records.get(packet);need(record&&record.facts.owner===owner,'UNION_INVOCATION_UNOWNED');record.guard();return record.facts;}
