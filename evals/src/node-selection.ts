@@ -219,11 +219,22 @@ export function inspectSelection(input: {
   mode: SelectionMode
   nodeTypes: string[] | null
   parts: unknown[]
+  runtime?: SelectionRuntime[]
 }): { jsNodes: number | null; jsCalls: number; successfulJsCalls: number; failures: string[] } {
   const jsNodes = input.nodeTypes?.filter((type) =>
     ["TBGJavaScriptEngine", "TBGCodeModelComponentEngine"].includes(type)).length ?? null
   const calls = input.parts.flatMap((part) => readApply(part, input.parts))
-  const jsCalls = calls.filter((call) => call.nodeType === "programming.javascript").length
+  const javascript = calls.filter((call) => call.nodeType === "programming.javascript")
+  const prepared = input.parts.filter(record).filter((part) => part.tool === "loginom_dock_prepare").map(receipt).filter(record)
+  const unprojected = (input.runtime ?? []).flatMap((runtime) => {
+    const session = record(runtime.session) ? runtime.session : undefined
+    if (!session || !prepared.some((value) => value.prepared === true && value.sessionId === session.sessionId)) return []
+    return runtime.events.filter(record).filter((event) => event.session_id === session.sessionId
+      && event.phase === "node_apply_prepared" && record(event.request) && record(event.request.target)
+      && event.request.target.type === "programming.javascript" && !javascript.some((call) => call.operationID === event.operation_id))
+      .map((event) => `${session.sessionId}/${event.operation_id}`)
+  })
+  const jsCalls = javascript.length + new Set(unprojected).size
   const successfulJsCalls = calls.filter((call) => call.nodeType === "programming.javascript" && call.succeeded).length
   const standard = input.mode === "standard" || input.mode === "standard-recovery"
   return {
@@ -254,6 +265,7 @@ function readApply(part: unknown, parts: unknown[]) {
   const node = record(terminal?.node) ? terminal.node : undefined
   return [{
     node,
+    operationID: request?.operation_id,
     nodeType: typeof target?.type === "string" ? target.type : undefined,
     succeeded: typeof part.id === "string" && typeof part.sessionID === "string" && typeof request?.operation_id === "string"
       && state?.status === "completed" && terminal?.operation_id === request.operation_id

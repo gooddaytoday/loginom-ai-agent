@@ -38,7 +38,7 @@ async function main() {
   const artifactDir = path.join(directory, "artifact")
   const exists = await Bun.file(path.join(artifactDir, "package.lgp")).exists()
   const xml = exists ? await readNodeXml(artifactDir).catch(() => ({ invalid: "XML_READ_FAILED" })) : null
-  const selection = inspectSelection({ mode: args.mode, parts,
+  const selection = inspectSelection({ mode: args.mode, parts, runtime,
     nodeTypes: xml && !("invalid" in xml) ? xml.nodes.map((node) => node.type) : null,
   })
   if (!exists) failures.push("PACKAGE_MISSING")

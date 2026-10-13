@@ -155,6 +155,14 @@ test("the pilot settles its own admitted operations including independently veri
   expect(result.failures).toEqual([])
 })
 
+test("an owned runtime JS admission cannot be hidden by a missing public apply", () => {
+  const runtime = structuredClone(pilotRuntime)
+  runtime[0]!.events.find((event) => event.phase === "node_apply_prepared")!.request!.target.type = "programming.javascript"
+  const result = inspectSelection({ mode: "standard", nodeTypes: [], parts: pilotHistory.snapshot.parts, runtime })
+  expect(result.jsCalls).toBe(1)
+  expect(result.failures).toContain("JAVASCRIPT_NOT_ALLOWED")
+})
+
 test.each(["missing-operation", "foreign-owner", "cleanup-false", "ambiguous", "upload-digest", "request-type"])(
   "runtime completion cannot use %s evidence",
   (kind) => {
