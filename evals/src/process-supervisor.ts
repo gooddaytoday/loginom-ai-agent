@@ -1,5 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
+import { Readable, Writable } from "node:stream"
 import os from "node:os"
 import { constants } from "node:fs"
 import { lstat, mkdtemp, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
@@ -332,7 +333,7 @@ async function browserIdentity(cmd: string[], env: Record<string, string>) {
  */
 export async function superviseProcess(input: {
   cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number
-  profileDir?: string; outDir?: string; stdin?: string; signal?: AbortSignal; sandbox?: string[]
+  profileDir?: string; outDir?: string; stdin?: string | ReadableStream<Uint8Array>; stdout?: WritableStream<Uint8Array>; signal?: AbortSignal; sandbox?: string[]
   observationMode?: "continuous" | "unit_after_exit"
 }) {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
@@ -416,12 +417,21 @@ export async function superviseProcess(input: {
     if (state.error) cleanup.error ??= "Launcher admission failed"
     if (state.exit_code !== null && Number.isSafeInteger(state.exit_code)) { cliExitCode = state.exit_code; finish() }
   }
+  const transport: Promise<void>[] = []
+  const transportAbort = new AbortController()
   if (input.stdin !== undefined) {
     proc.stdin!.on("error", () => { cleanup.error ??= "Command stdin delivery failed" })
-    proc.stdin!.end(input.stdin)
+    if (typeof input.stdin === "string") proc.stdin!.end(input.stdin)
+    else transport.push(input.stdin.pipeTo(Writable.toWeb(proc.stdin!), { signal: transportAbort.signal }).catch(() => {
+      cleanup.error ??= "Command stdin delivery failed"
+    }))
   }
+  if (input.stdout) transport.push(Readable.toWeb(proc.stdout!).pipeTo(input.stdout, { signal: transportAbort.signal }).catch(() => {
+    cleanup.capture_complete = false; cleanup.error ??= "Output transport failed"
+  }))
   const stdout: Uint8Array[] = [], stderr: Uint8Array[] = []
   for (const [index, stream] of [proc.stdout!, proc.stderr!].entries()) {
+    if (index === 0 && input.stdout) continue
     stream.on("data", (chunk: Buffer) => {
       (index === 0 ? stdout : stderr).push(chunk)
       if (files[index]) writing = writing.then(async () => { await files[index]!.write(chunk) }).catch(() => {
@@ -739,6 +749,13 @@ export async function superviseProcess(input: {
     }
   })])
   await writing
+  const transportDeadline = Promise.withResolvers<void>()
+  const transportTimer = setTimeout(() => {
+    cleanup.capture_complete = false; cleanup.error ??= "Output transport deadline exceeded"
+    transportAbort.abort(); transportDeadline.resolve()
+  }, 1_000)
+  await Promise.race([Promise.all(transport), transportDeadline.promise])
+  clearTimeout(transportTimer)
   for (const file of files) {
     await file.sync().catch(() => { cleanup.error ??= "Output capture sync failed"; cleanup.capture_complete = false })
     await file.close().catch(() => { cleanup.error ??= "Output capture close failed"; cleanup.capture_complete = false })
