@@ -24,8 +24,19 @@ Container ID, сеть и UserStorage проверены read-only, public routi
 Серия: 18 baseline и 25 candidate (18 standard, 3 explicit-js, 3 tags,
 1 recovery). Первые 9 candidate входят в эти 25; повторы разрешены только
 после чистой первой волны. При нарушении политики следующие слоты этой
-версии skill не запускаются. До model dispatch инцидент не занимает слот;
+ версии skill не запускаются. До model dispatch инцидент не занимает слот;
 после dispatch провал сохраняется в знаменателе.
+
+Текущая серия — `20261013T132356Z-0a3983`, исходная `20261013T093809Z-f5d429`
+остановлена после трёх baseline и сохранена отдельно. Пользователь поручил
+самостоятельно устранять блокеры; необходимый общий runtime-дефект
+`imports.text.date_format` исправлен по TDD в `263df9620`. Обе новые сборки
+на `6768520a0` выполнены в одном worktree и проверены против owning source;
+runtime/dependencies/compiled CLI побайтно совпадают. Native Host proof дат,
+Save/cleanup/logout прошёл без LLM. Smoke не входит в 43 модельных слота.
+Новые pins immutable; inputs/oracle/model/reviewSeed прежние. Исторический
+acceptance lock сохранён побайтно, новые hashes привязаны отдельным
+`pins-preparation-review.json`, 72/72 current source hashes PASS.
 
 ## Одна попытка
 
