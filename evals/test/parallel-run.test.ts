@@ -238,6 +238,35 @@ test("fixture main: a competing controller cannot overwrite the admitted control
   } finally { await pending; await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
+test("fixture main: unknown judge cleanup stops assignments while the other active slot drains", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-unknown-"))
+  try {
+    const input = await fixture(root, ["parallel-fast", "parallel-slow", "parallel-z-next"], true)
+    const slowFile = path.join(root, "tasks/parallel-slow/task.json")
+    await Bun.write(slowFile, JSON.stringify({ ...await Bun.file(slowFile).json(), inputs: [] }))
+    const pending = main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" },
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const deadline = Date.now() + 10_000
+    while (true) {
+      const prompts = await Array.fromAsync(new Bun.Glob("results/*/parallel-fast/1/prompt.txt").scan({ cwd: root, absolute: true }))
+      if (prompts[0]) {
+        await mkdir(path.join(path.dirname(prompts[0]), "judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
+        break
+      }
+      if (Date.now() > deadline) throw Error("Fixture dispatch not observed")
+      await Bun.sleep(10)
+    }
+    const run = await pending
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks.find(task => task.id === "parallel-z-next")!.attempts).toEqual([])
+    expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "completed", judge_cleanup_unconfirmed: true, environment_cleanup: { status: "failed" } })
+    expect(summary.tasks[1]!.attempts[0]).toMatchObject({ status: "no_artifact", environment_cleanup: { status: "confirmed" } })
+    expect(summary.slots?.map(slot => slot.state)).toEqual(["quarantined", "closed"])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("fixture main: consecutive interrupted parallel runs drain both slots and retain interruption metadata", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-interruption-"))
   const input = await fixture(root, ["parallel-slow"])
