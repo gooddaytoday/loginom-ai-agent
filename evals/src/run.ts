@@ -367,6 +367,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       : undefined
   const skippedJudge = input.skipJudge || artifact !== undefined || noJudge
+  const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
   const judgeFields = judged
     ? judgedFields(judged)
     : {
@@ -399,8 +400,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     artifact_ambiguous: artifact?.ambiguous ?? [],
     cleanup_error: cleanupError,
     environment_cleanup: {
-      status: run.processCleanup.status === "failed" ? "failed" : "not_run",
-      evidence: "cleanup.json", error: run.processCleanup.error,
+      status: judgeCleanupFailed || run.processCleanup.status === "failed" ? "failed" : "not_run",
+      evidence: judgeCleanupFailed ? `judge-processes-${judged.attempts}/process-cleanup.json` : "cleanup.json",
+      error: judgeCleanupFailed && !judged.ok ? judged.error : run.processCleanup.error,
     },
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
@@ -416,7 +418,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   Object.assign(base, result)
   await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup }, null, 2))
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
-  return { result, stop: stop || run.processCleanup.status === "failed" }
+  return { result, stop: stop || run.processCleanup.status === "failed" || Boolean(judgeCleanupFailed) }
 }
 
 async function archiveInfraAttempt(outDir: string) {

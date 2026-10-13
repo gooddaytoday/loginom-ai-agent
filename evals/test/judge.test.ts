@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -161,6 +161,57 @@ async function gateFixture() {
     async close() { await rm(root, { recursive: true, force: true }); await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true }) },
   }
 }
+
+test("judgeTask: supervisor drains the judge's child before returning a verdict", async () => {
+  const fixture = await gateFixture()
+  const pidFile = path.join(fixture.root, "judge-child.pid")
+  const active = async () => {
+    if (!await Bun.file(pidFile).exists()) return false
+    const raw = await Bun.file(`/proc/${(await Bun.file(pidFile).text()).trim()}/stat`).text().catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw !== "" && !["Z", "X"].includes(raw.slice(raw.lastIndexOf(")") + 2).split(" ")[0]!)
+  }
+  try {
+    const input = fixture.input("owned-child")
+    const result = await judgeTask({ ...input, judge: { ...input.judge,
+      command: [...input.judge.command, "--child-pid-file", pidFile] } })
+    expect(result).toMatchObject({ ok: true, attempts: 1 })
+    expect(await active()).toBe(false)
+    const proof = await Bun.file(path.join(fixture.root, "owned-child/judge-processes-1/process-cleanup.json")).json()
+    expect(proof.status).toBe("confirmed")
+    const pid = Number(await Bun.file(pidFile).text())
+    expect(proof.processes.some((entry: { pid: number }) => entry.pid === pid)).toBe(true)
+  } finally {
+    const deadline = Date.now() + 15_000
+    while (await active()) {
+      if (Date.now() > deadline) throw Error("Fixture child did not finish")
+      await Bun.sleep(25)
+    }
+    await fixture.close()
+  }
+}, 20_000)
+
+test("judgeTask: unconfirmed process evidence refuses verdict and retry", async () => {
+  const fixture = await gateFixture()
+  try {
+    await mkdir(path.join(fixture.root, "failed-proof/judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await judgeTask(fixture.input("failed-proof"))
+    expect(result).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 1 })
+    expect(result.ok ? "" : result.error).toContain("Process evidence persistence failed")
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await fixture.close() }
+})
+
+test("judgeTask: cleanup uncertainty during the second invocation remains in the outcome", async () => {
+  const fixture = await gateFixture()
+  try {
+    await mkdir(path.join(fixture.root, "failed-second/judge-processes-2/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await judgeTask(fixture.input("failed-second", { FAKE_CODEX_EXIT: "9" }))
+    expect(result).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 2 })
+  } finally { await fixture.close() }
+})
 
 test("judge gate: actual fake-codex intervals do not overlap", async () => {
   const fixture = await gateFixture()

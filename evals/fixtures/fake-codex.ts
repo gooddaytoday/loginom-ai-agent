@@ -15,6 +15,16 @@ if (args.includes("--version")) {
   process.stdout.write("fake-codex 0.0.0\n")
   process.exit(0)
 }
+if (args.includes("--child-pid-file")) {
+  const child = Bun.spawn([process.execPath, "-e", "console.log(process.pid); setTimeout(() => process.exit(0), 10000)"],
+    { stdin: "ignore", stdout: "pipe", stderr: "ignore" })
+  const reader = child.stdout.getReader()
+  await reader.read()
+  reader.releaseLock()
+  await Bun.write(args[args.indexOf("--child-pid-file") + 1]!, String(child.pid))
+  // Keep the parent alive for continuous ancestry observation before leaving the child behind.
+  await Bun.sleep(300)
+}
 const dir = args[args.indexOf("-C") + 1] ?? "."
 const out = args[args.indexOf("-o") + 1] ?? path.join(dir, "verdict.json")
 const trace = process.env.FAKE_CODEX_GATE_LOG ?? (args.includes("--gate-log") ? args[args.indexOf("--gate-log") + 1] : undefined)
@@ -54,3 +64,5 @@ await Bun.write(
     confidence: "high",
   }),
 )
+
+if (args.includes("--child-pid-file")) process.exit(0)
