@@ -1,0 +1,35 @@
+{
+  "checked_utc": "2026-10-13T17:19:04.487666+00:00",
+  "comment_id": "01a13644-79b2-712f-bd2b-5dc33cd1cc31",
+  "parent_id": "01a13623-89e7-70d1-9546-093696ecd94a",
+  "body_sha256": "35689a20a6b3a76d890263ff571303b9f9a1196f7ff8399f887e007dc4affa6d",
+  "body_readback": true,
+  "parent_readback": true,
+  "one_routed_Evaler_mention": true,
+  "attachments": [
+    {
+      "id": "01a13644-7652-72b9-a47e-42cec246945f",
+      "filename": "2026-10-13-text-import-apparmor-operator-receipt.json",
+      "bytes": 2686,
+      "sha256": "172a3eb01fb798edb66cc4778ffed51369e5ab6e429a9b26bcd1bd3bf3a0a156",
+      "byte_identical": true
+    },
+    {
+      "id": "01a13644-7807-79c5-bc6e-7deb6b87d613",
+      "filename": "2026-10-13-text-import-apparmor-operator-cleanup.json",
+      "bytes": 831,
+      "sha256": "9bb7d3cf238b430a30c67187ed26b9b716e0bd8f858330483838f567aeb61119",
+      "byte_identical": true
+    }
+  ],
+  "active": [
+    {
+      "id": "01a13644-79d0-7b23-adb5-3060f83cdc58",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "started_at": "2026-10-13T20:17:00+03:00"
+    }
+  ],
+  "issue_status": "blocked",
+  "issue_revision": 224
+}

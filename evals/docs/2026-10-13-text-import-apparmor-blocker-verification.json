@@ -1,0 +1,420 @@
+{
+  "checked_utc": "2026-10-13T16:40:17.383644+00:00",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "report_id": "01a1360e-ab19-73ee-84c0-861d13c6825b",
+  "report_parent_id": "01a1359b-d1a9-7767-8501-5c0731bd3916",
+  "report_task_id": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+  "status_at_read": "in_progress",
+  "revision_at_read": 212,
+  "attachments": [
+    {
+      "id": "01a1360e-aa5b-71af-bed2-9f0086b22ec0",
+      "filename": "lab57-effective-native-blocked-evidence.tar.gz",
+      "bytes": 1036934,
+      "sha256": "9d1f294e4b7d600d88237b0b7b7200d211ff657fb4c77dc36568ff8fd258d3f9"
+    },
+    {
+      "id": "01a1360e-aa8e-716a-9b21-a7525033338e",
+      "filename": "lab57-effective-native-blocked-manifest.json",
+      "bytes": 80543,
+      "sha256": "8b8d7a208ca36336d6b6267dd6e61d17da933f8dcf23626e8c1559d5c33ae155"
+    },
+    {
+      "id": "01a1360e-aac2-74f4-af91-fce810b5fe72",
+      "filename": "lab57-native-browser-blocker.md",
+      "bytes": 6436,
+      "sha256": "fc68f1eb7e40013d30d256fdc292e476d92a231347cf99eb3d849025e7773f5f"
+    },
+    {
+      "id": "01a1360e-aaef-7673-9cf3-df58ba9fa1aa",
+      "filename": "lab57-apparmor-path-proposal.NOT_APPLIED",
+      "bytes": 289,
+      "sha256": "f83e9f1b98972892f1d675267845341a6c6ec4f4528e41cddf1c1ffe78cf217c"
+    },
+    {
+      "id": "01a13616-9e5c-723a-94a5-5d593f987652",
+      "filename": "lab57-apparmor-approved-handoff.zip",
+      "bytes": 13843,
+      "sha256": "9834d2f7b2b75b4b294a631283c7354ec98377e5faaf58a96f2a44558984c1a7"
+    }
+  ],
+  "integrity": {
+    "archive_payload_verified": 418,
+    "archive_manifest_byte_identical": true,
+    "archive_members": 525,
+    "handoff_payload_verified": 8,
+    "handoff_crc_paths_types": true,
+    "policy_byte_identical": true,
+    "proposal_byte_identical": true
+  },
+  "source_git_file_verification": [
+    {
+      "family": "cli",
+      "sha": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "path": "packages/loginom-host/src/connection/connection-service.ts",
+      "bytes": 13743,
+      "sha256": "cd20246da8605dee69b3cc146f2efde343714718e15ba8c5524e1be07e79478a"
+    },
+    {
+      "family": "cli",
+      "sha": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "path": "packages/loginom-host/test/startup-failure.test.ts",
+      "bytes": 1587,
+      "sha256": "130d9ae847cddad4df373c8c99e40f7deb91e31ff2417ee2c0d734ce99fa52aa"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/script/check-text-import-cold.py",
+      "bytes": 5285,
+      "sha256": "7ebece25dced6c2a9ad1849043aedda3ced849cb6b8d59f1ef48fac5143ebe3e"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/script/prepare-text-import-cold.ts",
+      "bytes": 541,
+      "sha256": "916ad8a30e6cb357e9ca72583b108fb8f2a6211d5e4793f08a38751514161692"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/script/text-import-cold/cli-pin.mjs",
+      "bytes": 815,
+      "sha256": "86da67324a41ced59f4c270dbbe273b8c1c53d315fe71ad12ec9e0ca8776df12"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/script/text-import-cold/cli-pins.json",
+      "bytes": 831,
+      "sha256": "8a4b10194310a5b405fd468c2afac5ca8eed5147dd3eef4d33d399ed2cb252ad"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/script/text-import-cold/provenance.json",
+      "bytes": 2702,
+      "sha256": "d97abcf19e238f2205345330b5d14b2fb35fa447377c919917610df49d2aa905"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/script/text-import-cold/reader.mjs",
+      "bytes": 13805,
+      "sha256": "49d1fbefeec9430608579a65cf2a19a4378358cdedb90df9365acaf987ecd940"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/src/text-import-cold.ts",
+      "bytes": 3443,
+      "sha256": "776a4e49a0577807aecd3d6e7cfb07f676815b2746c08565ca5d03cabb2e35b7"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/test/text-import-cold-reader.test.ts",
+      "bytes": 7830,
+      "sha256": "21335e1bd0082c480c723e02ddf322ed8dea9c9df8380a63e8e8793029d4645c"
+    },
+    {
+      "family": "author",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "path": "evals/test/text-import-evidence.test.ts",
+      "bytes": 37392,
+      "sha256": "bacd6a44856ff247a40a3e31f0e111af460b90d04cbd9b17b02c68953727bba9"
+    }
+  ],
+  "proof_hashes": [
+    {
+      "path": "current/settlement/settlement-receipt.json",
+      "sha256": "4f5c68fb6c631600d816a8161e5a058881cafa1f3ebce2d2d10231edc3dc20d0"
+    },
+    {
+      "path": "current/settlement/archive-integrity.json",
+      "sha256": "d1caa1f7bd7fec1fc27143e0d9d59534de6b56035a8097d45b6e6b2929947449"
+    },
+    {
+      "path": "current/settlement/helper-free.json",
+      "sha256": "b3ba644974b8e9faa469ba48da63af36072079bc020358e97dd761100eb03be9"
+    },
+    {
+      "path": "current/support-installation.json",
+      "sha256": "26bfb508593408b7837609ef4f661e9573bfa700b54d749ccacb640cd41cb381"
+    },
+    {
+      "path": "unit/d6-unit-disk-repair-pass/completion.safe.json",
+      "sha256": "7d4d37e79fb2041ddf16cd0d76f381f0bbe54fb711022a6340eb14d22ace47af"
+    },
+    {
+      "path": "unit/d6-unit-disk-repair-pass/release.safe.json",
+      "sha256": "2c68c148660cd6b769a83a8a75369c8ad36ce680eb82261c983f66863139149a"
+    },
+    {
+      "path": "current/kernel-policy/actual-status-safe-view.json",
+      "sha256": "cafcf57ae97d33badbd60d11f68fde5f8b14af31955345243b4fc78d53e99e5e"
+    },
+    {
+      "path": "current/kernel-policy/kernel-read-receipt.json",
+      "sha256": "673235bbe5e9ee0c677155394b0fd22d7e45eab2c103c644f877d2ea4fbc2feb"
+    },
+    {
+      "path": "current/kernel-policy/invocation-kernel-audit.txt",
+      "sha256": "59e30e1c3a598dc1fb361f75760f7cff218ea6806759bd041dc5ed117b64124c"
+    },
+    {
+      "path": "current/kernel-policy/candidate-policy-source-search.json",
+      "sha256": "fa4a5d3601f9963ce9ca0adbe4c579f3f3e7658b092c6e3feea18572c6974402"
+    },
+    {
+      "path": "accounting/ledger.json",
+      "sha256": "37599d108bf963abed6d1f476d34603b736cefed5de6fb1367263af99772c131"
+    },
+    {
+      "path": "handoff/lab57-apparmor-approved-scope.json",
+      "sha256": "6ac1ceb7bf9c7368b234f7955d7f6d008e11de974418400ce2dfa996057ced83"
+    },
+    {
+      "path": "handoff/apparmor-coordinator-verification.json",
+      "sha256": "f0f8870864cca8a5293c5979ac838d76d116bb8b8de27a6745cd3efaa52c56f1"
+    }
+  ],
+  "verification_limits": {
+    "root_read_execution_host": false,
+    "root_checked_safe_projections_and_payload_hashes": true,
+    "evaler_original_execution_host_validation": "CONFIRMED per 01a13616-9e84",
+    "independent_Ben_acceptance": false,
+    "new_native_READY": false,
+    "lower_Playwright_exception": "NOT_RETAINED",
+    "denied_child_ancestry": "NOT_PROVEN_BY_OUTER_CAPTURE"
+  },
+  "support": {
+    "support_source": "d633e57d3d62be4aaf9a0c8a3452983e91e94efe",
+    "manifest_sha256": "44083a8f19d4307a17f5c1076af8adf910b8e85bf0a73e657679345bd63f320e",
+    "verified_files": 755,
+    "installation": "IMMUTABLE_SEPARATE",
+    "atomic_no_replace": true,
+    "installed89b_preserved": true,
+    "owner_policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0"
+  },
+  "preflight_lease_settlement": {
+    "result": "ABANDONED",
+    "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "operator_task": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+    "original_owner": {
+      "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+      "role": "rich",
+      "phase": "eval",
+      "sha": "49522d83318bac29779e497798becb2f799bc84e",
+      "version": 1,
+      "device": 64512,
+      "inode": 14429666,
+      "endpoint": "http://localhost/app/",
+      "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "acquiredAt": "2026-10-13T11:53:15.320Z",
+      "configSha256": "f76b3a6a3a2d28c10b255ef5e9e7542f931f2f55708958f2af3ff9dcfe87b264"
+    },
+    "policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+    "base_plan_sha256": "bd00fb531a7883773896a3ab5138c1a851796782141a106c3b6c0f9aad74dc1a",
+    "operator_start_utc": "2026-10-13T14:23:35.629262+00:00",
+    "operator_finished_utc": "2026-10-13T14:23:46.634677+00:00",
+    "once_attempted_utc": "2026-10-13T14:23:44.056212+00:00",
+    "once_sha256": "e15fc270309a138e0d0ed6988d6882ec2ce4bd9ac749e31d7514f5f1701edcd3",
+    "archive_integrity": "CONFIRMED",
+    "stand": "FREE",
+    "native_READY": false,
+    "historical_failure": "PROFILE_NOT_READY / UNCLASSIFIED / charge0",
+    "old_unit_once": "NOT_USED",
+    "new_recovery": 0,
+    "repeats": {
+      "consumed": 3,
+      "limit": 10,
+      "remaining": 7
+    },
+    "source_task_preserved": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7"
+  },
+  "archive_inventory": {
+    "entries": 8,
+    "before_equals_after": true,
+    "atomic_no_replace": true,
+    "entire_archive": true,
+    "all_bytes_and_identities_preserved": true
+  },
+  "unit": {
+    "owner": {
+      "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "task": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+      "role": "rich",
+      "phase": "unit",
+      "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190"
+    },
+    "acquiredAt": "2026-10-13T15:42:52.572Z",
+    "pass": 537,
+    "skip": 15,
+    "fail": 0,
+    "typecheck_exit": 0,
+    "completion_original_sha256": "88441f336b55af6189b07321706b584e8a39e08069fe7a0bf1e8e9cfbea9563e",
+    "release_original_sha256": "016cee56105bce1a40bd369dfa77092bb73b1c356036f55963da291ad523a7b7",
+    "releasedAt": "2026-10-13T16:09:01.349Z",
+    "release_status": "RELEASED",
+    "prior_failures_retained": [
+      "source SHA input error",
+      "EDQUOT 536PASS/15SKIP/1FAIL"
+    ]
+  },
+  "cli_candidate": {
+    "source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "base": "d73a13fabf358d281942f7885ba7afe7b007423b",
+    "manifest_sha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binary_sha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "files_verified_by_execution_receipt": 5389,
+    "resource_files_identical_to_d73_receipt": 4394,
+    "native_admission": "NOT_READY",
+    "diagnostic_behavior": "Preserve finite allowlisted startup error; readiness failure remains failure"
+  },
+  "author_partial": {
+    "sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+    "branch": "rich-text-pilot",
+    "addressed_pass": 20,
+    "skip": 1,
+    "frozen_sha": null,
+    "five_historical_references": "warm/cold offline replay with original pins, retained"
+  },
+  "blocker": {
+    "fingerprint": "AppArmor:unprivileged_userns:exact-candidate-chromium:sys_admin-denied",
+    "classification": "NEW_CONFIRMED_OS_POLICY_CAUSE",
+    "first_evidence_charge": 0,
+    "actual_management_mode": "headless",
+    "actual_management_view": "recoverable-error/LOGINOM_BROWSER_START_FAILED",
+    "stdout_sha256": "0bf56526277df4939fedd631126b06060684b584701f553371817b935667944f",
+    "audit_timestamp_within_invocation": true,
+    "audit_userns_pid": 1980365,
+    "audit_denied_pid": 1980372,
+    "observed_userns_pid_in_outer_capture": true,
+    "denied_pid_ancestry_in_outer_capture": false
+  },
+  "operator_action": {
+    "decision_comment_id": "01a13616-9e84-71de-a0b4-ab138cc08e2a",
+    "parent_id": "01a1360e-ab19-73ee-84c0-861d13c6825b",
+    "authority_comment_id": "01a13591-5d06-7734-b05b-5e3a4a9fd6c7",
+    "proposal_sha256": "f83e9f1b98972892f1d675267845341a6c6ec4f4528e41cddf1c1ffe78cf217c",
+    "policy_file": "/etc/apparmor.d/loginom-lab57-startup-chromium",
+    "scope": "Only exact candidate Chromium executable; preserve global AppArmor restrictions, sandbox, bubblewrap and foreign profiles",
+    "monitor_review": "Scoped technical choice supported by evidence and existing owner delegation; already dispatched, no duplicate handoff",
+    "actual_installation_confirmed": false,
+    "current_task_id": "01a13616-9e99-759a-b677-ec58945cd4a6",
+    "status_at_read": "running",
+    "started_at": "2026-10-13T19:27:45+03:00"
+  },
+  "budgets_at_receipt": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "repeat_consumed": 3,
+  "repeat_limit": 10,
+  "active_dispatch_precharged": false,
+  "historical_wall_time_gates": "SUPERSEDED",
+  "new_monitor_live_or_model_calls": 0,
+  "monitor_server_mutations": [],
+  "all_eight_done": false,
+  "operator_resolution": {
+    "status": "APPLIED_VERIFIED_BY_READONLY_RECONCILIATION",
+    "receipt_file": "evals/docs/2026-10-13-text-import-apparmor-operator-receipt.json",
+    "receipt_sha256": "172a3eb01fb798edb66cc4778ffed51369e5ab6e429a9b26bcd1bd3bf3a0a156",
+    "checked_utc": "2026-10-13T17:08:19.810145+00:00",
+    "root_access_used_on_execution_host": true,
+    "policy_file_and_kernel_load_attempts": 1,
+    "initial_postcheck_STOP_retained": {
+      "reason": "KERNEL_ATTACHMENT_DIFFERS",
+      "actual_attach_display": "<unknown>",
+      "failure_original_sha256": "efd5f342fbc1757f4d7f7b45ca394026f90b988551b1e3efbe279ca8719d7a2a"
+    },
+    "subsequent_action": "Read-only verification only; no repeat installation/load",
+    "verification_method": "Exact kernel-exported raw policy bytes equal uncompressed read-only compilation of exact approved source; attachment scope preserved",
+    "kernel_raw_bytes": 5786,
+    "kernel_raw_sha256": "e67764c46e400d325edf2d2c3891b5dbad66bcdd5d240bc4b5e14425cf20f6b2",
+    "primary_source_explanation": {
+      "url": "https://github.com/torvalds/linux/blob/master/security/apparmor/apparmorfs.c",
+      "function": "seq_profile_attach_show",
+      "observed_representation": "Kernel emits <unknown> when xmatch DFA exists without xmatch_str; corroborates display-only limitation. Actual scope proven by exact binary equality."
+    },
+    "global_restriction_unchanged": 1,
+    "other_policy_files_and_loaded_profiles_unchanged": true,
+    "actual_native_READY": false,
+    "scenario_calls": 0,
+    "transport_cleanup_receipt": "evals/docs/2026-10-13-text-import-apparmor-operator-cleanup.json",
+    "root_SSH_session_closed": true,
+    "worker_privilege_checkpoint": {
+      "comment_id": "01a1361f-517b-7c04-868f-265c81896eab",
+      "archive_sha256": "d64f9be2bbbab8f5013578f31af52314ec51b9bb6b52e3c0189cfb3708a7111f",
+      "manifest_sha256": "8b44b1fe7ccc83844f39752901d98567e77e04ba341ae1e68147efec2ab45476",
+      "files_verified": 35
+    },
+    "coordinator_privilege_checkpoint": {
+      "comment_id": "01a13623-89e7-70d1-9546-093696ecd94a",
+      "zip_sha256": "3f6e399f807a512418e0f54177f7e9770305e089ffac7e61b24de14f69587661",
+      "payload_files_verified": 6
+    }
+  },
+  "operator_handoff": {
+    "checked_utc": "2026-10-13T17:19:04.487666+00:00",
+    "comment_id": "01a13644-79b2-712f-bd2b-5dc33cd1cc31",
+    "parent_id": "01a13623-89e7-70d1-9546-093696ecd94a",
+    "body_sha256": "35689a20a6b3a76d890263ff571303b9f9a1196f7ff8399f887e007dc4affa6d",
+    "body_readback": true,
+    "parent_readback": true,
+    "one_routed_Evaler_mention": true,
+    "attachments": [
+      {
+        "id": "01a13644-7652-72b9-a47e-42cec246945f",
+        "filename": "2026-10-13-text-import-apparmor-operator-receipt.json",
+        "bytes": 2686,
+        "sha256": "172a3eb01fb798edb66cc4778ffed51369e5ab6e429a9b26bcd1bd3bf3a0a156",
+        "byte_identical": true
+      },
+      {
+        "id": "01a13644-7807-79c5-bc6e-7deb6b87d613",
+        "filename": "2026-10-13-text-import-apparmor-operator-cleanup.json",
+        "bytes": 831,
+        "sha256": "9bb7d3cf238b430a30c67187ed26b9b716e0bd8f858330483838f567aeb61119",
+        "byte_identical": true
+      }
+    ],
+    "active": [
+      {
+        "id": "01a13644-79d0-7b23-adb5-3060f83cdc58",
+        "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "status": "running",
+        "started_at": "2026-10-13T20:17:00+03:00"
+      }
+    ],
+    "issue_status": "blocked",
+    "issue_revision": 224
+  },
+  "automation_update": {
+    "id": "lab-56-lab-63",
+    "kind": "heartbeat",
+    "status": "ACTIVE",
+    "prompt_updated_for_actual_operator_progress": true,
+    "prompt_readback_verified": true,
+    "old_time_gates": "SUPERSEDED",
+    "new_user_approval_gate": false
+  }
+}

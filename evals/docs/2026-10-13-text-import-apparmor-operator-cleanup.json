@@ -1,0 +1,25 @@
+{
+  "status": "OWNED_TRANSPORT_CLEANED_EVIDENCE_RETAINED",
+  "checked_utc": "2026-10-13T17:13:23.910528+00:00",
+  "files": [
+    {
+      "file": "lab57-apparmor-f83e9f1b-coordinator.operator.py",
+      "sha256": "5ea10903c9edb293befeebff1670783fc4d61bf75f4199a1d52cc1fa47e271bc",
+      "archived_exact": true,
+      "temporary_removed": true
+    },
+    {
+      "file": "lab57-apparmor-f83e9f1b-coordinator.apply.py",
+      "sha256": "b690315618bd0c4ad686fd554a54b8863557e87e498638cd11601a7c3078ce57",
+      "archived_exact": true,
+      "temporary_removed": true
+    },
+    {
+      "file": "lab57-apparmor-f83e9f1b-coordinator.preflight.json",
+      "sha256": "fcffd4323d7d26ef45aa937128b4454bbf1087d8ee98ea46cf48d1e718914601",
+      "archived_exact": true,
+      "temporary_removed": true
+    }
+  ],
+  "policy_reapplied": false
+}
