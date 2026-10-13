@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "method": "independent TASK JSON and Python csv/Decimal/calendar calculation",
+  "program": "evals/script/lab57-oracle.py",
+  "programSha256": "36a1bfa41e51e4b76404f4015059c7284dab93805cc1983b07287a5bae43858a",
+  "id": "csv-pipe-multiline",
+  "inputTaskHashes": {
+    "TASK.md": "5ee956fe72c4fb06a07dcbf843bed7fa2cfb1f2d8a07a692e56f9fe39f3deaaf",
+    "data/pipe_multiline.csv": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927"
+  },
+  "independentOracleSha256": "7efaedfa44d9a149b6ec5ed00f5a819ce76c5d929dac6a3d7c490ba0ca54a988",
+  "existingExpectedSha256": "a9b3c295a6baa04c3259d3ef65c993724207d19d7c25d8a5200d183390d404a4",
+  "rows": 3,
+  "status": "EXACT_MATCH"
+}

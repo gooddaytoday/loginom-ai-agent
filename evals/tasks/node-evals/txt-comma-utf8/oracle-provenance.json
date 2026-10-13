@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "method": "independent TASK JSON and Python csv/Decimal/calendar calculation",
+  "program": "evals/script/lab57-oracle.py",
+  "programSha256": "36a1bfa41e51e4b76404f4015059c7284dab93805cc1983b07287a5bae43858a",
+  "id": "txt-comma-utf8",
+  "inputTaskHashes": {
+    "TASK.md": "18d3e240e2e7ea6e35a2917c05bd1db650a2e90c89ad5ef9a225a87aa1fe44c2",
+    "data/comma_utf8.txt": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+  },
+  "independentOracleSha256": "f9a8c52ed0654adfc9a7262ca605f2b0feb88494131c7364445c5fab34a9f6a6",
+  "existingExpectedSha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084",
+  "rows": 3,
+  "status": "EXACT_MATCH"
+}

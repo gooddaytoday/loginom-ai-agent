@@ -1,0 +1,158 @@
+{
+  "id": "txt-semicolon-cp1251-decimal",
+  "title": "TXT: Windows-1251, точка с запятой, десятичная запятая",
+  "group": "txt-matrix",
+  "eval_status": "NOT_RUN",
+  "case_readiness": "OFFLINE_VALIDATED",
+  "runner_adaptation": "NOT_IMPLEMENTED",
+  "historical_evidence": "HISTORICAL_SCOPED_PASS",
+  "inputs": [
+    {
+      "path": "data/semicolon_cp1251_decimal.txt",
+      "bytes": 150,
+      "sha256": "94821af546f6454601f5338d6fe32b8bf7a85bf7208b34df2bc522e55e2ab4dd",
+      "encoding": "cp1251",
+      "bom": false
+    }
+  ],
+  "settings": {
+    "source": {
+      "encoding": "1251",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": ";",
+      "text_qualifier": "\"",
+      "decimal_separator": ",",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "columns": [
+    {
+      "name": "Id",
+      "label": "Идентификатор",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Name",
+      "label": "Название",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Amount",
+      "label": "Сумма",
+      "type": "real",
+      "data_kind": "Непрерывный",
+      "used": true
+    },
+    {
+      "name": "Date",
+      "label": "Дата",
+      "type": "datetime",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Note",
+      "label": "Текст",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ],
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "stages": [],
+  "expected": [
+    "expected/table.json"
+  ],
+  "oracle_recipe": [
+    {
+      "input": "data/semicolon_cp1251_decimal.txt",
+      "expected": "expected/table.json",
+      "parse": {
+        "source": {
+          "name": "semicolon_cp1251_decimal.txt",
+          "bytes": 150,
+          "sha256": "94821af546f6454601f5338d6fe32b8bf7a85bf7208b34df2bc522e55e2ab4dd",
+          "encoding": "cp1251",
+          "bom": false
+        },
+        "settings": {
+          "source": {
+            "encoding": "1251",
+            "rows_to_skip": 0,
+            "first_line_as_title": true
+          },
+          "format": {
+            "delimiter": ";",
+            "text_qualifier": "\"",
+            "decimal_separator": ",",
+            "null_marker": "?",
+            "multiple_delimiters": false,
+            "date_format": "yyyy/mm/dd",
+            "date_separator": "-"
+          }
+        },
+        "columns": [
+          {
+            "name": "Id",
+            "label": "Идентификатор",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Name",
+            "label": "Название",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Amount",
+            "label": "Сумма",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "name": "Date",
+            "label": "Дата",
+            "type": "datetime",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Note",
+            "label": "Текст",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ],
+        "source_headers": [
+          "Идентификатор",
+          "Название",
+          "Сумма",
+          "Дата",
+          "Текст"
+        ]
+      }
+    }
+  ],
+  "privacy": "synthetic"
+}

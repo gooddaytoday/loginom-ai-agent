@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/txt/txt-comma-utf8",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1738,
+      "sha256": "85833855c867652c277528bab041c26000e58e111f92f20d49a0f949a37f9ee0"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3878,
+      "sha256": "d4394f1a0d4c6e14ad399484a0dd1ffa4e63fa0207eab34ea6cf936a7885a363"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5267,
+      "sha256": "db0613986381ece90ead98920e964695c7118c6ecd2c3876d4574ca54fea7940"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3758,
+      "sha256": "e54df858457b9a073546456783575f4259788f6036db58d945c163820c08e485"
+    },
+    {
+      "path": "data/comma_utf8.txt",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1879,
+      "sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

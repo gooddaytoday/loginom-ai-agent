@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "method": "independent TASK JSON and Python csv/Decimal/calendar calculation",
+  "program": "evals/script/lab57-oracle.py",
+  "programSha256": "36a1bfa41e51e4b76404f4015059c7284dab93805cc1983b07287a5bae43858a",
+  "id": "tsv-utf8",
+  "inputTaskHashes": {
+    "TASK.md": "075b6bc2124ef8e91d18ace9e68119a86a8d7eb00ea69a8dfae5b940fed71c43",
+    "data/control-utf8.tsv": "9fb5673fe3ce124bf7587375ad67338bec6a684bd85f6e108e61a459f1c73c4f"
+  },
+  "independentOracleSha256": "cedc1e04381642ea9b2e1e52d2a9932cce721f65dbeebdb5ac40a4a3e2eab28c",
+  "existingExpectedSha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084",
+  "rows": 3,
+  "status": "EXACT_MATCH"
+}

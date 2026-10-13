@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/csv/csv-comma-utf8",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1736,
+      "sha256": "eb024c378121044a2e72653507d465a721ac914862030edc098bf2ac1779635e"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3878,
+      "sha256": "63a6da8caa605bc5706d5a09fade56450a4e331dadde91bd0fec64eaae519204"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5267,
+      "sha256": "067c180ea55e1da7134d2700c0f1f1b525b27429d7661401f4284ea63fdac0df"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3758,
+      "sha256": "2133630fa6cb754094c10677cf93a47b57088dd7d334793fed26a471c25850d3"
+    },
+    {
+      "path": "data/comma_utf8.csv",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1879,
+      "sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}
