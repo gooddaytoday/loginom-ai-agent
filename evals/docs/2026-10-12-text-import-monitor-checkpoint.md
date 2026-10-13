@@ -1,7 +1,7 @@
 # Мониторинг LAB-56–LAB-63
 
-- Full8 fresh22:48:54UTC13Oct: LAB56 done70/owner ACK/ACCEPT+cleanup; LAB57 in_progress267/phaseBen/frozeneb1; LAB58–63 in_progress9/admission/no runs.
-- One second Ben task01a1375d-ce4a running01:24:49+03Oct14;150messages/seq150/22:49:23UTC; no ACCEPT/new verdict. Handoff01a1375d-ce31 parent Rich19 report01a13753-5c9f; no duplicate.
+- Full8 fresh23:10:53UTC13Oct: LAB56 done70/owner ACK/ACCEPT+cleanup; LAB57 in_progress267/phaseBen/frozeneb1; LAB58–63 in_progress9/admission/no runs.
+- One second Ben task01a1375d-ce4a running01:24:49+03Oct14;47new messages since150/seq197/23:10:13UTC; no ACCEPT/new report/owner question. Handoff01a1375d-ce31 parent Rich19 report01a13753-5c9f; no duplicate.
 - Rich new clean published eb1c2b0da02210a9d95569849ae056fa4784440c; rejectedc26/review_cycle2/reject_count1/history retained. Author7changed files/7Git blobs; inputs/oracle/collection unchanged.
 - Owner-fix archive d951f398…2093/6680249bytes/manifest6c4991af…b634/339payload paths/types/hashes/embedded equality verified; prior1542/71/Ben108/original27 preserved.
 - BEN1 mandatory unique execute phase/boolean owner=true; exact target/finish/execute/group-child/session/runtime/manifest/checkpoint/order. Saved13RED→13GREEN; both6 ownerfalse+6missing phase rejected +20lineage negatives.
