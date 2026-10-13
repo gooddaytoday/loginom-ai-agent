@@ -73,6 +73,15 @@ test("allowed JavaScript modes keep the required native processing on the export
   expect(inspectSelectionGraph(xml, "explicit-js").complete).toBe(false)
 })
 
+test("missing Join port metadata cannot turn a two-input node into a valid one-input graph", async () => {
+  const xml = await reference("first-last-touch")
+  const join = xml.nodes.find((node) => node.type === "TBGJoinDataEngine")!
+  const port = Object.keys(join.inputs).find((port) => join.inputs[port] === "JoinedDataSource")!
+  delete join.inputs[port]
+  xml.links = xml.links.filter((link) => link.target.NodeGuid !== join.id || link.target.PortGuid !== port)
+  expect(inspectSelectionGraph(xml, "standard").complete).toBe(false)
+})
+
 async function reference(id: string) {
   const root = await mkdtemp(path.join(tmpdir(), "selection-graph-"))
   try {

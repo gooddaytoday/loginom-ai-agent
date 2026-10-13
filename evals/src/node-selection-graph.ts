@@ -26,6 +26,8 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
     !xml.nodes.some((node) => node.type === "TBGExportTextFile")) failures.add("GRAPH_IMPORT_EXPORT_REQUIRED")
   for (const node of xml.nodes) {
     if (!/^Unit_[0-9]+\/Unit\.xml:0$/.test(node.scope)) failures.add("GRAPH_SCOPE_UNKNOWN")
+    if (node.type === "TBGJoinDataEngine" && ["MainDataSource", "JoinedDataSource"].some((name) =>
+      Object.values(node.inputs).filter((input) => input === name).length !== 1)) failures.add("GRAPH_JOIN_INPUTS_INCOMPLETE")
     if (Object.values(node.inputs).some((name) => !inputs.has(name) && !parameters.has(name)) ||
       Object.values(node.outputs).some((name) => !outputs.has(name) && !parameters.has(name))) failures.add("GRAPH_PORT_UNKNOWN")
   }
