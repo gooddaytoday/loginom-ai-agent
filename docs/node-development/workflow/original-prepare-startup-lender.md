@@ -48,7 +48,10 @@ Tests exercise actual source/installed production constructor and private
 lender with named SDK/Page/context/session doubles and real Node/FS. No native
 Page, native load/CurrentUser/FileStorage/session/cached exports/closures or
 same-realm preparation Map is qualified; all four terminal authorities remain
-false. Closed packet86/76/limit8 suites are not repeated. Managed Hm identity
-forwarding is a separate source hunk; constructor controls are not full selected
-factory/native acceptance. Amount/Import current cuts and pending journals,
+false. Closed packet86/76/limit8 suites are not repeated. One affected fixed FP factory startup control runs through actual managed Hm
+and the production constructor in SOURCE_COMPILED and INSTALLED phases, with
+private factory-owned grant and real Node/FS/IPC. It invokes no Prepare/capture.
+The Page/SDK/session/native remain named doubles; original readiness reference
+identity is not native current-document/lifecycle proof. Child exit0/null is
+orderly fixture finalization, not native cleanup or terminal acceptance. Amount/Import current cuts and pending journals,
 UNKNOWN/history/accounts/originals remain intact.
