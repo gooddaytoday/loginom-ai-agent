@@ -1602,3 +1602,18 @@ Proof10 recovery independentlyf85a02cf… подтверждён,1993raw/4729res
 full savedJScomponent equal; currentworkspaceUI изменён только намеренной правкой,
 old80d27immutable цел. Ordinary rebuilt nativeExport/CSV и новая matched18+25
 по-прежнему обязательны. Sourcefix не меняет skill/policy/Protocol/publicJSdeny.
+
+
+Новая matched пара233119-4699a5 source41101ae0b2/runtimebf2fd06b… собрана/
+bothverify0 и independently Approved pair130d7d7f…/pins791829db… . Pins6944fa22…/
+8ceb74b8…/locke2776d98…/provenancefd1ec5a5… frozen0400;72+2/model/seed/tasks/
+43slots unchanged,0models/0oldoutcome transfers. OrdinaryJS root72815exit0,
+result507286da…: оба native Group/directSort, ExportSortCSV/5nodes4links,
+fullsavedJSsource/component/schema unchanged, publicgenericJSdeny и actual
+packageclose/logout/shutdown confirmed. Независимый live review ещёpending.
+OrdinaryJoin root22971 running после e6d39d2a… preflight; newrawhiddenDOM capture
+не заявляется — проверяются nativeopening ACK/preparedrole context/граф/oracle.
+Freshschema probe67472exit0/15standard schemas,0c2166c3… result; actualprepare16
+изordinaryJS связан в gap prerequisitef958175b… разныхSession той же immutable
+сборки. ProbeexplicitLogout=false сохранён, не подменяется ACK; gapreviewpending.
+Current-run192418 остаётся stopped доordinarygates; полные18+25 не запускались.
