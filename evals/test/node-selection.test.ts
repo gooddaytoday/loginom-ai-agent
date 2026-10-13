@@ -97,6 +97,17 @@ test("a failed semantic review blocks acceptance without changing native selecti
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("a malformed existing standard review remains pending instead of becoming optional", async () => {
+  const directory = await pilotDirectory()
+  try {
+    await Bun.write(path.join(directory, "graph-review.json"), "{invalid")
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(2)
+    expect((await Bun.file(path.join(directory, "selection-audit.json")).json()).reviewStatus).toBe("pending")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 async function pilotDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-complete-"))
   await mkdir(path.join(directory, "artifact/results"), { recursive: true })

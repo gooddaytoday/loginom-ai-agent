@@ -102,7 +102,8 @@ async function main() {
     exportNode: applied.filter((call) => call.type === "exports.text").at(-1)?.node,
   }))) failures.push("JAVASCRIPT_IDENTITY_UNVERIFIED")
   const packageSha256 = exists ? await hash(path.join(artifactDir, "package.lgp")) : null
-  const review = await json(path.join(directory, "graph-review.json"))
+  const review = await Bun.file(path.join(directory, "graph-review.json")).exists()
+    ? await json(path.join(directory, "graph-review.json")) ?? {} : null
   const reviewed = inspectSelectionReview({ review, mode: args.mode, sessionID: record(snapshot) ? snapshot.sessionID : undefined, packageSha256 })
   const reviewFiles = record(review) && Array.isArray(review.evidence) ? await Promise.all(review.evidence.map(async (file) => {
     if (typeof file !== "string") return false
