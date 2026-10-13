@@ -49,6 +49,8 @@ class AdmissionTest(unittest.TestCase):
         transmitted=(self.root/'transmitted').read_text()
         for private in ('PRIVATE ORACLE','PRIVATE_TOKEN',str(self.root/'evidence'),str(self.root/'proof')): self.assertNotIn(private,transmitted)
         self.assertEqual(json.loads(transmitted)['env']['LOGINOM_AI_AGENT_SHARED_AUTH_DIR'],str(self.root/'oauth'))
+        self.assertEqual(json.loads(transmitted)['env']['PWD'],str(self.cwd))
+        args=json.loads(transmitted)['args']; self.assertEqual(args[args.index('--dir')+1],str(self.cwd))
         self.assertNotEqual(self.run_cli().returncode,0); self.assertEqual((self.root/'calls').read_text(),'call\n')
     def test_busy_profile_never_starts(self):
         (self.profile/'.writer').mkdir(); self.rejected()

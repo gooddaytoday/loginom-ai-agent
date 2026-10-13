@@ -28,6 +28,8 @@ def checked(record):
 def validate(spec):
     task = checked(spec['task'])
     inputs = [checked(row) for row in spec['inputs']]
+    if any(not Path(spec[key]).is_absolute() for key in ('cwd', 'profile')) or not Path(spec['candidate']['path']).is_absolute():
+        raise DeliveryError('Working directory, profile and candidate paths must be absolute')
     cwd = Path(spec['cwd']).resolve(strict=True)
     profile = Path(spec['profile']).resolve(strict=True)
     shared_auth = Path(spec['shared_auth_dir'])
@@ -87,7 +89,7 @@ def validate(spec):
     for record in (spec['requirements'], spec['evidence'], *(row['proof'] for row in fixes.values())):
         if checked(record).is_relative_to(cwd):
             raise DeliveryError('Private verification evidence must not be a model input')
-    return [str(candidate / 'bin/loginom-ai-agent-cli'), 'run', '--model', spec['model'], '--variant', spec['variant'], '--format', 'json', *[arg for p in inputs for arg in ('--file', str(p))], '--', text]
+    return [str(candidate / 'bin/loginom-ai-agent-cli'), 'run', '--dir', str(cwd), '--model', spec['model'], '--variant', spec['variant'], '--format', 'json', *[arg for p in inputs for arg in ('--file', str(p))], '--', text]
 
 
 def launch(args):
@@ -122,7 +124,7 @@ def launch(args):
             env = {key: value for key, value in os.environ.items() if key in (
                 'PATH', 'HOME', 'LANG', 'LC_ALL', 'TMPDIR', 'DISPLAY', 'XAUTHORITY',
                 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR')}
-            env.update(LOGINOM_AI_AGENT_CLI_PROFILE=spec['profile'],
+            env.update(PWD=spec['cwd'], LOGINOM_AI_AGENT_CLI_PROFILE=spec['profile'],
                 LOGINOM_AI_AGENT_SHARED_AUTH_DIR=spec['shared_auth_dir'],
                 LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false')
             # Do not kill a resource-owning CLI on timeout or retry on failure/UNKNOWN.

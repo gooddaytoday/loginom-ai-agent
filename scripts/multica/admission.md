@@ -27,6 +27,8 @@ JSON готовит действующий исполнитель из назн�
 }
 ```
 
+Команда закрепляет одновременно process cwd, `PWD` и `run --dir`; все три совпадают с проверенным абсолютным `cwd`.
+
 Business cwd содержит только task и входные файлы, без вложенных каталогов. Profile и кандидат находятся снаружи. `profile_config` — фактический config данного CLI profile, не произвольный substitute. Секретное содержимое config не записывается в квитанцию. Полный manifest и каждый payload проверяются существующим `artifacts.verify_build`.
 
 `requirements.json` содержит `case`, `task_sha256`, непустой `review_reference` на разбор задания, `required_text` (непустой массив обязательных дословных фраз в business task), `required_fixes` (массив ID всех применимых/подлежащих оценке исправлений). Для `LAB-72-enabled-prefixes` обязателен `prefixes`:
