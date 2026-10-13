@@ -32,6 +32,21 @@ test("report: parallel slots show wall time and receipts without a broad storage
   expect(report).not.toContain("rm -f")
 })
 
+test("report: a failed slot listing preserves healthy slot details and identifies the recovery target", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.config.parallel = 2
+  run.storage_leftovers = null
+  run.slots = ["a", "b"].map(id => ({ id, username: `eval-${id}`, profileDir: `/tmp/profile-${id}`,
+    historyDir: `/tmp/history-${id}`, workspaceRoot: `/tmp/work-${id}`, liveQualified: false,
+    state: id === "a" ? "quarantined" : "closed", storage_root: `/tmp/storage/${id}`,
+    storage_leftovers: id === "a" ? null : [], storage_error: id === "a" ? "listing denied | unavailable\nretry" : null }))
+  const report = renderReport(run)
+  expect(report).toContain("a: /tmp/storage/a — не удалось получить листинг: listing denied \\| unavailable retry")
+  expect(report).toContain("b: /tmp/storage/b — остатков нет")
+  expect(report).toContain("parallel-env recover")
+  expect(report).not.toContain("rm -f")
+})
+
 test("report: a scoped attempt displays its slot next to its logical attempt number", () => {
   const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
   run.config.parallel = 2
