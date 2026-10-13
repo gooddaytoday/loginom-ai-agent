@@ -393,8 +393,13 @@ async function handle(message) {
         timeout: 105_000,
       })
       assertReadOwner();
+      const replacementOriginal=state.captureRetained?.binding.harness==='replacement-input0-readonly-v1'
+        && message.input?.name==='dock_node_wait'
+        ? state.bridge.replacementOriginalReply(message.input,result) : undefined;
+      assertReadOwner();
       send({ id: message.id, result: {
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
+        ...(replacementOriginal?{replacementOriginal}: {}),
       } })
     } finally {
       state.controller = undefined

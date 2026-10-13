@@ -1,5 +1,7 @@
 import { assertCaptureOwner, capturePublication, assertCapturePublication, freezeCaptureResult } from '../../src/retained-capture.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
+import {retainReplacementOriginalPins} from './replacement-original-pins.mjs';
+import {captureData} from '../../src/retained-capture.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -141,6 +143,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   let clipboardUncertain = false;
   let actionRuntime = null;
   let captureNodeOperation, diagnosticCapture, captureIOAssert;
+  const replacementCapture=acceptanceCapture?.binding?.harness==='replacement-input0-readonly-v1';
+  let replacementWait;
   let pinnedActions = null;
   let recoveryContext = null;
   const recordExecution = createExecutionJournal({ directory: session.directory,
@@ -318,12 +322,29 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
                 if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
+              const originalWait=replacementCapture && request.params.name==='dock_node_wait' && args.operation_id===captureNodeOperation
+                ? captureNodeOperation : undefined;
+              if(originalWait)captureData(args);
+              const originalWaitArgs=originalWait?JSON.stringify(args):undefined;
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
               if (acceptanceCapture?.registration && request.params.name==='dock_node_apply')
                 captureNodeOperation=args.operation_id;
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
-              return nodeResultReply(result,{userProfile});
+              const reply=nodeResultReply(result,{userProfile});
+              if(originalWait) {
+                captureData(args);captureData(reply);
+                if(captureNodeOperation!==originalWait || JSON.stringify(args)!==originalWaitArgs)
+                  throw Error('REPLACEMENT_ORIGINAL_REPLY_CHANGED');
+                const node=actionRuntime.retainCaptureNode(captureNodeOperation);
+                const producer=retainReplacementOriginalPins(acceptanceCapture.retained,node);
+                producer.assertCurrent();
+                const slot={producer,node,operation:captureNodeOperation,args:JSON.stringify(args),reply:JSON.stringify(reply)};
+                if(replacementWait && (replacementWait.operation!==slot.operation || replacementWait.args!==slot.args
+                    || replacementWait.reply!==slot.reply))throw Error('REPLACEMENT_ORIGINAL_REPLY_CHANGED');
+                replacementWait??=slot;
+              }
+              return reply;
             };
             // Local lifecycle calls must remain available while another request is
             // awaiting browser work. The runtime owns exclusion through cleanup.
@@ -715,7 +736,27 @@ export async function createBridge(config, session, { browserTransport: managedB
       })();
       return closing;
     } };
-    return {...original,captureAcceptance,close:closeBridge};
+    function replacementOriginalReply(input,result) {
+      // Internal closure only: the MCP/model result never receives the packet.
+      // No later observation or caller DTO can replace the original executor slot.
+      captureData(input);captureData(result);
+      const slot=replacementWait;
+      if(!replacementCapture || !slot || shutdownStarted || cleanupRefused || captureUnknown
+          || !acceptanceCapture.registration || acceptanceCapture.registration.mode!=='readonly'
+          || acceptanceCapture.registration.resource!==acceptanceCapture.retained.resource
+          || Object.keys(input).sort().join(',')!=='arguments,name' || input.name!=='dock_node_wait'
+          || input.arguments?.operation_id!==slot.operation || captureNodeOperation!==slot.operation
+          || JSON.stringify(input.arguments)!==slot.args || JSON.stringify(result)!==slot.reply)
+        throw Error('REPLACEMENT_ORIGINAL_REPLY_REFUSED');
+      slot.producer.assertCurrent();
+      const current=actionRuntime.retainCaptureNode(slot.operation);
+      if(current.state!==slot.node.state || current.request!==slot.node.request || current.opening!==slot.node.opening)
+        throw Error('REPLACEMENT_ORIGINAL_REPLY_REFUSED');
+      return freezeCaptureResult({version:1,kind:'replacement-original-reply-v1',original:slot.producer.project(),
+        outcome:{kind:'original-pins',result:JSON.parse(slot.reply)}});
+    }
+    return {...original,captureAcceptance,close:closeBridge,
+      ...(replacementCapture?{replacementOriginalReply}: {})};
   } catch (error) {
     await closeClients();
     throw error;
