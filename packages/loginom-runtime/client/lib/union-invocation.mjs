@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-const records=new WeakMap(),owners=new WeakMap(),carriers=new WeakMap();
+const records=new WeakMap(),owners=new WeakMap(),carriers=new WeakMap(),processors=new WeakMap();
 const descriptor=Object.getOwnPropertyDescriptor;
 const aborted=descriptor(AbortSignal.prototype,'aborted').get,reason=descriptor(AbortSignal.prototype,'reason').get;
 const wall=Date.now,mono=performance.now.bind(performance);
@@ -17,6 +17,17 @@ function digest(value){
   seen.delete(v);
  };visit(value);return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
+// Fixed SessionProcessor creation registers its original getter/message before
+// the handle is published. Unknown accessors are never invoked.
+export function bindUnionInvocationProcessor(processor,message){
+ const d=descriptor(processor,'message');need(!processors.has(processor)&&d?.get&&typeof d.get==='function'&&!d.set&&!Object.hasOwn(d,'value'),'UNION_INVOCATION_PROCESSOR_UNKNOWN');
+ processors.set(processor,{get:d.get,message});
+}
+function processorMessage(processor){
+ const d=descriptor(processor,'message');if(d&&Object.hasOwn(d,'value'))return d.value;
+ const original=processors.get(processor);need(original&&d?.get===original.get&&!d.set,'UNION_INVOCATION_PROCESSOR_UNKNOWN');
+ const current=original.get.call(processor);need(current===original.message,'UNION_INVOCATION_BINDING_CHANGED');return current;
+}
 // Fixed private registration for the future qualified67 carrier. Not a public
 // tool/config flag or an arbitrary callback: retain the existing owner method.
 export function registerUnionInvocationCarrier(owner){
@@ -26,7 +37,7 @@ export function retainUnionInvocation(source){
  const definition=data(source,'definition');if(data(definition,'name')!=='dock_node_apply')return;
  const request=data(source,'request'),target=data(request,'target');if(data(target,'type')!=='transform.union_data')return;
  const options=data(source,'options'),signal=data(options,'abortSignal');if(aborted.call(signal))throw reason.call(signal);
- const owner=data(source,'owner'),sessionInput=data(source,'sessionInput'),session=data(sessionInput,'session'),processor=data(sessionInput,'processor'),message=data(processor,'message'),user=data(source,'user');
+ const owner=data(source,'owner'),sessionInput=data(source,'sessionInput'),session=data(sessionInput,'session'),processor=data(sessionInput,'processor'),message=processorMessage(processor),user=data(source,'user');
  const generation=data(owner,'generation'),call=data(owner,'call'),callId=data(options,'toolCallId');
  need(Number.isSafeInteger(generation)&&generation>0&&typeof call==='function'&&typeof callId==='string'&&callId.length>0,'UNION_INVOCATION_OWNER_UNKNOWN');
  const operation=data(request,'operation_id'),sessionId=data(session,'id'),messageId=data(message,'id'),userMessage=data(user,'id');
@@ -51,7 +62,7 @@ export function retainUnionInvocation(source){
   if(aborted.call(signal))throw reason.call(signal);
   need(wall()<deadline&&mono()-elapsed<budget,'UNION_INVOCATION_EXPIRED');
   need(data(source,'definition')===definition&&data(source,'request')===request&&data(source,'options')===options&&data(source,'owner')===owner&&data(source,'sessionInput')===sessionInput&&data(source,'user')===user
-   &&data(sessionInput,'loginom')===owner&&data(sessionInput,'session')===session&&data(sessionInput,'processor')===processor&&data(processor,'message')===message
+   &&data(sessionInput,'loginom')===owner&&data(sessionInput,'session')===session&&data(sessionInput,'processor')===processor&&processorMessage(processor)===message
    &&data(owner,'generation')===generation&&data(owner,'call')===call&&data(options,'abortSignal')===signal&&data(options,'toolCallId')===callId
    &&data(session,'id')===sessionId&&data(message,'id')===messageId&&data(user,'id')===userMessage&&data(definition,'name')==='dock_node_apply'
    &&data(definition,'inputSchema')===schema&&data(schema,'required')===required&&digest(required)===schemaDigest&&digest(request)===signature,'UNION_INVOCATION_BINDING_CHANGED');

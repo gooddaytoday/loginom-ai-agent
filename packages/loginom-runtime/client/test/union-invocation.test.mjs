@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {join} from 'node:path';import {pathToFileURL} from 'node:url';import {MessageChannel} from 'node:worker_threads';
 const lib=process.env.INVOCATION_LIB||new URL('../lib/',import.meta.url).pathname;
-const {retainUnionInvocation,originalUnionInvocation,registerUnionInvocationCarrier}=await import(pathToFileURL(join(lib,'union-invocation.mjs')));
+const {retainUnionInvocation,originalUnionInvocation,registerUnionInvocationCarrier,bindUnionInvocationProcessor}=await import(pathToFileURL(join(lib,'union-invocation.mjs')));
 const source=await readFile(new URL('../../../agent/src/session/tools.ts',import.meta.url),'utf8');
 const line=source.split('\n').find(l=>l.includes('const invocation = retainUnionInvocation('));assert(line);assert(source.indexOf(line)<source.indexOf('await (invocation ? invocation.invoke()'));
 // Exact production acquisition statement; surrounding services are labelled doubles.
@@ -58,4 +58,12 @@ test('late carrier registration does not upgrade retained unavailable creation',
 
 test('replacement toolCallId cannot remint an existing operation or extend its deadline',()=>{
  const f=fixture();try{const p=f.acquire(),deadline=p.facts().deadline;f.options.toolCallId='replacement';assert.throws(()=>f.acquire(),/BINDING/);assert.equal(p.facts().deadline,deadline);assert.equal(f.calls,0)}finally{f.close()}
+});
+
+test('actual fixed processor getter source is retained; replaced/unknown getters are refused before invocation',()=>{
+ const f=fixture();try{const message=f.input.processor.message;let gets=0;
+  const processor={get message(){gets++;return message}};bindUnionInvocationProcessor(processor,message);f.input.processor=processor;const p=f.acquire();assert(gets>0);const before=gets;p.guard();assert.equal(gets,before+1);
+  let foreignGets=0;Object.defineProperty(processor,'message',{get(){foreignGets++;return message}});assert.throws(()=>p.guard(),/PROCESSOR/);assert.equal(foreignGets,0);assert.equal(f.calls,0);
+ }finally{f.close()}
+ const g=fixture();try{let gets=0;g.input.processor={get message(){gets++;return {id:'message'}}};assert.throws(()=>g.acquire(),/PROCESSOR/);assert.equal(gets,0)}finally{g.close()}
 });
