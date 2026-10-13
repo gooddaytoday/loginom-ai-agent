@@ -15,7 +15,7 @@ import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
 import { buildJobs, runSlotQueue } from "./scheduler"
-import { beginFixtureAttempt, finishFixtureAttempt, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
+import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
@@ -133,6 +133,9 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
           (error: unknown) => { state.stopped ??= describe(error) })
       }
       await Promise.all(contexts.map(context => context.lease.close()))
+      if (attempts.some(result => result.judge_cleanup_unconfirmed)) await contexts[0]!.judgeLease?.close()
+      if (!attempts.some(result => result.judge_cleanup_unconfirmed))
+        await finishFixtureJudge(contexts[0]!, runDir).catch((error: unknown) => { state.stopped ??= describe(error) })
     }
   }
   if (!fixture && !config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
