@@ -218,7 +218,7 @@ source attempt и hash. Удалить секреты, заменить имен
   формат останавливает оценку как incomplete; исправляется parser и повторяется
   offline-аудит сохранённых evidence, без повторного модельного запуска.
 
-- [ ] Реализовать offline entrypoint с `parseArgs` и следующей командой:
+- [x] Реализовать offline entrypoint с `parseArgs` и следующей командой:
 
 ```bash
 bun script/audit-node-selection.ts --tasks tasks/analytic \
