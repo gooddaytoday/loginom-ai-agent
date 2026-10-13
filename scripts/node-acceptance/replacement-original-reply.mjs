@@ -73,10 +73,10 @@ export function createReplacementOriginalReplyAdapter(owner,input) {
     guard();exact(reply,['version','kind','original','outcome']);
     if(reply.version!==1||reply.kind!=='replacement-original-reply-v1')throw Error('REPLACEMENT_REPLY_SHAPE');
     const correlation=pin(reply.original);guard();
-    const outcome=reply.outcome,refused=Object.getOwnPropertyDescriptor(outcome??{},'refused')?.value===true,isUndefined=Object.getOwnPropertyDescriptor(outcome??{},'rejectedIsUndefined')?.value===true;
-    exact(outcome,refused?(isUndefined?['cleanupComplete','refused','rejectedIsUndefined']:['cleanupComplete','refused','rejectedIsUndefined','rejected']):['cleanupComplete','diagnosticRead','receipt']);
-    if(!first.seen)captureData(reply.outcome.receipt);
-    if(reply.outcome.cleanupComplete!==false || (!first.seen && reply.outcome.diagnosticRead!==true))throw Error('REPLACEMENT_REPLY_OUTCOME');
+    const outcome=reply.outcome,scopeReply=Object.getOwnPropertyDescriptor(outcome??{},'kind')?.value==='original-pins',refused=Object.getOwnPropertyDescriptor(outcome??{},'refused')?.value===true,isUndefined=Object.getOwnPropertyDescriptor(outcome??{},'rejectedIsUndefined')?.value===true;
+    exact(outcome,scopeReply?['kind','result']:refused?(isUndefined?['cleanupComplete','refused','rejectedIsUndefined']:['cleanupComplete','refused','rejectedIsUndefined','rejected']):['cleanupComplete','diagnosticRead','receipt']);
+    if(scopeReply)captureData(outcome.result);else if(!first.seen)captureData(reply.outcome.receipt);
+    if(!scopeReply && (reply.outcome.cleanupComplete!==false || (!first.seen && reply.outcome.diagnosticRead!==true)))throw Error('REPLACEMENT_REPLY_OUTCOME');
     // Refusal payload remains the exact observed channel object/cause. No JSON
     // coercion of primary failure, and no success/admission inferred from it.
     return Object.freeze({correlation,outcome:reply.outcome,correlation_only:true,native_admission:false,
