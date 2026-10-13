@@ -492,7 +492,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
 - [x] Проверить `git status --short`, ветку и HEAD. Сохранить diff/hash файлов
   skill и `git worktree list`. Убедиться, что никто не меняет исходники/ветку
   во время сборки; не полагаться на старые сведения о ветке основного checkout.
-- [ ] Сохранить базовые пути и пины серии в приватном `environment.json`.
+- [x] Сохранить базовые пути и пины серии в приватном `environment.json`.
   Ниже Bash-эквивалент для команд сборки; wrapper получает значения из pins:
 
 ```bash
