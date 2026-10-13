@@ -1,0 +1,356 @@
+{
+  "version": 1,
+  "authorization_source": {
+    "kind": "human_user_current_Codex_chat",
+    "selected_response_annotation_index": 1,
+    "selected_text": "Разрешаете разовый план архивирования резервации? После свежих проверок весь прерванный запуск будет сохранён как ABANDONED, затем можно продолжить штатные тесты.",
+    "human_reply": "разрешаю",
+    "approval_already_granted_do_not_ask_again": true
+  },
+  "workspace_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b",
+  "project_id": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "comment_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+  "parent_id": "01a134ea-fe1f-79a7-ac72-2f2d1811935a",
+  "created_at": "2026-10-13T14:14:41+03:00",
+  "published_utc": "2026-10-13T11:14:41.516455+00:00",
+  "readback_utc": "2026-10-13T11:16:05.805412+00:00",
+  "publisher_member_id": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+  "publisher_author_type": "member",
+  "single_routed_Evaler_mention": true,
+  "body": "[@Evaler](mention://agent/de4ba430-2182-4085-a148-fa4a3fc8a6f5), фиксирую прямое решение владельца из текущего Codex-чата в ответ на ваш запрос `01a134ea-fe1f-79a7-ac72-2f2d1811935a`: **разрешаю разовый план архивирования указанной резервации стенда**. Владелец подтвердил именно предложенный план, выбрав его в ответе-аннотации и написав «разрешаю».\n\nМаркер решения: LAB57-INTERRUPTED-UNIT-OWNER-APPROVAL-20261013.\n\nРазрешено ровно одно адресное немодельное операторское исключение по приложенному byte-identical proposal SHA256 `464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6`, из проверенного checkpoint ZIP `af591759e21003775fc364193d865f04fce6fd28ced1d6bb6fb2a8f3cab55729`. Оно относится только к original interrupted unit task `01a134a1-0f47-782c-8d67-9c843c2d25e3`, owner Rich/phase unit, SHA `49522d83318bac29779e497798becb2f799bc84e`, acquiredAt `2026-10-13T09:49:32.777Z`, canonical config `58435fbe4aca6ac2e40629800594526a7cec48af3d9306e02fa5b7163be96d71`, lease device/inode `64512/12748659`, operation guard `64512/12748661`.\n\nСначала поиск настоящих durable terminal/typecheck/completion/process proofs на исходном execution host. Если их нет, нужны свежие полные process/ancestry/absence проверки, отсутствие active/queued workers и writers, допуск всех профилей/storage/exact container и повторная сверка всех identities/bytes непосредственно перед мутацией. Затем private once receipt ATTEMPTED_BEFORE_MUTATION и атомарное архивирование ВСЕГО исходного stand.lease в отдельный ABANDONED по точному плану, с сохранением guard/owner/acquiredAt/config и всех bytes. Не синтезировать completion/RELEASED/PASS; historical ERROR и cleanup UNKNOWN остаются. Не удалять отдельные файлы, не перепривязывать owner и не затрагивать чужие процессы/профили/leases. Unknown process, mismatch, race, pending worker, existing destination или неполный допуск => STOP/BLOCKED; повтор once после error/crash не разрешён.\n\nОператорский проход ограничен **30 минутами с начала** и прежним общим deadline **2026-10-13T15:33:29.538616Z (18:33 МСК)**; clock и накопленная история не сбрасываются. После проверенного ABANDONED archival и настоящего FREE разрешено предусмотренное планом обычное продолжение: fresh acquire, настоящий supervised unit/typecheck/release и ранее разрешённая TSV CLI поставка. До native операций требуется настоящий READY.\n\nВсе модели, criteria, CLI/runtime/skill/supplement pins и shared defaults прежние, кроме отдельно уже разрешённой TSV CLI candidate поставки `01a13471-39bb-7677-a48c-2fb247c3beea`. Repeats **3/10**, remaining7; reference **1,1,2,1,1,1 /3**, product0/repeat1, cold8/7/5, admission3/3, wrapper1/1, recovery0 сохраняются. Это узкое operator исключение не расширяет helper recovery/model/probe/generation budgets и не подтверждает заранее успешный settlement, unit, build/admission или Ben ACCEPT.\n\nПеред назначением одного выполнения проверьте свежие active/queued/comment receipts, не дублируйте оператора/Rich. Сохраните фактический safe settlement receipt и archive integrity evidence отдельно; дальнейшие крупные переходы координируйте по штатному контракту. Done/merge/release остаются владельцу.\n",
+  "body_sha256": "d6ed8eb4214ca368333d5ec691a5c9f27896706d691f9d0bc8022cc1b5eb5451",
+  "parent_body_native_readback_verified": true,
+  "attachment": {
+    "id": "01a134f8-c4ce-7dc8-97bc-a9464151948b",
+    "bytes": 8012,
+    "sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+    "byte_identical_to_verified_proposal": true,
+    "path": "evals/docs/proposals/2026-10-13-lab57-interrupted-unit-settlement.md"
+  },
+  "original_lease": {
+    "owner_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+    "acquiredAt": "2026-10-13T09:49:32.777Z",
+    "config_sha256": "58435fbe4aca6ac2e40629800594526a7cec48af3d9306e02fa5b7163be96d71",
+    "lease_device": 64512,
+    "lease_inode": 12748659,
+    "guard_device": 64512,
+    "guard_inode": 12748661
+  },
+  "duration_seconds_limit": 1800,
+  "original_stage_deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+  "new_operator_allowance": "one exact named non-model ABANDONED archival exception, consumed-before-mutation and no reset after error/crash",
+  "existing_budgets_preserved": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "Rich_confirmed_repeats": {
+    "consumed": 3,
+    "limit": 10,
+    "remaining": 7
+  },
+  "initial_active_tasks_after_delivery": [
+    {
+      "id": "01a134f8-c638-7189-a6e1-1b4577110238",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "trigger_comment_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+      "started_at": "2026-10-13T14:14:41+03:00"
+    }
+  ],
+  "issue_status_after_delivery": "blocked",
+  "issue_revision_after_delivery": 171,
+  "actual_settlement_ABANDONED_FREE_unit_and_CLI_admission_confirmed": false,
+  "operator_system_mutations_by_monitor": 0,
+  "new_Evaler_routed_approval_comments": 1,
+  "automated_heartbeat_prompt_update": {
+    "id": "lab-56-lab-63",
+    "same_name_status_ACTIVE_and_schedule": true,
+    "owner_permission_body_appended": true,
+    "persistent_readback_verified": true
+  },
+  "next_step": "Evaler delegates one exact bounded operator pass; first genuine proof search and fresh full identity/process/concurrency admission; only verified ABANDONED/FREE opens normal continuation.",
+  "approved_handoff": {
+    "checked_utc": "2026-10-13T11:21:46.698519+00:00",
+    "comment_id": "01a134fd-ee62-7df0-be83-8da0f6cfdc9b",
+    "parent_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+    "task_id": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+    "outcome": "queued",
+    "attachment_id": "01a134fd-ee04-7bd2-aa30-d75c68072af8",
+    "ZIP_bytes": 21072,
+    "ZIP_sha256": "e1a3dd56b80a6385def6bd26e8c7862eb7dc2a93205ab2de1318c7e74330d668",
+    "ZIP_CRC": "PASS",
+    "safe_paths_regular_files_no_links": true,
+    "all_5_payload_members_match_manifest": true,
+    "members": [
+      {
+        "path": "lab57-interrupted-unit-settlement-proposal.md",
+        "bytes": 8012,
+        "sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6"
+      },
+      {
+        "path": "lab57-settlement-approved-continuation.json",
+        "bytes": 5772,
+        "sha256": "42bd35813463789f55bf6b092a5cbb8efa06cd6651f9346f4362b45edee5ab0a"
+      },
+      {
+        "path": "lab57-settlement-approval-admission.json",
+        "bytes": 5006,
+        "sha256": "b40b6c3ec8e0ebce3e578e5787b9a89377fefb3f1aa5d85ae4d3b9a02aa0ad1c"
+      },
+      {
+        "path": "lab57-settlement-approval-history.json",
+        "bytes": 15634,
+        "sha256": "bcade41e01ba9ca08b02c5d5b189eb745434fcc334d3168a6815f97c11fd25b2"
+      },
+      {
+        "path": "lab57-interrupted-unit-ledger.json",
+        "bytes": 15540,
+        "sha256": "55989ee31a652422d6ab52d46de61ded23d42e0dc135e1b20f94464c828014c4"
+      },
+      {
+        "path": "lab57-settlement-approval-manifest.json",
+        "bytes": 1029,
+        "sha256": "9aac3dfd581062c275bea8f41f289a4518b3c23039a6130ffa6ad33a5e8e9d97"
+      }
+    ],
+    "exact_proposal_bytes_hash_retained": true,
+    "metadata_native_receipt_verified": {
+      "parent_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+      "source_task_id": "01a134f8-c638-7189-a6e1-1b4577110238",
+      "trigger_outcomes": [
+        {
+          "reason_code": "queued",
+          "status": "queued",
+          "target_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+          "target_type": "agent"
+        }
+      ],
+      "comment_id": "01a134fd-ee62-7df0-be83-8da0f6cfdc9b",
+      "task_id": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7"
+    },
+    "scope": {
+      "version": 1,
+      "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "intent_id": "LAB57-RICH-UNIT-ABANDON-01a134f8",
+      "root_trigger": "01a134f8-c627-7845-9d3d-b203ec9af889",
+      "owner_approval_marker": "LAB57-INTERRUPTED-UNIT-OWNER-APPROVAL-20261013",
+      "owner_approval_comment_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+      "proposal_sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+      "proposal_file": "lab57-interrupted-unit-settlement-proposal.md",
+      "original_immutable_owner": {
+        "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "role": "rich",
+        "phase": "unit",
+        "sha": "49522d83318bac29779e497798becb2f799bc84e",
+        "acquiredAt": "2026-10-13T09:49:32.777Z",
+        "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+        "configSha256": "58435fbe4aca6ac2e40629800594526a7cec48af3d9306e02fa5b7163be96d71"
+      },
+      "private_config_locator": "/home/user/.local/share/loginom-evals-runtime/roles/rich/agent-work/lab57-autonomy/task-01a134a1-0f47-782c-8d67-9c843c2d25e3/ops-config.json",
+      "private_lease_locator": "/home/user/.local/share/loginom-evals-runtime/roles/rich/agent-work/lab57-autonomy/task-01a134a1-0f47-782c-8d67-9c843c2d25e3/stand-lease.json",
+      "operator_incident": "LAB57-interrupted-unit-01a134a1",
+      "operator_once_receipt": "/home/user/.local/share/loginom-evals-runtime/operations/abandon-incidents/LAB57-interrupted-unit-01a134a1.once.json",
+      "operator_destination": "/home/user/.local/share/loginom-evals-runtime/operations/abandoned/LAB57-interrupted-unit-01a134a1",
+      "operator_budget": {
+        "max_wall_seconds": 1800,
+        "start": "record actual execution-host UTC before beginning operator search/admission; dispatch is not execution start",
+        "deadline": "min(actual start+1800 seconds, overall stage deadline)",
+        "overall_deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+        "once": "ATTEMPTED_BEFORE_MUTATION wx/0600; do not rename/reset/retry after error or crash; detect any prior original-incident reservation before creating a new one"
+      },
+      "continuation_authorization": {
+        "autonomy_comment_id": "01a130f3-a16d-719a-a3b5-1930817d7cb4",
+        "cli_repair_comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+        "original_stage_attachment_id": "01a134a1-0ef2-738e-9504-3b7038f6fdf0",
+        "original_stage_document_sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147",
+        "same_stage_deadline_utc": "2026-10-13T15:33:29.538616+00:00"
+      },
+      "scope": [
+        "FIRST execute the approved byte-identical proposal on the original execution host as the same Rich owner. Search real durable terminal/typecheck/process/completion proofs; do not fabricate them or infer PASS from partial test logs.",
+        "If genuine proofs are absent, perform full fresh process/ancestry/absence checks and exact profiles/storage/container admission, check all workers and writers and repeat all owner/config/guard/capture identities immediately before mutation. Selected-name observations from the earlier report do not suffice. Current assigned Rich task itself is the sole authorized operator; no other active/queued worker is permitted. Unknown or inaccessible relevant process, original live invocation, ownership mismatch, race, pending other worker or existing destination => STOP/BLOCKED.",
+        "Create the private once ATTEMPTED_BEFORE_MUTATION proof only after all gates. Archive the whole original lease atomically as ABANDONED in the approved private destination, preserving guard, immutable owner/task/acquiredAt/config and all bytes. No individual file deletion, completion/recovery/release synthesis or completed/ archive. No changes to installed helper/supplement/runtime/defaults or foreign resources.",
+        "Deliver separate safe settlement and archive-integrity evidence, real helper FREE and exact once binding. Historical interrupted ERROR and cleanup UNKNOWN remain immutable. Archive/profiles/token/full env/DB are private and never attached. Save public file inventory hashes without secrets.",
+        "Only after verified ABANDONED integrity and actual FREE continue normal admission under fresh own acquire: genuine supervised unit/typecheck/process proofs/release and the already authorized isolated TSV source repair/build/admission. Native operations require real READY. Keep staged test-only work in rich-tsv-cli-01a134a1 and clean author partial49522; build from exact5cd and combined d68d433 patch SHA7f7a0153, no blind newer-source transplant.",
+        "Autonomous author continuation LAB57-RICH-AUTONOMY-20261012 remains in force after this major resource gate: repair local eval/harness issues and finish reference/product pilot under unchanged criteria and independent oracle. Preserve all historical FAIL/ERROR and original inputs/bytes. Candidate new CLI pin only after addressed+functional tests/typecheck/build and normal admission per owner014471; shared installed CLI/defaults unchanged.",
+        "Retain every cumulative budget: refs1,1,2,1,1,1 of3; products0/repeat1 per assigned executor; cold8/7/5; repeats3/10 remaining7, never precharge dispatch or reset on blocker/task; model admission3/3, old wrapper1/1 exhausted, helper recovery0 unchanged. Record actual usage and operator cold checks separately; reported cost is not external billing.",
+        "Operator stage at most30min from actual start; original total stage deadline2026-10-13T15:33:29.538616Z does not reset. No new action at a reached limit, address cleanup of own incomplete execution, then one checkpoint. Return one ordinary READY_FOR_BEN with clean frozen remote SHA/evidence or proven external BLOCKED; no intermediate per-fix comments, direct Ben handoff, done, merge or release decision."
+      ]
+    },
+    "coordinator_admission": {
+      "version": 1,
+      "checked_utc": "2026-10-13T11:19:18.602306+00:00",
+      "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "owner_approval_comment_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+      "marker": "LAB57-INTERRUPTED-UNIT-OWNER-APPROVAL-20261013",
+      "proposal_sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+      "checkpoint_sha256": "af591759e21003775fc364193d865f04fce6fd28ced1d6bb6fb2a8f3cab55729",
+      "roster": [
+        {
+          "id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+          "role": "Orchestrator"
+        },
+        {
+          "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+          "role": "Author"
+        },
+        {
+          "id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "role": "Independent reviewer"
+        }
+      ],
+      "worker": {
+        "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+        "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "model": "gpt-6.1-sol",
+        "thinking_level": "xhigh",
+        "max_concurrent_tasks": 1
+      },
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "name": "Codex (eval-tests)",
+        "status": "online",
+        "last_seen_at": "2026-10-13T14:15:48+03:00"
+      },
+      "pending_stand_workers": 0,
+      "dependency": {
+        "issue_id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+        "status": "in_review",
+        "gate": "VERIFIED_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": true,
+        "cleanup_confirmed": true,
+        "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+        "report_comment_id": "01a12edf-8658-7aa6-8336-cf4d3bfe8c22"
+      },
+      "fresh_dependency_receipt": {
+        "attachment_id": "01a12edf-8584-746b-a62e-f0db3d7717f2",
+        "manifest_sha256": "cfe057d770165013eb684a363cfb9d5a70c3aec0a38eedce1142bce530edac5f",
+        "checked_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+        "validation": "confirmed",
+        "cleanup": "confirmed",
+        "product": "PASS",
+        "report_id": "01a12edf-8658-7aa6-8336-cf4d3bfe8c22",
+        "quality": "ACCEPT",
+        "scope": "LAB-56 prepared suite and native/model admission",
+        "archive_sha256": "741b74f4c8818d2f9eda01bcc33bb57466e88f5753b62efc29438b6ab47ad4c3",
+        "internal_files_verified": 148,
+        "independent_calculation_sha256": "0505444a9c777fc5d3104b023479c46113da486b1ee33deb35b1bd049f69150c",
+        "calculation_reproduced": true,
+        "independence_native_chronology": "CONFIRMED",
+        "case_count": 58,
+        "input_count": 59,
+        "typed_tables": 49,
+        "diagnostic_contracts": 10,
+        "CLI_files_verified": 5389,
+        "source_git_files_verified": 1303,
+        "unit": {
+          "pass": 539,
+          "skip": 5,
+          "fail": 0,
+          "typecheck": "PASS"
+        },
+        "actual_model": "openai/gpt-6-luna",
+        "actual_variant": "high",
+        "admission_product": "PASS",
+        "scenario_reference_product_cold": "NOT_RUN",
+        "completion_sha256": "d35d7ca54acbae1ff14639b41155dd56b3a03631acbc78e95ec41035e658d879",
+        "internal_release_verified": true,
+        "stand": "FREE",
+        "storage_empty": true
+      },
+      "stand_status": {
+        "status": "BUSY",
+        "owner": {
+          "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+          "role": "rich",
+          "phase": "unit",
+          "sha": "49522d83318bac29779e497798becb2f799bc84e",
+          "acquiredAt": "2026-10-13T09:49:32.777Z"
+        },
+        "code": 2
+      },
+      "original_owner": {
+        "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "role": "rich",
+        "phase": "unit",
+        "sha": "49522d83318bac29779e497798becb2f799bc84e",
+        "acquiredAt": "2026-10-13T09:49:32.777Z",
+        "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+        "configSha256": "58435fbe4aca6ac2e40629800594526a7cec48af3d9306e02fa5b7163be96d71"
+      },
+      "guard_identity": {
+        "present": true,
+        "empty": true,
+        "device": 64512,
+        "inode": 12748661,
+        "uid": 1000,
+        "mode": "0o700",
+        "settlement_status": "UNCONFIRMED; do not delete or duplicate unit operation"
+      },
+      "current_author_sha": "49522d83318bac29779e497798becb2f799bc84e",
+      "main_clean": true,
+      "shared_config_unchanged": true,
+      "source_supplement_files_verified": 751,
+      "ordinary_READY_unit_release": "not yet proven; exact owner exception only",
+      "operator_once": "not reserved or consumed by dispatch; worker must record actual start and private once before mutation",
+      "budget_reset": false,
+      "scenario_budgets": {
+        "reference_consumed": {
+          "txt-comma-utf8": 1,
+          "csv-comma-utf8": 1,
+          "txt-semicolon-cp1251-decimal": 2,
+          "csv-pipe-multiline": 1,
+          "tsv-utf8": 1,
+          "tsv-utf16le": 1
+        },
+        "reference_limit_per_case": 3,
+        "product": 0,
+        "cold": 5,
+        "LAB-56_admission": "3/3 PASS, exhausted",
+        "new_smoke_probes_generations": 0,
+        "recovery": 0,
+        "cold_reader_invocations": 8,
+        "cold_browser_launch_attempts": 7,
+        "normal_cleanup_browser_continuations": 2
+      },
+      "repeats": {
+        "limit": 10,
+        "consumed": 3,
+        "remaining": 7
+      },
+      "overall_deadline_utc": "2026-10-13T15:33:29.538616+00:00"
+    }
+  },
+  "current_server_status": "in_progress",
+  "current_server_revision": 176,
+  "operator_exception_metadata": {
+    "authorization_comment_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+    "marker": "LAB57-INTERRUPTED-UNIT-OWNER-APPROVAL-20261013",
+    "proposal_sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+    "scope_document_sha256": "42bd35813463789f55bf6b092a5cbb8efa06cd6651f9346f4362b45edee5ab0a",
+    "max_wall_seconds": 1800,
+    "original_owner_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+    "status": "ASSIGNED_NOT_CONFIRMED_EXECUTED",
+    "once_consumed": "unconfirmed; not precharged",
+    "destination": "operations/abandoned/LAB57-interrupted-unit-01a134a1",
+    "attachment_id": "01a134fd-ee04-7bd2-aa30-d75c68072af8"
+  }
+}

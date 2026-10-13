@@ -253,6 +253,25 @@
       "all_eight_done_verified": false,
       "final_blocker_comment_active_read_utc": "2026-10-13T11:09:15.700353+00:00",
       "final_state_unchanged_blocked_no_runs_no_approval": true
+    },
+    {
+      "event": "human owner approved exact interrupted-unit operator exception",
+      "checked_utc": "2026-10-13T11:16:05.805412+00:00",
+      "comment_id": "01a134f8-c627-7845-9d3d-b203ec9af889",
+      "parent_id": "01a134ea-fe1f-79a7-ac72-2f2d1811935a",
+      "proposal_sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+      "native_Evaler_task": "01a134f8-c638-7189-a6e1-1b4577110238",
+      "status": "running",
+      "operator_mutation_by_monitor": 0,
+      "actual_settlement_confirmed": false,
+      "receipt": "evals/docs/2026-10-13-text-import-interrupted-unit-settlement-approval-receipt.json",
+      "Rich_repeat_consumed": 3,
+      "all_eight_done_verified": false,
+      "approved_handoff_comment": "01a134fd-ee62-7df0-be83-8da0f6cfdc9b",
+      "Rich_operator_task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+      "handoff_manifest_crc_proposal_verified": true,
+      "issue_status_after_Evaler_dispatch": "in_progress176",
+      "heartbeat_authorization_persisted": true
     }
   ]
 }
