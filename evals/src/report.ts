@@ -250,9 +250,7 @@ export function renderReport(summary: RunSummary) {
             "## Остатки в хранилище",
             "",
             ...summary.storage_leftovers.map((name) => `- ${name}`),
-            ...(scoped
-              ? ["", "Адресное восстановление: `parallel-env recover` со slot_id и сохранённым incident/lease receipt."]
-              : summary.loginom.container && summary.loginom.storage_dir
+            ...(!scoped && summary.loginom.container && summary.loginom.storage_dir
               ? [
                   "",
                   "```bash",
@@ -262,5 +260,12 @@ export function renderReport(summary: RunSummary) {
               : []),
           ]
         : []
-  return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers, ""].join("\n")
+  const storage = summary.slots?.filter(slot => slot.storage_leftovers !== undefined) ?? []
+  return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers,
+    ...(storage.length ? ["", "## Хранилища слотов", "", ...storage.map(slot =>
+      `- ${cell(slot.id)}: ${cell(slot.storage_root ?? "—")} — ${slot.storage_leftovers === null
+        ? `не удалось получить листинг: ${cell(slot.storage_error ?? "причина неизвестна")}`
+        : slot.storage_leftovers!.length ? slot.storage_leftovers!.map(cell).join(", ") : "остатков нет"}`)] : []),
+    ...(scoped && (summary.storage_leftovers === null || summary.storage_leftovers.length)
+      ? ["", "Адресное восстановление: `parallel-env recover` со slot_id и сохранённым incident/lease receipt."] : []), ""].join("\n")
 }
