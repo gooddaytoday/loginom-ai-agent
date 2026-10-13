@@ -74,6 +74,27 @@ fixture (5Bun+1Python/typecheck0, independent5Bun+6protocol cases PASS).
 Review SHA `0da1570936587e0504fd442c7b61ec1ee1971555c97b355111d6b226ab416efa`;
 его live и mandatory JS→Group/directSort gates ещёpending, Product/pins unchanged.
 
+Join core proof-2 завершёнexit0, independent live review SHA
+`2bbc5532d6ae5ccdc859370c4d4205e4ec98cf528dcb5603024f908284809e21` PASS:
+actualобеhiddenroles+nearestnative GUID/index/opening/time brackets, fresh rows
+[[1,5,15],[1,10,15]], inputs projections/Save/cleanup/logout/ACKexit0 verified.
+Result SHA `a257e643a899433c72cfe92fcb98613b057fdf6ab382be036fec8a5b4e068c1c`,
+ownpackage `/user/JD31103263.lgp` readbackSHA
+`ad460c7f4f42463ffb50feb708daec29f5caf0bc74f9d1f14f4741d88a627a45`:
+14ZIPmembers/3nodes(2imports+Join)/2correctlinks/noJS. StandaloneInputReread=false.
+
+PrivateJS proof-2 тожеexit1 до downstream: roots3pages(92records) и details2pages
+(24records) полностью прочитаны, ownJSoutput0 unique/delivered/actions[].
+Первый intentionallyforbidden genericclick вызвал общий IPCerror
+LOGINOM_RUNTIME_FAILED. Source bridge366→uiAct→validateUiAction throws до
+admission; managed-entry247 скрывает текст. Live точный validator message не
+наблюдался и не выведен из общей ошибки. Independentstop review SHA
+`e2cebed02404848c81f721a015196d2db575eb5a656133a3fa0f97505329c12a`:
+53sources/25receipts/3journals unchanged; no downstream/managedpreview effects,
+actualclose/logout/nodiscard/ACKexit0. Separateproof-3 добавляет только private
+IPC wrapper для exact MCP-32603 validator exception на том же publicUI call;
+instrumentation явно помечается. Product error IPC/Protocol/runtime/pins unchanged.
+
 ## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;

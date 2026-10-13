@@ -706,6 +706,13 @@ inspect после response-budget refusal). Standard group-001 останови
   beforefullXML и actualclose/logout/ACKexit0 verified; originalb274cbb2… preserved,
   independentstop3fea73a4… . Separateproof-2 actual021TDD roots pagination fix
   Approved0da15709…; runtime/pins unchanged, native branches ещёpending.
+  Joinproof-2 actualcorePASS/independent2bbc5532… (обаhiddenroles/freshoutput/
+  inputprojections/Save/3nodes2linksnoJS/close/logout/ACKexit0, no standalone reread).
+  JSproof-2 fullypaged, но intentionalgenericclick throws through normalbridge/
+  sanitizedHostIPC LOGINOM_RUNTIME_FAILED; exactlive validator message unknown.
+  Originalexit1 сохранён, stopreviewe2cebed0…/clearcleanup/noeffects. Separate
+  instrumentedproof-3 onlyfixed expectedvalidation-exception capture at privateIPC
+  aroundsamepublicUIcall; Product/runtime/pins unchanged. JSbranches stillpending.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять

@@ -442,6 +442,16 @@ next_cursor). Originalexit1/b274cbb2… сохранён, actualclose/logout/ACK
 sameobservationID/revision/bounded16, затем отдельные details pages. Static review
 Approved0da15709…; actual managed preview/native selection по-прежнемуpending.
 
+NewJoin core203142/proof-2 actualPASS/independentreview2bbc5532…:
+обаhiddenroles/fresh exact2rows/inputprojections/Save/3node2linknoJSpackage/
+cleanup/logout/ACKexit0; standaloneInputReread=false. JSproof-2 исправилpaging,
+но stoppedexit1 до downstream на intentionally forbidden genericUI call:
+normal bridge validator бросает исключение, normalHost IPC скрывает текст под
+LOGINOM_RUNTIME_FAILED. Exact live validator message покаunknown; stopreview
+e2cebed0… подтверждаетclearcleanup/noeffects. Separateproof-3 использует узкую
+private diagnostic error wrapper вокруг того же publiccall, не меняя Product
+IPC/Protocol/client. Это instrumented nativeproof; JSGroup/Sort gate ещёpending.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

@@ -57,6 +57,13 @@ logout/ACKexit0 complete; originalexit1 сохранён. Separateproof-2 pagina
 и details independently с sameID/revision/bounded16; staticApproved0da15709…,
 mandatorynative branches pending. Не менять frozenпару/pins или старыеoutcomes.
 
+Joinproof-2 actualcorePASS/independent2bbc5532…:обаhiddenroles/freshoutput/
+3nodes2linksnoJS/Save/close/logout/ACKexit0; standaloneInputReread=false.
+JSproof-2 stopped доbranches на намеренно запрещённом genericUI: validator throws,
+normalHostIPC маскирует текст. Exactlive message не заявлять по LOGINOM_RUNTIME_FAILED.
+Owncleanup confirmed/stopreviewe2cebed0… . Proof-3 явноinstrumented, narrowprivate
+IPC guard-exception capture only; ordinary nodecalls/client/pins unchanged.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1
