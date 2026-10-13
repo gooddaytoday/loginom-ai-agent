@@ -87,7 +87,8 @@
     "status": "NOT_APPLIED",
     "systemd_analyze_verify_exit": 0,
     "nft_check_exit": 0,
-    "model_or_runtime_registration_pin_changes": false
+    "model_or_runtime_registration_pin_changes": false,
+    "remote_local_patch_SHA256_match": true
   },
   "application_plan_after_owner_network_permission": [
     "Re-read service tasks, child processes and lease before any daemon lifecycle operation; back up exact two network files with existing owners/modes.",
@@ -103,5 +104,11 @@
   "same_Rich_repeat_limit": 10,
   "charge_this_diagnosis": 0,
   "scenario_native_reference_product_recovery_operations": 0,
-  "heartbeat": "lab-56-lab-63 remains ACTIVE every30 minutes; all eight done not verified"
+  "heartbeat": "lab-56-lab-63 remains ACTIVE every30 minutes; all eight done not verified",
+  "owner_network_permission": {
+    "state": "ASKED_PENDING",
+    "question": "Apply only78.17.1.143/32 main route and TCP443 firewall rule on eval-tests; preserve existing policy/services/models/counters.",
+    "reason": "Owner autonomy point6 explicitly reserves shared network/VPN/system defaults changes for a separate owner decision.",
+    "approval_not_inferred_from_SSH_access": true
+  }
 }
