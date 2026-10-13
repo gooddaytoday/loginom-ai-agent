@@ -271,7 +271,10 @@
       "Rich_operator_task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
       "handoff_manifest_crc_proposal_verified": true,
       "issue_status_after_Evaler_dispatch": "in_progress176",
-      "heartbeat_authorization_persisted": true
+      "heartbeat_authorization_persisted": true,
+      "latest_operator_task_status": "running",
+      "latest_operator_task_started_at": "2026-10-13T14:21:14+03:00",
+      "latest_operator_checked_utc": "2026-10-13T11:24:11.888893+00:00"
     }
   ]
 }

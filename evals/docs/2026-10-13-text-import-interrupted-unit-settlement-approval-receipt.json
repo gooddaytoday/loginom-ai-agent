@@ -352,5 +352,17 @@
     "once_consumed": "unconfirmed; not precharged",
     "destination": "operations/abandoned/LAB57-interrupted-unit-01a134a1",
     "attachment_id": "01a134fd-ee04-7bd2-aa30-d75c68072af8"
+  },
+  "latest_operator_task_observation": {
+    "checked_utc": "2026-10-13T11:24:11.888893+00:00",
+    "id": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+    "status": "running",
+    "started_at": "2026-10-13T14:21:14+03:00",
+    "trigger_comment_id": "01a134fd-ee62-7df0-be83-8da0f6cfdc9b",
+    "native_messages": 12,
+    "last_native_seq": 12,
+    "last_native_utc": "2026-10-13T11:22:10.029548Z",
+    "scope": "worker reads exact operator plan and searches original proofs; no mutation result delivered",
+    "actual_ABANDONED_FREE_still_not_confirmed": true
   }
 }
