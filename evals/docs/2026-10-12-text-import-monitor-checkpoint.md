@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Full8 16:31:26UTC13Oct: LAB56 in_review65/ACCEPT+cleanup, LAB57 in_progress212/Rich16, LAB58–63 in_progress9/admission/no runs. Fresh followup17:19:04UTC: LAB57 blocked224, Evaler01a13644-79d0 running20:17+03.
+- Full8 16:31:26UTC13Oct: LAB56 in_review65/ACCEPT+cleanup, LAB58–63 in_progress9/admission/no runs. Fresh LAB57 followup17:28:21UTC: in_progress229, Rich17/01a1364b-2539 running20:25:09+03.
 - Runtime online/same daemon; Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 проверены. Перед root operator и handoff все4stand+Evaler queues/protected LAB55/other pending0; duplicates0.
 - lab-56-lab-63 ACTIVE/30мин; prompt обновлён на actual progress/readback exact. All8done=false; Ben/дальнейшие карточки gated.
 - Original interrupted unit ABANDONED/FREE сохраняется, old ERROR/cleanup UNKNOWN/consumed unit once не переписаны.
@@ -14,7 +14,7 @@
 - Codex root operator actual17:03UTC: approved289-byte policyf83e9f1b exclusive root:root0644 + one targeted parser --add --skip-cache exit0; global restriction1/other347files+173profiles unchanged.
 - Initial STOP KERNEL_ATTACHMENT_DIFFERS/attach<unknown> сохранён. Без повторной install/load read-only compilation/kernel raw5786 bytes identical SHAe67764c4…0f6b2; separate APPLIED_VERIFIED17:08UTC receipt172a3eb0…a156.
 - Fresh root full pins12284files/6profiles/config/storage/no mounts/process/ancestry/FD/debugger absence/genuine FREE verified. Sandbox/bubblewrap/worker privileges/credentials/VPN/defaults preserved; own tmp archived/hash-checked/removed, SSH closed.
-- One handoff01a13644-79b2/parent01a13623-89e7; body/parent/oneEvalermention/2attachments byte-readback verified. Evaler processing; Root не запускает duplicate Rich.
+- One handoff01a13644-79b2/parent01a13623-89e7 body/parent/oneEvalermention/2attachments readback verified. Evaler ACK01a1364b-2525; one Rich17 dispatched/running, handoff9payload CRC/paths/hashes verified. Duplicate0.
 - References1/1/2/1/1/1 из3/product0×6/cold8/7/5/admission3/3/wrapper1/1/recovery0/repeats3/10 remaining7 retained; dispatch не precharged. Root Loginom native/scenario/model/cold calls0.
 - Owner policy743f98ac:30min/45min/6h/old deadline18:33МСК SUPERSEDED; technical timeouts/once/integrity остаются; owner вопросы решает координатор без пользователя до всех8complete.
-- Canonical: apparmor-blocker-verification/operator-receipt/operator-cleanup/handoff-receipt JSON (text-import prefix). Следующий шаг: Evaler validates actual operator receipt→one Rich fresh lease/native READY→UTF16ref2/cold/6product repeat1→independent Ben. LAB58–63 после ACCEPT/cleanup.
+- Canonical: 2026-10-13-text-import-apparmor-{blocker-verification,operator-receipt,operator-cleanup,handoff-receipt}.json. Следующий шаг: active Rich17 fresh lease/native READY→UTF16ref2/cold/6product repeat1→independent Ben; LAB58–63 после ACCEPT/cleanup.

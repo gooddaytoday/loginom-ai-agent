@@ -406,7 +406,23 @@
       }
     ],
     "issue_status": "blocked",
-    "issue_revision": 224
+    "issue_revision": 224,
+    "Evaler_acknowledged_and_dispatched": {
+      "checked_utc": "2026-10-13T17:31:37.291543+00:00",
+      "comment_id": "01a1364b-2525-7036-be0f-28dac9777001",
+      "parent_id": "01a13644-79b2-712f-bd2b-5dc33cd1cc31",
+      "zip_attachment_id": "01a1364b-24b6-78c7-b620-e6afebaf582c",
+      "zip_bytes": 11857,
+      "zip_sha256": "7778909e73e63882e12165fd81bc3b394dc78649a4118cb093d5d9ec2f546be5",
+      "payload_files_verified": 9,
+      "crc_paths_types_verified": true,
+      "active_Rich_task": "01a1364b-2539-75a1-a857-abeedd9545e5",
+      "started_at": "2026-10-13T20:25:09+03:00",
+      "status_at_final_read": "running",
+      "LAB57_status": "in_progress",
+      "LAB57_revision": 229,
+      "actual_native_READY": false
+    }
   },
   "automation_update": {
     "id": "lab-56-lab-63",
