@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Статус на 2026-10-13: **только документы; реализация, cherry-pick, сборки, новые прогоны и изменения стендов не начаты**.
+- Статус на 2026-10-13: **реализация начата с задачи 0 на b54455e187fb0a728787263e17a1adc828d77221; live v2 ещё не квалифицирован**.
 - Исследованная рабочая база: `ef06b6e9b2dba8b0da58c6063d350918ee66dd59`. Перед реализацией зафиксировать фактическую базу; не сбрасывать и не включать в свои коммиты чужие изменения.
 - Принятая топология: один выделенный Loginom Server, одна Studio, уникальный пользователь Loginom на слот. Её повторное согласование не требуется.
 - Runtime-код scheduler и provisioning остаётся в `evals/`. Продуктовая поставка shared OAuth — отдельная работа основного чата; harness потребляет проверенный установленный кандидат.
@@ -311,14 +311,14 @@ no-op возможен только после terminal state **всего** inc
 
 **Interfaces:** Produces нормативные версии slots v2, marker v2, lifecycle команд/блокировок, session identity, archive/cleanup receipts и summary, а также правила эксплуатации нового режима во всех перечисленных документах. Это обязательное предусловие задач 1–10; runtime-код ещё не меняется. Будущий v2 помечен как не реализованный: документ не разрешает менять действующий legacy стенд.
 
-- [ ] Прочитать фактический `git status --short`, базовый SHA, owning AGENTS и этот дизайн. Задать владельцев файлов из таблицы; сохранить только подтверждённые SHA и хэши evidence.
-- [ ] Записать новый контракт до изменения кода: admission failure до первой попытки → exit 2 и отдельный безопасный preparation receipt без measured summary; карантин после dispatch → summary и exit 1; неизвестная очистка удерживает соответствующие leases.
-- [ ] Описать v2 marker по существующему `/workdir/.loginom-evals-isolated.json`, который старая версия `checkIsolatedStorage` отвергает по version. Не оставлять рядом старый совместимый маркер, позволяющий broad cleanup.
-- [ ] Закрепить lifecycle из раздела «Владение самостоятельных команд»: OS guards действуют только при живом controller; durable reservations сохраняют запрет запуска после его выхода. Server reservation остаётся unresolved при незавершённом incident, даже если чистые user/profile reservations уже выпущены. Archive предшествует server close; удаление server files требует отдельного closure proof.
-- [ ] Зафиксировать разовый bootstrap владельца из раздела «Хост и bootstrap»: он создаёт `/var/lib/loginom-evals/locks`; prepare только проверяет этот root. CLI использует константу, функции получают root аргументом, unit-тесты используют temp. Env/config override запрещён. `controller.stateDir` хранит journal, но не переносит global fence; два stateDir конфликтуют по одинаковым server/user/profile/judge keys.
-- [ ] Во всех нормативных документах до изменения кода разделить legacy exclusive и v2 user-scoped admission/cleanup, описать marker migration, release/recover, архивирование до server close и отказ при uncertain outcome. Зафиксировать запрет старых broad-cleanup executors и перезапуска сервера для слота, сохранение текущих серий и условия 2 → 1 приёмки.
-- [ ] В node-evals/orchestration/runtime runbooks закрепить новую пару на `lg-pc-75` из задачи 1а; никаких изменений remote eval-tests/`R/operations/stand.lease` и legacy/dev контейнеров. Старые миграционные инструкции пометить legacy-only, без выполнения здесь. Новый marker делает свежую пару непригодной для broad cleaner; ordinary node-evals выбирает архив по slot_id. Нормативно закрепить `interrupted_cleanup` только по прерванным попыткам, включая исправление более широкой формулировки SIGINT в старой спеки. Задача 11 сверяет команды и evidence.
-- [ ] Проверить документный diff и закоммитить только свои контрактные файлы: `git diff --check`, затем `git commit -m "docs(evals): define user-isolated parallel contract"` с явным `git add` перечисленных файлов.
+- [x] Прочитать фактический `git status --short`, базовый SHA, owning AGENTS и этот дизайн. Задать владельцев файлов из таблицы; сохранить только подтверждённые SHA и хэши evidence.
+- [x] Записать новый контракт до изменения кода: admission failure до первой попытки → exit 2 и отдельный безопасный preparation receipt без measured summary; карантин после dispatch → summary и exit 1; неизвестная очистка удерживает соответствующие leases.
+- [x] Описать v2 marker по существующему `/workdir/.loginom-evals-isolated.json`, который старая версия `checkIsolatedStorage` отвергает по version. Не оставлять рядом старый совместимый маркер, позволяющий broad cleanup.
+- [x] Закрепить lifecycle из раздела «Владение самостоятельных команд»: OS guards действуют только при живом controller; durable reservations сохраняют запрет запуска после его выхода. Server reservation остаётся unresolved при незавершённом incident, даже если чистые user/profile reservations уже выпущены. Archive предшествует server close; удаление server files требует отдельного closure proof.
+- [x] Зафиксировать разовый bootstrap владельца из раздела «Хост и bootstrap»: он создаёт `/var/lib/loginom-evals/locks`; prepare только проверяет этот root. CLI использует константу, функции получают root аргументом, unit-тесты используют temp. Env/config override запрещён. `controller.stateDir` хранит journal, но не переносит global fence; два stateDir конфликтуют по одинаковым server/user/profile/judge keys.
+- [x] Во всех нормативных документах до изменения кода разделить legacy exclusive и v2 user-scoped admission/cleanup, описать marker migration, release/recover, архивирование до server close и отказ при uncertain outcome. Зафиксировать запрет старых broad-cleanup executors и перезапуска сервера для слота, сохранение текущих серий и условия 2 → 1 приёмки.
+- [x] В node-evals/orchestration/runtime runbooks закрепить новую пару на `lg-pc-75` из задачи 1а; никаких изменений remote eval-tests/`R/operations/stand.lease` и legacy/dev контейнеров. Старые миграционные инструкции пометить legacy-only, без выполнения здесь. Новый marker делает свежую пару непригодной для broad cleaner; ordinary node-evals выбирает архив по slot_id. Нормативно закрепить `interrupted_cleanup` только по прерванным попыткам, включая исправление более широкой формулировки SIGINT в старой спеки. Задача 11 сверяет команды и evidence.
+- [x] Проверить документный diff и закоммитить только свои контрактные файлы: `git diff --check`, затем `git commit -m "docs(evals): define user-isolated parallel contract"` с явным `git add` перечисленных файлов.
 
 ### Задача 1. Конфигурация, canonical paths и leases
 
@@ -702,12 +702,12 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 
 ## Checkpoint
 
-1. 2026-10-13: план подготовлен по `ef06b6e9b2dba8b0da58c6063d350918ee66dd59`; только документация.
-2. Принято: новая выделенная пара на lg-pc-75; отдельный пользователь на слот, legacy/dev без изменений.
-3. Прочитаны все 7 evidence JSON и 3 probe scripts; исторический эксперимент — Loginom 7.4.2, без моделей/судьи.
-4. Cleanup: процессы/recovery → остановка writers → durable archive → server close/readback → свои файлы/backups → release.
-5. Широкая очистка и per-slot server restart запрещены; v2 marker несовместим со старым cleaner.
-6. Standalone prepare/verify выпускают reservations; crash требует recovery-only takeover; новый run заново проходит admission.
-7. Session identity, квалифицированная backup policy и supervisor остаются gates реализации/live.
-8. OAuth-кандидат основного чата включает обязательные HTTP-only/password-focus fixes; judge-home отдельный.
-9. Следующий шаг после отдельной команды: задача 0, OS bootstrap, TDD 1/1а→2–11; CI unit отделён от live.
+1. 2026-10-13: реализация в evals-parallel, рабочая база b54455e187fb0a728787263e17a1adc828d77221.
+2. Задача 0: контракт v2/runbook и все нормативные ссылки синхронизированы; live не квалифицирован.
+3. Один исполнитель владеет файлами плана; семь исходных untracked-файлов сохранены.
+4. Соседняя node-selection сессия: отдельный worktree 4118, общий dev/legacy стенд не менять.
+5. Семь SHA-256 evidence проверены; исторический немодельный опыт не заменяет приёмку harness.
+6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
+7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
+8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
+9. Следующий шаг: TDD задачи 1, затем новая pair 1а; runtime/live тесты задачи 0 не требовались.

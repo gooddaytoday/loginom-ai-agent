@@ -1,0 +1,139 @@
+# Контракт параллельных evals по пользователям
+
+Принят 2026-10-13. Реализация выполняется по [плану](../../docs/superpowers/plans/2026-10-13-evals-parallel-users.md)
+и [дизайну](../../docs/plans/2026-10-11-evals-parallel-design.md). Этот контракт
+нормативен до изменения кода; наличие документа не подтверждает готовность v2.
+Фактические проверки и ограничения записываются в [runbook](../../docs/testing/loginom-ai-agent/parallel-evals.md).
+
+## Конфигурация и граница режимов
+
+Без `EVAL_SLOTS_FILE` действует legacy singleton с marker v1 и эксклюзивным
+endpoint. С файлом версии 2 `--parallel N` выбирает первые N слотов, default 1.
+Все записи файла проверяются до dispatch: уникальные id/username, безопасные
+logins, абсолютные непересекающиеся canonical profile/workspace/history roots,
+отдельные controller/admin/auth/judge/install paths. N больше числа слотов,
+v1-файл, N>1 без файла и неисправный выбранный слот запрещают допуск.
+
+V2 использует один выделенный Server и общую Studio, отдельного Loginom user
+на слот и независимые профили/историю. Поля slots v2 и публичные интерфейсы
+зафиксированы в разделе 2 плана. В JSON нет паролей. `--keep-storage` и
+`--reset-profile` в v2 запрещены; восстановление адресно через recover.
+N>1 запрещён для judge-only/calibrate и с `EVAL_NODE_OPS_CONFIG`,
+`EVAL_NODE_STAND_LEASE`, `EVAL_HARNESS_LEASE_RECEIPT` до чтения private config,
+создания run directory и других побочных действий.
+
+На новом сервере существует только `/workdir/.loginom-evals-isolated.json`
+с `kind: loginom-evals-users`, `version: 2`, полным container ID и owned inventory.
+Старый `checkIsolatedStorage` обязан отвергнуть его. Совместимый marker v1 рядом
+не создаётся; старые broad-cleanup executors на этой паре запрещены. Dev/legacy
+контейнеры, исторические results и pins начатых серий сохраняются.
+
+## Владение и самостоятельные команды
+
+Host-global root — `/var/lib/loginom-evals/locks`, private 0700, owner текущий
+пользователь. Разовый bootstrap владельца описан в плане; prepare только
+проверяет его и не вызывает sudo. CLI не принимает env/config override root;
+публичные lock-функции принимают root параметром, тесты используют temp.
+`controller.stateDir` — private журнал, не альтернативное место глобальных locks.
+
+OS guards — exclusive flock на постоянных файлах, CLOEXEC, единый порядок keys.
+Server key использует полный container ID; user key — ID и точный login/kind;
+profile и judge keys — canonical paths. Server generation и stateDir не входят
+в обходной ключ. Разные stateDir/servers конфликтуют по общим profile/judge keys.
+Guard автоматически освобождается после crash, durable reservation сохраняется.
+Reservation содержит token/revision, command/run/slot, boot ID, PID/starttime,
+server generation, inventory и canonical journal; записывается до side effects.
+Исчезновение PID и timeout не разрешают stale takeover.
+
+- `status`: чтение snapshots без входа в Loginom, takeover и admission.
+- Standalone `prepare`/`verify`: acquire, проверка, завершение собственных
+  probe/management/admin sessions и процессов, evidence и durable released,
+  затем закрытие guards. Verify не исправляет конфигурацию. Readiness receipt
+  не резервирует среду; следующий run заново приобретает владение и admission.
+- `run`: сохраняет владение между подготовкой и dispatch; выпускает чистые
+  user/profile reservations независимо от исхода других слотов. Server fence
+  остаётся unresolved до завершения всех retained слотов и admin finalization;
+  judge-home выпускается после завершения всех собственных judge processes.
+- `recover --slot --incident`: BUSY при живом controller; при crash — те же
+  guards, проверка всей lineage и актуального owner по boot ID/PID/starttime,
+  CAS ожидаемых token/revision в новый recovery-only epoch. Потерянный журнал,
+  чужая lineage или старый CAS запрещают takeover. Recovery не разрешает
+  dispatch/delete без новых proofs. Повтор после crash самой recovery сверяет
+  актуальную цепочку. Released слот не очищается повторно; общие retained
+  ресурсы incident завершаются отдельно. Чужое новое владение не принимается.
+
+## Сессии, архив и очистка
+
+Controller владеет одним trusted административным browser context/run и
+сериализует мутации; слоты не получают admin handles/credentials. Все соединения
+setup/check/runtime/recovery, включая pending disconnect, учитываются в journal.
+`summary.session_id` относится к агенту, не к Loginom session.
+Server epoch — versioned hash full ID/StartedAt/host boot ID/daemon PID/starttime;
+reconnect browser не подменяет эпоху daemon.
+
+Managed row не имеет доказанного Guid/UserID. Close разрешён только после
+квалификации сопоставления epoch + leased username + exact Name/CreateTime
+со свежим proxy и отрицательными race tests. Display name/префикс и
+PendingDisconnect недостаточны; `activeOperations:null` не означает ноль.
+Невозможность доказать identity даёт `SESSION_IDENTITY_UNSUPPORTED`, карантин
+и сохранение файлов. Capability adapter подтверждается задачей 2 на research pair.
+
+Обязательный порядок: завершить собственные локальные writers/management →
+сохранить artifact/results и durable архив history/БД/WAL/SHM/inputs с hashes →
+закрыть все доказанно собственные server sessions → readback прекращения операций
+и locks → удалить только свой user root/доказанные backups → inventory/readback →
+durable release. Browser exit/CloseSession response/пустая папка не заменяют
+closure proof. Имена файлов, hidden/вложенные файлы и `.autosave` не ограничены
+regex login; обход NUL-safe и не следует symlinks. Общая очистка UserStorage и
+SessionBackup и restart сервера для восстановления слота запрещены.
+
+SessionBackup gate требует непустого положительного опыта: либо доказанная
+адресность owner/session/epoch и cleanup A с сохранением B, либо поддержанное
+безопасное отключение, проверенное при crash/recovery. Неизвестный общий backup
+запрещает новый dispatch всего run. Неопределённый cleanup сохраняет данные,
+evidence и соответствующие reservations; здоровые слоты продолжают, если их
+безопасность доказана. Новый loginom check после deletion до admission запрещён.
+
+## Исходы и совместимость
+
+Admission failure до первой попытки: exit 2, безопасный preparation receipt
+без measured summary. Карантин после dispatch: summary, stopped_reason, exit 1.
+Первый SIGINT прекращает dispatch/retry, прерывает agent/judge и ожидает cleanup;
+безопасная пользовательская остановка даёт exit 0. Второй SIGINT — exit 130,
+без гарантии summary, незавершённые reservations сохраняются.
+
+Очередь общая, round-major, без барьера кругов; слот занят до конца cleanup.
+Infra retry один, после cleanup на том же слоте, заменяет результат по job index;
+quality FAIL не повторяется. Неназначенные jobs не получают измерений.
+Судья выполняется под одним run-local mutex и host-global canonical CODEX_HOME
+lease; abort ожидания не меняет уже измеренный исход агента.
+
+Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
+`config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy
+singleton получает `default`, старые файлы читаются как N=1 без переписывания.
+При N>1 общие profileDir/username/storageDir и summary storage_dir — null.
+Storage leftovers — null при неизвестном листинге; иначе при N>1 строки
+`slot=<id>;path=<JSON-encoded relative path>`, при N=1 прежний формат.
+Node-evals выбирает закрытый архив по доверенному slot_id; неизвестный ID
+даёт ошибку без fallback. Compare/rejudge/judge-only сохраняют metadata offline.
+`interrupted_cleanup` — `{recovered: boolean} | null`: null без interrupted
+попыток, иначе OR profile_recovered только interrupted попыток. Recovery обычной
+попытки не меняет поле; оно не является доказательством безопасного cleanup.
+
+## Авторизация и приёмка
+
+Admin credentials/cookies/private journals вне mounts/env/results агента и
+судьи. Bubblewrap, installed-binary admission, process identity и запрет внешнего
+CDP/inspector сохраняются. Shared model OAuth RW-store — отдельное исключение,
+не копия токенов по слотам. Judge использует private CODEX_HOME, не Desktop home;
+при skip-judge/code-only его auth/lease не нужны. OAuth-кандидат — продуктовая
+зависимость; собственные адаптации остаются в evals отдельными коммитами.
+
+Новые eval-прогоны: агент `openai/gpt-6-luna/high`, судья `gpt-6-sol/xhigh`.
+Приёмка на lg-pc-75: новая acceptance pair и отдельная research pair, затем
+немодельные ACL/crash/cleanup/supervisor/backup gates, полный LLM N=2 → N=1
+с неизменными manifest/pins/tasks/rubric/timeouts, node-evals и legacy readers.
+CPU/RAM/диск/лицензия/сессии фиксируются до run и наблюдаются во время и после.
+OOM/ENOSPC, license denial, rate/quota/429, включая промежуточные retries,
+не дают PASS. Skip integration не считается PASS; исторические результаты
+и начатые серии не пересуживаются ради прохождения новой приёмки.

@@ -1,5 +1,36 @@
 # Eval-прогоны Loginom AI Agent: дизайн MVP
 
+## Контракт пользовательских слотов — 2026-10-13
+
+Для нового режима нормативен [контракт v2](../../../evals/docs/parallel-users-contract.md), фактический статус —
+[runbook](../../testing/loginom-ai-agent/parallel-evals.md). Реализация начата; live v2 ещё не квалифицирован. Без
+EVAL_SLOTS_FILE остаётся legacy exclusive; прежние инструкции широкой очистки,
+миграции стенда и R/operations/stand.lease ниже относятся только к legacy.
+V2 создаёт новую пару на lg-pc-75 со своей сетью/портом; dev/legacy/remote
+стенды, исторические results и pins начатых серий сохраняются. Marker по
+/workdir/.loginom-evals-isolated.json имеет kind loginom-evals-users/version 2;
+совместимый v1 не создаётся, старые broad-cleanup executors на новой паре запрещены.
+
+Standalone prepare/verify выпускают доказанно чистые durable reservations и OS
+guards; readiness не резервирует среду. Crash освобождает guard, но retained
+reservation запрещает новый run. Recover требует incident/lineage/recovery-only
+CAS и новых proofs; отсутствие PID не разрешает takeover. Постоянный root
+/var/lib/loginom-evals/locks создаётся разовым bootstrap, prepare только проверяет
+его; stateDir и env/config не переносят global fence. Архив history/БД/WAL/SHM/inputs
+предшествует server close/readback; удаление только своего user root/backups
+требует closure proof. Unknown outcome сохраняет данные/fence; restart сервера
+для слота и широкая очистка запрещены. Admission failure до попыток — exit 2
+и preparation receipt без measured summary; карантин после dispatch — summary/exit 1.
+
+Node-evals выбирает архив по доверенному slot_id без fallback.
+interrupted_cleanup — null без interrupted попыток, иначе OR profile_recovered
+только interrupted попыток. Приёмка: немодельные session/ACL/backup/process
+gates, затем полный LLM N=2 → N=1 и node-evals с неизменными pins/условиями.
+Новые eval-прогоны используют openai/gpt-6-luna/high и судью gpt-6-sol/xhigh;
+исторические модели/defaults ниже описывают прежние серии. Admin secrets/state
+остаются вне mounts/env/results; shared model OAuth и private judge CODEX_HOME
+проверяются отдельно. Skip и исторический PASS не доказывают готовность v2.
+
 ## Утверждённый контракт compare — 2026-10-05
 
 Для реализации compare приоритет имеет [утверждённый контракт](2026-10-05-evals-compare-verdict-design.md)
@@ -412,7 +443,7 @@ Preflight (до первой попытки, отказ = выход 2 с при
 6. `result.json`: статус, код, `timed_out`, `interrupted`, `failure_kind`, `session_id`, `package_path`, `artifact_origin`, `artifact_ambiguous`, `cleanup_error`, `action_manifest_sha256`, score, pass, `judge_status`, `judge_attempts`, пункты чеклиста, длительность, стоимость, счётчики, `profile_recovered`.
 7. После попытки: если был таймаут или Ctrl+C — дождаться исчезновения процессов, ссылающихся на профиль (до 60 с), затем `releaseStaleWriter`; если процессы не исчезли — остановить прогон с выходом 1, профиль в неопределённом состоянии. Затем `recoverIfNeeded`; результат записывается в `profile_recovered` следующей попытки; отказ восстановления останавливает прогон с выходом 1.
 
-Ctrl+C: первый SIGINT harness'а во время работы процесса агента (шаг 2) переводит текущую попытку в `interrupted` (агент останавливается процедурой SIGINT → 30 с → SIGKILL). Если процесс агента уже завершился, статус попытки не меняется: на шагах 3–4 попытка доводится до записи `result.json` (судья пропускается, `judge_status: skipped`); на шаге 5 судья прерывается SIGKILL без повтора, `judge_status: error`. В обоих случаях далее выполняется шаг 7 (результат `recoverIfNeeded` пишется в `summary.interrupted_cleanup`), затем `summary.json` с `interrupted: true` и `report.md` по завершённым попыткам; новые попытки не стартуют. Второй SIGINT во время ожидания — немедленный выход 130 без summary.
+Ctrl+C: первый SIGINT harness'а во время работы процесса агента (шаг 2) переводит текущую попытку в `interrupted` (агент останавливается процедурой SIGINT → 30 с → SIGKILL). Если процесс агента уже завершился, статус попытки не меняется: на шагах 3–4 попытка доводится до записи `result.json` (судья пропускается, `judge_status: skipped`); на шаге 5 судья прерывается SIGKILL без повтора, `judge_status: error`. В обоих случаях далее выполняется шаг 7; `summary.interrupted_cleanup` остаётся `null`, если прерванных попыток не было, иначе `{recovered}` — логическое ИЛИ `profile_recovered` только попыток со статусом `interrupted`, затем `summary.json` с `interrupted: true` и `report.md` по завершённым попыткам; новые попытки не стартуют. Второй SIGINT во время ожидания — немедленный выход 130 без summary.
 
 Остановка прогона по `harness_error` (коды 2/3, отказ восстановления профиля, неисчезнувшие процессы профиля на шаге 7) также пишет `summary.json` и `report.md` по завершённым попыткам с полем `stopped_reason` и завершает процесс с выходом 1.
 
