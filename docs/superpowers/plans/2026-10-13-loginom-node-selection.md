@@ -1539,4 +1539,11 @@ ExportGroup для этого gate не требуется; его прежни�
 Independent proof9 review8e2d847c… Approved, preview-only override byteequal7,
 60source/32fixtures/104protected match; ошибочного navigation shim здесь нет.
 Обе private fixtures diagnostic/nonacceptance; обычная rebuilt проверка обязательна.
-Own proof8 server recovery ещё проверяется; model calls по паре203142 остаются0.
+Independent delivery review7030b977… подтвердил private shim failure; source
+правка не нужна. Strict ownership user97 не установлена, сессия сохранена;
+ownadmin98 logout/MCPexit0 подтверждены. Это не recoveryPASS: originalfalse
+остаётся. Root proof9 запущен отдельно после fresh no.writer/deadoldruntime/
+60+32hash checks/newstate+chat+browser; independent review разрешает эту
+изоляцию без изменения user97. Model calls по паре203142 остаются0.
+Условная новая matched пара225648-cc76ca собирается параллельно на общем
+committed source3a33edcae8; текущий stopped pointer192418 не меняется.
