@@ -371,6 +371,7 @@ name и каждого container name, в общем порядке захват
 После create сохраняются полные IDs, далее применяется и server guard. Неопределённое
 создание сохраняет reservation для reconciliation; destroy берёт оба вида guards.
 
+- [x] Подзадача 1а: pure planPair/usersMarker — pins image IDs, отдельная network, loopback port, no server publish, restart=no и отказ небезопасных полей; 4 tests/typecheck PASS.
 - [ ] RED/GREEN unit: выбор config paths/ports, schema marker, plan действий и reconciliation неизвестного Docker-ответа. Использовать pure входные JSON и временный lock root; Docker не подменять внутренним mock. Docker-поведение проверить отдельно в integration.
 - [ ] После bootstrap сохранить конфигурацию из раздела 2 как `/home/kiselev/.local/state/loginom-evals/parallel/slots.json` (0600) с проверенными локальными путями и отдельным bootstrap admin file. Подготовить второй research config с собственными именами/портом/roots. Пароль в slots JSON не записывать; private bootstrap file предоставляет владелец, последующие slot secrets создаёт harness. Existing config без подтверждённой принадлежности не перезаписывать.
 - [ ] В `evals/package.json` дополнить текущий `test:unit` явными исключениями `parallel-pair-integration`, `loginom-admin-integration`, `user-environment-integration`, `parallel-lifecycle-integration`, `shared-oauth-integration`, `process-supervisor-integration`, `parallel-acceptance-integration` к прежним `isolated-storage,node-eval-ops,node-skill,sandbox`. Создавать новые файлы в их задачах; проверки с Loginom/Docker/bwrap/Chromium не добавлять в обычные `*.test.ts`. Существующий `evals-unit` продолжает `bun run test:unit`; unit locks всегда на temp. Local integration запускается явным списком файлов по готовности; отсутствие prereqs даёт receipt непроверенной проверки, skip ≠ PASS. Для полного local regression сохраняются `bun test` и `bun typecheck`.
@@ -713,4 +714,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
 7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
 8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
-9. Задача 1 завершена: 90 config/slots/lease tests и typecheck PASS; broad unit в работе; bootstrap root готов; далее 1а.
+9. Задача 1: 90 target tests/typecheck PASS. Broad run 582/3skip/1fail после concurrent edit; повтор frozen-code. 1а: pure pair plan/marker 4 PASS, Docker create ещё впереди.
