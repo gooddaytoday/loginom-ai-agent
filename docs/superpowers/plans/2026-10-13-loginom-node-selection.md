@@ -1123,9 +1123,9 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 ## Checkpoint
 
 - 2026-10-13: реализация по согласованным spec/plan, ветка `node-javascript`.
-- Этап 1A выполнен; полный audit до 1B не сертифицирует PASS.
+- Этап 1B завершён; независимый review закрыл export/context binding дефекты.
 - Fixtures реализованы TDD: `81c4a14e7`, `2de55ec10`, `3de3526f9`.
-- Collector реализован TDD: `7ef876bf0`, `a50c93c25`; независимое review проведено.
+- Collector реализован TDD; cleanup guard `d73fa9def`, независимое review проведено.
 - Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
 - Текущий run: `20261013T093809Z-f5d429`, private evidence под evals/results.
@@ -1134,5 +1134,6 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
 - Первый pre-dispatch OAuth 401 сохранён как incident; авторизация по коду завершилась exit 0.
 - Пилот sales-by-category/1: CLI exit 0; native offline audit PASS, включая oracle/history/runtime/graph.
-- Audit 1B ещё завершает guards исключений/review; пилот будет перепроверен финальной версией offline.
-- Следующий шаг: завершить audit/graph TDD и offline-пилот; затем 17 baseline и candidate build.
+- Финальный auditVersion: `1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d`.
+- Root: 95 tests/219 assertions PASS, typecheck/diff-check PASS; acceptance-lock.json закрепляет 72 файла.
+- Следующий шаг: 17 baseline последовательно; candidate build параллельно при замороженных исходниках.

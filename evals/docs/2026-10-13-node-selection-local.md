@@ -86,11 +86,18 @@ CLI означает отмену; timeout требует записанного
 
 ## TDD и пилот
 
-Task 1A уже читает реальные reference XML/oracle, считает все JS apply и оба
-XML-типа; неполнота не становится нулём. До Task 1B намеренно возвращается
-`AUDIT_NOT_FINALIZED`: минимальный аудитор не сертифицирует полную историю,
-settlement, модель или digest. Первый baseline входит в 18 и даёт реальные
-fixtures; после уточнения parser он перепроверяется offline без нового model run.
+Task 1B завершён на реальном пилоте: история, settlement, модель/digest/catalog,
+импорт из закреплённых inputs, export identity, XML lineage, oracle и review gates.
+Первый baseline входит в 18 и перепроверен offline без нового model run.
+Финальный auditVersion:
+`1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d`.
+Root checks: 95 tests/219 assertions, typecheck и diff-check PASS. Независимый
+review подтвердил закрытие export/context identity дефектов пятью регрессиями.
+`acceptance-lock.json` в приватном run-каталоге закрепляет auditor/runner,
+существующие loader/oracle/XML dependencies и все task/fixture hashes.
+Исторический pilot wrapper exit 2 отражает минимальный Task 1A; текущий
+`selection-audit.json` после offline-проверки является источником текущих осей.
+Не переписывать исторический CLI/wrapper exit ради нового verdict.
 
 Initial TDD evidence: `36cf3558f`, `e60abc34f`, `9beee7cbf`, `312ff3872`,
 `86618a093`. Каждый новый сценарий сначала дал RED, затем GREEN. Fixtures
