@@ -191,6 +191,30 @@ test("fixture main: dry-run builds the round-major plan without processes, lease
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("fixture main: a finished controller releases its SIGINT handler", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-signal-release-"))
+  try {
+    const input = await fixture(root)
+    const before = process.listenerCount("SIGINT")
+    await main(["--dry-run", "--tasks", path.join(root, "tasks")], input.env,
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(process.listenerCount("SIGINT")).toBe(before)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("fixture main: failed profile admission also releases its SIGINT handler", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-signal-failure-"))
+  try {
+    const input = await fixture(root)
+    await rm(path.join(input.slots.slots[0]!.profileDir, "data/auth.json"))
+    const before = process.listenerCount("SIGINT")
+    await expect(main(["--tasks", path.join(root, "tasks"), "--skip-judge"], input.env,
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })).rejects.toThrow("Нет авторизации")
+    expect(process.listenerCount("SIGINT")).toBe(before)
+    expect(await readdir(input.slots.slots[0]!.workspaceRoot)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("fixture main: binary/source modes and ordinary CLI cannot acquire synthetic admission", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-mode-"))
   try {
