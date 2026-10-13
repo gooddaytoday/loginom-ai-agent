@@ -1,6 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { appendFile, chmod, mkdir, rm } from "node:fs/promises"
+import { appendFile, chmod, mkdir, rm, rmdir } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
@@ -136,6 +136,12 @@ if (command === "run" && /^parallel-/.test(process.env.EVAL_TASK_ID ?? "")) {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
+if (command === "run" && process.env.EVAL_TASK_ID === "parallel-storage-leftover") {
+  const workdir = Bun.argv[Bun.argv.indexOf("--dir") + 1]!
+  const name = `eval-${path.basename(path.dirname(path.dirname(workdir)))}-${process.env.EVAL_TASK_ID}-${path.basename(workdir)}.extra`
+  await Bun.write(path.join(process.env.EVAL_FAKE_SLOT_STORAGE!, name), "owned leftover")
+}
+if (command === "run" && process.env.EVAL_TASK_ID === "parallel-storage-missing") await rmdir(process.env.EVAL_FAKE_SLOT_STORAGE!)
 const orphanFile = command === "run" ? Bun.argv.find((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "fake-storage-export.json") : undefined
 const orphanFixture = orphanFile ? await Bun.file(orphanFile).json() as { storage: string; readonly?: boolean } : undefined
 const orphanStorage = process.env.EVAL_FAKE_ORPHAN_STORAGE ?? orphanFixture?.storage
