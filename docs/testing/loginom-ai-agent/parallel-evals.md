@@ -105,3 +105,16 @@ bun typecheck/git diff --check PASS. Последний цикл дополни�
 Полный unit запущен отдельно; его результат ещё не получен. Проверки генерации
 здесь используют сохранённые server identity fixtures; настоящая Docker epoch
 проверка research pair принадлежит задаче 1а. Live v2 по-прежнему закрыт.
+
+Broad unit run завершён: 582 PASS/3 SKIP/1 FAIL, 586 tests (473.96s). Единственный
+FAIL — новый owner-snapshot test. Source/test менялись во время этого процесса;
+свежий целевой набор после исправления проходит 90/90. Гипотеза: runner ранее
+закэшировал старый lease module и позднее прочитал новый тест. Ни test assertions,
+ни код не ослабляются; диагноз проверяется повтором narrow case и frozen full unit.
+Skipped writer-settlement/owned-registration checks не объявляются PASS.
+
+Задача 1а начата: pure planPair/usersMarker, 4 tests/typecheck/git diff --check PASS.
+Docker argv фиксируют image IDs и ownership labels, отдельную сеть, restart=no,
+только loopback Studio port; небезопасные routes/dev network/nonce/ID отклоняются.
+Marker v2 начинает с пустого owned inventory до фактической подготовки users.
+Create/destroy/reconciliation/readServerIdentity и real integration ещё впереди.
