@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 17/18, oracle/calculation 17;
+серия `20261013T142936Z-072953`: завершены baseline 18/18, oracle/calculation 18;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -376,6 +376,20 @@ runtime/identity/graph/export true, failures []. Package SHA
 `a80221fb50d3a1db9e08ab2f6091a029b020b77068150f83f8d865d1e5b46355`.
 Все три campaign baseline успешны без JS. Всего 17/18, policy 12/17, JS8/8/8;
 следующий first-last-touch/3 запущен, candidate 0/25.
+
+## First-last-touch/3 и итог baseline
+
+Session `ses_ec9991e6fffevrkgnHx3umenbP`: CLI exit 0, wrapper exit 1, cleanupConfirmed true,
+CLI 237.150 секунды, timeout false. JS nodes/calls/successful calls 1/1/1;
+oracle/calculation/history/runtime/identity/graph/export true. Единственный отказ
+JAVASCRIPT_NOT_ALLOWED. Package SHA
+`4b025d52f8689cde0ecac0ef3e397cd9c537886f705ece24fbab9b553058871d`.
+Все 18 baseline завершены: oracle/calculation 18/18, cleanup 18/18, policy 12/18;
+JS nodes/calls/successful calls 9/9/9 в шести попытках (ABC и first-last-touch).
+Все CLI exit 0, timeouts нет; original ABC/1 collection failure и ABC/2 prior
+settlement assessment сохранены отдельно от итоговой offline-переоценки.
+Baseline не проходил ручное semantic review; independent machine review
+завершается на всех 18. Candidate 0/25, итоговая приёмка остаётся незавершённой.
 
 ## Native proof исправления дат
 

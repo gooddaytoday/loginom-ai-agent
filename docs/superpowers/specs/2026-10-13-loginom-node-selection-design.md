@@ -4,7 +4,7 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Текущая серия `20261013T142936Z-072953`: завершены baseline 17/18, oracle/calculation 17;
+Текущая серия `20261013T142936Z-072953`: завершены baseline 18/18, oracle/calculation 18;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
@@ -322,6 +322,9 @@ Risky-approved-claims/3 завершился full audit/cleanup PASS без JS: 
 успешны. Начат campaign-roi-by-channel/3; candidate 0/25.
 Campaign-roi-by-channel/3 завершился full audit/cleanup PASS без JS: три campaign
 baseline успешны. Начат first-last-touch/3; candidate 0/25.
+First-last-touch/3 завершился CLI0/oracle/calculation/cleanup с одним JS. Baseline
+18/18 завершён: policy12/18, JS9/9/9, oracle/calculation18. Candidate0/25;
+завершается independent machine review baseline перед первой candidate-волной.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
