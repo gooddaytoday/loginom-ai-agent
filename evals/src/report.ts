@@ -49,6 +49,7 @@ export type AttemptResult = {
   oracle_error?: string | null
   judge_status: JudgeStatus
   judge_attempts: number
+  judge_cleanup_unconfirmed?: boolean
   judge_confidence: string | null
   judge_summary: string | null
   checklist: { id: string; passed: boolean; evidence: string }[] | null
