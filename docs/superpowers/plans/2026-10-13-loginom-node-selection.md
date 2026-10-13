@@ -708,11 +708,16 @@ inspect после response-budget refusal). Standard group-001 останови
   Approved0da15709…; runtime/pins unchanged, native branches ещёpending.
   Joinproof-2 actualcorePASS/independent2bbc5532… (обаhiddenroles/freshoutput/
   inputprojections/Save/3nodes2linksnoJS/close/logout/ACKexit0, no standalone reread).
-  JSproof-2 fullypaged, но intentionalgenericclick throws through normalbridge/
-  sanitizedHostIPC LOGINOM_RUNTIME_FAILED; exactlive validator message unknown.
-  Originalexit1 сохранён, stopreviewe2cebed0…/clearcleanup/noeffects. Separate
-  instrumentedproof-3 onlyfixed expectedvalidation-exception capture at privateIPC
-  aroundsamepublicUIcall; Product/runtime/pins unchanged. JSbranches stillpending.
+  JSproof-2 fullypaged, но intentionalgenericclick stopped с sanitizedHostIPC
+  LOGINOM_RUNTIME_FAILED. Originalexit1 сохранён, stopreviewe2cebed0…/clearcleanup.
+  Источники опровергли первоначальную validator-диагностику: user profile удаляет
+  dock_ui_action из catalog; Unknown Dock tool (-32602) возникает до uiAct.
+  Instrumentedproof-3 также exit1 до branches: wrapper ожидал -32603. Исходный
+  failure/ownclose/logout/HostACKexit0 сохранён. Privateproof-4 возвращается к
+  обычному managed-entry: actual catalog без genericUI, live JS actions[] и
+  отдельный actual pure guard check на live snapshot, без фиктивной UI receipt.
+  Group/directSort выполняются штатными node calls; Product/runtime/pins unchanged.
+  JSbranches stillpending.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять
@@ -1464,3 +1469,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Серия192418 baseline1/18 complete: sales1 CLI0/wrapper0/cleanuptrue/oracle+calculation+allmachineaxesPASS/JS0, CLI337.121s. ABC1 следующийactive; candidate0/25. Actualbaselineprepare16/7.4.2/JSapplyavailable bound (a81a317b…).
 - Серия192418 stopped2baseline/0candidate: sales1PASS; ABC1CLI1/wrapper3/cleanupfalse group-target genericJSsourceclickdeny. Exactactualpredicateconfirmed; JS→Group/newSort privateTDDintegrationongoing, noGeneralJSallow/policyrevision. Ownuser81closed20:15:37.094Z/adminabsenceverified; guardarchived/status0/checkpending.
 - Group/Sort blocker ownrecovery завершён: user81closed/guardarchived/status0/check0/adminlogout+MCP0; independentrecovery22e95b…PASS, original19files unchanged. CodeTDDpreviewintegration ongoing; baseline/candidate slots остановлены.
+- Пара203142 source dd8d480706/pair+pins Approved, native Join core PASS. JSproof3 exit1 до downstream сохранён; stopreview f28a8ebf… исправляет прежнюю validator-гипотезу: actualusercatalog не предоставляет UI tool. Ordinary privateproof4 awaiting independent review/live; model0, current-run192418 stopped.

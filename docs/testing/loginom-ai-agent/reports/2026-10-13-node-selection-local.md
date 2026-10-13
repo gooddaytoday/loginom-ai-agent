@@ -86,14 +86,25 @@ ownpackage `/user/JD31103263.lgp` readbackSHA
 PrivateJS proof-2 тожеexit1 до downstream: roots3pages(92records) и details2pages
 (24records) полностью прочитаны, ownJSoutput0 unique/delivered/actions[].
 Первый intentionallyforbidden genericclick вызвал общий IPCerror
-LOGINOM_RUNTIME_FAILED. Source bridge366→uiAct→validateUiAction throws до
-admission; managed-entry247 скрывает текст. Live точный validator message не
-наблюдался и не выведен из общей ошибки. Independentstop review SHA
+LOGINOM_RUNTIME_FAILED; managed-entry247 скрывает текст. Первоначальная гипотеза
+bridge366→uiAct→validateUiAction не учитывала user-profile tool filtering и
+позднее опровергнута. Live точный validator message не наблюдался.
+Independentstop review SHA
 `e2cebed02404848c81f721a015196d2db575eb5a656133a3fa0f97505329c12a`:
 53sources/25receipts/3journals unchanged; no downstream/managedpreview effects,
-actualclose/logout/nodiscard/ACKexit0. Separateproof-3 добавляет только private
-IPC wrapper для exact MCP-32603 validator exception на том же publicUI call;
-instrumentation явно помечается. Product error IPC/Protocol/runtime/pins unchanged.
+actualclose/logout/nodiscard/ACKexit0. Instrumentedproof-3 также exit1 до Group/
+Sort; ownclose/logout/ACKexit0 подтверждены, исходные файлы сохранены.
+Bridge185 удаляет dock_ui_action из user catalog,196 не добавляет его route,
+210–212 отклоняет неизвестный tool с -32602 до uiAct. Private wrapper ожидал
+-32603 и поэтому не мог подтвердить отрицательную проверку в этом профиле.
+Privateproof-4 использует обычный managed-entry и actual list catalog без genericUI;
+live JS port allowed_actions:[] плюс отдельный actual pure guard на live snapshot
+проверяют ограничения разных слоёв. Это не live UI refusal receipt. Главные
+Group/directSort идут штатными node calls; Product/runtime/pins unchanged.
+JS3 independent stop review SHA
+`f28a8ebf49d7964b4561d3537994224f458ca32711cceb1799a07d878959070d`:
+actual24-tool catalog/route,25receipts/3journals/56source hashes сохранены,
+888events без downstream/managedpreview; прежняя ошибка static review признана.
 
 ## Историческая пара после Join fix — допуск серии
 

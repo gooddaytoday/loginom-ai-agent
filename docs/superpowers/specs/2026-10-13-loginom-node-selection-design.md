@@ -446,11 +446,17 @@ NewJoin core203142/proof-2 actualPASS/independentreview2bbc5532…:
 обаhiddenroles/fresh exact2rows/inputprojections/Save/3node2linknoJSpackage/
 cleanup/logout/ACKexit0; standaloneInputReread=false. JSproof-2 исправилpaging,
 но stoppedexit1 до downstream на intentionally forbidden genericUI call:
-normal bridge validator бросает исключение, normalHost IPC скрывает текст под
-LOGINOM_RUNTIME_FAILED. Exact live validator message покаunknown; stopreview
-e2cebed0… подтверждаетclearcleanup/noeffects. Separateproof-3 использует узкую
-private diagnostic error wrapper вокруг того же publiccall, не меняя Product
-IPC/Protocol/client. Это instrumented nativeproof; JSGroup/Sort gate ещёpending.
+normalHost IPC скрывает текст под LOGINOM_RUNTIME_FAILED; stopreview e2cebed0…
+подтверждаетclearcleanup/noeffects. Первоначальное объяснение через UI validator
+опровергнуто проверкой реального user-profile routing: bridge удаляет
+dock_ui_action из catalog и отклоняет вызов как Unknown Dock tool (-32602) до
+uiAct/validateUiAction. Instrumentedproof-3 также exit1 до downstream; его узкий
+wrapper ожидал другой код (-32603), исходные результаты сохранены. Own package
+closed/logged_out и Host ACKexit0 подтверждены. Privateproof-4 использует обычный
+managed-entry: actual catalog подтверждает отсутствие genericUI tool, live JS
+port — allowed_actions:[], actual pure guard на live snapshot проверяется отдельно
+и не объявляется live UI receipt. Главные native Group/directSort проверки идут
+штатными node calls. Product/runtime/pins неизменны; JSGroup/Sort gate ещёpending.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

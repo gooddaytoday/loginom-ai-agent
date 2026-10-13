@@ -59,10 +59,15 @@ mandatorynative branches pending. Не менять frozenпару/pins или �
 
 Joinproof-2 actualcorePASS/independent2bbc5532…:обаhiddenroles/freshoutput/
 3nodes2linksnoJS/Save/close/logout/ACKexit0; standaloneInputReread=false.
-JSproof-2 stopped доbranches на намеренно запрещённом genericUI: validator throws,
-normalHostIPC маскирует текст. Exactlive message не заявлять по LOGINOM_RUNTIME_FAILED.
-Owncleanup confirmed/stopreviewe2cebed0… . Proof-3 явноinstrumented, narrowprivate
-IPC guard-exception capture only; ordinary nodecalls/client/pins unchanged.
+JSproof-2 stopped доbranches на genericUI с LOGINOM_RUNTIME_FAILED;
+owncleanup confirmed/stopreviewe2cebed0… . Первоначальная validator-гипотеза
+опровергнута: user profile не предоставляет dock_ui_action, bridge отклоняет
+Unknown Dock tool (-32602) до uiAct. Instrumentedproof-3 тоже exit1 до branches,
+его wrapper ожидал -32603; original failure/close/logout/ACKexit0 сохранены.
+Privateproof-4 использует обычный managed-entry: actual catalog без genericUI,
+live JS allowed_actions:[] и отдельный actual pure guard check на live snapshot.
+Не объявлять pure guard live UI receipt. Group/directSort проверять штатными
+node calls; Product/runtime/pins unchanged.
 
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
