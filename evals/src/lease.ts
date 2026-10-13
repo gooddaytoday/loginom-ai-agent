@@ -5,6 +5,7 @@ import { EvalFailure } from "./fail"
 import type { ProcessCleanup } from "./process-supervisor"
 import { groupProcesses } from "./process-group"
 import { assertProfileClean } from "./profile"
+import type { ServerIdentity } from "./slots"
 
 export const globalLockRoot = "/var/lib/loginom-evals/locks"
 
@@ -18,10 +19,11 @@ export type Reservation = {
   journal: string
   owner: { bootId: string; pid: number; starttime: string; uid: number }
   releaseEvidence?: { path: string; sha256: string }
-  lineage: { token: string; revision: number; journal: string }[]
+  lineage: { token: string; revision: number; journal: string; commandId: string; owner: Reservation["owner"]; identity?: ServerIdentity }[]
+  identity?: ServerIdentity
 }
 
-type ResourceRequest = { key: string; lockRoot: string; journal: string; commandId: string }
+type ResourceRequest = { key: string; lockRoot: string; journal: string; commandId: string; identity?: ServerIdentity }
 
 export function acquireResourceLease(input: ResourceRequest) {
   return acquireResource(input)
@@ -35,7 +37,7 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
   const root = await lstat(input.lockRoot).catch(() => { throw new EvalFailure("LEASE_LOCK_ROOT", 2) })
   if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
     !path.isAbsolute(input.lockRoot) || await realpath(input.lockRoot) !== input.lockRoot) throw new EvalFailure("LEASE_LOCK_ROOT", 2)
-  await readPrivateJson(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
+  await readLeaseReceipt(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
   const key = new Bun.CryptoHasher("sha256").update(input.key).digest("hex")
   const guardFile = path.join(input.lockRoot, `${key}.guard`)
   const { dlopen } = await import("bun:ffi")
@@ -69,10 +71,12 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
       throw new EvalFailure("LEASE_CAS_STALE", 2)
     if (!expected && previous && previous.state !== "released") throw new EvalFailure("RECOVERY_REQUIRED", 2)
     if (expected && previous) {
+      if (previous.identity && (!input.identity || Object.entries(previous.identity).some(entry => input.identity?.[entry[0] as keyof ServerIdentity] !== entry[1])))
+        throw new EvalFailure("LEASE_SERVER_GENERATION_CHANGED", 2)
       if (![previous.token, ...previous.lineage.map(item => item.token)].includes(expected.incidentToken ?? expected.token))
         throw new EvalFailure("LEASE_LINEAGE_INVALID", 2)
-      await Promise.all(previous.lineage.map(item => readPrivateJson(item.journal))).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
-      await readPrivateJson(previous.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
+      await Promise.all(previous.lineage.map(item => readLeaseReceipt(item.journal))).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
+      await readLeaseReceipt(previous.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
       const bootId = (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()
       if (previous.owner.uid !== process.getuid?.()) throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
       const owner = previous.owner.bootId === bootId ? await readFile(`/proc/${previous.owner.pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
@@ -85,26 +89,30 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
     const reservation: Reservation = {
       version: 2, key: input.key, revision: previous ? previous.revision + 1 : 1, token: crypto.randomUUID(), state: expected ? "recovery-only" : "retained",
       commandId: input.commandId, journal: input.journal,
-      lineage: expected && previous ? [...previous.lineage, { token: previous.token, revision: previous.revision, journal: previous.journal }] : [],
+      lineage: expected && previous ? [...previous.lineage, { token: previous.token, revision: previous.revision, journal: previous.journal,
+        commandId: previous.commandId, owner: previous.owner, ...(previous.identity ? { identity: previous.identity } : {}) }] : [],
+      ...(input.identity ? { identity: input.identity } : {}),
       owner: { bootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(), pid: process.pid,
         starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]!, uid: process.getuid!() },
     }
     await checkGuard()
-    await writeReservation(receipt, reservation)
+    await writeLeaseReceipt(receipt, reservation)
     return { reservation, receipt, guardFile, close, async release(proof: string) {
       await checkGuard()
-      const evidence = await readPrivateJson(proof).catch(() => { throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2) })
+      const evidence = await readLeaseReceipt(proof).catch(() => { throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2) })
       const current = await readReservation(receipt, input.key)
       if (closed || !jsonObject(evidence) || evidence.version !== 2 || evidence.status !== "confirmed" || evidence.key !== reservation.key ||
-        evidence.token !== reservation.token || evidence.revision !== reservation.revision || current?.token !== reservation.token || current?.revision !== reservation.revision)
+        evidence.token !== reservation.token || evidence.revision !== reservation.revision || current?.token !== reservation.token || current?.revision !== reservation.revision ||
+        JSON.stringify(current) !== JSON.stringify(reservation) ||
+        (reservation.identity && evidence.serverEpoch !== reservation.identity.serverEpoch))
         throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2)
-      await writeReservation(receipt, { ...reservation, state: "released", releaseEvidence: { path: proof, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(evidence)).digest("hex") } })
+      await writeLeaseReceipt(receipt, { ...reservation, state: "released", releaseEvidence: { path: proof, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(evidence)).digest("hex") } })
       await close()
     } }
   } catch (error) { await close(); throw error }
 }
 
-async function writeReservation(file: string, value: Reservation) {
+export async function writeLeaseReceipt(file: string, value: object) {
   const temporary = `${file}.${crypto.randomUUID()}.tmp`
   const handle = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
   try { await handle.writeFile(JSON.stringify(value)); await handle.sync() }
@@ -114,7 +122,7 @@ async function writeReservation(file: string, value: Reservation) {
   try { await directory.sync() } finally { await directory.close() }
 }
 
-async function readPrivateJson(file: string): Promise<unknown> {
+export async function readLeaseReceipt(file: string): Promise<unknown> {
   if (!path.isAbsolute(file) || await realpath(path.dirname(file)) !== path.dirname(file)) throw new EvalFailure("LEASE_FILE_PRIVATE", 2)
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
@@ -126,7 +134,7 @@ async function readPrivateJson(file: string): Promise<unknown> {
 }
 
 async function readReservation(file: string, key: string): Promise<Reservation | undefined> {
-  const value = await readPrivateJson(file).catch((error: NodeJS.ErrnoException) => {
+  const value = await readLeaseReceipt(file).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined
     throw new EvalFailure("LEASE_RESERVATION_INVALID", 2)
   })
@@ -134,10 +142,12 @@ async function readReservation(file: string, key: string): Promise<Reservation |
   if (!jsonObject(value) || value.version !== 2 || value.key !== key || !Number.isSafeInteger(value.revision) || Number(value.revision) < 1 ||
     typeof value.token !== "string" || !value.token || !["retained", "released", "recovery-only"].includes(String(value.state)) ||
     typeof value.commandId !== "string" || !value.commandId || typeof value.journal !== "string" || !path.isAbsolute(value.journal) ||
-    !jsonObject(value.owner) || typeof value.owner.bootId !== "string" || !value.owner.bootId || !Number.isSafeInteger(value.owner.pid) || Number(value.owner.pid) < 1 ||
-    typeof value.owner.starttime !== "string" || !/^\d+$/.test(value.owner.starttime) || !Number.isSafeInteger(value.owner.uid) ||
+    !validOwner(value.owner) ||
     !Array.isArray(value.lineage) || value.lineage.some(item => !jsonObject(item) || typeof item.token !== "string" || !item.token ||
-      !Number.isSafeInteger(item.revision) || Number(item.revision) < 1 || typeof item.journal !== "string" || !path.isAbsolute(item.journal)) ||
+      !Number.isSafeInteger(item.revision) || Number(item.revision) < 1 || typeof item.journal !== "string" || !path.isAbsolute(item.journal) ||
+      typeof item.commandId !== "string" || !item.commandId || !validOwner(item.owner)) ||
+    (value.identity !== undefined && (!jsonObject(value.identity) ||
+      ["containerId", "startedAt", "serverEpoch", "studioContainerId", "studioStartedAt", "configurationHash"].some(key => !jsonObject(value.identity) || typeof value.identity[key] !== "string" || !value.identity[key]))) ||
     (value.state === "released" && (!jsonObject(value.releaseEvidence) || typeof value.releaseEvidence.path !== "string" ||
       !path.isAbsolute(value.releaseEvidence.path) || typeof value.releaseEvidence.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.releaseEvidence.sha256))))
     throw new EvalFailure("LEASE_RESERVATION_INVALID", 2)
@@ -150,6 +160,11 @@ async function readReservation(file: string, key: string): Promise<Reservation |
 
 function jsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function validOwner(value: unknown) {
+  return jsonObject(value) && typeof value.bootId === "string" && !!value.bootId && Number.isSafeInteger(value.pid) && Number(value.pid) > 0 &&
+    typeof value.starttime === "string" && /^\d+$/.test(value.starttime) && Number.isSafeInteger(value.uid)
 }
 
 /** Sibling of the product profile: resetProfile cannot remove the harness lock.

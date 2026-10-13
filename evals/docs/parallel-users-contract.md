@@ -3,6 +3,8 @@
 Принят 2026-10-13. Реализация выполняется по [плану](../../docs/superpowers/plans/2026-10-13-evals-parallel-users.md)
 и [дизайну](../../docs/plans/2026-10-11-evals-parallel-design.md). Этот контракт
 нормативен до изменения кода; наличие документа не подтверждает готовность v2.
+Private CleanupReceipt включает leaseToken/serverEpoch: release сверяет их с
+текущим SlotLease; close только освобождает OS guards, сохраняя reservations.
 Фактические проверки и ограничения записываются в [runbook](../../docs/testing/loginom-ai-agent/parallel-evals.md).
 
 ## Конфигурация и граница режимов

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireHarnessLease, acquireResourceLease, recoverResourceLease, retireRecordedHarnessLease } from "../src/lease"
+import { acquireHarnessLease, acquireResourceLease, recoverResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
 import type { Reservation } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -127,6 +127,8 @@ test("resource lease: interrupted recovery keeps lineage and rejects a foreign i
     const next = await recoverResourceLease(item.request, { token: current.token, revision: current.revision, incidentToken: incident.token })
     expect(next.reservation.state).toBe("recovery-only")
     expect(next.reservation.revision).toBe(3)
+    expect(next.reservation.lineage[0]!.owner).toEqual(incident.owner)
+    expect(next.reservation.lineage[0]!.commandId).toBe(incident.commandId)
     await next.close()
   } finally { await rm(item.root, { recursive: true, force: true }) }
 })
@@ -160,9 +162,82 @@ test("resource lease: a corrupt lineage cannot authorize recovery", async () => 
   await lease.close()
   try {
     await writeFile(lease.receipt, JSON.stringify({ ...lease.reservation,
-      lineage: [{ token: "foreign", revision: 999, journal: item.request.journal }] }), { mode: 0o600 })
+      lineage: [{ token: "foreign", revision: 999, journal: item.request.journal, commandId: item.request.commandId, owner: lease.reservation.owner }] }), { mode: 0o600 })
     await expect(recoverResourceLease(item.request, { token: lease.reservation.token, revision: lease.reservation.revision })).rejects.toThrow("LEASE_LINEAGE_INVALID")
   } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: server restart with the same container ID cannot change the recovery fence", async () => {
+  const item = await resourceFixture()
+  const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+  try {
+    const owner = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      const lease=await acquireResourceLease(${JSON.stringify({ ...item.request, identity })});console.log(JSON.stringify(lease.reservation));await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    const saved: Reservation = JSON.parse(await new Response(owner.stdout).text())
+    expect(await owner.exited).toBe(0)
+    const restarted = { ...identity, startedAt: "2026-10-13T11:00:00Z", serverEpoch: "e".repeat(64) }
+    await expect(acquireResourceLease({ ...item.request, identity: restarted })).rejects.toThrow("RECOVERY_REQUIRED")
+    await expect(recoverResourceLease({ ...item.request, identity: restarted }, { token: saved.token, revision: saved.revision })).rejects.toThrow("LEASE_SERVER_GENERATION_CHANGED")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test.each(["pid-reuse", "old-boot"])("resource lease: %s permits recovery-only ownership without treating a current process as its owner", async kind => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  await lease.close()
+  try {
+    await writeFile(lease.receipt, JSON.stringify({ ...lease.reservation, owner: { ...lease.reservation.owner,
+      ...(kind === "pid-reuse" ? { starttime: String(BigInt(lease.reservation.owner.starttime) + 1n) } : { bootId: crypto.randomUUID() }) } }), { mode: 0o600 })
+    const recovery = await recoverResourceLease(item.request, { token: lease.reservation.token, revision: lease.reservation.revision })
+    expect(recovery.reservation.state).toBe("recovery-only")
+    expect(recovery.reservation.owner.pid).toBe(process.pid)
+    await recovery.close()
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: SIGKILL after durable release permits a new run", async () => {
+  const item = await resourceFixture()
+  const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease,writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    const lease=await acquireResourceLease(${JSON.stringify(item.request)});const proof=${JSON.stringify(path.join(item.root, "proof.json"))};
+    await writeLeaseReceipt(proof,{version:2,status:"confirmed",key:lease.reservation.key,token:lease.reservation.token,revision:lease.reservation.revision});
+    await lease.release(proof);console.log("RELEASED");setInterval(()=>{},1000)`], { stdout: "pipe", stderr: "pipe" })
+  try {
+    const reader = child.stdout.getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("RELEASED")
+    reader.releaseLock()
+    child.kill("SIGKILL")
+    await child.exited
+    const next = await acquireResourceLease({ ...item.request, commandId: "run-two" })
+    expect(next.reservation.revision).toBe(2)
+    await next.close()
+  } finally { child.kill("SIGKILL"); await child.exited; await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: different servers cannot bypass one judge-home key", async () => {
+  const item = await resourceFixture()
+  const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+  const request = { ...item.request, key: `judge:${path.join(item.root, "judge-home")}`, identity }
+  const lease = await acquireResourceLease(request)
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      try {await acquireResourceLease(${JSON.stringify({ ...request, identity: { ...identity, containerId: "f".repeat(64) } })});process.exitCode=4}
+      catch(error) {console.log(error.message);process.exitCode=2}`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stdout).text()).toContain("BUSY")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: a replaced owner snapshot cannot release with the old token", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  try {
+    await writeLeaseReceipt(lease.receipt, { ...lease.reservation, owner: { ...lease.reservation.owner, starttime: String(BigInt(lease.reservation.owner.starttime) + 1n) } })
+    const proof = path.join(item.root, "proof.json")
+    await writeFile(proof, JSON.stringify({ version: 2, status: "confirmed", key: item.request.key, token: lease.reservation.token, revision: lease.reservation.revision }), { mode: 0o600 })
+    await expect(lease.release(proof)).rejects.toThrow("LEASE_RELEASE_UNCONFIRMED")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
 })
 
 test("lease: второй harness не допускается, release проверяет свой owner", async () => {
