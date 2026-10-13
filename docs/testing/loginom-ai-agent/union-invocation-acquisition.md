@@ -23,3 +23,5 @@ Agent uses a local fixed session/union-invocation.ts facade to the same runtime 
 Self-review before independent delivery removed data-message fallback: only a privately bound original SessionProcessor getter/message qualifies. A copied data holder refuses before host IO. Positive fixture creation now follows the same getter/binding shape; earlier c11 product is preserved unaccepted, and the final exact product is separate.
 
 Corrective: original SDK ToolExecutionOptions identity and same-owner toolCallId retain the first record before mutable operation lookup/clock mint. Drift refuses without packet2/deadline2/call2; distinct options/toolCallId and operation remain valid. Original pending Promise/cause and original request IDs are not normalized or relabelled. Only helper/test/contract changed vs dac22131.
+
+Classification corrective: guard known options/same-owner toolCallId creation before mutable definition.name/target.type ordinary early-return; no packetless fallback after selector drift. Fresh ordinary calls remain ordinary. Only helper and contract change; original request/kind/IDs and public schema unchanged.

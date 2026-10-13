@@ -34,16 +34,17 @@ export function registerUnionInvocationCarrier(owner){
  need(!carriers.has(owner),'UNION_INVOCATION_CARRIER_ALREADY_BOUND');const call=data(owner,'call');need(typeof call==='function','UNION_INVOCATION_CARRIER_UNAVAILABLE');carriers.set(owner,call);
 }
 export function retainUnionInvocation(source){
+ const options=data(source,'options'),owner=data(source,'owner');
+ // Known SDK creation must guard before mutable name/kind classification can
+ // select the packetless ordinary fallback. Fresh ordinary creation stays ordinary.
+ const prior=creations.get(options)||sdkCalls.get(owner)?.get(data(options,'toolCallId'));
+ if(prior){prior.guard();need(prior.facts.owner===owner&&prior.options===options&&prior.request===data(source,'request')&&prior.definition===data(source,'definition')&&prior.user===data(source,'user')&&prior.sessionInput===data(source,'sessionInput'),'UNION_INVOCATION_DUPLICATE_CHANGED');return prior.packet;}
  const definition=data(source,'definition');if(data(definition,'name')!=='dock_node_apply')return;
  const request=data(source,'request'),target=data(request,'target');if(data(target,'type')!=='transform.union_data')return;
- const options=data(source,'options'),signal=data(options,'abortSignal');if(aborted.call(signal))throw reason.call(signal);
- const owner=data(source,'owner'),sessionInput=data(source,'sessionInput'),session=data(sessionInput,'session'),processor=data(sessionInput,'processor'),message=processorMessage(processor),user=data(source,'user');
+ const signal=data(options,'abortSignal');if(aborted.call(signal))throw reason.call(signal);
+ const sessionInput=data(source,'sessionInput'),session=data(sessionInput,'session'),processor=data(sessionInput,'processor'),message=processorMessage(processor),user=data(source,'user');
  const generation=data(owner,'generation'),call=data(owner,'call'),callId=data(options,'toolCallId');
  need(Number.isSafeInteger(generation)&&generation>0&&typeof call==='function'&&typeof callId==='string'&&callId.length>0,'UNION_INVOCATION_OWNER_UNKNOWN');
- // SDK creation is immutable even when request.operation_id is corrupted.
- // Check retained options identity/toolCallId BEFORE operation lookup or clock mint.
- const prior=creations.get(options)||sdkCalls.get(owner)?.get(callId);
- if(prior){prior.guard();need(prior.facts.owner===owner&&prior.options===options&&prior.request===request&&prior.definition===definition&&prior.user===user&&prior.sessionInput===sessionInput,'UNION_INVOCATION_DUPLICATE_CHANGED');return prior.packet;}
  const operation=data(request,'operation_id'),sessionId=data(session,'id'),messageId=data(message,'id'),userMessage=data(user,'id');
  need([operation,sessionId,messageId,userMessage].every(x=>typeof x==='string'&&x.length>0),'UNION_INVOCATION_CREATION_UNKNOWN');
  const schema=data(definition,'inputSchema'),required=data(schema,'required'),schemaDigest=digest(required),signature=digest(request);
