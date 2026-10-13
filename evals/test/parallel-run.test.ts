@@ -41,6 +41,41 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
+test("fixture main: reports slot-owned leftovers and retains only the affected slot fence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-leftovers-"))
+  try {
+    const input = await parallelFixture(root, ["parallel-storage-leftover", "parallel-z-healthy"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"], input.env,
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    const name = `eval-${summary.run_id}-parallel-storage-leftover-1.extra`
+    expect(summary.storage_leftovers).toEqual([`a/${name}`])
+    expect(summary.slots?.map(slot => slot.storage_leftovers)).toEqual([[name], []])
+    expect(summary.slots?.map(slot => slot.state)).toEqual(["quarantined", "closed"])
+    expect(run.code).toBe(1)
+    expect(await Bun.file(path.join(root, "storage/a", name)).text()).toBe("owned leftover")
+    const leases = await Promise.all(summary.slots!.map(slot => Bun.file(slot.lease_receipt!).json()))
+    expect(leases.map(lease => lease.state)).toEqual(["retained", "released"])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: failed listing of one slot yields aggregate null and preserves healthy detail", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-listing-failure-"))
+  try {
+    const input = await parallelFixture(root, ["parallel-storage-missing", "parallel-z-healthy"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"], input.env,
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(run.code).toBe(1)
+    expect(summary.storage_leftovers).toBeNull()
+    expect(summary.slots?.map(slot => slot.storage_leftovers)).toEqual([null, []])
+    expect(summary.slots![0]!.storage_error).toContain("ENOENT")
+    expect(summary.slots?.map(slot => slot.state)).toEqual(["quarantined", "closed"])
+    const cleanup = await Bun.file(summary.slots![0]!.cleanup_receipt!).json()
+    expect(cleanup).toMatchObject({ status: "failed", storageDeletionAllowed: false, nextAdmissionAllowed: false })
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("fixture main: removes only its artifacts after the profile archive is durably committed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-storage-order-"))
   try {
