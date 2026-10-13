@@ -1,0 +1,97 @@
+{
+  "groups": [
+    {
+      "card": 1,
+      "ids": [
+        "txt-comma-utf8",
+        "csv-comma-utf8",
+        "txt-semicolon-cp1251-decimal",
+        "csv-pipe-multiline",
+        "tsv-utf8",
+        "tsv-utf16le"
+      ]
+    },
+    {
+      "card": 2,
+      "ids": [
+        "txt-tab-utf16le",
+        "txt-tab-utf16be",
+        "txt-utf8-bom",
+        "txt-cp1252",
+        "csv-tab-utf16le",
+        "csv-tab-utf16be",
+        "csv-utf8-bom",
+        "csv-cp1252",
+        "csv-semicolon-cp1251-decimal"
+      ]
+    },
+    {
+      "card": 3,
+      "ids": [
+        "txt-no-header",
+        "txt-skip-header",
+        "txt-no-header-skip",
+        "txt-space",
+        "txt-merge-on",
+        "txt-merge-off",
+        "csv-no-header",
+        "csv-skip-header",
+        "csv-no-header-skip",
+        "csv-space",
+        "csv-merge-on",
+        "csv-merge-off"
+      ]
+    },
+    {
+      "card": 4,
+      "ids": [
+        "txt-single-quote",
+        "txt-backtick-quote",
+        "txt-no-quote",
+        "txt-multiline-crlf",
+        "txt-multiline-lf",
+        "csv-single-quote",
+        "csv-backtick-quote",
+        "csv-no-quote",
+        "csv-multiline-crlf",
+        "csv-multiline-lf",
+        "txt-pipe-multiline"
+      ]
+    },
+    {
+      "card": 5,
+      "ids": [
+        "txt-unclosed-quote",
+        "txt-wrong-encoding",
+        "txt-wrong-delimiter",
+        "txt-ambiguous-headers",
+        "csv-unclosed-quote",
+        "csv-wrong-encoding",
+        "csv-wrong-delimiter",
+        "csv-ambiguous-headers",
+        "initial-incomplete-settings",
+        "missing-source-column"
+      ]
+    },
+    {
+      "card": 6,
+      "ids": [
+        "missing-source-path-correction",
+        "txt-six-to-five-correction",
+        "csv-delimiter-correction",
+        "csv-to-tsv-source-refresh"
+      ]
+    },
+    {
+      "card": 7,
+      "ids": [
+        "analytic-txt-types-identifiers",
+        "analytic-txt-null-empty-zero",
+        "analytic-txt-multiline-values",
+        "analytic-csv-types-identifiers",
+        "analytic-csv-null-empty-zero",
+        "analytic-csv-multiline-values"
+      ]
+    }
+  ]
+}
