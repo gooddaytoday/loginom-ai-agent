@@ -87,6 +87,10 @@ try {
         root: process.cwd(),
         metafile: await Bun.file(join(resources, "host/build-inputs.json")).json(),
       },
+      {
+        root: process.cwd(),
+        metafile: await Bun.file(join(resources, "host/amount-launcher-build-inputs.json")).json(),
+      },
     ]),
   )
   const bunLicense = await readFile(join(import.meta.dir, "../licenses/bun/LICENSE.md"))

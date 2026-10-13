@@ -1,3 +1,4 @@
+import {retainAmountStartup,bindAmountHostStartup} from "./fp-startup-control"
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { join } from "node:path"
@@ -14,6 +15,7 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
 const state: {
+  amountStartup?: ReturnType<typeof retainAmountStartup>
   starting?: Promise<void>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
   port?: ReturnType<typeof loginomHostPort>
@@ -72,8 +74,14 @@ async function dispatch(message: unknown) {
   const input = "input" in message ? message.input : undefined
   try {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+    if (message.method === "readonly.preReady.cancel" && input && typeof input === "object" && "phase" in input && input.phase === "startup") {
+      const startup=state.amountStartup
+      if (!startup?.cancel(input)) throw Error("LOGINOM_HANDSHAKE_INVALID")
+      reply({id: message.id, result: {accepted: true, pending: startup.pending, nativeCancellationConfirmed: false}})
+      return
+    }
     if (message.method === "start") {
-      if (state.starting || state.host) throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      if (state.starting || state.host || state.amountStartup) throw new Error("LOGINOM_HANDSHAKE_INVALID")
       if (
         !input ||
         typeof input !== "object" ||
@@ -103,6 +111,11 @@ async function dispatch(message: unknown) {
           || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
           || capture.packagePath.split("/").some(x => x === "." || x === "..")))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
+      const amountStartup='amountStartup' in input
+        ? retainAmountStartup(message as unknown as Parameters<typeof retainAmountStartup>[0],input as unknown as Parameters<typeof retainAmountStartup>[1]) : undefined
+      state.amountStartup=amountStartup
+      const fpStartup=amountStartup
+      fpStartup?.guard()
       const options = {
         root: input.root,
         acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" } | undefined,
@@ -113,17 +126,37 @@ async function dispatch(message: unknown) {
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }
+      const guardFPStartup = () => {
+        fpStartup?.guard()
+        if (fpStartup && (options.root !== input.root || options.resources !== input.resources
+            || options.headless !== input.headless || options.acceptanceCapture !== capture
+            || options.strictRecovery !== ("strictRecovery" in input && input.strictRecovery === true)
+            || options.acceptanceCleanupPackage !== ("acceptanceCleanupPackage" in input ? input.acceptanceCleanupPackage : undefined)))
+          throw Error("LOGINOM_HANDSHAKE_INVALID")
+      }
+      guardFPStartup()
+      if(amountStartup)bindAmountHostStartup(options,amountStartup)
       state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
+        guardFPStartup()
         state.port = loginomHostPort(port, host)
-        await host.settled()
-      })
-      await state.starting
+        try { await host.settled() }
+        catch (error) { throw fpStartup ? fpStartup.reject(error) : error }
+        guardFPStartup()
+      }, fpStartup ? error => { throw fpStartup.reject(error) } : undefined)
+      let accepted = false
+      try {
+        await state.starting
+        guardFPStartup()
+        if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+        accepted = true
+      } finally { fpStartup?.settle(accepted) }
       if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
     }
+    if(state.amountStartup && !state.amountStartup.accepted)throw Error("LOGINOM_HOST_NOT_READY")
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "close") {
       // Stop admission now, but exclude this close request from its own drain.
@@ -140,10 +173,12 @@ async function dispatch(message: unknown) {
       events.emit("message", { data: message })
       return
     }
+    if(state.amountStartup && !["connection.status","connection.read"].includes(message.method))throw Error("LOGINOM_RECOVERY_REQUIRED")
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
-    reply({ id: message.id, error: hostError(error) })
+    if(message.method==="start" && state.amountStartup)reply({id:message.id,rejection:closeRejection(error),rejectionOrigin:state.amountStartup.rejectionOrigin,...(state.amountStartup.secondary?{secondaryRejection:closeRejection(state.amountStartup.secondary.value)}:{})})
+    else reply({ id: message.id, error: hostError(error) })
   }
 }
 
