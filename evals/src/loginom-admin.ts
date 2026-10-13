@@ -20,11 +20,73 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
 }
 import { EvalFailure } from "./fail"
 import type { ServerIdentity } from "./slots"
+import path from "node:path"
+import { constants } from "node:fs"
+import { lstat, open, readdir, realpath } from "node:fs/promises"
+import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
 export type AdminReply = { v: 1; id: string; outcome: "confirmed" | "not_applied" | "unknown"; data: unknown }
 const frameLimit = 1024 * 1024
+
+export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, output: WritableStream<Uint8Array>, journalDir: string) {
+  const channel = createAdminChannel(input, output)
+  let sequence = Promise.resolve()
+  let unresolved = false
+  let reconciled = false
+  return {
+    request(input: unknown) {
+      const result = sequence.then(async () => {
+        const request = requireAdminRequest(input)
+        if (unresolved && request.op !== "inspect" && request.op !== "dispose")
+          return { v: 1 as const, id: request.id, outcome: "not_applied" as const, data: { code: "ADMIN_RECONCILIATION_REQUIRED" } }
+        const info = await lstat(journalDir).catch(() => { throw new EvalFailure("ADMIN_JOURNAL_PRIVATE", 2) })
+        if (!path.isAbsolute(journalDir) || await realpath(journalDir) !== journalDir || !info.isDirectory() || info.isSymbolicLink() ||
+          info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700) throw new EvalFailure("ADMIN_JOURNAL_PRIVATE", 2)
+        if (!reconciled) {
+          unresolved = (await Promise.all((await readdir(journalDir)).map(async name => {
+            if (!/^[a-zA-Z0-9_-]{1,128}\.json$/.test(name)) return true
+            const row = await readLeaseReceipt(path.join(journalDir, name)).catch(() => { throw new EvalFailure("ADMIN_JOURNAL_INVALID", 2) })
+            if (!jsonObject(row) || row.version !== 1 || row.kind !== "loginom-admin-command" || `${row.id}.json` !== name ||
+              !["intent", "confirmed", "not_applied", "unknown"].includes(String(row.state))) throw new EvalFailure("ADMIN_JOURNAL_INVALID", 2)
+            return row.state === "intent" || row.state === "unknown" || JSON.stringify(row.expectedIdentity) !== JSON.stringify(request.expectedIdentity)
+          }))).some(Boolean)
+          reconciled = true
+        }
+        if (unresolved && request.op !== "inspect" && request.op !== "dispose")
+          return { v: 1 as const, id: request.id, outcome: "not_applied" as const, data: { code: "ADMIN_RECONCILIATION_REQUIRED" } }
+        const file = path.join(journalDir, `${request.id}.json`)
+        const journal = { version: 1, kind: "loginom-admin-command", id: request.id, op: request.op, expectedIdentity: request.expectedIdentity,
+          desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(request.payload)).digest("hex"), state: "intent", at: new Date().toISOString() }
+        const handle = await open(file, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
+          .catch((error: NodeJS.ErrnoException) => { throw new EvalFailure(error.code === "EEXIST" ? "ADMIN_COMMAND_REUSED" : "ADMIN_JOURNAL_UNAVAILABLE", 2) })
+        try { await handle.writeFile(JSON.stringify(journal)); await handle.sync() }
+        finally { await handle.close() }
+        const directory = await open(journalDir, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+        try { await directory.sync() } finally { await directory.close() }
+        const reply = await channel.request(request)
+        unresolved ||= reply.outcome === "unknown"
+        const settled = await (async () => {
+          const current = await lstat(journalDir)
+          if (current.dev !== info.dev || current.ino !== info.ino || current.isSymbolicLink() || current.uid !== info.uid ||
+            (current.mode & 0o777) !== 0o700 || await realpath(journalDir) !== journalDir ||
+            JSON.stringify(await readLeaseReceipt(file)) !== JSON.stringify(journal)) throw new EvalFailure("ADMIN_JOURNAL_UNAVAILABLE", 2)
+          await writeLeaseReceipt(file, { ...journal, state: reply.outcome,
+            replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex"), settledAt: new Date().toISOString() })
+        })().then(() => true, () => false)
+        if (!settled) {
+          unresolved = true
+          return { v: 1 as const, id: request.id, outcome: "unknown" as const, data: { code: "ADMIN_JOURNAL_UNAVAILABLE" } }
+        }
+        return reply
+      })
+      sequence = result.then(() => undefined, () => undefined)
+      return result
+    },
+    close: channel.close,
+  }
+}
 
 export function createAdminChannel(input: ReadableStream<Uint8Array>, output: WritableStream<Uint8Array>) {
   const reader = input.getReader()

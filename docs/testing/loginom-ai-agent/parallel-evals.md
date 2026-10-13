@@ -241,9 +241,9 @@ Raw malformed reply и canary secret не попадают в diagnostic envelop
 peer, без реализации Loginom RPC/пользователей. Детерминированная segmentation
 реальных pipe bytes доказывает UTF-8 framing; wire events доказывают single flight.
 С selector: 14 admin tests; pair/CI вместе — 26 PASS, typecheck/diff check PASS.
-Это transport qualification, не admin/browser readiness. Durable intent before
-send, runtime verifier/driver launch, dispose ack/process proof и live RPC ещё
-не реализованы; полный suite последнего factory коммита не включает этот codec.
+Это transport qualification, не admin/browser readiness. Runtime verifier,
+driver и durable intent добавлены следующими шагами ниже; dispose ack/process
+proof и live RPC ещё предстоят. Full unit factory не включает этот codec.
 
 verifyAdminRuntime реализован в preflight. До запуска проверяет CLI artifact
 format/source/target, весь declared/actual inventory, SHA-256, modes/links и
@@ -279,5 +279,19 @@ ManagedSessionInfo.Count по source — число пакетов, не active 
 Driver возвращает rawSessions/packageCount и activeOperations=null; composite
 identity пока sessionIdentityQualified=false. CloseSession возвращает
 SESSION_IDENTITY_UNSUPPORTED, user mutations — ADMIN_CAPABILITY_UNSUPPORTED.
-Положительные gate/race tests, journal/supervisor bridge и AdminConnection ещё
-предстоят; v2 live admission остаётся закрытым.
+Положительные gate/race tests и AdminConnection ещё предстоят; v2 live admission
+остаётся закрытым.
+
+Supervisor расширен потоковыми stdin/stdout. Три последовательных обмена через
+настоящий child и его EOF завершаются confirmed process proof; зависший consumer
+ограничен deadline и даёт failed/capture_complete=false. Protocol stdout уходит
+consumer, не в diagnostic output. Все 21 supervisor tests/98 assertions PASS
+(98.25s), typecheck/diff check PASS. Browser admission для admin ещё предстоит.
+
+createJournaledAdminChannel сохраняет private exclusive intent до pipe, fsync
+файла/каталога; payload/reply сохраняются только как SHA. Outcome становится
+durable до возврата confirmed. Unknown и retained intent нового канала запрещают
+mutation replay; inspect/dispose разрешены для read-back/закрытия. Ошибка result
+persistence либо подмена journal directory дают unknown, прежний intent и чужие
+данные сохраняются. Пять real-pipe/filesystem RED/GREEN tests; 41 admin/preflight/
+CI tests и typecheck PASS. Это не reconciliation proof и не server cleanup fence.
