@@ -371,3 +371,14 @@ generation/cli-profile. Весь profile suite 66 PASS/188 assertions (29.22s),
 typecheck/diff check PASS; новые private fixtures удалены. Fresh setup response/
 read-back и full prepare receipt ещё предстоят. Bootstrap paths и planned
 candidate-home launcher повторно проверены metadata-only: отсутствуют.
+
+Fresh v2 ensureProfile проверяет setup ack, затем запускает отдельный status для
+read-back exact url/username; agent config записывается лишь после обоих совпадений.
+Exit=0/правильный ack с чужим saved state не считается binding. Fake CLI читает
+stdin-json и сохраняет только URL/username/hasApiKey, без password/apiKey values;
+EVAL_FAKE_SETUP_FILE — data-only fixture для раздельных reply/state.
+RED/GREEN foreign ack и false ack→foreign saved state сохранили agent config;
+positive setup→status→reuse вызвал один setup. 8 v2 cases/32 assertions; 121 profile/
+config tests/366 assertions, typecheck/diff check PASS (32.65s). Private fixtures
+удалены. Durable prepare intent, actual connection/session и user/ACL qualification
+не подменяются этой проверкой сохранённых settings.

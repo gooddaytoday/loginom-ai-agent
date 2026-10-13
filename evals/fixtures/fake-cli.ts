@@ -100,14 +100,17 @@ if (command === "loginom") {
     )
     await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE, "setup-called"), "1")
   }
+  const candidate = sub === "setup" && Bun.argv.includes("--stdin-json") ? await Bun.stdin.json() as Record<string, unknown> : undefined
+  const setup = sub === "setup" && process.env.EVAL_FAKE_SETUP_FILE
+    ? await Bun.file(process.env.EVAL_FAKE_SETUP_FILE).json() as { reply: unknown; state: unknown } : undefined
   const next =
     sub === "setup" && stateFile
-      ? { state: "ready", hasApiKey: true }
+      ? setup?.state ?? { state: "ready", hasApiKey: true, ...(candidate ? { url: candidate.url, username: candidate.username } : {}) }
       : sub === "recover"
         ? process.env.EVAL_FAKE_RECOVERY_PERSISTS ? view : { ...view, recoveries: [] }
         : view
   if (stateFile && (sub === "recover" || sub === "setup")) await Bun.write(stateFile, JSON.stringify(next))
-  process.stdout.write(JSON.stringify(next) + "\n")
+  process.stdout.write(JSON.stringify(setup?.reply ?? next) + "\n")
   process.exit(0)
 }
 
