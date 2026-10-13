@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 11/18, oracle/calculation 11;
+серия `20261013T142936Z-072953`: завершены baseline 12/18, oracle/calculation 12;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -314,6 +314,21 @@ CLI 412.373 секунды, timeout false. JS nodes/calls 0/0; oracle/calculatio
 runtime/identity/graph/export true, failures []. Package SHA
 `b98dabdc3abe538adb45351aea55a127af7b3ffbb9f30fa19a30ecaec23e3f4c`.
 Завершены 11/18 baseline, policy 8/11; следующий first-last-touch/2 запущен.
+
+## First-last-touch/2 и итоги двух проходов
+
+Session `ses_ec9c2d2e2ffeFIgWa5RLVXOyjG`: CLI exit 0, wrapper exit 1,
+cleanupConfirmed true, CLI 244.122 секунды, timeout false. JS nodes/calls/successful
+calls 1/1/1; oracle/calculation/history/runtime/identity/graph/export true.
+Единственный отказ JAVASCRIPT_NOT_ALLOWED у старого skill. Package SHA
+`6c5fdf953dc36b3c1ae9b18858a722b817c1106f62fa49bceec2e0436b1a6a79`.
+Baseline 12/18: oracle/calculation/cleanup 12/12, policy 8/12, JS6/6/6 в четырёх
+ABC/attribution попытках. Первые восемь используют отдельный final reassessment,
+дальнейшие четыре — тот же auditVersion непосредственно; original outcomes
+не переписаны. Начат третий проход, sales-by-category/3; candidate 0/25.
+Среднее CLI время 12 попыток — 397.425 секунды (6.6 минуты). Грубая оценка
+оставшихся 6 baseline + 25 candidate — 3.4 часа модели плюс review/overhead;
+первая candidate-волна по этой выборке около 60 минут. Это не гарантированная ETA.
 
 ## Native proof исправления дат
 
