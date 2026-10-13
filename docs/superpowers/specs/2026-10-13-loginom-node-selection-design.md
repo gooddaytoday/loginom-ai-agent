@@ -237,6 +237,11 @@ tasks/model/seed, 72 hashes и 43 уникальных слота. `current-run`
 всех 5725 entries, затем удалён только его собственный каталог. Baseline/browser
 source и evidence сохранены; чужие артефакты не затронуты.
 
+Первый baseline третьей серии (sales/1) завершился CLI/wrapper exit 0: no JS,
+oracle/calculation/graph/export/history/identity/runtime и ordinary CLI cleanup
+подтверждены. Это один из 18 baseline; candidate ещё не выполнялся, полная
+приёмка не заявляется. Следующий плановый ABC/1 запущен.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

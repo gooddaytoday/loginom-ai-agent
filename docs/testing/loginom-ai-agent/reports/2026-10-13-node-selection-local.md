@@ -8,8 +8,8 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953` начата: sales baseline/1 в работе, завершённых
-baseline 0/18, candidate 0/25. Обе сборки/pins и native overflow proof проверены.
+серия `20261013T142936Z-072953`: sales baseline/1 полностью успешен, ABC/1 в работе;
+завершён baseline 1/18, candidate 0/25. Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
@@ -128,6 +128,14 @@ baseline и browser source сохранены, model evidence/pins не меня
 Квитанция `obsolete-candidate-cleanup.json` в старом run. Первая попытка очистки
 остановилась до удаления из-за Python 3.10/hashlib.file_digest; после совместимого
 streaming SHA256 архив повторно проверен и операция завершена.
+
+`sales-by-category/1` третьей серии, Session `ses_eca4160a6ffetc3GcVPs4aXuGm`:
+CLI/wrapper exit 0, cleanupConfirmed true. Полный audit PASS: JS nodes/calls 0/0,
+oracle/calculation/history/runtime/identity/graph/export identity true, failures [].
+Сохранены пакет и CSV с новым prefix; package SHA
+`dbccff922600803df11431203f36106895a935f0659ca1733c768790c3534b1e`.
+CLI время 336.384 секунды, без timeout. Это первый из новых 18 baseline;
+следующий `abc-pareto-groups/1` запущен, ещё не оценён.
 
 ## Native proof исправления дат
 
