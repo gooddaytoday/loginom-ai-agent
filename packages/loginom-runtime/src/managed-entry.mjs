@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import {open as evidenceOpen,writeFile as evidenceWrite,fsync as evidenceSync,close as evidenceClose,rename as evidenceRename,constants as evidenceConstants} from "node:fs"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
+import { retainCaptureOwner, bindCaptureRuntime, assertCaptureOwner } from "./retained-capture.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -273,17 +274,24 @@ async function handle(message) {
       const input = message.input
       const { acceptanceCleanupPackage, acceptanceCapture } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
-      let captureHarness
+      let captureHarness, captureRegistration, captureResource
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
         const amount = acceptanceCapture.harness === "amount-import-type-v1"
         const path = amount ? "runtime/src/acceptance/amount-import-type-v1.mjs"
           : "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
-        if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
+        const entries=resources.manifest.files.filter(file => file.path === path && !file.link && !file.directory)
+        if (entries.length !== 1 || !/^[a-f0-9]{64}$/.test(entries[0].sha256))
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)
         if (typeof (amount ? module.captureAmount : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         captureHarness = amount ? module.captureAmount : module.captureCalculator
+        captureResource = Object.freeze({path,sha256:entries[0].sha256})
+        if (module.captureMode !== undefined) {
+          if (module.captureMode !== "readonly" || typeof module.validateCaptureResult !== "function")
+            throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+          captureRegistration = Object.freeze({mode:"readonly",validate:module.validateCaptureResult,resource:captureResource})
+        }
       }
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -317,6 +325,10 @@ async function handle(message) {
       }
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
+      if(captureRegistration)state.captureStartupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,
+        account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,
+        page:state.startupOwner.page,generation:input.generation,chat:input.chat})
+      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:input.generation,chat:input.chat})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -346,6 +358,18 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
+      const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
+        originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
+      const assertStartup=()=>{
+        if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
+            || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
+            || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
+            || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
+            || originalStartup.generation!==originalOwner.generation || originalStartup.chat!==originalOwner.chat)
+          throw Error("LOGINOM_STARTUP_OWNER_CHANGED");
+      };
+      assertStartup();
       // Bind only the document owned by this successful private login. This is
       // not workspace preparation and confers no package-close authority.
       const documentId=randomUUID()
@@ -359,6 +383,7 @@ async function handle(message) {
         return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
       },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
         origin:new URL(config.loginomUrl).origin})
+      assertStartup();
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -366,16 +391,27 @@ async function handle(message) {
         JSON.parse(await readFile(session.browserConfig, "utf8")),
         async () => authenticated.context,
       )
+      assertStartup();
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      assertStartup();
+      const captureBinding=acceptanceCapture ? Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}) : undefined
+      const retained=captureRegistration ? retainCaptureOwner(state,captureBinding,captureResource) : undefined
+      state.captureRetained=retained
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
-        acceptanceCapture: acceptanceCapture ? { binding: Object.freeze({...acceptanceCapture, session:session.metadata.sessionId}),
-          harness: captureHarness } : undefined })
+        acceptanceCapture: acceptanceCapture ? { binding:captureBinding, harness:captureHarness,
+          registration:captureRegistration, retained } : undefined })
+      assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
+      if(retained)bindCaptureRuntime(retained,state.bridge,state.client)
       await state.bridge.server.connect(serverTransport)
+      assertStartup();
+      if(retained)assertCaptureOwner(retained)
       await state.client.connect(clientTransport)
+      assertStartup();
+      if(retained)assertCaptureOwner(retained)
       send({
         id: message.id,
         result: {
@@ -400,13 +436,25 @@ async function handle(message) {
     if (message.operation === "acceptance.capture") {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
+      const controller = new AbortController()
+      state.controller = controller
       try {
-        const result = await state.bridge.captureAcceptance()
+        const result = await state.bridge.captureAcceptance({signal:controller.signal})
+        if(result?.diagnosticRead===true) {
+          if(!state.captureRetained || state.controller!==controller
+              || Date.now()>=result.receipt.publication.deadline)
+            throw Error("LOGINOM_CAPTURE_RETAINED_OWNER_REFUSED")
+          assertCaptureOwner(state.captureRetained)
+          controller.signal.throwIfAborted()
+        }
         send({id:message.id,result})
       } catch (rejected) {
         send({id:message.id,result:{cleanupComplete:false,refused:true,
           rejectedIsUndefined:rejected === undefined,
-          rejected:rejected instanceof Error ? {name:rejected.name,message:rejected.message} : rejected}})
+          rejected:rejected instanceof Error ? {name:rejected.name,message:rejected.message,
+            ...(Object.hasOwn(rejected,"cause")?{cause:closeRejection(rejected.cause)}:{})} : rejected}})
+      } finally {
+        state.controller = undefined
       }
       return
     }

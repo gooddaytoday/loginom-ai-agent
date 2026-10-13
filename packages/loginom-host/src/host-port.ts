@@ -22,6 +22,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       active: Set<string>
       captured: boolean
       captureRefused: boolean
+      captureRuntime?: Awaited<ReturnType<typeof service.runtime>>
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
@@ -88,7 +89,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         // journal or mint another mutation admission from this observation.
         run.calls++
         try {
-          const runtime = await service.runtime(run.lease.generation, run.chat)
+          const runtime = run.captureRuntime
+          if(!runtime) throw Error("LOGINOM_RECOVERY_REQUIRED")
           const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined})
           if (!observed || typeof observed !== "object" || !("result" in observed)) throw Error("LOGINOM_REPLY_INVALID")
           reply({id:data.id,result:observed.result})
@@ -97,7 +99,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       if (data.method === "acceptance.capture") {
         if (Object.keys(input).sort().join(",") !== "authorization,run"
-            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization) || run.captured)
+            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization,owner,input.run,run.chat,run.lease) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
         if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
           throw Error("LOGINOM_CALL_BUSY")
@@ -107,9 +109,19 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         let id: string | undefined
         try {
           const runtime = await service.runtime(run.lease.generation, run.chat)
+          run.captureRuntime=runtime
+          const captureRun=input.run, authorization=input.authorization
+          const assertCapture=()=>{
+            if(state.closed || run.released || runs.get(captureRun)!==run
+                || !service.authorizeCapture?.(authorization,owner,captureRun,run.chat,run.lease))
+              throw Error("LOGINOM_RECOVERY_REQUIRED")
+          }
+          assertCapture()
           id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(id)
+          assertCapture()
           const result = await runtime.request("acceptance.capture")
+          assertCapture()
           if (!result || typeof result !== "object" || !("cleanupComplete" in result) || result.cleanupComplete !== true) {
             run.captureRefused = true
             run.lease.holdRecovery()
@@ -131,7 +143,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         } finally { run.calls--; run.dispatching = false }
         return
       }
-      if (run.captured && run.calls) throw Error("LOGINOM_CALL_BUSY")
+      if (run.captured && run.calls && data.method!=="interrupt") throw Error("LOGINOM_CALL_BUSY")
       if (run.captured && ["call", "admit"].includes(data.method)) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (data.method === "release") {
         run.released = true

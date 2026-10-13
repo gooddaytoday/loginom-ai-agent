@@ -38,6 +38,7 @@ export async function createLoginomHost(options: {
   const stale = new Set<string>()
   type CaptureBinding = NonNullable<Parameters<typeof supervise>[0]["acceptanceCapture"]>
   const captures = new Map<string, CaptureBinding>()
+  const captureLeases = new Map<string, unknown>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
   // Includes validation and failed-start children, even without a prepared
   // service handle. Removal requires confirmed close/exit, never merely failure.
@@ -183,8 +184,13 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
-    authorizeCapture(authorization: unknown) {
-      return !!options.acceptanceCapture && authorization === options.acceptanceCapture.authorization
+    authorizeCapture(authorization: unknown, owner?: string, run?: string, chat?: string, lease?: unknown) {
+      if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
+      const bound=chat?captures.get(chat):undefined
+      return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
+        && bound.expires>Date.now() && captureLeases.get(chat!)===lease
+        && generations.get(bound.generation)?.connection.username===bound.account
+        && !lost.has(chat!) && !stale.has(chat!)
     },
     bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
       if (!options.acceptanceCapture) return
@@ -195,6 +201,7 @@ export async function createLoginomHost(options: {
       captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
         packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+600000 })
+      captureLeases.set(chat,lease)
     },
     resetRestarts(chat: string) {
       restarts.delete(chat)

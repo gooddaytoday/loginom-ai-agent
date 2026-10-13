@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {captureData,assertCapturePublication} from '../src/retained-capture.mjs';
+const publication=Object.freeze({document_id:'doc',workflow_id:'workflow',node_id:'node',session_id:'session',account:'account',package_path:'/account/result.lgp',deadline:123});
+const receipt=()=>({status:'DIAGNOSTIC_READ',effect_possible:false,admission_confirmed:false,settings_applied:false,publication:{...publication},root:{...publication}});
+test('record publication survives JSON serialization without lost identity',()=>{const value=receipt();assertCapturePublication(value,publication);assertCapturePublication(JSON.parse(JSON.stringify(value)),publication)});
+test('publication decorated array rejected before serialization erases authority',()=>{const value=receipt();value.publication=Object.assign([],{...publication});assert.throws(()=>assertCapturePublication(value,publication),/LOGINOM_CAPTURE_RESULT_INVALID/)});
+for(const [label,value] of [['sparse',new Array(2)],['extra',Object.assign([],{note:'lost'})],['noncanonical index',Object.assign([0],{'01':1})],['undefined element',[undefined]]])test('lossy JSON array '+label+' refused',()=>assert.throws(()=>captureData(value),/LOGINOM_CAPTURE_RESULT_INVALID/));
+test('dense arrays and null-prototype records remain valid JSON data',()=>{captureData([0,false,null,'',Object.assign(Object.create(null),{identity:'owned'})])});
+test('array cannot be the receipt record even with a matching structural tuple',()=>{assert.throws(()=>assertCapturePublication(Object.assign([],{...receipt()}),publication),/LOGINOM_CAPTURE_RESULT_INVALID/)});

@@ -31,7 +31,7 @@ async function fixture(kind){
   fs.rename(a,b,cb);
  };
  const session={directory,metadata:{sessionId:'own-fixture'}},evidence={receipt:{cancel_verified:true}};
- const code=`let capturePersistencePrimary,captureEvidenceBinding,captureReceiptWritten=false,captureJournalWritten=false;const captureWriters=new Set(),capturePersistenceFailures=[],capturePublications=new Map();let captureEvidence=evidence;${helpers};({persist:persistCapture,inspect:()=>({marker:captureReceiptWritten,journal:captureJournalWritten,writers:captureWriters.size,primary:capturePersistencePrimary}),change:()=>captureEvidence={foreign:true}})`;
+ const code=`let captureIOAssert;let capturePersistencePrimary,captureEvidenceBinding,captureReceiptWritten=false,captureJournalWritten=false;const captureWriters=new Set(),capturePersistenceFailures=[],capturePublications=new Map();let captureEvidence=evidence;${helpers};({persist:persistCapture,inspect:()=>({marker:captureReceiptWritten,journal:captureJournalWritten,writers:captureWriters.size,primary:capturePersistencePrimary}),change:()=>captureEvidence={foreign:true}})`;
  const f=vm.runInNewContext(code,{captureOpen:open,captureWrite:write,captureSync:sync,captureClose:close,captureRename:rename,captureConstants:fs.constants,randomUUID,join,session,evidence,Error,Promise,recordExecution:async()=>events.push({stage:'journal'}),shutdownRejection:v=>({message:v?.message,cause:v?.cause})});
  return {f,path,directory,old,primary,events,owned,get deliver(){return deliver},get kernel(){return kernel},async dispose(){if(kernel)await kernel;if(deliver)deliver();for(const fd of owned)await new Promise(r=>fs.close(fd,()=>r()));await fsp.rm(directory,{recursive:true,force:true})}};
 }
