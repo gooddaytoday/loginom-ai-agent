@@ -154,7 +154,7 @@ export type SlotLease = {
   token: string; release(cleanupReceipt: string): Promise<void>
 }
 export function parseSlots(value: unknown, parallel: number): SlotFile
-export function loadSlots(file: string, parallel: number): Promise<SlotFile>
+export function loadSlots(file: string, parallel: number, installRoot?: string): Promise<SlotFile>
 export function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease>
 
 // loginom-admin.ts: userKey — controller hash от manifest generation,
@@ -326,7 +326,7 @@ no-op возможен только после terminal state **всего** inc
 
 **Interfaces:** Produces `SlotFile`, `SlotDefinition`, `ServerIdentity`, `SlotLease`, `parseSlots`, `loadSlots`, `acquireSlotLease`. `config.parallel` и `config.slotsFile` добавляются без удаления singleton-настроек.
 
-- [ ] RED: добавить минимальный JSON fixture прямо в тест и проверить одинакового пользователя/вложенные пути, при этом один общий сервер принимается:
+- [x] RED: добавить минимальный JSON fixture прямо в тест и проверить одинакового пользователя/вложенные пути, при этом один общий сервер принимается:
 
 ```ts
 const value = {
@@ -345,12 +345,13 @@ expect(() => parseSlots(value, 3)).toThrow("SLOT_COUNT")
 expect(() => parseSlots({ ...value, version: 1 }, 2)).toThrow("SLOTS_VERSION")
 ```
 
-- [ ] `root` в fixture — реальный `mkdtemp` под `tmpdir()`; создавать private child directories, удалять только свой fixture. Запустить RED: `bun test test/slots.test.ts test/config.test.ts`. Новый тест падает из-за контракта, не из-за отсутствия `/var/lib`/Docker/Loginom.
-- [ ] В `loadConfig` реализовать `--parallel` и отказы до ранних веток judge-only/calibrate, чтения node-ops private config и side effects: v2 с `--keep-storage` или `--reset-profile`; N>1 без slots; N>1 с judge-only/calibrate, `EVAL_NODE_OPS_CONFIG`, `EVAL_NODE_STAND_LEASE` или `EVAL_HARNESS_LEASE_RECEIPT`. Parameterized RED/GREEN покрывает каждую переменную отдельно, парные комбинации и разрешённый legacy N=1. Проверить exit 2 и отсутствие созданной run directory/CLI dispatch.
-- [ ] GREEN: добавить parse/validate и реальные filesystem-проверки отдельно в `loadSlots`; нормализовать канонические пути через `realpath` ближайшего существующего предка, затем проверить все попарные пересечения profile/workspace/history/controller/admin/auth/install. `username` ограничить безопасным идентификатором, а **имена файлов пользователя не ограничивать этим regex**.
+- [x] `root` в fixture — реальный `mkdtemp` под `tmpdir()`; создавать private child directories, удалять только свой fixture. Запустить RED: `bun test test/slots.test.ts test/config.test.ts`. Новый тест падает из-за контракта, не из-за отсутствия `/var/lib`/Docker/Loginom.
+- [x] В `loadConfig` реализовать `--parallel` и отказы до ранних веток judge-only/calibrate, чтения node-ops private config и side effects: v2 с `--keep-storage` или `--reset-profile`; N>1 без slots; N>1 с judge-only/calibrate, `EVAL_NODE_OPS_CONFIG`, `EVAL_NODE_STAND_LEASE` или `EVAL_HARNESS_LEASE_RECEIPT`. Parameterized RED/GREEN покрывает каждую переменную отдельно, парные комбинации и разрешённый legacy N=1. Проверить exit 2 и отсутствие созданной run directory/CLI dispatch.
+- [x] GREEN: добавить parse/validate и реальные filesystem-проверки отдельно в `loadSlots`; нормализовать канонические пути через `realpath` ближайшего существующего предка, затем проверить все попарные пересечения profile/workspace/history/controller/admin/auth/install. `username` ограничить безопасным идентификатором, а **имена файлов пользователя не ограничивать этим regex**.
 - [ ] RED/GREEN отдельными тестами реальной fs и двух Bun-процессов: duplicate `(containerId, username)` при разных profile; разные users на одном container; замена inode owner; мёртвый PID с неразобранным receipt; server restart с тем же container ID; symlink и вложенные canonical roots. Зафиксировать ключ user lease как hash полного container ID и canonical username/UserKind; сохранить manifest generation/epoch в receipt, не делать их частью обходного ключа блокировки.
 - [ ] RED/GREEN реальными Bun-процессами: освобождение OS guard при SIGKILL не снимает durable fence; FD не наследуется child; только recovery-only CAS принимает ожидаемую актуальную revision/token; устаревший CAS отклоняется, два recover не принимают одну revision одновременно. Проверить PID reuse/boot ID, потерянный журнал, crash до/после durable release и разные server IDs с общим profile/judge key. Эти тесты проверяют примитивы lease, не требуют будущей CLI recover.
 - [ ] Проверить `bun test test/slots.test.ts test/config.test.ts test/lease.test.ts` и `bun typecheck`; коммит `feat(evals): add user slot configuration and leases`.
+
 
 ### Задача 1а. Новая пара контейнеров, постоянные sources и граница CI
 
@@ -704,10 +705,10 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 
 1. 2026-10-13: реализация в evals-parallel, рабочая база b54455e187fb0a728787263e17a1adc828d77221.
 2. Задача 0: контракт v2/runbook и все нормативные ссылки синхронизированы; live не квалифицирован.
-3. Один исполнитель владеет файлами плана; семь исходных untracked-файлов сохранены.
+3. Работа перенесена в worktree 96cd после переключения общего checkout другим агентом; семь чужих untracked сохранены.
 4. Соседняя node-selection сессия: отдельный worktree 4118, общий dev/legacy стенд не менять.
 5. Семь SHA-256 evidence проверены; исторический немодельный опыт не заменяет приёмку harness.
 6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
 7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
 8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
-9. Следующий шаг: TDD задачи 1, затем новая pair 1а; runtime/live тесты задачи 0 не требовались.
+9. Задача 1 частично: slots/config + временный v2 dispatch fence; 88 тестов config/slots/run и typecheck PASS повторно в 96cd; далее durable leases.

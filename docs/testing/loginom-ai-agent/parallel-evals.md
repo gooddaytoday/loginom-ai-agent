@@ -55,3 +55,19 @@ shared OAuth и полный LLM N=2 → N=1 с агентом gpt-6-luna/high �
 gpt-6-sol/xhigh. Tasks/pins/rubric/timeout неизменны между N=2 и N=1.
 Ресурсные/лицензионные лимиты фиксируются до запуска; OOM/ENOSPC/429/quota
 и неполное наблюдение не объявляются PASS. Исторические серии сохраняются.
+
+Задача 1, конфигурация: parseSlots/loadSlots, ранние отказы --parallel и временный
+SLOTS_ADMISSION_UNAVAILABLE до подключения v2 controller. До переноса проверены
+`bun test test/config.test.ts test/slots.test.ts test/run.test.ts`: 88 PASS/0 FAIL,
+`bun typecheck` и `git diff --check`. loadSlots принимает optional installRoot
+третьим аргументом для проверки пересечения с продуктом; проверяет все записи,
+canonical paths и private slots/admin files. Live/модели не запускались.
+Durable reservations/OS guards задачи 1 ещё не реализованы.
+
+Общий checkout переключён другой задачей на loginom: шесть собственных файлов
+перенесены в worktree 96cd, SHA-256 совпали; исходные tracked bytes общего checkout
+восстановлены только для этих четырёх файлов, две свои новые копии удалены. Семь
+чужих untracked сохранены. Worktree 96cd закреплён за evals-parallel; здесь дальнейшая
+реализация. Dev-зависимости Bun устанавливаются локально для повторных проверок.
+
+После переноса в 96cd повторены те же 88 тестов: PASS/0 FAIL (23.65s), bun typecheck и git diff --check PASS.

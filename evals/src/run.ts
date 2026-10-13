@@ -26,6 +26,8 @@ export async function main(argv: string[], env: Record<string, string | undefine
     const { calibrate } = await import("./calibrate")
     return calibrate(config)
   }
+  // Replaced by the v2 controller after user/session/backup admission is qualified.
+  if (config.slotsFile) throw new EvalFailure("SLOTS_ADMISSION_UNAVAILABLE", 2)
   const lease = config.dryRun ? undefined : await acquireRunHarnessLease(config.profileDir, env)
   if (lease) config.profileDir = lease.profileDir
   const result = await executeRun(config)
