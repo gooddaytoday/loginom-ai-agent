@@ -15,7 +15,9 @@
 пользователей не заимствуются, файлы с фиктивными credentials не создаются.
 
 Нужны исходные административные credentials, пригодные для новых pinned-image
-пар; конкретную JSON-схему закрепит trusted adapter в задаче 2. Секреты нельзя
+пар; driver закрепил JSON-схему: ровно два непустых string-поля `username` и
+`password`, без NUL, private regular file 0600 текущего UID, nlink=1, без symlink.
+Секреты нельзя
 передавать через Git, results, argv или сообщения. После появления файлов:
 проверить owner/mode/schema, создать постоянные пары и квалифицировать admin login.
 
@@ -23,3 +25,8 @@
 2–5/10. Disposable Docker infrastructure integration не входит в Loginom под
 пользователем и не доказывает admin readiness. Unit-реализация и немодельные
 Docker проверки могут продолжаться.
+
+Driver rejection integration отдельно квалифицировала malformed/missing private
+credential и несовпадение runtime hash до browser launch. Format-only canary
+временный fixture не использовался для Loginom auth и удалён; постоянные
+bootstrap credentials не создавались. Browser/readonly RPC пути ещё не проверены.
