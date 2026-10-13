@@ -924,7 +924,7 @@ selection_supervisor_exit=$?
   без подтверждённого rule/digest/catalog policy непроверена. Не делать
   выборочных замен или автоматических retries ради улучшения доли успехов.
 
-- [ ] После выхода CLI получить Session ID из полного JSON stdout; требовать
+- [x] После выхода CLI получить Session ID из полного JSON stdout; требовать
   единственную верхнеуровневую Session попытки. Снять read-only snapshot БД:
 
 ```python

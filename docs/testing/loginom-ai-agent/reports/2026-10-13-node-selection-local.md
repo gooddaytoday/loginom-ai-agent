@@ -398,6 +398,8 @@ Task 3: подтверждены 18 уникальных workspaces/Session/pref
 
 Task 3: 18 отдельных CLI-процессов шли последовательно без пересечений; все CLI0, cleanup true и без timeout.
 
+Task 3: у всех 18 сохранены единственная own Session, полная история и read-only snapshot; runtime identity/settlement подтверждены.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.
