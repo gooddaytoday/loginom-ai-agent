@@ -92,6 +92,10 @@ if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
 if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
 
 if (command === "loginom") {
+  if (process.env.EVAL_FAKE_MANAGEMENT_ENV_FILE)
+    await appendFile(process.env.EVAL_FAKE_MANAGEMENT_ENV_FILE, JSON.stringify({ sub,
+      httpOnly: process.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS ?? null,
+      passwordPresent: process.env.LOGINOM_PASSWORD !== undefined }) + "\n")
   if (process.env.EVAL_FAKE_MANAGEMENT_CALLS_FILE)
     await appendFile(process.env.EVAL_FAKE_MANAGEMENT_CALLS_FILE, JSON.stringify(Bun.argv.slice(2)) + "\n")
   if (sub === "check" && process.env.EVAL_FAKE_CHECK_FILE) {

@@ -111,6 +111,7 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
     LOGINOM_AI_AGENT_PURE: "1",
     LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
     LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT: "1",
+    ...(config.slotsFile ? { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false" } : {}),
   }
   if (config.agent.cliMode === "source")
     return {
