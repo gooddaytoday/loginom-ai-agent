@@ -6,5 +6,10 @@
     "b970497eace6cc0fb3bb8f755d3b1da544338dc4552526d2e344ac1176b03eed"
   ],
   "fixture": "apply-wait.json",
-  "sanitization": "Consistent part/message/session/document/node UUID and storage path replacement; statuses and request/response shapes preserved. Public synthetic analytic dataset preview retained."
+  "sanitization": "Consistent part/message/session/document/node UUID and storage path replacement; statuses and request/response shapes preserved. Public synthetic analytic dataset preview retained.",
+  "pilotHistory": {
+    "snapshotSha256": "df0e2c47752b0541697e321e8f31b32ef0987a9ed13dbbba24cb0d77c816cd1a",
+    "eventsSha256": "9dd2a3948412c5a2a471bd9830c638d1c8b37d0c91acf6e8815af7e912ae47c5",
+    "sanitization": "Consistent identity replacement; non-tool prose, bundled skill/read contents, nonreceipt display metadata and local filesystem paths removed. Original tool inputs/output receipts, statuses, times, activation and duplicate events retained."
+  }
 }

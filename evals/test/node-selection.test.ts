@@ -3,8 +3,13 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { unzip } from "../src/artifact"
-import { inspectSelection } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
+import pilotHistory from "./fixtures/node-selection/pilot-history.json"
+
+test("complete pilot history accepts the activation metadata update and settles historical pending replies", () => {
+  expect(inspectSelectionHistory(pilotHistory)).toEqual({ historyComplete: true, failures: [] })
+})
 
 test("an admitted JavaScript apply counts as successful only after its matching real wait receipt", () => {
   const parts = structuredClone(applyWait)

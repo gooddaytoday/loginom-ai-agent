@@ -1,5 +1,52 @@
 export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "standard-recovery"
 
+export function inspectSelectionHistory(input: { snapshot: unknown; events: unknown[] }) {
+  const snapshot = record(input.snapshot) ? input.snapshot : undefined
+  const failures: string[] = []
+  if (!snapshot || typeof snapshot.sessionID !== "string" || snapshot.parentID !== null
+    || !Array.isArray(snapshot.childSessionIDs) || snapshot.childSessionIDs.length
+    || !Array.isArray(snapshot.messages) || !snapshot.messages.length || !Array.isArray(snapshot.parts))
+    return { historyComplete: false, failures: ["SNAPSHOT_INVALID"] }
+  const messages = snapshot.messages.filter(record)
+  const parts = snapshot.parts.filter(record)
+  if (messages.length !== snapshot.messages.length || parts.length !== snapshot.parts.length
+    || messages.some((message) => message.sessionID !== snapshot.sessionID || typeof message.id !== "string")
+    || !messages.some((message) => message.role === "user") || !messages.some((message) => message.role === "assistant"))
+    failures.push("HISTORY_IDENTITY_INVALID")
+  const byID = new Map<string, Record<string, unknown>>()
+  for (const part of parts) {
+    if (typeof part.id !== "string" || byID.has(part.id) || part.sessionID !== snapshot.sessionID
+      || !messages.some((message) => message.id === part.messageID)) failures.push("PART_IDENTITY_INVALID")
+    if (typeof part.id === "string") byID.set(part.id, part)
+    if (part.type !== "tool") continue
+    if (typeof part.tool !== "string" || !record(part.state) || !["completed", "error"].includes(String(part.state.status))
+      || !record(part.state.input)) failures.push("TOOL_EVIDENCE_INVALID")
+    if (part.tool === "loginom_dock_node_apply" && (!record(part.state) || !record(part.state.input)
+      || !record(part.state.input.target) || typeof part.state.input.target.type !== "string"
+      || !part.state.input.target.type.trim())) failures.push("TOOL_INPUT_INCOMPLETE")
+  }
+  if (!input.events.length) failures.push("EVENTS_MISSING")
+  const terminals = new Set<string>()
+  for (const event of input.events) {
+    if (!record(event) || event.sessionID !== snapshot.sessionID
+      || !["step_start", "step_finish", "text", "reasoning", "tool_use", "error"].includes(String(event.type))) {
+      failures.push("EVENT_IDENTITY_INVALID")
+      continue
+    }
+    if (event.type !== "tool_use") continue
+    const part = record(event.part) ? event.part : undefined
+    const saved = typeof part?.id === "string" ? byID.get(part.id) : undefined
+    if (!part || !saved || !record(part.state) || !record(saved.state)
+      || part.type !== "tool" || part.tool !== saved.tool || part.sessionID !== snapshot.sessionID
+      || JSON.stringify([part.state.status, part.state.input, part.state.output, part.state.error])
+        !== JSON.stringify([saved.state.status, saved.state.input, saved.state.output, saved.state.error]))
+      failures.push("TERMINAL_PART_MISMATCH")
+    if (typeof part?.id === "string") terminals.add(part.id)
+  }
+  if (parts.some((part) => part.type === "tool" && !terminals.has(String(part.id)))) failures.push("TERMINAL_EVENT_MISSING")
+  return { historyComplete: failures.length === 0, failures: [...new Set(failures)] }
+}
+
 export function inspectSelection(input: {
   mode: SelectionMode
   nodeTypes: string[] | null
