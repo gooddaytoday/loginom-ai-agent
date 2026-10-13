@@ -5,8 +5,8 @@
 поручил самостоятельно устранять блокеры: дефект `imports.text.date_format`
 исправлен по TDD в `263df9620`, 144 теста PASS. После проверки отсутствия
 собственных Loginom-сессий адресно архивирован также guard monthly.
-Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline sales/1 в работе,
-завершённых baseline 0/18, candidate 0/25;
+Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline sales/1 завершён
+неуспешно, ABC/1 запущен; завершённых baseline 1/18, candidate 0/25;
 обе сборки и deterministic native proof проверены. Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
@@ -34,6 +34,33 @@ Immutable baseline/candidate pins проверены независимо: 43 у
 `pins-preparation-review.json`. Actual baseline native prepare подтвердил build
 7.4.2 и 16 типов с доступным `programming.javascript` (`baseline-catalog-attestation.json`).
 `current-run.txt` переключён на новый run; первый `sales-by-category/1` запущен.
+
+## Новая серия: первый модельный исход
+
+`sales-by-category/1`, Session `ses_eca6f32d6ffeMWoNUZKw5hyJuQ`: CLI exit 1,
+wrapper exit 3, modelStarted true, cleanupConfirmed false. Offline audit exit 2:
+history/identity подтверждены, JS calls/successful calls 0/0, JS nodes неизвестны
+без XML, policy incomplete, calculation false, oracle не проверен без CSV.
+Импорт выполнен (500 строк). Группировка создана и связана с импортом, но
+`group-category-1` остановилась в фазе open с `WIZARD_OPEN_NOT_CONFIRMED`.
+Configure/Execute группировки не начинались, пакет и CSV не сохранены.
+
+Source review исключил коллизию позиций и не подтвердил ошибочный выбор узла.
+Позднее UI-наблюдение показывает нужный мастер, но catch повторно читает UI;
+исходный snapshot отказа отсутствует. `grouping_structure_unverifiable` не
+объясняет opening: DOM reader ожидает непустые keys и measures у ещё не
+настроенного узла. Конкретный failed conjunct не установлен; спекулятивной
+runtime-правки нет. Evidence: `forensic/group-category-1-diagnosis.json` и
+`forensic/source-analysis.json` внутри попытки.
+
+Точный GUID собственного импорта связывает попытку с `user:21`, созданной
+14:01:05.859 UTC. Текущая admin inventory подтверждена; закрыта только эта
+сессия, server close и отсутствие после refresh проверены. `user:20` не трогали.
+После проверки отсутствия own процессов и nonce/mtime архивирован только guard
+этой попытки. Хеши исходных attempt/events/parts/pins не изменились;
+`forensic/profile-recovery.json` фиксирует восстановление отдельно от исходного
+cleanup=false. Admin logout и закрытие MCP подтверждены. Это первый из 18
+baseline, повтор его слота не выполняется. Следующий плановый ABC/1 запущен.
 
 ## Native proof исправления дат
 

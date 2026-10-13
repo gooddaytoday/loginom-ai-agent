@@ -1181,7 +1181,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Collector реализован TDD; cleanup guard `d73fa9def`, независимое review проведено.
 - Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
-- Текущий run `20261013T132356Z-0a3983`, source6768520a0: build/native proof/pins PASS, sales baseline1 запущен.
+- Текущий run `20261013T132356Z-0a3983`, source6768520a0: build/native proof/pins PASS; sales1 CLI1/cleanupfalse, ABC1 запущен.
 - Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
@@ -1194,4 +1194,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Исходная серия stopped 3/18 сохранена отдельно; новая полная18+25 серия начата, candidate ждёт baseline.
+- Исходная серия stopped3/18 сохранена; новый sales1 ownuser21 закрыт, guard архивирован; source opening дефект не доказан.
