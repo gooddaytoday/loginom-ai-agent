@@ -126,7 +126,7 @@ test.each(["pending", "running", "completed", "error"])(
 )
 ```
 
-- [ ] Из `evals/` выполнить `bun test test/node-selection.test.ts`; убедиться,
+- [x] Из `evals/` выполнить `bun test test/node-selection.test.ts`; убедиться,
   что первый тест падает из-за отсутствующей реализации, а не окружения.
 
 - [ ] Реализовать минимальный чистый анализ. Использовать `unknown` и guards,
