@@ -13,6 +13,16 @@ test("a pinned slot derives the same owned paths without exposing oracle to the 
   expect(result.resultName).toBe("node-selection-local-1-sales-by-category-baseline-2.result.csv")
 })
 
+test("unsafe or incomplete pins are rejected before any CLI or filesystem work", () => {
+  for (const change of [
+    { phase: "../other" }, { runID: "../other" }, { resultsRoot: "relative" },
+    { workspaceRoot: "/tmp/selection-profile" }, { manifestSha256: "unknown" },
+    { connection: { url: "http://user:secret@localhost/", username: "user", folder: "/user" } },
+    { storageDir: "/workdir/UserStorage/other" }, { deadlineSeconds: 0 },
+    { container: { id: "loginom-server", name: "loginom-server" } },
+  ]) expect(() => selectionAttempt({ ...pins(), ...change }, "sales-by-category", 1)).toThrow("SELECTION_PINS_INVALID")
+})
+
 function pins() {
   return {
     runID: "local-1", phase: "baseline", resultsRoot: "/tmp/selection-results",
