@@ -174,6 +174,33 @@ test("a repair preflight cannot overwrite the original admission or write outsid
   } finally { await fixture.dispose() }
 })
 
+test("offline admission fixture cannot repeat or replace a recorded READY", async () => {
+  const f = await runtime()
+  try {
+    const lease = await acquireNodeStand(f.config, owner)
+    const file = path.join(f.config.runtimeRoot, "operations/stand.lease/admission-complete.json")
+    await Bun.write(file, "offline fixture original READY bytes")
+    await expect(preflightNodeStand(f.config, lease, {})).rejects.toThrow("ADMISSION_ALREADY_READY")
+    expect(await Bun.file(file).text()).toBe("offline fixture original READY bytes")
+    expect((await nodeStandStatus(f.config)).status).toBe("BUSY")
+  } finally { await f.dispose() }
+})
+
+test("offline failed admission fixture keeps its original evidence and owner bytes", async () => {
+  const f = await runtime()
+  try {
+    const lease = await acquireNodeStand(f.config, owner)
+    const root = path.join(f.config.runtimeRoot, "operations/stand.lease")
+    const before = await Bun.file(path.join(root, "owner.json")).text()
+    await Bun.write(path.join(root, "admission.json"), "offline fixture historical failed admission")
+    await Bun.write(path.join(f.config.roles.ben.evalProfile, "loginom/recovery/pending.json"), "{}")
+    await expect(preflightNodeStand(f.config, lease, {})).rejects.toThrow("PROFILE_NOT_CLEAN")
+    expect(await Bun.file(path.join(root, "admission.json")).text()).toBe("offline fixture historical failed admission")
+    expect(await Bun.file(path.join(root, "owner.json")).text()).toBe(before)
+    expect(await Bun.file(path.join(root, "admission-complete.json")).exists()).toBe(false)
+  } finally { await f.dispose() }
+})
+
 test("admission refuses another profile's harness lease even after its recorded PID disappears", async () => {
   const fixture = await runtime()
   try {

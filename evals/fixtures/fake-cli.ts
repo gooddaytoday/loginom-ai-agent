@@ -82,6 +82,10 @@ if (command === "loginom") {
   }
   // Management-команды: состояние читается из файла, recover снимает recoveries.
   const transitionState = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "fixture-cleanup-state.json")
+  if (process.env.EVAL_FAKE_REQUIRE_HEADLESS === "1" && !Bun.argv.includes("--headless")) {
+    process.stderr.write("OFFLINE_FIXTURE_HEADLESS_REQUIRED\n")
+    process.exit(2)
+  }
   const stateFile = process.env.EVAL_FAKE_STATE_FILE ?? (await Bun.file(transitionState).exists() ? transitionState : undefined)
   const view = stateFile
     ? ((await Bun.file(stateFile).json()) as Record<string, unknown>)
