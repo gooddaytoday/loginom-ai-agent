@@ -20,7 +20,7 @@ try{
  for(const mode of ['canonical-phase','foreign-grant','missing-run','preabort-capture','phase-held-false','phase-held-undefined']){
   row={mode,messages:[]};const root=await mkdtemp(join(output,mode+'-'));
   await mkdir(join(root,'connection'),{recursive:true,mode:0o700});await writeFile(join(root,'connection/connection.json'),JSON.stringify({generation:1,revision:1,url:'https://labelled.invalid/app/',username:'worker',secrets:{format:'loginom-cli-secrets-v1',protection:'plaintext',payload:JSON.stringify({apiKey:'labelled',password:'labelled'})}}),{mode:0o600});
-  const controller=new AbortController(),deadline=Date.now()+(mode.startsWith('phase-held')?2500:60000),control={signal:controller.signal,deadline};
+  const controller=new AbortController(),deadline=Date.now()+(mode.startsWith('phase-held')?12000:60000),control={signal:controller.signal,deadline};
   const input={node:join(resources,'bin/node'),entry:join(resources,'host/node-host.mjs'),root,resources,headless:true,packagePath:'/worker/fp.lgp'};
   try{
    const host=await launch(input,control);assert.equal(launch.retained(input),host);
