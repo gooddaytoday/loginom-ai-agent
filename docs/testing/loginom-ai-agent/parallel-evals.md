@@ -357,3 +357,17 @@ symlink parent отвергаются PROFILE_HISTORY_ROOT до mkdir/перем
 assertions, полный profile suite 61 PASS/166 assertions (25.32s), typecheck/diff
 check PASS. Новый slot caller/sandbox ещё не связан; rollback legacy архива не
 заменяет durable move journal и SIGKILL reconciliation из задачи 5.
+
+ensureProfile в v2 (config.slotsFile) проверяет exact url/username существующего
+configured profile до setup/config replacement. Отсутствующий/чужой field даёт
+PROFILE_CONNECTION_MISMATCH; unconfigured остаётся веткой начальной подготовки.
+Legacy callers без slotsFile не требуют новых полей. URL/username подтверждены
+read-only исходниками connection-service.view и loginom-management status;
+это описание сохранённых settings, не доказательство live Loginom identity/ACL.
+
+4 real fake-CLI RED/GREEN cases (foreign/missing username/url) сохранили config,
+setup не вызван; reuse case дважды получил status, не вызвал setup и сохранил
+generation/cli-profile. Весь profile suite 66 PASS/188 assertions (29.22s),
+typecheck/diff check PASS; новые private fixtures удалены. Fresh setup response/
+read-back и full prepare receipt ещё предстоят. Bootstrap paths и planned
+candidate-home launcher повторно проверены metadata-only: отсутствуют.
