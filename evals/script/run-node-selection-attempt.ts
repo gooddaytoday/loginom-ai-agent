@@ -94,14 +94,16 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
     exitCode: number; evidence: string; modelStarted: boolean | null; blocker: string | null
     sessionID: string | null; cliExitCode: number | null; mode: SelectionMode; taskID: string
     model: string; variant: string; expectedSkillDigest: string; binaryManifestSha256: string
-    startedAt: string; finishedAt: string | null; timedOut: boolean; interruptSentAt: string | null
+    startedAt: string; finishedAt: string | null; cliStartedAt: string | null; cliFinishedAt: string | null
+    timedOut: boolean; interruptSentAt: string | null
     packagePath: string | null; resultPath: string | null; policyStatus: string; oraclePassed: boolean | null
     calculationPassed: boolean; reviewStatus: string; collectionFailures: string[]
   } = {
     exitCode: 3, evidence, modelStarted: false, blocker: null, sessionID: null, cliExitCode: null,
     mode: plan.task.mode, taskID, model: plan.pins.model, variant: plan.pins.variant,
     expectedSkillDigest: plan.pins.expectedSkillDigest, binaryManifestSha256: plan.pins.manifestSha256,
-    startedAt: new Date().toISOString(), finishedAt: null, timedOut: false, interruptSentAt: null,
+    startedAt: new Date().toISOString(), finishedAt: null, cliStartedAt: null, cliFinishedAt: null,
+    timedOut: false, interruptSentAt: null,
     packagePath: null, resultPath: null, policyStatus: "incomplete", oraclePassed: null,
     calculationPassed: false, reviewStatus: "pending", collectionFailures: [],
   }
@@ -165,6 +167,7 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       return target
     }))
     await Bun.write(path.join(attempt.directory, "prompt.txt"), buildAgentPrompt(task.prompt, attempt.packagePath, attempt.resultName))
+    result.cliStartedAt = new Date().toISOString()
     const child = Bun.spawn([binary, "run", "--headless", "--format", "json", "--model", plan.pins.model,
       "--variant", plan.pins.variant, "--command", "loginom-automation", "--dir", attempt.workspace,
       "--title", attempt.prefix, ...inputs.flatMap((input) => ["--file", input])], {
@@ -198,6 +201,7 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       child.unref()
       throw Error("CLI_EXIT_UNCONFIRMED")
     }
+    result.cliFinishedAt = new Date().toISOString()
     await Bun.write(path.join(attempt.directory, "cli-exit-code.txt"), String(result.cliExitCode) + "\n")
     await save()
     const stderr = await Bun.file(path.join(attempt.directory, "stderr.txt")).text()
@@ -214,10 +218,12 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       throw Error("SELECTION_CLEANUP_UNCONFIRMED")
     const events: unknown[] = (await Bun.file(path.join(attempt.directory, "events.jsonl")).text())
       .split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line) as unknown)
-    const sessions = [...new Set(events.flatMap((event) => record(event) && typeof event.sessionID === "string" ? [event.sessionID] : []))]
-    if (sessions.length !== 1) throw Error("SELECTION_SESSION_INCOMPLETE")
-    result.sessionID = sessions[0]!
-    const snapshot = readSnapshot(path.join(plan.pins.profile, "data/loginom-ai-agent.db"), result.sessionID)
+    const sessions = [...new Set(events.flatMap((event) => record(event) && typeof event.sessionID === "string" && event.sessionID ? [event.sessionID] : []))]
+    if (events.length && sessions.length !== 1) throw Error("SELECTION_SESSION_INCOMPLETE")
+    const snapshot = readSelectionSnapshot(path.join(plan.pins.profile, "data/loginom-ai-agent.db"), sessions[0] ?? "", {
+      title: attempt.prefix, startedAt: Date.parse(result.cliStartedAt), finishedAt: Date.parse(result.cliFinishedAt),
+    })
+    result.sessionID = snapshot.sessionID
     result.modelStarted = events.some((event) => record(event) && ["step_start", "tool_use", "text"].includes(String(event.type))) ||
       snapshot.messages.some((message) => message.role === "assistant" && typeof message.modelID === "string" && typeof message.providerID === "string")
     await Bun.write(path.join(attempt.directory, "parts.json"), JSON.stringify(snapshot, null, 2) + "\n")
@@ -297,19 +303,24 @@ export function selectionExitCode(result: { exitCode: number; cliExitCode: numbe
   return result.cliExitCode === 130 && !result.timedOut && result.exitCode !== 3 ? 130 : result.exitCode
 }
 
-function readSnapshot(filename: string, sessionID: string) {
+export function readSelectionSnapshot(filename: string, sessionID: string,
+  fallback?: { title: string; startedAt: number; finishedAt: number }) {
   const database = new Database(filename, { readonly: true, strict: true })
   try {
     database.exec("PRAGMA query_only=ON; BEGIN")
-    const session = database.query<{ id: string; parent_id: string | null }, [string]>("SELECT id, parent_id FROM session WHERE id = ?").get(sessionID)
+    const matches = !sessionID && fallback ? database.query<{ id: string }, [string, number, number]>(
+      "SELECT id FROM session WHERE title = ? AND parent_id IS NULL AND time_created >= ? AND time_created <= ?")
+      .all(fallback.title, fallback.startedAt, fallback.finishedAt) : []
+    if (!sessionID && matches.length !== 1) throw Error("SELECTION_SESSION_INCOMPLETE")
+    const ownID = sessionID || matches[0]!.id
+    const session = database.query<{ id: string; parent_id: string | null }, [string]>("SELECT id, parent_id FROM session WHERE id = ?").get(ownID)
     if (!session) throw Error("SELECTION_SESSION_MISSING")
-    const children = database.query<{ id: string }, [string]>("SELECT id FROM session WHERE parent_id = ?").all(sessionID)
+    const children = database.query<{ id: string }, [string]>("SELECT id FROM session WHERE parent_id = ?").all(ownID)
     const messages = database.query<{ id: string; session_id: string; data: string }, [string]>(
-      "SELECT id, session_id, data FROM message WHERE session_id = ? ORDER BY time_created, id").all(sessionID)
+      "SELECT id, session_id, data FROM message WHERE session_id = ? ORDER BY time_created, id").all(ownID)
     const parts = database.query<{ id: string; message_id: string; session_id: string; data: string }, [string]>(
-      "SELECT id, message_id, session_id, data FROM part WHERE session_id = ? ORDER BY time_created, id").all(sessionID)
-    if (!parts.length) throw Error("SELECTION_PARTS_MISSING")
-    return { sessionID, parentID: session.parent_id, childSessionIDs: children.map((child) => child.id),
+      "SELECT id, message_id, session_id, data FROM part WHERE session_id = ? ORDER BY time_created, id").all(ownID)
+    return { sessionID: ownID, parentID: session.parent_id, childSessionIDs: children.map((child) => child.id),
       messages: messages.map((row): Record<string, unknown> => ({ ...jsonRecord(row.data), id: row.id, sessionID: row.session_id })),
       parts: parts.map((row) => ({ ...jsonRecord(row.data), id: row.id, messageID: row.message_id, sessionID: row.session_id })),
     }

@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test"
+import { Database } from "bun:sqlite"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode } from "../script/run-node-selection-attempt"
+import { readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -69,6 +70,50 @@ test("failed payload preflight preserves an incident and does not consume the mo
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test("empty stdout recovers only the exact own Session created during the CLI lifetime", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-test-"))
+  const filename = path.join(root, "snapshot.db")
+  const database = new Database(filename)
+  try {
+    database.exec("CREATE TABLE session (id TEXT, parent_id TEXT, title TEXT, time_created INTEGER); " +
+      "CREATE TABLE message (id TEXT, session_id TEXT, data TEXT, time_created INTEGER); " +
+      "CREATE TABLE part (id TEXT, message_id TEXT, session_id TEXT, data TEXT, time_created INTEGER)")
+    database.run("INSERT INTO session VALUES (?, NULL, ?, ?)", [refreshIncident.sessionID, "own-exact-title", 1791885819700])
+    for (const message of refreshIncident.messages) database.run("INSERT INTO message VALUES (?, ?, ?, ?)",
+      [message.id, refreshIncident.sessionID, JSON.stringify(message), message.time.created])
+    for (const part of refreshIncident.parts) database.run("INSERT INTO part VALUES (?, ?, ?, ?, ?)",
+      [part.id, part.messageID, refreshIncident.sessionID, JSON.stringify(part), 1791885819742])
+    database.close()
+    const window = { title: "own-exact-title", startedAt: 1791885807486, finishedAt: 1791885821184 }
+    expect(readSelectionSnapshot(filename, "", window).sessionID).toBe(refreshIncident.sessionID)
+    expect(() => readSelectionSnapshot(filename, "", { ...window, title: "own-exact" })).toThrow("SELECTION_SESSION_INCOMPLETE")
+    expect(() => readSelectionSnapshot(filename, "", { ...window, startedAt: 1791885822000 })).toThrow("SELECTION_SESSION_INCOMPLETE")
+  } finally {
+    database.close()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+// Sanitized shape of the 2026-10-13 pilot: no private paths, prompt, attachments or credentials.
+const refreshIncident = {
+  sessionID: "ses_pilot", parentID: null, childSessionIDs: [],
+  messages: [
+    { id: "msg_user", sessionID: "ses_pilot", role: "user", time: { created: 1791885819742 } },
+    { id: "msg_assistant", sessionID: "ses_pilot", parentID: "msg_user", role: "assistant",
+      modelID: "gpt-6-sol-fast", providerID: "openai",
+      error: { name: "UnknownError", data: { message: "Token refresh failed: HTTP 401" } },
+      time: { created: 1791885819802, completed: 1791885820833 },
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+  ],
+  parts: [
+    { id: "prt_1", messageID: "msg_user", sessionID: "ses_pilot", type: "text" },
+    { id: "prt_2", messageID: "msg_user", sessionID: "ses_pilot", type: "text" },
+    { id: "prt_3", messageID: "msg_user", sessionID: "ses_pilot", type: "text" },
+    { id: "prt_4", messageID: "msg_user", sessionID: "ses_pilot", type: "file" },
+  ],
+}
 
 function pins() {
   return {
