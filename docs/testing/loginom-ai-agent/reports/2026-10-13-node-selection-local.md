@@ -1116,3 +1116,17 @@ predicate и bounded projection; verification4957c301…/review9f466a29… Appro
 62source/37fixtures/132historical hashes match,19tests/typecheck/syntax PASS.
 Root81926 live запущен после ready/status-only activation72c602c4…;
 моделей0, guards/source/pins unchanged. Это diagnosis, не ordinary acceptance.
+
+
+Proof10 original468c4235…/root81926exit3 изолировал exact caption conjunct:
+final export-sort:n5 имеет verified own native input logical0/native_index1;
+unique/bounded/chain/icons=true, exact=false. Hidden crumb7 raw «Источник данных»
+получил effectiveLabel пустую/hiddenCaption=false, а crumb8 «Настройка» распознан.
+Old workspaceUI80d27… принимает длинную «Входной источник данных», но не actual
+короткую подпись. Surgical TDD fix ограничен этой подписью verified prepared port0;
+owner/native/chain/icons/sensitivity/uniqueness и publicJSdeny сохраняются.
+Rootownuser101 строго bound41b9b3a8… и адресноclosed/admin102logout/MCPexit0;
+originalcleanupfalse сохранён. Неизвестный user97 завершил сам сервер по timeout
+23:19:16Z; root его не закрывал и ownership не утверждает. LastSave036 readback
+7f377888… подтвердил full savedJScomponent/source/schema equal после Group/Sort.
+Sourcefix ещё не завершён; commonruntime change потребует новой matched пары и18+25.
