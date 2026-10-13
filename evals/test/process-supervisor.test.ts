@@ -17,7 +17,7 @@ test("supervisor streams repeated pipe exchanges and confirms process exit", asy
   const abort = new AbortController()
   const pending = superviseProcess({
     cmd: [process.execPath, "-e", 'const {createInterface}=await import("node:readline");for await(const line of createInterface({input:process.stdin})){await Bun.sleep(50);process.stdout.write(line+"\\n")}'],
-    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5_000,
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: null,
     stdin: input.readable, stdout: output.writable, signal: abort.signal,
   })
   try {
@@ -30,6 +30,7 @@ test("supervisor streams repeated pipe exchanges and confirms process exit", asy
     const run = await pending
     expect(run.stdout).toBe("")
     expect(run.exitCode).toBe(0)
+    expect(run.timedOut).toBe(false)
     expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, observation_mode: "continuous" })
     expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
   } finally { abort.abort(); await reader.cancel(); await pending; await rm(root, { recursive: true, force: true }) }

@@ -1,12 +1,51 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
+import { openLoginomAdmin } from "../src/loginom-admin"
+import { createPair, destroyPair } from "../src/parallel-pair"
+import { parseSlots } from "../src/slots"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+integration("trusted bridge: failed initialization disposes the actual Node child with durable process proof", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "evals-admin-bridge-"))
+  const name = `eval-admin-${crypto.randomUUID().slice(0, 8)}`
+  const port = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${port.port}/app/`
+  port.stop(true)
+  const file = parseSlots({ version: 2,
+    server: { container: `${name}-server`, studioContainer: `${name}-studio`, network: name, alias: "loginom-server-7.4.2-test", url,
+      storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" },
+    controller: { stateDir: `${root}/controller`, adminCredentialsFile: `${root}/secrets/missing.json` },
+    judge: { codexHome: `${root}/judge` },
+    slots: [{ id: "a", username: "eval-a", profileDir: `${root}/a/profile`, workspaceRoot: `${root}/a/work`, historyDir: `${root}/a/history` }],
+  }, 1)
+  await mkdir(`${root}/locks`, { mode: 0o700 })
+  const options = { purpose: "research" as const, out: `${root}/evidence`, lockRoot: `${root}/locks` }
+  const pair = await createPair(file, options)
+  try {
+    await expect(openLoginomAdmin(file, pair.identity, { binary: "/home/kiselev/.local/bin/loginom-ai-agent-cli" })).rejects.toThrow("ADMIN_CREDENTIAL_PRIVATE")
+    const directory = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-"))
+    expect(directory).toHaveLength(1)
+    const receipt = await Bun.file(path.join(file.controller.stateDir, directory[0]!, "connection.json")).json()
+    expect(receipt).toMatchObject({ version: 1, kind: "loginom-admin-connection", status: "disposed", identity: pair.identity,
+      initialization: "not_applied", dispose: "confirmed", processes: { status: "confirmed", error: null, observation_mode: "continuous", capture_complete: true } })
+    expect(receipt.processes.verification.map((pass: { owned_remaining: number }) => pass.owned_remaining)).toEqual([0, 0])
+    expect(receipt.processes.processes.some((entry: { executable: string }) => entry.executable.endsWith("/resources/loginom/bin/node"))).toBe(true)
+    const journals = await Promise.all((await readdir(path.join(file.controller.stateDir, directory[0]!, "commands")))
+      .map(name => Bun.file(path.join(file.controller.stateDir, directory[0]!, "commands", name)).json()))
+    expect(journals.map(row => [row.op, row.state]).sort()).toEqual([["dispose", "confirmed"], ["init", "not_applied"]])
+    expect(await Bun.file(`${root}/secrets/missing.json`).exists()).toBe(false)
+    expect(receipt.processes.browserBindings).toEqual([])
+    await expect(openLoginomAdmin(file, { ...pair.identity, serverEpoch: "e".repeat(64) }, { binary: "/home/kiselev/.local/bin/loginom-ai-agent-cli" }))
+      .rejects.toThrow("SERVER_EPOCH_CHANGED")
+    expect((await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-"))).toEqual(directory)
+  } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+}, 60_000)
 
 integration("real Node driver: rejects generic execution and disposes without starting a browser", async () => {
   const runtime = await verifyAdminRuntime("/home/kiselev/.local/bin/loginom-ai-agent-cli")
@@ -38,7 +77,8 @@ integration("real Node driver: missing or malformed private credentials fail bef
       { stdin: "pipe", stdout: "pipe", stderr: "pipe", cwd: root, env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8" } })
     const request = { v: 1, id: "missing", op: "init", expectedIdentity: identity, deadline: Date.now() + 2000,
       payload: { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url: "http://127.0.0.1:1/app/", credentialsFile: `${root}/secrets/missing.json`, profileDir: `${root}/profile` } }
-    child.stdin.write(JSON.stringify(request) + "\n" + JSON.stringify({ ...request, id: "malformed", payload: { ...request.payload, credentialsFile: `${root}/secrets/invalid.json` } }) + "\n" +
+    child.stdin.write(JSON.stringify(request) + "\n" + JSON.stringify({ ...request, id: "missing-parent", payload: { ...request.payload, credentialsFile: `${root}/absent/secret.json` } }) + "\n" +
+      JSON.stringify({ ...request, id: "malformed", payload: { ...request.payload, credentialsFile: `${root}/secrets/invalid.json` } }) + "\n" +
       JSON.stringify({ ...request, id: "bad-runtime", payload: { ...request.payload, credentialsFile: `${root}/secrets/format-only.json`, manifestHash: "0".repeat(64) } }) + "\n" +
       JSON.stringify({ ...request, id: "dispose", op: "dispose", payload: {} }) + "\n")
     child.stdin.end()
@@ -46,6 +86,7 @@ integration("real Node driver: missing or malformed private credentials fail bef
     expect(code).toBe(0)
     expect(stdout.trim().split("\n").map(line => JSON.parse(line))).toEqual([
       { v: 1, id: "missing", outcome: "not_applied", data: { code: "ADMIN_CREDENTIAL_PRIVATE" } },
+      { v: 1, id: "missing-parent", outcome: "not_applied", data: { code: "ADMIN_CREDENTIAL_PRIVATE" } },
       { v: 1, id: "malformed", outcome: "not_applied", data: { code: "ADMIN_CREDENTIAL_INVALID" } },
       { v: 1, id: "bad-runtime", outcome: "not_applied", data: { code: "ADMIN_RUNTIME_HASH" } },
       { v: 1, id: "dispose", outcome: "confirmed", data: { disposed: true } },

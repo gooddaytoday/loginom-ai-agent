@@ -332,7 +332,7 @@ async function browserIdentity(cmd: string[], env: Record<string, string>) {
  * Unknown native children block continuation rather than becoming guessed owners.
  */
 export async function superviseProcess(input: {
-  cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number
+  cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number | null
   profileDir?: string; outDir?: string; stdin?: string | ReadableStream<Uint8Array>; stdout?: WritableStream<Uint8Array>; signal?: AbortSignal; sandbox?: string[]
   observationMode?: "continuous" | "unit_after_exit"
 }) {
@@ -682,7 +682,7 @@ export async function superviseProcess(input: {
   }
   let budgetEnded: () => void = () => {}
   const budget = new Promise<void>((resolve) => { budgetEnded = resolve })
-  const timer = setTimeout(() => { timedOut = true; budgetEnded() }, input.timeoutMs)
+  const timer = input.timeoutMs === null ? undefined : setTimeout(() => { timedOut = true; budgetEnded() }, input.timeoutMs)
   const abort = () => { interrupted = true; budgetEnded() }
   input.signal?.addEventListener("abort", abort, { once: true })
   if (input.signal?.aborted) abort()
