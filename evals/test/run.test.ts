@@ -10,6 +10,16 @@ import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
 
+test("main: unfinished v2 admission cannot fall through to legacy dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-v2-admission-"))
+  try {
+    await expect(main(["--dry-run", "--only", "group-sum-qty"], {
+      EVAL_SLOTS_FILE: path.join(root, "slots.json"), EVAL_RESULTS_DIR: path.join(root, "results"), EVAL_WORKSPACE_ROOT: path.join(root, "workspace"),
+    })).rejects.toThrow("SLOTS_ADMISSION_UNAVAILABLE")
+    expect(await readdir(root)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("runAttempt: live binary без выделенного Loginom останавливается до агента и судьи", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-storage-admission-run-"))
   try {
