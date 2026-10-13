@@ -4,9 +4,28 @@ import path from "node:path"
 import os from "node:os"
 import { unzip } from "../src/artifact"
 import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance } from "../src/node-selection"
+import type { SelectionRuntime } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
 import pilotRuntime from "./fixtures/node-selection/pilot-runtime.json"
+
+test.each(["source", "context"])("owned %s reads settle using their own contract without an apply status", (kind) => {
+  const runtime: SelectionRuntime[] = structuredClone(pilotRuntime)
+  const node = JSON.parse(applyWait[2]!.state.output).node as Record<string, unknown>
+  const owner = { ...node, operation_id: "source-read", ui_epoch: 1 }
+  const parts: unknown[] = [...pilotHistory.snapshot.parts, {
+    id: "read-part", type: "tool", tool: "loginom_dock_node_read", sessionID: pilotHistory.snapshot.sessionID,
+    state: { status: "completed", input: { kind, operation_id: owner.operation_id, node,
+      document_id: node.document_id, workflow_ref: { workflow_id: node.workflow_id } },
+    output: JSON.stringify({ kind, owner, ...(kind === "context" ? { cleanup_complete: true, semantic_sha256: "a".repeat(64) } : { source_sha256: "a".repeat(64) }) }) },
+  }]
+  runtime[0]!.events.push(...["source_open_dispatch", "source_discard_settled", "source_delivery_verified",
+    ...(kind === "context" ? ["javascript_context_delivery_verified"] : [])].map((phase) => ({
+    session_id: pilotRuntime[0]!.session.sessionId, owner, step: 1, phase,
+    semantic_sha256: "a".repeat(64), receipt: { source_sha256: "a".repeat(64) },
+  })))
+  expect(inspectSelectionRuntime({ parts, runtime })).toEqual({ runtimeSettled: true, failures: [] })
+})
 
 test("pilot policy evidence binds the actual model, activated bundled skill and runtime catalog", () => {
   expect(inspectSelectionProvenance({ snapshot: pilotHistory.snapshot, runtime: pilotRuntime,

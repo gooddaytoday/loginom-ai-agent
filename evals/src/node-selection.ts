@@ -60,6 +60,12 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
       failures.push("RUNTIME_IDENTITY_INVALID")
       continue
     }
+    for (const opening of events.filter((event) => event.phase === "source_open_dispatch")) {
+      if (!record(opening.owner) || !Number.isSafeInteger(opening.step)
+        || !events.slice(events.indexOf(opening) + 1).some((event) => event.phase === "source_discard_settled"
+          && event.step === opening.step && JSON.stringify(event.owner) === JSON.stringify(opening.owner)))
+        failures.push("SOURCE_READ_UNSETTLED")
+    }
     const admitted = events.filter((event) => ["prepared", "node_apply_prepared", "artifact_delivery_prepared"].includes(String(event.phase)))
     for (const admission of admitted) {
       if (typeof admission.operation_id !== "string") { failures.push("RUNTIME_OPERATION_INVALID"); continue }
@@ -91,6 +97,21 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
   for (const { part, result, dockID } of calls) {
     if (!record(part.state) || !record(part.state.input)) continue
     if (!/^loginom_dock_(node_apply|node_wait|node_resume|node_read|artifact_deliver|action_run|operation_inspect)$/.test(String(part.tool))) continue
+    if (record(result) && ["source", "context"].includes(String(result.kind))) {
+      const owner = record(result.owner) ? result.owner : undefined
+      const request = part.state.input
+      const node = record(request.node) ? request.node : undefined
+      const events = input.runtime.filter((runtime) => record(runtime.session) && runtime.session.sessionId === dockID)
+        .flatMap((runtime) => runtime.events).filter(record).filter((event) => JSON.stringify(event.owner) === JSON.stringify(owner))
+      if (!owner || owner.operation_id !== request.operation_id || !node
+        || !["document_id", "workflow_id", "node_id"].every((key) => typeof owner[key] === "string" && owner[key] === node[key])
+        || !Number.isSafeInteger(owner.ui_epoch) || !events.some((event) => event.phase === "source_discard_settled")
+        || (result.kind === "source" ? !events.some((event) => event.phase === "source_delivery_verified"
+          && record(event.receipt) && event.receipt.source_sha256 === result.source_sha256)
+          : result.cleanup_complete !== true || !events.some((event) => event.phase === "javascript_context_delivery_verified"
+            && event.semantic_sha256 === result.semantic_sha256))) failures.push("SOURCE_RECEIPT_UNVERIFIED")
+      continue
+    }
     if (!record(result) || typeof result.operation_id !== "string") { failures.push("TOOL_RECEIPT_INCOMPLETE"); continue }
     if (part.state.input.operation_id !== result.operation_id) failures.push("TOOL_OPERATION_MISMATCH")
     if (!(result.request_rejected === true && result.status === "NOT_APPLIED" && result.effect_possible === false)
