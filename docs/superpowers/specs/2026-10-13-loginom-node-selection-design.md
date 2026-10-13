@@ -402,6 +402,10 @@ latest successful managedJS execution/cleanup, nativeowner/doc/workflow/port0GUI
 fixedgestures/ACK/rebind/fresh complete schema. Cached mapping/active port не
 заменяют свежесть (actual freshness_verified:false). Public JS click/F3/editor/
 execute deny и Calculator/Union остаются; skill не меняется из-за runtime.
+Own user81 закрыт по GUID/log/admin binding; guard адресно архивирован после
+nonce SHA/mtime/no-own-process checks. Status0/check0, Helpready/browserverified,
+adminlogout/MCPexit0 подтверждены. Independent recovery22e95b…PASS,19 originals
+unchanged; исходные CLI1/wrapper3/cleanupfalse сохранены.
 После TDD/runtime review нужны новая matched пара/native proof и полные18+25.
 Исходные2baseline192418 сохраняются отдельно; предыдущие18 также не переносятся.
 

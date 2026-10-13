@@ -664,8 +664,19 @@ inspect после response-budget refusal). Standard group-001 останови
   design review SHA `c9e0075fd8fa66bd6a142b391c5de841d16ca4f1b0558780bc14de21de6ca2e0`.
   Upstream freshness_verified:false не заменяется наличием active порта или
   cached schema; generic JS click/F3/editor/execute запреты не снимаются.
-- [ ] Выполнить strict own server/profile recovery с GUID/log/admin/process/
+- [x] Выполнить strict own server/profile recovery с GUID/log/admin/process/
   guard SHA+mtime binding, подтвердить status/check и сохранить original failure.
+  Own user81/init19:55:47.707Z bound двумя executed GUID; close20:15:37.094Z,
+  UIabsence20:15:37.234Z и остальные rows подтверждены независимо. Guard nonce
+  (не SessionID/PID) SHA/mtime стабильны, own CLI4185156/no ownprofile processes
+  отсутствуют; адресный archive сохранён,19 originals unchanged. Admin logout
+  20:19:38.404Z/MCPexit0; status0(config starting/browserunknown), check0 actual
+  Helpready/browserverified, writerabsent. Unsupported--profile operator exit2
+  сохранены; correct selector envCLI_PROFILE. Review SHA
+  `22e95b237b7f15a5d71ff9bceef8d99a2ea749c1d47719c8cc98a336e9ef5cab`,
+  recovery `d3891697223881d7520f21b724ee0ffcffa68ab420020eb6a8d2f76c53aba579`,
+  management `922d769c55ac1812eba131450ae2aadb09ae9d873e412ad56c9656916aa55f08`.
+  Original model CLI1/wrapper3/cleanupfalse не изменён.
 - [ ] По TDD исправить только управляемый preview JS-источника для Group и new
   Sort: private owned native lease/fixed select-port→F3/fresh complete preview,
   latest successful managedJS history/execution/cleanup, owner/doc/workflow/
@@ -1426,3 +1437,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Новая192418-c71363 допущена к новой полной18+25: paired/pins/nativecore Approved; fullprivate driverexit1 сохранён (extra stale retained reread). Новая actualgapattestation c485ce08… completed, tags/model ещёpending; historical18+2 не переносятся.
 - Серия192418 baseline1/18 complete: sales1 CLI0/wrapper0/cleanuptrue/oracle+calculation+allmachineaxesPASS/JS0, CLI337.121s. ABC1 следующийactive; candidate0/25. Actualbaselineprepare16/7.4.2/JSapplyavailable bound (a81a317b…).
 - Серия192418 stopped2baseline/0candidate: sales1PASS; ABC1CLI1/wrapper3/cleanupfalse group-target genericJSsourceclickdeny. Exactactualpredicateconfirmed; JS→Group/newSort privateTDDintegrationongoing, noGeneralJSallow/policyrevision. Ownuser81closed20:15:37.094Z/adminabsenceverified; guardarchived/status0/checkpending.
+- Group/Sort blocker ownrecovery завершён: user81closed/guardarchived/status0/check0/adminlogout+MCP0; independentrecovery22e95b…PASS, original19files unchanged. CodeTDDpreviewintegration ongoing; baseline/candidate slots остановлены.

@@ -107,10 +107,18 @@ Own server user:81/init19:55:47.707Z установлен по двум executed
 absence20:15:37.234Z подтверждены независимо, остальные UIrows сохранены.
 Closure review SHA86b9bd1a… . Только own guard архивирован после nonce SHA/mtime
 и no-own-process checks,19 originalfiles unchanged; recovery SHAd3891697… .
-Status0, checkpending; adminlogout20:19:38.404Z/MCPexit0. Первые management
+Status0 (config starting/browserunknown), check0 (LOGINOM_CONNECTION_VALID/Helpready/browserverified); adminlogout20:19:38.404Z/MCPexit0. Первые management
 команды с неподдержанным --profile далиCLI_ARGUMENT_INVALID/exit2 и сохранены
 `.invalid-argument`; корректный envCLI_PROFILE используется затем. Original
 ABCcleanupfalse/CLI1/wrapper3 не переписаны; новая попытка не запускается.
+Independent recovery review SHA
+`22e95b237b7f15a5d71ff9bceef8d99a2ea749c1d47719c8cc98a336e9ef5cab` PASS:
+archived owner SHA/mtime/modes exact, writerabsent/oldPIDabsent,19 originals unchanged.
+Management verification SHA
+`922d769c55ac1812eba131450ae2aadb09ae9d873e412ad56c9656916aa55f08`.
+Atomic rename подтверждён root syscall/result, но его историческую атомарность
+независимый reviewer не выводит только из конечных файлов.
+
 
 Private managed preview integration Group+Sort по TDD в работе, общий publicJS
 click/F3deny и соседниеhandlers не расширяются. После новой общей runtimeправки
