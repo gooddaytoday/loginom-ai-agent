@@ -52,13 +52,13 @@ async function fixture() {
  const definitions={ObjectProxyPrototype:Object.getPrototypeOf(packageProxy),FileStoragePrototype:storageProto,StreamPersistPrototype:persistProto,StreamPersist};
  const abort=new AbortController();const original=Object.fromEntries(['owner','run','lease','chat','document','account','session','page','context','packageNode','tab','operation','gate'].map(k=>[k,{}]));
  Object.assign(original,{generation:7,packageProxy,currentUser:user,fileStorage:storage,nativeSession:session,signal:abort.signal,deadline:1000,refusal:Error('original unsaved refusal',{cause:0})});
- const current={...original,pending:false,running:false,unknown:false,writerPending:false,dirty:false,targetSelected:false};let clock=0,writes=0,writeRefusal;
+ const current={...original,pending:false,running:false,unknown:false,writerPending:false,dirty:false,targetSelected:false};let clock=0,writes=0,writeRefusal,writeHook=async()=>{};
  const build=()=>retainTerminalOriginalInterfaces({original,current:()=>current,definitions,sourceInputs:inputs,signal:abort.signal,deadline:1000,now:()=>clock,
-  record:async facts=>{writes++;if(writeRefusal)throw writeRefusal.value;const f=await open(join(dir,'facts.json'),'w',0o600);try{await f.writeFile(JSON.stringify(facts));await f.sync();}finally{await f.close();}return JSON.parse(await readFile(join(dir,'facts.json'),'utf8'));}});
+  record:async facts=>{writes++;await writeHook();if(writeRefusal)throw writeRefusal.value;const f=await open(join(dir,'facts.json'),'w',0o600);try{await f.writeFile(JSON.stringify(facts));await f.sync();}finally{await f.close();}return JSON.parse(await readFile(join(dir,'facts.json'),'utf8'));}});
  const scope=build();
  return {scope,build,current,original,definitions,calls,abort,dir,packageProxy,storage,support,
   writes:()=>writes,clock:v=>clock=v,own:v=>ownership=v,connected:v=>connected=v,root:v=>root=v,
-  queryReply:f=>responseMutation=f,fail:v=>{hasError=true;error=v;},writeFail:v=>writeRefusal=v,
+  queryReply:f=>responseMutation=f,fail:v=>{hasError=true;error=v;},writeFail:v=>writeRefusal=v,writeHook:f=>writeHook=f,
   hold(){hold=true;},async drain(){hold=false;for(const [id,w]of waiting){waiting.delete(id);w.task.deliver();w.fn();}await Promise.resolve();},
   cleanup:async()=>{ipc.port1.close();ipc.port2.close();await rm(dir,{recursive:true});}};
 }
@@ -129,3 +129,33 @@ for(const value of [undefined,null,false,0,''])
   await f.scope.read();f.writeFail({value});await assert.rejects(f.scope.persist(),x=>x===value);assert.equal(f.scope.secondary[0],value);
   f.writeFail(null);await f.scope.persist();assert.deepEqual(f.calls,[907,0,909,910,911]);assert.equal(f.writes(),2);
  }));
+
+test('returned method drift after durable record refuses inspect/persist/end without replay',()=>control(async f=>{
+ const token=await f.scope.read();await f.scope.persist();let foreignCalls=0;
+ Object.defineProperty(f.support,'SaveToStream',{value(){foreignCalls++;},configurable:true});
+ assert.throws(()=>f.scope.inspect(token));assert.throws(()=>f.scope.persist());assert.throws(()=>f.scope.end());
+ assert.equal(f.scope.state.ended,false);assert.equal(foreignCalls,0);assert.equal(f.writes(),1);
+ assert.deepEqual(f.calls,[907,0,909,910,911]);
+ delete f.support.SaveToStream;assert.equal(f.scope.inspect(token).saveAuthority,false);f.scope.end();
+}));
+test('returned accessor refuses after writer refusal; original restoration repairs only storage',()=>control(async f=>{
+ const token=await f.scope.read(), first=Error('fsync refusal',{cause:0});f.writeFail({value:first});
+ await assert.rejects(f.scope.persist(),x=>x===first);let getterCalls=0;
+ Object.defineProperty(f.support,'SaveToStream',{get(){getterCalls++;return f.definitions.StreamPersistPrototype.SaveToStream;},configurable:true});
+ assert.throws(()=>f.scope.persist());assert.throws(()=>f.scope.inspect(token));assert.throws(()=>f.scope.end());
+ assert.equal(getterCalls,0);assert.equal(f.scope.secondary[0],first);assert.equal(f.writes(),1);
+ delete f.support.SaveToStream;f.writeFail(null);await f.scope.persist();
+ assert.equal(f.writes(),2);assert.deepEqual(f.calls,[907,0,909,910,911]);assert.equal(f.scope.inspect(token).closeAuthority,false);
+}));
+test('returned method drift during writer await cannot confirm publication; repair no reader replay',()=>control(async f=>{
+ await f.scope.read();const d=deferred(),started=deferred();f.writeHook(async()=>{started.resolve();return d.promise;});
+ const work=f.scope.persist();await started.promise;Object.defineProperty(f.support,'SaveToStream',{value(){},configurable:true});
+ d.resolve();await assert.rejects(work);assert.equal(f.scope.state.write,'refused');assert.throws(()=>f.scope.end());
+ delete f.support.SaveToStream;f.writeHook(async()=>{});await f.scope.persist();assert.equal(f.writes(),2);
+ assert.deepEqual(f.calls,[907,0,909,910,911]);
+}));
+test('original abort remains primary before returned accessor guard',()=>control(async f=>{
+ const token=await f.scope.read();let getterCalls=0;
+ Object.defineProperty(f.support,'SaveToStream',{get(){getterCalls++;return f.definitions.StreamPersistPrototype.SaveToStream;}});
+ f.abort.abort(false);assert.throws(()=>f.scope.inspect(token),x=>x===false);assert.equal(getterCalls,0);assert.equal(f.writes(),0);
+}));

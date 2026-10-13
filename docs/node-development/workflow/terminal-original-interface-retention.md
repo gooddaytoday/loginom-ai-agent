@@ -21,7 +21,10 @@ handle composition must provide original refs before production registration.
 Only QueryInterface(IBGStreamPersist), storage get_Connected907,
 get_CurrentDirectory909, get_IsOwnCurrentDirectory910 and get_RootPath911 are
 allowed. Original exported method data descriptors and native proxy data/session
-identity are captured before awaits, checked before/after every reply. Loaded
+identity are captured before awaits, checked before/after every reply. The
+qualified returned interface retains its effective SaveToStream data-method;
+all later read/inspect/persist/end checks refuse shadow functions or accessors
+without invoking the getter or SaveToStream. Loaded
 defining source pins are checked before the first dispatch. Pending, running,
 UNKNOWN, dirty/writer/disconnected, substitutions/accessors, abort or absolute
 deadline expiry refuse. Read work is retained exactly once, including all raw

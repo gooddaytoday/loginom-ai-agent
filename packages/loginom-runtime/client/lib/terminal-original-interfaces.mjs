@@ -61,7 +61,8 @@ export function retainTerminalOriginalInterfaces({original, current, definitions
     if(Object.keys(nativeDependencies).some(k=>data(retained.nativeSession,k)!==nativeDependencies[k])
       ||Object.keys(packageDependencies).some(k=>data(retained.packageProxy,k)!==packageDependencies[k]))refuse('ORIGINAL_DEPENDENCY');
     for (const b of proxyBindings) if (data(b.proxy,'$')!==b.native||data(b.proxy,'$S')!==b.session
-      ||data(b.native,'$OW')!==b.owner||data(b.native,'$O')!==b.id) refuse('NATIVE_REPLACED');
+      ||data(b.native,'$OW')!==b.owner||data(b.native,'$O')!==b.id
+      ||(b.method && data(b.proxy,'SaveToStream')!==b.method)) refuse('NATIVE_REPLACED');
     return true;
   };
   check();
@@ -87,7 +88,7 @@ export function retainTerminalOriginalInterfaces({original, current, definitions
       const native=data(support,'$');
       if(data(support,'$S')!==proxyBindings[0].session||data(native,'$OW')!==proxyBindings[0].owner
         ||data(native,'$O')!==proxyBindings[0].id||data(support,'SaveToStream')!==supportMethod)refuse('FOREIGN_INTERFACE');
-      proxyBindings.push({proxy:support,native,session:retained.nativeSession,owner:proxyBindings[0].owner,id:proxyBindings[0].id});
+      proxyBindings.push({proxy:support,native,session:retained.nativeSession,owner:proxyBindings[0].owner,id:proxyBindings[0].id,method:supportMethod});
       const observed={get_Connected:connected};
       for(const method of methods.slice(1)) {
         check();observed[method]=await readers[method].call(retained.fileStorage);check();
