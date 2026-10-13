@@ -743,4 +743,8 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
 7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
 8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
-9. 1а: factory/identity, full unit 595/3skip/0fail, Docker 24 assertions PASS; admin bootstrap blocked. Task 2: Node bridge/journal, 3 rejection integration/17 assertions, 21 supervisor tests PASS. Task 8: pure queue 7 + judge gate 8, 82 targeted PASS. Task 3: historyDir/settings binding, 121 profile/config PASS. Task 5: durable archive primitive, 80 archive/profile/typecheck PASS. Task 8: fixture main/actual lease/archive, retry/quarantine/clean stop/gate — 64 main/judge/report + 24 main/archive PASS; далее SIGINT/reporting/host judge lease и prepare ledger; реальные lifecycle/admission ждут bootstrap, identity unsupported.
+9. c972e05ac5: fixture main/actual leases/archive, same-slot retry, quarantine/clean stop, gate и SIGINT реализованы; liveQualified=false.
+10. Проверки: 64 main/judge/report, 24 main/archive, 60 legacy/report/compare PASS; SIGINT 2 runs/2 slots и OR metadata PASS; typecheck/diff PASS.
+11. Full unit 595/3skip/0fail — прежний frozen factory checkpoint, не последняя full-suite проверка; Docker factory 24 assertions PASS.
+12. Bootstrap admin и candidate отсутствуют; live identity/backup/OAuth/licence/resource/N=2→N=1 остаются gates. Missing admin записан в eval_parallel_blockers.md.
+13. Далее: fixture journal без overwrite при конкурирующих controllers, host judge lease, SIGINT judge/cleanup, slot-aware reporting/node evidence, prepare ledger; Task 6 parallel registry ещё не квалифицирован.
