@@ -10,6 +10,13 @@ import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
 import pilotRuntime from "./fixtures/node-selection/pilot-runtime.json"
 
+test("an optional standard review cannot hide a bound failed verdict", () => {
+  expect(inspectSelectionReview({ mode: "standard", sessionID: "session", packageSha256: "a".repeat(64),
+    review: { verdict: "failed", reviewer: "reviewer", notes: "Anomaly in the saved graph.", sessionID: "session",
+      packageSha256: "a".repeat(64), evidence: ["artifact/package.lgp"] },
+  }).reviewStatus).toBe("failed")
+})
+
 test.each(["valid", "missing", "wrong-session", "wrong-package", "no-evidence", "wrong-role"])(
   "exception review binds the current session and saved bytes: %s", (kind) => {
     const review = { verdict: "passed", reviewer: "independent reviewer", notes: "Checked the requested aggregation and its native surroundings.",

@@ -3,7 +3,7 @@ export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "sta
 export type SelectionRuntime = { path: string; session: unknown; events: unknown[] }
 
 export function inspectSelectionReview(input: { review: unknown; mode: SelectionMode; sessionID: unknown; packageSha256: unknown }) {
-  if (input.mode === "standard") return { reviewStatus: "not-required" }
+  if (input.mode === "standard" && input.review == null) return { reviewStatus: "not-required" }
   const value = input.review
   if (!record(value) || !["passed", "failed"].includes(String(value.verdict))
     || typeof value.reviewer !== "string" || !value.reviewer.trim() || typeof value.notes !== "string" || !value.notes.trim()
