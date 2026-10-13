@@ -377,6 +377,11 @@ native input0/input1 и единственной Join icon; identity/opening/anc
 `20261013T192418Z-c71363` готовит общий runtime и отдельные skill версии; до
 модельных слотов нужны успешные live обе скрытые роли, Join output, Save/cleanup.
 
+Новые payload/pins192418 готовы: общий source05b645eec9, обе sourceverify0,
+старые skills/datasets/model/seed неизменны. Independent pair/pins review и
+native Join positive proof ещё gates. Новый model-free describe probe15 схем
+завершился ACK/exit0; связь с actual prepare новой сборки ещё pending.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

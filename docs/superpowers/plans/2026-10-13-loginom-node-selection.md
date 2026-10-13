@@ -1373,3 +1373,5 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
 - Серия142936-072953: baseline18/18, oracle/calculation18, policy12/18 старого skill, JS9/9/9; independent machine review18 PASS (baseline-final-review.json); candidate2/25 начаты: sales1 PASS JS0, ABC1 runtime-blocked join/input_mapping, cleanupfalse, callsJS0. Серияpaused, diagnosis/ownrecovery; повторызакрыты.
+
+- Новая пара192418-c71363 собрана/verify0 из общего05b645eec9; immutablepins43слота и effectiveaudit2654… закреплены. Независимый pair/pins review и nativebothhiddenroles proof pending; model0/current-run ещё historical142936. Новыйdescribeprobe15схем ACK/exit0, actualprepare/gapbinding pending.

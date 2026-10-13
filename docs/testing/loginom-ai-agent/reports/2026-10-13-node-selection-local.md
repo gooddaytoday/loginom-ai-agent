@@ -14,6 +14,36 @@ ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; can
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
+## Новая пара после Join fix — подготовка
+
+Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;
+baseline source dirty только двумя прежними skill файлами, candidate clean.
+`verify-cli-candidate` обоих exit0; baseline проверен до восстановления skill.
+Compiled payload/runtime/resources, pins и closure проверяются независимо.
+Baseline manifest SHA `4a8126f1f2ef47485695609de8a8aa919e3480f45a06e532a222abfe02acf99b`,
+candidate SHA `f06ab58ff3e585c066ad1f903bc436602063d98298b18d02df2b83ff19d0ffcd`.
+Pins SHA baseline `4207532acd2c0626c05187418f5022989736c81a0d07d0b1361a494a377dd80a`,
+candidate `f23c6e0cb6ba5b060ec693900d37f7bf9f375fc2974ef7dda07fbe1d9d14b5d4`.
+Обе skill версии, tasks/model/reviewSeed сохранены; новый denominator43слота,
+старые18+2 исхода в него не включаются. Effective lock SHA
+`c9863b1d0b146c4b918baedbca85c0061787636816cfb21e8e90639c6158ab07` закрепляет
+финальный audit2654…; historical locks/frozen-models сохранены побайтно.
+
+Model-free describe probe новой candidate завершился exit0:16 raw replies,
+15 стандартных parameter_schema, Host closed ACK/exit0. Result SHA
+`0c63b641f2ad2161171c9e13ce2e8ebff45fc825c4acf3011133bc0695d5c46e`.
+Explicit Loginom logout этим no-package probe не подтверждён. Actual prepare
+нового native proof и итоговая gap binding ещё pending. Probe reuse изменяет
+только pinned SHA и путь historical parser-shape fixture:2 tests/4expects и
+typecheck0, independent static review Approved. Новых model calls нет.
+
+Первый build остановился до mkdtemp из-за отсутствующего собственного parent
+каталога; original stderr/stdout сохранены `.missing-parent`. После mkdir build
+успешен. Это operator build incident, не модельная попытка.
+Допуск серии всё ещё требует independent pair/pins review и успешного native
+Join proof обеих реальных скрытых ролей, результата, Save/cleanup.
+`current-run.txt` пока указывает на исторический142936 run; новый не допущен.
+
 ## Историческая вторая сопоставимая пара
 
 Обе сборки выполнены последовательно в одном managed worktree `node-selection-build`
