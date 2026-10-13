@@ -17,7 +17,7 @@ const retainedProfileFiles = new Set([
 ])
 
 // Retain exact settings files, never whole data/cache/loginom directories.
-async function profileHistory(profile: string, directory = profile): Promise<string[]> {
+export async function profileHistory(profile: string, directory = profile): Promise<string[]> {
   return (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async (entry) => {
     const file = path.join(directory, entry.name)
     const relative = path.relative(profile, file)
@@ -41,7 +41,7 @@ export async function assertProfileClean(profileDir: string) {
     throw new EvalFailure("В доступном профиле осталась история; admission запрещён", 2)
 }
 
-async function assertProfileSettled(profile: string) {
+export async function assertProfileSettled(profile: string) {
   const recovery = await readdir(path.join(profile, "loginom/recovery")).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return []
     throw error
