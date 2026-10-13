@@ -553,6 +553,25 @@ native exit3. Original result `join-native-diagnostic-2/result.json` SHA256
 `native-first-server-binding.json` SHA256
 `e0769c609c181b029fac3736e22bd69b72dbe157f128539385358aaefa15ba7c`.
 
+## Join diagnostic/3: исправление private capture guard
+
+Private capture больше не запрещается из-за unresolved terminal effect.
+Concurrent IPC dispatch, fixed args {}, own prepared page/URL и fixed read-only
+NavigationPanel остаются ограничениями; running-only гарантия не заявляется.
+Actual native2 settled AMBIGUOUS + activeWork/recoveryPending привязан к RED;
+6tests/typecheck/syntax GREEN, independent Approved. Entry SHA256
+`2a9c6f9f844edaebd89cf7ab7a66a95e105741bc490c11cd201d7bd14c0f5662`,
+review SHA `acb6c3b65c1480dc789693ed469a15c4c1cfd934f442b68c976cf5a9c383c0f3`.
+Все source snapshots и результаты первых двух native сохранены.
+
+Own native2 user72/init18:45:26.926 UTC привязана к двум GUID и двум Save
+`/user/JD18fef2b4.lgp`. Admin сверил CreateTime06:45PM и закрыл только user72;
+fresh second refresh18:52:57.948 подтвердил отсутствие, user69 остался.
+Admin logout18:53:18.557/MCP exit0, own native процессов нет, guard отсутствует.
+Сверка fresh server close выполняется независимо. Третий instrumented native
+начат в `join-native-diagnostic-3`; Product/candidate/resources/pins неизменны.
+Это source diagnostic, не модельная попытка и не acceptance.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.

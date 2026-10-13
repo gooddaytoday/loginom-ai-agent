@@ -599,7 +599,9 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   Второй diagnostic в `join-native-diagnostic-2` воспроизвёл Join refusal,
   но private capture guard не допустил stopped/ambiguous context, DOM не получен.
   Оба original native failures сохранены; исправляется только diagnostic guard
-  по TDD перед третьим native, Product/candidate не меняются. Этот пункт открыт.
+  по TDD (6tests/typecheck/independent review PASS), Product/candidate не меняются.
+  Own native2 user72 адресно закрыт по GUID/Save/log/admin binding. Третий native
+  начат в новом каталоге; actual DOM cause ещё не подтверждён. Этот пункт открыт.
 
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 

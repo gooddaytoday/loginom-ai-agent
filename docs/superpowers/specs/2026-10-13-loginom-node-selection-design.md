@@ -360,6 +360,9 @@ refresh absence подтверждены. Exact guard архивирован п�
 отклонил чтение unresolved terminal context (LOGINOM_DIAGNOSTIC_BUSY). DOM cause
 остаётся недоказанной; готовится узкая TDD-правка только diagnostic guard.
 Оба исходных native failures сохранены, original model slot не повторяется.
+Fixed read-only capture guard исправлен TDD (6tests/review PASS), own page/URL
+и fixedargs сохраняются. Native2 user72 адресно закрыт по GUID/Save/log/admin
+binding; третий native начат в новом каталоге. Product runtime не менялся.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
