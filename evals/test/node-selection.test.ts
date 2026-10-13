@@ -232,6 +232,14 @@ test("complete pilot history accepts the activation metadata update and settles 
   expect(inspectSelectionHistory(pilotHistory)).toEqual({ historyComplete: true, failures: [] })
 })
 
+test("an unknown part type cannot hide an apply from complete history", () => {
+  const evidence = structuredClone(pilotHistory)
+  const part = evidence.snapshot.parts.find((part) => part.tool === "loginom_dock_node_apply")!
+  part.type = "future-tool"
+  evidence.events = evidence.events.filter((event) => event.part?.id !== part.id)
+  expect(inspectSelectionHistory(evidence).historyComplete).toBe(false)
+})
+
 test("an admitted JavaScript apply counts as successful only after its matching real wait receipt", () => {
   const parts = structuredClone(applyWait)
   parts[0]!.state.input.target!.type = "programming.javascript"

@@ -216,6 +216,8 @@ export function inspectSelectionHistory(input: { snapshot: unknown; events: unkn
     if (typeof part.id !== "string" || byID.has(part.id) || part.sessionID !== snapshot.sessionID
       || !messages.some((message) => message.id === part.messageID)) failures.push("PART_IDENTITY_INVALID")
     if (typeof part.id === "string") byID.set(part.id, part)
+    if (!["snapshot", "patch", "text", "reasoning", "file", "agent", "compaction", "subtask", "retry", "step-start", "step-finish", "tool"]
+      .includes(String(part.type))) failures.push("PART_TYPE_INVALID")
     if (part.type !== "tool") continue
     if (typeof part.tool !== "string" || !record(part.state) || !["completed", "error"].includes(String(part.state.status))
       || !record(part.state.input)) failures.push("TOOL_EVIDENCE_INVALID")
