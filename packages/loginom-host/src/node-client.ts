@@ -18,6 +18,100 @@ type NodeHostInput = {
 }
 const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" }>()
 
+type AmountStartupControl = { signal: AbortSignal; deadline: number; operation: string; request: string }
+type AmountInput = NodeHostInput & { packagePath: string }
+type AmountRoot = {
+  input: AmountInput; control: AmountStartupControl; original: Readonly<AmountStartupControl>;
+  authorization: string; phase: "inventory" | "provider_unavailable" | "refused";
+  pending: boolean; primary?: { value: unknown }; secondary?: { value: unknown };
+}
+// Stage A retains the real foreground object before inventory IO. It makes no
+// claim about a run/lease that stage B has not acquired. Map entries also fence
+// reconstructed carriers after pending/lost replies and eventual settlement.
+const amountRoots = new Map<string, AmountRoot>()
+const amountControls = new WeakMap<object,AmountRoot>()
+export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountInput, control: AmountStartupControl) => {
+  if (!input || typeof input!=="object" || !control || Object.keys(control).sort().join(",")!=="deadline,operation,request,signal"
+    || !(control.signal instanceof AbortSignal) || !Number.isSafeInteger(control.deadline)
+    || control.deadline <= Date.now() || ![control.operation,control.request].every(v=>typeof v==="string" && v.length>0))
+    throw Error("LOGINOM_AMOUNT_STARTUP_CONTROL_REQUIRED")
+  control.signal.throwIfAborted()
+  const original = Object.freeze({ signal:control.signal, deadline:control.deadline, operation:control.operation, request:control.request })
+  const key = JSON.stringify([original.operation,original.request])
+  if (amountRoots.has(key) || amountControls.has(control)) throw Error("LOGINOM_RECOVERY_REQUIRED")
+  const snapshot = { ...input, environment:runtimeEnvironment(input.environment??process.env) }, environment=input.environment
+  const root: AmountRoot = {
+    input,control,original,authorization:randomBytes(32).toString("hex"),phase:"inventory",pending:false,
+  }
+  amountRoots.set(key,root)
+  amountControls.set(control,root)
+  const primary = (value:unknown) => { root.primary ??= {value}; return root.primary.value }
+  const abort = () => { primary(original.signal.reason) }
+  original.signal.addEventListener("abort",abort,{once:true})
+  const guard = () => {
+    if (original.signal.aborted) primary(original.signal.reason)
+    if (Date.now()>=original.deadline) primary(Error("LOGINOM_AMOUNT_STARTUP_EXPIRED"))
+    if (root.primary) throw root.primary.value
+    if (control.signal!==original.signal || control.deadline!==original.deadline || control.operation!==original.operation || control.request!==original.request
+      || ["node","entry","root","resources","headless","packagePath","strictRecovery","acceptanceCleanupPackage"].some(k=>(input as any)[k] !== (snapshot as any)[k])
+      || input.environment!==environment || JSON.stringify(runtimeEnvironment(input.environment??process.env))!==JSON.stringify(snapshot.environment))
+      throw primary(Error("LOGINOM_AMOUNT_STARTUP_CHANGED"))
+  }
+  const observed = async <T>(work:()=>Promise<T>) => {
+    guard();root.pending=true
+    let value:T
+    try { value=await work() }
+    catch (error) { if(root.primary)root.secondary??={value:error};throw primary(error) }
+    finally { root.pending=false }
+    guard();return value
+  }
+  try {
+    guard()
+    if (!input || ![snapshot.node,snapshot.entry,snapshot.root,snapshot.resources].every(isAbsolute)
+      || typeof snapshot.packagePath!=="string" || snapshot.packagePath.length>1024
+      || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(snapshot.packagePath)
+      || snapshot.packagePath.split("/").some(x=>x==="."||x==="..")) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    const product=resolve(snapshot.resources,"../..")
+    if(await observed(()=>realpath(snapshot.resources))!==join(product,"resources/loginom"))throw Error("LOGINOM_HANDSHAKE_INVALID")
+    const cli=await observed(async()=>JSON.parse(await readFile(join(product,"cli-manifest.json"),"utf8")))
+    const manifest=await observed(async()=>JSON.parse(await readFile(join(snapshot.resources,"resource-manifest.json"),"utf8")))
+    if(cli.format!=="loginom-cli-artifact-v1" || !Array.isArray(cli.files) || !Array.isArray(manifest.files))throw Error("LOGINOM_HANDSHAKE_INVALID")
+    for (const [path,actual,files] of [
+      ["resources/loginom/host/node-host.mjs",snapshot.entry,cli.files],
+      ["bin/node",snapshot.node,manifest.files],
+      ["runtime/src/acceptance/amount-import-type-v1.mjs",join(snapshot.resources,"runtime/src/acceptance/amount-import-type-v1.mjs"),manifest.files],
+      ["runtime/src/acceptance/ui-scan-collector.mjs",join(snapshot.resources,"runtime/src/acceptance/ui-scan-collector.mjs"),manifest.files],
+    ] as const) {
+      const entries=files?.filter((f:{path:string})=>f.path===path),entry=entries?.[0]
+      const expected=path.startsWith("resources/")?join(product,path):join(snapshot.resources,path)
+      if(entries?.length!==1 || !/^[a-f0-9]{64}$/.test(entry.sha256)
+        || await observed(()=>realpath(actual))!==expected
+        || createHash("sha256").update(await observed(()=>readFile(actual))).digest("hex")!==entry.sha256)
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
+    }
+    guard()
+    // No shared acquisition/proxy provider has been linked on this receiving
+    // SHA. In particular, do NOT fall through to uncontrolled launchNodeHost,
+    // fabricate a phase-B tuple, fork, or reinterpret expiry as caller control.
+    root.phase="provider_unavailable"
+    throw Error("ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE")
+  } catch(error) {
+    if(root.phase!=="provider_unavailable")root.phase="refused"
+    throw primary(error)
+  }
+}, {
+  retained(input: object, control: AmountStartupControl) {
+    if(!control)return undefined
+    const root=amountControls.get(control)
+    if(!root || root.input!==input || root.control!==control)return undefined
+    return Object.freeze({original:root.original,authorization:root.authorization,phase:root.phase,pending:root.pending,
+      primaryFailurePresent:root.primary!==undefined,primaryFailure:root.primary?.value,
+      secondaryFailurePresent:root.secondary!==undefined,secondaryFailure:root.secondary?.value,
+      originalControlRetained:true,bindingPhase:"unavailable" as const,nativeOwnerVerified:false,
+      evidenceSettled:false,cleanupSettled:false,acknowledged:false})
+  },
+})
+
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
 export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
