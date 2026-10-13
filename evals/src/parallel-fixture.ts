@@ -1,6 +1,6 @@
 import os from "node:os"
 import path from "node:path"
-import { lstat, mkdtemp, readdir, realpath, unlink } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readdir, realpath, unlink } from "node:fs/promises"
 import { agentCommand } from "./cli"
 import type { EvalConfig } from "./config"
 import { archiveDiagnostics } from "./diagnostics"
@@ -44,15 +44,17 @@ export async function validateFixture(config: EvalConfig, input: ParallelFixture
 }
 
 export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnType<typeof validateFixture>>, runId: string, runDir: string) {
+  const file = { ...input.file, controller: { ...input.file.controller, stateDir: path.join(input.file.controller.stateDir, runId) } }
+  await mkdir(file.controller.stateDir, { mode: 0o700 })
   const identity = { containerId: `fixture:${new Bun.CryptoHasher("sha256").update(input.storage).digest("hex")}`,
     startedAt: new Date().toISOString(), serverEpoch: crypto.randomUUID(), studioContainerId: "fixture:studio",
     studioStartedAt: new Date().toISOString(), configurationHash: "fixture" }
-  await writeLeaseReceipt(path.join(input.file.controller.stateDir, "run-journal.json"),
+  await writeLeaseReceipt(path.join(file.controller.stateDir, "run-journal.json"),
     { version: 2, commandId: runId, liveQualified: false, identity })
   const leases: SlotLease[] = []
   try {
     for (const slot of input.file.slots.slice(0, config.parallel))
-      leases.push(await acquireSlotLease(input.file, slot, identity, input.lockRoot))
+      leases.push(await acquireSlotLease(file, slot, identity, input.lockRoot))
     const contexts = []
     for (const lease of leases) {
       const slot = lease.slot
@@ -72,10 +74,10 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
       await recoverIfNeeded(command, 2)
       const archive = await mkdtemp(path.join(slot.historyDir, `${runId}-initial-`))
       const receipt = await archiveProfileEvidence(slot.profileDir, archive,
-        path.join(input.file.controller.stateDir, `${runId}-${slot.id}-initial.archive.json`))
-      const cleanup = path.join(input.file.controller.stateDir, `slot-${slot.id}.cleanup.json`)
+        path.join(file.controller.stateDir, `${runId}-${slot.id}-initial.archive.json`))
+      const cleanup = path.join(file.controller.stateDir, `slot-${slot.id}.cleanup.json`)
       await writeLeaseReceipt(cleanup, fixtureCleanup(lease, receipt.archive))
-      contexts.push({ config: own, command, lease, cleanup, controllerDir: input.file.controller.stateDir,
+      contexts.push({ config: own, command, lease, cleanup, controllerDir: file.controller.stateDir,
         storage: { path: storage, device: storageInfo.dev, inode: storageInfo.ino } })
     }
     return contexts
