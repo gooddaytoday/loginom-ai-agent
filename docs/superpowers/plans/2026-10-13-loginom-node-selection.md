@@ -879,7 +879,7 @@ docker cp "$selection_container:$selection_storage/$selection_csv_name" \
   и неизвестный формат evidence приостанавливают серию как раньше.
   Baseline закрывается машинным аудитом без ручного semantic review. Сохранить
   все исходы и причины, не приписывать отсутствие артефакта автоматически runtime.
-- [ ] Параллельно оставшимся baseline разрешить Task 4 с отдельным ownership
+- [x] Параллельно оставшимся baseline разрешить Task 4 с отдельным ownership
   двух skill-файлов. Во время candidate build никто не меняет исходники, runner,
   audit или fixtures. Изолированный payload baseline продолжает работать;
   candidate live/check ждут освобождения общего профиля и завершения baseline.
