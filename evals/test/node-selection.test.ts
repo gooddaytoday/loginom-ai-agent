@@ -68,3 +68,20 @@ test("pilot audit reads real native XML and oracle but does not certify unfinish
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test.each(["invalid", "missing"])("pilot preserves %s package evidence as unknown JS count", async (kind) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-"))
+  try {
+    await mkdir(path.join(directory, "artifact"))
+    if (kind === "invalid") await Bun.write(path.join(directory, "artifact/package.lgp"), "not a package")
+    await Bun.write(path.join(directory, "parts.json"), JSON.stringify({ sessionID: "pilot-session", parts: [] }))
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(2)
+    const audit = await Bun.file(path.join(directory, "selection-audit.json")).json()
+    expect(audit).toMatchObject({ jsNodes: null, policyStatus: "incomplete", calculationPassed: false })
+    expect(audit.failures).toContain(kind === "invalid" ? "PACKAGE_XML_INVALID" : "PACKAGE_MISSING")
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})

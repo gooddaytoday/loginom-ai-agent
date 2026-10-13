@@ -16,11 +16,12 @@ async function main() {
   const task = (await loadTasks(args.tasks, [args.task]))[0]!
   const snapshot = await Bun.file(path.join(args.attempt, "parts.json")).json() as unknown
   const artifactDir = path.join(args.attempt, "artifact")
-  const xml = await readNodeXml(artifactDir)
+  const xml = await Bun.file(path.join(artifactDir, "package.lgp")).exists()
+    ? await readNodeXml(artifactDir).catch(() => ({ invalid: "XML_READ_FAILED" })) : null
   const oracle = await checkOracle(task, artifactDir)
   const selection = inspectSelection({
     mode: args.mode,
-    nodeTypes: "invalid" in xml ? [] : xml.nodes.map((node) => node.type),
+    nodeTypes: xml && !("invalid" in xml) ? xml.nodes.map((node) => node.type) : null,
     parts: record(snapshot) && Array.isArray(snapshot.parts) ? snapshot.parts : [],
   })
   const result = {
@@ -29,7 +30,9 @@ async function main() {
     oraclePassed: oracle.passed, oracleError: oracle.error, calculationPassed: false,
     historyComplete: false, runtimeSettled: false,
     // Task 1B completes receipt/history validation using the first real pilot.
-    failures: [...selection.failures, "AUDIT_NOT_FINALIZED"],
+    failures: [...selection.failures,
+      ...(xml === null ? ["PACKAGE_MISSING"] : "invalid" in xml ? ["PACKAGE_XML_INVALID"] : []),
+      "AUDIT_NOT_FINALIZED"],
   }
   await Bun.write(path.join(args.attempt, "selection-audit.json"), JSON.stringify(result, null, 2) + "\n")
   process.exitCode = result.policyStatus === "failed" ? 1 : 2
