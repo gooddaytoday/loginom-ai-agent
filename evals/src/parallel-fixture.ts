@@ -132,12 +132,17 @@ export async function finishFixtureAttempt(context: Awaited<ReturnType<typeof pr
   const receipt = await archiveProfileEvidence(context.config.profileDir, archive,
     path.join(context.controllerDir, `${path.basename(archive)}.archive.json`))
   const storage = await cleanupFixtureStorage(context, result, out)
-  result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
+  const remaining = await inspectFixtureStorage(context, path.basename(path.dirname(path.dirname(out))))
+  const error = remaining.names === null ? remaining.error ?? "Slot storage inspection failed"
+    : remaining.names.length ? `Slot storage not empty: ${context.lease.slot.id}` : null
+  result.environment_cleanup = { status: error ? "failed" : "confirmed", evidence: "cleanup.json", error }
   await writeLeaseReceipt(path.join(out, "cleanup.json"), { ...evidence, liveQualified: false, archive: receipt, storage, result: result.environment_cleanup,
     stages: [...["processes", "diagnostics", "writer", "ready"].map(stage => ({ stage, status: "confirmed" })),
       { stage: "profile_history", status: "confirmed", path: archive }] })
-  await writeLeaseReceipt(context.cleanup, fixtureCleanup(context.lease, archive))
+  await writeLeaseReceipt(context.cleanup, { ...fixtureCleanup(context.lease, archive), ...(error
+    ? { status: "failed", storageDeletionAllowed: false, nextAdmissionAllowed: false, storage: remaining } : {}) })
   await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
+  if (error) throw Error(error)
 }
 
 export async function beginFixtureAttempt(context: Awaited<ReturnType<typeof prepareFixture>>[number]) {
