@@ -73,6 +73,19 @@ role review ещёpending; per-node limits не являются global/fixed151
 `d42bccf0c4b94ec77813955e3586a886af7ed15ce8f348ab0689868dc0ff28c0`.
 Модельная baseline начинается заново; historical18+2 не включены в новые слоты.
 
+## Серия192418: baseline1/18
+
+sales-by-category/1: CLI0/wrapper0, cleanuptrue, timeoutfalse,
+Session `ses_ec930295affezmSkcSMYMMkfSI`, CLI337.121s (19:49:09.689–19:54:46.810Z).
+Audit2654… complete: oracle/calculation/history/runtime/identity/graph/export PASS,
+policy passed, failures[], JSnodes/calls/success0/0/0. Package SHA
+`88282df240afb3a0515adaa3e7110713c98b4dbcd0bf7ae17c0e4c2929ae9674`.
+Actual baseline prepare подтвердил16types/7.4.2/programming.javascript applyavailable;
+baseline-catalog-attestation SHA
+`a81a317b9eac9d44e581281e2dd1051b60bf651874f3884433e3ecee38658bd9`.
+Baseline semantic review не выполнялся; это штатный machine audit новой попытки.
+abc-pareto-groups/1 запущен следующим отдельным CLI; candidate0/25.
+
 ## Историческая вторая сопоставимая пара
 
 Обе сборки выполнены последовательно в одном managed worktree `node-selection-build`

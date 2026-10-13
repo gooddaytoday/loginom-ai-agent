@@ -1386,3 +1386,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 
 - Новая пара192418-c71363 собрана/verify0 из общего05b645eec9; immutablepins43слота и effectiveaudit2654… закреплены. Независимый pair/pins review и nativebothhiddenroles proof pending; model0/current-run ещё historical142936. Новыйdescribeprobe15схем ACK/exit0, actualprepare/gapbinding pending.
 - Новая192418-c71363 допущена к новой полной18+25: paired/pins/nativecore Approved; fullprivate driverexit1 сохранён (extra stale retained reread). Новая actualgapattestation c485ce08… completed, tags/model ещёpending; historical18+2 не переносятся.
+- Серия192418 baseline1/18 complete: sales1 CLI0/wrapper0/cleanuptrue/oracle+calculation+allmachineaxesPASS/JS0, CLI337.121s. ABC1 следующийactive; candidate0/25. Actualbaselineprepare16/7.4.2/JSapplyavailable bound (a81a317b…).

@@ -391,6 +391,10 @@ gap attestation c485ce08… поддерживает known-standard capability g
 невозможность произвольной композиции151элемента. Model acceptance ещёpending.
 Текущий run192418 требует полный новый denominator18+25.
 
+Новая baseline192418 начата: sales1 полный machinePASS/CLI0/cleanuptrue/JS0,
+actual baseline prepare16types/7.4.2/JSavailable подтвердил pins. ABC1 active,
+candidate0; полная18+25 ещёpending. Ранее завершённые18baseline не включены.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.
