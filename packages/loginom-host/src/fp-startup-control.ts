@@ -144,11 +144,13 @@ export function getFPHostStartup(options: object) { return hostStarts.get(option
 // The early receiver is the only producer of this private Stage-A capability.
 // Keep Amount separate from the FP WeakMap and literal FP wrapper.
 const amountHostStarts = new WeakMap<object, ReturnType<typeof retainAmountStartup>>()
+const amountBoundStarts = new WeakSet<object>()
 export function bindAmountHostStartup(options: object, startup: ReturnType<typeof retainAmountStartup>) {
   if(startup.tuple.harness!=='amount-import-type-v1' || !startup.tuple.operation || !startup.tuple.request)
     throw Error('LOGINOM_HANDSHAKE_INVALID')
-  if(hostStarts.has(options) || amountHostStarts.has(options))throw Error('LOGINOM_HANDSHAKE_INVALID')
+  if(!startup.pending || amountBoundStarts.has(startup) || hostStarts.has(options) || amountHostStarts.has(options))throw Error('LOGINOM_HANDSHAKE_INVALID')
   startup.assertHostOptions(options as Record<string,unknown>)
+  amountBoundStarts.add(startup)
   const guard=()=>startup.assertHostOptions(options as Record<string,unknown>)
   amountHostStarts.set(options,{...startup,guard,get pending(){return startup.pending},
     get accepted(){return startup.accepted},get secondary(){return startup.secondary}})
