@@ -36,6 +36,8 @@
 | `packages/product/skills/loginom-automation/references/workflow.md` | Процедура выбора, fallback, восстановление |
 | `evals/src/node-selection.ts` | Новый чистый аудит структуры и tool parts, без запуска CLI |
 | `evals/test/node-selection.test.ts` | Негативные и положительные тесты аудита |
+| `evals/src/node-selection-graph.ts` | Проверка data lineage на результате существующего readNodeXml |
+| `evals/test/node-selection-graph.test.ts` | Реальные reference-графы и точечные нарушения связности |
 | `evals/script/audit-node-selection.ts` | Новый offline entrypoint, загрузка пакета/CSV/evidence |
 | `evals/script/run-node-selection-attempt.ts` | Единая команда одной локальной попытки: подготовка, CLI, evidence, аудит |
 | `evals/test/fixtures/node-selection/` | Обезличенные реальные evidence и их точечные негативные варианты |
@@ -241,6 +243,12 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
     operation/node identity и `cleanup_complete:true`; для их wait/status —
     `state:settled`, `progress.cleanup_complete:true`, `pending_phase:null` и
     отсутствие незавершённого чтения. `outcome:null` у этих read штатен.
+    Узкое исключение для вложенного `artifact.upload`: его
+    `AMBIGUOUS/UPLOAD_SERVER_VERIFICATION_REQUIRED` закрывается собственным
+    `artifact_delivery_completed` с `SUCCEEDED`, `cleanup_complete:true` и
+    `upload_completion_verified:true` только при совпадении runtime attempt/Dock
+    UUID, `upload_operation_id`, destination, bytes и SHA256. Другие AMBIGUOUS
+    и несовпадающие квитанции остаются incomplete.
     События `completed`, `node_checkpoint` или `state:"settled"` сами по себе
     недостаточны: completed допускает AMBIGUOUS, а синтаксический отказ
     Калькулятора не обязательно пишет node_checkpoint.
@@ -259,9 +267,12 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
   ровно один JS и `TBGGroupDataEngine`, `TBGSortingEngine`, `TBGExportTextFile`.
   Связность проверять машинно по XML всех workflows: endpoints связей существуют,
   у каждого экспортируемого результата есть направленный путь от импорта
-  приложенных данных, вычислительные узлы входят в эту цепочку, нет подмены
-  результата изолированной константной веткой. Не требовать точного reference
-  графа. Неизвестная форма ссылок/lineage — incomplete, не PASS.
+  приложенных данных; все data inputs предков Export имеют источник с такой
+  lineage (у Join оба входа). Нет подмены результата изолированной константной
+  веткой. Боковые ветви, не влияющие на Export, допустимы. Порты идентифицировать
+  вместе с узлом и scope; параметрические связи не считать data path.
+  Переиспользовать readNodeXml, не писать новый XML-парсер. Не требовать точного
+  reference графа. Неизвестная форма ссылок/lineage — incomplete, не PASS.
   Стандартный успех закрывается машинно: полные evidence, settlement, exit 0,
   no-JS, oracle и связность. Reviewer смотрит исключения/аномалии и выборку
   успехов по Task 6; его verdict хранится в `<attempt>/graph-review.json`.
@@ -1082,7 +1093,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   провала. К сравнению долей добавлен минимум одного полного успеха на задачу.
 - Node/npm и Chromium проверены по release SHA. Найденный Chromium в `/tmp` —
   подтверждённый источник, а не доказательство отсутствия других локальных копий.
-  Постоянная копия будет создана при реализации Task 3.
+  Постоянная копия создана и SHA проверен при реализации Task 3.
 - Код 130 означает отмену; timeout требует записи собственного дедлайна/SIGINT.
   90 секунд — бюджет `host.close`, а не гарантированный срок завершения CLI.
   Профиль занят на время каждого процесса/cleanup; бюджет окон не включает накладные
@@ -1104,10 +1115,12 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Этап 1A выполнен; полный audit до 1B не сертифицирует PASS.
 - Fixtures реализованы TDD: `81c4a14e7`, `2de55ec10`, `3de3526f9`.
 - Collector реализован TDD: `7ef876bf0`, `a50c93c25`; независимое review проведено.
-- Целевые проверки из evals: 32 PASS, typecheck PASS; runtime/skill ещё не менялись.
+- Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
 - Текущий run: `20261013T093809Z-f5d429`, private evidence под evals/results.
 - Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
-- Baseline ещё не собран, модельные live-попытки ещё не запускались.
-- Следующий шаг: frozen baseline → пилот → аудит 1B; затем остальные baseline параллельно Task 4.
+- Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
+- Первый pre-dispatch OAuth 401 сохранён как incident; авторизация по коду завершилась exit 0.
+- Пилот sales-by-category/1: CLI exit 0, oracle PASS, артефакты сохранены; полный audit 1B ещё идёт.
+- Следующий шаг: завершить audit/graph TDD и offline-пилот; затем 17 baseline и candidate build.
