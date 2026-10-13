@@ -496,6 +496,23 @@ decimal1.7E+01/2.1E+01 с verified precision. Sort ещёне вызван. Orig
 по actual028 исправить только Group real-number assertion; не менять sourcefix,
 числа/oracle и целочисленные producer/Sort проверки. Finalnativegate pending.
 
+Privateproof7 подтвердил оба actual native sourceoverride preflights через
+existing verifier: Group A17/B21, прямой Sort B21/A11/A6, freshschema/F3/Close/
+graphrestore/Save. LastSave037 readback сохраняет полный JS component/source/
+declaredschema. Source DOMfix завершён: independent f2a80fb9… и full upstream
+3828tests/3818PASS/0FAIL/10SKIP/exit0, root verification98cdb115… . Это не final
+ordinary rebuilt gate: first export-group остановился в input_mapping, Done
+enabled, но finish_wizard недоступен из-за unobserved input_port_context.
+Публичный запрос/схема/opening/mapping корректны; точный native predicate ещё
+неизвестен и требует bounded readonly capture. Originalexit3/cleanupfalse
+сохраняются. Sourcefix не ослабляет общий JS UI guard или Export ownership.
+Independent recovery cf1fbfc8… подтверждает закрытие ownuser95/admin96 и полное
+равенство JS component before/afterSort; CSV/finalgate не подтверждены. Следующая
+минимальная diagnosticfixture Import→Group→Export сохраняет actual Group source/
+schema/labels/breadcrumb ширину; bounded readonly preparedInputPort/navigation
+capture нужен до нового guardfix. Non-reproduction не считается основанием для
+Product changes.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

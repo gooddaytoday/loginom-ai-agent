@@ -8,7 +8,7 @@ import {captureManagedJavascriptSelection} from '../lib/javascript-managed-selec
 import {captureJavascriptSelection} from '../lib/javascript-owned-selection.mjs';
 import {inspectJavascriptVisualizers} from '../lib/javascript-output-context.mjs';
 import {inspectJavascriptPreviewPort} from '../lib/javascript-output-preview.mjs';
-import {runJavascriptOutputPreview} from '../lib/javascript-output-preview.mjs';
+import {runJavascriptOutputPreview,makeJavascriptOutputPreviewCode} from '../lib/javascript-output-preview.mjs';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {preflightGroupingSource} from '../lib/grouping-preflight.mjs';
 import {preflightSortingSource} from '../lib/sorting-preflight.mjs';
@@ -102,10 +102,11 @@ test('owned preview performs one port click followed by one F3 and retains unkno
 });
 
 function channelFixture(){
- const f=browserFixture(),records=[],events=[];
+ const f=browserFixture(),records=[],events=[],pressedElements=[];
  const unwrap=args=>Object.fromEntries(Object.entries(args).map(([k,v])=>[k,v?.handleValue??v]));
  const evaluate=(fn,args)=>runInNewContext('('+fn.toString()+')',f.context)(unwrap(args));
- const page={evaluate:async(fn,args)=>evaluate(fn,args),evaluateHandle:async(fn,args)=>({handleValue:evaluate(fn,args),dispose:async()=>{},getProperty:async()=>({asElement:()=>({press:async key=>events.push(key)}),dispose:async()=>{}})}),
+ const page={evaluate:async(fn,args)=>evaluate(fn,args),evaluateHandle:async(fn,args)=>{
+  const value=evaluate(fn,args);return {handleValue:value,dispose:async()=>{},getProperty:async property=>{const element=value[property];return {asElement:()=>({press:async key=>{assert.equal(element.isConnected,true);pressedElements.push(element);events.push(key);}}),dispose:async()=>{}};}};},
   mouse:{click:async()=>{events.push('click');f.selected.splice(0,f.selected.length,f.port.FCell);}},
   locator:()=>({press:async key=>events.push(key)})};
  const operation={id:'group-001',action:{action_key:'node.apply',revision:'1.0.0'},deadline:Date.now()+10000,
@@ -113,7 +114,7 @@ function channelFixture(){
  const options={operation,targetOrigin:f.task.targetOrigin,targetBuild:f.task.targetBuild,preparedNodeContext:fixture().binding,
   record:async entry=>{records.push(entry);return structuredClone(entry);},
   wrapMutation:(code,options)=>({code,options}),execute:async code=>runInNewContext('('+(typeof code==='string'?code:code.code)+')',{Symbol,Map,Date})(page)};
- return {...f,page,operation,options,records,events,channel:createNodeProcedure(options)};
+ return {...f,page,operation,options,records,events,pressedElements,channel:createNodeProcedure(options)};
 }
 test('managed preview journals each fixed gesture and keeps cleanup pending until preview Close',async()=>{
  const f=channelFixture();await f.channel.openJavascriptPreview(f.task.output);
@@ -248,4 +249,71 @@ test('locked managed producer refuses capture and revalidation before another ge
   const f=browserFixture(),ticket=afterCapture?f.inspect(null,true):null;f.native.FLocked=true;
   assert.throws(()=>f.inspect(ticket,!afterCapture),/locked/);
  }
+});
+
+// Real private native proof: native owner/data/cell and node shape are unchanged,
+// own port is selected, but its old DOM is detached and replaced after mouse.click.
+test('observed post-click own port redraw keeps native binding and F3 uses the current verified element',async()=>{
+ const observed=JSON.parse(readFileSync(new URL('./fixtures/javascript-preview-post-select-redraw.json',import.meta.url),'utf8'));
+ assert.equal(observed.tuple.sameElement,false);assert.equal(observed.tuple.oldElementConnected,false);
+ assert.equal(observed.tuple.s0Port,true);assert.equal(observed.tuple.sameData,true);
+ const f=channelFixture(),before=f.portShape;f.port.FPortIndex=observed.tuple.piValue;
+ const replacement=new Element('g',before.attrs,'',before.box);replacement.append(new Element('image',{href:'output_table_active.svg'}));
+ const click=f.page.mouse.click,graph=f.held.retained.graph,getState=graph.view.getState;
+ f.page.mouse.click=async(...args)=>{
+  await click(...args);before.remove();graph.container.append(replacement);
+  graph.view.getState=cell=>cell===f.port.FCell?{shape:{node:replacement}}:getState(cell);
+  f.context.document.elementFromPoint=()=>replacement;
+ };
+ await f.channel.openJavascriptPreview(f.task.output);
+ assert.deepEqual(f.events,['click','F3']);assert.deepEqual(f.pressedElements,[replacement]);
+ assert.equal(f.records.find(r=>r.action?.verb==='javascript_preview_open').action.expected.port_element_replacements,1);
+ assert.equal(f.operation.cleanupConfirmed,false);
+});
+
+function redrawPort(f,{keepOld=false}={}){
+ const graph=f.held.retained.graph,current=graph.view.getState(f.port.FCell).shape.node,getState=graph.view.getState;
+ const replacement=new Element('g',current.attrs,'',current.box);replacement.append(new Element('image',{href:'output_table_active.svg'}));
+ if(!keepOld)current.remove();graph.container.append(replacement);
+ graph.view.getState=cell=>cell===f.port.FCell?{shape:{node:replacement}}:getState(cell);
+ f.context.document.elementFromPoint=()=>replacement;
+ return replacement;
+}
+test('one confirmed post-select port redraw never authorizes a second replacement',async()=>{
+ const f=channelFixture(),task={...f.task,operation_id:'preview-repeat'};
+ const run=extra=>f.options.execute(makeJavascriptOutputPreviewCode({...task,...extra}));
+ const before=await run({mode:'capture'}),click=f.page.mouse.click;
+ f.page.mouse.click=async(...args)=>{await click(...args);redrawPort(f);};
+ await run({mode:'select',gesture_id:'select-once',expected:before});
+ const after=await run({mode:'inspect'});assert.equal(after.port_element_replacements,1);
+ redrawPort(f);
+ await assert.rejects(run({mode:'inspect'}),/Managed preview native port changed/);
+ assert.deepEqual(f.events,['click']);await run({mode:'dispose'});
+});
+
+test('a detached port replacement before the selection gesture refuses without a click',async()=>{
+ const f=channelFixture(),task={...f.task,operation_id:'preview-before-click'};
+ const run=extra=>f.options.execute(makeJavascriptOutputPreviewCode({...task,...extra}));
+ const before=await run({mode:'capture'});redrawPort(f);
+ await assert.rejects(run({mode:'inspect'}),/Managed preview native port changed/);
+ await assert.rejects(run({mode:'select',gesture_id:'must-not-click',expected:before}),/Managed preview native port changed/);
+ assert.deepEqual(f.events,[]);await run({mode:'dispose'});
+});
+for(const [name,change] of Object.entries({
+ foreignSelection:f=>f.selected.splice(0,f.selected.length,{}),
+ connectedOldElement:(f,old)=>{const foreignRoot=new Element('div');foreignRoot.root=true;foreignRoot.append(old);},
+ nativePortData:f=>{f.port.data={};},
+ nativePortCell:f=>{f.port.FCell={parent:f.native.FCell};},
+ coveredCurrentElement:f=>{f.context.document.elementFromPoint=()=>null;},
+}))test('post-click redraw still refuses '+name+' without F3 or rebinding the ticket',async()=>{
+ const f=channelFixture(),task={...f.task,operation_id:'preview-unsafe-redraw'};
+ const run=extra=>f.options.execute(makeJavascriptOutputPreviewCode({...task,...extra}));
+ const before=await run({mode:'capture'}),old=f.portShape,click=f.page.mouse.click;
+ f.page.mouse.click=async(...args)=>{await click(...args);redrawPort(f);change(f,old);};
+ await run({mode:'select',gesture_id:'select-once',expected:before});
+ await assert.rejects(run({mode:'inspect'}));
+ const lease=f.page[Symbol.for('loginom-dock.javascript-output-preview-v1')].get(task.operation_id);
+ assert.equal(lease.ticket.handleValue.portElement,old);
+ assert.equal(lease.ticket.handleValue.portElementReplacements,0);
+ assert.deepEqual(f.events,['click']);await run({mode:'dispose'});
 });

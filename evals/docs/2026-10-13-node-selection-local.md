@@ -96,6 +96,18 @@ originalexit1 — privateintegerreader отказал на nativeSUM Totaltype r
 verifiedbinary64 values17/21/decimal1.7E+01/2.1E+01. Sortnever; ownclose/logout/
 ACKexit0 verified. Separateproof7 actual028TDD exactrealassertion only; sourcebf5/
 pair47/expectedvalues не меняются, fullnative+upstream ещёpending.
+Privateproof7 Group/directSort+Save PASS, fullJS component/source/schema after
+both unchanged; DOM sourcefix fullupstream3828/3818PASS/0FAIL/10SKIP/exit0,
+verification98cdb115… completed. Firstexport-group input_mapping refused:
+Done enabled без finish_wizard из-за unobserved input_port_context. Request/schema/
+mapping valid, exactnativepredicate UNKNOWN; boundedreadonlycapture next.
+Originalexit3/cleanupfalse сохранён. Ownuser95closed/admin2freshabsence/logout/
+MCPexit0; postreviewpending. Ordinarynewpair/nativeCSV/model18+25 pending.
+Recovery/component review cf1fbfc8… completed: exactuser95/admin96 closed,
+noReinit/others/raw/payload preserved; full JS component before/afterSort equal.
+Minimalprivateproof8 Import→Group→Export сохраняет source type/schema/breadcrumb
+layout для bounded readonly input-port/navigation capture. No guardfix до actual
+predicate; non-reproduction не подтверждает необходимость Product changes.
 
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core

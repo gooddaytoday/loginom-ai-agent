@@ -173,6 +173,35 @@ offline.1259events/5sourceoverride records/58sources/12fixtures/29receipts/
 4journals/2cleanup preserved. Packageclosed/logout/nodiscard/HostACKexit0;
 Sort/export/afterXML pending, originalexit1/nonacceptance остаётся.
 
+Privateproof7 root14182exit3, resultSHA
+`627a0fcfee003d653139b41858dadf9685ee0cd4dd44bd5042759bb59fbda61d`;
+independent stop review SHA
+`f7825c7e5056a816f46784547f09d8612d882f89caf8c0004cd3dde21f0e8d02`:
+оба Group/directSort sourceoverride preflights PASS (F3/completefreshschema/
+Close/graphrestore), Group A17/B21 и Sort B21/A11/A6, обаSave.10overlayrecords/
+59sources/13fixtures/39raw/4journals/1685events preserved. First export-group
+039 AMBIGUOUS input_mapping до execution. Actual input open и mapping2/2 verified,
+Done enabledtrue, но input_port_context unobserved и finish_wizard отсутствует;
+точный native predicate UNKNOWN. Диагноз5673994a…/publicschemaPASS.
+Originalcleanup/logout/shutdownfalse/HostACKfalse exit1 preserved. Rootownuser95
+closed/admin2freshabsence/logout22:36:14.799Z/MCP80355exit0; postreviewpending.
+Root lastSave037 package readbackSHA
+`218bb0b8c59fc77ab6d7de2dfaf6de485692cb032cc164a241b355e244239282`
+подтвердил fullJScomponent/source/schema unchanged после обеих ветвей; CSV/final
+exportgraph всё ещёpending. Source DOMfix полный upstream:3828tests/3818PASS/
+0FAIL/10SKIP/exit0, pinnedNode24.19; verificationSHA
+`98cdb115ff3acbf6e29fd83a238cc2213e77bcdfb3304cf99041fb703d120a43`.
+Sourcefix completion не закрывает ordinary rebuilt native или model18+25 gate.
+Independent recovery/component preservation review SHA
+`cf1fbfc87dc0aa380d9eac2fc1b1bf8c9437e41bd6a3e75fb259f6ea001467a5`:
+user95 closed22:36:03.790Z/admin96 closed22:36:14.791Z/noReinit/others preserved;
+54raw/59source/4397runtime files unchanged. Existing saved-js.py independently
+прочитал actual before/package.lgp и lastSave037 saved-after-sort.lgp; весь
+normalized JS component/source/2columnschema равен beforeJSON. Это не CSV gate.
+Proof8 готовится как минимальные Import→Group→Export, без JS/Sort: тот же Group
+source/typed schema/labels/breadcrumb width, bounded readonly native navigation
+tuple; product guard не менять до confirmed predicate.
+
 ## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;

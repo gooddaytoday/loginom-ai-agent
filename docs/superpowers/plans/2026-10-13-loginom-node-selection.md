@@ -690,6 +690,17 @@ inspect после response-budget refusal). Standard group-001 останови
   pinned Node24.19 upstream3820 tests/3810PASS/0FAIL/10SKIP, exit0; native ещёpending.
   Source verification SHA `a1c91ba28f775d83b90f0be0e6dc680f6d46a64813247f642c7964be18d1603a`,
   independent review `fdd3a83d6c85bce0b938b7172ab996c07015f73cdc59effd3faad178807c3897`.
+- [x] По actual post-select DOM redraw исправить только private preview ticket:
+  после полного owner/native/selection/DOM/hitpoint validation разрешить одну
+  замену отсоединённого portElement до F3 и использовать текущий ElementHandle.
+  Helper bf5dd674…/actualtuple fixture, два RED→GREEN/218relevantPASS; independent
+  source review f2a80fb9…/53focusedPASS. Pinned Node24.19 full upstream3828/
+  3818PASS/0FAIL/10SKIP/exit0, verification98cdb115… . Private sourceoverride7
+  подтвердил оба native Group/directSort preflights, fresh outputs/Close/Save;
+  source/component/schema сохранённого JS после обеих ветвей неизменны.
+  Это sourcefix completion; обычная пересобранная nativeприёмка/CSV остаются
+  следующей незакрытой задачей. Отдельный Export input-context blocker не
+  разрешает ослаблять guards или переходить на JS.
 - [ ] Собрать новую matched baseline/candidate пару с этой общей runtime-правкой,
   прежними version/model/fixtures/seed/двумя skill версиями. Native без LLM
   подтвердить JS→Group и JS→newSort→Export, сохранённый пакет/выход/cleanup,
@@ -745,7 +756,21 @@ inspect после response-budget refusal). Standard group-001 останови
   Totaltype real/binary64 values17/21 и decimal1.7E+01/2.1E+01, precisionverified.
   Ownclose/logout/ACKexit0 verified; Sortnever. Separateproof7 TDD actual028
   limitedexact realcell assertion, producer/Sort integerguards/source unchanged.
-  FullprivateGroup+directSort/CSV/XML gate ещёpending; только после него upstream.
+  Полная private CSV/XML-проверка остаётся обязательной. Upstream sourcefix
+  выполняется после обоих native preview переходов; отдельный Export blocker
+  не изменяет проверяемый preview source и не закрывает finalgate.
+  Privateproof7 подтвердил ОБА Group/directSort+Save (A17/B21; B21/A11/A6),
+  source/component/schema после обоих сохранились. Fullupstream DOMfix passed,
+  но firstexport-group AMBIGUOUS/input_mapping: preparedInputPort context
+  unobserved, Done enabled без finish_wizard. Request/schema/mapping valid;
+  exact hidden native caption/visibility/icon predicate UNKNOWN. Source DOMfix
+  закрыт отдельно, oldexit3/cleanupfalse preserved. Ownuser95 адресноclosed/
+  admin2freshabsence/logout/MCPexit0, postreviewpending. Следующий boundedreadonly
+  private capture должен изолировать Export predicate перед sourcefix; не строить
+  гипотетическое разрешение hidden controls. Pair/model admission всё ещёblocked.
+  Recovery/sourcecomponent independentlycf1fbfc8… confirmed; originalcleanupfalse
+  remains. Следующий proof8 минимален: Import→Group→Export с тем же Group source/
+  schema/labels/breadcrumb width, readonly preparedInputPort/navigation tuple.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять

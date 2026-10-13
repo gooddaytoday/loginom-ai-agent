@@ -34,7 +34,7 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
 
 // Browser-only, fixed output-port observer. Visualizers contributes native
 // ownership checks only; neither its control nor Setting is used or opened.
-export function inspectJavascriptPreviewPort({held,task,ticket=null,capture=false},inspectOutput){
+export function inspectJavascriptPreviewPort({held,task,ticket=null,capture=false,allowPortRedraw=false},inspectOutput){
  const preparation=globalThis.__loginomDockPreparationV1,form=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
  const tabs=exact(task.workflow_ref.tab_tid),roots=exact(task.workflow_ref.prefix+';ModelForm;cmpDiagram');
@@ -52,11 +52,14 @@ export function inspectJavascriptPreviewPort({held,task,ticket=null,capture=fals
  const port=native.FPorts.flatMap(list=>list.FCollection).find(p=>p.FGuid===task.output.port_guid);
  const shape=graph.view.getState(native.FCell)?.shape?.node,portElement=graph.view.getState(port.FCell)?.shape?.node;
  const selected=graph.getSelectionCells();
+ const portRedrawn=ticket&&ticket.portElement!==portElement;
  if(port.FType!==1||port.FSubType!==1||task.output.native_index!==0
   ||port.FPortIndex!==undefined&&port.FPortIndex!==0
   ||!Array.isArray(selected)||selected.length>1||selected.length===1&&![native.FCell,port.FCell].includes(selected[0])
   ||ticket&&(ticket.shape!==shape||ticket.port!==port||ticket.portData!==port.data
-   ||ticket.portCell!==port.FCell||ticket.portElement!==portElement))throw Error('Managed preview native port changed');
+   ||ticket.portCell!==port.FCell)
+  ||portRedrawn&&!(allowPortRedraw&&ticket.portElementReplacements===0&&selected.length===1&&selected[0]===port.FCell
+   &&ticket.portElement?.isConnected===false&&portElement?.isConnected===true))throw Error('Managed preview native port changed');
  const box=portElement.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
  const hit=document.elementFromPoint(point.x,point.y),interactive=hit?.closest('button,a,input,select,textarea,[role="button"],[role="menuitem"]');
  if(!Object.values(box).every(Number.isFinite)||box.width<=0||box.height<=0
@@ -65,9 +68,13 @@ export function inspectJavascriptPreviewPort({held,task,ticket=null,capture=fals
   ||portElement.getAttribute('aria-disabled')==='true'||!hit||!portElement.contains(hit)
   ||hit.closest('[data-tid]')!==portElement||interactive&&interactive!==portElement)
   throw Error('Managed preview port hit point unavailable');
- if(capture)return {shape,port,portData:port.data,portCell:port.FCell,portElement};
+ if(capture)return {shape,port,portData:port.data,portCell:port.FCell,portElement,portElementReplacements:0};
+ // Selection redraws the port in Loginom 7.4.2. Rebind only our private ticket,
+ // after the unchanged native owner and the current DOM/hit point are verified.
+ if(portRedrawn){ticket.portElement=portElement;ticket.portElementReplacements++;}
  return {verified:true,node_id:task.owner.node_id,port_guid:port.FGuid,native_index:0,
-  selected:selected.length===1&&selected[0]===port.FCell,point,execution_started:false};
+  selected:selected.length===1&&selected[0]===port.FCell,point,execution_started:false,
+  port_element_replacements:ticket?.portElementReplacements??0};
 }
 
 export async function runJavascriptOutputPreview(page,task,capture,inspect){
@@ -88,7 +95,7 @@ export async function runJavascriptOutputPreview(page,task,capture,inspect){
  }
  if(Date.now()>=task.deadline)throw Error('Managed preview deadline expired');
  const args={held:lease.handle,ticket:lease.ticket,task};
- if(task.mode==='inspect')return page.evaluate(inspect,args);
+ if(task.mode==='inspect')return page.evaluate(inspect,{...args,allowPortRedraw:lease.selectReturned===true&&!lease.openAttempted});
  if(!['select','open'].includes(task.mode)||lease[task.mode+'Attempted']||task.mode==='open'&&!lease.selectReturned)
   throw Error('Managed preview gesture already used or lease unavailable');
  const current=await page.evaluate(inspect,args);

@@ -1,0 +1,31 @@
+{
+  "source": "Actual private native proof 20261013T203142Z-5bf175/native-js-downstream-proof-5, downstream-group post-select inspect before F3",
+  "receipt_sha256": "097272dd468bd8be2f91d6bb2fad8bf4d0a03db88fac483ba0662c4623d77022",
+  "original_status": "AMBIGUOUS",
+  "original_cleanup_complete": false,
+  "tuple": {
+    "pt": 1,
+    "ps": 1,
+    "ni": 0,
+    "piDefined": true,
+    "piNumber": true,
+    "piValue": 0,
+    "array": true,
+    "count": 1,
+    "s0Node": false,
+    "s0Port": true,
+    "s0Other": false,
+    "s1Node": false,
+    "s1Port": false,
+    "s1Other": false,
+    "sameShape": true,
+    "samePort": true,
+    "sameData": true,
+    "sameCell": true,
+    "sameElement": false,
+    "oldShapeConnected": true,
+    "shapeConnected": true,
+    "oldElementConnected": false,
+    "elementConnected": true
+  }
+}
