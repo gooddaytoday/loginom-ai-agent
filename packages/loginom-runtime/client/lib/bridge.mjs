@@ -265,6 +265,12 @@ export async function createBridge(config, session, { browserTransport: managedB
       if ((cleanupRefused || captureInFlight) && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
         'dock_operation_inspect','dock_node_status','dock_node_wait','tool_search','tool_describe'].includes(request.params.name))
         throw new McpError(ErrorCode.InvalidRequest, 'Package cleanup is unconfirmed; only read-only diagnosis is allowed');
+      // The private original lender cannot be replaced by public arguments or
+      // SDK extra.signal/timeout_ms. Require its per-call provider before any
+      // await, Prepare, receipt reader or serialized workspace creation. Keep
+      // raw first rejection outside the public error-formatting catch.
+      if (request.params.name === 'dock_prepare' && prepareLender)
+        prepareLender.requireInvocation();
       if (request.params.name === 'dock_diagnostics') {
         let archive = null;
         try { archive = JSON.parse(await readFile(join(session.directory, 'archive.json'), 'utf8')); } catch {}
