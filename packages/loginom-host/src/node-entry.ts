@@ -138,9 +138,10 @@ async function dispatch(message: unknown) {
         state.host = host
         guardFPStartup()
         state.port = loginomHostPort(port, host)
-        await host.settled()
+        try { await host.settled() }
+        catch (error) { throw fpStartup ? fpStartup.reject(error) : error }
         guardFPStartup()
-      })
+      }, fpStartup ? error => { throw fpStartup.reject(error) } : undefined)
       let accepted = false
       try {
         await state.starting
@@ -172,7 +173,8 @@ async function dispatch(message: unknown) {
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
-    if (message.method === "start" && state.fpStartup) reply({id: message.id, rejection: closeRejection(error)})
+    if (message.method === "start" && state.fpStartup) reply({id: message.id, rejection: closeRejection(error),
+      ...(state.fpStartup.secondary ? {secondaryRejection: closeRejection(state.fpStartup.secondary.value)} : {})})
     else reply({ id: message.id, error: hostError(error) })
   }
 }
