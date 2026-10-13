@@ -13,7 +13,7 @@ const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 function requestDigest(value,seen=new Set()) {
  const walk=v=>{
   if(v===null||typeof v==='string'||typeof v==='boolean')return;
-  if(typeof v==='number'){requireValue(Number.isFinite(v),'UNION_CALLER_REQUEST_SHAPE');return;}
+  if(typeof v==='number'){requireValue(Number.isFinite(v)&&!Object.is(v,-0),'UNION_CALLER_REQUEST_SHAPE');return;}
   requireValue(v&&typeof v==='object'&&!seen.has(v),'UNION_CALLER_REQUEST_SHAPE');seen.add(v);
   const array=Array.isArray(v),keys=Reflect.ownKeys(v);
   requireValue(array?Object.getPrototypeOf(v)===Array.prototype:Object.getPrototypeOf(v)===Object.prototype,'UNION_CALLER_REQUEST_SHAPE');
