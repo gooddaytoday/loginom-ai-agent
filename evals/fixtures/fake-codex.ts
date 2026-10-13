@@ -1,4 +1,5 @@
 import path from "node:path"
+import { appendFileSync } from "node:fs"
 
 const args = Bun.argv.slice(2)
 if (args.includes("--environment-probe")) {
@@ -16,6 +17,13 @@ if (args.includes("--version")) {
 }
 const dir = args[args.indexOf("-C") + 1] ?? "."
 const out = args[args.indexOf("-o") + 1] ?? path.join(dir, "verdict.json")
+const trace = process.env.FAKE_CODEX_GATE_LOG
+if (trace) {
+  const record = (kind: "start" | "end") => appendFileSync(trace, JSON.stringify({ kind, pid: process.pid, dir, at: Date.now().toString() }) + "\n", { mode: 0o600 })
+  record("start")
+  process.on("exit", () => record("end"))
+  await Bun.sleep(Number(process.env.FAKE_CODEX_DELAY_MS ?? "0"))
+}
 // FAKE_CODEX_FLAKY_MARKER: первый вызов падает и создаёт маркер, второй проходит.
 const marker = process.env.FAKE_CODEX_FLAKY_MARKER
 if (marker && !(await Bun.file(marker).exists())) {
