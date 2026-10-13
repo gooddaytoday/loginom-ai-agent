@@ -156,7 +156,13 @@ export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, o
             if (!/^[a-zA-Z0-9_-]{1,128}\.json$/.test(name)) return true
             const row = await readLeaseReceipt(path.join(journalDir, name)).catch(() => { throw new EvalFailure("ADMIN_JOURNAL_INVALID", 2) })
             if (!jsonObject(row) || row.version !== 1 || row.kind !== "loginom-admin-command" || `${row.id}.json` !== name ||
-              !["intent", "confirmed", "not_applied", "unknown"].includes(String(row.state))) throw new EvalFailure("ADMIN_JOURNAL_INVALID", 2)
+              !["intent", "confirmed", "not_applied", "unknown"].includes(String(row.state)) ||
+              Object.keys(row).length !== (row.state === "intent" ? 8 : 10) || typeof row.desiredHash !== "string" || !/^[a-f0-9]{64}$/.test(row.desiredHash) ||
+              typeof row.at !== "string" || !Number.isFinite(Date.parse(row.at)) || row.state !== "intent" &&
+              (typeof row.replyHash !== "string" || !/^[a-f0-9]{64}$/.test(row.replyHash) || typeof row.settledAt !== "string" || !Number.isFinite(Date.parse(row.settledAt))))
+              throw new EvalFailure("ADMIN_JOURNAL_INVALID", 2)
+            try { requireAdminRequest({ v: 1, id: row.id, op: row.op, expectedIdentity: row.expectedIdentity, deadline: 0, payload: null }) }
+            catch { throw new EvalFailure("ADMIN_JOURNAL_INVALID", 2) }
             return row.state === "intent" || row.state === "unknown" || JSON.stringify(row.expectedIdentity) !== JSON.stringify(request.expectedIdentity)
           }))).some(Boolean)
           reconciled = true
