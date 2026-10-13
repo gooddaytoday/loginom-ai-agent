@@ -3976,11 +3976,12 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const mode of ['valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
     const socket=find('>Result'),settings=find('>Settings'),done=find(';btnDone');
+    socket.children[0].attrs.class='bg-vendor-icon-'+socketIcon;
     settings.attrs['data-tid']=settings.attrs['data-tid'].replace('>Settings','>Настройка');settings.ownText='Настройка';
     socket.style.display='none';settings.style.display='none';
     const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'};
@@ -3990,7 +3991,7 @@ test('overflow output socket requires a current native owner and visible actiona
     if(mode==='wrong_index')port.native_index=1;
     if(mode==='duplicate_socket'){
       const duplicate=page.add('a',socket.attrs['data-tid'],'Result',undefined,socket.parentElement);duplicate.style.display='none';
-      page.add('span',null,'',undefined,duplicate).attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+      page.add('span',null,'',undefined,duplicate).attrs.class='bg-vendor-icon-'+socketIcon;
     }
     if(mode==='wrong_socket_icon')socket.children[0].attrs.class='bg-vendor-icon-inputdatasourcesocketdef';
     if(mode==='missing_settings')settings.remove();
@@ -4005,7 +4006,7 @@ test('overflow output socket requires a current native owner and visible actiona
     if(mode==='stale_owner'){assert.notEqual(raw.status,'SUCCEEDED');assert.equal(raw.error.code,'PREPARED_NODE_CONTEXT_CHANGED');continue;}
     assert.equal(raw.status,'SUCCEEDED',mode);
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
-    assert.equal(controls.length,mode==='valid'?1:0,mode);
+    assert.equal(controls.length,mode==='valid'?1:0,socketIcon+': '+mode);
     if(mode==='valid'){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
     assert.equal(page.events.filter(e=>e==='click').length,0,mode);
   }

@@ -656,7 +656,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           && typeof preparedOutputPort.opening_operation_id==='string'&&preparedOutputPort.opening_operation_id.length>0;
         const overflowSocket=e=>boundOutputOverflow&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
-          &&e.querySelectorAll('.bg-vendor-icon-deriveddatasourceoutputsocketdef,.bg-vendor-icon-outputdatasourcesocketdef').length===1
+          &&e.querySelectorAll('.bg-vendor-icon-deriveddatasourceoutputsocketdef,.bg-vendor-icon-outputdatasourcesocketdef,.bg-vendor-icon-datasetoutputsocketdef').length===1
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
