@@ -188,6 +188,7 @@ export async function createLoginomHost(options: {
       if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
       const bound=chat?captures.get(chat):undefined
       return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
+        && bound.harness===(options.acceptanceCapture.harness??"calculator-grouped-before-done-v1")
         && bound.expires>Date.now() && captureLeases.get(chat!)===lease
         && generations.get(bound.generation)?.connection.username===bound.account
         && !lost.has(chat!) && !stale.has(chat!)
