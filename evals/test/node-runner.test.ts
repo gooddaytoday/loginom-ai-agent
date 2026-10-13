@@ -106,6 +106,28 @@ test("runNodeEvals: matching session filenames are collected only from the attem
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
+test("runNodeEvals: evidence write failure returns the completed run directory for recovery", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "node-runner-output-failure-"))
+  try {
+    const input = await parallelFixture(root, ["crosstable-min-max"], true)
+    const directory = path.join(root, "tasks/crosstable-min-max")
+    const task = await Bun.file(path.join(directory, "task.json")).json()
+    await Bun.write(path.join(directory, "parallel-native.json"), "{}")
+    await Bun.write(path.join(directory, "node-output-collision.json"), JSON.stringify({ resultsDir: input.env.EVAL_RESULTS_DIR }))
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({ ...task,
+      inputs: [...task.inputs, "parallel-native.json", "node-output-collision.json"],
+      checklist: [{ id: "crosstable", text: "real CrossTable", required: true }] }))
+    const run = await runNodeEvals(["--tasks", path.join(root, "tasks")], input.env,
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(2)
+    expect("error" in run ? run.error : "").toContain("native-crosstable.json")
+    expect(run.runDir).not.toBeNull()
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json()
+    expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "completed", slot_id: "a", environment_cleanup: { status: "confirmed" } })
+    expect(await Bun.file(path.join(run.runDir!, "code-verdict.json")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("text import diagnostic pipeline completes without a package but does not certify missing refusal evidence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "import-runner-"))
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ result: { revision: "fixture" } }) })
