@@ -133,7 +133,7 @@ async function dispatch(message: unknown) {
         state.port = loginomHostPort(port, host)
         try{await host.settled()}catch(error){throw fpStartup?fpStartup.reject(error):error}
         guardFPStartup()
-      })
+      },fpStartup ? error=>{throw fpStartup.reject(error)} : undefined)
       let accepted=false;try{await state.starting;guardFPStartup();if(state.closed)throw Error("LOGINOM_HOST_CLOSED");accepted=true}finally{fpStartup?.settle(accepted)}
       if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
