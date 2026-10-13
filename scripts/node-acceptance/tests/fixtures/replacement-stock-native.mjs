@@ -67,15 +67,13 @@ const replacements=new Map([
  [sdkStdio,`export const StdioClientTransport=globalThis.__replacementFixture.Transport;export const getDefaultEnvironment=()=>({});`],
  [sdkHttp,`export const StreamableHTTPClientTransport=globalThis.__replacementFixture.Transport;`],
  [lib+'workspace.mjs',`export * from ${JSON.stringify(lib+'workspace.mjs?original')};import {makeWorkspacePrepareCode as original} from ${JSON.stringify(lib+'workspace.mjs?original')};export const makeWorkspacePrepareCode=o=>original({...o,platform:'darwin'});`],
- [lib+'bridge.mjs',`import {createBridge as actual} from ${JSON.stringify(lib+'bridge.mjs?original')};import {writeFile} from 'node:fs/promises';export const createBridge=async(...args)=>{try{return await actual(...args)}catch(e){await writeFile(args[1].directory+'/fixture-stack.txt',e.stack??String(e));throw e}};`],
+ [lib+'bridge.mjs',`export {createBridge} from ${JSON.stringify(lib+'bridge.mjs?original')};`],
  [lib+'executor.mjs',`export * from ${JSON.stringify(lib+'executor.mjs?original')};export const createActionRuntime=globalThis.__replacementFixture.runtime;`],
  [lib+'action-catalog.mjs',`export * from ${JSON.stringify(lib+'action-catalog.mjs?original')};export const pinActionCatalog=globalThis.__replacementFixture.pin;`],
  [lib+'skill.mjs',`export * from ${JSON.stringify(lib+'skill.mjs?original')};export const createSkillLoader=globalThis.__replacementFixture.loader;export const skillTransport=()=>({});`],
 ]);
 // CJS createConnection is the only require() seam; host MCP Client/transport
 // remain the genuine SDK. This replacement does not produce native proof.
-const clientPath=require.resolve('@modelcontextprotocol/sdk/client/index.js'), originalClient=require(clientPath);
-require.cache[clientPath].exports={...originalClient,Client:class extends originalClient.Client {async callTool(...args){try{return await super.callTool(...args)}catch(e){await writeFile(join(root,'../whole-sdk-error.txt'),e.stack??String(e));throw e}}}};
 const mcp=require.resolve('@playwright/mcp');require.cache[mcp]={id:mcp,filename:mcp,loaded:true,exports:{createConnection:globalThis.__replacementFixture.createConnection}};
 registerHooks({resolve(specifier,context,next){const r=next(specifier,context);return replacements.has(r.url)?{...r,url:r.url+'?fixture'}:r;},load(url,context,next){const key=url.replace(/\?fixture$/,'');if(url!==key&&replacements.has(key))return {format:'module',source:replacements.get(key),shortCircuit:true};return next(url,context);}});
 

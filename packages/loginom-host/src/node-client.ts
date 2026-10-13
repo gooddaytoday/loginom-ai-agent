@@ -153,7 +153,7 @@ export async function launchNodeHost(input: NodeHostInput) {
           stock!.originals.set(p.run,stockFreeze({envelope,messageId:data.id,run:p.run,session:lease.session,generation:lease.generation}))
         }catch(error){stock!.failure??={value:error};data={id:data.id,error:'LOGINOM_RECOVERY_REQUIRED'}}
       }
-      if(sent.method==='acceptance.capture')stock!.captures.set(sent.input.run,Object.hasOwn(data,'error')?{rejected:true,error:Error(String(data.error))}:{rejected:false,result:data.result,messageId:data.id})
+      if(sent.method==='acceptance.capture'&&!stock!.captures.has(sent.input.run))stock!.captures.set(sent.input.run,Object.hasOwn(data,'error')?{rejected:true,error:Error(String(data.error))}:{rejected:false,result:stockFreeze(data.result),messageId:data.id})
     }
     events.emit("message", { data })
   })

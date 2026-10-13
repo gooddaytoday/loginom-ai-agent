@@ -16,11 +16,11 @@ const {cliCredentials}=await import('../../../packages/loginom-host/src/connecti
 const proof=JSON.parse(await readFile(join(import.meta.dir,'fixtures/replacement-capture/native-node-context.json'),'utf8')).binding
 const observation=JSON.parse(await readFile(join(import.meta.dir,'fixtures/replacement-capture/mapping-observation.json'),'utf8')).output
 const packagePath=observation.package_identity.path,account=packagePath.split('/')[1]
-for(const name of ['valid','native-error','undefined','null','false','zero','empty','missing','foreign','generation','hash','opening-sibling','outcome','duplicate','lost','native-error-late-client'])test('stock host/factory/caller '+name,async()=>{
+for(const name of ['valid','dto','native-error','undefined','null','false','zero','empty','missing','foreign','generation','hash','opening-sibling','outcome','duplicate','lost','native-error-late-client'])test('stock host/factory/caller '+name,async()=>{
  scenario=name==='native-error-late-client'?'native-error':name
  const directory=join(base,'profiles',name);await mkdir(directory,{recursive:true})
  const store=connectionStore(join(directory,'connection'),cliCredentials('linux'))
- await store.stage({generation:3,revision:1,url:'https://loginom.test',username:account,apiKey:'fixture',password:'fixture'});await store.activate(3)
+ await store.stage({generation:3,revision:1,url:'https://loginom.test',username:account,apiKey:'synthetic-only-73-test-key',password:'synthetic-only-73-password'});await store.activate(3)
  const owner:any={},signal=new AbortController().signal,run='stock-run',session='stock-session'
  let host:any,result:any,error:any,original:any
  try{
@@ -40,10 +40,11 @@ for(const name of ['valid','native-error','undefined','null','false','zero','emp
   }
   original=owner.observeStockOriginal();expect(original.correlation_only).toBe(true);expect(original.native_admission).toBe(false);expect(original.server_cancellation_verified).toBe(false);expect(original.outcome.result).toEqual(wait)
   expect(original.correlation.run).toBe(run);expect(original.correlation.generation).toBe(3);expect(original.correlation.native_opening_operation_id).not.toBe(original.correlation.outer_opening_operation_id);expect('signal' in original.correlation).toBe(false)
+  if(name==='dto'){expect(()=>owner.pinOriginal(original.correlation)).toThrow('ORIGINAL_REQUIRED');expect(owner.gates.native_admission).toBe('not_verified');return}
   await call('dock_action_run',{action_key:'package.save_checkpoint',parameters:{path:packagePath,conflict_policy:'fail'},operation_id:'fixture-save'})
   // Existing owned closed capability supplies the diagnostic. Receiving the
   // sibling does not invoke read(), construct original signal or set admission.
-  const channelResult=await owner.captureHandle(run)
+  const channelResult=await owner.captureHandle(run);expect(Object.isFrozen(channelResult)).toBe(true)
   if(name==='native-error-late-client')owner.host={foreign:true}
   if(name==='native-error-late-client'){
    expect(()=>owner.observeStockCapture()).toThrow('OWNER_CHANGED');expect(owner.primaryFailure).toBe(channelResult.rejected);expect(owner.primaryFailure.cause).toEqual({kind:'value',value:0,is_undefined:false});expect(owner.secondaryFailures.some((e:any)=>e.message==='REPLACEMENT_CALLER_OWNER_CHANGED')).toBe(true)
@@ -57,7 +58,7 @@ for(const name of ['valid','native-error','undefined','null','false','zero','emp
  }finally{
   await writeFile(join(directory,'stock-test-result.json'),JSON.stringify({name,result,error:error?.message,correlation:original,native:false,FS_tap:false,server_cancellation_verified:false},null,2))
   if(host){await host.close().catch((e:any)=>console.log('FIXTURE_CLOSE_REFUSAL '+name+' '+e.message));await host.exited}
-  console.log('STOCK_HOST_CALLER '+JSON.stringify({name,pass:true,native:false,FS_tap:false,host:'actual compiled',factory_caller:'SOURCE',Page_auth_driver:'doubles'}))
+  console.log('STOCK_HOST_CALLER '+JSON.stringify({name,native:false,FS_tap:false,host:'actual compiled',factory_caller:'SOURCE',Page_auth_driver:'doubles'}))
  }
 },30000)
 test('structural host cannot supply a stock receipt',()=>expect(()=>takeReplacementDiagnosticReply({} as any,'stock-run','original')).toThrow('NO_RETRY'))
