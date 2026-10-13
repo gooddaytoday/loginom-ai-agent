@@ -1047,6 +1047,189 @@
       "server_mutations": [],
       "status": "UNCHANGED_RUNNING_RICH_NO_NEW_STAGE_EVIDENCE",
       "all_eight_done": false
+    },
+    {
+      "checked_utc": "2026-10-13T15:31:29.162773+00:00",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "in_review",
+          "revision": 65,
+          "phase": "in_review",
+          "metadata_sha256": "bb36c06ec8ceeb9948d985fc9015c1fcbc299ed320486d82fa43374107369c9f",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-12T10:07:12+03:00"
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "in_progress",
+          "revision": 203,
+          "phase": "rich",
+          "metadata_sha256": "bb0debdd795951b48014cabf79b33c51862bb06b6bf0c2a352e4b5a5654e835f",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [
+            {
+              "id": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+              "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+              "status": "running",
+              "started_at": "2026-10-13T17:17:47+03:00",
+              "error": null
+            }
+          ],
+          "last_thread_activity": "2026-10-13T17:12:46+03:00"
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "1c3439df2d038d96961236f870b7d4a7f20cffad9ade44c693659f30cd971ca9",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-10T23:15:17+03:00"
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "c94038bbf05486f59b51773fe40ebb0ace242d3972f30a71d1e7080a24a8cca8",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-10T23:15:05+03:00"
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "fdeecab7fbf5f72f3e483d3a7349201dd62a2f87b7bf443bf0f91d5262db0c8e",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-10T23:14:56+03:00"
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "2717d9a9e9f9af134f383822828ea79e4dcb6596f37abb78ae8d1042afcabc84",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-10T23:14:07+03:00"
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "c16a330e1ad7221fe6a8f2036dd042517896e7b738e6b38dbf02ab2e37b22197",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-10T23:14:35+03:00"
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "47b8d8d47d1687af45c1a9d8e5cebcb924d2699afd0a896283c00cc97080c4ab",
+          "metadata_unchanged_since_previous_read": true,
+          "active_queued": [],
+          "last_thread_activity": "2026-10-10T23:20:36+03:00"
+        }
+      ],
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "status": "online",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+        "last_seen_at": "2026-10-13T18:31:18+03:00"
+      },
+      "worker_settings": {
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "latest_stage_comment_id": "01a1359b-d1a9-7767-8501-5c0731bd3916",
+      "latest_stage_at": "2026-10-13T17:12:46+03:00",
+      "active_task_id": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+      "worker_progress_structure": {
+        "checked_utc": "2026-10-13T15:32:01.440207+00:00",
+        "task_id": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+        "since_sequence": 156,
+        "new_message_count": 54,
+        "last_message_structure": {
+          "seq": 210,
+          "created_at": "2026-10-13T15:25:33.306316Z",
+          "type": "tool_result",
+          "tool": "exec_command"
+        }
+      },
+      "read_errors": {},
+      "effective_wall_time_gates": "SUPERSEDED",
+      "human_approval_gate": false,
+      "repeat_consumed": 3,
+      "repeat_limit": 10,
+      "new_task_precharged": false,
+      "scientific_counters_at_latest_evaler_receipt": {
+        "reference_consumed": {
+          "txt-comma-utf8": 1,
+          "csv-comma-utf8": 1,
+          "txt-semicolon-cp1251-decimal": 2,
+          "csv-pipe-multiline": 1,
+          "tsv-utf8": 1,
+          "tsv-utf16le": 1
+        },
+        "reference_limit_per_case": 3,
+        "product": 0,
+        "cold": 5,
+        "LAB-56_admission": "3/3 PASS, exhausted",
+        "new_smoke_probes_generations": 0,
+        "recovery": 0,
+        "cold_reader_invocations": 8,
+        "cold_browser_launch_attempts": 7,
+        "normal_cleanup_browser_continuations": 2
+      },
+      "execution_evidence": {
+        "helper_installation": "AUTHORIZED_NOT_INSTALLED",
+        "current_preflight_archive": "ASSIGNED_NOT_CONFIRMED_EXECUTED",
+        "candidate_native_admission": "NATIVE_ADMISSION_NOT_READY",
+        "frozen_sha": null,
+        "new_stage_report": false
+      },
+      "automation": {
+        "id": "lab-56-lab-63",
+        "kind": "heartbeat",
+        "status": "ACTIVE"
+      },
+      "new_tests_or_live_calls": 0,
+      "server_mutations": [],
+      "status": "UNCHANGED_RUNNING_RICH_NO_NEW_STAGE_EVIDENCE",
+      "all_eight_done": false
     }
   ]
 }
