@@ -83,11 +83,29 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
   return env
 }
 
+export type FPStartupControl = {
+  signal:AbortSignal; deadline:number; requestId:string; authorization:string; harness:"field-parameters-preservation-v1"
+  guard():void; reject(value:unknown):unknown
+  retain(runtime: Awaited<ReturnType<typeof supervise>>):void
+}
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
-export async function supervise(input: Launch) {
+export async function supervise(input: Launch, startup?:FPStartupControl) {
+  startup?.guard()
+  const originalStartup=startup
+  if(startup)startup=Object.freeze({...startup})
+  const original=input, originalConnection=input.connection
+  const snapshot={...input,connection:{...input.connection},environment:runtimeEnvironment(input.environment??process.env)}
+  const guard=()=>{
+    startup?.guard()
+    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","retain"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    if(startup && (Object.keys(snapshot).some(key=>key!=="connection" && key!=="environment" && (original as any)[key] !== (snapshot as any)[key])
+        || original.connection!==originalConnection || Object.keys(snapshot.connection).some(key=>(originalConnection as any)[key] !== (snapshot.connection as any)[key]))) throw Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  if(startup) input=snapshot
   if (![input.node, input.entry, input.resources, input.stateDir].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
+  guard()
   const child = fork(input.entry, [], {
     execPath: input.node,
     execArgv: ["--use-system-ca"],
@@ -97,7 +115,7 @@ export async function supervise(input: Launch) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; primary?:{value:unknown} }
   >()
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
@@ -107,7 +125,7 @@ export async function supervise(input: Launch) {
     pending.forEach((request) => {
       clearTimeout(request.timer)
     request.dispose?.()
-      request.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
+      request.reject(request.primary?request.primary.value:new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     })
     pending.clear()
   }
@@ -121,6 +139,12 @@ export async function supervise(input: Launch) {
     pending.delete(message.id)
     clearTimeout(request.timer)
     request.dispose?.()
+    if (request.primary) {
+      if ("secondaryRejection" in message) startup?.reject(rejection(message.secondaryRejection))
+      else if ("rejection" in message) startup?.reject(rejection(message.rejection))
+      request.reject(request.primary.value); return
+    }
+    if (request.fp && "rejection" in message) { request.reject(rejection(message.rejection)); return }
     if ("error" in message) {
       request.reject(
         new Error(
@@ -150,6 +174,11 @@ export async function supervise(input: Launch) {
       const deadline=control?.deadline??Date.now()+timeout
       const cancel = (reason: unknown) => {
         if(!pending.has(id)) return
+        if(startup && operation==="start") {
+          const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason}
+          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:"startup",requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,rejection:encodeReadRejection(current.primary.value)}})
+          return
+        }
         pending.delete(id);clearTimeout(timer);control?.signal.removeEventListener("abort",abort)
         // Cancellation belongs to this original request, never the next call.
         if(control && child.connected)child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{requestId:id,rejection:encodeReadRejection(reason)}})
@@ -157,7 +186,7 @@ export async function supervise(input: Launch) {
       }
       const abort = () => cancel(control!.signal.reason)
       const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
-      pending.set(id, { resolve, reject, timer, dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
       child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => { if (error) fail() })
       if(control?.signal.aborted)abort()
@@ -205,7 +234,9 @@ export async function supervise(input: Launch) {
     return reply.result
   }
   const runtime = { ready: undefined as unknown, request, readPreReady, close, exited }
+  startup?.retain(runtime)
   async function failedStart(error: unknown): Promise<never> {
+    if(startup) throw startup.reject(error)
     try { await close() }
     catch (cleanupFailure) {
       const failure = new Error("LOGINOM_RUNTIME_START_FAILED", { cause: error })
@@ -220,9 +251,11 @@ export async function supervise(input: Launch) {
   }
   const ready = await request(
     "start",
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, environment: undefined, protocol: 1, ...(startup?{fpStartup:{requestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline}}:{}) },
     input.validation ? 210_000 : 120_000,
+    startup,
   ).catch(failedStart)
+  guard()
   if (
     !ready ||
     typeof ready !== "object" ||

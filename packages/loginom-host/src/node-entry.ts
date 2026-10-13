@@ -8,7 +8,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostError } from "./errors"
-import { retainFPStartup } from "./fp-startup-control"
+import { retainFPStartup, bindFPHostStartup } from "./fp-startup-control"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -133,6 +133,7 @@ async function dispatch(message: unknown) {
           throw Error("LOGINOM_HANDSHAKE_INVALID")
       }
       guardFPStartup()
+      if (fpStartup) bindFPHostStartup(options,fpStartup)
       state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host

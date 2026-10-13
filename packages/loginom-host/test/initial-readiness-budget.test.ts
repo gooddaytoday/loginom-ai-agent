@@ -9,7 +9,7 @@ const body=new Bun.Transpiler({loader:'ts'}).transformSync(text.slice(begin,end)
 for(const [operation,timeout] of [['start',120000],['start',250],['close',5000]] as const)test(`actual supervisor budget ${operation}/${timeout}; child/clock are doubles`,async()=>{
  const messages:any[]=[],pending=new Map(),FakeDate=class extends Date {static now(){return 100000}}
  const child={connected:true,send(message:any,callback:Function){messages.push(message);pending.get(message.id).resolve({fixture:true});callback()}}
- const request=vm.runInNewContext(body+';request',{child,pending,Date:FakeDate,randomUUID:()=> 'id',Promise,Error,setTimeout:()=> 1,fail:()=>{throw Error('fixture transport failure')},fail7:()=>{throw Error('fixture transport failure')}})
+ const request=vm.runInNewContext(body+';request',{startup:undefined,child,pending,Date:FakeDate,randomUUID:()=> 'id',Promise,Error,setTimeout:()=> 1,fail:()=>{throw Error('fixture transport failure')},fail7:()=>{throw Error('fixture transport failure')}})
  const input={fixture:true};await request(operation,input,timeout)
  expect(messages[0].input).toBe(input)
  expect(messages[0].operation).toBe(operation)
@@ -19,12 +19,12 @@ for(const [operation,timeout] of [['start',120000],['start',250],['close',5000]]
 const managed=await readFile(process.env.READINESS_MANAGED??new URL('../../loginom-runtime/src/managed-entry.mjs',import.meta.url),'utf8')
 const handler=managed.slice(managed.indexOf('async function handle(message)'))
 test('actual start forwards original absolute deadline and cancellation to owner; auth is a double',async()=>{
- const begin=managed.indexOf('state.startupController=new AbortController()')
+ const begin=managed.indexOf('state.startupController??=new AbortController()')
  const end=managed.indexOf('      const config =',begin)
  const state:any={},deadline=Date.now()+120000
  const run=vm.runInNewContext('(async()=>{'+managed.slice(begin,end)+'})',{
   state,message:{deadline},input:{validation:true,generation:2,chat:'fixture',connection:{fixture:true}},
-  directory:'/fixture',resources:{browserPath:'/fixture'},browserProfile:'/fixture',AbortController,
+  observed:async(work:any)=>await work,directory:'/fixture',resources:{browserPath:'/fixture'},browserProfile:'/fixture',AbortController,
   checkConnection:async(login:any)=>{expect(login.owner.deadline).toBe(deadline);expect(login.owner.deadlineSource).toBe('supervisor.request.start');expect(login.owner.signal).toBe(state.startupController.signal);expect(login.owner.generation).toBe(2)},send:()=>{},
  })
  await run()

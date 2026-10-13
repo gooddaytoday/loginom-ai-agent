@@ -1,0 +1,43 @@
+import {decodePreReadyRejection} from './qualified-pre-ready.mjs'
+
+// IPC carries the original accepted startup tuple, never an AbortSignal or
+// readiness grant. Reuse the managed startup's one original controller.
+export function retainFPManagedStartup(message,input,state,controller) {
+  const id=message.id,tuple=input.fpStartup,connection=input.connection
+  const fixed={...tuple}, primitives={...input}, credentials={...connection}
+  if(message.deadline!==fixed.deadline)throw Error('LOGINOM_START_INVALID')
+  let owner,bound,primary,secondary,pending=true,accepted=false
+  function refuse(value) {primary??={value};if(!controller.signal.aborted)controller.abort(primary.value)}
+  const timer=setTimeout(()=>refuse(Error('LOGINOM_INITIAL_READINESS_DEADLINE')),fixed.deadline-Date.now())
+  function guard() {
+    if(primary)throw primary.value
+    if(controller.signal.aborted){refuse(controller.signal.reason);throw primary.value}
+    if(Date.now()>=fixed.deadline){refuse(Error('LOGINOM_INITIAL_READINESS_DEADLINE'));throw primary.value}
+    if(state.startupController!==controller || message.id!==id || message.input!==input || message.deadline!==fixed.deadline
+        || input.fpStartup!==tuple || Object.keys(fixed).some(k=>tuple[k]!==fixed[k])
+        || Object.keys(primitives).some(k=>input[k]!==primitives[k]) || input.connection!==connection
+        || Object.keys(credentials).some(k=>connection[k]!==credentials[k])
+        || (owner && (state.startupOwner!==owner || Object.keys(bound).some(k=>owner[k]!==bound[k]))))
+      throw Error('LOGINOM_STARTUP_OWNER_CHANGED')
+  }
+  return {
+    guard,
+    get pending(){return pending}, get accepted(){return accepted}, get secondary(){return secondary},
+    bindOwner(value) {
+      guard();if(owner)throw Error('LOGINOM_STARTUP_OWNER_CHANGED')
+      owner=value;bound={directory:value.directory,generation:value.generation,chat:value.chat,signal:value.signal,deadline:value.deadline}
+      if(value.signal!==controller.signal || value.deadline!==fixed.deadline || value.generation!==input.generation || value.chat!==input.chat)
+        throw Error('LOGINOM_STARTUP_OWNER_CHANGED')
+      guard()
+    },
+    reject(value){if(!primary)primary={value};else secondary??={value};return primary.value},
+    cancel(value){
+      if(!pending || value?.phase!=='startup' || value.requestId!==id || value.startupRequestId!==fixed.requestId
+          || value.authorization!==fixed.authorization || value.harness!==fixed.harness || value.deadline!==fixed.deadline)return false
+      if(primary)return false
+      guard();refuse(decodePreReadyRejection(value.rejection));return true
+    },
+    accept(){guard();accepted=true},
+    settle(){pending=false;clearTimeout(timer);if(state.startupController===controller)state.startupController=undefined},
+  }
+}

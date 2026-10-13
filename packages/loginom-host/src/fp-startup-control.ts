@@ -33,6 +33,7 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
   }
   return {
     control: {signal: controller.signal, deadline},
+    tuple: Object.freeze({requestId:id, authorization, harness:"field-parameters-preservation-v1" as const, deadline}),
     guard,
     get pending() { return state.pending },
     get accepted() { return state.accepted === true },
@@ -66,3 +67,9 @@ function decode(value: unknown): unknown {
     return rejection.is_undefined ? undefined : rejection.value
   throw Error('LOGINOM_HANDSHAKE_INVALID')
 }
+
+// Only the trusted early receiver binds an existing startup object to its host
+// options. Serialized caller fields cannot create this retained capability.
+const hostStarts = new WeakMap<object, ReturnType<typeof retainFPStartup>>()
+export function bindFPHostStartup(options: object, startup: ReturnType<typeof retainFPStartup>) { hostStarts.set(options,startup) }
+export function getFPHostStartup(options: object) { return hostStarts.get(options) }
