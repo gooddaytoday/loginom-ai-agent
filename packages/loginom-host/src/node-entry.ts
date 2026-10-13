@@ -8,7 +8,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostError } from "./errors"
-import { retainFPStartup, bindFPHostStartup } from "./fp-startup-control"
+import { retainFPStartup, retainAmountStartup, bindFPHostStartup } from "./fp-startup-control"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -17,6 +17,7 @@ const operations = new Set<Promise<void>>()
 const state: {
   starting?: Promise<void>
   fpStartup?: ReturnType<typeof retainFPStartup>
+  amountStartup?: ReturnType<typeof retainAmountStartup>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
   port?: ReturnType<typeof loginomHostPort>
   stopping?: Promise<void>
@@ -75,12 +76,13 @@ async function dispatch(message: unknown) {
   try {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
     if (message.method === "readonly.preReady.cancel" && input && typeof input === "object" && "phase" in input && input.phase === "startup") {
-      if (!state.fpStartup?.cancel(input)) throw Error("LOGINOM_HANDSHAKE_INVALID")
-      reply({id: message.id, result: {accepted: true, pending: state.fpStartup.pending, nativeCancellationConfirmed: false}})
+      const startup=state.fpStartup ?? state.amountStartup
+      if (!startup?.cancel(input)) throw Error("LOGINOM_HANDSHAKE_INVALID")
+      reply({id: message.id, result: {accepted: true, pending: startup.pending, nativeCancellationConfirmed: false}})
       return
     }
     if (message.method === "start") {
-      if (state.starting || state.host) throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      if (state.starting || state.host || state.amountStartup) throw new Error("LOGINOM_HANDSHAKE_INVALID")
       if (
         !input ||
         typeof input !== "object" ||
@@ -110,6 +112,20 @@ async function dispatch(message: unknown) {
           || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
           || capture.packagePath.split("/").some(x => x === "." || x === "..")))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
+      if ('amountStartup' in input) {
+        if (!capture || typeof capture !== 'object' || !('harness' in capture) || capture.harness !== 'amount-import-type-v1')
+          throw Error('LOGINOM_HANDSHAKE_INVALID')
+        const startup = retainAmountStartup(message as unknown as Parameters<typeof retainAmountStartup>[0],
+          input as unknown as Parameters<typeof retainAmountStartup>[1])
+        state.amountStartup = startup
+        try {
+          startup.guard()
+          // No trusted stage-B acquisition provider is linked to this receiver.
+          // Refuse before host/credentials/FS/browser/managed dispatch. A late
+          // capture run or serialized tuple must never supply that authority.
+          throw startup.reject(Error('ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE'))
+        } finally { startup.settle(false) }
+      }
       const fpStartup = capture && typeof capture === "object" && "harness" in capture && capture.harness === "field-parameters-preservation-v1"
         ? retainFPStartup(message as unknown as Parameters<typeof retainFPStartup>[0], input as unknown as Parameters<typeof retainFPStartup>[1]) : undefined
       state.fpStartup = fpStartup
@@ -174,8 +190,9 @@ async function dispatch(message: unknown) {
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
-    if (message.method === "start" && state.fpStartup) reply({id: message.id, rejection: closeRejection(error),
-      ...(state.fpStartup.secondary ? {secondaryRejection: closeRejection(state.fpStartup.secondary.value)} : {})})
+    const startup = state.fpStartup ?? state.amountStartup
+    if (message.method === "start" && startup) reply({id: message.id, rejection: closeRejection(error),
+      ...(startup.secondary ? {secondaryRejection: closeRejection(startup.secondary.value)} : {})})
     else reply({ id: message.id, error: hostError(error) })
   }
 }

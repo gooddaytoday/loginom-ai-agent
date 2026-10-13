@@ -5,11 +5,44 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
   acceptanceCleanupPackage?: unknown;
   acceptanceCapture: {authorization: string; packagePath: string; harness?: string}
 }) {
+  return retainStartup(message, input, 'field-parameters-preservation-v1')
+}
+
+type AmountStartup = {
+  purpose: 'amount-import-type-v1'; authorization: string;
+  operation: string; request: string; deadline: number
+}
+// Private receiver proxy only. Parent signal identity belongs to the fixed
+// Amount caller; IPC labels cannot establish an acquired root/run/lease.
+export function retainAmountStartup(message: {id:string; deadline?:unknown}, input: Parameters<typeof retainFPStartup>[1] & {
+  amountStartup: AmountStartup
+}) {
+  const original = input.amountStartup
+  if (!original || Object.keys(original).sort().join(',') !== 'authorization,deadline,operation,purpose,request'
+      || original.purpose !== 'amount-import-type-v1'
+      || original.authorization !== input.acceptanceCapture.authorization
+      || !/^[a-f0-9]{64}$/.test(original.authorization)
+      || ![original.operation,original.request,message.id].every(value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(value))
+      || original.deadline !== message.deadline)
+    throw Error('LOGINOM_HANDSHAKE_INVALID')
+  const snapshot = Object.freeze({...original})
+  const guard = () => {
+    if (input.amountStartup !== original || Object.keys(snapshot).some(key =>
+        original[key as keyof AmountStartup] !== snapshot[key as keyof AmountStartup]))
+      throw Error('LOGINOM_HANDSHAKE_INVALID')
+  }
+  return retainStartup(message,input,'amount-import-type-v1',snapshot,guard)
+}
+
+function retainStartup<H extends 'field-parameters-preservation-v1' | 'amount-import-type-v1'>(
+  message: Parameters<typeof retainFPStartup>[0], input: Parameters<typeof retainFPStartup>[1],
+  purpose: H, amount?: Readonly<AmountStartup>, guardAmount?: () => void,
+) {
   const id = message.id, rawDeadline = message.deadline, capture = input.acceptanceCapture
   const authorization = capture.authorization, packagePath = capture.packagePath, harness = capture.harness
   const root = input.root, resources = input.resources, headless = input.headless
   const strictRecovery = input.strictRecovery, cleanupPackage = input.acceptanceCleanupPackage
-  if (harness !== 'field-parameters-preservation-v1' || !Number.isSafeInteger(rawDeadline)
+  if (harness !== purpose || !Number.isSafeInteger(rawDeadline)
       || typeof rawDeadline !== 'number' || Date.now() >= rawDeadline || rawDeadline - Date.now() > 180_000)
     throw Error('LOGINOM_PRE_READY_READ_EXPIRED')
   const deadline = rawDeadline
@@ -25,6 +58,7 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
   function guard() {
     // Original refusal wins over secondary tuple drift, including falsy causes.
     if (state.refusal) throw state.refusal.value
+    guardAmount?.()
     if (Date.now() >= deadline) { refuse(Error('LOGINOM_PRE_READY_READ_EXPIRED')); throw state.refusal!.value }
     if (message.id !== id || message.deadline !== deadline || input.acceptanceCapture !== capture
         || capture.authorization !== authorization || capture.packagePath !== packagePath || capture.harness !== harness
@@ -34,7 +68,8 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
   }
   return {
     control: {signal: controller.signal, deadline},
-    tuple: Object.freeze({requestId:id, authorization, harness:"field-parameters-preservation-v1" as const, deadline}),
+    tuple: Object.freeze({requestId:id, authorization, harness:purpose, deadline,
+      ...(amount ? {operation:amount.operation, request:amount.request} : {})}),
     guard,
     get pending() { return state.pending },
     get accepted() { return state.accepted === true },
@@ -68,7 +103,8 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
       if (state.disposed || !state.pending || !value || typeof value !== 'object') return false
       const tuple = value as Record<string, unknown>
       if (tuple.phase !== 'startup' || tuple.requestId !== id || tuple.authorization !== authorization
-          || tuple.deadline !== deadline || tuple.harness !== harness || !('rejection' in tuple)) return false
+          || tuple.deadline !== deadline || tuple.harness !== harness || !('rejection' in tuple)
+          || (amount && (tuple.operation !== amount.operation || tuple.request !== amount.request))) return false
       guard()
       refuse(decode(tuple.rejection))
       return true
