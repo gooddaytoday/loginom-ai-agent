@@ -104,7 +104,7 @@
   Приложить `events.jsonl`, `parts.json`, `stderr.txt`, `prompt.txt`,
   `artifact/package.lgp`, `artifact/unpacked/`, `artifact/results/*.result.csv`.
 
-- [ ] Добавить по одному падающему тесту поведения. Начать с неудачной JS-попытки,
+- [x] Добавить по одному падающему тесту поведения. Начать с неудачной JS-попытки,
   отсутствующей в финальном пакете:
 
 ```ts
