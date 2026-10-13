@@ -80,7 +80,7 @@
 - [x] Этап 1A: минимальный аудит готов; JS не теряется при ошибках/незавершённости,
   оба XML-типа учитываются, неизвестный формат остаётся incomplete.
   До пилота полный PASS намеренно закрыт `AUDIT_NOT_FINALIZED`.
-- [ ] Этап 1B: окончательный аудит завершён и проверен на реальных evidence пилота.
+- [x] Этап 1B: окончательный аудит завершён и проверен на реальных evidence пилота.
 
 **Interfaces:**
 - Consumes: `readNodeXml(artifactDir)` из `src/node-xml.ts`, `checkOracle(task, artifactDir)`
