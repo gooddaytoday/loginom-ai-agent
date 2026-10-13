@@ -90,6 +90,8 @@ test("main --dry-run --repeat 2: статусы по фикстурам, поп�
     const summary = (await Bun.file(path.join(runDir!, "summary.json")).json()) as RunSummary
     expect(summary.label).toBe("dry")
     expect(summary.config.repeat).toBe(2)
+    expect(summary.config.parallel).toBe(1)
+    expect(summary.slots).toMatchObject([{ id: "default", username: "user", state: "planned", liveQualified: false }])
     expect(summary.metrics.total).toBe(6)
     expect(summary.metrics.completed).toBe(2)
     expect(summary.metrics.mean_score).toBeNull()
