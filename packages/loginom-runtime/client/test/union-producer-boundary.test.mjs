@@ -15,7 +15,7 @@ async function fixture() {
  const directory=await mkdtemp(join(tmpdir(),'union-birth-gap-'));const ipc=new MessageChannel();
  const node={document_id:'document',workflow_id:'workflow',node_id:'node'};
  const workflow={workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'root',label:'workflow'}]};
- const operation={id:'original',signature:'original-signature',deadline:9000,action:{action_key:'node.apply',revision:'original'},parameters:{operation_id:'original',target:{type:'transform.union'}},
+ const operation={id:'original',signature:'original-signature',deadline:9000,action:{action_key:'node.apply',revision:'original'},parameters:{operation_id:'original',target:{type:'transform.union_data'}},
   nodeApply:{node,phases:[],request:{document_id:'document',workflow_ref:workflow}}};
  const calls=[],started=deferred(),waiting=new Map();let sequence=0;
  ipc.port2.on('message',id=>ipc.port2.postMessage(id));

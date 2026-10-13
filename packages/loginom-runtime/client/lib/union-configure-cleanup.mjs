@@ -43,7 +43,7 @@ export function retainUnionConfigureCleanup({operation, tuple, current, prepared
   originalClose, observeTerminal, record, signal, deadline, now = Date.now}) {
   const keys = ['owner','run','lease','generation','chat','account','session','page','context',
     'package','workflow','node','wizard','controller','close','signal','deadline'];
-  if (!operation || operation.parameters?.target?.type !== 'transform.union'
+  if (!operation || operation.parameters?.target?.type !== 'transform.union_data'
     || !operation.id || !operation.signature || keys.some(k => tuple?.[k] === undefined || tuple[k] === null)
     || !Number.isSafeInteger(tuple.generation) || tuple.generation < 0
     || !Number.isFinite(deadline) || !signal || typeof signal.throwIfAborted !== 'function'

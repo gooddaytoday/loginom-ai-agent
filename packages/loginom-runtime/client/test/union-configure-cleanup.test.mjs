@@ -14,7 +14,7 @@ async function fixture(beforeMint = () => {}) {
   const directory = await mkdtemp(join(tmpdir(),'union-partial-'));
   const abort = new AbortController(), counts={close:0,read:0,write:0};
   const node = {document_id:'document',workflow_id:'workflow',node_id:'node'};
-  const operation = {id:'original',signature:'original-signature',parameters:{operation_id:'original',target:{type:'transform.union'},inputs:[{id:'input0'}]},
+  const operation = {id:'original',signature:'original-signature',parameters:{operation_id:'original',target:{type:'transform.union_data'},inputs:[{id:'input0'}]},
     nodeApply:{node,phases:[{phase:'target',value:{effect_possible:true}},{phase:'input_mapping'},{phase:'open'}],pending:{phase:'configure',receipt_id:'original:configure'},execution:{status:'not_requested'}},
     outcome:{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,error:{code:'NODE_APPLY_STOPPED',message:'first'},accepted_effects:['target','input','open']}};
   const prepared={wizard:{status:'observed',root_ref:'root',root_tid:'wizard',stage:'union',owner_context:{status:'observed',node:{tid:'original-node'}}},prepared_node_context:{verified:true,surface:'wizard',...node},ui:{dialogs:[],masks:[]}};
