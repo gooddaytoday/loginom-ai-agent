@@ -395,7 +395,7 @@ name и каждого container name, в общем порядке захват
 
 **Interfaces:** Produces `ServerSession`, `AdminConnection`, `openLoginomAdmin`, `selectOwnedSessions`. Consumes `SlotFile`, `ServerIdentity`; credentials не выходят из модуля.
 
-- [ ] RED: чистая функция выбора сессии должна отказать при несовпадении user/epoch даже с одинаковым remoteKey:
+- [x] RED: чистая функция выбора сессии должна отказать при несовпадении user/epoch даже с одинаковым remoteKey:
 
 ```ts
 const owned = { remoteKey: "session-41", userKey: "user-a", username: "eval-a", serverEpoch: "epoch-1", pendingDisconnect: true, activeOperations: 0 }
@@ -405,7 +405,7 @@ expect(() => selectOwnedSessions([{ ...owned, serverEpoch: "epoch-2" }], [owned]
 expect(() => selectOwnedSessions([owned, owned], [owned])).toThrow("SESSION_IDENTITY_AMBIGUOUS")
 ```
 
-- [ ] Запустить `bun test test/loginom-admin.test.ts` (RED), затем реализовать нормализатор и проверки (GREEN). Display name `eval-a:1` не используется как достаточное доказательство.
+- [x] Запустить `bun test test/loginom-admin.test.ts` (RED), затем реализовать нормализатор и проверки (GREEN). Display name `eval-a:1` не используется как достаточное доказательство.
 - [ ] Проверить доступные реальные поля session identity/user identity и сигнатуры административных browser RPC на закреплённой 7.4.2 по перечню выше. Зафиксировать adapter capability contract и обезличенный ответ в `evals/docs/parallel-users-contract.md`. У managed row нет обнаруженного immutable ID: доказать составную identity epoch/leased username/exact Name/CreateTime и fresh proxy отрицательными race tests; если нельзя — возвращать `SESSION_IDENTITY_UNSUPPORTED`, не ослаблять выбор до имени.
 - [x] Подзадача 2: установленный prod runtime read-only квалифицирован по 5393 CLI/4381 resource entries (paths, SHA, modes, links, full inventory, ELF/x64/executable). Bundled Node v24.19.0, Chromium 153.0.8010.12 --version и createRequire/playwright-core resolve/import PASS; private admin-runtime-inventory.json. Browser/admin login ещё не запускался; runtime verifier в коде ниже предстоит.
 - [ ] Запустить браузер средствами проверенной установленной копии: bundled Node и Chromium из `resources/loginom/resource-manifest.json`, `playwright-core` через `createRequire` от `resources/loginom/runtime/client/package.json`. Проверить relative paths, CLI manifest hashes и executable; исходный monorepo `node_modules` не использовать. Не добавлять runtime-зависимость harness и не скачивать другой Chromium.
@@ -721,4 +721,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
 7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
 8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
-9. 1а: guarded factory/identity + CI/sources, full unit 595/3skip/0fail и real Docker 24 assertions/typecheck PASS. Admin bootstrap заблокирован (eval_parallel_blockers.md). Далее trusted adapter task 2; установленный runtime inventory проверен.
+9. 1а: factory/identity, full unit 595/3skip/0fail, Docker 24 assertions PASS; admin bootstrap blocked. Task 2: owned selector + runtime inventory готовы, 16 targeted tests/typecheck PASS. Далее JSONL codec/driver; live identity не доказана.
