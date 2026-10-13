@@ -1847,6 +1847,184 @@
       ],
       "all_eight_done": false,
       "status": "LAB56_OWNER_DONE_VERIFIED_SINGLE_RICH17_RUNNING_NO_NEW_BLOCKER"
+    },
+    {
+      "checked_utc": "2026-10-13T18:09:41.141758+00:00",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "done",
+          "revision": 68,
+          "phase": "in_review",
+          "metadata_sha256": "bb36c06ec8ceeb9948d985fc9015c1fcbc299ed320486d82fa43374107369c9f",
+          "active_queued": [
+            {
+              "id": "01a13662-3aa6-7389-97f2-dcec6166d4e8",
+              "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+              "status": "queued",
+              "started_at": null
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "in_progress",
+          "revision": 229,
+          "phase": "rich",
+          "metadata_sha256": "ab06fd3b56a5ca4bf9dff8bafa8234fc5c2da5c35e6f723c997779de384708af",
+          "active_queued": [
+            {
+              "id": "01a1364b-2539-75a1-a857-abeedd9545e5",
+              "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+              "status": "running",
+              "started_at": "2026-10-13T20:25:09+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "1c3439df2d038d96961236f870b7d4a7f20cffad9ade44c693659f30cd971ca9",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "c94038bbf05486f59b51773fe40ebb0ace242d3972f30a71d1e7080a24a8cca8",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "fdeecab7fbf5f72f3e483d3a7349201dd62a2f87b7bf443bf0f91d5262db0c8e",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "2717d9a9e9f9af134f383822828ea79e4dcb6596f37abb78ae8d1042afcabc84",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "c16a330e1ad7221fe6a8f2036dd042517896e7b738e6b38dbf02ab2e37b22197",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "47b8d8d47d1687af45c1a9d8e5cebcb924d2699afd0a896283c00cc97080c4ab",
+          "active_queued": []
+        }
+      ],
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "status": "online",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+        "last_seen_at": "2026-10-13T21:09:18+03:00"
+      },
+      "worker_settings": {
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "fresh_LAB56_last_stage_comment": "01a13662-3a99-7d38-a161-c90b6883f568",
+      "fresh_LAB57_last_stage_comment": "01a1364b-2525-7036-be0f-28dac9777001",
+      "new_stage_comments_or_evidence": [],
+      "LAB56_acceptance_metadata_matches_verified_completion_receipt": true,
+      "LAB56_owner_server_done": true,
+      "LAB56_owned_metadata_sync_pending": {
+        "task": "01a13662-3aa6-7389-97f2-dcec6166d4e8",
+        "status": "queued",
+        "no_duplicate": true
+      },
+      "Rich17_safe_progress": {
+        "checked_utc": "2026-10-13T18:10:22.262113+00:00",
+        "task_id": "01a1364b-2539-75a1-a857-abeedd9545e5",
+        "message_count": 298,
+        "safe_tail": [
+          {
+            "seq": 294,
+            "type": "tool_result",
+            "created_at": "2026-10-13T18:09:31.896245Z"
+          },
+          {
+            "seq": 295,
+            "type": "tool_use",
+            "created_at": "2026-10-13T18:09:32.056572Z"
+          },
+          {
+            "seq": 296,
+            "type": "tool_result",
+            "created_at": "2026-10-13T18:09:37.162114Z"
+          },
+          {
+            "seq": 297,
+            "type": "tool_use",
+            "created_at": "2026-10-13T18:10:00.441011Z"
+          },
+          {
+            "seq": 298,
+            "type": "tool_result",
+            "created_at": "2026-10-13T18:10:00.441798Z"
+          }
+        ],
+        "raw_contents_not_saved_or_printed": true
+      },
+      "LAB57_frozen_SHA": null,
+      "LAB57_new_native_READY_official_CLI_pin_Ben_ACCEPT": "NOT_CONFIRMED_BY_NEW_DELIVERED_EVIDENCE",
+      "inflight_counter_changes_not_assumed_from_old_receipts": true,
+      "current_metadata_matches_prior_revision": 229,
+      "root_native_model_reference_product_cold_calls": 0,
+      "new_tests_or_live_calls": 0,
+      "new_comments_dispatches_or_server_mutations": 0,
+      "full_history_preserved": true,
+      "all_eight_done": false,
+      "automation": {
+        "id": "lab-56-lab-63",
+        "status": "ACTIVE",
+        "every_minutes": 30,
+        "saved_prompt_sha256": "272376764db80ec6fd0e5c18fd583c948932b6b1bbab477263f845e3c100810d",
+        "saved_prompt_chars": 18028,
+        "mutations": 0
+      },
+      "status": "UNCHANGED_SINGLE_RICH17_PROGRESSING_EVALER_SYNC_QUEUED_NO_ACTION"
     }
   ]
 }
