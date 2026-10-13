@@ -351,6 +351,11 @@ NavigationPanel capture; immutable candidate и original model slot не мен�
 Own user:67 закрыт адресно по четырём GUID/server/admin binding; fresh log и
 refresh absence подтверждены. Exact guard архивирован после SHA/mtime/proc
 проверки; status/check0. Это recovery, original cleanup false сохранён.
+Первый native diagnostic остановился до Join из-за operator preview assertion
+(display_text вместо exact_integer value), Save не состоялся. Original failure
+сохранён. После TDD-проверки actual receipt и Save-before-assertions исправлен
+только private driver (5 tests/review PASS); own native user70 адресно закрыт,
+второй diagnostic начат в новом каталоге без LLM и без изменения candidate.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

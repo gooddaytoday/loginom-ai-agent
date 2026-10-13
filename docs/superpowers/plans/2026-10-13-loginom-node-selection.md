@@ -591,6 +591,13 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   NavigationPanel capture. Сохранить actual input1 caption/visibility/bounds/icon
   и подтвердить failed predicate до минимальной TDD-правки, если она нужна.
   Diagnostic не входит в модельные слоты/acceptance; исходная попытка сохраняется.
+  Первый native завершился до Join из-за неверного preview assertion: exact
+  integer использует value, не display_text; Save отсутствовал, cleanup blocked.
+  Original result/source/raw сохранены. Private driver исправлен TDD по actual
+  receipt (5 tests/typecheck/review PASS), Save перенесён до preview assertions.
+  Own native user70 закрыт по GUID/log/admin binding, guard не создавался.
+  Второй diagnostic начат в отдельном `join-native-diagnostic-2`; DOM причина
+  Join пока не подтверждена, этот пункт остаётся открыт.
 
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 

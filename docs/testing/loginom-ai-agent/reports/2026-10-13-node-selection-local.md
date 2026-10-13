@@ -507,6 +507,32 @@ writer absent. `profile-management-verification.json` SHA256
 логи `.invalid-option` сохранены, исправлена только команда. Recovery не
 изменяет original CLI1/wrapper3/cleanupfalse и не подтверждает ABC oracle.
 
+## Join native diagnostic: ошибка проверки preview
+
+Первый instrumented diagnostic остановился до Join: импорт SUCCEEDED и
+exact_integer preview содержал value:"1"/"5"/"10", decimal_integer, is_null:false.
+Private assertion ошибочно читала отсутствующее display_text и получила NaN.
+Save не состоялся; package cleanup BLOCKED/CONFIRMED_SAVE_REQUIRED, exit3.
+Это ошибка operator driver, не воспроизведение Join. Original result
+`forensic/join-native-diagnostic/result.json` SHA256
+`9c09ed7d295dce8c15f1337a22c580b130079ab9ce4b186795ea606748923e90`
+и все raw receipts сохранены; модельный слот не повторялся.
+
+Driver исправлен TDD по actual08 receipt: строгий BigInt reader exact_integer,
+Save после каждого successful/cleanup import до preview assertions. Итоговые
+5 tests/typecheck/syntax PASS, независимый review Approved. Entry с fixed
+read-only capture не менялся (`15a753a5…`), Product/resources/pins неизменны.
+Новый driver SHA `31e81fe39533289ae1270fc30089f81b299160d97bbcbf8ae4fcbf90315bacee`;
+review SHA `526b30546372ddf92e5de5e7504551816f201c477a9187a811aa5003d33a362b`.
+Первый source snapshot сохранён отдельно.
+
+Own native import GUID62584e00… связан server log с user:70/init18:38:09.993Z;
+admin сверил CreateTime06:38 PM, закрыл только user70; fresh refresh18:44:46.852Z
+подтвердил отсутствие, user69 остался. Admin logout18:45:04.441Z и MCP exit0,
+own native процессов нет, профиль свободен; guard не создавался.
+Сверка свежего server close выполняется независимо. Второй отдельный native
+запуск в `join-native-diagnostic-2` начат; причина Join пока не доказана.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.
