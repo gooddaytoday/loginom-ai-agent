@@ -3,7 +3,7 @@ import path from "node:path"
 import os from "node:os"
 import { cp, mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
-import { validateNodeAttempt } from "../src/node-evals"
+import { validateNodeAttempt, validateNodeRun } from "../src/node-evals"
 import { collectTextImportEvidence } from "../src/text-import"
 import { prepareTextImportCold, validateTextImportCold } from "../src/text-import-cold"
 import { finalizeTextImportCase } from "../src/text-import-finalize"
@@ -75,16 +75,17 @@ async function positiveFixture(id = "txt-comma-utf8") {
   const workspace = { status: "READY", ownership_verified: true, loginom_account: "eval",
     document_id: "doc", workflow_ref: { workflow_id: "flow" } }
   const settings = { ...spec.settings, source: { ...spec.settings.source, source_path: destination }, columns: spec.columns }
-  const port = { port: 0, port_guid: "port", fresh: true, execution_id: "execution", schema: expected.schema,
+  const executionId = "doc:145:1"
+  const port = { port: 0, port_guid: "port", fresh: true, execution_id: executionId, schema: expected.schema,
     row_count: expected.row_count, sample_rows: expected.row_count, sample_complete: true,
     precision: { numbers_verified: true, limitations: [] },
     sample: expected.rows.map((row: { type: string; value: string | null }[]) => row.map(cell =>
       ({ ...cell, is_null: cell.value === null, ...(cell.type === "real" && cell.value !== null ? { decimal: cell.value } : {}) }))) }
   const output = { operation_id: "import", state: "settled", status: "SUCCEEDED", cleanup_complete: true,
-    node, execution: { status: "completed", execution_id: "execution" },
+    node, execution: { status: "completed", execution_id: executionId },
     configuration: { status: "applied", readback: { kind: "text_import", values_are: "observed_ui_values", node,
       ...settings, output_mapping: { fields: spec.columns.map((c: { name: string }) => ({ ...c, source_name: c.name })) } } },
-    output: { status: "complete", execution_id: "execution", ports: [port] } }
+    output: { status: "complete", execution_id: executionId, ports: [port] } }
   const apply = { tool: "loginom_dock_node_apply", input: { operation_id: "import", document_id: "doc", workflow_ref: { workflow_id: "flow" },
     target: { kind: "new", type: "imports.text" }, mode: "delimited", finish: "execute", inputs: [],
     parameters: { source: { artifact_id: "file", upload_operation_id: "upload" }, settings } }, output }
@@ -101,10 +102,19 @@ async function positiveFixture(id = "txt-comma-utf8") {
   const graph = { complete: true, nodes: [{ ref: node, type: "imports.text", inputs: [], outputs: [0] }], links: [] }
   const fields = (values: Record<string, unknown>) => Object.fromEntries(Object.entries(values).map(([k, v]) => [k, { status: "observed", value: v }]))
   const events = [
-    { operation_id: "import", phase: "node_target_checkpoint", target_state: { completed: true, result: { created: true }, final_graph: graph } },
+    { operation_id: "import", phase: "node_target_checkpoint", target_state: { completed: true, targetId: node.node_id,
+      result: { status: "SUCCEEDED", created: true, node: { ref: node, type: "imports.text" } }, final_graph: graph } },
+    { operation_id: "import", phase: "node_phase_completed", receipt: { phase: "target", status: "verified", receipt_id: "import:target",
+      value: { verified: true, cleanup_complete: true, node } } },
     { operation_id: "import", phase: "node_phase_completed", receipt: { phase: "configure", status: "verified", receipt_id: "import:configure",
       value: { verified: true, cleanup_complete: true, source: { fields: fields(settings.source) }, format: { fields: fields(settings.format) },
         columns: spec.columns.map((c: Record<string, unknown>, i: number) => ({ ...c, index: i, status: "observed" })) } } },
+    { operation_id: "import", phase: "node_phase_completed", receipt: { phase: "finish", status: "verified", receipt_id: "import:finish",
+      value: { verified: true, cleanup_complete: true, mode: "execute", execution_started: true, execution_id: executionId,
+        execution_group: { node, root_id: "145", group_id: "1", group_record_id: "322", execution_id: executionId } } } },
+    { operation_id: "import", phase: "node_phase_completed", receipt: { phase: "execute", status: "verified", receipt_id: "import:execute",
+      value: { verified: true, cleanup_complete: true, status: "completed", owner_verified: true,
+        execution_id: executionId, group_id: "1", process_id: "1.1", process_record_id: "323" } } },
     { operation_id: "import", phase: "node_checkpoint", result: output },
   ]
   const profile = path.join(root, "profile"), archive = profile + ".history/run/1"
@@ -114,7 +124,8 @@ async function positiveFixture(id = "txt-comma-utf8") {
   async function write() {
     await Bun.write(path.join(attempt, "events.jsonl"), calls.map((call, i) => JSON.stringify({ type: "tool_use", part: { id: `call-${i}`, tool: call.tool,
       state: { status: "completed", input: call.input, output: JSON.stringify(call.output), time: { start: i * 10, end: i * 10 + 1 } } } })).join("\n") + "\n")
-    await Bun.write(journal, events.map(event => JSON.stringify(event)).join("\n") + "\n")
+    await Bun.write(journal, events.map(event => JSON.stringify({ session_id: "fixture-session", runtime_revision: "fixture-runtime",
+      manifest_sha256: "a".repeat(64), ...event })).join("\n") + "\n")
     await collectTextImportEvidence(attempt, profile)
   }
   await write()
@@ -133,6 +144,68 @@ test("text import checks full typed warm data and raw native settings", async ()
     f.port.sample[0][0].value = "1"
     await f.write()
     expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("VALUES")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+// Behavior fixtures reproduce Ben's mutations; none is a live run/completion proof.
+for (const id of ["txt-comma-utf8", "csv-comma-utf8", "txt-semicolon-cp1251-decimal", "csv-pipe-multiline", "tsv-utf8", "tsv-utf16le"]) {
+  for (const mutation of ["owner-false", "missing-execute"]) {
+    test(`${id} rejects native ${mutation} in warm and full-run gates`, async () => {
+      const f = await positiveFixture(id)
+      try {
+        expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+        if (mutation === "owner-false") f.events[4]!.receipt!.value.owner_verified = false
+        if (mutation === "missing-execute") f.events.splice(4, 1)
+        await f.write()
+        const warm = await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")
+        expect(warm.errors).toEqual([])
+        expect(warm.failures.join(" ")).toContain("native: execute")
+        const run = path.join(f.root, "offline-run"), target = path.join(run, id, "1")
+        await cp(f.attempt, target, { recursive: true })
+        const cleanup = await Bun.file(path.join(target, "cleanup.json")).json()
+        cleanup.processes = { status: "confirmed" }
+        cleanup.stages.push(...["processes", "diagnostics", "writer", "ready"].map(stage => ({ stage, status: "confirmed" })))
+        await Bun.write(path.join(target, "cleanup.json"), JSON.stringify(cleanup))
+        await Bun.write(path.join(run, "summary.json"), JSON.stringify({ config: { repeat: 1 }, storage_leftovers: [],
+          tasks: [{ id, attempts: [{ attempt: 1, status: "completed", package_path: "/eval/result.lgp", environment_cleanup: { status: "confirmed" } }] }] }))
+        expect(await validateNodeRun(run, [id], f.root)).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
+      } finally { await rm(f.root, { recursive: true, force: true }) }
+    })
+  }
+}
+
+test("native execute owner binds unique target and finish execution lineage", async () => {
+  const f = await positiveFixture()
+  try {
+    const original = structuredClone(f.events)
+    for (const mutation of [
+      () => { f.events[4]!.receipt!.value.owner_verified = undefined },
+      () => { f.events[4]!.receipt!.value.verified = false },
+      () => { f.events[4]!.receipt!.value.cleanup_complete = false },
+      () => { f.events[4]!.receipt!.value.execution_id = "doc:145:9" },
+      () => { f.events[4]!.receipt!.value.group_id = "9" },
+      () => { f.events[4]!.receipt!.value.process_id = "9.1" },
+      () => { f.events[4]!.receipt!.value.process_record_id = "" },
+      () => { f.events[4]!.receipt!.receipt_id = "foreign:execute" },
+      () => { f.events[4]!.operation_id = "foreign" },
+      () => { f.events.push(structuredClone(f.events[4]!)) },
+      () => { f.events[3]!.receipt!.value.execution_id = "doc:145:9" },
+      () => { f.events[3]!.receipt!.value.execution_group!.node.node_id = "other" },
+      () => { f.events[3]!.receipt!.value.execution_group!.root_id = "999" },
+      () => { f.events[3]!.receipt!.value.execution_group!.group_record_id = "" },
+      () => { f.events[1]!.receipt!.value.node!.document_id = "foreign" },
+      () => { f.events[1]!.receipt!.value.node!.workflow_id = "foreign" },
+      () => { f.events[1]!.receipt!.value.node!.node_id = "foreign" },
+      () => { f.events[1]!.receipt!.status = "unverified" },
+      () => { f.events.push(structuredClone(f.events[1]!)) },
+      () => { f.events.push(structuredClone(f.events[3]!)) },
+    ]) {
+      f.events.splice(0, f.events.length, ...structuredClone(original))
+      mutation(); await f.write()
+      const result = await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")
+      expect(result.errors).toEqual([])
+      expect(result.failures.join(" ")).toContain("native:")
+    }
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
@@ -199,7 +272,7 @@ test("text import binds the compact public output to a complete native checkpoin
     port.schema = port.schema.map((column: Record<string, unknown>) => ({ ...column, header_tid: "private header" }))
     port.sample = port.sample.map((row: { type: string; value: string | null; is_null: boolean; decimal?: string }[]) =>
       row.map(cell => Object.assign(cell, { display_text: cell.value })))
-    f.events[2]!.result = native
+    f.events[5]!.result = native
     await f.write()
     expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
     const original = structuredClone(native)
@@ -343,8 +416,8 @@ test("CSV to TSV refresh requires two deliveries and fresh full reads on the sam
     const changed = spec.inputs[1], destination = "/eval/changed.tsv"
     const first = JSON.parse(JSON.stringify(f.apply))
     first.input.operation_id = "stage1"; first.output.operation_id = "stage1"
-    first.output.execution.execution_id = "first"; first.output.output.execution_id = "first"; first.output.output.ports[0].execution_id = "first"
-    const firstConfig = JSON.parse(JSON.stringify(f.events[1])), firstCheckpoint = { operation_id: "stage1", phase: "node_checkpoint", result: first.output }
+    first.output.execution.execution_id = "doc:145:2"; first.output.output.execution_id = "doc:145:2"; first.output.output.ports[0].execution_id = "doc:145:2"
+    const firstConfig = JSON.parse(JSON.stringify(f.events[2])), firstCheckpoint = { operation_id: "stage1", phase: "node_checkpoint", result: first.output }
     firstConfig.operation_id = "stage1"
     f.events[0]!.operation_id = "stage1"
     const prepare = JSON.parse(JSON.stringify(f.calls[0]))
@@ -365,17 +438,30 @@ test("CSV to TSV refresh requires two deliveries and fresh full reads on the sam
     f.port.row_count = expected.row_count; f.port.sample_rows = expected.row_count
     f.port.sample = expected.rows.map((row: { type: string; value: string | null }[]) => row.map(cell => ({ ...cell, is_null: cell.value === null,
       ...(cell.type === "real" && cell.value !== null ? { decimal: cell.value } : {}) })))
-    const finalConfig = JSON.parse(JSON.stringify(f.events[1])), finalCheckpoint = f.events[2]!
+    const finalConfig = JSON.parse(JSON.stringify(f.events[2])), finalCheckpoint = f.events[5]!
     finalConfig.receipt.value.source.fields.source_path.value = destination
     finalConfig.receipt.value.format.fields.delimiter.value = "\t"
-    f.events.splice(1, 2, firstConfig, JSON.parse(JSON.stringify(firstCheckpoint)), finalConfig, finalCheckpoint)
+    const firstTarget = JSON.parse(JSON.stringify(f.events[1])), firstFinish = JSON.parse(JSON.stringify(f.events[3])), firstExecute = JSON.parse(JSON.stringify(f.events[4]))
+    for (const event of [firstTarget, firstFinish, firstExecute]) {
+      event.operation_id = "stage1"; event.receipt.receipt_id = `stage1:${event.receipt.phase}`
+    }
+    firstConfig.receipt.receipt_id = "stage1:configure"
+    firstFinish.receipt.value.execution_id = "doc:145:2"
+    Object.assign(firstFinish.receipt.value.execution_group, { execution_id: "doc:145:2", group_id: "2", group_record_id: "324" })
+    Object.assign(firstExecute.receipt.value, { execution_id: "doc:145:2", group_id: "2", process_id: "2.1", process_record_id: "325" })
+    f.events.splice(1, 0, firstTarget, firstConfig, firstFinish, firstExecute, JSON.parse(JSON.stringify(firstCheckpoint)))
+    f.events[7] = finalConfig
+    f.events[10] = finalCheckpoint
     await f.write()
     const patch = Bun.spawn(["python3", "-c", `import pathlib,sys,zipfile
 p=pathlib.Path(sys.argv[1]);xml=p/'unpacked/Unit_1/Unit.xml';data=xml.read_bytes().replace(b'/eval/base.csv',b'/eval/changed.tsv');xml.write_bytes(data)
 with zipfile.ZipFile(p/'package.lgp','w') as z:z.writestr('Unit_1/Unit.xml',data)`, path.join(f.attempt, "artifact")])
     expect(await patch.exited).toBe(0)
     expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
-    f.output.execution.execution_id = "first"; f.output.output.execution_id = "first"; f.port.execution_id = "first"
+    f.output.execution.execution_id = "doc:145:2"; f.output.output.execution_id = "doc:145:2"; f.port.execution_id = "doc:145:2"
+    f.events[8]!.receipt!.value.execution_id = "doc:145:2"
+    Object.assign(f.events[8]!.receipt!.value.execution_group!, { execution_id: "doc:145:2", group_id: "2", group_record_id: "324" })
+    Object.assign(f.events[9]!.receipt!.value, { execution_id: "doc:145:2", group_id: "2", process_id: "2.1", process_record_id: "325" })
     await f.write()
     expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("fresh")
   } finally { await rm(f.root, { recursive: true, force: true }) }
@@ -437,12 +523,12 @@ test("cold preparation binds the exact saved package and independent typed expec
 test("damaged input may be refused by a verified terminal engine failure", async () => {
   const f = await positiveFixture("txt-unclosed-quote")
   try {
-    const execution = { status: "failed", execution_id: "doc:root:group", failure_verified: true, root_id: "root", group_id: "group", group_record_id: "record" }
+    const execution = { status: "failed", execution_id: "doc:145:1", failure_verified: true, root_id: "145", group_id: "1", group_record_id: "322" }
     Object.assign(f.output, { status: "FAILED", execution, output: { status: "not_refreshed", ports: [] },
       error: { code: "NODE_EXECUTION_FAILED", message: "Unclosed quote" } })
-    f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_phase_completed", receipt: {
-      phase: "execute", status: "verified", value: { ...execution, verified: true, owner_verified: true,
-        node: f.output.node, output_refreshed: false } } })))
+    f.events[4] = JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_phase_completed", receipt: {
+      phase: "execute", receipt_id: "import:execute", status: "verified", value: { ...execution, verified: true, cleanup_complete: true, owner_verified: true,
+        node: f.output.node, output_refreshed: false } } }))
     await f.write()
     expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
     Object.assign(f.output.execution, { failure_verified: false })
@@ -503,7 +589,7 @@ test("every ordinary positive import draft accepts exact typed evidence and reje
     const f = await positiveFixture(id)
     try {
       expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
-      f.events[1]!.receipt!.value.format.fields.delimiter!.value = "WRONG"
+      f.events[2]!.receipt!.value.format!.fields.delimiter!.value = "WRONG"
       await f.write()
       expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("format")
     } finally { await rm(f.root, { recursive: true, force: true }) }
