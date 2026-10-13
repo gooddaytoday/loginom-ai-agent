@@ -24,6 +24,7 @@ export async function createLoginomHost(options: {
   // Retain the accepted private grant before any startup await. The caller's
   // mutable options cannot change the kind/package/authorization later.
   const fpStartup = getFPHostStartup(options)
+  try {
   fpStartup?.guard()
   const acceptedCapture = options.acceptanceCapture
   options = { ...options, acceptanceCapture: acceptedCapture && Object.freeze({ ...acceptedCapture }) }
@@ -35,7 +36,7 @@ export async function createLoginomHost(options: {
   // model calls use advisory recovery. Caller settings cannot weaken admission.
   const journal = await recoveryStore(join(root, "recovery"), {
     strict: options.acceptanceCapture !== undefined || options.strictRecovery === true,
-  })
+  }).catch(error=>{throw fpStartup?fpStartup.forward(fpStartup.reject(error)):error})
   fpStartup?.guard()
   const generations = new Map<
     number,
@@ -106,7 +107,7 @@ export async function createLoginomHost(options: {
       actionManifestSha256: manifest.actionManifestSha256,
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
-    }, startup ? { ...startup.control, ...startup.tuple, guard:startup.guard, reject:startup.reject, retain:child=>{owner.child=child} } : undefined)
+    }, startup ? { ...startup.control, ...startup.tuple, guard:startup.guard, reject:startup.propagate, receive:startup.receive, retain:child=>{owner.child=child} } : undefined)
     owner.settled = launched.then(child => { owner.child = child }, error => {
       owner.failure = { value: error }
       owner.child = error?.runtime ?? owner.child
@@ -261,4 +262,5 @@ export async function createLoginomHost(options: {
       return retain(current, chat, launch(current.connection, chat, false, captures.get(chat)))
     },
   }
+  } catch(error) {throw fpStartup?fpStartup.forward(error):error}
 }

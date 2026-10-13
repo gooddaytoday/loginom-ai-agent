@@ -20,6 +20,7 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
     state.refusal = {value}
     controller.abort(value)
   }
+  const propagated=new WeakSet<object>()
   const timer = setTimeout(() => refuse(Error('LOGINOM_PRE_READY_READ_EXPIRED')), deadline - Date.now())
   function guard() {
     // Original refusal wins over secondary tuple drift, including falsy causes.
@@ -38,7 +39,27 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
     get pending() { return state.pending },
     get accepted() { return state.accepted === true },
     get secondary() { return state.secondary },
+    forward(value:unknown) {
+      state.refusal ??= {value}
+      const carrier={};propagated.add(carrier);return carrier
+    },
+    propagate(value:unknown) {
+      state.refusal ??= {value}
+      return state.refusal.value
+    },
+    // One response for the original pending managed request. A control receipt
+    // carries the already accepted cancellation; an await/guard receipt records
+    // a native event. Equal values are deliberately not compared.
+    receive(value:unknown, origin:unknown, secondary?:{value:unknown}) {
+      if(!["control","await","guard"].includes(origin as string))throw Error("LOGINOM_STARTUP_RECEIPT_INVALID")
+      if(origin==="control")state.refusal??={value}
+      else if(!state.refusal)state.refusal={value}
+      else state.secondary??={value}
+      if(secondary)state.secondary??=secondary
+      return state.refusal!.value
+    },
     reject(value: unknown) {
+      if(value!==null && typeof value==="object" && propagated.has(value))return state.refusal!.value
       if (!state.refusal) state.refusal = {value}
       else state.secondary ??= {value}
       return state.refusal.value

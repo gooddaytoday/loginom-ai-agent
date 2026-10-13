@@ -85,7 +85,7 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
 
 export type FPStartupControl = {
   signal:AbortSignal; deadline:number; requestId:string; authorization:string; harness:"field-parameters-preservation-v1"
-  guard():void; reject(value:unknown):unknown
+  guard():void; reject(value:unknown):unknown; receive(value:unknown,origin:unknown,secondary?:{value:unknown}):unknown
   retain(runtime: Awaited<ReturnType<typeof supervise>>):void
 }
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
@@ -97,7 +97,7 @@ export async function supervise(input: Launch, startup?:FPStartupControl) {
   const snapshot={...input,connection:{...input.connection},environment:runtimeEnvironment(input.environment??process.env)}
   const guard=()=>{
     startup?.guard()
-    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","retain"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","receive","retain"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
     if(startup && (Object.keys(snapshot).some(key=>key!=="connection" && key!=="environment" && (original as any)[key] !== (snapshot as any)[key])
         || original.connection!==originalConnection || Object.keys(snapshot.connection).some(key=>(originalConnection as any)[key] !== (snapshot.connection as any)[key]))) throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
@@ -139,12 +139,13 @@ export async function supervise(input: Launch, startup?:FPStartupControl) {
     pending.delete(message.id)
     clearTimeout(request.timer)
     request.dispose?.()
-    if (request.primary) {
-      if ("secondaryRejection" in message) startup?.reject(rejection(message.secondaryRejection))
-      else if ("rejection" in message) startup?.reject(rejection(message.rejection))
-      request.reject(request.primary.value); return
+    if(request.fp && "rejection" in message) {
+      try {request.reject(startup!.receive(rejection(message.rejection),"rejectionOrigin" in message?message.rejectionOrigin:undefined,
+        "secondaryRejection" in message?{value:rejection(message.secondaryRejection)}:undefined))}
+      catch(error){request.reject(startup!.reject(error))}
+      return
     }
-    if (request.fp && "rejection" in message) { request.reject(rejection(message.rejection)); return }
+    if (request.primary) {request.reject(request.primary.value);return}
     if ("error" in message) {
       request.reject(
         new Error(

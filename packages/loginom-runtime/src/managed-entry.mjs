@@ -562,7 +562,7 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    if(message.operation==="start" && state.fpStartup)send({id:message.id,rejection:closeRejection(state.fpStartup.reject(error)),
+    if(message.operation==="start" && state.fpStartup)send({id:message.id,rejection:closeRejection(state.fpStartup.propagate(error)),rejectionOrigin:state.fpStartup.rejectionOrigin,
       ...(state.fpStartup.secondary?{secondaryRejection:closeRejection(state.fpStartup.secondary.value)}:{})})
     else send({ id: message.id, error: code })
     if (message.operation === "start") {

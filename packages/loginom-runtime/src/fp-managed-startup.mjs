@@ -7,7 +7,7 @@ export function retainFPManagedStartup(message,input,state,controller) {
   const fixed={...tuple}, primitives={...input}, credentials={...connection}
   if(message.deadline!==fixed.deadline)throw Error('LOGINOM_START_INVALID')
   let owner,bound,primary,secondary,pending=true,accepted=false
-  function refuse(value) {primary??={value};if(!controller.signal.aborted)controller.abort(primary.value)}
+  function refuse(value) {primary??={value,origin:"control"};if(!controller.signal.aborted)controller.abort(primary.value)}
   const timer=setTimeout(()=>refuse(Error('LOGINOM_INITIAL_READINESS_DEADLINE')),fixed.deadline-Date.now())
   function guard() {
     if(primary)throw primary.value
@@ -22,7 +22,7 @@ export function retainFPManagedStartup(message,input,state,controller) {
   }
   return {
     guard,
-    get pending(){return pending}, get accepted(){return accepted}, get secondary(){return secondary},
+    get pending(){return pending}, get accepted(){return accepted}, get secondary(){return secondary}, get rejectionOrigin(){return primary?.origin},
     bindOwner(value) {
       guard();if(owner)throw Error('LOGINOM_STARTUP_OWNER_CHANGED')
       owner=value;bound={directory:value.directory,generation:value.generation,chat:value.chat,signal:value.signal,deadline:value.deadline}
@@ -30,7 +30,10 @@ export function retainFPManagedStartup(message,input,state,controller) {
         throw Error('LOGINOM_STARTUP_OWNER_CHANGED')
       guard()
     },
-    reject(value){if(!primary)primary={value};else secondary??={value};return primary.value},
+    // Only a rejected owned await is a new event. A guard/root catch carries
+    // the existing primary without claiming a second failure.
+    reject(value){if(!primary)primary={value,origin:"await"};else secondary??={value};return primary.value},
+    propagate(value){primary??={value,origin:"guard"};return primary.value},
     cancel(value){
       if(!pending || value?.phase!=='startup' || value.requestId!==id || value.startupRequestId!==fixed.requestId
           || value.authorization!==fixed.authorization || value.harness!==fixed.harness || value.deadline!==fixed.deadline)return false

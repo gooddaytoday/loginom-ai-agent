@@ -78,11 +78,11 @@ export async function connectionService(
           state.phase = state.pending ? "pending" : "ready"
         },
         (error) => {
-          if (startup) startupFailure={value:startup.reject(error)}
+          if (startup) startupFailure={value:startup.propagate(error)}
           state.phase = "recoverable-error"
         },
       )
-      .catch(error=>{if(startup)startupFailure={value:startup.reject(error)};else throw error})
+      .catch(error=>{if(startup)startupFailure={value:startup.propagate(error)};else throw error})
       .finally(() => {
         state.applying = undefined
         if (!startupFailure) progress()
@@ -362,9 +362,11 @@ export async function connectionService(
       }
     },
     async settled() {
-      while (state.applying) await state.applying
-      if (startupFailure) throw startupFailure.value
-      if(!startupChecked){startup?.guard();startupChecked=true}
+      try {
+        while (state.applying) await state.applying
+        if (startupFailure) throw startupFailure.value
+        if(!startupChecked){startup?.guard();startupChecked=true}
+      } catch(error) {throw startup?startup.forward(error):error}
     },
     close() {
       const lifecycle = state as typeof state & { closingAttempt?: Promise<void> }
