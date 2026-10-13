@@ -85,3 +85,18 @@ test.each(["invalid", "missing"])("pilot preserves %s package evidence as unknow
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test("pilot audit writes an incomplete report when the session snapshot is unreadable", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-"))
+  try {
+    await Bun.write(path.join(directory, "parts.json"), "{broken")
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(2)
+    const audit = await Bun.file(path.join(directory, "selection-audit.json")).json()
+    expect(audit).toMatchObject({ policyStatus: "incomplete", historyComplete: false, calculationPassed: false })
+    expect(audit.failures).toContain("SNAPSHOT_INVALID")
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})

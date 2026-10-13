@@ -14,7 +14,7 @@ async function main() {
     throw Error("AUDIT_ARGUMENTS_INVALID")
   }
   const task = (await loadTasks(args.tasks, [args.task]))[0]!
-  const snapshot = await Bun.file(path.join(args.attempt, "parts.json")).json() as unknown
+  const snapshot = await Bun.file(path.join(args.attempt, "parts.json")).json().catch(() => null) as unknown
   const artifactDir = path.join(args.attempt, "artifact")
   const xml = await Bun.file(path.join(artifactDir, "package.lgp")).exists()
     ? await readNodeXml(artifactDir).catch(() => ({ invalid: "XML_READ_FAILED" })) : null
@@ -31,6 +31,7 @@ async function main() {
     historyComplete: false, runtimeSettled: false,
     // Task 1B completes receipt/history validation using the first real pilot.
     failures: [...selection.failures,
+      ...(record(snapshot) && Array.isArray(snapshot.parts) ? [] : ["SNAPSHOT_INVALID"]),
       ...(xml === null ? ["PACKAGE_MISSING"] : "invalid" in xml ? ["PACKAGE_XML_INVALID"] : []),
       "AUDIT_NOT_FINALIZED"],
   }
