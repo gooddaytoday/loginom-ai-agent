@@ -1523,3 +1523,20 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Серия192418 stopped2baseline/0candidate: sales1PASS; ABC1CLI1/wrapper3/cleanupfalse group-target genericJSsourceclickdeny. Exactactualpredicateconfirmed; JS→Group/newSort privateTDDintegrationongoing, noGeneralJSallow/policyrevision. Ownuser81closed20:15:37.094Z/adminabsenceverified; guardarchived/status0/checkpending.
 - Group/Sort blocker ownrecovery завершён: user81closed/guardarchived/status0/check0/adminlogout+MCP0; independentrecovery22e95b…PASS, original19files unchanged. CodeTDDpreviewintegration ongoing; baseline/candidate slots остановлены.
 - Пара203142 source dd8d480706/pair+pins Approved, native Join core PASS. JSproof3 exit1 до downstream сохранён; stopreview f28a8ebf… исправляет прежнюю validator-гипотезу: actualusercatalog не предоставляет UI tool. Ordinary privateproof4 awaiting independent review/live; model0, current-run192418 stopped.
+
+
+## Checkpoint: private artifact delivery и обязательная Sort-ветвь
+
+Proof8 остановился до Import/Group/Export: original result45f825bc…/exit3/
+cleanupfalse сохранён. CSV prepared/upload/checkpoint совпадают (27bytes/
+SHA c5235fe2…); private navigation shim ошибочно требует standalone frame
+у artifact download wrapper. Offline pinned generator воспроизводит
+PINNED_WORKSPACE_CODE_MISMATCH до browser send; непосредственно записан
+BROWSER_CALL_UNCERTAIN. Это не доказательство Product Export regression.
+Proof9 сохраняет обязательные JS→Group и прямой JS→Sort→ExportSort,
+full JS before/after, afterproducer read и CSV/5nodes4links. Дополнительный
+ExportGroup для этого gate не требуется; его прежний failure остаётся аномалией.
+Independent proof9 review8e2d847c… Approved, preview-only override byteequal7,
+60source/32fixtures/104protected match; ошибочного navigation shim здесь нет.
+Обе private fixtures diagnostic/nonacceptance; обычная rebuilt проверка обязательна.
+Own proof8 server recovery ещё проверяется; model calls по паре203142 остаются0.

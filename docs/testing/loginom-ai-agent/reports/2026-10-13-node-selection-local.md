@@ -1072,3 +1072,20 @@ Evidence: `baseline/monthly-demand/1/forensic/monthly-import-001-diagnosis.json`
 Не проверены live explicit-js/tags/recovery, candidate no-JS 18/18, сравнение
 oracle-pass всей серии и обязательное содержательное review. Не проверены
 Desktop/natural activation и cold reuse tags. Итоговая приёмка не заявляется.
+
+
+## Checkpoint: private artifact delivery и обязательная Sort-ветвь
+
+Proof8 остановился до Import/Group/Export: original result45f825bc…/exit3/
+cleanupfalse сохранён. CSV prepared/upload/checkpoint совпадают (27bytes/
+SHA c5235fe2…); private navigation shim ошибочно требует standalone frame
+у artifact download wrapper. Offline pinned generator воспроизводит
+PINNED_WORKSPACE_CODE_MISMATCH до browser send; непосредственно записан
+BROWSER_CALL_UNCERTAIN. Это не доказательство Product Export regression.
+Proof9 сохраняет обязательные JS→Group и прямой JS→Sort→ExportSort,
+full JS before/after, afterproducer read и CSV/5nodes4links. Дополнительный
+ExportGroup для этого gate не требуется; его прежний failure остаётся аномалией.
+Independent proof9 review8e2d847c… Approved, preview-only override byteequal7,
+60source/32fixtures/104protected match; ошибочного navigation shim здесь нет.
+Обе private fixtures diagnostic/nonacceptance; обычная rebuilt проверка обязательна.
+Own proof8 server recovery ещё проверяется; model calls по паре203142 остаются0.

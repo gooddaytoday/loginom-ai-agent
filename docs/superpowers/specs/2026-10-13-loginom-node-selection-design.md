@@ -854,3 +854,20 @@ live попытки, подтверждение исключений, досту
 На этапе дизайна выполнены исследование исходников/аналитических эталонов,
 независимое review и проверка примеров команд, oracle и snapshot из плана
 на временных данных. Skill/runtime не изменены; сборки и live-серии ещё не запускались.
+
+
+## Checkpoint: private artifact delivery и обязательная Sort-ветвь
+
+Proof8 остановился до Import/Group/Export: original result45f825bc…/exit3/
+cleanupfalse сохранён. CSV prepared/upload/checkpoint совпадают (27bytes/
+SHA c5235fe2…); private navigation shim ошибочно требует standalone frame
+у artifact download wrapper. Offline pinned generator воспроизводит
+PINNED_WORKSPACE_CODE_MISMATCH до browser send; непосредственно записан
+BROWSER_CALL_UNCERTAIN. Это не доказательство Product Export regression.
+Proof9 сохраняет обязательные JS→Group и прямой JS→Sort→ExportSort,
+full JS before/after, afterproducer read и CSV/5nodes4links. Дополнительный
+ExportGroup для этого gate не требуется; его прежний failure остаётся аномалией.
+Independent proof9 review8e2d847c… Approved, preview-only override byteequal7,
+60source/32fixtures/104protected match; ошибочного navigation shim здесь нет.
+Обе private fixtures diagnostic/nonacceptance; обычная rebuilt проверка обязательна.
+Own proof8 server recovery ещё проверяется; model calls по паре203142 остаются0.
