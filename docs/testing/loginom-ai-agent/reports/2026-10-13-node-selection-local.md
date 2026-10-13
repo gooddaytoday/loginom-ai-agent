@@ -5,9 +5,11 @@
 поручил самостоятельно устранять блокеры: дефект `imports.text.date_format`
 исправлен по TDD в `263df9620`, 144 теста PASS. После проверки отсутствия
 собственных Loginom-сессий адресно архивирован также guard monthly.
-Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline sales/1 завершён
-неуспешно, ABC/1 запущен; завершённых baseline 1/18, candidate 0/25;
-обе сборки и deterministic native proof проверены. Ни один старый провал
+Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
+Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
+socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
+серия `20261013T142936Z-072953` готовится; native overflow proof и сборки впереди.
+Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
 ## Новая сопоставимая пара
@@ -61,6 +63,29 @@ runtime-правки нет. Evidence: `forensic/group-category-1-diagnosis.json
 `forensic/profile-recovery.json` фиксирует восстановление отдельно от исходного
 cleanup=false. Admin logout и закрытие MCP подтверждены. Это первый из 18
 baseline, повтор его слота не выполняется. Следующий плановый ABC/1 запущен.
+
+`abc-pareto-groups/1`, Session `ses_eca65e74effehzx2YIw9HkvGOz`: CLI exit 1,
+wrapper exit 3, modelStarted true, cleanupConfirmed false; offline audit exit 1.
+History/identity подтверждены, один JS apply и ноль terminal-confirmed successful
+JS calls; XML/CSV отсутствуют, calculation false, policy failed у старого skill.
+Это baseline-замер, не причина менять candidate policy. Импорт/сортировка успешно
+выполнены. Declared JS дошёл до materialization execute и native mapping verified,
+но output port_context unobserved отклонил Close до жеста; Save не состоялся.
+
+Два ABC forensic журнала воспроизвели одну boundary. Публичный offline RED
+подтвердил missing dataset overflow icon; минимальная правка добавляет один
+selector, сохраняя guards. Existing matrix 28 случаев и полные 310 tests PASS;
+независимый review PASS. Evidence: `forensic/diagnosis.json`, `source-analysis.json`
+и `evidence/dataset-output-fix/{verification,independent-review}.json`.
+Native DOM style/class в историческом incident не сохранены, поэтому native proof
+именно repaired overflow-ветки ещё требуется.
+
+Собственная `user:24`, init 14:11:06.719 UTC, привязана точными JS/import GUID.
+Закрытие подтверждено server log; после промежуточной строки «Удаляется» выполнен
+ещё один refresh, отсутствие всей записи проверено и снят `admin-after-settled.png`.
+Guard архивирован после проверки own процессов, nonce/mtime в own CLI window;
+исторические hashes/cleanup=false не изменены. `user:20` и `user:23` не трогали,
+admin logout проверен. Серия stopped 2/18 сохранена отдельно от следующей полной.
 
 ## Native proof исправления дат
 

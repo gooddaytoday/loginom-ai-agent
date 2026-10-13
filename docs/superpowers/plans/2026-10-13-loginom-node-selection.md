@@ -471,6 +471,30 @@ Skill не меняется из-за ошибки runtime. В публичны�
   gates Tasks 3–6. Старые три попытки не включать в новую сопоставимую серию;
   отразить их отдельно в итоговом отчёте.
 
+## Предпосылка продолжения: dataset output socket в overflow
+
+Серия `20261013T132356Z-0a3983` остановлена после двух baseline, candidate 0/25.
+Sales/opening отказ сохранён отдельно, его точная причина не доказана. ABC
+повторила старый отказ закрытия output mapping: native mapping verified,
+но port_context unobserved. Обе ABC использовали JS `schema_mode=declared`.
+Offline crossed regression подтвердил отсутствие dataset icon в overflow selector;
+это необходимая общая runtime-правка, а не изменение политики выбора JS.
+
+- [x] Исправить отсутствующий dataset output socket в существующем overflow
+  selector по TDD (`c2c898aca5`). Проверки GUID/owner/opening/index/ancestry не
+  менять. RED на публичном capability, GREEN на матрице 28 случаев двух типов,
+  полные workspace-ui + node-wizard-close 310/310 PASS, independent review PASS.
+  Изменены только одна строка runtime и существующая тестовая матрица.
+- [ ] Подтвердить native hidden dataset output mapping/Close, output и Save/cleanup
+  через настоящий Host без LLM; убедиться, что проверена overflow-ветка.
+  Сохранить ограничения и отдельно проверить даты в общем smoke, если требуется.
+- [ ] Собрать новую сопоставимую пару в собственном общем build worktree с обоими
+  runtime fixes, прежними version/resources/двумя skill версиями. Закрепить новые
+  pins `20261013T142936Z-072953`, подтвердить полные inventories и источник.
+  Выполнить полные 18+25 и все прежние gates; пять старых попыток двух остановленных
+  серий сохранить отдельно. Удалять только собственные ненужные build artifacts,
+  сохраняя необходимые evidence и не затрагивая работу других агентов.
+
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
 **Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под
@@ -1181,7 +1205,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Collector реализован TDD; cleanup guard `d73fa9def`, независимое review проведено.
 - Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
-- Текущий run `20261013T132356Z-0a3983`, source6768520a0: build/native proof/pins PASS; sales1 CLI1/cleanupfalse, ABC1 запущен.
+- Серия132356 stopped2/18, candidate0: sales/opening и ABC/outputmapping сохранены; ownuser21/24 закрыты, guards архивированы.
 - Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
@@ -1194,4 +1218,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Исходная серия stopped3/18 сохранена; новый sales1 ownuser21 закрыт, guard архивирован; source opening дефект не доказан.
+- Dataset overflow fix c2c898aca5: TDD/310tests/review PASS; новая серия142936-072953 preparing, native proof/build впереди.
