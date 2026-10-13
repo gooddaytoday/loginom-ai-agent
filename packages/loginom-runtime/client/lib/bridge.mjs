@@ -1,4 +1,6 @@
 import { assertCaptureOwner, capturePublication, assertCapturePublication, freezeCaptureResult } from '../../src/retained-capture.mjs';
+import {captureImportPreconfig,validateCaptureResult} from '../../src/acceptance/import-preconfig-adapter-v1.mjs';
+import {captureData} from '../../src/retained-capture.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -135,6 +137,8 @@ function shutdownRejection(value) {
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, authenticatedReadiness, acceptanceCapture } = {}) {
+  const importAdmission=acceptanceCapture ? Object.freeze({binding:acceptanceCapture.binding,registration:acceptanceCapture.registration,
+    retained:acceptanceCapture.retained,harness:acceptanceCapture.harness}) : undefined;
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -186,7 +190,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
   let actionRuntime = null;
-  let captureNodeOperation, diagnosticCapture, captureIOAssert;
+  let captureNodeOperation, diagnosticCapture, captureIOAssert, importOpening;
   let pinnedActions = null;
   let recoveryContext = null;
   const recordExecution = createExecutionJournal({ directory: session.directory,
@@ -365,7 +369,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
-              if (acceptanceCapture?.registration && request.params.name==='dock_node_apply')
+              if (!importOpening && acceptanceCapture?.registration && request.params.name==='dock_node_apply')
                 captureNodeOperation=args.operation_id;
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
@@ -595,13 +599,85 @@ export async function createBridge(config, session, { browserTransport: managedB
         captureJournalWritten=true;
       }
     }
+    // Closed retained-owner caller; never an MCP tool or a node_apply alias.
+    function assertImportAdmission(signal) {
+      const a=importAdmission,r=a?.retained,b=a?.binding;
+      signal?.throwIfAborted();
+      if(!a || acceptanceCapture.binding!==b || acceptanceCapture.retained!==r
+          || acceptanceCapture.registration!==a.registration || acceptanceCapture.harness!==a.harness
+          || b?.harness!=='import-before-configure-v1' || a.harness!==captureImportPreconfig
+          || !Object.isFrozen(a.registration) || a.registration.mode!=='readonly'
+          || a.registration.validate!==validateCaptureResult || a.registration.resource!==r?.resource
+          || r.resource.path!=='runtime/src/acceptance/import-preconfig-adapter-v1.mjs'
+          || r.binding!==b || r.session!==session || r.runtime.bridge!==bridge
+          || !Object.isFrozen(r.runtime) || signal!==r.state.controller?.signal)
+        throw Error('LOGINOM_IMPORT_CALLER_ADMISSION');
+      assertCaptureOwner(r);
+      const prepared=session.metadata.workspacePreparation;
+      if(shutdownStarted || cleanupRefused && importOpening?.phase!=='confirmed' || clipboardUncertain || heldLeases.size
+          || session.metadata.workspaceReady!==true || b.session!==session.metadata.sessionId
+          || !prepared?.attempted || prepared.state?.status!=='READY' || prepared.state.authenticated!==true
+          || prepared.state.target_verified!==true || prepared.state.document_id===undefined
+          || prepared.state.loginom_account!==b.account || prepared.state.package_ref?.path!==b.packagePath
+          || !prepared.state.workflow_ref?.tab_tid || session.metadata.targetIdentity?.loginom_build!=='7.4.2')
+        throw Error('LOGINOM_IMPORT_CALLER_PREPARATION');
+      return prepared;
+    }
+    function assertImportLatch(signal) {
+      const prepared=assertImportAdmission(signal),o=importOpening;
+      if(!o || o.phase!=='confirmed' || o.signal!==signal || o.prepared!==prepared
+          || o.preparedBytes!==JSON.stringify(prepared) || o.requestBytes!==JSON.stringify(o.request)
+          || captureNodeOperation!==o.operation || o.node!==actionRuntime.retainCaptureNode(o.operation)
+          || o.node.owner!==importAdmission.retained || o.node.identity!==o.identity
+          || o.node.signal!==signal || o.node.runtime!==actionRuntime || o.node.preconfig!==true
+          || o.node.request.operation_id!==o.operation || o.node.request.document_id!==o.identity.document_id
+          || o.node.request.workflow_ref.tab_tid!==o.identity.tab_tid)
+        throw Error('LOGINOM_IMPORT_CALLER_LATCH');
+      actionRuntime.assertImportPreconfigIdle(o.node);return o.node;
+    }
+    function openImportPreconfig(request,{signal,retained}={}) {
+      const prepared=assertImportAdmission(signal);
+      if(retained!==importAdmission.retained || captureConsumed || captureInFlight)
+        throw Error('LOGINOM_IMPORT_CALLER_ADMISSION');
+      captureData(request);
+      const bytes=JSON.stringify(request);
+      if(importOpening) {
+        if(importOpening.request!==request || importOpening.requestBytes!==bytes || importOpening.signal!==signal)
+          throw Error('LOGINOM_IMPORT_CALLER_CHANGED');
+        return importOpening.promise;
+      }
+      actionRuntime.assertPreparationAllowed();
+      if(actionRuntime.hasActiveWork() || actionRuntime.hasUnsettledWork() || captureNodeOperation)
+        throw Error('LOGINOM_IMPORT_CALLER_BUSY');
+      const identity=Object.freeze({session_id:importAdmission.binding.session,document_id:prepared.state.document_id,
+        tab_tid:prepared.state.workflow_ref.tab_tid,account:importAdmission.binding.account,
+        package_path:importAdmission.binding.packagePath,loginom_build:session.metadata.targetIdentity.loginom_build});
+      const o={request,requestBytes:bytes,signal,identity,prepared,preparedBytes:JSON.stringify(prepared),
+        operation:request.operation_id,phase:'pending'};importOpening=o;
+      o.promise=browserGate(async()=>{
+        assertImportAdmission(signal);
+        if(prepared!==session.metadata.workspacePreparation || o.preparedBytes!==JSON.stringify(prepared)
+            || bytes!==JSON.stringify(request))throw Error('LOGINOM_IMPORT_CALLER_CHANGED');
+        const node=await actionRuntime.openImportPreconfig(request,{signal,retained,identity});
+        assertImportAdmission(signal);
+        if(prepared!==session.metadata.workspacePreparation || o.preparedBytes!==JSON.stringify(prepared)
+            || bytes!==JSON.stringify(request) || node.request.operation_id!==o.operation
+            || node.owner!==retained || node.identity!==identity || node.signal!==signal
+            || node!==actionRuntime.retainCaptureNode(o.operation))throw Error('LOGINOM_IMPORT_CALLER_LATCH');
+        o.node=node;captureNodeOperation=o.operation;o.phase='confirmed';
+        assertImportLatch(signal);await node.assertOpeningCurrent();assertImportLatch(signal);
+        return node;
+      }).catch(value=>{o.phase='refused';o.failure={value};throw value;});
+      return o.promise;
+    }
     async function captureAcceptance({signal} = {}) {
       const binding = acceptanceCapture?.binding;
       if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
         throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
       const registration=acceptanceCapture.registration;
       const retained=acceptanceCapture.retained;
-      const node=registration ? actionRuntime.retainCaptureNode(captureNodeOperation) : undefined;
+      const originalImport=!!importOpening;
+      const node=originalImport ? assertImportLatch(signal) : registration ? actionRuntime.retainCaptureNode(captureNodeOperation) : undefined;
       const preparedAtCapture=session.metadata.workspacePreparation;
       const preparedBytes=registration?JSON.stringify(preparedAtCapture):undefined;
       const assertBound = () => {
@@ -616,6 +692,10 @@ export async function createBridge(config, session, { browserTransport: managedB
           if(session.metadata.workspacePreparation!==preparedAtCapture
               || JSON.stringify(preparedAtCapture)!==preparedBytes)
             throw Error('LOGINOM_CAPTURE_PREPARATION_CHANGED');
+        }
+        if(originalImport) {
+          if(node!==assertImportLatch(signal))throw Error('LOGINOM_IMPORT_CALLER_LATCH');
+          return;
         }
         actionRuntime.assertPreparationAllowed();
         const prepared=session.metadata.workspacePreparation;
@@ -633,15 +713,17 @@ export async function createBridge(config, session, { browserTransport: managedB
       captureConsumed=true;
       captureInFlight=browserGate(async () => {
         assertBound();
-        const identity=Object.freeze({session_id:binding.session, document_id:managedSave.documentId,
+        const identity=originalImport ? importOpening.identity : Object.freeze({session_id:binding.session, document_id:managedSave.documentId,
           tab_tid:managedSave.tabTid, account:binding.account, package_path:binding.packagePath,
           loginom_build:managedSave.loginomBuild});
         // Only the fixed verified resource receives this private Page transport.
         // It is never supplied by IPC, the tool catalogue or the model.
         captureUnknown=true;
+        if(originalImport){await node.assertOpeningCurrent();assertBound();}
         const publication=registration ? capturePublication(retained,node,identity) : undefined;
         const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution,
           ...(registration?{retained,runtime:actionRuntime,session,node,publication,signal,deadline:node.deadline}: {})});
+        if(originalImport){await node.assertOpeningCurrent();assertBound();}
         assertBound();
         if (registration) {
           assertCapturePublication(receipt,publication);
@@ -688,15 +770,19 @@ export async function createBridge(config, session, { browserTransport: managedB
         }catch(persistence){session.metadata.capturePersistenceFailure=shutdownRejection(persistence)}
         throw error
       }
-      finally { captureInFlight=undefined; captureIOAssert=undefined }
+      finally { captureInFlight=undefined; if(!originalImport)captureIOAssert=undefined }
     }
     function closeBridge() {
       if (acceptanceCapture?.registration && captureConsumed) {
         // Only evidence repair is possible here. A read never permits teardown.
         if(captureEvidence && captureRejected && !captureUnknown)
-          return persistCapture().then(()=>{throw captureRejection});
+          return persistCapture().then(()=>{throw captureRejection},value=>{
+            if(importOpening){rememberCapturePersistence(value,'import_evidence_repair');throw captureRejection;}
+            throw value;
+          });
         return Promise.reject(captureRejected?captureRejection:Error('LOGINOM_CAPTURE_DIAGNOSTIC_RETAINED'));
       }
+      if(importOpening)return Promise.reject(importOpening.failure?importOpening.failure.value:Error('LOGINOM_IMPORT_OPENING_RETAINED'));
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if(captureEvidence&&captureRejected&&!captureUnknown) return persistCapture().then(()=>{captureRejected=false;return closeBridge()});
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
@@ -834,10 +920,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       });
       return closing;
     }
-    return {server,catalog,captureAcceptance,
+    const bridge={server,catalog,captureAcceptance,openImportPreconfig,
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};
+    return bridge;
   } catch (error) {
     await closeClients();
     throw error;

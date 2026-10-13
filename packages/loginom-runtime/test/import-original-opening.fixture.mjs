@@ -28,7 +28,7 @@ export async function fixture(options={}) {
  const session={directory,metadata:{sessionId:'session',clientRevision:'a'.repeat(40),workspacePreparation:{attempted:true,state:{document_id:'doc'}}}};
  const state={startupOwner:owner,session,controller};state.captureStartupBinding=Object.freeze({...owner,owner});
  const retained=retainCaptureOwner(state,binding,Object.freeze({path:'runtime/src/acceptance/import-preconfig-adapter-v1.mjs',sha256:'a'.repeat(64)}));
- state.bridge={};state.client={callTool(){throw Error('No alternate Page transport');}};bindCaptureRuntime(retained,state.bridge,state.client);
+ state.bridge={};state.client={callTool(){throw Error('No alternate Page transport');}};if(!options.unbound)bindCaptureRuntime(retained,state.bridge,state.client);
  const native=vm.createContext({Date});
  vm.runInContext(`
  class ModelForm{};class WizardTreeNode{};class ModelNodeTreeNode{};class WizardModelComponentForm{};
@@ -88,7 +88,7 @@ export async function fixture(options={}) {
  const onRecord=async event=>{events.push(event);options.beforeRecord?.({event,state,native,heldOperation});await file.writeFile(JSON.stringify(event)+'\n');await file.sync();options.afterRecord?.({event,state,native,heldOperation});return event;};
  const support=createTextImportNodeSupport({targetOrigin:owner.origin,targetBuild:'7.4.2'});
  const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Import',inputs:[],outputs:[0]}],links:[],foreign_links:[]};
- const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},execute,onRecord,targetOrigin:owner.origin,targetBuild:'7.4.2',
+ const runtime=createActionRuntime({allowCandidate:options.candidate===true,pinned:{actions:new Map(),selectors:new Map(),pins:{}},execute,onRecord,targetOrigin:owner.origin,targetBuild:'7.4.2',
   nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:async()=>{},mutate:async()=>{throw Error('No create');}}),
   nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:c=>{
    heldOperation=c.operation;
@@ -104,6 +104,6 @@ export async function fixture(options={}) {
  const contextFor=node=>({retained,node,identity,publication:capturePublication(retained,node,identity),runtime,
   browser:{callTool(){throw Error('No foreign resource transport');}},record:onRecord,signal:controller.signal});
  const adapterFor=node=>createImportPreconfigAdapter(contextFor(node));
- return {runtime,native,state,retained,identity,controller,events,calls,dispatch,openNode,adapterFor,contextFor,operation:()=>heldOperation,
+ return {runtime,native,state,retained,identity,controller,events,calls,dispatch,execute,onRecord,openNode,adapterFor,contextFor,operation:()=>heldOperation,
   async cleanup(){channel.port1.close();channel.port2.close();await file.close();await rm(directory,{recursive:true,force:true});}};
 }
