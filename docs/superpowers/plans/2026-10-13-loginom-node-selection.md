@@ -1006,7 +1006,7 @@ docker cp "$selection_container:$selection_storage/$selection_csv_name" \
   первым из 18 baseline даже при расчётном провале. Если model dispatch не
   произошёл, это отдельный preflight incident; если потерян trace после dispatch,
   не заменять модельную попытку удобным повтором.
-- [ ] После завершения аудита зафиксировать его версию, runner и task/oracle
+- [x] После завершения аудита зафиксировать его версию, runner и task/oracle
   hashes. Выполнить оставшиеся 17 baseline в порядке: остальные пять задач
   с номером 1, затем все шесть с номером 2, затем все с номером 3. Baseline
   не останавливать из-за JS: это измеряемое старое поведение. Busy/uncertainty
