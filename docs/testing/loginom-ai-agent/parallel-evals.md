@@ -318,3 +318,11 @@ bindings пусты. Stale epoch отвергается до создания co
 temp artifacts удалены после проверки. 41 targeted tests, typecheck, Node --check
 и diff check PASS. Это отрицательная квалификация до browser launch; bootstrap,
 положительный admin login/RPC, crash registry и live acceptance ещё не доказаны.
+
+Независимая очередь scheduler.ts реализует round-major jobs и синхронный claim
+перед await всего slot pipeline. Healthy slot продолжает очередь без барьера;
+quarantined прекращает claim, abort/ошибка останавливают новые assignments.
+Results упорядочены по job.index; AggregateError возвращается только после drain
+всех запущенных pipelines. 7 public-interface tests/20 assertions PASS; вместе
+с admin/preflight/CI — 48 PASS/111 assertions и typecheck/diff check PASS. Это core
+очереди: реальный main/runAttempt/retry, judge gate и summary writer ещё не связаны.
