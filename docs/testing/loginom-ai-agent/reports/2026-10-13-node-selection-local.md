@@ -533,6 +533,26 @@ own native процессов нет, профиль свободен; guard н�
 Сверка свежего server close выполняется независимо. Второй отдельный native
 запуск в `join-native-diagnostic-2` начат; причина Join пока не доказана.
 
+## Join native diagnostic/2: отказ воспроизведён, capture blocked
+
+Второй instrumented run: обе таблицы импортированы/прочитаны успешно, оба Save
+подтверждены (`/user/JD18fef2b4.lgp`). Join `join-repro` остановился AMBIGUOUS
+input_mapping с тем же calculator done readiness timeout; Execute не начат.
+Затем private read_navigation_panel ошибочно заблокировался
+LOGINOM_DIAGNOSTIC_BUSY: guard счёл unresolved terminal effect активной работой.
+DOM после отказа не получен. Cleanup BLOCKED/CLEANUP_OR_OPERATION_UNCONFIRMED,
+native exit3. Original result `join-native-diagnostic-2/result.json` SHA256
+`ec9cfb304fd970fba437e56db4659f328e134625d2d2b0e88ce61302f816a8df`
+сохранён. Это подтверждает воспроизведение отказа, но не конкретный DOM conjunct.
+Правка касается только private диагностического guard: fixed read-only capture
+собственного prepared мастера после stopped/ambiguous outcome. Product/runtime
+и immutable candidate всё ещё не менялись; native/3 ещё не запускался.
+
+Первый native recovery дополнительно подтверждён server close user70
+18:44:37.180 UTC и независимым review; original 1749 files/hashes неизменны.
+`native-first-server-binding.json` SHA256
+`e0769c609c181b029fac3736e22bd69b72dbe157f128539385358aaefa15ba7c`.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.

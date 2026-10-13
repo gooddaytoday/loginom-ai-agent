@@ -355,7 +355,11 @@ refresh absence подтверждены. Exact guard архивирован п�
 (display_text вместо exact_integer value), Save не состоялся. Original failure
 сохранён. После TDD-проверки actual receipt и Save-before-assertions исправлен
 только private driver (5 tests/review PASS); own native user70 адресно закрыт,
-второй diagnostic начат в новом каталоге без LLM и без изменения candidate.
+второй diagnostic выполнен в новом каталоге без LLM и без изменения candidate.
+Он воспроизвёл Join input_mapping refusal, но private capture guard ошибочно
+отклонил чтение unresolved terminal context (LOGINOM_DIAGNOSTIC_BUSY). DOM cause
+остаётся недоказанной; готовится узкая TDD-правка только diagnostic guard.
+Оба исходных native failures сохранены, original model slot не повторяется.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
