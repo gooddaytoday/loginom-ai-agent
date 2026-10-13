@@ -14,6 +14,7 @@ JSON готовит действующий исполнитель из назн�
   "inputs": [{"path": "/business/input.csv", "sha256": "..."}],
   "cwd": "/business",
   "profile": "/private/cli-profile",
+  "shared_auth_dir": "/home/user/.local/state/loginom-cli-oauth/shared-oauth-v1",
   "profile_config": {"path": "/private/cli-profile/config/opencode.json", "sha256": "..."},
   "model": "openai/gpt-6-luna",
   "variant": "high",
@@ -38,11 +39,11 @@ Business cwd содержит только task и входные файлы, б
 
 `evidence.json` содержит:
 
-- `binding`: точная копия полей manifest `issue, case, candidate, task, inputs, model, variant, profile, profile_config, cwd`.
+- `binding`: точная копия полей manifest `issue, case, candidate, task, inputs, model, variant, profile, profile_config, shared_auth_dir, cwd`.
 - `reviewer`, `resource_reference`: непустые ссылки/идентичность проверяющего и актуального собственного resource/cleanup evidence.
 - `checked_at`: UNIX timestamp проверки не старше 300 секунд непосредственно перед запуском; `resources: "PASS"`, `cleanup: "PASS"`, `unknown_operation_replay: false`.
 - `fixes`: объект с теми же ключами, что `required_fixes`. Каждое значение: `candidate_sha`, `verdict` (`PASS` или `NOT_APPLICABLE`), непустой `explanation`, `proof` (файловая ссылка), для PASS непустой `reproducer` на независимую проверку исходного воспроизводителя.
 
 Обвязка сверяет доказательства и привязки; она не создаёт resource authority и не доказывает истинность заявлений reviewer. Пустой список исправлений допустим только если действительно нет необходимых исправлений. После композиции LAB-73 обязательно оценить canonical-array guard против исходной потери дополнительных keys.
 
-Перед spawn всё проверяется повторно под локальной блокировкой profile. Действующий владелец обеспечивает неизменность кандидата и входов на время использования (штатные artifact pins/use сохраняются); это не файловая песочница и не защита от злонамеренной подмены после spawn. Evidence не добавляется к argv/attachments; Multica token и прочие служебные переменные не наследуются. CLI получает только business task и inputs, назначенный profile и сетевое окружение. Общий OAuth сохраняется через фактическую конфигурацию профиля. Обвязка не отменяет 7200-секундный предел, штатный wait и same-owner cleanup; не убивает удерживающий ресурсы процесс по собственному таймеру.
+Перед spawn всё проверяется повторно под локальной блокировкой profile. Действующий владелец обеспечивает неизменность кандидата и входов на время использования (штатные artifact pins/use сохраняются); это не файловая песочница и не защита от злонамеренной подмены после spawn. Evidence не добавляется к argv/attachments; Multica token и прочие служебные переменные не наследуются. CLI получает только business task и inputs, назначенный profile и сетевое окружение. Общий OAuth сохраняется через явный существующий `shared_auth_dir` из настроек сквада; копировать credentials по карточкам нельзя. CLI profile должен быть уже инициализирован (`cli-profile.json`) и свободен от `.writer`; marker сверяется с channel кандидата. Обвязка не отменяет 7200-секундный предел, штатный wait и same-owner cleanup; не убивает удерживающий ресурсы процесс по собственному таймеру.

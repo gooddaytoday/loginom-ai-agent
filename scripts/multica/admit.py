@@ -30,6 +30,12 @@ def validate(spec):
     inputs = [checked(row) for row in spec['inputs']]
     cwd = Path(spec['cwd']).resolve(strict=True)
     profile = Path(spec['profile']).resolve(strict=True)
+    shared_auth = Path(spec['shared_auth_dir'])
+    if not shared_auth.is_absolute() or not shared_auth.is_dir() or shared_auth.resolve().is_relative_to(cwd):
+        raise DeliveryError('Existing shared OAuth directory must be explicit and outside business inputs')
+    marker = json.loads((profile / 'cli-profile.json').read_text())
+    if marker != {'format': 'loginom-cli', 'version': 1, 'channel': spec['candidate']['channel']} or (profile / '.writer').exists():
+        raise DeliveryError('An initialized idle CLI profile for the candidate channel is required')
     candidate = Path(spec['candidate']['path']).resolve(strict=True)
     build = verify_build(candidate)
     if build['manifest_sha256'] != spec['candidate']['manifest_sha256'] or build['metadata']['sourceCommit'] != spec['candidate']['sha']:
@@ -61,7 +67,7 @@ def validate(spec):
     if spec['issue'] == 'LAB-72' and spec['case'] not in ('LAB-72-enabled-prefixes', 'LAB-72-original-strict'):
         raise DeliveryError('LAB-72 must identify the strict or enabled-prefixes scenario separately')
     evidence = json.loads(checked(spec['evidence']).read_text())
-    binding = {key: spec[key] for key in ('issue', 'case', 'candidate', 'task', 'inputs', 'model', 'variant', 'profile', 'profile_config', 'cwd')}
+    binding = {key: spec[key] for key in ('issue', 'case', 'candidate', 'task', 'inputs', 'model', 'variant', 'profile', 'profile_config', 'shared_auth_dir', 'cwd')}
     if evidence['binding'] != binding or not evidence['reviewer'] or not evidence['resource_reference']:
         raise DeliveryError('Evidence is not bound to the exact candidate, task, inputs and profile')
     age = time.time() - evidence['checked_at']
@@ -114,7 +120,9 @@ def launch(args):
             env = {key: value for key, value in os.environ.items() if key in (
                 'PATH', 'HOME', 'LANG', 'LC_ALL', 'TMPDIR', 'DISPLAY', 'XAUTHORITY',
                 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR')}
-            env.update(LOGINOM_AI_AGENT_CLI_PROFILE=spec['profile'], LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false')
+            env.update(LOGINOM_AI_AGENT_CLI_PROFILE=spec['profile'],
+                LOGINOM_AI_AGENT_SHARED_AUTH_DIR=spec['shared_auth_dir'],
+                LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false')
             # Do not kill a resource-owning CLI on timeout or retry on failure/UNKNOWN.
             result = subprocess.run(argv, cwd=spec['cwd'], env=env, stdin=subprocess.DEVNULL)
             record.update(state='exited', returncode=result.returncode, acceptance=False)
