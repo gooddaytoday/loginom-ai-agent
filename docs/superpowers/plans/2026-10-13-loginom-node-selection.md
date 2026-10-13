@@ -287,7 +287,7 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
   Отсутствие обязательного review у исключения не даёт полного PASS.
   Не запускать модель, браузер, судью или cleanup из этого entrypoint.
 
-- [ ] Повторить `bun test test/node-selection.test.ts test/oracle.test.ts`,
+- [x] Повторить `bun test test/node-selection.test.ts test/oracle.test.ts`,
   затем `bun typecheck` из `evals/`.
 - [ ] Повторить offline-аудит пилота окончательным аудитором и зафиксировать
   его версию. Новая версия аудита перепроверяет все уже собранные попытки;
