@@ -6,6 +6,7 @@ import type { AgentRun } from "./cli"
 import { unzip } from "./artifact"
 import { EvalFailure } from "./fail"
 import { checkOracle } from "./oracle"
+import { superviseProcess } from "./process-supervisor"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -185,11 +186,11 @@ export async function judgeTask(input: {
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
   const first = await invoke(input, checklist, 1)
   if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: 1 as const }
-  if (input.signal?.aborted) return { ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
+  if (input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
   const second = await invoke(input, checklist, 2)
   return second.ok
     ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }
-    : { ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
+    : { ...second, ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
 }
 export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0 }
 
@@ -249,23 +250,20 @@ async function invoke(
 ) {
   const verdictPath = path.join(input.outDir, "verdict.json")
   await rm(verdictPath, { force: true })
-  const proc = Bun.spawn(
-    judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
-    {
-      cwd: input.outDir,
-      env: judgeEnvironment(input.judge.env),
-      stdin: Bun.file(path.join(input.outDir, "PROMPT.md")),
-      stdout: Bun.file(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`)),
-      stderr: Bun.file(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`)),
-    },
-  )
-  const timer = setTimeout(() => proc.kill("SIGKILL"), input.judge.timeoutMs)
-  const onAbort = () => proc.kill("SIGKILL")
-  input.signal?.addEventListener("abort", onAbort, { once: true })
-  if (input.signal?.aborted) proc.kill("SIGKILL")
-  const exitCode = await proc.exited
-  clearTimeout(timer)
-  input.signal?.removeEventListener("abort", onAbort)
+  const processDir = path.join(path.dirname(input.outDir), `judge-processes-${attempt}`)
+  await mkdir(processDir, { recursive: true, mode: 0o700 })
+  const supervised = await superviseProcess({
+    cmd: judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
+    cwd: input.outDir, env: judgeEnvironment(input.judge.env),
+    stdin: await Bun.file(path.join(input.outDir, "PROMPT.md")).text(),
+    outDir: processDir,
+    timeoutMs: input.judge.timeoutMs, signal: input.signal,
+  })
+  await Bun.write(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`), supervised.stdout)
+  await Bun.write(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`), supervised.stderr)
+  if (supervised.processCleanup.status !== "confirmed") return { ok: false as const,
+    error: `Judge process cleanup unconfirmed: ${supervised.processCleanup.error ?? "unknown"}`, cleanupUnconfirmed: true }
+  const exitCode = supervised.exitCode
   if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
   const file = Bun.file(verdictPath)
   if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }

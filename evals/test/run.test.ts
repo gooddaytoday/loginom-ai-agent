@@ -404,6 +404,23 @@ test("runAttempt: стартовый timeout host сохраняется без 
   } finally { await rm(runDir, { recursive: true, force: true }) }
 })
 
+test("runAttempt: unknown judge process cleanup preserves measurement and forbids continuation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-cleanup-fence-"))
+  try {
+    const config = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace") })
+    const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+    await mkdir(path.join(root, task!.id, "1/judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "unknown-judge", runDir: root, signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false,
+      judge: { command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts")], model: "fake", reasoning: "high", timeoutMs: 3_000, passThreshold: 70 } })
+    expect(result.result).toMatchObject({ status: "completed", exit_code: 0, judge_status: "error", judge_attempts: 1,
+      environment_cleanup: { status: "failed" } })
+    expect(result.result.environment_cleanup?.error).toContain("Judge process cleanup unconfirmed")
+    expect(result.stop).toBe(true)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("afterAttempt: exit 1 со stale writer восстанавливает профиль до следующей попытки", async () => {
   const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-stale-"))
   const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-stale-run-"))
