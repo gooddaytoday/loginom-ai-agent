@@ -677,12 +677,19 @@ inspect после response-budget refusal). Standard group-001 останови
   recovery `d3891697223881d7520f21b724ee0ffcffa68ab420020eb6a8d2f76c53aba579`,
   management `922d769c55ac1812eba131450ae2aadb09ae9d873e412ad56c9656916aa55f08`.
   Original model CLI1/wrapper3/cleanupfalse не изменён.
-- [ ] По TDD исправить только управляемый preview JS-источника для Group и new
+- [x] По TDD исправить только управляемый preview JS-источника для Group и new
   Sort: private owned native lease/fixed select-port→F3/fresh complete preview,
   latest successful managedJS history/execution/cleanup, owner/doc/workflow/
   nativeport0GUID guards и ACK/uncertain receipts. General public JS deny и
   Calculator/Union не расширять; public parameters/Protocol/schema/skill не менять.
   Нужны actual RED→GREEN, отрицательные случаи, runtime suites и independent review.
+  Source commit `dd8d480706`: private output0 lease/fixed native port gestures,
+  fresh complete schema/Close/graph restore и latest successful execution binding.
+  Public JS deny/Calculator/Union/Protocol/skill unchanged. По independent RED
+  добавлен FLocked guard, в том числе между prepared ACK и click/F3. Итоговый
+  pinned Node24.19 upstream3820 tests/3810PASS/0FAIL/10SKIP, exit0; native ещёpending.
+  Source verification SHA `a1c91ba28f775d83b90f0be0e6dc680f6d46a64813247f642c7964be18d1603a`,
+  independent review `fdd3a83d6c85bce0b938b7172ab996c07015f73cdc59effd3faad178807c3897`.
 - [ ] Собрать новую matched baseline/candidate пару с этой общей runtime-правкой,
   прежними version/model/fixtures/seed/двумя skill версиями. Native без LLM
   подтвердить JS→Group и JS→newSort→Export, сохранённый пакет/выход/cleanup,

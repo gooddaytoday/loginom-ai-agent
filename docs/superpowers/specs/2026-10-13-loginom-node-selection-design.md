@@ -406,7 +406,15 @@ Own user81 закрыт по GUID/log/admin binding; guard адресно арх
 nonce SHA/mtime/no-own-process checks. Status0/check0, Helpready/browserverified,
 adminlogout/MCPexit0 подтверждены. Independent recovery22e95b…PASS,19 originals
 unchanged; исходные CLI1/wrapper3/cleanupfalse сохранены.
-После TDD/runtime review нужны новая matched пара/native proof и полные18+25.
+Private Group/newSort preflight исправлен в `dd8d480706`: latest owned successful
+JS execution допускает только fixed output0 preview; fresh complete schema,
+Close/graph restoration, prepared/completed ACK и native FLocked guard обязательны.
+Общий publicJS deny и соседниеhandlers побайтно сохранены. Actual RED→GREEN и
+independent review Approved, Node24.19 upstream3810PASS/0FAIL/10SKIP/exit0.
+Verification SHA `a1c91ba28f775d83b90f0be0e6dc680f6d46a64813247f642c7964be18d1603a`,
+review `fdd3a83d6c85bce0b938b7172ab996c07015f73cdc59effd3faad178807c3897`.
+Native port selection==[port.FCell] пока fixture-only: новая matched пара203142,
+actual JS→Group/directJS→newSort и обе Join hiddenroles, затем полные18+25 pending.
 Исходные2baseline192418 сохраняются отдельно; предыдущие18 также не переносятся.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор

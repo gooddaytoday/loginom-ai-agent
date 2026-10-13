@@ -120,9 +120,18 @@ Atomic rename подтверждён root syscall/result, но его истор
 независимый reviewer не выводит только из конечных файлов.
 
 
-Private managed preview integration Group+Sort по TDD в работе, общий publicJS
-click/F3deny и соседниеhandlers не расширяются. После новой общей runtimeправки
-обязательны новые matchedpins/native proof/18+25; эти2слота остаются диагностикой.
+Private managed preview Group+newSort исправлен в `dd8d480706`. Managed execution
+history допускает владельца; retained schema не подменяет fresh native preview.
+Fixed native output0 gestures/ACK, lock guard, schema/Close/graph restore проверены.
+Общий publicJS click/F3deny, Calculator/Union, Protocol и skill не изменены.
+TDD и независимое review APPROVED; pinned Node24.19 upstream3820tests:
+3810PASS/0FAIL/10SKIP, exit0. Verification SHA
+`a1c91ba28f775d83b90f0be0e6dc680f6d46a64813247f642c7964be18d1603a`, review
+`fdd3a83d6c85bce0b938b7172ab996c07015f73cdc59effd3faad178807c3897`.
+Новая matched пара `20261013T203142Z-5bf175` готовится на общем source;
+native JS→Group/directJS→newSort/обе hidden Join роли и полный18+25 pending.
+Historical locks/model bytes и72+2 acceptance source hashes подтверждены;
+пока newpins/admission нет. Исходные2слота192418 остаются диагностикой.
 
 ## Историческая вторая сопоставимая пара
 

@@ -33,6 +33,12 @@ Sales1 полный machinePASS; ABC1 CLI1/wrapper3/cleanupfalse на станд
 newSort preview. План требует private owned-preview fix без общегоJSallow, новую
 matchedпару/native proof и полный18+25; старые outcomes не переносятся.
 
+Private JS output preview для Group/newSort исправлен в `dd8d480706` по TDD:
+3810PASS/0FAIL/10SKIP Node24.19 upstream, independent review Approved.
+PublicJS guards/skill не менялись. Новый run203142 готовится; его native proofs,
+immutablepins/admission и модельные18+25 ещёpending. Старый current-run192418
+не является разрешением продолжать остановленные model slots.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1
