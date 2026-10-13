@@ -1,7 +1,7 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка full8: 2026-10-13T15:31:29.162773+00:00; LAB56 in_review65, LAB57 in_progress203/Rich15 running, LAB58–63 in_progress9/admission/no runs; fresh statuses/active/queued/metadata/comments, metadata всех8 unchanged.
-- Runtime online/same daemon; Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 проверены; Rich15/01a1359b-d1cd running с17:17:47+03, единственный active/queued; +54 events, latest210/tool_result15:25:33UTC, не execution receipt.
+- Проверка full8: 2026-10-13T16:01:36.879820+00:00; LAB56 in_review65, LAB57 in_progress203/Rich15 running, LAB58–63 in_progress9/admission/no runs; fresh statuses/active/queued/metadata/comments, metadata всех8 unchanged.
+- Runtime online/same daemon; Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 проверены; Rich15/01a1359b-d1cd running с17:17:47+03, единственный active/queued; +127 events, latest337/tool_result16:01:48UTC, не execution receipt.
 - Latest stage comment01a1359b-d1a9/17:12:46+03 unchanged; новых replies/evidence нет; все fresh reads успешны. lab-56-lab-63 ACTIVE/30мин; все8 done=false; server mutations мониторинга0.
 - LAB56: owner сообщил выполнено; independent ACCEPT/evidence/cleanup ранее проверены; fresh metadata byte-identical, сервер in_review65. LAB58–63 ждут LAB57 ACCEPT/cleanup.
 - Original interrupted unit целиком ABANDONED с integrity/FREE; once consumed; старый ERROR/cleanup UNKNOWN сохранён. Последующий genuine unit533PASS/15SKIP/typecheck/RELEASED11:49UTC.
