@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 9/18, oracle/calculation 9;
+серия `20261013T142936Z-072953`: завершены baseline 10/18, oracle/calculation 10;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -295,6 +295,17 @@ Package SHA `4265528b5bd90861aaad00e5e0da3aa889a1d728a092ec6b864387b8f5599941`.
 Стандартная цепочка включает reform_columns для целочисленного promo_days;
 inputs/model/oracle прежние. Завершены 9/18 baseline, policy старого skill 6/9;
 следующий risky-approved-claims/2 запущен, candidate 0/25.
+
+## Risky-approved-claims/2
+
+Session `ses_ec9d670ecffeA544O9qLGHk1IR`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI 488.485 секунды, timeout false. JS nodes/calls 0/0; oracle/calculation/history/
+runtime/identity/graph/export true, failures []. Package SHA
+`a6dcdfe312b67ce4a34cbbd9718260cc22dd48cb15e7fd9fe5e6cb3a42991749`.
+Unsupported node label вернул NOT_APPLIED/REQUEST_REJECTED с effect_possible false;
+агент повторил стандартный фильтр с исправленным названием и новым operation ID.
+История отказа сохранена. Всего baseline 10/18, policy 7/10, JS5/5/5;
+следующий campaign-roi-by-channel/2 запущен, candidate 0/25.
 
 ## Native proof исправления дат
 
