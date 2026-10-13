@@ -435,6 +435,31 @@ writer.writerows(sorted(totals.items(), key=lambda pair: (-pair[1], pair[0])))
   отсутствие answers/oracle в модельных inputs. Закоммитить:
   `test(evals): add javascript exception and recovery cases`.
 
+## Предпосылка новой серии: исправление native date_format
+
+Самостоятельное решение принято после обновления пользователем цели о разрешении
+устранять блокеры. Исходная серия `20261013T093809Z-f5d429` остановлена на 3/18
+baseline, 0/25 candidate; все её неудачи и исходные evidence сохраняются.
+Skill не меняется из-за ошибки runtime. В публичных контрактах/cleanup изменений нет.
+
+- [x] Исправить подтверждённый routing `imports.text.date_format` по TDD через
+  существующий bound native dropdown; public RED воспроизводит исходный отказ,
+  GREEN, foreign input и same-value проверки проходят. Коммит `263df9620`:
+  только runtime procedure и `text-import-wide.test.mjs`, 144 text-import теста PASS.
+- [ ] Подтвердить точный формат `yyyy/mm/dd` детерминированным native Host proof
+  с датами и проверенными output/readback/cleanup, без внешней LLM и без зачёта
+  этого smoke в модельные 43 попытки.
+- [ ] Создать новый общий managed build worktree на согласованном HEAD; выполнить
+  обе сборки последовательно в нём с одинаковой явной VERSION=0.1.17 и resources.
+  Baseline получает только два old skill bytes, затем эти файлы восстанавливаются
+  к HEAD для candidate. Проверить обе сборки против owning source, сохранить
+  manifest/source/skill inventories и доказать, что runtime/dependencies совпали.
+  Никаких source/docs edits во время сборки. Исходные payload/pins не переписывать.
+- [ ] Закрепить новый run ID и immutable baseline/candidate pins с прежними
+  tasks/inputs/oracle/model/reviewSeed; провести полные 18+25 попыток и все прежние
+  gates Tasks 3–6. Старые три попытки не включать в новую сопоставимую серию;
+  отразить их отдельно в итоговом отчёте.
+
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
 **Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под
@@ -1152,4 +1177,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Monthly/1: runtime imports.text.date_format дефект; новый guard сохранён, scope-решение запрошено; осталось 15 baseline.
+- Исходная серия stopped 3/18: date_format исправлен TDD в 263df9620; далее native proof и новая matched 18+25 серия.
