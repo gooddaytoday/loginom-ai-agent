@@ -1,0 +1,323 @@
+{
+  "format": "text-import-ben-reject-coordinator-verification-v1",
+  "checked_utc": "2026-10-13T20:51:12.819407+00:00",
+  "owner_policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+  "cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "done",
+      "revision": 70,
+      "phase": "in_review",
+      "metadata_sha256": "07f0c42e23c6bfe44c26e10b529f25803e7a4ade3b0636f77516231c1a812963",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "in_progress",
+      "revision": 260,
+      "phase": "rich",
+      "metadata_sha256": "72260a3a073d855e44c3e8b291562996e69c39d9b27d6af32f8f34b34d443248",
+      "active_queued": [
+        {
+          "id": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+          "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+          "status": "running",
+          "started_at": "2026-10-13T23:50:10+03:00"
+        }
+      ]
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "e764ccd644a7734a0d9534cbea83b3089b75691e5440a447544751364036cd71",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "b4113127941a5d52f15437b33dd972f35835c52d28bb0905357113848c5b986c",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "68a0253f1c69dc43f3f0922348d803ab9c6abc23a252e344f06f9b841539d632",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "a36ce57a0ac88194eb12122a444c325e44f389b62c25721b775506779b8d6735",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "fe2418ea13f32267ae5f348010fc9adc063122f1d027eb525bad6479ccacc5ca",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "dc2448cfc26a0470e70d9014574c5d7676f00995ef5698d6de1c47bcf8ace97d",
+      "active_queued": []
+    }
+  ],
+  "Ben_report": {
+    "id": "01a136fa-6ae7-7982-a42f-0be925ffb318",
+    "parent_id": "01a136d6-1795-789f-b967-db6f20f614ed",
+    "task_id": "01a136d6-17c3-79e5-b00c-d6aaa3f21b0a",
+    "VERDICT_BEN": "REJECT",
+    "rejected_sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa",
+    "support_sha": "99a285107ea2f3969ceeda7bcd78eedcf01b2107",
+    "delivery": {
+      "archive_sha256": "c54f2cad0e8e76518d0fa34b6fc845c7e6c5be8e26fe70b86f399a741e2ecac2",
+      "manifest_sha256": "615ee32f6c9e32b436e2eb28ad6e9fe66eb9852242f0a99f9a3c201f9f39eb28",
+      "payload_files_verified": 108,
+      "safe_paths_unique_regular_or_directory": true,
+      "embedded_manifest_exact": true
+    },
+    "archive_bytes": 4134880,
+    "attachments": {
+      "archive": "01a136fa-6a79-78e8-96c9-46da795a8d21",
+      "manifest": "01a136fa-6aa0-7d9a-9b63-f39346755c9b",
+      "delivery": "01a136fa-6ac1-736e-9e0b-54fdcafe6d06"
+    }
+  },
+  "confirmed_validator_defect": {
+    "location": "evals/script/check-text-import.py:174",
+    "finding": "Native execute phase and its verified owner are not mandatory",
+    "Ben_sensitivity": {
+      "checks": 198,
+      "rejected": 174,
+      "owner_false_and_missing_execute_survived": 12,
+      "owner_gesture_not_applicable": 12
+    },
+    "Ben_full_run_guards": {
+      "checks": 40,
+      "control_guards_pass": 28,
+      "owner_mutants_false_PASS": 12,
+      "sources": [
+        "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa",
+        "99a285107ea2f3969ceeda7bcd78eedcf01b2107"
+      ]
+    },
+    "root_offline_reproduction": {
+      "source_sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa",
+      "exported_git_blobs_verified": 1379,
+      "fixture_native_execute_owner_verified": false,
+      "summary": "SYNTHETIC_REPRODUCTION_ONLY_NOT_EXECUTION_EVIDENCE",
+      "validator_exit": 0,
+      "validator_result": {
+        "verdict": "PASS",
+        "code": 0,
+        "errors": [],
+        "failures": [],
+        "attempts": [
+          {
+            "task_id": "txt-comma-utf8",
+            "attempt": 1,
+            "status": "completed",
+            "cleanup": "confirmed",
+            "infra_retry_initial": null,
+            "verdict": "PASS"
+          }
+        ]
+      },
+      "root_offline_reproduction": "CONFIRMED_FALSE_PASS",
+      "calculation_reproduced_sha256": "37ec6f197609e88de3fe3daaf04a7477b3730cf825ddfbea1277ab4cea1d2ed2",
+      "temporary_export_and_fixture_only": true,
+      "new_model_native_scenario_calls": 0
+    },
+    "root_has_not_claimed_all_mutants_reexecuted": true,
+    "synthetic_fixture_never_used_as_actual_completion": true
+  },
+  "independent_calculation": {
+    "receipt_saved_utc": "2026-10-13T20:00:20.877934+00:00",
+    "Ben_receipt_author_answers_opened": false,
+    "calculation_sha256": "37ec6f197609e88de3fe3daaf04a7477b3730cf825ddfbea1277ab4cea1d2ed2",
+    "root_reproduced_same_sha256": true,
+    "inputs_zip_sha256": "f175fe6b01793e451ad334a0b5ee8b8b91f3e569d732027e4360c025571beccd",
+    "six_independent_oracles_match_in_Ben_delivered_report": true,
+    "chronology_is_Ben_saved_receipt_and_Evaler_validation_not_root_live_observation": true
+  },
+  "Ben_measurements": {
+    "cold": {
+      "calls": 3,
+      "launches": 3,
+      "completed_pass": 2,
+      "errors": 1,
+      "not_started": [
+        "csv-pipe-multiline",
+        "tsv-utf8",
+        "tsv-utf16le"
+      ]
+    },
+    "product": {
+      "status": "NOT_RUN",
+      "all_six_repeat1_consumed": 0,
+      "reason": "Further live execution stopped at cold infrastructure error, per contract"
+    },
+    "root_two_saved_cold_comparisons": {
+      "case_ids": [
+        "txt-comma-utf8",
+        "csv-comma-utf8"
+      ],
+      "all_3_rows_5_fields_typed_values": "EXACT_MATCH_WITH_BEN_INDEPENDENT_CALCULATION",
+      "decimal_and_datetime_comparison": "EXACT",
+      "original_delivered_bytes_unchanged": true
+    },
+    "CP1251": {
+      "classification": "INFRASTRUCTURE_ERROR",
+      "native_code": "UI_EPOCH_CHANGED",
+      "status": "NOT_APPLIED",
+      "effect_possible": false,
+      "reader_error": "COLD_SOURCE:storage navigation uncertain",
+      "source_download_and_new_execute": "NOT_REACHED",
+      "lower_cause_or_repair_success": "NOT_PROVEN",
+      "unchanged_retry": 0
+    },
+    "saved_unit_summary": {
+      "pass": 538,
+      "skip": 15,
+      "fail": 0,
+      "typecheck": "PASS",
+      "processes": "CONFIRMED"
+    },
+    "support_release_tests": {
+      "pass": 10,
+      "fail": 0
+    },
+    "original_warm_cold_replay": "12/12 PASS per Ben report; root prior author replay already recorded"
+  },
+  "Ben_cleanup": {
+    "ordinary_release": {
+      "status": "RELEASED",
+      "owner": {
+        "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "task": "01a136d6-17c3-79e5-b00c-d6aaa3f21b0a",
+        "role": "ben",
+        "phase": "eval",
+        "sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa"
+      },
+      "acquiredAt": "2026-10-13T20:03:32.570Z",
+      "releasedAt": "2026-10-13T20:21:52.267Z",
+      "kind": "cold",
+      "evidenceSha256": "0e6dc4f238baa65f06d9932fa01e0303cd3d6cc1ef8fdbb5b4856b2cf54c59a8",
+      "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "archive": "/home/user/.local/share/loginom-evals-runtime/operations/completed/5509ca67-ec15-4ad8-acea-eaee2022bcaa"
+    },
+    "completion_sha256": "0e6dc4f238baa65f06d9932fa01e0303cd3d6cc1ef8fdbb5b4856b2cf54c59a8",
+    "release_sha256": "9a1fc05bf3d4bda2120d571f0c9d208fd93603563105a3efd2394431f06b6ea2",
+    "owner_acquiredAt_completion_release_bindings": "MATCH",
+    "final_resources_checked_utc": "2026-10-13T20:26:43.776852+00:00",
+    "stand": "FREE",
+    "storage_files": 0,
+    "six_profiles_clean": true,
+    "native_process_proof_status": "confirmed/continuous",
+    "unit_process_proof_status": "confirmed/unit_after_exit",
+    "root_original_host_private_DB_or_lease_access": false
+  },
+  "preserved_Rich": {
+    "product": {
+      "PASS": 4,
+      "quality_FAIL": 2,
+      "ERROR": 0,
+      "failures": [
+        "tsv-utf16le:no_artifact",
+        "txt-semicolon-cp1251-decimal:exact import apply count"
+      ]
+    },
+    "budgets": {
+      "Rich_reference": [
+        1,
+        1,
+        2,
+        1,
+        1,
+        3
+      ],
+      "Rich_cold": [
+        9,
+        8,
+        6
+      ],
+      "Rich_cleanup_continuations": 2,
+      "same_cause_repeats": "3/10",
+      "admission_generations": "3/3 exhausted",
+      "old_wrapper": "1/1 exhausted",
+      "recovery": 0
+    },
+    "actual_models": {
+      "independently_checked_by_Ben": "8 original closed DB/101 assistant rows openai/gpt-6-luna/high; original DB/WAL/SHM unchanged",
+      "root_access": "safe delivered evidence only; no private DB access",
+      "billed_cost": "UNKNOWN"
+    },
+    "all_old_archives_errors_unknowns_once_receipts_unchanged": true
+  },
+  "actual_Evaler_continuation": {
+    "phase": "rich",
+    "review_cycle": 1,
+    "reject_count": 1,
+    "comment_id": "01a13706-c38d-7390-bc21-492dc11cf742",
+    "parent_id": "01a136fa-6ae7-7982-a42f-0be925ffb318",
+    "routed_mention_count": 1,
+    "task_id": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+    "task_status": "running",
+    "started_at": "2026-10-13T23:50:10+03:00",
+    "prior_ambiguous_dispatch": "RECONCILED_BY_FRESH_SERVER_METADATA_AND_RUN",
+    "handoff": {
+      "archive_sha256": "2e621ba029a2f064b79cec5a9974581efbb915685f0f573ba1511c0588ab3e29",
+      "manifest_sha256": "7b2ea034424f3cd0604757870a8dbbafaebad2cf6a273e338d6d86e694341fc9",
+      "payload_files_verified": 10,
+      "CRC_paths_types_hashes_verified": true,
+      "scope_sha256": "7b7d2c9d3112e50ef0b2e13013de0b55495fb97e8468e59ed304ebeb67a99f32"
+    },
+    "allowed_scope": "TDD execute phase/verified owner and actual execution/target lineage; reject ownerfalse/missing/stale/foreign/duplicate/inconsistent records; separate saved-evidence CP1251 epoch diagnosis/reader repair; separate immutable derivative99a with lifecycle unchanged",
+    "new_Rich_reference_or_product_generation_budget": 0,
+    "Ben_initial_product_repeat1": "unspent0/6",
+    "coordinator_decision": "Verified existing autonomous correction fits human delegation. Preserve REJECT/history/budgets and require independent Ben ACCEPT+cleanup before done/LAB58. No duplicate server message or worker."
+  },
+  "root_actions": {
+    "new_comments_dispatches_server_mutations": 0,
+    "new_model_native_reference_product_cold_calls": 0,
+    "focused_offline_checks": [
+      "Ben independent calculation exact SHA",
+      "one native execute ownerfalse full-run false PASS reproduction from exact Git-exported c26",
+      "two saved cold typed comparisons",
+      "108 payload safety/hashes/embedded manifest",
+      "10 payload handoff CRC/safety/hashes",
+      "ordinary cold completion/release owner and hash bindings"
+    ],
+    "unchanged_full_suites_repeated": 0,
+    "disposable_export_and_fixture_cleaned": true
+  },
+  "all_eight_done": false,
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "every_minutes": 30,
+    "delete_gate": "ALL8 server done + independent ACCEPT/evidence/cleanup"
+  },
+  "remaining": "Rich repaired clean new SHA/support/native/cold proof and ordinary RELEASED/FREE; independent Ben final cases+validator negatives+remaining cold+6 own product repeat1; no LAB58 before LAB57 gates"
+}
