@@ -5,7 +5,7 @@ import { agentCommand } from "./cli"
 import type { EvalConfig } from "./config"
 import { archiveDiagnostics } from "./diagnostics"
 import { EvalFailure } from "./fail"
-import { writeLeaseReceipt } from "./lease"
+import { acquireJudgeLease, writeLeaseReceipt } from "./lease"
 import { archiveProfileEvidence } from "./profile-archive"
 import { assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter } from "./profile"
 import type { ProcessCleanup } from "./process-supervisor"
@@ -51,6 +51,8 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
     studioStartedAt: new Date().toISOString(), configurationHash: "fixture" }
   await writeLeaseReceipt(path.join(file.controller.stateDir, "run-journal.json"),
     { version: 2, commandId: runId, liveQualified: false, identity })
+  const judgeLease = config.skipJudge ? undefined : await acquireJudgeLease({ codexHome: file.judge.codexHome,
+    journal: path.join(file.controller.stateDir, "run-journal.json"), commandId: runId, lockRoot: input.lockRoot })
   const leases: SlotLease[] = []
   try {
     for (const slot of input.file.slots.slice(0, config.parallel))
@@ -77,14 +79,44 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
         path.join(file.controller.stateDir, `${runId}-${slot.id}-initial.archive.json`))
       const cleanup = path.join(file.controller.stateDir, `slot-${slot.id}.cleanup.json`)
       await writeLeaseReceipt(cleanup, fixtureCleanup(lease, receipt.archive))
-      contexts.push({ config: own, command, lease, cleanup, controllerDir: file.controller.stateDir,
+      contexts.push({ config: own, command, lease, cleanup, controllerDir: file.controller.stateDir, judgeLease,
         storage: { path: storage, device: storageInfo.dev, inode: storageInfo.ino } })
     }
     return contexts
   } catch (error) {
-    await Promise.all(leases.map(lease => lease.close()))
+    try {
+      if (judgeLease) {
+        const proof = path.join(file.controller.stateDir, "judge-unused.json")
+        await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: judgeLease.reservation.key,
+          token: judgeLease.reservation.token, revision: judgeLease.reservation.revision, reason: "no-judge-dispatch", liveQualified: false })
+        await judgeLease.release(proof)
+      }
+    } finally { await Promise.all([...leases.map(lease => lease.close()), judgeLease?.close()]) }
     throw error
   }
+}
+
+export async function finishFixtureJudge(context: Awaited<ReturnType<typeof prepareFixture>>[number], runDir: string) {
+  if (!context.judgeLease) return
+  try {
+    const proofs = await Promise.all((await Array.fromAsync(new Bun.Glob("*/*/judge-processes-[12]").scan({ cwd: runDir, absolute: true, onlyFiles: false, dot: true })))
+      .map(async directory => {
+        const root = await lstat(directory)
+        const file = path.join(directory, "process-cleanup.json")
+        const info = await lstat(file)
+        const bytes = await Bun.file(file).bytes()
+        const proof = JSON.parse(new TextDecoder().decode(bytes)) as ProcessCleanup
+        if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
+          !info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.nlink !== 1 ||
+          proof.status !== "confirmed" || proof.capture_complete !== true)
+          throw Error("Judge process cleanup unconfirmed")
+        return { path: file, sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") }
+      }))
+    const receipt = path.join(context.controllerDir, "judge-release.json")
+    await writeLeaseReceipt(receipt, { version: 2, status: "confirmed", liveQualified: false, key: context.judgeLease.reservation.key,
+      token: context.judgeLease.reservation.token, revision: context.judgeLease.reservation.revision, judgeProcesses: "confirmed", proofs })
+    await context.judgeLease.release(receipt)
+  } finally { await context.judgeLease.close() }
 }
 
 export async function finishFixtureAttempt(context: Awaited<ReturnType<typeof prepareFixture>>[number], result: AttemptResult, out: string) {

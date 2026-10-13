@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireHarnessLease, acquireResourceLease, recoverResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
+import { acquireHarnessLease, acquireJudgeLease, acquireResourceLease, recoverResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
 import type { Reservation } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -14,6 +14,44 @@ async function resourceFixture() {
   await writeFile(journal, "{}", { mode: 0o600 })
   return { root, request: { key: "server:container", lockRoot, journal, commandId: "run-one" } }
 }
+
+test("judge lease: different server controllers share the canonical CODEX_HOME OS guard", async () => {
+  const item = await resourceFixture()
+  const home = path.join(item.root, "judge-home")
+  const alias = path.join(item.root, "judge-alias")
+  await mkdir(home, { mode: 0o700 })
+  await symlink(home, alias)
+  await writeLeaseReceipt(item.request.journal, { commandId: "a", serverId: "server-a" })
+  const journal = path.join(item.root, "server-b.json")
+  await writeLeaseReceipt(journal, { commandId: "b", serverId: "server-b" })
+  const lease = await acquireJudgeLease({ codexHome: home, journal: item.request.journal, commandId: "a", lockRoot: item.request.lockRoot })
+  try {
+    expect(lease.reservation.key).toBe(`judge:${home}`)
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireJudgeLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      try {await acquireJudgeLease(${JSON.stringify({ codexHome: alias, journal, commandId: "b", lockRoot: item.request.lockRoot })});process.exit(4)}
+      catch(error) {console.log(error.message);process.exit(2)}`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stdout).text()).toContain("BUSY")
+    await new Response(child.stderr).text()
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("judge lease: a dead holder leaves the shared home reserved until recovery", async () => {
+  const item = await resourceFixture()
+  const home = path.join(item.root, "judge-home")
+  await mkdir(home, { mode: 0o700 })
+  const input = { codexHome: home, journal: item.request.journal, commandId: "crashed", lockRoot: item.request.lockRoot }
+  const child = Bun.spawn([process.execPath, "-e", `const {acquireJudgeLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    await acquireJudgeLease(${JSON.stringify(input)});console.log("READY");setInterval(()=>{},1000)`], { stdout: "pipe", stderr: "pipe" })
+  try {
+    const reader = child.stdout.getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("READY")
+    reader.releaseLock()
+    child.kill("SIGKILL")
+    await child.exited
+    await expect(acquireJudgeLease({ ...input, commandId: "next" })).rejects.toThrow("RECOVERY_REQUIRED")
+  } finally { child.kill("SIGKILL"); await child.exited; await new Response(child.stderr).text(); await rm(item.root, { recursive: true, force: true }) }
+})
 
 test("resource lease: another Bun process cannot acquire the same OS guard", async () => {
   const item = await resourceFixture()

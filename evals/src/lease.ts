@@ -29,6 +29,14 @@ export function acquireResourceLease(input: ResourceRequest) {
   return acquireResource(input)
 }
 
+export async function acquireJudgeLease(input: { codexHome: string; journal: string; commandId: string; lockRoot?: string }) {
+  const home = await realpath(input.codexHome).catch(() => { throw new EvalFailure("JUDGE_HOME_PRIVATE", 2) })
+  const info = await lstat(home)
+  if (!info.isDirectory() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700)
+    throw new EvalFailure("JUDGE_HOME_PRIVATE", 2)
+  return acquireResourceLease({ key: `judge:${home}`, journal: input.journal, commandId: input.commandId, lockRoot: input.lockRoot ?? globalLockRoot })
+}
+
 export function recoverResourceLease(input: ResourceRequest, expected: { token: string; revision: number; incidentToken?: string }) {
   return acquireResource(input, expected)
 }

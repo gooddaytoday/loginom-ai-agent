@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
 import type { SlotFile } from "../src/slots"
+import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
 
 async function fixture(root: string, taskIds = ["parallel-fast", "parallel-slow"], withArtifact = false) {
   const slots: SlotFile = {
@@ -238,6 +239,59 @@ test("fixture main: a competing controller cannot overwrite the admitted control
   } finally { await pending; await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
+test("fixture main: shared judge home conflicts across servers before any agent dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-shared-judge-"))
+  const a = await fixture(await mkdtemp(path.join(root, "server-a-")), ["parallel-slow"], true)
+  const bRoot = await mkdtemp(path.join(root, "server-b-"))
+  const b = await fixture(bRoot, ["parallel-fast"], true)
+  b.slots.judge.codexHome = a.slots.judge.codexHome
+  const env = { EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" }
+  const aRoot = path.dirname(a.slots.controller.stateDir)
+  const pending = main(["--tasks", path.join(aRoot, "tasks")], { ...a.env, ...env }, { fixture: { slots: a.slots, lockRoot: a.lockRoot } })
+  try {
+    const deadline = Date.now() + 10_000
+    while (!await Bun.file(path.join(a.slots.slots[0]!.profileDir, "data/loginom-ai-agent.db")).exists()) {
+      if (Date.now() > deadline) throw Error("Fixture dispatch not observed")
+      await Bun.sleep(10)
+    }
+    await expect(main(["--tasks", path.join(bRoot, "tasks")], { ...b.env, ...env },
+      { fixture: { slots: b.slots, lockRoot: a.lockRoot } })).rejects.toThrow("BUSY")
+    expect(await readdir(b.slots.slots[0]!.workspaceRoot)).toEqual([])
+    expect((await pending).code).toBe(0)
+    const next = await main(["--tasks", path.join(bRoot, "tasks")], { ...b.env, ...env }, { fixture: { slots: b.slots, lockRoot: a.lockRoot } })
+    expect(next.code).toBe(0)
+  } finally { await pending; await rm(root, { recursive: true, force: true }) }
+}, 40_000)
+
+test("fixture main: skip-judge does not acquire an occupied judge home", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-no-judge-"))
+  const input = await fixture(root, ["parallel-fast"])
+  const journal = path.join(root, "holder.json")
+  await writeLeaseReceipt(journal, { commandId: "holder" })
+  const lease = await acquireJudgeLease({ codexHome: input.slots.judge.codexHome, journal, commandId: "holder", lockRoot: input.lockRoot })
+  try {
+    const run = await main(["--tasks", path.join(root, "tasks"), "--skip-judge"], input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(0)
+    expect((await Bun.file(lease.receipt).json()).state).toBe("retained")
+  } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: failed model admission releases its unused judge reservation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-unused-judge-"))
+  try {
+    const input = await fixture(root, ["parallel-fast"], true)
+    await rm(path.join(input.slots.slots[0]!.profileDir, "data/auth.json"))
+    await expect(main(["--tasks", path.join(root, "tasks")], { ...input.env,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" },
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })).rejects.toThrow("Нет авторизации")
+    const journal = path.join(root, "followup.json")
+    await writeLeaseReceipt(journal, { commandId: "followup" })
+    const lease = await acquireJudgeLease({ codexHome: input.slots.judge.codexHome, journal, commandId: "followup", lockRoot: input.lockRoot })
+    try { expect(lease.reservation.revision).toBe(2) } finally { await lease.close() }
+    expect(await readdir(input.slots.slots[0]!.workspaceRoot)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("fixture main: unknown judge cleanup stops assignments while the other active slot drains", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-unknown-"))
   try {
@@ -264,6 +318,9 @@ test("fixture main: unknown judge cleanup stops assignments while the other acti
     expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "completed", judge_cleanup_unconfirmed: true, environment_cleanup: { status: "failed" } })
     expect(summary.tasks[1]!.attempts[0]).toMatchObject({ status: "no_artifact", environment_cleanup: { status: "confirmed" } })
     expect(summary.slots?.map(slot => slot.state)).toEqual(["quarantined", "closed"])
+    const reserved = await Promise.all((await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: input.lockRoot, absolute: true })))
+      .map(file => Bun.file(file).json()))
+    expect(reserved.find(item => item.key.startsWith("judge:")).state).toBe("retained")
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
