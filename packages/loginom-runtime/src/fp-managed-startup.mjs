@@ -25,7 +25,9 @@ function retainManagedStartup(message,input,state,controller,key) {
     if(primary)throw primary.value
     if(controller.signal.aborted){refuse(controller.signal.reason);throw primary.value}
     if(Date.now()>=fixed.deadline){refuse(Error('LOGINOM_INITIAL_READINESS_DEADLINE'));throw primary.value}
-    if(state.startupController!==controller || message.id!==id || message.input!==input || message.deadline!==fixed.deadline
+    // Successful settlement ends pending control ownership, not the lifetime
+    // of the original accepted owner/signal/deadline. Never restore the slot.
+    if((pending ? state.startupController!==controller : !accepted || state.startupController!==undefined) || message.id!==id || message.input!==input || message.deadline!==fixed.deadline
         || input[key]!==tuple || Object.keys(fixed).some(k=>tuple[k]!==fixed[k])
         || (key==='amountStartup' && Object.keys(tuple).sort().join(',')!==Object.keys(fixed).sort().join(','))
         || (originalBinding && (tuple.binding!==binding || input.acceptanceCapture!==capture
