@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 4/18, oracle/calculation 4;
+серия `20261013T142936Z-072953`: завершены baseline 5/18, oracle/calculation 5;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -201,7 +201,16 @@ Package SHA `9dc6980b08cbe131d5fcc2f8ec515e92fac7cd0b665c8a681d64c336ad9f1f63`.
 effect_possible false, cleanup true. Агент исправил название и повторил стандартный
 фильтр с новым operation ID; успешные фильтрация/группировка/сортировка/экспорт
 подтверждены. Это естественная ошибка baseline, не замена обязательного recovery
-candidate. Следующий campaign-roi-by-channel/1 запущен; candidate 0/25.
+candidate. Следующий campaign-roi-by-channel/1 завершился; candidate 0/25.
+
+## Campaign-roi-by-channel третьей серии
+
+Session `ses_eca0bfffbffe314nanPq1R43k8`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI 409.688 секунды, timeout false. JS nodes/calls 0/0; oracle и полный audit PASS:
+calculation/history/runtime/identity/graph/export true, failures []. Package SHA
+`160782e00d1096a173d6b050c15b46dc11133ac71fa7b09e4014367adfdb7e3b`.
+Стандартные импорт, группировка, калькулятор, сортировка и экспорт подтверждены.
+Следующий first-last-touch/1 запущен — последний case первого прохода baseline.
 
 ## Native proof исправления дат
 
