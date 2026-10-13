@@ -8,7 +8,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostError } from "./errors"
-import { retainFPStartup, retainAmountStartup, bindFPHostStartup } from "./fp-startup-control"
+import { retainFPStartup, retainAmountStartup, bindAmountHostStartup, bindFPHostStartup } from "./fp-startup-control"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -112,23 +112,13 @@ async function dispatch(message: unknown) {
           || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
           || capture.packagePath.split("/").some(x => x === "." || x === "..")))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
-      if ('amountStartup' in input) {
-        if (!capture || typeof capture !== 'object' || !('harness' in capture) || capture.harness !== 'amount-import-type-v1')
-          throw Error('LOGINOM_HANDSHAKE_INVALID')
-        const startup = retainAmountStartup(message as unknown as Parameters<typeof retainAmountStartup>[0],
-          input as unknown as Parameters<typeof retainAmountStartup>[1])
-        state.amountStartup = startup
-        try {
-          startup.guard()
-          // No trusted stage-B acquisition provider is linked to this receiver.
-          // Refuse before host/credentials/FS/browser/managed dispatch. A late
-          // capture run or serialized tuple must never supply that authority.
-          throw startup.reject(Error('ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE'))
-        } finally { startup.settle(false) }
-      }
-      const fpStartup = capture && typeof capture === "object" && "harness" in capture && capture.harness === "field-parameters-preservation-v1"
+      const amountStartup='amountStartup' in input
+        ? retainAmountStartup(message as unknown as Parameters<typeof retainAmountStartup>[0],input as unknown as Parameters<typeof retainAmountStartup>[1]) : undefined
+      state.amountStartup=amountStartup
+      const fpOnly = capture && typeof capture === "object" && "harness" in capture && capture.harness === "field-parameters-preservation-v1"
         ? retainFPStartup(message as unknown as Parameters<typeof retainFPStartup>[0], input as unknown as Parameters<typeof retainFPStartup>[1]) : undefined
-      state.fpStartup = fpStartup
+      const fpStartup=amountStartup ?? fpOnly
+      state.fpStartup = fpOnly
       fpStartup?.guard()
       const options = {
         root: input.root,
@@ -149,7 +139,8 @@ async function dispatch(message: unknown) {
           throw Error("LOGINOM_HANDSHAKE_INVALID")
       }
       guardFPStartup()
-      if (fpStartup) bindFPHostStartup(options,fpStartup)
+      if(amountStartup)bindAmountHostStartup(options,amountStartup)
+      else if (fpOnly) bindFPHostStartup(options,fpOnly)
       state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
@@ -170,7 +161,7 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
     }
-    if (state.fpStartup && !state.fpStartup.accepted) throw new Error("LOGINOM_HOST_NOT_READY")
+    if ((state.fpStartup ?? state.amountStartup) && !(state.fpStartup ?? state.amountStartup)!.accepted) throw new Error("LOGINOM_HOST_NOT_READY")
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "close") {
       // Stop admission now, but exclude this close request from its own drain.
@@ -187,11 +178,13 @@ async function dispatch(message: unknown) {
       events.emit("message", { data: message })
       return
     }
+    if(state.amountStartup && !["connection.status","connection.read"].includes(message.method))throw Error("LOGINOM_RECOVERY_REQUIRED")
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
     const startup = state.fpStartup ?? state.amountStartup
     if (message.method === "start" && startup) reply({id: message.id, rejection: closeRejection(error),
+      ...(state.amountStartup?{rejectionOrigin:startup.rejectionOrigin}:{}),
       ...(startup.secondary ? {secondaryRejection: closeRejection(startup.secondary.value)} : {})})
     else reply({ id: message.id, error: hostError(error) })
   }

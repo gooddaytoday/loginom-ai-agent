@@ -45,7 +45,7 @@ export function retainAmountStartup(message: {id:string; deadline?:unknown}, inp
         || ['root','resources','headless','acceptanceCleanupPackage'].some(key=>
           options[key] !== input[key as keyof typeof input]))throw Error('LOGINOM_HANDSHAKE_INVALID')
   }, tuple:Object.freeze({...startup.tuple,operation:snapshot.operation,request:snapshot.request}),
-    get pending(){return startup.pending},get accepted(){return startup.accepted},get secondary(){return startup.secondary}}
+    get pending(){return startup.pending},get accepted(){return startup.accepted},get secondary(){return startup.secondary},get rejectionOrigin(){return startup.rejectionOrigin}}
 }
 
 function retainStartup<H extends 'field-parameters-preservation-v1' | 'amount-import-type-v1'>(
@@ -61,10 +61,10 @@ function retainStartup<H extends 'field-parameters-preservation-v1' | 'amount-im
     throw Error('LOGINOM_PRE_READY_READ_EXPIRED')
   const deadline = rawDeadline
   const controller = new AbortController()
-  const state: {pending: boolean; disposed: boolean; accepted?: boolean; refusal?: {value: unknown}; secondary?: {value: unknown}} = { pending: true, disposed: false }
+  const state: {pending: boolean; disposed: boolean; accepted?: boolean; refusal?: {value: unknown;origin?:string}; secondary?: {value: unknown}} = { pending: true, disposed: false }
   function refuse(value: unknown) {
     if (state.refusal) return
-    state.refusal = {value}
+    state.refusal = {value,origin:"control"}
     controller.abort(value)
   }
   const propagated=new WeakSet<object>()
@@ -88,12 +88,14 @@ function retainStartup<H extends 'field-parameters-preservation-v1' | 'amount-im
     get pending() { return state.pending },
     get accepted() { return state.accepted === true },
     get secondary() { return state.secondary },
+    get rejectionOrigin(){return state.refusal?.origin},
+    abortAcquired(value:unknown){if(purpose!=="amount-import-type-v1" || state.pending || !state.accepted)return false;refuse(value);if(!controller.signal.aborted)controller.abort(state.refusal!.value);return true},
     forward(value:unknown) {
-      state.refusal ??= {value}
+      state.refusal ??= {value,origin:"guard"}
       const carrier={};propagated.add(carrier);return carrier
     },
     propagate(value:unknown) {
-      state.refusal ??= {value}
+      state.refusal ??= {value,origin:"guard"}
       return state.refusal.value
     },
     // One response for the original pending managed request. A control receipt
@@ -101,15 +103,15 @@ function retainStartup<H extends 'field-parameters-preservation-v1' | 'amount-im
     // a native event. Equal values are deliberately not compared.
     receive(value:unknown, origin:unknown, secondary?:{value:unknown}) {
       if(!["control","await","guard"].includes(origin as string))throw Error("LOGINOM_STARTUP_RECEIPT_INVALID")
-      if(origin==="control")state.refusal??={value}
-      else if(!state.refusal)state.refusal={value}
+      if(origin==="control")state.refusal??={value,origin:"control"}
+      else if(!state.refusal)state.refusal={value,origin:origin as string}
       else state.secondary??={value}
       if(secondary)state.secondary??=secondary
       return state.refusal!.value
     },
     reject(value: unknown) {
       if(value!==null && typeof value==="object" && propagated.has(value))return state.refusal!.value
-      if (!state.refusal) state.refusal = {value}
+      if (!state.refusal) state.refusal = {value,origin:"await"}
       else state.secondary ??= {value}
       return state.refusal.value
     },
@@ -157,7 +159,7 @@ export function bindAmountHostStartup(options: object, startup: ReturnType<typeo
   amountBoundStarts.add(startup)
   const guard=()=>startup.assertHostOptions(options as Record<string,unknown>)
   amountHostStarts.set(options,{...startup,guard,get pending(){return startup.pending},
-    get accepted(){return startup.accepted},get secondary(){return startup.secondary}})
+    get accepted(){return startup.accepted},get secondary(){return startup.secondary},get rejectionOrigin(){return startup.rejectionOrigin}})
 }
 export function getAmountHostStartup(options: object) { return amountHostStarts.get(options) }
 export type HostStartup = ReturnType<typeof retainFPStartup> | ReturnType<typeof retainAmountStartup>

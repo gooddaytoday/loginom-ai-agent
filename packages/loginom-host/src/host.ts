@@ -203,6 +203,12 @@ export async function createLoginomHost(options: {
         return view
       },
     },
+    amountStartupControl(){return getAmountHostStartup(originalOptions)},
+    assertAmountAcquire(chat:string){
+      const startup=getAmountHostStartup(originalOptions);if(!startup)throw Error("LOGINOM_HANDSHAKE_INVALID");startup.guard();guardOwners();
+      if(journal.pending().length || stale.has(chat) || lost.has(chat) || recoveries.has(chat)
+          || [...generations.values()].some(generation=>generation.children.has(chat)))throw Error("LOGINOM_RECOVERY_REQUIRED");
+    },
     acquire(run: string) {
       if ([...owners.values()].some(owner => owner.failure)) return
       return service.acquire(run)

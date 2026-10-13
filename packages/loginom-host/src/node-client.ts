@@ -4,7 +4,7 @@ import { readFile, realpath } from "node:fs/promises"
 import { createHash, randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
-import { transport, privateFPTransport, type Port } from "./transport"
+import { transport, privateFPTransport, privateAmountTransport, type Port } from "./transport"
 
 type NodeHostInput = {
   node: string
@@ -28,6 +28,114 @@ const fpRetained = new WeakMap<object, Awaited<ReturnType<typeof launchNodeHost>
 const fpAttempts = new WeakSet<object>()
 const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "field-parameters-preservation-v1" }>()
 
+type AmountStartupControl = { signal: AbortSignal; deadline: number; operation: string; request: string }
+type AmountInput = NodeHostInput & { packagePath: string }
+type AmountRoot = {
+  input: AmountInput; control: AmountStartupControl; original: Readonly<AmountStartupControl>;
+  authorization: string; phase: "inventory" | "provider_unavailable" | "refused" | "startup" | "host_ready" | "acquired";
+  pending: boolean; host?: Awaited<ReturnType<typeof launchNodeHost>>; acquireRun?:string; acquireSession?:string; primary?: { value: unknown }; secondary?: { value: unknown };
+}
+// Stage A retains the real foreground object before inventory IO. It makes no
+// claim about a run/lease that stage B has not acquired. Map entries also fence
+// reconstructed carriers after pending/lost replies and eventual settlement.
+const amountRoots = new Map<string, AmountRoot>()
+const amountControls = new WeakMap<object,AmountRoot>()
+export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountInput, control: AmountStartupControl) => {
+  if (!input || typeof input!=="object" || !control || Object.keys(control).sort().join(",")!=="deadline,operation,request,signal"
+    || !(control.signal instanceof AbortSignal) || !Number.isSafeInteger(control.deadline)
+    || control.deadline <= Date.now() || ![control.operation,control.request].every(v=>typeof v==="string" && v.length>0))
+    throw Error("LOGINOM_AMOUNT_STARTUP_CONTROL_REQUIRED")
+  control.signal.throwIfAborted()
+  const original = Object.freeze({ signal:control.signal, deadline:control.deadline, operation:control.operation, request:control.request })
+  const key = JSON.stringify([original.operation,original.request])
+  if (amountRoots.has(key) || amountControls.has(control)) throw Error("LOGINOM_RECOVERY_REQUIRED")
+  const snapshot = { ...input, environment:runtimeEnvironment(input.environment??process.env) }, environment=input.environment
+  const root: AmountRoot = {
+    input,control,original,authorization:randomBytes(32).toString("hex"),phase:"inventory",pending:false,
+  }
+  amountRoots.set(key,root)
+  amountControls.set(control,root)
+  const carriers=new WeakSet<object>();
+  const primary = (value:unknown) => { root.primary ??= {value}; return root.primary.value }
+  const abort = () => { primary(original.signal.reason) }
+  original.signal.addEventListener("abort",abort,{once:true})
+  const guard = () => {
+    if (original.signal.aborted) primary(original.signal.reason)
+    if (Date.now()>=original.deadline) primary(Error("LOGINOM_AMOUNT_STARTUP_EXPIRED"))
+    if (root.primary) throw root.primary.value
+    if (control.signal!==original.signal || control.deadline!==original.deadline || control.operation!==original.operation || control.request!==original.request
+      || ["node","entry","root","resources","headless","packagePath","strictRecovery","acceptanceCleanupPackage"].some(k=>(input as any)[k] !== (snapshot as any)[k])
+      || input.environment!==environment || JSON.stringify(runtimeEnvironment(input.environment??process.env))!==JSON.stringify(snapshot.environment))
+      throw primary(Error("LOGINOM_AMOUNT_STARTUP_CHANGED"))
+  }
+  const observed = async <T>(work:()=>Promise<T>) => {
+    guard();root.pending=true
+    let value:T
+    try { value=await work() }
+    catch (error) { if(error!==null && typeof error==="object" && carriers.has(error))throw root.primary!.value; if(root.primary)root.secondary??={value:error};throw primary(error) }
+    finally { root.pending=false }
+    guard();return value
+  }
+  try {
+    guard()
+    if (!input || ![snapshot.node,snapshot.entry,snapshot.root,snapshot.resources].every(isAbsolute)
+      || typeof snapshot.packagePath!=="string" || snapshot.packagePath.length>1024
+      || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(snapshot.packagePath)
+      || snapshot.packagePath.split("/").some(x=>x==="."||x==="..")) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    const product=resolve(snapshot.resources,"../..")
+    if(await observed(()=>realpath(snapshot.resources))!==join(product,"resources/loginom"))throw Error("LOGINOM_HANDSHAKE_INVALID")
+    const cli=await observed(async()=>JSON.parse(await readFile(join(product,"cli-manifest.json"),"utf8")))
+    const manifest=await observed(async()=>JSON.parse(await readFile(join(snapshot.resources,"resource-manifest.json"),"utf8")))
+    if(cli.format!=="loginom-cli-artifact-v1" || !Array.isArray(cli.files) || !Array.isArray(manifest.files))throw Error("LOGINOM_HANDSHAKE_INVALID")
+    for (const [path,actual,files] of [
+      ["resources/loginom/host/node-host.mjs",snapshot.entry,cli.files],
+      ["bin/node",snapshot.node,manifest.files],
+      ["runtime/src/acceptance/amount-import-type-v1.mjs",join(snapshot.resources,"runtime/src/acceptance/amount-import-type-v1.mjs"),manifest.files],
+      ["runtime/src/acceptance/ui-scan-collector.mjs",join(snapshot.resources,"runtime/src/acceptance/ui-scan-collector.mjs"),manifest.files],
+    ] as const) {
+      const entries=files?.filter((f:{path:string})=>f.path===path),entry=entries?.[0]
+      const expected=path.startsWith("resources/")?join(product,path):join(snapshot.resources,path)
+      if(entries?.length!==1 || !/^[a-f0-9]{64}$/.test(entry.sha256)
+        || await observed(()=>realpath(actual))!==expected
+        || createHash("sha256").update(await observed(()=>readFile(actual))).digest("hex")!==entry.sha256)
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
+    }
+    guard()
+    const receive=(value:unknown,origin:unknown,secondary?:{value:unknown})=>{
+      if(!["control","guard","await"].includes(origin as string))throw Error("LOGINOM_STARTUP_RECEIPT_INVALID");
+      if(root.primary && origin==="await")root.secondary??={value};
+      primary(value);if(secondary)root.secondary??=secondary;const carrier={};carriers.add(carrier);return carrier;
+    };
+    const options={...snapshot};diagnostics.set(options,{authorization:root.authorization,packagePath:snapshot.packagePath,harness:"amount-import-type-v1"});
+    amountStarts.set(options,{control:original,guard,observed,receive,retain(host){root.host=host}});
+    root.phase="startup";const host=await observed(()=>launchNodeHost(options));root.phase="host_ready";
+    return Object.assign(host,{acquire:async(run:string,session:string)=>{
+      guard();if(root.acquireRun!==undefined)throw Error("LOGINOM_RECOVERY_REQUIRED");
+      if(!run||!session)throw Error("LOGINOM_RUN_INVALID");root.acquireRun=run;root.acquireSession=session;
+      try {const result=await observed(()=>host.acquireAmount(run,session));guard();
+      if(result===null){root.phase="provider_unavailable";throw primary(Error("ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE"))}
+      if(!result||typeof result!=="object"||!("generation" in result)||!Number.isSafeInteger(result.generation))throw primary(Error("LOGINOM_GENERATION_UNAVAILABLE"));
+      root.phase="acquired";return result;}catch(error){if(root.phase!=="provider_unavailable")root.phase="refused";throw error}
+    }});
+  } catch(error) {
+    if(root.phase!=="provider_unavailable")root.phase="refused"
+    throw primary(error)
+  }
+}, {
+  retained(input: object, control: AmountStartupControl) {
+    if(!control)return undefined
+    const root=amountControls.get(control)
+    if(!root || root.input!==input || root.control!==control)return undefined
+    return Object.freeze({original:root.original,authorization:root.authorization,phase:root.phase,pending:root.pending,host:root.host,run:root.acquireRun,session:root.acquireSession,
+      primaryFailurePresent:root.primary!==undefined,primaryFailure:root.primary?.value,
+      secondaryFailurePresent:root.secondary!==undefined,secondaryFailure:root.secondary?.value,
+      originalControlRetained:true,bindingPhase:root.phase==="acquired"?"acquired" as const:"unavailable" as const,nativeOwnerVerified:false,
+      evidenceSettled:false,cleanupSettled:false,acknowledged:false})
+  },
+})
+
+type AmountStart={control:Readonly<AmountStartupControl>;guard():void;observed<T>(work:()=>Promise<T>):Promise<T>;receive(value:unknown,origin:unknown,secondary?:{value:unknown}):unknown;retain(host:Awaited<ReturnType<typeof launchNodeHost>>):void}
+const amountStarts=new WeakMap<object,AmountStart>();
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
 export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
@@ -124,6 +232,8 @@ export async function launchNodeHost(input: NodeHostInput) {
   // Ordinary product callers cannot turn structural fields into authority.
   if ("acceptanceCapture" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
   const diagnostic = diagnostics.get(input)
+  const amount=amountStarts.get(input)
+  amount?.guard()
   const fp = fpStarts.get(input)
   fp?.guard()
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
@@ -176,9 +286,11 @@ export async function launchNodeHost(input: NodeHostInput) {
     start() {},
   }
   const fpClient = diagnostic?.harness === "field-parameters-preservation-v1" ? privateFPTransport(port) : undefined
-  const client = fpClient ?? transport(port)
+  const amountClient=amount ? privateAmountTransport(port,amount.receive):undefined
+  const client = amountClient ?? fpClient ?? transport(port)
   const startupInput = {
     protocol: 1 as const,
+    ...(amount&&diagnostic?{amountStartup:{purpose:"amount-import-type-v1" as const,authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request,deadline:amount.control.deadline}}:{}),
     ...(diagnostic ? {acceptanceCapture: diagnostic} : {}),
     root: input.root, resources: input.resources, headless: input.headless,
     ...(input.acceptanceCleanupPackage !== undefined ? {acceptanceCleanupPackage: input.acceptanceCleanupPackage} : {}),
@@ -186,6 +298,7 @@ export async function launchNodeHost(input: NodeHostInput) {
   }
   const handle = {
     port, exited, request: client.request,
+    acquireAmount:(run:string,session:string)=>{if(!amountClient||!amount||!diagnostic)throw Error("LOGINOM_HANDSHAKE_INVALID");amount.guard();return amountClient.acquire({run,session,amountControl:{authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request}},amount.control)},
     ...(fpClient && diagnostic ? {readPreReady: async (run:string, control:{signal:AbortSignal;deadline:number}) => {
       fp?.guard()
       // Continue the actual factory's original control; a fresh signal/budget
@@ -200,15 +313,19 @@ export async function launchNodeHost(input: NodeHostInput) {
     close,
   }
   fp?.retain(handle)
-  const ready = await (fp && fpClient && diagnostic
+  amount?.retain(handle)
+  const ready = await (amount && amountClient && diagnostic
+    ? amountClient.start(startupInput as Parameters<typeof amountClient.start>[0],amount.control)
+    : fp && fpClient && diagnostic
     ? fpClient.start(startupInput as Parameters<typeof fpClient.start>[0], fp.control)
     : client.request("start", startupInput, 180_000))
     .catch(async (error:unknown) => {
       // Keep the original FP child UNKNOWN after dispatch, without kill/replay.
-      if (!fp) { child.kill("SIGTERM"); client.close() }
+      if (!fp && !amount) { child.kill("SIGTERM"); client.close() }
       throw error
     })
   fp?.guard()
+  amount?.guard()
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -219,7 +336,7 @@ export async function launchNodeHost(input: NodeHostInput) {
     !("pid" in ready) ||
     ready.pid !== child.pid
   ) {
-    if (!fp) { child.kill("SIGTERM"); client.close() }
+    if (!fp && !amount) { child.kill("SIGTERM"); client.close() }
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   }
   return handle

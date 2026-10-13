@@ -24,10 +24,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       captureRefused: boolean
       draftRetained?: boolean
       preReadyHeld?: boolean
+      amountHeld?:boolean
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
+  let amountClaimed=false
+  const amountAcquires=new Map<string,{run:string;startup:NonNullable<ReturnType<typeof service.amountStartupControl>>}>()
   const reads = new Map<string, {run: NonNullable<ReturnType<typeof runs.get>>; controller: AbortController; authorization: string}>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
@@ -62,13 +65,23 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
     }
+    let amountRequest=false
     try {
+      if(data.method==="readonly.preReady.cancel" && "phase" in input && input.phase==="acquired") {
+        const active="requestId" in input && typeof input.requestId==="string" ? amountAcquires.get(input.requestId):undefined;
+        if(Object.keys(input).sort().join(",")!=="authorization,deadline,operation,phase,rejection,request,requestId,run" || !active || active.run!==input.run || !("authorization" in input) || input.authorization!==active.startup.tuple.authorization
+            || !("operation" in input) || input.operation!==active.startup.tuple.operation || !("request" in input) || input.request!==active.startup.tuple.request
+            || !("deadline" in input) || input.deadline!==active.startup.control.deadline || !("rejection" in input))throw Error("LOGINOM_METHOD_INVALID");
+        active.startup.abortAcquired(decodeReadRejection(input.rejection));reply({id:data.id,result:false});return;
+      }
       if (data.method === "acquire") {
         if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
         if (service.recoveries.has(chat)) throw new Error("LOGINOM_RECOVERY_REQUIRED")
         if ([...runs.values()].some((run) => run.chat === chat)) throw new Error("LOGINOM_CALL_BUSY")
+        const amount=service.amountStartupControl?.();
+        if(!amount){
         const lease = service.acquire(`${owner}:${input.run}`)
         if (!lease) {
           reply({ id: data.id, result: null })
@@ -79,6 +92,30 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         try { service.bindCapture?.(owner, input.run, chat, lease) } catch (error) { lease.release(); throw error }
         runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false })
         reply({ id: data.id, result: { generation: lease.generation } })
+          return
+        }
+        if(amount) {
+          const c="amountControl" in input ? input.amountControl as Record<string,unknown> : undefined;
+          if(!c || Object.keys(c).sort().join(',')!=="authorization,operation,request" || c.authorization!==amount.tuple.authorization
+              || c.operation!==amount.tuple.operation || c.request!==amount.tuple.request || !("deadline" in data) || data.deadline!==amount.control.deadline)
+            throw Error("LOGINOM_HANDSHAKE_INVALID");
+          amount.guard();service.assertAmountAcquire(chat);if(amountClaimed)throw Error("LOGINOM_RECOVERY_REQUIRED");amountClaimed=true;amountRequest=true;amountAcquires.set(data.id,{run:input.run,startup:amount});
+        }
+        const lease = service.acquire(`${owner}:${input.run}`)
+        if (!lease) {
+          amountAcquires.delete(data.id);reply({ id: data.id, result: null });return
+        }
+        const acquired={chat,lease,calls:0,dispatching:false,released:false,active:new Set<string>(),captured:false,captureRefused:false,amountHeld:!!amount};
+        if(amount)runs.set(input.run,acquired);
+        try {
+          if(!amount)await service.retireRuntime(chat);amount?.guard();
+          service.resetRestarts(chat);service.bindCapture?.(owner,input.run,chat,lease);
+          if(amount){await service.runtime(lease.generation,chat);amount.guard();service.assertCapture(owner,input.run,chat,lease)}
+          runs.set(input.run,acquired);reply({id:data.id,result:{generation:lease.generation}});
+        } catch(error) {
+          if(amount){acquired.captureRefused=true;lease.holdRecovery();service.recoveries.set(chat,lease);throw error}
+          lease.release();throw error;
+        } finally {amountAcquires.delete(data.id)}
         return
       }
       const run = runs.get(input.run)
@@ -151,6 +188,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (data.method === "acceptance.capture") {
+        if(run.amountHeld)throw Error("LOGINOM_AMOUNT_CAPTURE_PROXY_UNAVAILABLE")
         if (Object.keys(input).sort().join(",") !== "authorization,run"
             || !("authorization" in input) || !service.authorizeCapture?.(input.authorization) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
@@ -201,9 +239,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         } finally { run.calls--; run.dispatching = false }
         return
       }
+      if(run.amountHeld && ["admit","call","interrupt"].includes(data.method))throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (run.captured && run.calls) throw Error("LOGINOM_CALL_BUSY")
       if (run.captured && ["call", "admit"].includes(data.method)) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (data.method === "release") {
+        if(service.amountStartupControl?.() && (run.captureRefused||run.amountHeld))throw Error("LOGINOM_RECOVERY_REQUIRED")
         run.released = true
         if (!run.calls) {
           await release(input.run, run)
@@ -319,7 +359,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
       }
     } catch (error) {
-      reply({ id: data.id, error: hostError(error) })
+      const amount=service.amountStartupControl?.();
+      if(amount && amountRequest && data.method==="acquire")reply({id:data.id,rejection:encodeAmountRejection(amount.propagate(error)),rejectionOrigin:amount.rejectionOrigin,
+        ...(amount.secondary?{secondaryRejection:encodeAmountRejection(amount.secondary.value)}:{})});
+      else reply({ id: data.id, error: hostError(error) })
     }
   }
   port.on("message", ({ data }) => {
@@ -335,7 +378,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.stopping) return state.stopping
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
-      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.preReadyHeld))
+      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.preReadyHeld || run.amountHeld))
         throw new Error("LOGINOM_RECOVERY_REQUIRED")
       for (const [id, run] of runs) await release(id, run)
       state.closed = true
@@ -364,4 +407,9 @@ function encodeReadRejection(value: unknown): unknown {
 function decodeReadRejection(value: any): unknown {
   if(value?.kind==="Error"){const error=new Error(value.message,"cause" in value?{cause:decodeReadRejection(value.cause)}:undefined);error.name=value.name;return error}
   return value?.is_undefined?undefined:value?.value
+}
+
+function encodeAmountRejection(value:unknown):unknown {
+ if(value instanceof Error)return{kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeAmountRejection(value.cause)}:{})};
+ return{kind:"value",value:value===undefined?null:value,is_undefined:value===undefined};
 }

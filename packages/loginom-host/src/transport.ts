@@ -38,6 +38,19 @@ export function privateFPTransport(port: Port) {
     },
   }
 }
+export function privateAmountTransport(port: Port, receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown) {
+  const client=requests(port);
+  type AmountControl=Control & {operation:string;request:string};
+  return {request:client.request,close:client.close,
+    start(input:{protocol:1;acceptanceCapture:{authorization:string;harness:"amount-import-type-v1"};amountStartup:{operation:string;request:string}},control:AmountControl) {
+      const authorization=input.acceptanceCapture.authorization;
+      return client.amountControlled("start",input,control,{phase:"startup",authorization,harness:"amount-import-type-v1",deadline:control.deadline,
+        operation:control.operation,request:control.request},receive);
+    },
+    acquire(input:{run:string;session:string;amountControl:{authorization:string;operation:string;request:string}},control:AmountControl) {
+      return client.amountControlled("acquire",input,control,{phase:"acquired",run:input.run,...input.amountControl,deadline:control.deadline},receive);
+    }}
+}
 function encode(value: unknown): unknown {
   if (value instanceof Error) return { kind: "Error", name: value.name, message: value.message,
     ...("cause" in value ? { cause: encode(value.cause) } : {}) }
@@ -49,7 +62,7 @@ function decode(value: any): unknown {
 }
 function requests(port: Port) {
   const state = { closed: false }
-  const pending = new Map<string, { resolve(value: unknown): void; reject(value: unknown): void; dispose(): void; controlled?: boolean; cancel?(value: unknown): void }>()
+  const pending = new Map<string, { resolve(value: unknown): void; reject(value: unknown): void; dispose(): void; controlled?: boolean; receive?:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown; cancel?(value: unknown): void }>()
   function settle(id: string, error: boolean, value: unknown) {
     const request = pending.get(id)
     if (!request) return
@@ -58,7 +71,7 @@ function requests(port: Port) {
   }
   function response({ data }: { data: unknown }) {
     if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string") return
-    if ("rejection" in data && pending.get(data.id)?.controlled) { settle(data.id, true, decode(data.rejection)); return }
+    if ("rejection" in data && pending.get(data.id)?.controlled) { const request=pending.get(data.id)!;const value=decode(data.rejection);settle(data.id, true, request.receive ? request.receive(value,"rejectionOrigin" in data?data.rejectionOrigin:"guard","secondaryRejection" in data?{value:decode(data.secondaryRejection)}:undefined):value); return }
     if ("error" in data) { settle(data.id, true, new Error(hostError(data.error))); return }
     settle(data.id, false, "result" in data ? data.result : undefined)
   }
@@ -75,7 +88,7 @@ function requests(port: Port) {
   removeClose = port.onClose?.(close)
   if (state.closed && typeof removeClose === "function") removeClose()
   port.start()
-  function send(method: string, input: unknown, timeout: number, control?: Control, cancellation?: object) {
+  function send(method: string, input: unknown, timeout: number, control?: Control, cancellation?: object, receive?:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown) {
     if (state.closed) return Promise.reject(Error("LOGINOM_HOST_CLOSED"))
     if (control) {
       control.signal.throwIfAborted()
@@ -85,18 +98,19 @@ function requests(port: Port) {
     }
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
-      let dispatched = false
+      let dispatched = false, cancelled=false
       function cancel(value: unknown) {
-        if (!pending.has(id)) return
+        if (!pending.has(id) || cancelled && !state.closed) return
         if (control && dispatched) {
           try { port.postMessage({ id: randomUUID(), method: "readonly.preReady.cancel",
             input: { ...(cancellation ?? input as object), requestId: id, rejection: encode(value) } }) } catch { /* Original refusal remains primary. */ }
         }
-        settle(id, true, value)
+        if(receive && dispatched && !state.closed){receive(value,"control");cancelled=true;return}
+        settle(id, true, receive?receive(value,"await"):value)
       }
       const abort = () => cancel(control!.signal.reason)
       const timer = setTimeout(() => cancel(Error(control ? "LOGINOM_PRE_READY_READ_EXPIRED" : "LOGINOM_HOST_TIMEOUT")), timeout)
-      pending.set(id, {resolve, reject, ...(control ? {cancel,controlled:true} : {}), dispose() { clearTimeout(timer); control?.signal.removeEventListener("abort", abort) }})
+      pending.set(id, {resolve, reject, ...(receive?{receive}:{}), ...(control ? {cancel,controlled:true} : {}), dispose() { clearTimeout(timer); control?.signal.removeEventListener("abort", abort) }})
       control?.signal.addEventListener("abort", abort, {once: true})
       if (control?.signal.aborted) { cancel(control.signal.reason); return }
       try { dispatched = true; port.postMessage({id, method, input, ...(control ? {deadline: control.deadline} : {})}) }
@@ -105,5 +119,6 @@ function requests(port: Port) {
   }
   return { request: (method: string, input: unknown, timeout = 180_000) => send(method, input, timeout),
     startControlled: (input: unknown, control:Control, cancellation:object) => send("start", input, 0, control, cancellation),
+    amountControlled:(method:"start"|"acquire",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
     controlled: (input: {run:string;authorization:string}, control:Control) => send("readonly.preReady", input, 0, control), close }
 }
