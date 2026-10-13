@@ -323,7 +323,7 @@ with open(sys.argv[1], "w", newline="", encoding="utf-8") as target:
   Oracle: `Tag,Occurrences\nblue,3\ngreen,1\nred,153\n`.
   Повторных Session, второго oracle и XML-сравнения до/после нет.
 
-- [ ] Создать независимый `tags/oracle.py` и до модельного запуска вывести
+- [x] Создать независимый `tags/oracle.py` и до модельного запуска вывести
   `tags/oracle.csv`; проверить совпадение с приведёнными выше значениями:
 
 ```python
