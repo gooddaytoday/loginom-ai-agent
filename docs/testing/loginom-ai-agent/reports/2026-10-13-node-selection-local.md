@@ -9,7 +9,7 @@
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
 серия `20261013T142936Z-072953`: завершены baseline 18/18, oracle/calculation 18;
-ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
+ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 1/25: первый standard full PASS без JS.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
@@ -426,6 +426,16 @@ prepare. Первый candidate sales-by-category/1 запущен; completed ca
 Baseline: 7111.472 секунды суммарного CLI-времени, среднее 395.082 секунды.
 Ориентир первой волны — 59.3 минуты модельных процессов, всех 25 — 2.74 часа
 плюс сбор артефактов/review; сроки не гарантированы.
+
+## Candidate sales-by-category/1
+
+Session `ses_ec992fe2effeCSAp2IHU9Jamok`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI 343.331 секунды, timeout false. Candidate digest `ff18dc5f…`, auditVersion
+`2654bfc1…`. JS nodes/calls 0/0; oracle/calculation/history/runtime/identity/graph/
+export true, failures []. Package SHA
+`529f80b6d7d23aa3a86ce07024b840fffbd125426b29603d387ee1c72d1a0567`.
+Первая candidate-волна: 1/9 завершена чисто; standard policy/oracle 1/1,
+completed candidate 1/25. Следующий ABC/1 запущен. Повторы пока не разрешены.
 
 ## Native proof исправления дат
 
