@@ -163,7 +163,13 @@ exit 1: oracle/calculation/history/runtime/identity/graph/export true, JS 2 node
 с прежним skill, его JS policy failure не блокирует измерение «до».
 Evidence: `forensic/receipt-recovery.json`, `copyout-recovery.json`,
 `collector-diagnosis.json` и отдельная audit-проекция. Исправление collector
-выполняется по TDD; общие payload/runtime не пересобираются.
+`f5eb5373e2` выполнено по TDD: RED → GREEN, 4 suites/88 tests/206 assertions,
+typecheck/diff-check PASS. Независимый review Approved: 4 regressions/8 assertions
+PASS, actual 68 parts дают 16 managed calls без ошибок; испорченный managed JSON
+по-прежнему отклоняется. Изменены только runner и его tests; общие payload/runtime
+не пересобираются. `collector-fix-lock.json` SHA
+`3296113f675d8d87505feb2cd402dc2f08eca7c1d277c0b74b1944cf026ca438`
+фиксирует новое sourceHead/runner, 71 неизменённый historical hash и прежние pins.
 Независимый `forensic/copyout-recovery-review.json` подтвердил 11 original hashes,
 21 shared evidence file и все 14 ZIP members; pure audit/oracle повторно прошли.
 Изменения проекции исчерпываются двумя receipt paths и явным collectorRecovery.

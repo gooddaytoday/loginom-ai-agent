@@ -513,11 +513,16 @@ Wrapper exit 2 (`SELECTION_COLLECTION_FAILED`) возник при разбор�
 `loginom_find`: named import из Help ошибочно попал в JSON-парсер квитанций.
 Это дефект внешнего сборщика evidence; общие runtime/payload/model/inputs не меняются.
 
-- [ ] По TDD ограничить только проекцию квитанций managed `loginom_dock_*`.
+- [x] По TDD ограничить только проекцию квитанций managed `loginom_dock_*`.
   Полные parts/events/Help и shared parser сохранить; повреждённый managed JSON
   должен по-прежнему отклоняться. Проверить сохранение Save/Export, отсутствие
   мутации истории, целевые suites, typecheck и независимый review. Сохранить
   исторический acceptance lock и закрепить новые runner hashes отдельным addendum.
+  `f5eb5373e2`: только runner и его тесты. RED → GREEN; четыре целевых suites
+  88 tests/206 assertions PASS, typecheck/diff-check PASS. Independent review:
+  4 regressions/8 assertions PASS, actual 68 parts → 16 managed calls без ошибок.
+  `collector-fix-lock.json` закрепляет новый runner SHA и 71 неизменённый historical
+  hash; pins и auditVersion прежние, runtime/skill/corpus не менялись.
 - [x] Восстановить evidence той же ABC-попытки по точным Save/Export receipts:
   copyout, проверка bytes/SHA, распаковка и полный offline audit в отдельной
   явной проекции. Сохранить original attempt.json, CLI/wrapper outcomes и все
@@ -1252,4 +1257,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Серия142936-072953: baseline2/18, oracle/calculation2; ABC CLI0/wrapper2 восстановлен отдельно, collector fix в работе; candidate0/25.
+- Серия142936-072953: baseline2/18, oracle/calculation2; ABC CLI0/wrapper2 восстановлен отдельно; collector f5eb5373e2/review PASS; candidate0/25.

@@ -246,6 +246,10 @@ ordinary cleanup подтверждены. Wrapper exit 2 вызван текс�
 переданным в JSON-парсер квитанций. Исправление ограничивается внешним collector:
 проекция `loginom_dock_*`, сохранение полной истории и строгого managed parser.
 Общие runtime, payload и pins остаются прежними; новый model run не требуется.
+Правка `f5eb5373e2` проверена RED → GREEN, 88 tests/206 assertions, typecheck и
+independent review. Actual 68 parts дают 16 managed calls; original history
+не мутируется. Historical acceptance lock неизменён; `collector-fix-lock.json`
+закрепляет новый runner SHA и 71 прежний file hash. AuditVersion не менялся.
 
 Exact receipt-based copyout дал пакет SHA
 `dddd3fc96c6036cc74cf9096efd3a596a863b8d45e5417cc006e895d82b48e2a`

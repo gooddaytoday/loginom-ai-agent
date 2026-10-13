@@ -64,6 +64,11 @@ Help в receipt parser. Повтор модели не выполняется. E
 и hashes неизменны. Итог этой попытки читать вместе с исходным attempt.json,
 `forensic/{receipt-recovery,copyout-recovery,copyout-recovery-review}.json` и
 audit проекции. Baseline policy failed из-за двух JS, oracle/calculation true.
+Collector `f5eb5373e2` ограничивает только receipt projection по `loginom_dock_*`;
+полные parts/Help сохраняются. RED/GREEN, 88 целевых tests, typecheck и independent
+review PASS. Historical lock сохранён; `collector-fix-lock.json` закрепляет новый
+runner hash, 71 прежний hash и неизменные runtime/pins/auditVersion. Та же текущая
+серия продолжается без пересборки matched payload и без повторения ABC модели.
 
 ## Доказательства
 
