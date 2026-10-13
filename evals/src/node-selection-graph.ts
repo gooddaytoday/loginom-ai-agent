@@ -9,6 +9,7 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
   const outputs = new Set(["DataSet", "DataSource", "DataSourceElse"])
   const parameters = new Set(["Variables", "ControlVariables", "Connection"])
   const nodes = new Map(xml.nodes.map((node) => [`${node.scope}/${node.id}`, node]))
+  const incoming = new Map<string, string[]>()
   if (!xml.nodes.some((node) => node.type === "TBGImportTextFile") ||
     !xml.nodes.some((node) => node.type === "TBGExportTextFile")) failures.add("GRAPH_IMPORT_EXPORT_REQUIRED")
   for (const node of xml.nodes) {
@@ -23,7 +24,35 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
     const input = target?.inputs[link.target.PortGuid!]
     if (!output || !input || outputs.has(output) !== inputs.has(input) ||
       Object.keys(link.source).some((key) => !["NodeGuid", "PortGuid"].includes(key)) ||
-      Object.keys(link.target).some((key) => !["NodeGuid", "PortGuid"].includes(key))) failures.add("GRAPH_ENDPOINT_INVALID")
+      Object.keys(link.target).some((key) => !["NodeGuid", "PortGuid"].includes(key))) {
+      failures.add("GRAPH_ENDPOINT_INVALID")
+      continue
+    }
+    if (!outputs.has(output)) continue
+    const key = `${link.scope}/${link.target.NodeGuid}/${link.target.PortGuid}`
+    incoming.set(key, [...(incoming.get(key) ?? []), `${link.scope}/${link.source.NodeGuid}`])
+    if (incoming.get(key)!.length > 1) failures.add("GRAPH_INPUT_COMPETING")
   }
+  const visiting = new Set<string>()
+  const visited = new Map<string, boolean>()
+  function reachesImport(key: string): boolean {
+    if (visiting.has(key)) { failures.add("GRAPH_DATA_CYCLE"); return false }
+    if (visited.has(key)) return visited.get(key)!
+    const node = nodes.get(key)!
+    if (node.type === "TBGImportTextFile") return true
+    const ports = Object.entries(node.inputs).filter(([, name]) => inputs.has(name))
+    if (!ports.length) { failures.add("GRAPH_IMPORT_LINEAGE_REQUIRED"); return false }
+    visiting.add(key)
+    const complete = ports.map(([port]) => {
+      const sources = incoming.get(`${key}/${port}`) ?? []
+      if (sources.length !== 1) { failures.add("GRAPH_INPUT_SOURCE_REQUIRED"); return false }
+      return reachesImport(sources[0]!)
+    }).every(Boolean)
+    visiting.delete(key)
+    visited.set(key, complete)
+    return complete
+  }
+  for (const node of xml.nodes.filter((node) => node.type === "TBGExportTextFile"))
+    if (!reachesImport(`${node.scope}/${node.id}`)) failures.add("GRAPH_IMPORT_LINEAGE_REQUIRED")
   return { complete: !failures.size, failures: [...failures] }
 }

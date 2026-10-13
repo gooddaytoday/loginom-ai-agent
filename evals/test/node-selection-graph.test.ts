@@ -27,6 +27,20 @@ test("data links require existing endpoints in their own scope and the correct p
   }
 })
 
+test("both Join data inputs need exactly one source on the exported ancestry", async () => {
+  const xml = await reference("first-last-touch")
+  const join = xml.nodes.find((node) => node.type === "TBGJoinDataEngine")!
+  for (const port of Object.keys(join.inputs).filter((port) => ["MainDataSource", "JoinedDataSource"].includes(join.inputs[port]!))) {
+    const altered = structuredClone(xml)
+    const index = altered.links.findIndex((link) => link.target.NodeGuid === join.id && link.target.PortGuid === port)
+    altered.links.splice(index, 1)
+    expect(inspectSelectionGraph(altered, "standard").complete).toBe(false)
+  }
+  const competing = structuredClone(xml)
+  competing.links.push(structuredClone(competing.links.find((link) => link.target.NodeGuid === join.id)!))
+  expect(inspectSelectionGraph(competing, "standard").complete).toBe(false)
+})
+
 async function reference(id: string) {
   const root = await mkdtemp(path.join(tmpdir(), "selection-graph-"))
   try {
