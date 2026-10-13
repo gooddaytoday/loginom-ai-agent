@@ -5,7 +5,7 @@ import { appendFile, chmod, mkdir, rm } from "node:fs/promises"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
-const infraRetry = command === "run" && process.env.EVAL_TASK_ID?.startsWith("infra-retry-")
+const infraRetry = command === "run" && (process.env.EVAL_TASK_ID?.startsWith("infra-retry-") || process.env.EVAL_TASK_ID === "parallel-infra-retry")
 const launch = infraRetry ? await (async () => {
   const file = Bun.file(path.join(Bun.argv[Bun.argv.indexOf("--dir") + 1]!, "fake-launches.json"))
   const count = await file.json().catch(() => 0) as number
@@ -114,11 +114,11 @@ if (command === "loginom") {
   process.exit(0)
 }
 
-if (command === "run" && /^parallel-(fast|slow)$/.test(process.env.EVAL_TASK_ID ?? "")) {
+if (command === "run" && /^parallel-(fast|slow|infra-retry)$/.test(process.env.EVAL_TASK_ID ?? "")) {
   const startedAt = Date.now()
   const profile = process.env.LOGINOM_AI_AGENT_CLI_PROFILE!
   const workdir = Bun.argv[Bun.argv.indexOf("--dir") + 1]!
-  await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), JSON.stringify({ task: process.env.EVAL_TASK_ID, workdir }))
+  await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), JSON.stringify({ task: process.env.EVAL_TASK_ID, workdir, profile, launch: launch ?? 1 }))
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db-wal"), "fixture WAL")
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db-shm"), "fixture SHM")
   await Bun.sleep(process.env.EVAL_TASK_ID === "parallel-slow" ? 3_000 : 20)
@@ -136,7 +136,7 @@ if (command === "run" && orphanStorage) {
   if (orphanFixture?.readonly) await chmod(orphanStorage, 0o500)
 }
 const retryOutcomes: Record<string, string> = {
-  "infra-retry-twice": "host-timeout", "infra-retry-no-artifact": "default",
+  "parallel-infra-retry": "default", "infra-retry-twice": "host-timeout", "infra-retry-no-artifact": "default",
   "infra-retry-failed": "transition-failed", "infra-retry-harness-error": "stop-case",
 }
 const id = infraRetry ? launch === 1 ? "host-timeout" : retryOutcomes[process.env.EVAL_TASK_ID!] ?? "group-sum-qty"

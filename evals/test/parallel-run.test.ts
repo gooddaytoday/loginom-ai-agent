@@ -6,7 +6,7 @@ import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
 import type { SlotFile } from "../src/slots"
 
-async function fixture(root: string) {
+async function fixture(root: string, taskIds = ["parallel-fast", "parallel-slow"]) {
   const slots: SlotFile = {
     version: 2,
     server: { container: "fixture-server", studioContainer: "fixture-studio", url: "http://127.0.0.1/app/",
@@ -22,7 +22,7 @@ async function fixture(root: string) {
     ...slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir, path.join(storage, slot.id)])]
     .map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
   await Promise.all(slots.slots.map(slot => Bun.write(path.join(slot.profileDir, "data/auth.json"), '{"fake":{"type":"api","key":"fixture"}}')))
-  await Promise.all(["parallel-fast", "parallel-slow"].map(async id => {
+  await Promise.all(taskIds.map(async id => {
     await Bun.write(path.join(root, "tasks", id, "spec.md"), "Fixture diagnostic")
     await Bun.write(path.join(root, "tasks", id, "task.json"), JSON.stringify({ id, title: id, prompt: id,
       output_mode: "diagnostic", spec: "spec.md", expected_output: "diagnostic", checklist: [{ id: "diagnostic", text: "Returns diagnostic", weight: 1, required: true }] }))
@@ -61,6 +61,8 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
     }
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
+
+
 
 test("fixture main: overlapping writable results are rejected before any admission or dispatch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-overlap-"))
@@ -125,3 +127,30 @@ test("fixture main: a shared profile is rejected across all configured slots bef
     expect(await readdir(input.slots.controller.stateDir)).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("fixture main: one infra retry keeps the same slot and archives the initial attempt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-retry-"))
+  try {
+    const input = await fixture(root, ["parallel-infra-retry", "parallel-slow"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
+      input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    const result = summary.tasks.find(task => task.id === "parallel-infra-retry")!.attempts[0]!
+    expect(result).toMatchObject({ status: "completed", slot_id: "a", infra_retry: {
+      initial: { status: "infra_error", slot_id: "a", environment_cleanup: { status: "confirmed" } },
+    } })
+    expect(summary.metrics.infra_error_count).toBe(1)
+    expect(summary.metrics.total).toBe(2)
+    const initial = await Bun.file(path.join(run.runDir!, result.task_id, "1", "infra-error/result.json")).json()
+    expect(initial).toEqual(result.infra_retry!.initial)
+    const slot = input.slots.slots[0]!
+    const history = await Promise.all((await readdir(slot.historyDir)).map(async archive => {
+      const file = Bun.file(path.join(slot.historyDir, archive, "data/loginom-ai-agent.db"))
+      return await file.exists() ? await file.json() as { launch: number; profile: string } : undefined
+    }))
+    expect(history.filter(row => row !== undefined).map(row => row.launch).sort()).toEqual([1, 2])
+    expect(history.filter(row => row !== undefined).every(row => row.profile === slot.profileDir)).toBe(true)
+    expect(await Bun.file(path.join(slot.profileDir, "data/loginom-ai-agent.db")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
