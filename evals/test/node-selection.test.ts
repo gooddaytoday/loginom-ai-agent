@@ -58,6 +58,22 @@ test("offline audit refuses an oracle whose bytes differ from the pinned task", 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("a failed semantic review blocks acceptance without changing native selection policy", async () => {
+  const directory = await pilotDirectory()
+  try {
+    await Bun.write(path.join(directory, "graph-review.json"), JSON.stringify({ verdict: "failed", reviewer: "reviewer",
+      notes: "The reviewed interpretation is wrong despite its matching CSV.", sessionID: pilotHistory.snapshot.sessionID,
+      packageSha256: createHash("sha256").update(await Bun.file(path.join(directory, "artifact/package.lgp")).bytes()).digest("hex"),
+      evidence: ["artifact/package.lgp"] }))
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(1)
+    expect(await Bun.file(path.join(directory, "selection-audit.json")).json()).toMatchObject({
+      reviewStatus: "failed", policyStatus: "passed", calculationPassed: true,
+    })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 async function pilotDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-complete-"))
   await mkdir(path.join(directory, "artifact/results"), { recursive: true })

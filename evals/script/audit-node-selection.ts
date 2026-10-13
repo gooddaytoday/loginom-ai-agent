@@ -113,7 +113,7 @@ async function main() {
     ...selection.failures.filter((failure) => !failure.startsWith("JAVASCRIPT_")),
     ...failures.filter((failure) => !["PACKAGE_MISSING", "PACKAGE_RECEIPT_MISSING", "RESULT_RECEIPT_UNVERIFIED", "ORACLE_MISSING"].includes(failure))]
   const policyStatus = !provenance.identityVerified ? "incomplete"
-    : selection.failures.includes("JAVASCRIPT_NOT_ALLOWED") || reviewStatus === "failed" ? "failed"
+    : selection.failures.includes("JAVASCRIPT_NOT_ALLOWED") ? "failed"
     : evidenceFailures.length ? "incomplete"
     : allowed && (selection.failures.length || !roleGraph.complete) ? "incomplete" : "passed"
   const calculationPassed = history.historyComplete && settlement.runtimeSettled && provenance.identityVerified
@@ -126,7 +126,7 @@ async function main() {
     failures: [...new Set([...failures, ...evidenceFailures, ...selection.failures, ...graph.failures, ...roleGraph.failures])],
   }
   await Bun.write(path.join(directory, "selection-audit.json"), JSON.stringify(result, null, 2) + "\n")
-  process.exitCode = policyStatus === "failed" || (!evidenceFailures.length && resultVerified && oracle.passed === false)
+  process.exitCode = policyStatus === "failed" || reviewStatus === "failed" || (!evidenceFailures.length && resultVerified && oracle.passed === false)
     ? 1 : policyStatus === "passed" && calculationPassed && ["passed", "not-required"].includes(reviewStatus) ? 0 : 2
 }
 
