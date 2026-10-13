@@ -392,6 +392,45 @@ test("ensureProfile: ready с hasApiKey не вызывает setup и пише�
   expect(await Bun.file(path.join(profileDir, "config", "loginom-ai-agent.json")).exists()).toBe(true)
 })
 
+test.each(["username", "url", "missing-username", "missing-url"] as const)("ensureProfile v2: %s mismatch refuses before setup or config replacement", async kind => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    const mismatch = kind === "username" ? { username: "eval-b" } : kind === "url" ? { url: "http://127.0.0.1:80/app/" }
+      : kind === "missing-username" ? { username: undefined } : { url: undefined }
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, ...mismatch }))
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
+    expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile v2: matching ready profile is reused without setup or generation change", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    const view = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, revision: 4, generation: 9 }
+    await Bun.write(state, JSON.stringify(view))
+    await Bun.write(path.join(context.profileDir, "cli-profile.json"), "preserve-profile")
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await Bun.file(state).json()).toEqual(view)
+    expect(await Bun.file(path.join(context.profileDir, "cli-profile.json")).text()).toBe("preserve-profile")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
 test("ensureProfile: source без cache/models.json засевает каталог из product snapshot", async () => {
   const { config, command, profileDir } = await fakeProfile({
     EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),

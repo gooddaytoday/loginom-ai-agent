@@ -441,6 +441,8 @@ expect(await Bun.file(foreignSentinel).text()).toBe("preserve")
 
 Полная пара `receipt`/`second` требует реального Loginom и выполняется в немодельной интеграционной приёмке; unit RED с fake CLI проверяет только профильную часть через её публичный интерфейс, без fake-admin и без попытки выдать её за полный prepare.
 
+- [x] Подзадача 3: ensureProfile при slotsFile связывает существующий configured profile с exact url/username; чужие/missing fields отказали до setup/config write. 4 fake-CLI RED/GREEN и reuse case (2 status, 0 setup, unchanged generation/cli-profile); 66 profile tests/188 assertions и typecheck PASS (29.22s). Legacy missing fields сохраняют прежний контракт. Fresh setup read-back и полная prepare receipt ещё не квалифицированы; это profile metadata, не доказательство live user/ACL.
+
 `receipt`/`second` — JSON публичной будущей `parallel-env prepare`; `foreignSentinel` создаёт тест во временном постороннем каталоге. Счётчики изменения — только безопасный отчёт подготовки, без credential values.
 
 - [ ] Запустить RED: `bun test test/profile.test.ts test/user-environment.test.ts`. Затем реализовать журнал prepare: запланировать операцию с nonce и desired hash → сохранить private secret → выполнить → прочитать фактическое состояние → записать committed receipt. После crash продолжать по read-back, а не создавать пользователя или менять пароль второй раз.
@@ -730,4 +732,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 6. Cleanup: writers/management → durable archive → server close/readback → свои files/backups → release.
 7. Standalone выпускает reservations; crash сохраняет durable fence до recovery-only CAS/proofs.
 8. Непустой backup/session identity/supervisor/OAuth/LLM N=2→N=1 остаются gates.
-9. 1а: factory/identity, full unit 595/3skip/0fail, Docker 24 assertions PASS; admin bootstrap blocked. Task 2: Node bridge/journal, 3 rejection integration/17 assertions, 21 supervisor tests PASS. Task 8: pure queue 7 + judge gate 8, 82 targeted PASS. Task 3: explicit historyDir, 61 profile/typecheck PASS. Далее profile identity и fixture main; реальные lifecycle/admission ждут bootstrap, identity unsupported.
+9. 1а: factory/identity, full unit 595/3skip/0fail, Docker 24 assertions PASS; admin bootstrap blocked. Task 2: Node bridge/journal, 3 rejection integration/17 assertions, 21 supervisor tests PASS. Task 8: pure queue 7 + judge gate 8, 82 targeted PASS. Task 3: historyDir и ready-profile binding, 66 profile/typecheck PASS. Далее fresh setup read-back/fixture main; реальные lifecycle/admission ждут bootstrap, identity unsupported.

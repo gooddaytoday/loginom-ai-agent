@@ -9,7 +9,7 @@ import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRe
 import { archiveDiagnostics } from "./diagnostics"
 import { sandboxCommand, assertNoDebuggers } from "./sandbox"
 
-type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
+type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
 
 const retainedProfileFiles = new Set([
   "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
@@ -296,6 +296,8 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
     await Bun.write(modelsCache, Bun.file(path.join(repoRoot, "packages", "product", "models.json")))
   }
   const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+  if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
+    throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
   const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
   if (fresh) {
     const setup = await management(
