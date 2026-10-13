@@ -75,6 +75,11 @@
 нулём; валидный native XML читается. Они опираются на проверенные контракты кода.
 Остальные ветви ниже реализуются в 1B после первой baseline-попытки.
 
+- [x] Этап 1A: минимальный аудит готов; JS не теряется при ошибках/незавершённости,
+  оба XML-типа учитываются, неизвестный формат остаётся incomplete.
+  До пилота полный PASS намеренно закрыт `AUDIT_NOT_FINALIZED`.
+- [ ] Этап 1B: окончательный аудит завершён и проверен на реальных evidence пилота.
+
 **Interfaces:**
 - Consumes: `readNodeXml(artifactDir)` из `src/node-xml.ts`, `checkOracle(task, artifactDir)`
   из `src/oracle.ts`, `loadTasks(dir, only)` из `src/task.ts`; полный JSON snapshot
@@ -1095,18 +1100,14 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 
 ## Checkpoint
 
-- 2026-10-13: согласован дизайн, включая локальную текущую систему вместо стенда.
-- Spec прошёл независимое review; коммит `849cc844e`.
-- Этот план создан до реализации. Skill и runtime ещё не менялись.
-- 2026-10-13: рекомендации перепроверены; план и spec синхронно уточнены.
-- Редакция `eabc25693` проверила read receipts, reuse-аудит и supervisor;
-  её примеры прошли проверки синтаксиса/oracle/status/snapshot.
-- По следующему запросу пользователя план перестроен: сначала 9 candidate,
-  затем 16; всего 43 модельных run, единый wrapper, аудит по пилоту, выборочное
-  review, один recovery и tags без повторной сессии. Spec обновлён синхронно.
-- Новая редакция прошла независимое review, `git diff --check` и синтаксическую
-  проверку 13 Bash, 7 Python и 3 TypeScript фрагментов. Генератор единого tags input
-  и независимый oracle проверены на временном файле: blue=3, green=1, red=153.
-- Unit/static проверки будущего изменения и live серии ещё не запускались.
-- Следующий шаг: Task 1A → fixtures/wrapper/frozen baseline/pilot → Task 1B;
-  затем остальные baseline параллельно Task 4 при ограничениях сборки/профиля.
+- 2026-10-13: реализация по согласованным spec/plan, ветка `node-javascript`.
+- Этап 1A выполнен; полный audit до 1B не сертифицирует PASS.
+- Fixtures реализованы TDD: `81c4a14e7`, `2de55ec10`, `3de3526f9`.
+- Collector реализован TDD: `7ef876bf0`, `a50c93c25`; независимое review проведено.
+- Целевые проверки из evals: 32 PASS, typecheck PASS; runtime/skill ещё не менялись.
+- Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
+- Текущий run: `20261013T093809Z-f5d429`, private evidence под evals/results.
+- Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
+- Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
+- Baseline ещё не собран, модельные live-попытки ещё не запускались.
+- Следующий шаг: frozen baseline → пилот → аудит 1B; затем остальные baseline параллельно Task 4.
