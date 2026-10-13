@@ -48,7 +48,9 @@ try{
      const reply=await wait(m=>m.fixture==='bound-managed-reply'&&m.packet.id===capture.requestId);assert.equal(reply.packet.rejectionOrigin,'control');
      assert.equal(reply.packet.secondaryRejection.kind,'value');assert.equal(reply.packet.secondaryRejection.is_undefined,mode==='phase-held-undefined');assert.equal(reply.packet.secondaryRejection.value,mode==='phase-held-undefined'?null:false);
     }
-    const files=(await readdir(join(root,'recovery'))).filter(x=>x.endsWith('.json'));assert.equal(files.length,1);row.journal=JSON.parse(await readFile(join(root,'recovery',files[0]),'utf8'));
+    const files=(await readdir(join(root,'recovery'))).filter(x=>x.endsWith('.json'));
+    if(mode==='canonical-phase'){assert.equal(files.length,1);row.journal=JSON.parse(await readFile(join(root,'recovery',files[0]),'utf8'))}
+    else{assert.equal(files.length,0,'failed startup precedes capture journal admission');row.journal=null}
     await rejected(host.request('release',{run:'original-run'}));
    }
    if(['foreign-grant','missing-run','preabort-capture'].includes(mode))assert.equal(row.messages.filter(m=>m.fixture==='bound-start').length,1,'no acquired-chat dispatch');
