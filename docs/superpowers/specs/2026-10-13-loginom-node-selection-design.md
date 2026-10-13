@@ -4,7 +4,7 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Текущая серия `20261013T142936Z-072953`: завершены baseline 7/18, oracle/calculation 7;
+Текущая серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle 8/calculation 7;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
@@ -278,7 +278,11 @@ risky-approved-claims/1 также прошёл full audit/CLI cleanup без JS
 и все evidence axes true, один JS node/call; wrapper1 только из-за baseline
 JAVASCRIPT_NOT_ALLOWED. Первый проход всех шести baseline завершён: четыре без JS,
 ABC с двумя JS и attribution с одним. Sales-by-category/2 также завершился
-CLI/wrapper0, полный audit/cleanup PASS без JS. Начат abc-pareto-groups/2,
+CLI/wrapper0, полный audit/cleanup PASS без JS. ABC/2 завершился CLI0/cleanup true,
+oracle true, wrapper1: public/runtime settlement одного JS не подтверждён
+(RUNTIME_APPLY_MISMATCH, TOOL_OPERATION_UNSETTLED, TOOL_RECEIPT_INCOMPLETE).
+Calculation false сохраняется до диагностики `operation_inspect`; следующая
+модель пока не запускается. Collector корректно обработал реальный Help с import.
 candidate 0/25, полная приёмка ещё впереди.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор

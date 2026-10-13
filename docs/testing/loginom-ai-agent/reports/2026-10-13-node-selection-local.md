@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 7/18, oracle/calculation 7;
+серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle 8/calculation 7;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -237,6 +237,23 @@ CLI 343.882 секунды, timeout false. JS nodes/calls 0/0; oracle и пол�
 calculation/history/runtime/identity/graph/export true, failures []. Package SHA
 `1c0eb77f14a3eb05ce98cfebed0d32872352887a669b9df8378c6ee565fb64a1`.
 Начат abc-pareto-groups/2; сборка, pins, inputs/model/oracle прежние.
+
+## ABC/2: неподтверждённое согласование операции
+
+Session `ses_ec9f9ea4fffe3ennmoDQkOo9Ht`: CLI exit 0, wrapper exit 1,
+cleanupConfirmed true, CLI 459.388 секунды, timeout false. JS nodes/calls 2/2,
+successful JS calls 1. Oracle/history/identity/graph/export true, но runtimeSettled
+и calculation false: RUNTIME_APPLY_MISMATCH, TOOL_OPERATION_UNSETTLED,
+TOOL_RECEIPT_INCOMPLETE; JAVASCRIPT_NOT_ALLOWED ожидаем для старого skill.
+Package SHA `dd9604cf371586fd9092f0cd885805dead3f4a81b03101fdb4cf51b80b890513`.
+Первая JS-операция после running wait проверена через operation_inspect,
+затем выполнена сводка. Save/Export и CLI cleanup подтверждены; отличие формы
+квитанции или недостающий public settlement требуют диагностики, успех не подменён.
+Следующая модель пока не запускается, candidate 0/25.
+
+Collector fix подтверждён в обычном live CLI: один полный loginom_find содержит
+named import `{ OutputTable, DataType }`, но сбор Save/Export/пакета/CSV и audit
+завершился без collection failure. Исходные outcomes и audit сохранены.
 
 ## Native proof исправления дат
 
