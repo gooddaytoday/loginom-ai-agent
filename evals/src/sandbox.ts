@@ -1,5 +1,5 @@
 import path from "node:path"
-import { realpath, readFile } from "node:fs/promises"
+import { lstat, readdir, realpath, readFile } from "node:fs/promises"
 import { repoRoot } from "./config"
 import { EvalFailure } from "./fail"
 
@@ -21,6 +21,21 @@ export async function sandboxCommand(input: {
   const installation = path.dirname(path.dirname(binary))
   const profile = await realpath(input.profileDir)
   const workspace = await realpath(input.workdir)
+  const shared = input.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR
+  if (shared) {
+    const info = await lstat(shared)
+    if (!info.isDirectory() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700 || await realpath(shared) !== shared ||
+      [repoRoot, installation, profile, workspace].some(root => inside(shared, root) || inside(root, shared)))
+      throw new SandboxFailure("SHARED_AUTH_PATH_PRIVATE")
+    await Promise.all((await readdir(shared)).map(async name => {
+      const entry = await lstat(path.join(shared, name)).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined
+        throw error
+      })
+      if (entry && (!entry.isFile() || entry.uid !== process.getuid?.() || entry.nlink !== 1 || (entry.mode & 0o777) !== 0o600))
+        throw new SandboxFailure("SHARED_AUTH_FILE_PRIVATE")
+    }))
+  }
   if (inside(repoRoot, installation) || !await Bun.file(path.join(installation, "cli-manifest.json")).exists())
     throw new EvalFailure("Изоляция eval требует установленный CLI с cli-manifest.json вне checkout", 2)
   if ([profile, workspace].some((root) => inside(repoRoot, root) || inside(installation, root)) ||
@@ -32,11 +47,12 @@ export async function sandboxCommand(input: {
     "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
     "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/dev/shm", "--tmpfs", "/tmp", "--dir", "/home/eval",
     "--ro-bind", installation, installation, "--bind", profile, profile, "--bind", workspace, workspace, "--chdir", workspace]
+  if (shared) cmd.push("--bind", shared, shared)
   for (const file of ["/etc/ld.so.cache", "/etc/nsswitch.conf", "/etc/resolv.conf", "/etc/hosts", "/etc/passwd", "/etc/group", "/etc/fonts", "/etc/ssl/certs"])
     cmd.push("--ro-bind", await realpath(file), file)
   cmd.push("--", binary, ...input.cmd.slice(1))
   const inherited = Object.fromEntries(Object.entries(input.env).flatMap(([name, value]) =>
-    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT|EXPERIMENTAL_WEBSOCKETS))$/.test(name)
+    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT|EXPERIMENTAL_WEBSOCKETS|SHARED_AUTH_DIR))$/.test(name)
       ? [[name, value]] : []))
   // Bundled Node needs this startup switch to use the inherited proxy settings.
   if (Object.entries(inherited).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))

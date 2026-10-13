@@ -117,7 +117,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   }
 }
 
-export type EvalConfig = ReturnType<typeof loadConfig>
+export type EvalConfig = ReturnType<typeof loadConfig> & { auth?: { sharedDir: string } }
 
 function parseEvalArgs(argv: string[]) {
   try {
