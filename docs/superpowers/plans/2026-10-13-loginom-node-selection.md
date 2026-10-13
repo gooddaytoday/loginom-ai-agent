@@ -239,8 +239,11 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
     результат той же операции внутри того же runtime attempt/Dock UUID по
     контракту конкретного инструмента. Для apply/delivery/save проверять
     `SUCCEEDED|FAILED|NOT_APPLIED`, `cleanup_complete:true`, отсутствие pending/active.
-    Source/context read не имеют apply-outcome: проверять owner-bound receipt,
-    operation/node identity и `cleanup_complete:true`; для их wait/status —
+    Source/context read не имеют apply-outcome: проверять owner-bound receipt
+    и operation/node identity. Direct context требует `cleanup_complete:true`.
+    Direct source этого поля не содержит: cleanup подтверждают собственные
+    `source_discard_settled` и `source_delivery_verified` для каждого read step
+    в том же runtime attempt с тем же owner. Для их wait/status —
     `state:settled`, `progress.cleanup_complete:true`, `pending_phase:null` и
     отсутствие незавершённого чтения. `outcome:null` у этих read штатен.
     Узкое исключение для вложенного `artifact.upload`: его

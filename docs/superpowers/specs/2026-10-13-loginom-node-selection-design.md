@@ -291,7 +291,10 @@ terminal stdout parts полному snapshot, отсутствие неизве
 Для apply/delivery/save последний результат должен иметь
 `SUCCEEDED | FAILED | NOT_APPLIED`, `cleanup_complete:true`, без оставшихся
 pending/active работ. Source/context read используют собственный owner-bound
-receipt с cleanup и operation/node identity; их wait/status имеют
+receipt с operation/node identity. Direct context имеет `cleanup_complete:true`;
+direct source не содержит этого поля, поэтому cleanup подтверждается парой
+`source_discard_settled` и `source_delivery_verified` для каждого read step
+в том же runtime attempt с тем же owner. Их wait/status имеют
 `state:settled`, `progress.cleanup_complete:true`, `pending_phase:null`.
 Для таких read `outcome:null` штатен, apply-status от них не требуется.
 Вложенный `artifact.upload` с `AMBIGUOUS/UPLOAD_SERVER_VERIFICATION_REQUIRED`
