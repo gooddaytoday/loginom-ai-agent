@@ -1,3 +1,4 @@
+import {retainCaptureOwner,bindCaptureRuntime,assertCaptureOwner} from './retained-capture.mjs'
 import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
 import {retainFPManagedStartup,retainAmountManagedStartup} from "./fp-managed-startup.mjs"
 import {decodePreReadyRejection} from "./qualified-pre-ready.mjs"
@@ -307,13 +308,15 @@ async function handle(message) {
       }
       const observed=async(work)=>{
         let value;try {value=await work}catch(error){throw state.controlledStartup?state.controlledStartup.reject(error):error}
-        state.controlledStartup?.guard();return value
+        state.controlledStartup?.guard();
+        if(state.captureRetained)assertCaptureOwner(state.captureRetained);
+        return value
       }
       state.controlledStartup?.guard()
       if (Object.hasOwn(message,"deadline") && (!Number.isSafeInteger(message.deadline) || message.deadline<=Date.now()))
         throw Error("LOGINOM_INITIAL_READINESS_DEADLINE")
       const resources = await observed(verifyResources(input.resources))
-      let captureHarness
+      let captureHarness,captureResource
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
         const fp = acceptanceCapture.harness === "field-parameters-preservation-v1"
@@ -322,6 +325,8 @@ async function handle(message) {
           : "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
         if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        const resource=resources.manifest.files.find(file=>file.path===path);
+        captureResource=Object.freeze({path,sha256:resource.sha256});
         const module = await observed(import(pathToFileURL(join(input.resources, path)).href))
         if (typeof (fp ? module.collectFieldParametersPreservation : amount ? module.captureAmount : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         captureHarness = fp ? module.collectFieldParametersPreservation : amount ? module.captureAmount : module.captureCalculator
@@ -441,10 +446,16 @@ async function handle(message) {
       assertStartup();
       retainOriginalPrepareStartup(session,{startup:originalStartup,owner:originalOwner,
         readiness:state.authenticatedReadiness,assertStartup});
+      let retainedAcceptance;
+      if(acceptanceCapture){
+        const binding=Object.freeze({...acceptanceCapture,session:session.metadata.sessionId});
+        state.captureStartupBinding=originalStartup;
+        state.captureRetained=retainCaptureOwner(state,binding,captureResource);
+        retainedAcceptance={binding,harness:captureHarness,retained:state.captureRetained};
+      }
       state.bridge = await observed(createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
-        acceptanceCapture: acceptanceCapture ? { binding: Object.freeze({...acceptanceCapture, session:session.metadata.sessionId}),
-          harness: captureHarness } : undefined }))
+        acceptanceCapture:retainedAcceptance }))
       assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
@@ -456,6 +467,7 @@ async function handle(message) {
       assertStartup();
       await observed(state.client.connect(clientTransport))
       assertStartup();
+      if(state.captureRetained)bindCaptureRuntime(state.captureRetained,state.bridge,state.client);
       state.controlledStartup?.accept()
       send({
         id: message.id,
@@ -515,7 +527,9 @@ async function handle(message) {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
       try {
-        const result = await state.bridge.captureAcceptance()
+        if(state.captureRetained)assertCaptureOwner(state.captureRetained);
+        const result = await state.bridge.captureAcceptance();
+        if(state.captureRetained)assertCaptureOwner(state.captureRetained)
         send({id:message.id,result})
       } catch (rejected) {
         send({id:message.id,result:{cleanupComplete:false,refused:true,
