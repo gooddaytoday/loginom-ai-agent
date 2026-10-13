@@ -603,7 +603,7 @@ if [ "$selection_hash_exit" -ne 0 ]; then exit "$selection_hash_exit"; fi
   Если он исчез, сборку остановить до нахождения ресурса с тем же pin.
   Node/npm/browser не скачивать и pins не менять. HOME/XDG не переопределять.
 
-- [ ] Из `packages/loginom-host` собрать baseline в новый каталог:
+- [x] Из `packages/loginom-host` собрать baseline в новый каталог:
 
 ```bash
 LOGINOM_AI_AGENT_CHANNEL=prod \
