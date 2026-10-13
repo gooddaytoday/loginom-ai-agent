@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode } from "../script/run-node-selection-attempt"
+import { readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -114,6 +114,14 @@ const refreshIncident = {
     { id: "prt_4", messageID: "msg_user", sessionID: "ses_pilot", type: "file" },
   ],
 }
+
+test("the observed OAuth refresh failure proves no inference, while assistant creation alone does not", () => {
+  expect(selectionModelStarted(refreshIncident, 1)).toBe(false)
+  expect(selectionModelStarted(refreshIncident, null)).toBe(null)
+  const unknown = structuredClone(refreshIncident)
+  unknown.messages[1]!.error!.data.message = "An unknown failure"
+  expect(selectionModelStarted(unknown, 1)).toBe(null)
+})
 
 function pins() {
   return {

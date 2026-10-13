@@ -224,8 +224,7 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       title: attempt.prefix, startedAt: Date.parse(result.cliStartedAt), finishedAt: Date.parse(result.cliFinishedAt),
     })
     result.sessionID = snapshot.sessionID
-    result.modelStarted = events.some((event) => record(event) && ["step_start", "tool_use", "text"].includes(String(event.type))) ||
-      snapshot.messages.some((message) => message.role === "assistant" && typeof message.modelID === "string" && typeof message.providerID === "string")
+    result.modelStarted = selectionModelStarted(snapshot, result.cliExitCode)
     await Bun.write(path.join(attempt.directory, "parts.json"), JSON.stringify(snapshot, null, 2) + "\n")
     await save()
     const runtime = path.join(plan.pins.profile, "loginom/runtime")
@@ -241,6 +240,13 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       journals.push({ source, path: path.relative(attempt.directory, destination), sha256: await hashFile(destination) })
     }
     await Bun.write(path.join(attempt.directory, "runtime-journals.json"), JSON.stringify(journals, null, 2) + "\n")
+    if (result.modelStarted === false) {
+      const incident = path.join(evidence, "auth-rejected")
+      await rename(attempt.directory, incident)
+      result.evidence = incident
+      throw Error("SELECTION_AUTH_REFRESH_FAILED")
+    }
+    if (result.modelStarted === null) throw Error("SELECTION_DISPATCH_UNCONFIRMED")
     const completeParts = await fullToolOutputs(snapshot.parts, plan.pins.profile, attempt.directory)
     const receipts = readNodeEvents(completeParts.map((part) => JSON.stringify({ type: "tool_use", part })).join("\n"))
     if (receipts.failures.length) result.collectionFailures.push(...receipts.failures)
@@ -301,6 +307,27 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
 
 export function selectionExitCode(result: { exitCode: number; cliExitCode: number | null; timedOut: boolean }) {
   return result.cliExitCode === 130 && !result.timedOut && result.exitCode !== 3 ? 130 : result.exitCode
+}
+
+export function selectionModelStarted(snapshot: ReturnType<typeof readSelectionSnapshot>, cliExitCode: number | null): boolean | null {
+  const assistants = snapshot.messages.filter((message) => message.role === "assistant")
+  if (snapshot.parts.some((part) => assistants.some((message) => message.id === part.messageID) &&
+    ["step-start", "step-finish", "text", "reasoning", "tool"].includes(String(part.type)))) return true
+  const users = snapshot.messages.filter((message) => message.role === "user")
+  const assistant = assistants[0]
+  if (cliExitCode !== 1 || snapshot.parentID !== null || snapshot.childSessionIDs.length ||
+    snapshot.messages.length !== 2 || users.length !== 1 || assistants.length !== 1 || !assistant ||
+    assistant.parentID !== users[0]!.id || assistant.providerID !== "openai" ||
+    !record(assistant.error) || assistant.error.name !== "UnknownError" || !record(assistant.error.data) ||
+    assistant.error.data.message !== "Token refresh failed: HTTP 401" ||
+    !record(assistant.time) || typeof assistant.time.created !== "number" || typeof assistant.time.completed !== "number" ||
+    assistant.time.completed < assistant.time.created || !record(assistant.tokens) || !record(assistant.tokens.cache) ||
+    [assistant.tokens.input, assistant.tokens.output, assistant.tokens.reasoning, assistant.tokens.cache.read,
+      assistant.tokens.cache.write].some((value) => value !== 0) || !snapshot.parts.length ||
+    snapshot.parts.some((part) => part.messageID !== users[0]!.id)) return null
+  // Observed pilot failure: OpenAI OAuth refresh is awaited before the inference fetch.
+  // A durable assistant row is created earlier and, on its own, proves no dispatch.
+  return false
 }
 
 export function readSelectionSnapshot(filename: string, sessionID: string,
