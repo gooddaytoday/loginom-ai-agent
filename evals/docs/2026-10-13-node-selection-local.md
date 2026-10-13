@@ -27,13 +27,16 @@ Container ID, сеть и UserStorage проверены read-only, public routi
  версии skill не запускаются. До model dispatch инцидент не занимает слот;
 после dispatch провал сохраняется в знаменателе.
 
-Текущая серия — `20261013T132356Z-0a3983`, исходная `20261013T093809Z-f5d429`
+Текущая серия — `20261013T142936Z-072953`; `20261013T132356Z-0a3983` остановлена
+после двух baseline и сохранена отдельно. Исходная `20261013T093809Z-f5d429`
 остановлена после трёх baseline и сохранена отдельно. Пользователь поручил
 самостоятельно устранять блокеры; необходимый общий runtime-дефект
 `imports.text.date_format` исправлен по TDD в `263df9620`. Обе новые сборки
-на `6768520a0` выполнены в одном worktree и проверены против owning source;
+на `1bfc135430` выполнены в одном worktree и проверены против owning source;
 runtime/dependencies/compiled CLI побайтно совпадают. Native Host proof дат,
 Save/cleanup/logout прошёл без LLM. Smoke не входит в 43 модельных слота.
+Новая пара также включает dataset output overflow fix `c2c898aca5`; exact native
+overflow/Close/output/Save/cleanup подтверждены отдельно без LLM.
 Новые pins immutable; inputs/oracle/model/reviewSeed прежние. Исторический
 acceptance lock сохранён побайтно, новые hashes привязаны отдельным
 `pins-preparation-review.json`, 72/72 current source hashes PASS.
@@ -53,6 +56,14 @@ model/variant, task prompt/input/oracle hashes, публичное подклю�
 Один вызов запускает одну модельную попытку. Каталог существующего слота не
 перезаписывается. Для повторной оценки сохранённых данных вызывается только
 offline-аудит; он не запускает модель или Loginom.
+
+У ABC/1 третьей серии CLI0/cleanup true, но исходный wrapper2 остановился на
+Help в receipt parser. Повтор модели не выполняется. Exact copyout и offline
+аудит сохранены в отдельной явной проекции `evidence/abc-collector-recovery`:
+только receipt paths добавлены к копии attempt metadata, original outcomes
+и hashes неизменны. Итог этой попытки читать вместе с исходным attempt.json,
+`forensic/{receipt-recovery,copyout-recovery,copyout-recovery-review}.json` и
+audit проекции. Baseline policy failed из-за двух JS, oracle/calculation true.
 
 ## Доказательства
 

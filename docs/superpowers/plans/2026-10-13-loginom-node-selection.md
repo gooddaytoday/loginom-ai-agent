@@ -506,6 +506,29 @@ Offline crossed regression подтвердил отсутствие dataset ico
   серий сохранить отдельно. Удалять только собственные ненужные build artifacts,
   сохраняя необходимые evidence и не затрагивая работу других агентов.
 
+## Предпосылка продолжения: сборщик квитанций и Help
+
+В третьей серии ABC/1 завершился CLI exit 0 со штатным cleanup, Save и экспортом.
+Wrapper exit 2 (`SELECTION_COLLECTION_FAILED`) возник при разборе текста
+`loginom_find`: named import из Help ошибочно попал в JSON-парсер квитанций.
+Это дефект внешнего сборщика evidence; общие runtime/payload/model/inputs не меняются.
+
+- [ ] По TDD ограничить только проекцию квитанций managed `loginom_dock_*`.
+  Полные parts/events/Help и shared parser сохранить; повреждённый managed JSON
+  должен по-прежнему отклоняться. Проверить сохранение Save/Export, отсутствие
+  мутации истории, целевые suites, typecheck и независимый review. Сохранить
+  исторический acceptance lock и закрепить новые runner hashes отдельным addendum.
+- [x] Восстановить evidence той же ABC-попытки по точным Save/Export receipts:
+  copyout, проверка bytes/SHA, распаковка и полный offline audit в отдельной
+  явной проекции. Сохранить original attempt.json, CLI/wrapper outcomes и все
+  исходные hashes. Повтор модели и новая matched-сборка для collector не нужны.
+  Baseline с JS остаётся замером «до»; расчёт и политика учитываются отдельно.
+  Copyout и отдельная audit-проекция проверены независимо: 11 исходных hashes,
+  21 shared evidence file, все 14 ZIP members совпали. Пакет/CSV receipt binding
+  и oracle/calculation/history/runtime/identity/graph/export подтверждены;
+  единственный отказ — baseline JAVASCRIPT_NOT_ALLOWED (2 JS nodes/calls).
+  Original CLI0/wrapper2 и collector blocker сохранены, модель не повторяли.
+
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
 **Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под
@@ -1229,4 +1252,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Текущая серия142936-072953 на1bfc135430: sales1 CLI0/full audit PASS/noJS; baseline1/18, ABC1 в работе, candidate0/25.
+- Серия142936-072953: baseline2/18, oracle/calculation2; ABC CLI0/wrapper2 восстановлен отдельно, collector fix в работе; candidate0/25.

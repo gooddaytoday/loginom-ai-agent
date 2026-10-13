@@ -8,12 +8,13 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: sales baseline/1 полностью успешен, ABC/1 в работе;
-завершён baseline 1/18, candidate 0/25. Обе сборки/pins и native overflow proof проверены.
+серия `20261013T142936Z-072953`: завершены baseline 2/18, oracle/calculation 2;
+ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
+Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
-## Новая сопоставимая пара
+## Историческая вторая сопоставимая пара
 
 Обе сборки выполнены последовательно в одном managed worktree `node-selection-build`
 на общем source `6768520a0`, версия `0.1.17`. Baseline использует точные два старых
@@ -38,7 +39,7 @@ Immutable baseline/candidate pins проверены независимо: 43 у
 7.4.2 и 16 типов с доступным `programming.javascript` (`baseline-catalog-attestation.json`).
 `current-run.txt` переключён на новый run; первый `sales-by-category/1` запущен.
 
-## Новая серия: первый модельный исход
+## Историческая вторая серия: модельные исходы
 
 `sales-by-category/1`, Session `ses_eca6f32d6ffeMWoNUZKw5hyJuQ`: CLI exit 1,
 wrapper exit 3, modelStarted true, cleanupConfirmed false. Offline audit exit 2:
@@ -135,7 +136,37 @@ oracle/calculation/history/runtime/identity/graph/export identity true, failures
 Сохранены пакет и CSV с новым prefix; package SHA
 `dbccff922600803df11431203f36106895a935f0659ca1733c768790c3534b1e`.
 CLI время 336.384 секунды, без timeout. Это первый из новых 18 baseline;
-следующий `abc-pareto-groups/1` запущен, ещё не оценён.
+следующий `abc-pareto-groups/1` завершился и оценён отдельно ниже.
+
+## ABC третьей серии: восстановление collection failure
+
+Session `ses_eca3a1284ffeZGQg7hUjWiiokX`: CLI exit 0, cleanupConfirmed true,
+wrapper exit 2 (`SELECTION_COLLECTION_FAILED`), время CLI 417.524 секунды.
+Save/Export и managed package close/logout SUCCEEDED. Причина wrapper failure —
+текст `loginom_find` с named import `{ OutputTable, DataType }`, ошибочно переданный
+в JSON-парсер managed receipts. Полный Help и история сохранены; модель не повторяли.
+
+После независимой сверки public/runtime bindings скопированы только два точных
+собственных пути. Пакет: 11333 bytes, SHA
+`dddd3fc96c6036cc74cf9096efd3a596a863b8d45e5417cc006e895d82b48e2a`;
+CSV: 228 bytes, SHA
+`45a56e494b383ff377cbfd792a1db899717f3bcfbf207c707302f0bf5482ac03`, совпал с receipt.
+Original `attempt.json` и source evidence hashes неизменны. В отдельной проекции
+`evidence/abc-collector-recovery` восстановлены только package/result paths;
+исходные CLI0/wrapper2/blocker сохранены и явно привязаны к original SHA.
+
+Первый offline audit до распаковки сохранил PACKAGE_XML_INVALID; это ошибка
+оператора copyout, а не исходного пакета. Результат оставлен в
+`selection-audit-before-unpack.json`. После существующего unzip повторный audit
+exit 1: oracle/calculation/history/runtime/identity/graph/export true, JS 2 nodes,
+2 successful calls; единственный отказ JAVASCRIPT_NOT_ALLOWED. Это baseline
+с прежним skill, его JS policy failure не блокирует измерение «до».
+Evidence: `forensic/receipt-recovery.json`, `copyout-recovery.json`,
+`collector-diagnosis.json` и отдельная audit-проекция. Исправление collector
+выполняется по TDD; общие payload/runtime не пересобираются.
+Независимый `forensic/copyout-recovery-review.json` подтвердил 11 original hashes,
+21 shared evidence file и все 14 ZIP members; pure audit/oracle повторно прошли.
+Изменения проекции исчерпываются двумя receipt paths и явным collectorRecovery.
 
 ## Native proof исправления дат
 

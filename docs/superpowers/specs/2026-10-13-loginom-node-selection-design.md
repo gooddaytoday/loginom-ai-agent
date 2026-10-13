@@ -4,7 +4,8 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Baseline: начаты 3/18, один полный успех; ABC и monthly остановились на cleanup blockers.
+Текущая серия `20261013T142936Z-072953`: baseline 2/18, oracle/calculation 2;
+ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
 фактический `prepare`-каталог и `parameter_schema` ещё не проверены live.
@@ -240,7 +241,22 @@ source и evidence сохранены; чужие артефакты не зат
 Первый baseline третьей серии (sales/1) завершился CLI/wrapper exit 0: no JS,
 oracle/calculation/graph/export/history/identity/runtime и ordinary CLI cleanup
 подтверждены. Это один из 18 baseline; candidate ещё не выполнялся, полная
-приёмка не заявляется. Следующий плановый ABC/1 запущен.
+приёмка не заявляется. ABC/1 той же серии завершился CLI exit 0, Save/Export и
+ordinary cleanup подтверждены. Wrapper exit 2 вызван текстом `loginom_find`,
+переданным в JSON-парсер квитанций. Исправление ограничивается внешним collector:
+проекция `loginom_dock_*`, сохранение полной истории и строгого managed parser.
+Общие runtime, payload и pins остаются прежними; новый model run не требуется.
+
+Exact receipt-based copyout дал пакет SHA
+`dddd3fc96c6036cc74cf9096efd3a596a863b8d45e5417cc006e895d82b48e2a`
+и CSV 228 bytes с ожидаемым SHA. Явная offline-проекция
+`evidence/abc-collector-recovery` сохраняет исходные CLI/wrapper/blocker, восстанавливая
+только receipt paths. После распаковки audit подтвердил oracle/calculation,
+history/runtime/identity/graph/export identity; JS nodes/calls 2/2 и единственный
+отказ `JAVASCRIPT_NOT_ALLOWED` отражают старый skill. Original attempt/history
+не переписаны. Независимый read-only review подтвердил 11 исходных hashes,
+21 shared evidence file, все 14 ZIP members и повторные pure audit/oracle checks.
+Это baseline-замер, не приёмка candidate.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
