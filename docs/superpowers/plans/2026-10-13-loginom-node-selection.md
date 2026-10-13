@@ -541,7 +541,7 @@ selection_username="${selection_identity[0]}"
 selection_folder="${selection_identity[1]}"
 ```
 
-- [ ] Зафиксировать модель и variant, которыми проверяется skill: взять указанную
+- [x] Зафиксировать модель и variant, которыми проверяется skill: взять указанную
   пользователем модель, проверить через штатные `models`, явно передавать её
   во все run. Сохранить provider/model, variant и фактические model metadata
   созданных сообщений. Не менять модель между baseline/candidate и не считать
