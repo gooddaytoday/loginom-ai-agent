@@ -16,14 +16,17 @@ type NodeHostInput = {
   strictRecovery?: boolean
   acceptanceCleanupPackage?: string
 }
-const diagnostics = new WeakMap<object, { authorization: string; packagePath: string }>()
+const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "import-before-configure-v1" }>()
 
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
 export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
   return launchDiagnostic(input, "calculator-grouped-before-done-v1")
 }
-async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1") {
+export async function launchImportPreconfigDiagnostic(input: NodeHostInput & { packagePath: string }) {
+  return launchDiagnostic(input, "import-before-configure-v1")
+}
+async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1" | "import-before-configure-v1") {
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
@@ -40,15 +43,18 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
       || await realpath(input.entry) !== join(product, "resources/loginom/host/node-host.mjs")
       || createHash("sha256").update(await readFile(input.entry)).digest("hex") !== hostItem.sha256)
     throw Error("LOGINOM_HANDSHAKE_INVALID")
-  for (const [path, actual] of [["bin/node", input.node],
-    [`runtime/src/acceptance/${harness}.mjs`, join(input.resources, `runtime/src/acceptance/${harness}.mjs`)]]) {
+  const resourcePath = harness === "import-before-configure-v1"
+    ? "runtime/src/acceptance/import-preconfig-adapter-v1.mjs"
+    : "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
+  for (const [path, actual] of [["bin/node", input.node], [resourcePath, join(input.resources, resourcePath)]]) {
     const items = manifest.files?.filter((file: { path: string }) => file.path === path)
     const item = items?.[0]
     if (items?.length !== 1 || item.link || item.directory || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
         || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
-  const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath }
+  const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath,
+    ...(harness === "import-before-configure-v1" ? {harness} : {}) }
   const options = { ...input }
   diagnostics.set(options, grant)
   const host = await launchNodeHost(options)

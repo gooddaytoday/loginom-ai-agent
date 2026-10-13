@@ -2,6 +2,7 @@
 import vm from 'node:vm';
 import {readFile,realpath,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 let captureHarness,root;
@@ -13,7 +14,10 @@ process.on('message',async m=>{
    if(begin<0||end<0)throw Error('EXACT_LOADER_BLOCK_UNAVAILABLE');
    const {verifyResources}=await import(pathToFileURL(resourceVerifier).href);
    root=m.input.resources;const resources=await verifyResources(root);
-   const context=vm.createContext({acceptanceCapture:m.input.acceptanceCapture,resources,input:m.input,Error,join,pathToFileURL,realpath,readFile,createHash});
+   const {loadPrivateCaptureResource}=await import(pathToFileURL(join(dirname(loaderSource),'private-capture-resource.mjs')).href);
+   // Fixture NodeHost represents the existing host grant->startup conversion.
+   const acceptanceCapture={...m.input.acceptanceCapture,harness:m.input.acceptanceCapture?.harness??'calculator-grouped-before-done-v1'};
+   const context=vm.createContext({acceptanceCapture,resources,input:m.input,Error,join,pathToFileURL,realpath,readFile,createHash,loadPrivateCaptureResource});
    captureHarness=await new vm.Script('(async()=>{'+source.slice(begin,end)+';return captureHarness})()', {importModuleDynamically:vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER}).runInContext(context);
    process.send({id:m.id,result:{ready:true,protocol:1,pid:process.pid}});
   }else if(m.method==='acceptance.capture'){

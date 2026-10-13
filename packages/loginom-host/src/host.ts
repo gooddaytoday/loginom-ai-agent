@@ -17,9 +17,11 @@ export async function createLoginomHost(options: {
   strictRecovery?: boolean
   // Acceptance-only forwarding of the existing managed shutdown binding.
   acceptanceCleanupPackage?: string
-  acceptanceCapture?: { authorization: string; packagePath: string }
+  acceptanceCapture?: { authorization: string; packagePath: string; harness?: "import-before-configure-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  if (options.acceptanceCapture?.harness !== undefined && options.acceptanceCapture.harness !== "import-before-configure-v1")
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
@@ -197,7 +199,7 @@ export async function createLoginomHost(options: {
           || captures.size !== 0
           || !options.acceptanceCapture.packagePath.startsWith(`/${current.connection.username}/`))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
-      captures.set(chat, { revision: 1, harness: "calculator-grouped-before-done-v1", owner, run,
+      captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
         packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+600000 })
       captureLeases.set(chat,lease)
