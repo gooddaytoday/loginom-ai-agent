@@ -191,9 +191,11 @@ export async function createLoginomHost(options: {
     authorizeCapture(authorization: unknown, owner?: string, run?: string, chat?: string, lease?: unknown) {
       if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
       const bound=chat?captures.get(chat):undefined
+      const leaseGeneration=lease && typeof lease==='object' && 'generation' in lease ? lease.generation : undefined
       return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
         && bound.harness===(options.acceptanceCapture.harness??"calculator-grouped-before-done-v1")
         && bound.expires>Date.now() && captureLeases.get(chat!)===lease
+        && Number.isSafeInteger(leaseGeneration) && leaseGeneration===bound.generation
         && generations.get(bound.generation)?.connection.username===bound.account
         && !lost.has(chat!) && !stale.has(chat!)
     },
