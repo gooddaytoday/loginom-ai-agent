@@ -8,7 +8,7 @@ import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
 import { checkIsolatedLoginom, gitInfo, preflight } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
-import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
+import { createJudgeGate, judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
@@ -70,8 +70,10 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
         reasoning: config.judge.reasoning,
         timeoutMs: config.judgeTimeoutMs,
         passThreshold: config.passThreshold,
+        ...(fixture ? { env: { CODEX_HOME: fixture.file.judge.codexHome } } : {}),
       }
     : undefined
+  const judgeGate = createJudgeGate()
   const inputsHash = await agentInputsHash(tasks)
   const rubric = await rubricHash(tasks)
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
@@ -96,7 +98,7 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
               source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
               task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
               signal: controller.signal, profileRecovered: false, slotId, judge: settings,
-              initialInfraAttempt, skipJudge: config.skipJudge, evaluationHash })
+              initialInfraAttempt, skipJudge: config.skipJudge, evaluationHash, judgeGate })
             attempts[job.index] = completed.result
             const cleanup = await finishFixtureAttempt(context, completed.result, out).then(() => true, async (error: unknown) => {
               completed.result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
@@ -265,6 +267,7 @@ export async function runAttempt(input: {
   initialInfraAttempt?: AttemptResult
   skipJudge: boolean
   judge?: JudgeSettings
+  judgeGate?: ReturnType<typeof createJudgeGate>
   evaluationHash?: string
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base: AttemptResult = {
@@ -351,7 +354,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const noJudge = status === "harness_error" || status === "interrupted" || status === "infra_error"
   const judged =
     artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
-      ? await judgeTask({
+      ? await (input.judgeGate ?? judgeTask)({
           task,
           run,
           artifactDir: path.dirname(artifact.unpackedDir),
