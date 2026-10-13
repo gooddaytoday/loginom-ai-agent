@@ -96,7 +96,12 @@ def run(args, workspace):
         lgp = source / "Исходный сценарий.LGP"
     shutil.copyfile(fixtures / "demo.lgp", lgp)
     original = hashlib.sha256(lgp.read_bytes()).hexdigest()
-    reserved = ["package-docs", "loginom-automation", "package_docs"]
+    product_names = sorted(
+        path.name
+        for path in (repo / "packages/product/skills").iterdir()
+        if path.is_dir() and (path / "SKILL.md").is_file()
+    )
+    reserved = [*product_names, "package_docs"]
     if args.reserved_diagnostics == "skills":
         for name in reserved:
             directory = workspace / ".agents/skills" / name
@@ -335,7 +340,7 @@ def run(args, workspace):
     system = "\n".join(message["content"] for message in first["messages"]
         if message.get("role") == "system" and isinstance(message.get("content"), str))
     discovered = re.findall(r"<skill>\s*<name>(.*?)</name>.*?<location>(.*?)</location>\s*</skill>", system, re.S)
-    expected_names = ["customize-opencode"] if args.modified_skill else ["customize-opencode", "loginom-automation", "package-docs"]
+    expected_names = ["customize-opencode"] if args.modified_skill else sorted(["customize-opencode", *product_names])
     assert sorted(name for name, _ in discovered) == expected_names, "Workspace must expose only trusted, valid skills"
     assert "UNTRUSTED" not in system, "External reserved skill must not enter the model catalog"
     if args.reserved_diagnostics:

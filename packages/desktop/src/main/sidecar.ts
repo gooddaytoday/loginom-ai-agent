@@ -2,6 +2,7 @@ import type { HostPort } from "@loginom-ai-agent/loginom-host/host-port"
 import { assignProxyEnvironment, loopbackNoProxy } from "./proxy-env"
 import { exitOnFatalErrors } from "./fatal-exit"
 import * as http from "node:http"
+import { join } from "node:path"
 import * as tls from "node:tls"
 
 type NodeHttpWithEnvProxy = typeof http & {
@@ -106,6 +107,7 @@ function prepareSidecarEnv(password: string, userDataPath: string) {
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
     LOGINOM_AI_AGENT_PRINT_LOGS: "1",
     LOGINOM_AI_AGENT_DISABLE_LOG_FILE: "1",
+    LOGINOM_AI_AGENT_DESKTOP_LOG_ROOT: join(userDataPath, "logs"),
   })
 }
 

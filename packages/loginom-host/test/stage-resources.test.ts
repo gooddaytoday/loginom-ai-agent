@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
-import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { verifyBundledSkills } from "../src/bundled-skills"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
@@ -139,7 +139,7 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const destination = join(root, "resources")
       await stageResources({ destination, node, browsers, target, flavor: "cli" })
       const skills = await verifyBundledSkills(destination)
-      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
+      expect(skills.map((skill) => skill.name).toSorted()).toEqual([...reservedSkillNames].toSorted())
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
