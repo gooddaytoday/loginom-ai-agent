@@ -437,6 +437,20 @@ export true, failures []. Package SHA
 Первая candidate-волна: 1/9 завершена чисто; standard policy/oracle 1/1,
 completed candidate 1/25. Следующий ABC/1 запущен. Повторы пока не разрешены.
 
+## Actual candidate catalog/schema — предпосылка tags
+
+`actual-candidate-gap-attestation.json`: actual-candidate-gap-supported, SHA256
+`0384b22c01366bf6d50f11171bae54927d7979a204b159d76ad83e27a7b85d50`.
+Проверены 16 raw describe receipts, 15 schemas и все 5725 CLI/4728 resource
+entries. Successful sales/1 prepare подтвердил build 7.4.2 и 16 типов;
+связь с probe — одна immutable сборка/digest/catalog/runtime pins, разные browser
+Session указаны явно. У 14 схем static bytes совпадают, у exports.text добавлено
+только user-v1 description. General variable split-to-rows среди известных
+стандартных handlers не найдено. Пределы 128/15 — на один узел, не доказательство
+невозможности конечной композиции для 151 элемента. Этот пункт закрывает только
+предусловие до tags; роль JS, oracle и граф каждой tags-попытки ещё предстоит
+проверить. Отдельного Help retrieval, cold reuse и explicit probe logout не было.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.

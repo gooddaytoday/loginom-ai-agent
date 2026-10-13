@@ -10,8 +10,9 @@ Candidate payload собран и проверен; sales-by-category/1 прош
 completed candidate 1/25. Начат ABC/1; первая волна 1/9, повторы ещё закрыты.
 Статические контракты candidate для tags сверены с baseline и исходниками;
 реальные 15 стандартных `parameter_schema` получены native Host probe candidate
-без LLM (ACK/exit0). Successful `prepare`-каталог candidate ещё предстоит связать
-с этими схемами до tags; explicit logout этого schema probe не проверен.
+без LLM (ACK/exit0) и связаны с successful sales/1 `prepare` по build/catalog/digest.
+Общего variable split-to-rows не найдено; невозможность конечной композиции для
+151 элемента не доказана. Приёмка tags впереди; explicit logout probe не проверен.
 Адресное offline-восстановление выполнено после проверки Loginom. По точному
 GUID собственного ABC-узла подтверждены серверная сессия и её автоматическое
 закрытие; актуальный admin-диспетчер через Playwright MCP подтвердил отсутствие

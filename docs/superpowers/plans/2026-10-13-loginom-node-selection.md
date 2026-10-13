@@ -1154,19 +1154,23 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   лишь при подтверждённом отсутствии model dispatch, с отдельным incident.
 - [ ] Во всех трёх explicit-js требовать исходный oracle и ровно один успешный
   JS для агрегации, стандартные импорт/сортировку/экспорт и review роли JS.
-- [ ] До tags-попыток сверить реальный каталог с обоснованием Task 2. Если
+- [x] До tags-попыток сверить реальный каталог с обоснованием Task 2. Если
   появилось стандартное split-to-rows, не провоцировать JS и не подменять критерий;
   остановить приёмку этой ветви с точным расхождением и пересмотреть fixture.
   Статическая часть сверки candidate завершена: пять файлов контрактов совпали
   с baseline и исходниками, проверены экспорты 16 типов и релевантные схемы.
   Evidence: `candidate-gap-attestation.json` в текущем private run,
-  SHA256 `0d2bdcdb35e8c5d8af595cc19cb34424998a368c163dd7f094bd22935a01c0aa`.
-  `static-gap-supported` не закрывает эту задачу: фактические
-  `prepare.knowledge.node_types` ещё не получен в candidate model Session.
-  Native candidate Host schema probe получил 16 типов и 15 стандартных
-  `action_describe.parameter_schema`, raw receipts и ACK/exit0; отдельные
-  prepare/package/model calls отсутствуют, explicit logout не подтверждён.
-  До tags связать успешный actual prepare с этими схемами той же immutable сборки.
+  SHA256 `6a6f18270dfcdadc532ecc50c201bbfceaf4cc4af4394e387839ea13f8a0fe8e`.
+  Actual candidate проверка завершена: successful prepare sales/1 (Loginom 7.4.2,
+  16 типов) связан через digest/catalog/build/runtime pins с native Host probe
+  15 стандартных `action_describe.parameter_schema` той же immutable сборки.
+  Разные browser Session указаны явно; raw receipts, 5725 CLI/4728 resource
+  entries и cache keys проверены. Evidence `actual-candidate-gap-attestation.json`,
+  SHA256 `0384b22c01366bf6d50f11171bae54927d7979a204b159d76ad83e27a7b85d50`.
+  Общего variable split-to-rows в известных схемах/handlers нет; пределы 128/15
+  относятся к отдельным узлам и не доказывают невозможность фиксированной
+  композиции для 151 элемента. Tags oracle/роль JS/reuse ещё не проверены;
+  probe ACK/exit0 не подтверждает explicit Loginom logout.
 - [ ] Выполнить tags 3 раза. Должен получиться локальный JS для разворачивания,
   затем стандартные группировка, сортировка и экспорт. Проверить код JS и
   отсутствие захардкоженных меток/числа позиций/готовых агрегатов.
