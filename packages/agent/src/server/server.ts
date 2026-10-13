@@ -76,7 +76,7 @@ export async function listen(opts: ListenOptions): Promise<Listener> {
     hostname: listener.hostname,
     port: listener.port,
     url: listener.url,
-    stop: (close?: boolean) => Effect.runPromiseExit(listener.stop(close)).then(() => undefined),
+    stop: (close?: boolean) => Effect.runPromise(listener.stop(close)),
   }
 }
 
@@ -171,10 +171,9 @@ function setupMdns(opts: ListenOptions, port: number, scope: Scope.Scope) {
 
 function makeStop(state: ListenerState, unpublishMdns: Effect.Effect<void>, listenerUrl: URL) {
   return Effect.gen(function* () {
-    const forceCloseOnce = yield* Effect.cached(forceClose(state).pipe(Effect.ignore))
+    const forceCloseOnce = yield* Effect.cached(forceClose(state))
     const closeScopeOnce = yield* Effect.cached(
       Scope.close(state.scope, Exit.void).pipe(
-        Effect.ignore,
         Effect.ensuring(
           Effect.sync(() => {
             if (url === listenerUrl) url = undefined

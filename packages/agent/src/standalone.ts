@@ -1,5 +1,6 @@
 import { standalone } from "./cli/standalone"
 
+let contextCleanupRefused = false
 await standalone(process.argv.slice(2), async (args, paths) => {
   if (["providers", "auth", "models"].includes(args[0] ?? "")) {
     const { standaloneModels } = await import("./cli/standalone-models")
@@ -7,6 +8,12 @@ await standalone(process.argv.slice(2), async (args, paths) => {
     return
   }
   const command = args.filter((value) => !["--headless", "--no-headless"].includes(value))[0]
+  if (command === "serve") {
+    const { standaloneServe, standaloneServeClosed } = await import("./cli/standalone-serve")
+    try { await standaloneServe(args) }
+    catch (error) { contextCleanupRefused = !standaloneServeClosed(); throw error }
+    return
+  }
   if (command !== "loginom") {
     const { standaloneRun } = await import("./cli/standalone-run")
     await standaloneRun(args, paths, command === "run" ? "run" : "tui")
@@ -28,6 +35,7 @@ await standalone(process.argv.slice(2), async (args, paths) => {
   }
 })
   .then(async () => {
+    if (contextCleanupRefused) return
     // Only a resolved owner cleanup permits transport/process exit.
     // Provider libraries may retain process-global handles after a finished request.
     await Promise.all([
