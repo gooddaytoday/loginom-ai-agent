@@ -14,6 +14,24 @@ test("the pilot settles its own admitted operations including independently veri
   expect(result.failures).toEqual([])
 })
 
+test.each(["missing-operation", "foreign-owner", "cleanup-false", "ambiguous", "upload-digest", "request-type"])(
+  "runtime completion cannot use %s evidence",
+  (kind) => {
+    const runtime = structuredClone(pilotRuntime)
+    const events = runtime[0]!.events
+    if (kind === "missing-operation") runtime[0]!.events = events.filter((event) => event.operation_id !== "import-sales-1")
+    if (kind === "foreign-owner") runtime[0]!.session.sessionId = "another-dock-session"
+    const final = events.find((event) => event.operation_id === "import-sales-1" && event.phase === "completed")!
+    if (kind === "cleanup-false") final.outcome!.cleanup_complete = false
+    if (kind === "ambiguous") final.outcome!.status = "AMBIGUOUS"
+    if (kind === "upload-digest") events.find((event) => event.phase === "artifact_delivery_completed")!.result!.sha256 = "0".repeat(64)
+    if (kind === "request-type") events.find((event) => event.phase === "node_apply_prepared")!.request!.target.type = "programming.javascript"
+    const result = inspectSelectionRuntime({ parts: pilotHistory.snapshot.parts, runtime })
+    expect(result.runtimeSettled).toBe(false)
+    expect(result.failures.length).toBeGreaterThan(0)
+  },
+)
+
 test("complete pilot history accepts the activation metadata update and settles historical pending replies", () => {
   expect(inspectSelectionHistory(pilotHistory)).toEqual({ historyComplete: true, failures: [] })
 })

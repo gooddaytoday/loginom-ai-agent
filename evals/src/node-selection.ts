@@ -5,8 +5,14 @@ export type SelectionRuntime = { path: string; session: unknown; events: unknown
 export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: SelectionRuntime[] }) {
   const failures: string[] = []
   const prepared = input.parts.filter(record).filter((part) => part.tool === "loginom_dock_prepare").map(receipt).filter(record)
+  const owner: { dockID?: string } = {}
   const calls = input.parts.filter(record).filter((part) => typeof part.tool === "string" && part.tool.startsWith("loginom_")
-    && record(part.state) && record(part.state.input)).map((part) => ({ part, result: receipt(part) }))
+    && record(part.state) && record(part.state.input)).map((part) => {
+      const result = receipt(part)
+      if (part.tool === "loginom_dock_prepare" && record(result) && result.prepared === true && typeof result.sessionId === "string")
+        owner.dockID = result.sessionId
+      return { part, result, dockID: owner.dockID }
+    })
   if (!input.runtime.length) failures.push("RUNTIME_MISSING")
   for (const runtime of input.runtime) {
     const session = record(runtime.session) ? runtime.session : undefined
@@ -40,16 +46,22 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
       if (admission.phase !== "node_apply_prepared") continue
       const request = record(admission.request) ? admission.request : undefined
       const target = record(request?.target) ? request.target : undefined
-      if (typeof target?.type !== "string" || !calls.some(({ part }) => record(part.state) && record(part.state.input)
+      if (typeof target?.type !== "string" || !calls.some(({ part, dockID }) => dockID === session.sessionId && record(part.state) && record(part.state.input)
         && part.tool === "loginom_dock_node_apply" && part.state.input.operation_id === admission.operation_id
         && record(part.state.input.target) && part.state.input.target.type === target.type)) failures.push("RUNTIME_APPLY_MISMATCH")
     }
   }
-  for (const { part, result } of calls) {
+  for (const { part, result, dockID } of calls) {
     if (!record(part.state) || !record(part.state.input)) continue
     if (!/^loginom_dock_(node_apply|node_wait|node_resume|node_read|artifact_deliver|action_run|operation_inspect)$/.test(String(part.tool))) continue
     if (!record(result) || typeof result.operation_id !== "string") { failures.push("TOOL_RECEIPT_INCOMPLETE"); continue }
-    const terminal = calls.filter((call) => call.part.sessionID === part.sessionID && record(call.result)
+    if (part.state.input.operation_id !== result.operation_id) failures.push("TOOL_OPERATION_MISMATCH")
+    if (!(result.request_rejected === true && result.status === "NOT_APPLIED" && result.effect_possible === false)
+      && !input.runtime.some((runtime) => record(runtime.session) && runtime.session.sessionId === dockID
+        && runtime.events.some((event) => record(event) && event.operation_id === result.operation_id
+          && ["prepared", "node_apply_prepared", "artifact_delivery_prepared"].includes(String(event.phase)))))
+      failures.push("TOOL_ADMISSION_MISSING")
+    const terminal = calls.filter((call) => call.dockID === dockID && call.part.sessionID === part.sessionID && record(call.result)
       && call.result.operation_id === result.operation_id).at(-1)?.result
     if (!record(terminal) || terminal.state === "running" || terminal.cleanup_complete !== true
       || !["SUCCEEDED", "FAILED", "NOT_APPLIED"].includes(String(terminal.status))) failures.push("TOOL_OPERATION_UNSETTLED")
