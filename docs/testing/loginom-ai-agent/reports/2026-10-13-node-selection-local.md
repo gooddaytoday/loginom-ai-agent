@@ -8,8 +8,8 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953` готовится; обе сборки/pins и native overflow proof
-проверены, модельные слоты ещё не запускались.
+серия `20261013T142936Z-072953` начата: sales baseline/1 в работе, завершённых
+baseline 0/18, candidate 0/25. Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
@@ -105,6 +105,29 @@ verification завершились exit 0. Evidence в третьем run:
 `native-proof-offline-review.json`, `native-proof-offline-verify.py`, исходные
 `native-proof.{ts,stdout.txt,stderr.txt}` и receipts. Persisted reopen, обычный
 CLI teardown и модельная политика этим smoke не подтверждаются.
+
+## Третья сопоставимая серия и очистка
+
+Source обеих сборок `1bfc1354306a418d33b9710718edc455f3d188d7`, версия `0.1.17`.
+Baseline source tree `a5ec8ab3c0a14dc2cb25fa1893ccd943ea14d0dba7d23ffe6baf432940f1cc07`
+dirty; candidate `a0fda2e9dad55807c8ee7a531d5fb6082e46143cda8e7225a3a2e08cb7495fc4`
+clean. Manifest SHA baseline `e0210ac2fceb6e44cea32f5683f5bf880cf78ffa574ff6be50a180ddd64eb473`,
+candidate `4b53a39397c2921de89e59bf7ca2041dd78c032cbe51a242c5cd29b381aead67`.
+Source verification обоих exit 0; full independent inventories 5725/5725 и
+4728/4728 PASS. Runtime/CLI/Host/dependencies/browser совпали; различаются два
+skill, два manifests, два build-inputs. Pins 0400, прежние inputs/model/seed;
+72 hashes и 43 уникальных слота проверены. `current-run` переключён, первый
+sales baseline запущен. Пять старых попыток двух остановленных серий отдельно.
+
+Неиспользованный candidate второй серии сжат в `obsolete-candidate.tar.gz`
+(SHA `c4953583424ea3e4964a034480f6f0795d6b9180c84c8f5a7deac0b6c208afc9`).
+Перед удалением собственного каталога проверены все 5725 manifest entries,
+modes/symlinks и точное совпадение cli-manifest. Активных ссылок процессов нет;
+baseline и browser source сохранены, model evidence/pins не менялись. Удалено
+765055067 байт исходных файлов, архив 331404633 байт; другие агенты не затронуты.
+Квитанция `obsolete-candidate-cleanup.json` в старом run. Первая попытка очистки
+остановилась до удаления из-за Python 3.10/hashlib.file_digest; после совместимого
+streaming SHA256 архив повторно проверен и операция завершена.
 
 ## Native proof исправления дат
 

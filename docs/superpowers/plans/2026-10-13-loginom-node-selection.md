@@ -495,10 +495,14 @@ Offline crossed regression подтвердил отсутствие dataset ico
   сохранён: он ошибочно ожидал одинаковый display у discrete import и continuous
   JS datetime. Import display precision ограничена; JS local datetime без timezone.
   Native не повторялся, persisted reopen и ordinary CLI teardown не заявляются.
-- [ ] Собрать новую сопоставимую пару в собственном общем build worktree с обоими
+- [x] Собрать новую сопоставимую пару в собственном общем build worktree с обоими
   runtime fixes, прежними version/resources/двумя skill версиями. Закрепить новые
   pins `20261013T142936Z-072953`, подтвердить полные inventories и источник.
-  Выполнить полные 18+25 и все прежние gates; пять старых попыток двух остановленных
+  Обе source verification exit 0 на `1bfc135430`; независимая сверка каждой CLI
+  inventory 5725/5725 и resources 4728/4728 PASS. Runtime/dependencies/CLI/Host/
+  браузер побайтно одинаковы; отличаются только два skill и четыре metadata файла.
+  Immutable pins/frozen models/lock проверены: 72 hashes, 43 уникальных слота.
+- [ ] Выполнить полные 18+25 и все прежние gates; пять старых попыток двух остановленных
   серий сохранить отдельно. Удалять только собственные ненужные build artifacts,
   сохраняя необходимые evidence и не затрагивая работу других агентов.
 
@@ -1225,4 +1229,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Dataset overflow fix c2c898aca5: TDD/310tests/review PASS; новая серия142936-072953 preparing, native proof/build впереди.
+- Текущая серия142936-072953: native offline proof/build/pins PASS на1bfc135430; sales baseline1 запущен, candidate0/25.

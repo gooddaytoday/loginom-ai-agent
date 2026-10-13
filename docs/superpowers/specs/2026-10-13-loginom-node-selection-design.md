@@ -227,6 +227,16 @@ review и root повторная offline verification exit 0 подтверди
 полях. Импорт сохраняет display precision limitation; JS timezone unspecified.
 Это native proof, не модельный eval и не проверка повторного открытия пакета.
 
+Третья пара собрана и проверена на общем `1bfc135430`: baseline dirty только
+из-за двух старых skill-файлов, candidate clean. Обе source verification exit 0;
+независимая сверка полных CLI/resource inventories PASS, runtime/dependencies/
+CLI/Host/Node/Chromium побайтно одинаковы. Immutable pins закрепляют прежние
+tasks/model/seed, 72 hashes и 43 уникальных слота. `current-run` переключён на
+`20261013T142936Z-072953`, первый sales baseline запущен; кандидат ещё не выполнялся.
+Неиспользованный candidate остановленной второй серии архивирован с проверкой
+всех 5725 entries, затем удалён только его собственный каталог. Baseline/browser
+source и evidence сохранены; чужие артефакты не затронуты.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.
