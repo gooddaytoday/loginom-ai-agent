@@ -15,7 +15,7 @@ import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
 import { buildJobs, runSlotQueue } from "./scheduler"
-import { finishFixtureAttempt, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
+import { beginFixtureAttempt, finishFixtureAttempt, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
@@ -94,6 +94,7 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
           const out = path.join(runDir, job.taskId, String(job.attempt))
           const perform = async (initialInfraAttempt?: AttemptResult) => {
             unconfirmed.add(slotId)
+            await beginFixtureAttempt(context)
             const completed = await runAttempt({ config: context.config, command: context.command,
               source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
               task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
