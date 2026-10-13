@@ -4,7 +4,7 @@
 
 **Goal:** Стандартные поддерживаемые узлы используются по умолчанию; JavaScript допускается по явному запросу или для подтверждённого функционального пробела.
 
-**Architecture:** Изменить канонический Product skill и его workflow. Проверять поведение реальной модели локальным CLI на текущем подключении Loginom, используя существующие аналитические задания и oracle; отдельный offline-аудит проверяет типы узлов и все сохранённые tool calls. Общий eval runner и runtime-контракты не меняются.
+**Architecture:** Изменить канонический Product skill и его workflow. Единый локальный скрипт выполняет попытку и собирает evidence; offline-аудит проверяет пакет и все tool calls. Минимальный аудит уточняется по первой baseline-попытке. Candidate запускается волнами, с остановкой при первом нарушении политики; общий eval runner и runtime-контракты не меняются.
 
 **Tech Stack:** Markdown, Bun 1.3.14, TypeScript, Python 3 stdlib SQLite/CSV, Loginom 7.4.2, standalone CLI и его pinned Node/Chromium.
 
@@ -37,6 +37,8 @@
 | `evals/src/node-selection.ts` | Новый чистый аудит структуры и tool parts, без запуска CLI |
 | `evals/test/node-selection.test.ts` | Негативные и положительные тесты аудита |
 | `evals/script/audit-node-selection.ts` | Новый offline entrypoint, загрузка пакета/CSV/evidence |
+| `evals/script/run-node-selection-attempt.ts` | Единая команда одной локальной попытки: подготовка, CLI, evidence, аудит |
+| `evals/test/fixtures/node-selection/` | Обезличенные реальные evidence и их точечные негативные варианты |
 | `evals/fixtures/node-selection/` | Дополнительные входы, prompts и независимые oracle |
 | `evals/docs/2026-10-13-node-selection-local.md` | Команды и формат локальных доказательств |
 | `docs/testing/loginom-ai-agent/reports/2026-10-13-node-selection-local.md` | Итог всех проверок и ограничения |
@@ -45,10 +47,33 @@
 редактировать. Никаких новых публичных параметров `dock_node_apply`, policy
 блокировок runtime, копий skill или изменений judge prompt.
 
-## Task 1: Независимый offline-аудит выбора узлов
+## Порядок выполнения и параллельность
+
+1. Task 1A: минимальный аудит; Task 2: fixtures; Task 3: скрипт попытки,
+   закреплённый baseline payload и одна пилотная baseline-попытка.
+2. Task 1B: завершить аудит на её реальных evidence и перепроверить пилот offline.
+   Пилот входит в 18 baseline, отдельный модельный запуск для тестовых данных не нужен.
+3. Оставшиеся 17 baseline запускать последовательно. Параллельно разрешены
+   Task 4: текст skill и сборка candidate. Baseline payload к этому моменту
+   автономен и неизменяем; source attestation сохранён до изменения skill.
+4. Все исходники, включая audit/runner/fixtures, заморожены во время каждой
+   сборки. Candidate build не пересекается с их редактированием. Проверки и live
+   с общим CLI-профилем никогда не пересекаются, даже у разных payload.
+   Новые evidence/pins писать в игнорируемый `evals/results/` или вне checkout;
+   публикацию fixtures, runbook/report и других docs отложить до конца сборки.
+5. Task 5: первая волна candidate из 9 попыток; после чистого прохода — ещё 16.
+   Task 6: итоговый машинный отчёт и выборочное независимое review.
+
+## Task 1: Минимальный аудит, затем уточнение по реальным evidence
 
 **Files:** создать `evals/src/node-selection.ts`, `evals/test/node-selection.test.ts`,
 `evals/script/audit-node-selection.ts` и локальный runbook из таблицы выше.
+
+**Этап 1A — до пилота:** формат evidence, подсчёт JS во всех состояниях,
+явное `incomplete` для неполноты и минимальный offline entrypoint. Начальные
+проверки: JS в error/pending не теряется; отсутствующий input/пакет не становится
+нулём; валидный native XML читается. Они опираются на проверенные контракты кода.
+Остальные ветви ниже реализуются в 1B после первой baseline-попытки.
 
 **Interfaces:**
 - Consumes: `readNodeXml(artifactDir)` из `src/node-xml.ts`, `checkOracle(task, artifactDir)`
@@ -62,8 +87,9 @@
   `runtimeSettled` и причиной отказа. Код 0 — все требуемые машинные проверки,
   1 — наблюдённый провал, 2 — неполные доказательства; отдельные оси всегда
   сохраняются, даже если общий код ненулевой.
-- `mode`: `standard | explicit-js | capability-gap | capability-gap-reuse | standard-recovery`.
-  Проверку семантики графа/роли JS выполняет независимый reviewer отдельно.
+- `mode`: `standard | explicit-js | capability-gap | standard-recovery`.
+  Граф стандартного успеха проверяется машинно; роль JS, аномалии и выборку
+  стандартных успехов проверяет независимый reviewer по Task 6.
 
 - [ ] Зафиксировать формат `<attempt>/attempt.json` в runbook. Обязательные поля:
   `sessionID`, `cliExitCode`, `mode`, `taskID`, `model`, `variant`,
@@ -74,8 +100,6 @@
   `dock_prepare`; сверять с metadata активации и digest всего дерева
   `loginom-automation` из `verifyBundledSkills` проверенного payload.
   `historyComplete`/`runtimeSettled` — вычисляемые выходы аудита, не поля входа.
-  Для reuse дополнительно обязательны `originalAttempt` (путь к исходной
-  успешной попытке), SHA её пакета/audit/review и выбранного `oracle-reuse.csv`.
   Модель/variant сверять с messages и pins, отсутствие сведений не угадывать.
   Приложить `events.jsonl`, `parts.json`, `stderr.txt`, `prompt.txt`,
   `artifact/package.lgp`, `artifact/unpacked/`, `artifact/results/*.result.csv`.
@@ -109,7 +133,7 @@ test.each(["pending", "running", "completed", "error"])(
   без `any` и без поиска слов JS в произвольном тексте. Базовые контракты:
 
 ```ts
-export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "capability-gap-reuse" | "standard-recovery"
+export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "standard-recovery"
 
 export function inspectSelection(input: {
   mode: SelectionMode
@@ -126,13 +150,19 @@ export function inspectSelection(input: {
   const standard = input.mode === "standard" || input.mode === "standard-recovery"
   if (standard && (jsNodes || jsCalls)) failures.push("JAVASCRIPT_NOT_ALLOWED")
   if (!standard && !jsNodes) failures.push("JAVASCRIPT_NODE_REQUIRED")
-  if (!standard && input.mode !== "capability-gap-reuse" && !successfulJsCalls)
-    failures.push("JAVASCRIPT_EXECUTION_REQUIRED")
+  if (!standard && !successfulJsCalls) failures.push("JAVASCRIPT_EXECUTION_REQUIRED")
   return { jsNodes, jsCalls, successfulJsCalls, failures }
 }
 ```
 
-  Реализовать в этом же модуле `readApply(part: unknown, parts: unknown[])` с
+**Этап 1B — после пилота Task 3:** сохранить минимальные обезличенные реальные
+parts/messages/stdout/runtime/XML в `test/fixtures/node-selection/` с указанием
+source attempt и hash. Удалить секреты, заменить имена/идентификаторы согласованно,
+не менять статусы, связи операций или форму квитанций. Полные оригиналы остаются
+в приватном evidence. Дальнейшие red/green проверки строятся на этом материале
+и точечных мутациях одного поля, а не на выдуманном формате JSON.
+
+  Завершить в этом же модуле `readApply(part: unknown, parts: unknown[])` с
   результатом `Array<{ nodeType?: string; succeeded: boolean; failure?: string }>`:
   не-tool и не-node_apply пропускаются;
   для `*_node_apply` необходимы id, state, известный status и `input.target.type`.
@@ -167,8 +197,6 @@ export function inspectSelection(input: {
   completed+loginomPending→wait→SUCCEEDED и отказ принять wait другой операции,
   обрезанный output/error, exit 0 при отказе Loginom, completed с AMBIGUOUS,
   cleanup_complete:false, missing oracle (`passed:null`) и invalid XML.
-  Для reuse проверить PASS без нового JS apply при доказанной исходной попытке,
-  отказ без неё/при смене JS или связей, применение второго oracle вместо первого.
   Source/context receipt без apply-status должен допускаться при собственном
   подтверждённом cleanup; чужой owner и cleanup_complete:false — incomplete.
   Missing package даёт `jsNodes:null` и `calculationPassed:false`; при полной
@@ -176,6 +204,12 @@ export function inspectSelection(input: {
   приравнивать к отсутствующему пакету или пустому списку типов.
   Нативный успешный пакет брать из реального analytic reference, JS engine —
   из минимального ZIP/XML fixture; не писать копию production-парсера в тестах.
+  Эти пункты — инварианты, не требование заранее написать по отдельному тесту
+  на каждый возможный формат. Объединять однотипные мутации таблицей. Если пилот
+  не показал нужную ветвь, использовать подтверждённый контракт исходников;
+  первый реальный пример исключения затем добавить в fixtures. Неизвестный
+  формат останавливает оценку как incomplete; исправляется parser и повторяется
+  offline-аудит сохранённых evidence, без повторного модельного запуска.
 
 - [ ] Реализовать offline entrypoint с `parseArgs` и следующей командой:
 
@@ -185,12 +219,8 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
 ```
 
   Он вызывает `loadTasks`, `readNodeXml`, `checkOracle`, `inspectSelection`.
-  Для `capability-gap-reuse` требовать `--task tags` и `--original-attempt`
-  с полными evidence первой успешной `capability-gap` попытки. Только в этом
-  режиме передавать `checkOracle({ ...task, oracle: "oracle-reuse.csv" }, artifactDir)`;
-  файл берётся из `task.dir`, должен существовать и совпадать с заранее pinned SHA.
-  В остальных режимах используется исходный `task.oracle`; общий loader/runner
-  не менять. Выбранный oracle и его SHA включать в audit, отсутствие — incomplete.
+  Используется исходный `task.oracle`; общий loader/runner не менять.
+  Выбранный oracle и его SHA включать в audit, отсутствие — incomplete.
   `readNodeXml` и `checkOracle` получают именно `<attempt>/artifact`.
   `readNodeXml.invalid` — отказ, `checkOracle.passed:null` — не PASS.
   Аудит вычисляет:
@@ -216,22 +246,28 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
   Сопоставляет
   успешные JS-квитанции с GUID/типами пакета; для allowed-JS при потере identity
   требуется неполнота доказательств, а не предположение о совпадении.
-  В reuse исходная успешная JS-квитанция и role review берутся из проверенной
-  первой попытки. В текущей нужны неизменный вычислительный XML, полная трасса,
-  новое исполнение сохранённого графа, пакет и второй CSV/oracle; новый JS apply
-  не обязателен и не провоцируется. Отсутствие исходных доказательств — incomplete.
   Для recovery отдельно выводит `policyStatus` и `calculationPassed`:
   честный блокер не превращается в успешный расчёт и не скрывает ненулевой exit.
   На первом реальном JS-пакете подтвердить XML-тип; пока оба исторических имени
   считаются JS консервативно. Для explicit-js машинно требовать ровно один JS,
   native import/sorting/export, отсутствие `TBGGroupDataEngine`; для tags —
   ровно один JS и `TBGGroupDataEngine`, `TBGSortingEngine`, `TBGExportTextFile`.
-  Связность/порядок и смысл JS проверяет отдельный reviewer без права менять
-  skill, записывая verdict по checklist в `<attempt>/graph-review.json`.
+  Связность проверять машинно по XML всех workflows: endpoints связей существуют,
+  у каждого экспортируемого результата есть направленный путь от импорта
+  приложенных данных, вычислительные узлы входят в эту цепочку, нет подмены
+  результата изолированной константной веткой. Не требовать точного reference
+  графа. Неизвестная форма ссылок/lineage — incomplete, не PASS.
+  Стандартный успех закрывается машинно: полные evidence, settlement, exit 0,
+  no-JS, oracle и связность. Reviewer смотрит исключения/аномалии и выборку
+  успехов по Task 6; его verdict хранится в `<attempt>/graph-review.json`.
+  Отсутствие обязательного review у исключения не даёт полного PASS.
   Не запускать модель, браузер, судью или cleanup из этого entrypoint.
 
 - [ ] Повторить `bun test test/node-selection.test.ts test/oracle.test.ts`,
   затем `bun typecheck` из `evals/`.
+- [ ] Повторить offline-аудит пилота окончательным аудитором и зафиксировать
+  его версию. Новая версия аудита перепроверяет все уже собранные попытки;
+  model/skill digest попытки при этом не меняется, данные не подменяются.
 - [ ] Закоммитить только новые audit/runbook файлы:
   `test(evals): audit standard node selection from saved evidence`.
 
@@ -262,14 +298,18 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
   именно JS, штатные импорт/сортировку/экспорт. Не копировать конфликтующий пункт,
   требующий GroupData, и не менять оригинальные prompt/checklist корпуса.
 
-- [ ] Создать `tags/data/dataset.csv`:
+- [ ] Создать единый `tags/data/dataset.csv` с короткими, пустыми и длинным
+  списками. Генератор записывает заголовок и все строки:
 
-```csv
-OrderID,Tags
-1,red;blue;red
-2,blue;;green;
-3,; red ;
-4,
+```python
+import csv
+import sys
+
+with open(sys.argv[1], "w", newline="", encoding="utf-8") as target:
+    writer = csv.writer(target, lineterminator="\n")
+    writer.writerow(["OrderID", "Tags"])
+    writer.writerows([[1, "red;blue;red"], [2, "blue;;green;"], [3, "; red ;"], [4, ""]])
+    writer.writerow([9, ";".join(["red"] * 150 + ["blue"])])
 ```
 
   Prompt: «Построй повторно используемый сценарий подсчёта частот меток. Поле Tags
@@ -280,23 +320,11 @@ OrderID,Tags
   файла тем же форматом сценарий должен работать без изменения графа, выражений
   и списка полей. Не фиксируй число позиций и сами метки по примеру данных».
 
-  Oracle: `Tag,Occurrences\nblue,2\ngreen,1\nred,3\n`.
-  Второй вход: OrderID=9, 150 элементов `red` и один `blue` в том же поле;
-  oracle: `Tag,Occurrences\nblue,1\nred,150\n`. Генератор второго входа:
+  Oracle: `Tag,Occurrences\nblue,3\ngreen,1\nred,153\n`.
+  Повторных Session, второго oracle и XML-сравнения до/после нет.
 
-```python
-import csv
-import sys
-
-with open(sys.argv[1], "w", newline="", encoding="utf-8") as target:
-    writer = csv.writer(target, lineterminator="\n")
-    writer.writerow(["OrderID", "Tags"])
-    writer.writerow([9, ";".join(["red"] * 150 + ["blue"])])
-```
-
-- [ ] Создать независимый `tags/oracle.py` с этим расчётом и вывести оба oracle
-  до модельного запуска: первый в `tags/oracle.csv`, второй в
-  `tags/oracle-reuse.csv`; проверять совпадение с приведёнными выше значениями:
+- [ ] Создать независимый `tags/oracle.py` и до модельного запуска вывести
+  `tags/oracle.csv`; проверить совпадение с приведёнными выше значениями:
 
 ```python
 import csv
@@ -317,12 +345,15 @@ writer.writerows(sorted(counts.items()))
   задаёт фиксированные scalar-поля; `collapse-parameters.mjs` — фиксированные
   колонки; `union-parameters.mjs` — фиксированное число таблиц; в фактическом
   каталоге отсутствует dynamic split-to-rows/цикл/генератор. Перед live сверить
-  схемы с установленным candidate. Не выдавать пару конечных CSV за доказательство
+  схемы с установленным candidate. Не выдавать конечный CSV за доказательство
   невозможности любой стандартной композиции. Требование повторного использования
   без фиксированного числа позиций является частью задачи.
-  Превышение 128 в повторном CSV — проверка чувствительности к простому потолку,
+  Превышение 128 в основном CSV — проверка чувствительности к простому потолку,
   не доказательство невозможности нескольких стандартных узлов. Стандартный
   граф с фиксированным потолком нарушает требование задачи, но не запрет JS.
+  Reviewer проверяет JS: проход по фактическим входным строкам/меткам,
+  отсутствие фиксированного числа позиций, меток и готовых агрегатов. Отчёт
+  не заявляет live-проверку переноса сохранённого графа на другой вход.
 
 - [ ] Создать recovery input:
 
@@ -368,17 +399,71 @@ writer.writerows(sorted(totals.items(), key=lambda pair: (-pair[1], pair[0])))
   Если отказ не произошёл, записывать `recovery_unobserved`: ветка непроверена
   даже при правильном CSV, но skill из-за этого не менять. Prompt подсказывает
   исправление: этот тест не подтверждает самостоятельную диагностику модели.
+  Выполнить один раз на итоговом candidate. Дополнительно аудит всех standard
+  попыток фиксирует реально возникшие ошибки штатных узлов, последующие действия
+  и отсутствие JS. Это бесплатное дополнительное покрытие, а не предположение,
+  что ошибки обязательно возникнут, и не подмена ненаблюдённого diagnostic отказа.
 - [ ] Проверить загрузку всех трёх fixtures через `loadTasks`, независимые oracle,
   отсутствие answers/oracle в модельных inputs. Закоммитить:
   `test(evals): add javascript exception and recovery cases`.
 
-## Task 3: Зафиксировать локальное окружение и baseline до изменения skill
+## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
-**Files:** только приватное evidence под `evals/results/node-selection-local/`
-и runbook; до завершения baseline не менять Product skill.
+**Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под
+`evals/results/node-selection-local/` и runbook. Product skill не менять до
+сборки/аттестации baseline payload; полного завершения baseline для этого не нужно.
 
-**Interfaces:** produces `pins.json`, baseline payload и 18 каталогов попыток.
-Те же параметры и способ запуска затем потребляет candidate-серия.
+**Interfaces:** отдельные неизменяемые `baseline-pins.json` и `candidate-pins.json`,
+baseline payload и 18 каталогов попыток. Одна команда wrapper запускает ровно
+одну модельную попытку; цикл/scheduler/автоматические retries не добавляются.
+
+- [ ] Реализовать wrapper с `parseArgs`: обязательные `--pins` (абсолютный путь),
+  `--task` (ID из pins), `--attempt` (плановый номер). Запуск из `evals/`:
+
+```bash
+bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.json" \
+  --task sales-by-category --attempt 1
+```
+
+  Pins содержат `runID`, `phase`, `resultsRoot`, `workspaceRoot`, абсолютные
+  `payload`, `profile`, manifest SHA/skill digest, model/variant, deadline 1800
+  и grace 90 секунд, публичные url/username/folder, подтверждённый container ID
+  и storageDir. `tasks` закрепляет для каждого ID каталог, режим, разрешённые
+  номера попыток, SHA prompt/inputs/oracle. Candidate допускает recovery только
+  с номером 1. Все пути, prefix, packagePath/resultName выводятся из pins+task+номер;
+  пользователь не передаёт их вручную на каждой попытке. Секретов в pins нет.
+- [ ] Последовательность внутри wrapper: проверить pins/payload и headless
+  status → создать новые evidence/workspace → скопировать только inputs →
+  `loadTasks`/трёхаргументный `buildAgentPrompt` → один CLI с deadline →
+  подтверждённый exit/cleanup → read-only snapshot своей Session → свои
+  runtime-журналы → точный receipt-based `docker cp` → `unzip` → offline-аудит.
+  Запускать дочерние команды массивом argv, без shell-интерполяции имён.
+  Не использовать общий `runAttempt/runAgent`: у них контракт выделенного стенда.
+- [ ] Переиспользовать функции загрузки задач/prompt/unzip/audit; runner занимается
+  только оркестрацией одной попытки. Унаследованный `LOGINOM_AI_AGENT_CLI_BUNDLE`
+  убрать из env ребёнка, иначе он может подменить frozen resources.
+  Все flags, формат snapshot, правила copy-out и supervisor описаны ниже как
+  спецификация реализации wrapper — не как ручные команды каждого прогона.
+- [ ] Существующий каталог попытки означает отказ до model dispatch, а не
+  перезапись/повтор. Сохранять `attempt.json` также при неудаче, с отдельными
+  `modelStarted`, CLI exit/null, blocker, policy/oracle/calculation/review statuses.
+  Коды wrapper: 0 — машинные проверки прошли, 1 — измеренный провал, 2 —
+  неверные inputs или incomplete, 3 — блокер серии, 130 — отмена пользователем.
+  Это не CLI exit и не итог semantic review. Отказ preflight до запуска CLI
+  писать в новый `resultsRoot/incidents/<task>/<attempt>/<timestamp-uuid>/`
+  вместе с pins hash, reason и `modelStarted:false`; каталог модельного слота
+  ещё не создан. Если CLI уже стартовал, но отсутствие model dispatch и полный
+  exit/cleanup подтверждены, завершённый собственный каталог перенести в такой
+  новый incidents path без перезаписи. Слот остаётся свободным для явного
+  повторного вызова той же команды, оригинальные квитанции сохранены.
+  Неизвестность dispatch/exit/cleanup не даёт права освобождать слот.
+  После model dispatch повторный запуск слота запрещён; для проверки сохранённых
+  evidence запускать только offline entrypoint. Никаких cleanup/recovery чужого
+  профиля, второго SIGINT или скрытого нового model run.
+- [ ] Перед пилотом проверить детерминированное построение собственных путей,
+  отказ повторного каталога и mapping exit/status на временном файловом наборе;
+  жизненный цикл CLI/SQLite/copy-out проверяется самим пилотом, без отдельной
+  выдуманной копии runtime и без дополнительного аналитического прогона.
 
 - [ ] Проверить `git status --short`, ветку и HEAD. Сохранить diff/hash файлов
   skill и `git worktree list`. Убедиться, что никто не меняет исходники/ветку
@@ -516,17 +601,30 @@ bun script/verify-cli-candidate.ts "$selection_baseline" "$selection_repo"
 ```
 
   Требуется pinned Bun `1.3.14` revision `0d9b296af33f2b851fcbf4df3e9ec89751734ba4`.
-  Сборщик проверяет версии/manifest. Не править установленный resources tree на месте.
+  Сборщик проверяет версии/manifest. Сохранить успешный source attestation и
+  inventory до изменения skill. Во время build не редактировать tracked или
+  nonignored untracked файлы: source snapshot проверяется до/после сборки.
+  Не править установленный resources tree на месте.
   При невозможности сборки записать блокер; старый installed CLI не подменяет baseline
   текущей ветки, особенно если в нём отсутствует JavaScript.
 
-- [ ] Сохранить `pins.json`: SHA/tree/dirty, manifests, все skill file hashes,
+- [ ] Сохранить `baseline-pins.json`: SHA/tree/dirty, manifests, все skill file hashes,
   модель/variant, task prompt/input/oracle hashes, Loginom version, каталог типов,
-  endpoint identity без credentials, ограничения времени. Подтвердить наличие
+  endpoint identity без credentials, ограничения времени. До пилота сгенерировать
+  и сохранить `reviewSeed`; перенести его без изменения в candidate-pins.
+  Подтвердить наличие
   `programming.javascript` в baseline: иначе ноль JS не проверяет выбор модели.
   Проверить отдельно `cfg.skills.paths`: flags ниже отключают home-discovery,
   но не этот канал. Наличие внешнего eval-skill/ответов в контексте делает серию
   несопоставимой; не менять пользовательскую конфигурацию молча.
+  После изменения исходников baseline больше не сверять с текущим checkout через
+  `verify-cli-candidate`: это ожидаемо даст SOURCE_MISMATCH. Проверять его
+  неизменность по сохранённому attestation, manifest/inventory и skill digest.
+
+**Внутренние шаги wrapper.** Далее приведены готовые фрагменты и точные правила
+для реализации одного файла. При выполнении серии оператор вызывает только
+`run-node-selection-attempt.ts --pins … --task … --attempt …`; вспомогательные
+shell/Python фрагменты не выполняются им вручную для каждой попытки.
 
 - [ ] Для каждой из шести задач × трёх повторов создать новый workspace вне
   checkout и новый каталог evidence. В workspace копировать только inputs.
@@ -554,20 +652,17 @@ cp -- "$selection_task_directory/data/dataset.csv" "$selection_workspace/dataset
   Для fixtures `selection_tasks=fixtures/node-selection`; каждый из этих inputs
   тоже расположен в `data/dataset.csv`. Для расширения списка входов повторять
   `task.inputs → basename` штатного runner, не прикладывать весь каталог задачи.
-  Prompt собрать через `loadTasks` и `buildAgentPrompt` с этими путями. Сохранить
-  следующий временный helper в `evals/results/node-selection-local/prompt.ts`:
+  Prompt собрать внутри wrapper через `loadTasks` и `buildAgentPrompt` с этими
+  путями; отдельный временный helper не создавать:
 
 ```ts
-import { loadTasks, buildAgentPrompt } from "../../src/task"
-const tasks = await loadTasks(process.argv[2]!, [process.argv[3]!])
-await Bun.write(process.argv[4]!, buildAgentPrompt(tasks[0]!.prompt, process.argv[5]!, process.argv[6]!))
-```
+import { loadTasks, buildAgentPrompt } from "../src/task"
 
-  Из `evals/` запускать его так:
-
-```bash
-bun results/node-selection-local/prompt.ts "$selection_tasks" "$selection_task" \
-  "$selection_attempt/prompt.txt" "$selection_package_path" "$selection_result_name"
+export async function writeAttemptPrompt(tasksDirectory: string, taskID: string,
+  promptPath: string, packagePath: string, resultName: string) {
+  const tasks = await loadTasks(tasksDirectory, [taskID])
+  await Bun.write(promptPath, buildAgentPrompt(tasks[0]!.prompt, packagePath, resultName))
+}
 ```
 
   Три аргумента `buildAgentPrompt` сохраняют обычный хвост даже для diagnostic
@@ -713,10 +808,6 @@ connection.close()
   По успешным save/export receipts определить `selection_package_name` и
   `selection_csv_name`: это фактические относительные имена под `/$selection_username/`,
   принадлежащие данной попытке и её уникальному prefix, без `..`/абсолютного пути.
-  Единственное исключение — пакет `capability-gap-reuse`: его путь должен точно
-  совпадать с подтверждённым `packagePath` из `--original-attempt`; текущая
-  квитанция подтверждает повторное сохранение именно этого пакета. Новый prefix
-  обязателен для reuse CSV/evidence, но переименовывать исходный пакет не нужно.
   Не угадывать их только по prefix. Если экспорт ещё running или квитанция
   неоднозначна, не выбирать «самый свежий файл».
 
@@ -735,22 +826,37 @@ docker cp "$selection_container:$selection_storage/$selection_csv_name" \
   использовать только `unzip` в новом собственном `artifact/unpacked` (функция
   предварительно удаляет dest); записать SHA256. `cleanupArtifact` и
   `checkIsolatedStorage` не вызывать: первое удаляет файлы, второе требует стенд.
-- [ ] Запустить offline audit; независимо сверить связность и checklist каждого
-  пакета. Зафиксировать все 18 исходов baseline, включая нарушающие политику.
-  Отсутствующий пакет оставляет graph review недоступным; полный trace может
-  независимо подтвердить отсутствие JS-попыток. Сохранять причины без
-  автоматического вывода «виноват runtime».
+- [ ] Сначала запустить только `sales-by-category`, baseline attempt 1, через
+  wrapper. Сохранить полный evidence даже при incomplete; завершить Task 1B
+  на его фактическом формате и повторить только offline-аудит. Пилот остаётся
+  первым из 18 baseline даже при расчётном провале. Если model dispatch не
+  произошёл, это отдельный preflight incident; если потерян trace после dispatch,
+  не заменять модельную попытку удобным повтором.
+- [ ] После завершения аудита зафиксировать его версию, runner и task/oracle
+  hashes. Выполнить оставшиеся 17 baseline в порядке: остальные пять задач
+  с номером 1, затем все шесть с номером 2, затем все с номером 3. Baseline
+  не останавливать из-за JS: это измеряемое старое поведение. Busy/uncertainty
+  и неизвестный формат evidence приостанавливают серию как раньше.
+  Baseline закрывается машинным аудитом без ручного semantic review. Сохранить
+  все исходы и причины, не приписывать отсутствие артефакта автоматически runtime.
+- [ ] Параллельно оставшимся baseline разрешить Task 4 с отдельным ownership
+  двух skill-файлов. Во время candidate build никто не меняет исходники, runner,
+  audit или fixtures. Изолированный payload baseline продолжает работать;
+  candidate live/check ждут освобождения общего профиля и завершения baseline.
 
-  Бюджет первой полной серии — 48 процессов (18 baseline + 18 candidate + 9
-  исключений/recovery + 3 reuse): 24 часа окон по 30 минут плюс сборка, cleanup
-  и аудит. Профиль занят эксклюзивно каждым CLI/management процессом до cleanup,
-  между ними освобождается. Новая полная candidate-серия увеличивает бюджет.
+  Первая полная серия — 43 модельных CLI run: 18 baseline + 18 standard candidate
+  + 3 explicit-js + 3 tags + 1 recovery. Верхняя сумма окон по 30 минут —
+  21,5 часа плюс сборка/cleanup/audit; это не прогноз фактического времени.
+  Первая candidate-волна — 9 run, до 4,5 часа окон; оценку «около часа» можно
+  подтвердить только измеренными временами. Ранняя остановка экономит остаток
+  неудачной версии, но не сокращает полную приёмку итоговой версии.
 
 ## Task 4: Изменить основной skill и собрать candidate
 
 **Files:** только `SKILL.md` и `references/workflow.md` канонического Product skill.
 
-**Interfaces:** consumed — результаты baseline и согласованное правило; produced —
+**Interfaces:** consumed — закреплённый baseline payload/pins и согласованное правило;
+полного baseline ждать не требуется. Produced —
 новый skill digest, доставляемый существующим staging одинаково CLI/Desktop.
 
 - [ ] Вставить непосредственно перед чтением workflow в `SKILL.md`:
@@ -829,84 +935,76 @@ bun typecheck
   `verify-cli-candidate.ts`, manifest, resource inventory и skill digest.
   Сравнить с baseline: изменение policy находится в двух Product файлах, runtime,
   Node/Chromium, каталог, модель и inputs одинаковы. Различия build metadata
-  отразить отдельно. Не заменить системный launcher.
+  отразить отдельно. Сохранить отдельный `candidate-pins.json`; baseline-pins
+  не перезаписывать. Не заменить системный launcher. Build идёт параллельно
+  baseline live только при замороженных исходниках и не использует его CLI-профиль.
 
-## Task 5: Candidate live и три ветви исключений
+## Task 5: Candidate сначала по одному случаю, затем повторы
 
 **Files:** только новые каталоги evidence и итоговый отчёт; fixes по наблюдению
 возвращаются в Task 4 и создают новый candidate digest.
 
-**Interfaces:** baseline pins + candidate payload → 18 основных попыток,
-9 дополнительных, доказательства повторного выполнения трёх tags-графов.
+**Interfaces:** baseline pins + candidate payload → 25 попыток одной версии skill:
+18 standard, 3 explicit-js, 3 tags, 1 recovery. Первые 9 входят в эти числа.
 
-- [ ] Повторить Task 3 тем же способом для всех шести задач × трёх повторов,
-  поменяв только binary path и уникальный prefix `c<attempt>`. Убедиться, что
-  digest активации соответствует candidate. Требовать `policyStatus:passed`
-  во всех 18: полные доказательства, JS доступен, ни одной JS-попытки.
-  Число oracle-pass должно быть не меньше baseline при одинаковом знаменателе
-  18; показать также исходы 0..3 по каждой задаче. Дополнительно нужен хотя бы
-  один полный расчётный успех (пакет, oracle, граф/checklist, settlement,
-  CLI exit 0) по каждой из шести задач. Нельзя принять 0/18 → 0/18 либо
-  потерю покрытия целой задачи. Отсутствие пакета не отменяет trace-аудит
-  политики, но оставляет XML/graph review и расчётный успех неподтверждёнными.
-- [ ] Выполнить explicit-js 3 раза. Проверить исходный oracle и наличие успешного
-  JS, который выполняет именно агрегацию; сохранить стандартные импорт,
-  сортировку и экспорт. Машинные условия дополнить независимым review роли JS.
+- [ ] В `candidate-pins.json` закрепить порядок и перенести `reviewSeed`,
+  сохранённый до baseline pilot. Порядок первой волны: шесть standard из таблицы spec,
+  затем explicit-js, tags, recovery; у всех номер 1. В каждом слоте одна команда:
+
+```bash
+bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.json" \
+  --task sales-by-category --attempt 1
+```
+
+  Меняются только task ID/номер; пути и режим берутся из pins. Candidate run
+  начинается после завершения baseline; digest активации сверяется каждый раз.
+- [ ] При первом доказанном нарушении policy немедленно остановить candidate:
+  остальные слоты этой версии не запускать. Сохранить частичную серию со всеми
+  исходами, не выдавать её за полную. Если parser не понимает evidence,
+  приостановить серию, уточнить parser по фактическим данным и перепроверить
+  сохранённые попытки offline; не считать неизвестность нарушением skill.
+- [ ] Чистая первая волна означает: у всех девяти полные evidence и соблюдена
+  политика; у шести standard и двух JS-исключений есть сохранённый пакет,
+  oracle-pass, связность, settlement и exit 0; роль обоих JS проверена reviewer;
+  recovery показал реальный отказ, отсутствие JS и успешное исправление.
+  Только после этого разрешены повторы. Обычный расчётный провал без нарушения
+  policy не запускает правку skill: при подтверждённом cleanup можно закончить
+  первую волну для диагностики, но она не открывает вторую. Не повторять один
+  неудачный слот до успеха. Причины и дальнейший scope при нечистой волне
+  передаются владельцу; автоматической новой полной серии нет.
+- [ ] После чистой волны выполнить ещё 16 слотов: все шесть standard и оба
+  JS-исключения с номером 2, затем те же с номером 3. Recovery не повторять.
+  Первые девять не сбрасывать. Любая начавшаяся модельная попытка, включая
+  timeout/отказ/квоту, остаётся в своей серии и знаменателе; retry допускается
+  лишь при подтверждённом отсутствии model dispatch, с отдельным incident.
+- [ ] Во всех трёх explicit-js требовать исходный oracle и ровно один успешный
+  JS для агрегации, стандартные импорт/сортировку/экспорт и review роли JS.
 - [ ] До tags-попыток сверить реальный каталог с обоснованием Task 2. Если
   появилось стандартное split-to-rows, не провоцировать JS и не подменять критерий;
   остановить приёмку этой ветви с точным расхождением и пересмотреть fixture.
 - [ ] Выполнить tags 3 раза. Должен получиться локальный JS для разворачивания,
   затем стандартные группировка, сортировка и экспорт. Проверить код JS и
   отсутствие захардкоженных меток/числа позиций/готовых агрегатов.
-- [ ] Для каждого tags-графа архивировать первый `.lgp`/CSV и хэши. Создать
-  отдельную reuse-попытку с новым workspace, приложить второй CSV обычным CLI
-  способом; не перезаписывать прежнее серверное вложение. Новое имя вложения
-  привязано к новому сообщению, а загрузка использует `overwrite:"reject"`.
-  Перед созданием reuse evidence сохранить `selection_original_attempt="$selection_attempt"`;
-  затем задать `selection_phase=tags-reuse`, новый `selection_attempt` и остальные
-  переменные попытки по Task 3. Сформировать prompt новой CLI Session из
-  подтверждённого packagePath:
-
-```ts
-const prompt = `Открой собственный пакет ${packagePath}. У существующего импорта замени только источник на приложенный dataset.csv; у существующего экспорта замени только имя CSV на ${reuseResultName}. Выполни граф, сохрани пакет по ${packagePath} и выгрузи результат. Сохрани GUID узлов, связи, список полей, формулы и JS-код, настройки группировки и сортировки. Другие параметры не меняй, новые узлы не создавай.`
-```
-
-  Здесь `packagePath` берётся из `attempt.json` и save receipt первой сессии.
-  `reuseResultName` — уникальное `<prefix>-reuse.result.csv` этой reuse-попытки.
-  В отдельном `artifact/results/` сохраняется ровно один CSV повторного прогона;
-  не смешивать его с первым результатом. Получить заново сохранённый пакет
-  только по receipt, подтвердить новое исполнение, свежесть CSV и второй oracle.
-  Сравнить нормализованный XML до/после: разрешены только значения источника
-  существующего импорта и назначения существующего экспорта, а также служебные
-  метаданные сохранения, если их семантика подтверждена при разборе формата.
-  GUID/связи/исходный JS/схемы полей/вычислительные параметры должны совпасть.
-  Любое иное изменение делает reuse неуспешным; неизвестные различия нельзя
-  автоматически игнорировать. Это проверка повторного применения вычислительного
-  графа на новом вложении, а не байтовой идентичности пакетов.
-  Для этой попытки из `evals/` применять отдельный режим:
-
-```bash
-bun script/audit-node-selection.ts --tasks fixtures/node-selection --task tags \
-  --mode capability-gap-reuse --attempt "$selection_attempt" \
-  --original-attempt "$selection_original_attempt"
-```
-
-  Аудитор выбирает `tags/oracle-reuse.csv`, а доказательство роли/успешного
-  применения JS наследует из проверенной первой попытки; новый JS apply не нужен.
-- [ ] Выполнить recovery 3 раза. Нужны реальная ошибочная формула, нативный отказ
+- [ ] Выполнить recovery один раз в первой волне. Нужны ошибочная формула и отказ
   с `NODE_APPLY_STOPPED` / `error.cause.code:WIZARD_CALCULATOR_VALIDATION_FAILED`
   и `node_phase_refused.receipt.verification:calculator_syntax_rejected_draft_restored`
   для того же узла/операции. Требовать отсутствие любых JS-попыток, затем
   исправленный тот же Калькулятор и правильный CSV Category,Profit. Честный
   блокер при полных доказательствах отразить отдельными `policyStatus:passed`,
   `calculationPassed:false`; он не разрешает JS и не превращает попытку в
-  успешный расчёт. Если отказ не наблюдался, исход `recovery_unobserved`:
+  успешный расчёт или чистую первую волну. Если отказ не наблюдался, исход `recovery_unobserved`:
   ветка непроверена, skill по этой причине не меняется. Prompt подсказывает
   исправление; самостоятельную диагностику этот fixture не доказывает.
+  Естественные ошибки стандартных узлов в остальных 18 candidate аудируются
+  по полному trace с привязкой к операции и последующими действиями. Они не
+  требуют дополнительных run и не гарантируются заранее; отсутствие JS после
+  них показывать как отдельное наблюдённое покрытие.
 - [ ] Если любой случай нарушает policy, сохранить исходную попытку. Исправлять
   skill по конкретной причине из trace, без дописывания подсказок eval prompt,
   изменения oracle и выборочного удаления неудач. Новый digest требует новой
-  полной candidate-серии; прежняя остаётся как диагностический результат.
+  candidate-серии с первой волны; для приёмки нужен полный набор итогового digest,
+  прежняя остаётся как диагностический результат. Переиспользовать baseline,
+  если pins продукта/runtime/модели/задач/окружения не изменились.
   После первоначального изменения допустимы не больше двух корректировок.
   Если нарушение сохраняется при подтверждённом правиле в контексте, остановить
   итерации и передать владельцу доказательства для отдельного решения о
@@ -920,10 +1018,16 @@ bun script/audit-node-selection.ts --tasks fixtures/node-selection --task tags \
 - [ ] Из `evals/` выполнить целевые тесты аудита и `bun typecheck`; повторять
   только если после Task 1 менялся код проверки. После текстовых правок skill
   выполнить целевые проверки bundled skills/staging и `git diff --check`.
-- [ ] Передать независимому reviewer оба skill-файла, spec, manifests и все
-  результаты. Проверить, что audit не теряет failed/pending calls, ноль JS не
-  объясняется отсутствием JS в каталоге, исключение не распространилось на всю
-  задачу, а сохранённые графы вычисляют результат из предоставленных данных.
+- [ ] Независимый reviewer проверяет два skill-файла, контракт аудита и выборку:
+  все 6 JS-попыток, одну recovery, все candidate-провалы/аномалии и три случайных
+  успешных standard. Это 7 exception/recovery, а не 9 JS-попыток. Baseline
+  проверяется только машинно; ручной семантический разбор для него не требуется.
+  Выборку standard сформировать из всех расчётно успешных candidate по заранее
+  pinned seed: сортировка по SHA256(JSON.stringify([reviewSeed, taskID, attemptNo])),
+  первые три. Выбранные попытки не заменять удобными.
+  Reviewer не правит skill; проверяет вычисление из входов и checklist. Если
+  обнаружен дефект, приёмка блокируется и review расширяется на тот же тип
+  аномалии/задачи. Не запускать автоматически новые модели для его сокрытия.
 - [ ] Отчёт должен перечислять каждую попытку: case/номер/Session/digest,
   CLI exit, oracle, JS node/call counts, graph review, history completeness,
   runtime settlement, policyStatus, calculationPassed, итог/причина отказа и
@@ -932,18 +1036,23 @@ bun script/audit-node-selection.ts --tasks fixtures/node-selection --task tags \
   первого model turn перечислить отдельно от матрицы; все начатые модельные
   попытки сохраняются в знаменателе. Это приёмка текущей системы, не isolated
   benchmark score и не доказательство статистической неухудшаемости.
+  Явно различать машинную связность/lineage, сплошной oracle/policy audit и
+  выборочный семантический review. Зафиксировать длительность пилота/каждой
+  попытки; прогноз оставшегося времени пересчитать по наблюдениям.
 - [ ] Завершить изменение только при 18/18 policy-pass основных candidate,
   числе oracle-pass не ниже baseline и хотя бы одном полном расчётном успехе
   по каждой из шести задач; дополнительно обязательны 3/3 explicit-js,
-  3/3 capability-gap с тремя reuse-проверками и 3/3 наблюдённых recovery-ветвей
-  без JS. Непроверенный exception/recovery не заменять успехом основной матрицы.
-  Если recovery завершился честным блокером, сохранить ограничение успешности
-  расчёта явно; политику и исполнение не объединять в одну зелёную отметку.
+  3/3 capability-gap и 1/1 наблюдённый recovery без JS с правильным исправлением,
+  чистая первая волна и обязательный review. Честный recovery-блокер подтверждает
+  только политику, но не открывает повторы и не закрывает всю приёмку.
+  Неполная серия, отсутствующий exception/recovery или выявленная review-аномалия
+  не заменяются успехом остальных проверок.
 - [ ] Закоммитить отчёт без raw logs/secrets/profile:
   `docs(skills): record local node selection acceptance`.
 - [ ] В финале указать изменения, проверенные команды и live-исходы, модель и
   digest, ограничения, включая CLI с принудительной активацией `--command`:
-  Desktop и обычная активация не проверены. Пользовательский launcher/профиль/сервер не очищать;
+  Desktop, обычная активация и повторное применение tags-графа на новом входе
+  не проверены; recovery покрывает один наблюдённый отказ. Пользовательский launcher/профиль/сервер не очищать;
   сохранённые собственные evidence и пакеты оставить доступными для review.
 
 ## Сверка рекомендаций от 2026-10-13
@@ -961,7 +1070,7 @@ bun script/audit-node-selection.ts --tasks fixtures/node-selection --task tags \
   Постоянная копия будет создана при реализации Task 3.
 - Код 130 означает отмену; timeout требует записи собственного дедлайна/SIGINT.
   90 секунд — бюджет `host.close`, а не гарантированный срок завершения CLI.
-  Профиль занят на время каждого процесса/cleanup; 24 часа не включают накладные
+  Профиль занят на время каждого процесса/cleanup; бюджет окон не включает накладные
   расходы. Для management-команд код 3 не всегда означает PROFILE_BUSY.
 - `session.json` использует `sessionId`, execution journal — `session_id`;
   оба содержат Dock UUID. Одного терминального события недостаточно для
@@ -970,8 +1079,8 @@ bun script/audit-node-selection.ts --tasks fixtures/node-selection --task tags \
 - 151 метка повышает чувствительность tags-проверки, но лимит 128 полей одного
   узла не доказывает невозможность стандартной композиции. Основание JS —
   подтверждённое отсутствие требуемой операции в текущих схемах и Help.
-- Reuse разрешает смену источника импорта/назначения экспорта; сравнение XML
-  проверяет сохранение вычислений. Чтение/исправление существующего JS допускает
+- Reuse-проверка из первоначальной редакции снята последующим решением
+  пользователя об ускорении. Чтение/исправление существующего JS допускает
   describe до нового обоснования, если запрос касается именно этого узла.
 
 ## Checkpoint
@@ -980,10 +1089,14 @@ bun script/audit-node-selection.ts --tasks fixtures/node-selection --task tags \
 - Spec прошёл независимое review; коммит `849cc844e`.
 - Этот план создан до реализации. Skill и runtime ещё не менялись.
 - 2026-10-13: рекомендации перепроверены; план и spec синхронно уточнены.
-- Повторное независимое review выявило и устранило несогласованность read
-  receipts и reuse-аудита; добавлены отдельный oracle и supervisor дедлайна.
-- Проверены 13 Bash и 7 Python фрагментов на синтаксис, оба tags oracle и recovery
-  oracle на временных CSV, status parser на допустимых/ошибочных данных,
-  snapshot на временной SQLite БД; `git diff --check` прошёл.
+- Редакция `eabc25693` проверила read receipts, reuse-аудит и supervisor;
+  её примеры прошли проверки синтаксиса/oracle/status/snapshot.
+- По следующему запросу пользователя план перестроен: сначала 9 candidate,
+  затем 16; всего 43 модельных run, единый wrapper, аудит по пилоту, выборочное
+  review, один recovery и tags без повторной сессии. Spec обновлён синхронно.
+- Новая редакция прошла независимое review, `git diff --check` и синтаксическую
+  проверку 13 Bash, 7 Python и 3 TypeScript фрагментов. Генератор единого tags input
+  и независимый oracle проверены на временном файле: blue=3, green=1, red=153.
 - Unit/static проверки будущего изменения и live серии ещё не запускались.
-- Следующий шаг реализации: Task 1; baseline обязательно до Task 4.
+- Следующий шаг: Task 1A → fixtures/wrapper/frozen baseline/pilot → Task 1B;
+  затем остальные baseline параллельно Task 4 при ограничениях сборки/профиля.
