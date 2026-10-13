@@ -9,10 +9,14 @@ const fail=code=>Object.assign(Error(code),{code});
 const keys=['page','context','gate','token','run','lease','generation','chat','operation','request','authorization','account','session','purpose','target','signal','deadline','destination'];
 export function retainDestinationLockFixture(owner) {
  const original=Object.fromEntries(keys.map(k=>{const d=Object.getOwnPropertyDescriptor(owner,k);if(!d||!('value'in d)||d.value==null)throw fail('DESTINATION_ORIGINAL_MISSING');return[k,d.value];}));
+ // Native getters brand-check the original signal without consulting its
+ // shadowable throwIfAborted property. Preserve preabort before validation.
+ if(signalAborted.call(original.signal))throw signalReason.call(original.signal);
  const url=new URL(original.destination);
- if(original.purpose!=='resource68-destination-fixture-v1'||!Number.isSafeInteger(original.generation)||original.generation<1||original.page.context()!==original.context||original.page.url()!=='about:blank'||url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.pathname!=='/destination.html'||!Number.isSafeInteger(original.deadline)||!original.signal||typeof original.signal.throwIfAborted!=='function')throw fail('DESTINATION_ORIGINAL_INVALID');
+ if(original.purpose!=='resource68-destination-fixture-v1'||!Number.isSafeInteger(original.generation)||original.generation<1||original.page.context()!==original.context||original.page.url()!=='about:blank'||url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.pathname!=='/destination.html'||!Number.isSafeInteger(original.deadline))throw fail('DESTINATION_ORIGINAL_INVALID');
  let sessionCreation='not_started';
  let session,targetId,frameId,initialContext,defaultContext,breakpoint;
+ let realmLost=false;
  let installed=false,pending=0,first,held=false,disposal='not_started';
  let installPromise,navigationPromise,armPromise,boundaryPromise,readPromise,disposePromise,normalBreakpoint;
  let navigation='not_started',boundary='not_started',readState='not_started';
@@ -32,6 +36,11 @@ export function retainDestinationLockFixture(owner) {
    if(disposal!=='not_started'||original.page.isClosed())throw fail('DESTINATION_RELEASED');
    for(const k of keys){const d=Object.getOwnPropertyDescriptor(owner,k);if(!d||!('value'in d)||d.value!==original[k])throw fail('DESTINATION_BINDING_CHANGED');}
    if(original.page.context()!==original.context)throw fail('DESTINATION_BINDING_CHANGED');
+   if(realmLost)throw fail('DESTINATION_REALM_LOST');
+   if(defaultContext!==undefined){
+    const current=contexts.filter(c=>c.auxData?.isDefault&&c.auxData.frameId===frameId);
+    if(current.length!==1||current[0].id!==defaultContext)throw fail('DESTINATION_REALM_LOST');
+   }
    for(const k of ['pending','unknown','overlap']){const d=Object.getOwnPropertyDescriptor(original.gate,k);if(!d||!('value'in d)||d.value!==false)throw fail('DESTINATION_UNSETTLED');}
    const start=Object.getOwnPropertyDescriptor(original.gate,'started');
    if(!start||!('value'in start)||!start.writable)throw fail('DESTINATION_UNSETTLED');
@@ -94,7 +103,21 @@ export function retainDestinationLockFixture(owner) {
    guard(true);pending++;
    installPromise=Promise.resolve().then(async()=>{
     sessionCreation='pending';try{session=await original.context.newCDPSession(original.page);sessionCreation='confirmed';}catch(e){sessionCreation='unknown';throw e;}guard(true);
-    session.on('Runtime.executionContextCreated',e=>contexts.push(e.context));
+    // Events invalidate continuity, but do not preempt an original pending
+    // transport rejection. Its raw primary settles before secondary guards.
+    const loseRealm=()=>{realmLost=true;};
+    session.on('Runtime.executionContextCreated',e=>{
+     contexts.push(e.context);
+     if(defaultContext!==undefined&&e.context.auxData?.isDefault&&e.context.auxData.frameId===frameId&&e.context.id!==defaultContext)loseRealm();
+    });
+    session.on('Runtime.executionContextDestroyed',e=>{
+     const index=contexts.findIndex(c=>c.id===e.executionContextId);if(index!==-1)contexts.splice(index,1);
+     if(defaultContext!==undefined&&e.executionContextId===defaultContext)loseRealm();
+    });
+    session.on('Runtime.executionContextsCleared',()=>{contexts.length=0;if(defaultContext!==undefined)loseRealm();});
+    session.on('Page.frameNavigated',e=>{if(defaultContext!==undefined&&e.frame.id===frameId)loseRealm();});
+    session.on('Page.frameDetached',e=>{if(defaultContext!==undefined&&e.frameId===frameId)loseRealm();});
+    session.on('Inspector.detached',()=>{if(defaultContext!==undefined)loseRealm();});
     session.on('Debugger.scriptParsed',e=>scripts.push(e));
     session.on('Debugger.paused',event=>{
      const script=scripts.find(s=>s.scriptId===(event.data?.scriptId??event.callFrames[0]?.location.scriptId));const context=contexts.find(c=>c.id===script?.executionContextId);
@@ -109,7 +132,7 @@ export function retainDestinationLockFixture(owner) {
     });
     targetId=(await query('Target.getTargetInfo')).targetInfo.targetId;
     frameId=(await query('Page.getFrameTree')).frameTree.frame.id;
-    await query('Runtime.enable');await query('Debugger.enable');
+    await query('Page.enable');await query('Runtime.enable');await query('Debugger.enable');
     const initial=contexts.filter(c=>c.auxData?.isDefault&&c.auxData.frameId===frameId);
     if(initial.length!==1)throw fail('DESTINATION_INITIAL_CONTEXT_CHANGED');initialContext=initial[0].id;
     breakpoint=(await query('Debugger.setInstrumentationBreakpoint',{instrumentation:'beforeScriptExecution'})).breakpointId;
@@ -131,7 +154,7 @@ export function retainDestinationLockFixture(owner) {
   },
   acquire() {
    if(arguments.length)throw fail('DESTINATION_EXTERNAL_INPUT_FORBIDDEN');
-   if(readPromise){if(readState==='confirmed')guard();return readPromise;}
+   if(readPromise){if(readState==='confirmed'||realmLost)guard();return readPromise;}
    guard();if(navigation!=='confirmed'||boundary!=='confirmed'||pending)throw fail('DESTINATION_NOT_READY');
    readState='pending';pending++;
    readPromise=Promise.resolve().then(async()=>{
@@ -178,6 +201,6 @@ export function retainDestinationLockFixture(owner) {
    }).catch(e=>{disposal='unknown';secondary.push(e);throw hold(e);}).finally(()=>{pending--;});
    return disposePromise;
   },
-  facts(){return{armResumeState,sessionCreation,pending,held,first,secondary:[...secondary],installed,navigation,boundary,readState,disposal,bootstrapAnchor,exportLocation,getterLocation,trace:[...trace],firstContext:initialContext,destinationContext:defaultContext,nativeProvider:false,openReadAuthority:false};},
+  facts(){return{realmLost,armResumeState,sessionCreation,pending,held,first,secondary:[...secondary],installed,navigation,boundary,readState,disposal,bootstrapAnchor,exportLocation,getterLocation,trace:[...trace],firstContext:initialContext,destinationContext:defaultContext,nativeProvider:false,openReadAuthority:false};},
  });
 }

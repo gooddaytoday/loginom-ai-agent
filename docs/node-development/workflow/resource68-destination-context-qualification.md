@@ -111,3 +111,12 @@ loaded defining/export/lexical inputs and original Dispatcher initialize/
 ChangeNode/refresh/autoUpdate/select completion packet require their own verdict.
 This helper never navigates to Loginom, attaches to a historical Page, performs
 native/model/Save/Close/logout or supplies a provider/read/release/ACK grant.
+
+
+Destination realm continuity corrective
+
+The original CDP session now retains live default execution-context continuity and receives Page frame events before navigation (`Page.enable` ACK). Destruction/clear/replacement of the qualified default context, navigation/detachment of its frame or inspector detachment invalidates the scope permanently. Context events update the original live-context set; guards after each await and before cached acquire projection require the same unique original default context/frame. Cached handles and same Page/BrowserContext object references cannot prove that a destroyed realm still exists. No rebind, remint, acquisition or callback replay is permitted. Realm loss retains UNKNOWN/disposal refusal and original resources; browser fixture closure is not original scope/native cleanup confirmation.
+
+Event invalidation does not replace the raw rejection of an already pending original transport. That original Error/cause/undefined/null/false/0/empty settles first; later continuity/disposal failures remain refusals/secondary. A successful held final atomic reply cannot project after real same-Page realm replacement. Before any secondary input validation the retained native AbortSignal aborted/reason getters brand-check and preserve a preabort reason; the helper never reads shadowable throwIfAborted. Non-aborted shadow getters are also never invoked.
+
+`reviewer-destination.mjs` is byte-identical to the three independent assertions supplied with CHANGES_REQUESTED2eb28 (cached realm replacement, held atomic reply realm replacement, preabort0 accessor). Seven new addressed controls retain all six raw transport primaries across simultaneous real realm replacement and test an un-aborted shadow method getter. The affected original25 controls also run once on SOURCE and ACTUAL bundled Node. Chromium/CDP/default realms/raw handles/navigation/AbortSignal/HTTP are real; labels, held/rejected replies and accessor corruption are fixture doubles. Production diff remains zero, Product7fec/202610131423 unchanged, NativeProvider/openReadAuthority=false. No native Loginom/provider/current-owner/receiving/runtime PASS follows from these fixture results. Common67/Import f421 and current010 remain unchanged.
