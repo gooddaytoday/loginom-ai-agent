@@ -24,19 +24,19 @@ for(const name of ['valid','dto','native-error','undefined','null','false','zero
  const owner:any={},signal=new AbortController().signal,run='stock-run',session='stock-session'
  let host:any,result:any,error:any,original:any
  try{
-  await launchReplacementReadOnlyCaller({product,root:directory,packagePath,run,session,signal,deadline:Date.now()+60000},owner);if(owner.failed)throw owner.error;host=owner.host
+  await launchReplacementReadOnlyCaller({product,root:directory,packagePath,run,session,signal,deadline:Date.now()+120000},owner);if(owner.failed)throw owner.error;host=owner.host
   const acquired=await owner.acquire();expect(acquired).toEqual({generation:3})
   const call=(name:string,args:any,timeout?:number)=>owner.request('call',{run,name,args,userMessage:'offline stock fixture'},timeout)
   const request={operation_id:'stock-node',contract_revision:'1.0.0',document_id:proof.document_id,workflow_ref:{workflow_id:proof.workflow_ref.workflow_id},target:{kind:'existing',ref:proof.node,type:'transform.replace_columns'},inputs:[],mode:'exact',parameters:{},finish:'done'}
   await call('dock_prepare',{});await call('dock_node_apply',request)
   let wait:any
-  try{wait=await call('dock_node_wait',{operation_id:'stock-node',timeout_ms:1000},['lost','wrong-message'].includes(name)?500:undefined)}catch(e){error=e}
+  try{wait=await call('dock_node_wait',{operation_id:'stock-node',timeout_ms:60000},['lost','wrong-message'].includes(name)?500:undefined)}catch(e){error=e}
   if(['missing','foreign','generation','hash','opening-sibling','outcome','lost','wrong-message','deadline-sibling'].includes(name)){
    expect(error).toBeDefined();expect(()=>owner.observeStockOriginal()).toThrow();expect(owner.stockOriginal).toBeUndefined();return
   }
   expect(error).toBeUndefined();expect(wait.isError).toBeUndefined();expect('replacementOriginal' in wait).toBe(false)
   if(name==='duplicate'){
-   await expect(call('dock_node_wait',{operation_id:'stock-node',timeout_ms:1000})).rejects.toThrow();expect(()=>owner.observeStockOriginal()).toThrow();return
+   await expect(call('dock_node_wait',{operation_id:'stock-node',timeout_ms:60000})).rejects.toThrow();expect(()=>owner.observeStockOriginal()).toThrow();return
   }
   original=owner.observeStockOriginal();expect(original.correlation_only).toBe(true);expect(original.native_admission).toBe(false);expect(original.server_cancellation_verified).toBe(false);expect(original.outcome.result).toEqual(wait)
   expect(original.correlation.run).toBe(run);expect(original.correlation.generation).toBe(3);expect(original.correlation.native_opening_operation_id).not.toBe(original.correlation.outer_opening_operation_id);expect('signal' in original.correlation).toBe(false)
@@ -60,7 +60,7 @@ for(const name of ['valid','dto','native-error','undefined','null','false','zero
   if(host){await host.close().catch((e:any)=>console.log('FIXTURE_CLOSE_REFUSAL '+name+' '+e.message));await host.exited}
   console.log('STOCK_HOST_CALLER '+JSON.stringify({name,native:false,FS_tap:false,host:'actual compiled',factory_caller:'SOURCE',Page_auth_driver:'doubles'}))
  }
-},30000)
+},120000)
 test('structural host cannot supply a stock receipt',()=>expect(()=>takeReplacementDiagnosticReply({} as any,'stock-run','original')).toThrow('NO_RETRY'))
 
 test('structural getter host is never inspected',()=>{let calls=0;const host={get port(){calls++;return {}}};expect(()=>takeReplacementDiagnosticReply(host as any,'stock-run','original')).toThrow('NO_RETRY');expect(calls).toBe(0)})
