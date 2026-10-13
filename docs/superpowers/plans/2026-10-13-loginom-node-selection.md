@@ -259,6 +259,10 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
   закрывать операцию, но не делает расчёт успешным. `cliExitCode===0` необходим
   для полного расчётного успеха, но не заменяет успешных Loginom-квитанций.
   Digest/catalog/model должны быть подтверждены для оценки policy.
+  Публичный node_apply, runtime admission и terminal должны совпадать по
+  document/workflow/node identity, включая существующий target.ref.
+  GUID экспортёра выбранного CSV однозначно связан с XML TBGExportTextFile;
+  старый CSV после удаления/замены экспортёра не подтверждает новый пакет.
   Сопоставляет
   успешные JS-квитанции с GUID/типами пакета; для allowed-JS при потере identity
   требуется неполнота доказательств, а не предположение о совпадении.
@@ -1136,4 +1140,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Пилот sales-by-category/1: CLI exit 0; native offline audit PASS, включая oracle/history/runtime/graph.
 - Финальный auditVersion: `1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d`.
 - Root: 95 tests/219 assertions PASS, typecheck/diff-check PASS; acceptance-lock.json закрепляет 72 файла.
-- Следующий шаг: 17 baseline последовательно; candidate build параллельно при замороженных исходниках.
+- Baseline abc-pareto-groups/1 выполняется; единственный CLI handle `95493`.
+- Candidate собран/verify PASS; digest `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
+- Candidate pins готовы: first wave 9, всего 25, исходный reviewSeed сохранён.
+- Следующий шаг: завершить оставшиеся 17 baseline последовательно, затем candidate first wave.
