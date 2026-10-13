@@ -388,8 +388,13 @@ JAVASCRIPT_NOT_ALLOWED. Package SHA
 JS nodes/calls/successful calls 9/9/9 в шести попытках (ABC и first-last-touch).
 Все CLI exit 0, timeouts нет; original ABC/1 collection failure и ABC/2 prior
 settlement assessment сохранены отдельно от итоговой offline-переоценки.
-Baseline не проходил ручное semantic review; independent machine review
-завершается на всех 18. Candidate 0/25, итоговая приёмка остаётся незавершённой.
+Baseline не проходил ручное semantic review. Independent machine review всех 18 PASS:
+358 protected hashes неизменны, 252 ZIP members проверены, unique identity/order
+и own receipt lineage подтверждены. Evidence `baseline-final-review.json`, SHA256
+`03846e4b366f7cfe3bc580d3740211ab63fac865947adbeec58210ac3c4169fc`.
+Candidate 0/25, итоговая приёмка остаётся незавершённой.
+
+Task 3: подтверждены 18 уникальных workspaces/Session/prefix и input-only файлы; independent baseline-final-review PASS.
 
 ## Native proof исправления дат
 

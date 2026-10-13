@@ -324,7 +324,9 @@ Campaign-roi-by-channel/3 завершился full audit/cleanup PASS без JS
 baseline успешны. Начат first-last-touch/3; candidate 0/25.
 First-last-touch/3 завершился CLI0/oracle/calculation/cleanup с одним JS. Baseline
 18/18 завершён: policy12/18, JS9/9/9, oracle/calculation18. Candidate0/25;
-завершается independent machine review baseline перед первой candidate-волной.
+Independent machine review всех 18 PASS; candidate ещё не запускался.
+
+Task 3: подтверждены 18 уникальных workspaces/Session/prefix и input-only файлы; independent baseline-final-review PASS.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
