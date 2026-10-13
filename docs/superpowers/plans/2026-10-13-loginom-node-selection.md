@@ -1556,4 +1556,14 @@ component/source/declaredschema после обеих ветвей; это не 
 capture точного native predicate перед surgical TDD fix. Product guards/skill
 не менять по предположениям. Пара225648 source3a33/runtimef262e52c… собрана/
 bothverify0, но остаётся условной: commonruntime fix потребует следующую пару
-и полные18+25. Ownproof9 recovery проверяется отдельно, unknownuser97 сохраняется.
+и полные18+25. Ownproof9 recovery independently48163591… подтверждён:
+строго bound user99 closed/admin100logout/MCPexit0, unknownuser97 сохранён.
+44raw/60source/4397runtime unchanged; full savedJS before/after равен.
+Pair225648 independent43b494ad…/pins3b56a9b3… Approved после mode0400 freeze,
+0models/0outcomes. Static Product/primaryaudit783c7650… Approved; runner/graph
+в этом review имеют self-review limitation и проверяются отдельно.
+Proof10 readonly capture дополнен exact rawcrumbset/effective labels/полным
+predicate и bounded projection; verification4957c301…/review9f466a29… Approved,
+62source/37fixtures/132historical hashes match,19tests/typecheck/syntax PASS.
+Root81926 live запущен после ready/status-only activation72c602c4…;
+моделей0, guards/source/pins unchanged. Это diagnosis, не ordinary acceptance.
