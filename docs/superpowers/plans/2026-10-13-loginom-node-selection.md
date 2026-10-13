@@ -449,12 +449,17 @@ Skill не меняется из-за ошибки runtime. В публичны�
 - [ ] Подтвердить точный формат `yyyy/mm/dd` детерминированным native Host proof
   с датами и проверенными output/readback/cleanup, без внешней LLM и без зачёта
   этого smoke в модельные 43 попытки.
-- [ ] Создать новый общий managed build worktree на согласованном HEAD; выполнить
+- [x] Создать новый общий managed build worktree на согласованном HEAD; выполнить
   обе сборки последовательно в нём с одинаковой явной VERSION=0.1.17 и resources.
   Baseline получает только два old skill bytes, затем эти файлы восстанавливаются
   к HEAD для candidate. Проверить обе сборки против owning source, сохранить
   manifest/source/skill inventories и доказать, что runtime/dependencies совпали.
   Никаких source/docs edits во время сборки. Исходные payload/pins не переписывать.
+  Выполнено на `6768520a0` в `node-selection-build`: обе source verification exit 0;
+  независимая проверка обеих inventories 5725/5725 и resources 4728/4728 PASS.
+  Отличаются два skill, два манифеста и два build-inputs; runtime, compiled CLI/Host,
+  Node/Chromium и зависимости побайтно одинаковы. Разница build-inputs — только
+  представление import paths, при одинаковых inventories/outputs.
 - [ ] Закрепить новый run ID и immutable baseline/candidate pins с прежними
   tasks/inputs/oracle/model/reviewSeed; провести полные 18+25 попыток и все прежние
   gates Tasks 3–6. Старые три попытки не включать в новую сопоставимую серию;
@@ -1164,7 +1169,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Collector реализован TDD; cleanup guard `d73fa9def`, независимое review проведено.
 - Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
-- Текущий run: `20261013T093809Z-f5d429`, private evidence под evals/results.
+- Новая matched пара: `20261013T132356Z-0a3983`, source `6768520a0`, build/inventory PASS; native proof в работе.
 - Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.

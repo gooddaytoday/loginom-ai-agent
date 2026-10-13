@@ -1,10 +1,31 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
-Статус: приёмка не завершена. Из 18 baseline начаты три попытки; 15 не запускались.
-Все 25 candidate ещё не запускались. Профиль `analytic-evals` восстановлен после
-проверки закрытия собственной серверной сессии. Архивирован только её guard;
-status/check прошли. Следующий `monthly-demand/1` завершился новым cleanup blocker;
-его guard сохранён, решение по отдельному runtime-дефекту запрошено.
+Статус: приёмка не завершена. Исходная серия `20261013T093809Z-f5d429`
+остановлена после трёх baseline; её результаты сохранены отдельно. Пользователь
+поручил самостоятельно устранять блокеры: дефект `imports.text.date_format`
+исправлен по TDD в `263df9620`, 144 теста PASS. После проверки отсутствия
+собственных Loginom-сессий адресно архивирован также guard monthly.
+Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline 0/18, candidate 0/25;
+обе сборки готовы, deterministic native proof в работе. Ни один старый провал
+не переименован в успех и не включён в новую серию.
+
+## Новая сопоставимая пара
+
+Обе сборки выполнены последовательно в одном managed worktree `node-selection-build`
+на общем source `6768520a0`, версия `0.1.17`. Baseline использует точные два старых
+skill-файла; затем они восстановлены к HEAD для candidate. Source verification
+обоих payload завершилась exit 0. Манифесты SHA256: baseline
+`861ce1594806414b1a40a3339a787cb893b1d583f79c990738ea565d4857b522`, candidate
+`ffc4a0d09e9d6787115f42f920e5d0c5b69f753897bb9973fc18a14481c6107b`.
+Skill digests прежние; baseline dirty, candidate clean отражены честно.
+
+Независимая проверка каждого payload: 5725/5725 CLI entries, 4728/4728 resource
+entries, SHA256/modes/symlinks PASS. Полная разница — шесть файлов: два skill,
+два манифеста и два build-inputs. Runtime, compiled CLI/Host, dependencies,
+Node/Chromium побайтно одинаковы. Разница build-inputs касается только
+представления import paths; входные inventories и outputs совпадают.
+Private evidence: `baseline-attestation.json`, `candidate-attestation.json`,
+обе skill inventories и `pair-independent-review.json` в новом run.
 
 ## Изменение и проверки
 
