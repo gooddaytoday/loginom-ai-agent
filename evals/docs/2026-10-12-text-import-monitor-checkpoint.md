@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-13T03:21:55Z; API/host/default workspace/project доступны и совпали; все8 UUID, LAB-55 и прямые LAB-57 active/roots reads NOT_FOUND. Project list прежний: LAB-16/17/22/26, total4/has_more=false. Статусы/runs/comments/metadata ожидаемых cards UNAVAILABLE, не empty/done; ниже история2026-10-12T19:21:58Z.
+- Проверка: 2026-10-13T03:52:19Z; API/host/default workspace/project доступны и совпали; все8 UUID, LAB-55 и прямые LAB-57 active/roots reads NOT_FOUND. Project list прежний: LAB-16/17/22/26, total4/has_more=false. Статусы/runs/comments/metadata ожидаемых cards UNAVAILABLE, не empty/done; ниже история2026-10-12T19:21:58Z.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; выполнение всех8 не подтверждено, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
 - LAB-57: blocked rev149; оба Evaler runs01a13138-6f0f-7266-8736-a3fd9734a8ad/01a13153-b536-7ae8-9b14-4993a38f1f77 completed; active/queued всех работников нет. Metadata обновлена: TSV pin blocker, full frozen/READY_FOR_BEN/ACCEPT отсутствуют.
