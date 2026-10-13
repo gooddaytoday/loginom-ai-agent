@@ -187,10 +187,13 @@ const cell = (text: string) => text.replaceAll("|", "\\|").replace(/(?:\r?\n)+/g
 
 export function renderReport(summary: RunSummary) {
   const m = summary.metrics
+  const scoped = Boolean(summary.slots?.length || (summary.config.parallel ?? 1) > 1)
+  const wall = Date.parse(summary.finished_at) - Date.parse(summary.started_at)
   const head = [
     `# Eval ${summary.run_id}${summary.label ? ` (${summary.label})` : ""}`,
     "",
     `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · CLI ${summary.agent.cli_version ?? "неизвестен"} · variant ${summary.agent.variant ?? "неизвестен"} · source ${summary.agent.source_commit ?? (summary.agent.cli_mode === "source" ? summary.agent.git_sha : null) ?? "неизвестен"}${summary.agent.source_dirty ? "-dirty" : ""} · binary sha256 ${summary.agent.binary_sha256 ?? "—"}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
+    `Параллельность: ${summary.config.parallel ?? 1}. Длительность прогона: ${Number.isFinite(wall) && wall >= 0 ? (wall / 1000).toFixed(1) + "s" : "—"}. Сумма времени агентов: ${(m.total_duration_ms / 1000).toFixed(1)}s.`,
     summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
     summary.stopped_reason ? `**Прогон остановлен: ${cell(summary.stopped_reason)}**` : "",
     "",
@@ -206,6 +209,8 @@ export function renderReport(summary: RunSummary) {
     `- failure_kinds: ${Object.entries(m.failure_kinds).map(([kind, count]) => `${kind}=${count}`).join(", ") || "—"}`,
     `- tool_calls: ${m.tool_calls}, tool_errors: ${m.tool_errors}, memory_tool_calls: ${m.memory_tool_calls}${m.memory_tool_calls > 0 ? " **(агент писал в память Dock)**" : ""}`,
     `- total_cost: ${m.total_cost}, total_duration: ${Math.round(m.total_duration_ms / 60000)} мин`,
+    ...(summary.slots?.length ? ["", "## Слоты", "", "| Слот | Пользователь | Состояние | Cleanup receipt |", "|---|---|---|---|",
+      ...summary.slots.map(slot => `| ${cell(slot.id)} | ${cell(slot.username)} | ${cell(slot.state ?? "unknown")} | ${cell(slot.cleanup_receipt ?? slot.lease_receipt ?? "—")} |`)] : []),
     "",
     "## Задачи",
     "",
@@ -218,12 +223,12 @@ export function renderReport(summary: RunSummary) {
     "",
     "## Попытки",
     "",
-    "| Задача | # | Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья | Cleanup |",
-    "|---|---|---|---|---|---|---|---|---|---|---|---|",
+    `| Задача | # | ${scoped ? "Слот | " : ""}Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья | Cleanup |`,
+    `|---|---|${scoped ? "---|" : ""}---|---|---|---|---|---|---|---|---|---|`,
     ...summary.tasks.flatMap((task) =>
       runsOf(task.attempts).map(
         (item) =>
-          `| ${task.id} | ${item.attempt}${item.infra_retry ? " (повтор)" : ""} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
+          `| ${task.id} | ${item.attempt}${item.infra_retry ? " (повтор)" : ""} | ${scoped ? `${cell(item.slot_id ?? "default")} | ` : ""}${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
       ),
     ),
   ]
@@ -245,7 +250,9 @@ export function renderReport(summary: RunSummary) {
             "## Остатки в хранилище",
             "",
             ...summary.storage_leftovers.map((name) => `- ${name}`),
-            ...(summary.loginom.container && summary.loginom.storage_dir
+            ...(scoped
+              ? ["", "Адресное восстановление: `parallel-env recover` со slot_id и сохранённым incident/lease receipt."]
+              : summary.loginom.container && summary.loginom.storage_dir
               ? [
                   "",
                   "```bash",

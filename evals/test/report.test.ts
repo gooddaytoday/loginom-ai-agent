@@ -3,12 +3,42 @@ import { mkdtemp, readdir } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
+import { comparisonSummary } from "./helpers/compare-summary"
 
 test("statusFor: ошибка изоляции останавливает запуск даже при exit 1 или timeout", () => {
   const run = { exitCode: 1, timedOut: false, interrupted: false, sandboxError: "SANDBOX_EXECUTION_FAILED" }
   expect(statusFor(run, false)).toEqual({ status: "harness_error", stop: true })
   expect(statusFor({ ...run, timedOut: true }, false)).toEqual({ status: "harness_error", stop: true })
   expect(statusFor({ ...run, sandboxError: null }, false)).toEqual({ status: "failed", stop: false })
+})
+
+test("report: parallel slots show wall time and receipts without a broad storage deletion command", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.started_at = "2026-10-14T00:00:00Z"
+  run.finished_at = "2026-10-14T00:00:12Z"
+  run.config.parallel = 2
+  run.loginom = { image_digest: "image", container: "users", storage_dir: "/workdir/UserStorage/eval-a" }
+  run.storage_leftovers = ["eval-fixture-task-1.lgp"]
+  run.slots = ["a", "b"].map(id => ({ id, username: `eval-${id}`, profileDir: `/tmp/profile-${id}`,
+    historyDir: `/tmp/history-${id}`, workspaceRoot: `/tmp/work-${id}`, liveQualified: false,
+    state: id === "a" ? "closed" : "quarantined", cleanup_receipt: `/tmp/controller/${id}.cleanup.json` }))
+  const report = renderReport(run)
+  expect(report).toContain("Параллельность: 2")
+  expect(report).toContain("Длительность прогона: 12.0s")
+  expect(report).toContain("Сумма времени агентов: 0.0s")
+  expect(report).toContain("b | eval-b | quarantined")
+  expect(report).toContain("/tmp/controller/b.cleanup.json")
+  expect(report).toContain("parallel-env recover")
+  expect(report).not.toContain("rm -f")
+})
+
+test("report: a scoped attempt displays its slot next to its logical attempt number", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.config.parallel = 2
+  run.tasks[0]!.attempts[0]!.slot_id = "b"
+  const report = renderReport(run)
+  expect(report).toContain("| Задача | # | Слот | Статус |")
+  expect(report).toContain("| task-0 | 1 | b | completed |")
 })
 
 test("statusFor: таблица кодов выхода и приоритет timed_out/interrupted", () => {
