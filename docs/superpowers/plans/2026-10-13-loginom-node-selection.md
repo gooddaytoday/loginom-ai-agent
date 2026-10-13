@@ -718,6 +718,14 @@ inspect после response-budget refusal). Standard group-001 останови
   отдельный actual pure guard check на live snapshot, без фиктивной UI receipt.
   Group/directSort выполняются штатными node calls; Product/runtime/pins unchanged.
   JSbranches stillpending.
+  Privateproof-4 дошёл до realGroup preflight: import/JS/Save succeeded, mouse.click
+  вернулся с ACK; subsequentinspect AMBIGUOUS/Managed preview native port changed
+  до F3/Groupcreation, Sortnever. Exactcompoundconjunct unknown; originalexit3/
+  cleanupfalse/HostACKfalse preserved. Ownuser90 строгоbound по initialization/
+  nativeGUID, адресноclosed/admin2freshabsence/logout/MCPexit0; writerabsent.
+  Privateproof-5 instrumenteddiagnostic only: boundedpredicate tuple в одном
+  exactgeneratedthrowmessage, исходный guard/controlflow сохраняется. По actual
+  tuple установить причину перед surgicalTDDfix; не ослаблять ownership по догадке.
 - [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
   серии192418 и native full-driver failure остаются диагностическими и не
   включаются в новый denominator. Policy revision limit прежний; не заменять

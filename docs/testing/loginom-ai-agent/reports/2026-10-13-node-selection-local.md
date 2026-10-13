@@ -106,6 +106,23 @@ JS3 independent stop review SHA
 actual24-tool catalog/route,25receipts/3journals/56source hashes сохранены,
 888events без downstream/managedpreview; прежняя ошибка static review признана.
 
+Privateproof-4 originalexit3, resultSHA
+`e34ab9ed7051bc2bc0e6e2c9e3746e433c27dfadc66a407ff39e02e796b95798`:
+raw019 Save SUCCEEDED; raw022 Group admitted, raw023 AMBIGUOUS с Managed preview
+native port changed. Journal889 selectprepared/890 mouse.click ACK/891 failed
+inspect;892rows, F3/open0, Groupnode=null, Sort0. ACK подтверждает возврат клика,
+не успешную native selection. Originalcleanup BLOCKED/HostACKfalse exit1 сохранены.
+Собственная user:90 initialization21:39:48.808Z/дваnativeGUID/exact packageSave
+строгоbound; Root adminclosure+дваfreshabsence+logout21:44:42.271Z/MCPexit0 выполнены.
+Writer отсутствует, профиль/history/storage не менялись. Конкретный compoundguard
+predicate неизвестен. Privateproof-5 добавит только bounded tuple к error.message
+в exact generated failing inspect через private transport seam; без изменения
+guard/controlflow/runtime/pins. Это инструментированная диагностика, не gatePASS.
+Independent stop review SHA
+`56da0b1375992bc207c066b9dcc2351adc436ff1b5149f70673f775f761c8ca2`:
+53sources/23raw/3journals/catalog/fullXML-before/exactJSrows проверены;
+точный conjunct остаётся UNKNOWN, административное восстановление отдельно.
+
 ## Историческая пара после Join fix — допуск серии
 
 Run `20261013T192418Z-c71363` собран из общего source `05b645eec9`, версия0.1.17;

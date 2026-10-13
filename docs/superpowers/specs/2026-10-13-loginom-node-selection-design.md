@@ -458,6 +458,18 @@ port — allowed_actions:[], actual pure guard на live snapshot проверя
 и не объявляется live UI receipt. Главные native Group/directSort проверки идут
 штатными node calls. Product/runtime/pins неизменны; JSGroup/Sort gate ещёpending.
 
+Privateproof-4 впервые дошёл до реального Group preflight: import/managedJS/
+save-producer SUCCEEDED, затем select ACK подтвердил возврат mouse.click.
+Следующий inspect остановился с Managed preview native port changed до F3 и
+создания Group; Sort не вызван. Originalexit3/cleanupfalse/HostACKfalse сохраняются.
+Конкретное условие составного guard по этому сообщению неизвестно. Собственная
+server incarnation user:90 установлена по initialization21:39:48.808Z и двум
+nativeGUID; Root адресно закрыл её, дважды проверил отсутствие и вышел из admin.
+Privateproof-5 собирается только для диагностики: exact generated browser code
+получает bounded tuple в error.message того же guard, без изменения predicate/
+жестов/control flow и без дополнительного browser call. Он instrumented, не
+является приёмкой immutable runtime; Product/runtime/pins пока не меняются.
+
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
 и все расчётные/политические критерии остаются прежними.

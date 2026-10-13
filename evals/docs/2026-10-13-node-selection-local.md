@@ -69,6 +69,14 @@ live JS allowed_actions:[] и отдельный actual pure guard check на li
 Не объявлять pure guard live UI receipt. Group/directSort проверять штатными
 node calls; Product/runtime/pins unchanged.
 
+Privateproof-4 впервые вызвал Group на actualJSoutput: import/JS/Save SUCCEEDED,
+nativeclick ACKreturned; nextinspect остановился на Managed preview native port
+changed до F3/Groupcreation, Sort не вызван. Originalexit3/cleanupfalse сохраняется.
+Ownuser90 initialization21:39:48.808Z/nativeGUID bound, rootclosed/admin2freshabsence/
+logout/MCPexit0, writerabsent. Exactcompoundpredicate требует отдельного bounded
+diagnostic tuple из того же failing inspect; privateproof-5 явноinstrumented,
+guard/controlflow/Product/pins неизменны. Не запускать модельные18+25 до gatePASS.
+
 Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1
