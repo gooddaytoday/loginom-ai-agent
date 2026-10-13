@@ -139,3 +139,15 @@ CPU/RAM/диск/лицензия/сессии фиксируются до run �
 OOM/ENOSPC, license denial, rate/quota/429, включая промежуточные retries,
 не дают PASS. Skip integration не считается PASS; исторические результаты
 и начатые серии не пересуживаются ради прохождения новой приёмки.
+
+### Временный candidate shared OAuth — 2026-10-14
+
+Отдельная ветка `evals-oauth`, worktree `/home/kiselev/.codex/worktrees/evals-oauth/loginom-ai-agent`, база `loginom@38ee045e79720d363a35666484f17804162b55a1`. Общий checkout и ветки других агентов не изменялись. Импорт выполнен строго `cherry-pick -x` в указанном порядке; evals-код не добавлен в импортируемые коммиты.
+
+- `dfd2b0df2de6b60f529973f35fcccc59feceef5f` → `ede16ba7f91786a584608a97dac98e57341e33be`.
+- `ba919629f966e23670ff0a02720057067adbb040` → `80c3d7a60410b456beae92d9ff2830f0d58ee61c`.
+- `bd4951803532db3f51c1b5a66a864038d88865c3` → `c8106ca501178dc1193d0df3e7534cd1a34a9d67`.
+- `66f0956bc9f16ee580b20f3cf98e368857048f27` → `37ccccdd0a7f6186e78663421ee7bcfb84afb6a5`.
+- `3bcf645a7363b41aed709b985a63758431abeee6` → `694c1d3a4cae1f2529543333502a63ada2689805`.
+
+Единственный конфликт первого переноса: `packages/product/package.json` содержит обе независимые записи exports `./skills` и `./cli-capabilities`. Остальные переносы применились без конфликтов; авто-слияния не заменяют проверки. Последующие адаптации должны оставаться отдельными коммитами, без amend/fixup/squash импортов. Candidate build/install/manifest/bubblewrap/refresh и live qualification ещё не завершены. Existing development CLI, historical results и ранее установленный CLI не заменяются.
