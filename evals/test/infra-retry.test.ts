@@ -239,6 +239,6 @@ test("main: два startup timeout дают infra_error_count 2 без трет�
     expect(await Bun.file(path.join(run.runDir, id, "1/result.json")).json()).toEqual(result)
     expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(2)
     expect(summary.metrics.total_duration_ms).toBe(result.duration_ms + result.infra_retry!.initial.duration_ms)
-    expect(await Bun.file(path.join(run.runDir, "report.md")).text()).toContain("1 (повтор) | infra_error")
+    expect(await Bun.file(path.join(run.runDir, "report.md")).text()).toContain("| infra-retry-twice | 1 (повтор) | default | infra_error |")
   } finally { await context.close() }
 }, 30_000)
