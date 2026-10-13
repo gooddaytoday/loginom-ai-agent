@@ -1147,9 +1147,9 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Пилот sales-by-category/1: CLI exit 0; native offline audit PASS, включая oracle/history/runtime/graph.
 - Финальный auditVersion: `1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d`.
 - Root: 95 tests/219 assertions PASS, typecheck/diff-check PASS; acceptance-lock.json закрепляет 72 файла.
-- Baseline ABC/1: CLI exit 1, cleanup unconfirmed, 1 JS apply; модельный слот сохраняется.
+- Baseline ABC/1 и monthly/1: CLI exit 1, cleanup unconfirmed; оба модельных слота сохраняются.
 - Candidate собран/verify PASS; digest `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Следующий шаг: monthly-demand/1 и остальные 16 baseline; ABC/1 остаётся в знаменателе.
+- Monthly/1: runtime imports.text.date_format дефект; новый guard сохранён, scope-решение запрошено; осталось 15 baseline.

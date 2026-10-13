@@ -1,9 +1,10 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
-Статус: приёмка не завершена. Из 18 baseline начаты две попытки; 16 не запускались.
+Статус: приёмка не завершена. Из 18 baseline начаты три попытки; 15 не запускались.
 Все 25 candidate ещё не запускались. Профиль `analytic-evals` восстановлен после
 проверки закрытия собственной серверной сессии. Архивирован только её guard;
-status/check прошли. Следующий слот — `monthly-demand/1`.
+status/check прошли. Следующий `monthly-demand/1` завершился новым cleanup blocker;
+его guard сохранён, решение по отдельному runtime-дефекту запрошено.
 
 ## Изменение и проверки
 
@@ -64,7 +65,7 @@ Private run: `evals/results/node-selection-local/20261013T093809Z-f5d429/`.
   подтверждён, runtime settlement false. Evidence:
   `baseline/abc-pareto-groups/1/forensic/summary.json` и `readonly-audit.json`.
 
-Таким образом, среди двух начатых baseline один полный расчётный успех и один
+Таким образом, среди трёх начатых baseline один полный расчётный успех и один
 oracle-pass. Это промежуточные числа, не результат всей матрицы 18/25.
 Первый отказ OAuth до inference сохранён отдельно в `incidents/`; после успешной
 авторизации по коду этот запланированный слот впервые дошёл до модели.
@@ -112,10 +113,28 @@ Recovery UUID-записей нет. История, storage и сервер н�
 `profile-recovery-attestation.json`, `recovery-status.json`, `recovery-check.json`,
 `playwright-mcp-installation.json`. Техническое восстановление не превращает
 исторический runtime cleanup ABC в успешный и не подтверждает её oracle.
-Провал ABC остаётся
-в знаменателе; повторять слот 1 нельзя. Следующий слот — `monthly-demand/1`, затем
-остальные запланированные baseline. Candidate начинается после baseline:
+Провалы ABC и monthly остаются в знаменателе; повторять их слоты 1 нельзя.
+Осталось 15 запланированных baseline. Candidate начинается после baseline:
 сначала девять случаев, затем повторы только после чистой первой волны.
+
+## Новый runtime-блокер monthly
+
+`monthly-demand/1`, Session `ses_ecac06e84ffet1Rxb3IuG67J54`: CLI exit 1,
+wrapper exit 3, 111.993 секунды; modelStarted true, cleanupConfirmed false.
+Операция `monthly-import-001`, native GUID `75355558-68d1-4885-a9e5-489c546a0335`,
+осталась `AMBIGUOUS/configure`, `Unsupported import format field`.
+Замороженный `text-import-procedure.mjs` принимает `date_format` в validator,
+но направляет его в setter, поддерживающий лишь delimiter/text_qualifier/
+null_marker/decimal_separator. Это дефект настройки стандартного импорта,
+а не основание переходить на JavaScript или менять правило skill.
+
+Evidence: `baseline/monthly-demand/1/forensic/monthly-import-001-diagnosis.json`.
+Строгая server identity ещё не подтверждена: own GUID/input path/Dock IDs в
+server log отсутствуют, backups пусты. Одного совпадения времени `user:15`
+недостаточно для CloseSession. Новый guard сохранён, серию остановили.
+Запрошено отдельное решение владельца: исправление runtime по TDD с новой
+сопоставимой серией либо сохранение исходного scope с блокером приёмки.
+Текущие frozen payload/pins и первоначальные evidence не изменены.
 
 Не проверены live explicit-js/tags/recovery, candidate no-JS 18/18, сравнение
 oracle-pass всей серии и обязательное содержательное review. Не проверены
