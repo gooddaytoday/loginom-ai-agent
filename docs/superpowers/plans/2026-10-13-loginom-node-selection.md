@@ -988,7 +988,7 @@ bun typecheck
 **Interfaces:** baseline pins + candidate payload → 25 попыток одной версии skill:
 18 standard, 3 explicit-js, 3 tags, 1 recovery. Первые 9 входят в эти числа.
 
-- [ ] В `candidate-pins.json` закрепить порядок и перенести `reviewSeed`,
+- [x] В `candidate-pins.json` закрепить порядок и перенести `reviewSeed`,
   сохранённый до baseline pilot. Порядок первой волны: шесть standard из таблицы spec,
   затем explicit-js, tags, recovery; у всех номер 1. В каждом слоте одна команда:
 
