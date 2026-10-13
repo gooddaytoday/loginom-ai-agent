@@ -451,7 +451,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
   номера попыток, SHA prompt/inputs/oracle. Candidate допускает recovery только
   с номером 1. Все пути, prefix, packagePath/resultName выводятся из pins+task+номер;
   пользователь не передаёт их вручную на каждой попытке. Секретов в pins нет.
-- [ ] Последовательность внутри wrapper: проверить pins/payload и headless
+- [x] Последовательность внутри wrapper: проверить pins/payload и headless
   status → создать новые evidence/workspace → скопировать только inputs →
   `loadTasks`/трёхаргументный `buildAgentPrompt` → один CLI с deadline →
   подтверждённый exit/cleanup → read-only snapshot своей Session → свои
