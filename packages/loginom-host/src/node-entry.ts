@@ -124,7 +124,9 @@ async function dispatch(message: unknown) {
         environment: process.env,
       }
       const guardFPStartup=()=>{fpStartup?.guard();if(fpStartup && (options.root!==input.root || options.resources!==input.resources
-        || options.headless!==input.headless || options.acceptanceCapture!==capture))throw Error('LOGINOM_HANDSHAKE_INVALID')};
+        || options.headless!==input.headless || options.acceptanceCapture!==capture
+        || options.strictRecovery!==('strictRecovery' in input && input.strictRecovery===true)
+        || options.acceptanceCleanupPackage!==('acceptanceCleanupPackage' in input?input.acceptanceCleanupPackage:undefined)))throw Error('LOGINOM_HANDSHAKE_INVALID')};
       guardFPStartup();if(fpStartup)bindFPHostStartup(options,fpStartup);
       state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {

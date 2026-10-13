@@ -22,6 +22,8 @@ export async function createLoginomHost(options: {
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const fpStartup=getFPHostStartup(options)
+  if(options.acceptanceCapture?.harness==='field-parameters-preservation-v1' && !fpStartup)
+    throw Error('LOGINOM_HANDSHAKE_INVALID')
   try {
   fpStartup?.guard()
   const root = options.root
