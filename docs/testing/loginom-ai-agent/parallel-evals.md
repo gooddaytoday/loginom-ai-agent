@@ -229,3 +229,18 @@ live composite identity race qualification и административные �
 Studio /app/ и backend alias loginom-server-7.4.2-test. Иной path/alias отклоняется
 PAIR_CONFIGURATION при построении плана, до provision mutations. 16 targeted
 tests/typecheck PASS; исходный full unit относится к factory commit96338cbc32.
+
+JSONL v1 codec реализован в loginom-admin.ts: строгие header/identity/op checks,
+request/reply correlation, 1 MiB byte cap, UTF-8/LF framing, absolute deadlines,
+один request in flight. Invalid request отвергается до pipe; expired до отправки
+→ not_applied. EOF/timeout/malformed/oversized response → unknown с постоянным
+safe code, дальнейшие отправки на этом канале запрещены до reconciliation.
+Raw malformed reply и canary secret не попадают в diagnostic envelope.
+
+10 codec tests используют stdin/stdout настоящего Bun child — только protocol
+peer, без реализации Loginom RPC/пользователей. Детерминированная segmentation
+реальных pipe bytes доказывает UTF-8 framing; wire events доказывают single flight.
+С selector: 14 admin tests; pair/CI вместе — 26 PASS, typecheck/diff check PASS.
+Это transport qualification, не admin/browser readiness. Durable intent before
+send, runtime verifier/driver launch, dispose ack/process proof и live RPC ещё
+не реализованы; полный suite последнего factory коммита не включает этот codec.
