@@ -21,7 +21,7 @@ class AdmissionTest(unittest.TestCase):
         (self.profile/'config.json').write_text('{}')
         (self.profile/'cli-profile.json').write_text(json.dumps({'format':'loginom-cli','version':1,'channel':'dev'}))
         (self.root/'oauth').mkdir()
-        (self.cwd/'task.md').write_text('Enable prefixes. Joined_ label JOIN_READY')
+        (self.cwd/'task.md').write_text('Enable prefixes. Joined_ label JOIN_READY. На первом этапе и при добавлении третьего входа включите префиксы: имя Joined_, метка «Присоединённое: ».')
         (self.cwd/'input.csv').write_text('id\n1\n')
         self.candidate = self.root/'candidate'; self.candidate.mkdir()
         files = []
@@ -31,7 +31,7 @@ class AdmissionTest(unittest.TestCase):
             path.chmod(0o755); files.append({'path':relative,'sha256':pin(path)['sha256'],'mode':0o755})
         (self.candidate/'cli-manifest.json').write_text(json.dumps({'format':'loginom-cli-artifact-v1','metadata':{'version':'test','channel':'dev','platform':'linux','arch':'x64','sourceCommit':'a'*40,'sourceTreeSha256':'b'*64,'sourceDirty':False,'dependencies':{}},'files':files}))
         self.spec = dict(issue='LAB-72',case='LAB-72-enabled-prefixes',task=pin(self.cwd/'task.md'),inputs=[pin(self.cwd/'input.csv')],cwd=str(self.cwd),profile=str(self.profile),shared_auth_dir=str(self.root/'oauth'),profile_config=pin(self.profile/'config.json'),model='openai/gpt-6-luna',variant='high',candidate={'path':str(self.candidate),'manifest_sha256':pin(self.candidate/'cli-manifest.json')['sha256'],'sha':'a'*40,'platform':'linux','arch':'x64','channel':'dev'})
-        self.contract = dict(case=self.spec['case'],task_sha256=self.spec['task']['sha256'],review_reference='comment-review',required_text=['Enable prefixes.','Joined_','JOIN_READY'],required_fixes=['canonical-array'],prefixes=dict(enabled=True,joined='Joined_',label='JOIN_READY',enabled_text='Enable prefixes.'))
+        self.contract = dict(case=self.spec['case'],task_sha256=self.spec['task']['sha256'],review_reference='comment-review',required_text=['Enable prefixes.','Joined_','JOIN_READY'],required_fixes=['canonical-array'],prefixes=dict(enabled=True,joined='Joined_',label='Присоединённое: ',enabled_text='Enable prefixes.'))
         (self.root/'proof').write_text('PRIVATE ORACLE: expected=42')
         self.evidence = dict(binding=dict(self.spec),reviewer='reviewer',resource_reference='own resource probe',checked_at=time.time(),resources='PASS',cleanup='PASS',unknown_operation_replay=False,fixes={'canonical-array':dict(candidate_sha='a'*40,explanation='array keys preserved',verdict='PASS',reproducer='original counterexample',proof=pin(self.root/'proof'))})
         self.write()
@@ -54,6 +54,11 @@ class AdmissionTest(unittest.TestCase):
         (self.profile/'.writer').mkdir(); self.rejected()
     def test_missing_shared_oauth_never_starts(self):
         self.spec['shared_auth_dir']=str(self.root/'absent'); self.write(); self.rejected()
+    def test_wrong_required_label(self):
+        self.contract['prefixes']['label']='Wrong'; self.write(); self.rejected()
+    def test_missing_first_stage_even_with_new_approved_hash(self):
+        (self.cwd/'task.md').write_text('Enable prefixes. Joined_ label Присоединённое: JOIN_READY only on third input')
+        self.spec['task']=pin(self.cwd/'task.md'); self.contract['task_sha256']=self.spec['task']['sha256']; self.evidence['binding']['task']=self.spec['task']; self.write(); self.rejected()
     def test_wrong_prefixes(self):
         self.contract['prefixes']['enabled']=False; self.write(); self.rejected()
     def test_changed_task(self):

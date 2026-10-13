@@ -60,8 +60,10 @@ def validate(spec):
         raise DeliveryError('Business task is missing required case wording')
     if spec['case'] == 'LAB-72-enabled-prefixes':
         prefixes = contract['prefixes']
-        if prefixes['enabled'] is not True or prefixes['joined'] != 'Joined_' or not prefixes['label']:
-            raise DeliveryError('LAB-72 requires enabled prefixes, Joined_ and the required label')
+        if prefixes['enabled'] is not True or prefixes['joined'] != 'Joined_' or prefixes['label'] != 'Присоединённое: ':
+            raise DeliveryError('LAB-72 requires enabled prefixes, Joined_ and the assigned label')
+        if 'На первом этапе и при добавлении третьего входа включите префиксы: имя Joined_, метка «Присоединённое: ».' not in text:
+            raise DeliveryError('LAB-72 must enable the assigned prefixes at BOTH stages')
         if any(prefixes[k] not in text for k in ('joined', 'label')) or prefixes['enabled_text'] not in text or not prefixes['enabled_text']:
             raise DeliveryError('LAB-72 prefix requirements are absent from the transmitted task')
     if spec['issue'] == 'LAB-72' and spec['case'] not in ('LAB-72-enabled-prefixes', 'LAB-72-original-strict'):
