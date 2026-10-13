@@ -102,6 +102,8 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
               signal: controller.signal, profileRecovered: false, slotId, judge: settings,
               initialInfraAttempt, skipJudge: config.skipJudge, evaluationHash, judgeGate })
             attempts[job.index] = completed.result
+            if (completed.result.judge_cleanup_unconfirmed)
+              throw Error(completed.result.environment_cleanup?.error ?? "Judge process cleanup unconfirmed")
             const cleanup = await finishFixtureAttempt(context, completed.result, out).then(() => true, async (error: unknown) => {
               completed.result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
               await Bun.write(path.join(out, "result.json"), JSON.stringify(completed.result, null, 2))
@@ -385,6 +387,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const result: AttemptResult = {
     ...base,
     ...judgeFields,
+    ...(judgeCleanupFailed ? { judge_cleanup_unconfirmed: true } : {}),
     ...((judged || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
     status,
     exit_code: run.exitCode,
@@ -401,7 +404,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     cleanup_error: cleanupError,
     environment_cleanup: {
       status: judgeCleanupFailed || run.processCleanup.status === "failed" ? "failed" : "not_run",
-      evidence: judgeCleanupFailed ? `judge-processes-${judged.attempts}/process-cleanup.json` : "cleanup.json",
+      evidence: judgeCleanupFailed ? judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null : "cleanup.json",
       error: judgeCleanupFailed && !judged.ok ? judged.error : run.processCleanup.error,
     },
     action_manifest_sha256: run.actionManifestSha256 ?? null,

@@ -192,10 +192,11 @@ export async function judgeTask(input: {
     ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }
     : { ...second, ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
 }
-export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0 }
+export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0; cleanupUnconfirmed?: true }
 
 export function createJudgeGate() {
   let sequence = Promise.resolve()
+  let poisoned = false
   return (input: Parameters<typeof judgeTask>[0]): Promise<Judged> => {
     const previous = sequence
     const finished = Promise.withResolvers<void>()
@@ -207,7 +208,11 @@ export function createJudgeGate() {
     if (input.signal?.aborted) abort()
     return Promise.race([previous, cancelled.promise]).then<Judged>(() => {
       if (input.signal?.aborted) return { ok: false, error: "interrupted before judge", attempts: 0 }
-      return judgeTask(input)
+      if (poisoned) return { ok: false, error: "Judge gate blocked by unconfirmed cleanup", attempts: 0, cleanupUnconfirmed: true }
+      return judgeTask(input).then(result => {
+        if ("cleanupUnconfirmed" in result && result.cleanupUnconfirmed) poisoned = true
+        return result
+      })
     }).finally(() => {
       input.signal?.removeEventListener("abort", abort)
       finished.resolve()
