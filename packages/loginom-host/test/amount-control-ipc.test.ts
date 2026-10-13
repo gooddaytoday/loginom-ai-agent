@@ -5,7 +5,7 @@ import {retainAmountCaller,runAmountCaller,settleAmountCaller} from '../src/amou
 const node='/home/user/.cache/loginom-bootstrap/node/node-v24.19.0-linux-x64/bin/node'
 const entry=fileURLToPath(new URL('../../loginom-runtime/test/fixtures/amount-control-ipc-child.mjs',import.meta.url))
 for(const stage of ['success','preabort','read','record','foreign'])test('fixture-owned retained root -> real child IPC -> fixed Amount '+stage,async()=>{
- const c=new AbortController(),input={signal:c.signal,deadline:Date.now()+50000,operation:'op',request:'req',owner:'own',run:'run',lease:'own:run',generation:1,chat:'chat',account:'test-2'}
+ const c=new AbortController(),input={signal:c.signal,deadline:Date.now()+50000,operation:'op',request:'req-'+stage,owner:'own',run:'run',lease:'own:run',generation:1,chat:'chat',account:'test-2'}
  const grant=retainAmountCaller(input);let child:any,abort:()=>void=()=>{},tuple:any,result:any
  let exited!:Promise<any>
  const returned=await runAmountCaller(grant,input,async original=>{

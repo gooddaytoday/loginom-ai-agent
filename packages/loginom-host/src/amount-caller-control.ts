@@ -6,6 +6,10 @@ export type AmountCallerControl = Tuple & { signal: AbortSignal; deadline: numbe
 const keys = ["operation", "request", "owner", "run", "lease", "generation", "chat", "account", "signal", "deadline"] as const
 const retained = new WeakMap<object, { input: AmountCallerControl; original: AmountCallerControl; attempted: boolean; dispatchSettled: boolean; settled: boolean }>()
 const inputs = new WeakMap<object, object>()
+// Fence the original identity, not its replaceable JS carrier. Keep only the
+// operation/request tombstone after settlement: neither UNKNOWN nor a copied
+// carrier can restore attempted=false. Different original requests stay valid.
+const originalRequests = new Set<string>()
 const refuse = () => { throw Error("LOGINOM_AMOUNT_CALLER_CONTROL") }
 
 export function retainAmountCaller(input: AmountCallerControl) {
@@ -17,6 +21,9 @@ export function retainAmountCaller(input: AmountCallerControl) {
   // Own scalar values are captured before any await. Signal is the ACTUAL
   // parent object, deliberately retained by reference and never serialized.
   const original = Object.freeze(Object.fromEntries(keys.map(k => [k, input[k]]))) as AmountCallerControl
+  const requestKey = JSON.stringify([original.operation, original.request])
+  if (originalRequests.has(requestKey)) refuse()
+  originalRequests.add(requestKey)
   const grant = Object.freeze({})
   retained.set(grant, { input, original, attempted: false, dispatchSettled: false, settled: false })
   inputs.set(input, grant)

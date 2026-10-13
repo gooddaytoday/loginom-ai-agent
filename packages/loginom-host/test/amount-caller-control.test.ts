@@ -1,6 +1,7 @@
 import {test,expect} from 'bun:test'
 import {retainAmountCaller,assertAmountCaller,runAmountCaller,settleAmountCaller} from '../src/amount-caller-control'
-function fixture() { const c=new AbortController();return {c,input:{signal:c.signal,deadline:Date.now()+60000,operation:'operation',request:'request',owner:'owner',run:'run',lease:'owner:run',generation:1,chat:'chat',account:'account'}} }
+let sequence=0
+function fixture() { const c=new AbortController();return {c,input:{signal:c.signal,deadline:Date.now()+60000,operation:'operation',request:'request-'+(++sequence),owner:'owner',run:'run',lease:'owner:run',generation:1,chat:'chat',account:'account'}} }
 test('actual original object retained before await, single dispatch and cleanup/evidence settlement',async()=>{
  const {input}=fixture(),grant=retainAmountCaller(input);let calls=0
  const result=await runAmountCaller(grant,input,async original=>{calls++;expect(original.signal).toBe(input.signal);expect(original.deadline).toBe(input.deadline);await Promise.resolve();return 7})
