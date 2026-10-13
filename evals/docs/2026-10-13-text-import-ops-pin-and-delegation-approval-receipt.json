@@ -100,5 +100,53 @@
     "native_scenario_model_calls": 0,
     "shared_runtime_CLI_credentials_VPN_changes": 0
   },
-  "verified_utc": "2026-10-13T14:06:10.517741+00:00"
+  "verified_utc": "2026-10-13T14:06:10.517741+00:00",
+  "coordinator_acknowledgement": {
+    "comment_id": "01a1359b-d1a9-7767-8501-5c0731bd3916",
+    "parent_id": "01a13591-5d06-7734-b05b-5e3a4a9fd6c7",
+    "effective_scope_sha256": "cbb1f622d86756455aa4d4c8dd23874917e8bd50db08d173fff919e0417fe04c",
+    "handoff_attachment_id": "01a1359b-cd03-779c-b73a-edba11b1d25a",
+    "handoff_bytes": 60170,
+    "handoff_sha256": "dd7dd51d8221bef7ba867d9bc84444148a612ea8649982ec5d54dd43b2639b1b",
+    "payload_files_verified": 9,
+    "CRC_paths_types_bytes_hashes": true,
+    "policy_and_plan_byte_identical": true,
+    "effective_timing": {
+      "operator_30min": "SUPERSEDED",
+      "offline_45min": "SUPERSEDED",
+      "stage_6h": "SUPERSEDED",
+      "historical_deadline_utc": "2026-10-13T15:33:29.538616Z",
+      "historical_deadline_effective": false,
+      "scope_until": "actual verified completion of LAB-56..LAB-63",
+      "technical_command_timeouts_and_cleanup": "UNCHANGED"
+    },
+    "owner_routing": "Evaler/Rich choose technical options autonomously; remaining real decisions go as evidence/checkpoint to delegated Codex coordinator, no human approval gate",
+    "metadata_stage": {
+      "authorization_comment_id": "01a13591-5d06-7734-b05b-5e3a4a9fd6c7",
+      "status": "AUTHORIZED_AUTONOMOUS_CONTINUATION",
+      "wall_time_gates": "SUPERSEDED",
+      "scope_until": "LAB-56..LAB-63 verified completion",
+      "technical_timeouts": "UNCHANGED",
+      "cost": "Cumulative counters/actual usage retained; no budget reset"
+    },
+    "accepted_dispatch": {
+      "id": "LAB57-RICH-OPS-PIN-ARCHIVE-01a13591",
+      "phase": "rich",
+      "sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+      "root_trigger": "01a13591-5d06-7734-b05b-5e3a4a9fd6c7",
+      "task_id": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+      "outcome": "queued"
+    },
+    "active_Rich_task": "01a1359b-d1cd-7559-8ae8-5b05a20fe866",
+    "Rich_running_since": "2026-10-13T17:17:47+03:00",
+    "status": "in_progress203",
+    "direct_operator_or_worker_duplicate": false
+  },
+  "automation_persistence": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "schedule_name_kind_preserved": true,
+    "cohesive_prompt_replaced_old_active_deadline_and_owner_gates": true,
+    "exact_readback": true
+  }
 }
