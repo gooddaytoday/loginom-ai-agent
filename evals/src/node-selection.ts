@@ -112,6 +112,23 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
             && event.semantic_sha256 === result.semantic_sha256))) failures.push("SOURCE_RECEIPT_UNVERIFIED")
       continue
     }
+    const operationID = part.state.input.operation_id
+    const sourceRead = calls.find((call) => call.dockID === dockID && call.part.sessionID === part.sessionID
+      && call.part.tool === "loginom_dock_node_read" && record(call.part.state) && record(call.part.state.input)
+      && ["source", "context"].includes(String(call.part.state.input.kind))
+      && call.part.state.input.operation_id === operationID)
+    if (sourceRead && record(sourceRead.part.state) && record(sourceRead.part.state.input)) {
+      const request = sourceRead.part.state.input
+      const terminal = calls.filter((call) => call.dockID === dockID && record(call.result)
+        && (call.result.operation_id ?? (record(call.result.owner) ? call.result.owner.operation_id : undefined)) === request.operation_id).at(-1)?.result
+      const progress = record(terminal) && record(terminal.progress) ? terminal.progress : undefined
+      if (!record(terminal) || terminal.state !== "settled" || progress?.cleanup_complete !== true || progress.pending_phase !== null
+        || JSON.stringify(progress.node) !== JSON.stringify(request.node)
+        || !input.runtime.some((runtime) => record(runtime.session) && runtime.session.sessionId === dockID
+          && runtime.events.some((event) => record(event) && record(event.owner) && event.owner.operation_id === request.operation_id
+            && event.phase === "source_discard_settled"))) failures.push("SOURCE_READ_UNSETTLED")
+      continue
+    }
     if (!record(result) || typeof result.operation_id !== "string") { failures.push("TOOL_RECEIPT_INCOMPLETE"); continue }
     if (part.state.input.operation_id !== result.operation_id) failures.push("TOOL_OPERATION_MISMATCH")
     if (!(result.request_rejected === true && result.status === "NOT_APPLIED" && result.effect_possible === false)

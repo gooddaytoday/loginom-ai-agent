@@ -56,6 +56,11 @@ async function pilotDirectory() {
 }
 
 test.each(["source", "context"])("owned %s reads settle using their own contract without an apply status", (kind) => {
+  const evidence = sourceReadEvidence(kind)
+  expect(inspectSelectionRuntime(evidence)).toEqual({ runtimeSettled: true, failures: [] })
+})
+
+function sourceReadEvidence(kind: string) {
   const runtime: SelectionRuntime[] = structuredClone(pilotRuntime)
   const node = JSON.parse(applyWait[2]!.state.output).node as Record<string, unknown>
   const owner = { ...node, operation_id: "source-read", ui_epoch: 1 }
@@ -70,7 +75,19 @@ test.each(["source", "context"])("owned %s reads settle using their own contract
     session_id: pilotRuntime[0]!.session.sessionId, owner, step: 1, phase,
     semantic_sha256: "a".repeat(64), receipt: { source_sha256: "a".repeat(64) },
   })))
-  expect(inspectSelectionRuntime({ parts, runtime })).toEqual({ runtimeSettled: true, failures: [] })
+  return { parts, runtime, node }
+}
+
+test.each([true, false])("source wait uses its progress cleanup contract: %s", (cleanup) => {
+  const evidence = sourceReadEvidence("source")
+  evidence.parts.push({ id: "read-wait", type: "tool", tool: "loginom_dock_node_wait", sessionID: pilotHistory.snapshot.sessionID,
+    state: { status: "completed", input: { operation_id: "source-read", timeout_ms: 1000 }, output: JSON.stringify({
+      operation_id: "source-read", state: "settled", outcome: null, progress: {
+        node: evidence.node, cleanup_complete: cleanup, pending_phase: null,
+      },
+    }) },
+  })
+  expect(inspectSelectionRuntime(evidence).runtimeSettled).toBe(cleanup)
 })
 
 test("pilot policy evidence binds the actual model, activated bundled skill and runtime catalog", () => {
