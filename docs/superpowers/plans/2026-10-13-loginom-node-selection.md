@@ -474,7 +474,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
 selection_repo=/home/kiselev/.codex/worktrees/4118/loginom-ai-agent
 selection_run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 selection_root="$selection_repo/evals/results/node-selection-local/$selection_run_id"
-selection_profile=/home/kiselev/.config/com.loginom.aiagent/cli/profiles/default
+selection_profile=/home/kiselev/.config/com.loginom.aiagent/cli/profiles/analytic-evals
 selection_cli=/home/kiselev/.local/bin/loginom-ai-agent-cli
 selection_resources="/home/kiselev/.local/share/loginom-ai-agent-acceptance/node-selection-$selection_run_id"
 selection_baseline="$selection_resources/baseline"
@@ -485,6 +485,12 @@ mkdir -- "$selection_resources"
 ```
 
   Повторный запуск подготовки не заменяет существующие каталоги.
+  Для этой реализации выбран уже существующий локальный профиль `analytic-evals`:
+  его headless status/check подтвердили `http://localhost/app/`, user, /user.
+  На localhost:80 опубликован существующий client; его Apache ProxyPass ведёт
+  к `loginom-server-7.4.2-test:8080/ws/` в той же Docker network, а /user существует
+  в UserStorage этого server. Настройки профиля не изменялись. Профиль default
+  указывает на публичный app.loginom.ai и не соответствует локальному copy-out.
 - [ ] Проверить текущее подключение, без изменения настроек:
 
 ```bash
@@ -683,6 +689,7 @@ LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG=1 \
 LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT=1 \
 LOGINOM_AI_AGENT_DISABLE_EXTERNAL_SKILLS=1 \
 LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS=1 \
+LOGINOM_AI_AGENT_MODELS_PATH="$selection_root/frozen-models.json" \
   python3 - "$selection_baseline/bin/loginom-ai-agent-cli" "$selection_workspace" \
   "$selection_model" "$selection_variant" "$selection_attempt" "$selection_prefix" <<'PY'
 import json
@@ -908,8 +915,9 @@ JavaScript используй только для этого остатка ил
 
 ```markdown
 Ошибка параметров, timeout, временный отказ и неполная выборка не разрешают
-перейти на JavaScript. Исправляй параметры по схеме и восстанавливай исходную
-операцию; при невозможности продолжения сообщи конкретный блокер.
+перейти на JavaScript. При неопределённом результате сначала восстанови исходную
+операцию. При подтверждённом отказе исправь запрос по схеме и следуй next_step;
+при невозможности продолжения сообщи конкретный блокер.
 ```
 
 - [ ] Перед блоком JS source/context добавить отсылку, сохранив сам блок:

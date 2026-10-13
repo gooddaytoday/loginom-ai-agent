@@ -15,6 +15,12 @@
 в pins обеих серий. Дочернему CLI передаётся `LOGINOM_AI_AGENT_MODELS_PATH`.
 Пользовательская конфигурация моделей не меняется.
 
+Текущая локальная серия использует существующий профиль `analytic-evals`:
+status/check подтвердили `http://localhost/app/`, user, /user. Client на порту 80
+проксирует WebSocket на существующий `loginom-server-7.4.2-test:8080/ws/`.
+Container ID, сеть и UserStorage проверены read-only, public routing evidence
+сохранён в приватном каталоге серии. Профили и настройки не перенастраивались.
+
 Серия: 18 baseline и 25 candidate (18 standard, 3 explicit-js, 3 tags,
 1 recovery). Первые 9 candidate входят в эти 25; повторы разрешены только
 после чистой первой волны. При нарушении политики следующие слоты этой
