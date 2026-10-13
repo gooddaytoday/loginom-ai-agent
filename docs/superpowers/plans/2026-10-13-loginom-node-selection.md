@@ -289,7 +289,7 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
 
 - [x] Повторить `bun test test/node-selection.test.ts test/oracle.test.ts`,
   затем `bun typecheck` из `evals/`.
-- [ ] Повторить offline-аудит пилота окончательным аудитором и зафиксировать
+- [x] Повторить offline-аудит пилота окончательным аудитором и зафиксировать
   его версию. Новая версия аудита перепроверяет все уже собранные попытки;
   model/skill digest попытки при этом не меняется, данные не подменяются.
 - [ ] Закоммитить только новые audit/runbook файлы:
