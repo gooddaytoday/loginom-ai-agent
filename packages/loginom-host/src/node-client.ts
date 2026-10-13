@@ -110,7 +110,14 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
   diagnostics.set(options, grant)
   if (fp) fpStarts.set(options, fp)
   const host = await observed(launchNodeHost(options))
-  return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
+  if (!fp) return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
+  // Keep the exact handle retained by the factory, including its live getters.
+  return Object.assign(host, { capture: async (run: string) => {
+    fp.guard()
+    const result = await host.request("acceptance.capture", { run, authorization: grant.authorization })
+    fp.guard()
+    return result
+  } })
 }
 
 export async function launchNodeHost(input: NodeHostInput) {
@@ -179,7 +186,16 @@ export async function launchNodeHost(input: NodeHostInput) {
   }
   const handle = {
     port, exited, request: client.request,
-    ...(fpClient && diagnostic ? {readPreReady: (run:string, control:{signal:AbortSignal;deadline:number}) => fpClient.readPreReady({run,authorization:diagnostic.authorization},control)} : {}),
+    ...(fpClient && diagnostic ? {readPreReady: async (run:string, control:{signal:AbortSignal;deadline:number}) => {
+      fp?.guard()
+      // Continue the actual factory's original control; a fresh signal/budget
+      // cannot qualify the retained child after the owning attempt expired.
+      if (!fp || control.signal !== fp.control.signal || control.deadline !== fp.control.deadline)
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
+      const result = await fpClient.readPreReady({run,authorization:diagnostic.authorization},fp.control)
+      fp.guard()
+      return result
+    }} : {}),
     get alive() { return !state.closed },
     close,
   }

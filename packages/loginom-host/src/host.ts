@@ -207,13 +207,18 @@ export async function createLoginomHost(options: {
     },
     bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
       if (!options.acceptanceCapture) return
+      if (options.acceptanceCapture.harness === "field-parameters-preservation-v1") {
+        if (!fpStartup) throw Error("LOGINOM_HANDSHAKE_INVALID")
+        fpStartup.guard()
+      }
       const current = generations.get(lease.generation)
       if (!current || current.children.has(chat) || captures.has(chat)
           || !options.acceptanceCapture.packagePath.startsWith(`/${current.connection.username}/`))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
       captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
-        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+(options.acceptanceCapture.harness==="field-parameters-preservation-v1"?120000:600000) })
+        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: options.acceptanceCapture.harness === "field-parameters-preservation-v1"
+          ? Math.min(fpStartup?.control.deadline ?? 0, Date.now()+120000) : Date.now()+600000 })
     },
     resetRestarts(chat: string) {
       restarts.delete(chat)
