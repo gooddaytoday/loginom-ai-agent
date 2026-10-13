@@ -270,6 +270,13 @@ fixtures и oracle. Независимый review закрыл две ошибк
 document/workflow/node (`0d44e677a`); повторные пять регрессий прошли.
 
 Bundled skills: 9/9 до и после; полный staging 13/13 без SKIP, host typecheck PASS.
+Для Task 6 независимая read-only сверка подтвердила сохранение этих результатов
+в историческом report `53e471ddf4` и неизменность skill/host/dependencies.
+Отдельный raw host-test receipt не найден; новые host tests не запускались.
+Актуальный eval collector проверен отдельно: 88 tests/206 assertions/typecheck/
+diff PASS, source hashes и все 72 файла addendum совпали. Runtime 310-test source,
+build verification и native offline evidence также сверены. Прежний native driver
+exit 1 сохранён, самостоятельный offline validator exit 0 — отдельный результат.
 Baseline и candidate собраны и проверены. Node/Bun/Chromium dependencies совпали;
 различия Product-исходников между payload commits — ровно два skill-файла.
 Время сборки исходники были заморожены. `acceptance-lock.json` закрепляет 72 файла.

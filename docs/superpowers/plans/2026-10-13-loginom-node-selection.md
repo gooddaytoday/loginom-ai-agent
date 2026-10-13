@@ -1170,9 +1170,16 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 
 **Files:** итоговый отчёт, runbook, краткий checkpoint в конце этого плана.
 
-- [ ] Из `evals/` выполнить целевые тесты аудита и `bun typecheck`; повторять
+- [x] Из `evals/` выполнить целевые тесты аудита и `bun typecheck`; повторять
   только если после Task 1 менялся код проверки. После текстовых правок skill
   выполнить целевые проверки bundled skills/staging и `git diff --check`.
+  Актуальный collector `f5eb5373e2`: 88 tests/206 assertions, typecheck/diff PASS,
+  независимое source/lock review PASS. Прежние bundled 9/9, staging 13/13 без SKIP
+  и host typecheck документированы ещё `53e471ddf4`; skill/host/dependencies с тех
+  пор не менялись, source hashes сверены с candidate. Raw host-test log не найден;
+  используется зафиксированный результат Task 4, а не заявляется новый запуск.
+  Runtime 310 tests и build/native offline evidence отдельно сверены с source.
+  Этот пункт не закрывает live candidate и содержательный review.
 - [ ] Независимый reviewer проверяет два skill-файла, контракт аудита и выборку:
   все 6 JS-попыток, одну recovery, все candidate-провалы/аномалии и три случайных
   успешных standard. Это 7 exception/recovery, а не 9 JS-попыток. Baseline

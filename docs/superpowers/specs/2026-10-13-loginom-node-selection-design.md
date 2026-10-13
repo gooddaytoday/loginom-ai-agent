@@ -250,6 +250,11 @@ ordinary cleanup подтверждены. Wrapper exit 2 вызван текс�
 independent review. Actual 68 parts дают 16 managed calls; original history
 не мутируется. Historical acceptance lock неизменён; `collector-fix-lock.json`
 закрепляет новый runner SHA и 71 прежний file hash. AuditVersion не менялся.
+Командные проверки Task 6 завершены: current collector source/lock сверены,
+evals 88 tests/typecheck/diff PASS. Bundled/staging/host checks Task 4 используются
+без повтора: skill/host/dependencies неизменны; отдельного raw host-test log не
+найдено, подтверждение сохранено в committed report. Runtime 310-test и native
+offline evidence сверены отдельно. Это не закрывает candidate/review gates.
 
 Exact receipt-based copyout дал пакет SHA
 `dddd3fc96c6036cc74cf9096efd3a596a863b8d45e5417cc006e895d82b48e2a`
