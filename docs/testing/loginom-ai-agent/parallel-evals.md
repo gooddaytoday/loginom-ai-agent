@@ -135,3 +135,10 @@ Image 69ce44ac1002 полный ID указан в inventory. Source SHA: 53d043
 e80d141da198b7800c3d212a534eb70bf0853a8dd0dd6381793291532f16ace3,
 d3ab87a3aca82985d41a8b9d4b3502c9d8d662204c67c07fb3ff2156d802407a.
 /tmp originals и чужие artefacts сохранены; own copy-temp удалён.
+
+CI boundary завершён: test:unit исключает семь новых integration suites помимо
+прежних исключений. Публичная команда проверена реальным Bun child в private
+package fixture: unit выполняется, семь integration modules не загружаются.
+RED без исключений дал exit 1; GREEN — exit 0. Пять ci-boundary/parallel-pair
+tests и bun typecheck/git diff --check PASS. Этот fixture не подменяет Docker,
+Loginom или admin adapter; живые проверки остаются отдельными integration files.
