@@ -28,11 +28,24 @@ export function validateStartInput(input) {
   )
     throw Error("LOGINOM_START_INVALID")
   const fpStartup=input.fpStartup
-  if(fpStartup!==undefined && (!fpStartup || typeof fpStartup!=="object" || Object.keys(fpStartup).sort().join(",")!=="authorization,deadline,harness,requestId"
+  if(fpStartup!==undefined && (!fpStartup || typeof fpStartup!=="object"
       || fpStartup.harness!=="field-parameters-preservation-v1" || typeof fpStartup.authorization!=="string" || !/^[a-f0-9]{64}$/.test(fpStartup.authorization)
       || typeof fpStartup.requestId!=="string" || !/^[a-zA-Z0-9_-]{1,160}$/.test(fpStartup.requestId)
       || !Number.isSafeInteger(fpStartup.deadline) || fpStartup.deadline<=Date.now() || fpStartup.deadline>Date.now()+180000
-      || input.validation===true || input.chat!=="readiness" || input.acceptanceCapture!==undefined)) throw Error("LOGINOM_START_INVALID")
+      || input.validation===true)) throw Error("LOGINOM_START_INVALID")
+  if(fpStartup!==undefined) {
+    const keys=Object.keys(fpStartup).sort().join(',')
+    if(keys==='authorization,deadline,harness,requestId') {
+      if(input.chat!=='readiness' || input.acceptanceCapture!==undefined)throw Error('LOGINOM_START_INVALID')
+    } else if(keys==='authorization,binding,deadline,harness,phase,requestId' && fpStartup.phase==='capture') {
+      const capture=input.acceptanceCapture,binding=fpStartup.binding
+      if(input.chat==='readiness' || !capture || capture.harness!=='field-parameters-preservation-v1'
+          || !binding || typeof binding!=='object'
+          || Object.keys(binding).sort().join(',')!==Object.keys(capture).sort().join(',')
+          || Object.keys(capture).some(key=>binding[key]!==capture[key])
+          || capture.expires>fpStartup.deadline)throw Error('LOGINOM_START_INVALID')
+    } else throw Error('LOGINOM_START_INVALID')
+  }
   const capture = input.acceptanceCapture
   if (capture !== undefined) {
     const keys = 'account,admission,chat,expires,generation,harness,lease,owner,packagePath,revision,run'

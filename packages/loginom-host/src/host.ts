@@ -47,6 +47,12 @@ export async function createLoginomHost(options: {
   const stale = new Set<string>()
   type CaptureBinding = NonNullable<Parameters<typeof supervise>[0]["acceptanceCapture"]>
   const captures = new Map<string, CaptureBinding>()
+  const captureStarts = new Map<string, {
+    startup: NonNullable<typeof fpStartup>
+    binding: CaptureBinding
+    lease: NonNullable<ReturnType<typeof service.acquire>>
+    guard(): void
+  }>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
   // Includes validation and failed-start children, even without a prepared
   // service handle. Removal requires confirmed close/exit, never merely failure.
@@ -111,7 +117,9 @@ export async function createLoginomHost(options: {
       actionManifestSha256: manifest.actionManifestSha256,
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
-    }, startup ? { ...startup.control, ...startup.tuple, guard:startup.guard, reject:startup.propagate, receive:startup.receive, retain:child=>{owner.child=child} } : undefined)
+    }, startup ? { ...startup.control, ...startup.tuple,
+      ...(acceptanceCapture ? {phase:'capture' as const,binding:acceptanceCapture} : {}),
+      guard:startup.guard, reject:startup.propagate, receive:startup.receive, retain:child=>{owner.child=child} } : undefined)
     owner.settled = launched.then(child => { owner.child = child }, error => {
       owner.failure = { value: error }
       owner.child = error?.runtime ?? owner.child
@@ -202,6 +210,16 @@ export async function createLoginomHost(options: {
     recoveries,
     captureHarness(chat: string) { return captures.get(chat)?.harness },
     captureBinding(chat: string) { return captures.get(chat) },
+    assertCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
+      const phase=captureStarts.get(chat)
+      if (!phase) {
+        if (captures.get(chat)?.harness==='field-parameters-preservation-v1')throw Error('ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE')
+        return
+      }
+      phase.guard()
+      if (phase.lease!==lease || phase.binding.owner!==owner || phase.binding.run!==run || phase.binding.chat!==chat)
+        throw Error('LOGINOM_HANDSHAKE_INVALID')
+    },
     authorizeCapture(authorization: unknown) {
       return !!options.acceptanceCapture && authorization === options.acceptanceCapture.authorization
     },
@@ -215,10 +233,25 @@ export async function createLoginomHost(options: {
       if (!current || current.children.has(chat) || captures.has(chat)
           || !options.acceptanceCapture.packagePath.startsWith(`/${current.connection.username}/`))
         throw Error("LOGINOM_HANDSHAKE_INVALID")
-      captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
+      const binding: CaptureBinding = { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
         packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: options.acceptanceCapture.harness === "field-parameters-preservation-v1"
-          ? Math.min(fpStartup?.control.deadline ?? 0, Date.now()+120000) : Date.now()+600000 })
+          ? Math.min(fpStartup?.control.deadline ?? 0, Date.now()+120000) : Date.now()+600000 }
+      if (binding.harness === 'field-parameters-preservation-v1') {
+        const original = Object.freeze({...binding}), generation=current, connection=current.connection
+        const guard=()=>{
+          fpStartup!.guard()
+          lease.assertCurrent()
+          if (captures.get(chat)!==binding || generations.get(lease.generation)!==generation
+              || generation.connection!==connection || connection.username!==original.account
+              || Object.keys(original).some(key=>binding[key as keyof CaptureBinding]!==original[key as keyof CaptureBinding])
+              || lease.generation!==original.generation || Date.now()>=original.expires)
+            throw Error('LOGINOM_HANDSHAKE_INVALID')
+        }
+        captureStarts.set(chat,{startup:{...fpStartup!,guard},binding,lease,guard})
+      }
+      captures.set(chat,binding)
+      captureStarts.get(chat)?.guard()
     },
     resetRestarts(chat: string) {
       restarts.delete(chat)
@@ -257,10 +290,17 @@ export async function createLoginomHost(options: {
     },
     retainedRuntime(generation: number, chat: string) { return generations.get(generation)?.children.get(chat) },
     async runtime(generation: number, chat: string) {
+      const phase=captureStarts.get(chat)
+      phase?.guard()
+      if(phase && phase.binding.generation!==generation)throw Error('LOGINOM_GENERATION_UNAVAILABLE')
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)
-      if (previous) return previous
+      if (previous) {
+        const runtime=await previous
+        phase?.guard()
+        return runtime
+      }
       if (captures.has(chat) && (lost.has(chat) || stale.has(chat))) throw Error("LOGINOM_RUNTIME_UNAVAILABLE")
       if (lost.has(chat)) {
         const count = restarts.get(chat) ?? 0
@@ -268,7 +308,9 @@ export async function createLoginomHost(options: {
         restarts.set(chat, count + 1)
         lost.delete(chat)
       }
-      return retain(current, chat, launch(current.connection, chat, false, captures.get(chat)))
+      const runtime=await retain(current, chat, launch(current.connection, chat, false, captures.get(chat),phase?.startup))
+      phase?.guard()
+      return runtime
     },
   }
   } catch(error) {throw fpStartup?fpStartup.forward(error):error}

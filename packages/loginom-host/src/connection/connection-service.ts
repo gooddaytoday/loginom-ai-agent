@@ -341,6 +341,14 @@ export async function connectionService(
       leases.set(run, lease)
       return {
         generation: lease.generation,
+        // Private capability held by the acquiring host, never an IPC tuple.
+        // A matching generation number alone cannot prove this lease is live.
+        assertCurrent() {
+          if (leases.get(run) !== lease || !lease.active || lease.recovery
+              || state.closing || state.pending || state.writing || state.checking
+              || state.phase !== 'ready' || state.active?.generation !== lease.generation)
+            throw Error('LOGINOM_GENERATION_UNAVAILABLE')
+        },
         // Uncertain effects outlive the model drain. Only reconciliation releases recovery.
         holdRecovery() {
           if (leases.get(run) === lease) lease.recovery = true

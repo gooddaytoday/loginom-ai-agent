@@ -156,15 +156,19 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw Error("LOGINOM_METHOD_INVALID")
         if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
           throw Error("LOGINOM_CALL_BUSY")
+        service.assertCapture?.(owner,input.run,run.chat,run.lease)
         run.captured = true
         run.dispatching = true
         run.calls++
         let id: string | undefined
         try {
           const runtime = await service.runtime(run.lease.generation, run.chat)
+          service.assertCapture?.(owner,input.run,run.chat,run.lease)
           id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(id)
+          service.assertCapture?.(owner,input.run,run.chat,run.lease)
           const result = await runtime.request("acceptance.capture")
+          service.assertCapture?.(owner,input.run,run.chat,run.lease)
           if(service.captureHarness?.(run.chat)==='field-parameters-preservation-v1'){
             const grant=service.captureBinding(run.chat),draft=result&&typeof result==='object'&&'draft' in result?result.draft as any:undefined;
             if(!result||typeof result!=='object'||!('draftRetained' in result)||result.draftRetained!==true

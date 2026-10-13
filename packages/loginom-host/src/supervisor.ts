@@ -87,6 +87,8 @@ export type FPStartupControl = {
   signal:AbortSignal; deadline:number; requestId:string; authorization:string; harness:"field-parameters-preservation-v1"
   guard():void; reject(value:unknown):unknown; receive(value:unknown,origin:unknown,secondary?:{value:unknown}):unknown
   retain(runtime: Awaited<ReturnType<typeof supervise>>):void
+  phase?: 'capture'
+  binding?: NonNullable<Launch['acceptanceCapture']>
 }
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
 export async function supervise(input: Launch, startup?:FPStartupControl) {
@@ -97,7 +99,7 @@ export async function supervise(input: Launch, startup?:FPStartupControl) {
   const snapshot={...input,connection:{...input.connection},environment:runtimeEnvironment(input.environment??process.env)}
   const guard=()=>{
     startup?.guard()
-    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","receive","retain"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","receive","retain","phase","binding"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
     if(startup && (Object.keys(snapshot).some(key=>key!=="connection" && key!=="environment" && (original as any)[key] !== (snapshot as any)[key])
         || original.connection!==originalConnection || Object.keys(snapshot.connection).some(key=>(originalConnection as any)[key] !== (snapshot.connection as any)[key]))) throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
@@ -177,7 +179,8 @@ export async function supervise(input: Launch, startup?:FPStartupControl) {
         if(!pending.has(id)) return
         if(startup && operation==="start") {
           const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason}
-          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:"startup",requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,rejection:encodeReadRejection(current.primary.value)}})
+          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:"startup",requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
+            ...(startup.phase?{bindingPhase:startup.phase,captureBinding:startup.binding}:{}),rejection:encodeReadRejection(current.primary.value)}})
           return
         }
         pending.delete(id);clearTimeout(timer);control?.signal.removeEventListener("abort",abort)
@@ -252,7 +255,8 @@ export async function supervise(input: Launch, startup?:FPStartupControl) {
   }
   const ready = await request(
     "start",
-    { ...input, environment: undefined, protocol: 1, ...(startup?{fpStartup:{requestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline}}:{}) },
+    { ...input, environment: undefined, protocol: 1, ...(startup?{fpStartup:{requestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
+      ...(startup.phase?{phase:startup.phase,binding:startup.binding}:{})}}:{}) },
     input.validation ? 210_000 : 120_000,
     startup,
   ).catch(failedStart)

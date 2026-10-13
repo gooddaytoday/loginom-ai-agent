@@ -5,6 +5,7 @@ import {decodePreReadyRejection} from './qualified-pre-ready.mjs'
 export function retainFPManagedStartup(message,input,state,controller) {
   const id=message.id,tuple=input.fpStartup,connection=input.connection
   const fixed={...tuple}, primitives={...input}, credentials={...connection}
+  const capture=input.acceptanceCapture,binding=tuple.binding,originalBinding=binding&&{...binding}
   if(message.deadline!==fixed.deadline)throw Error('LOGINOM_START_INVALID')
   let owner,bound,primary,secondary,pending=true,accepted=false
   function refuse(value) {primary??={value,origin:"control"};if(!controller.signal.aborted)controller.abort(primary.value)}
@@ -15,6 +16,10 @@ export function retainFPManagedStartup(message,input,state,controller) {
     if(Date.now()>=fixed.deadline){refuse(Error('LOGINOM_INITIAL_READINESS_DEADLINE'));throw primary.value}
     if(state.startupController!==controller || message.id!==id || message.input!==input || message.deadline!==fixed.deadline
         || input.fpStartup!==tuple || Object.keys(fixed).some(k=>tuple[k]!==fixed[k])
+        || (originalBinding && (tuple.binding!==binding || input.acceptanceCapture!==capture
+          || Object.keys(binding).sort().join(',')!==Object.keys(originalBinding).sort().join(',')
+          || Object.keys(capture).sort().join(',')!==Object.keys(originalBinding).sort().join(',')
+          || Object.keys(originalBinding).some(k=>binding[k]!==originalBinding[k] || capture[k]!==originalBinding[k])))
         || Object.keys(primitives).some(k=>input[k]!==primitives[k]) || input.connection!==connection
         || Object.keys(credentials).some(k=>connection[k]!==credentials[k])
         || (owner && (state.startupOwner!==owner || Object.keys(bound).some(k=>owner[k]!==bound[k]))))
@@ -37,6 +42,9 @@ export function retainFPManagedStartup(message,input,state,controller) {
     cancel(value){
       if(!pending || value?.phase!=='startup' || value.requestId!==id || value.startupRequestId!==fixed.requestId
           || value.authorization!==fixed.authorization || value.harness!==fixed.harness || value.deadline!==fixed.deadline)return false
+      if(originalBinding && (value.bindingPhase!=='capture' || !value.captureBinding
+          || Object.keys(value.captureBinding).sort().join(',')!==Object.keys(originalBinding).sort().join(',')
+          || Object.keys(originalBinding).some(k=>value.captureBinding[k]!==originalBinding[k])))return false
       if(primary)return false
       guard();refuse(decodePreReadyRejection(value.rejection));return true
     },
