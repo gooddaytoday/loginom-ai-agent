@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 5/18, oracle/calculation 5;
+серия `20261013T142936Z-072953`: завершены baseline 6/18, oracle/calculation 6;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -210,7 +210,25 @@ CLI 409.688 секунды, timeout false. JS nodes/calls 0/0; oracle и пол�
 calculation/history/runtime/identity/graph/export true, failures []. Package SHA
 `160782e00d1096a173d6b050c15b46dc11133ac71fa7b09e4014367adfdb7e3b`.
 Стандартные импорт, группировка, калькулятор, сортировка и экспорт подтверждены.
-Следующий first-last-touch/1 запущен — последний case первого прохода baseline.
+Следующий first-last-touch/1 завершился — первый проход baseline завершён.
+
+## First-last-touch и итоги первого прохода baseline
+
+Session `ses_eca0538c6ffegD2qIgKCab6nuk`: CLI exit 0, wrapper exit 1,
+cleanupConfirmed true, CLI 241.446 секунды, timeout false. JS nodes/calls 1/1,
+successful JS calls 1. Oracle/calculation/history/runtime/identity/graph/export
+true; единственный отказ JAVASCRIPT_NOT_ALLOWED у старого skill. Package SHA
+`f0b446c8267b1e79c2acd1e877b651346be2fb5b5f41ac02a9be2f8c0416f8db`.
+Это baseline-замер; wrapper1 по политике не останавливает серию «до».
+
+Шесть разных baseline cases первого прохода: oracle/calculation 6/6, cleanup 6/6,
+standard policy 4/6, JS суммарно 3 nodes/3 successful calls в двух сценариях.
+Original ABC wrapper2 остаётся collection failure с отдельной проверенной
+audit-проекцией, остальные outcomes не переписаны. Начат sales-by-category/2.
+Среднее CLI время шести попыток 376.381 секунды (около 6.3 минуты). Грубый прогноз
+оставшихся 12 baseline + 25 candidate — около 3.9 часа модельных попыток плюс
+review/overhead; первые 9 candidate — около 56 минут. Это экстраполяция малой
+выборки: candidate композиции и исключения могут иметь другие длительности.
 
 ## Native proof исправления дат
 
