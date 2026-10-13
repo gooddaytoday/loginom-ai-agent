@@ -560,9 +560,10 @@ export async function createBridge(config, session, { browserTransport: managedB
     function rememberCapturePersistence(value,phase) {
         capturePersistencePrimary??={phase,value};
         capturePersistenceFailures.push({phase,rejection:shutdownRejection(value)});
-        session.metadata.capturePersistencePrimary??={phase:capturePersistencePrimary.phase,
+        const metadata=captureEvidenceBinding?.metadata??session.metadata;
+        metadata.capturePersistencePrimary??={phase:capturePersistencePrimary.phase,
           rejection:shutdownRejection(capturePersistencePrimary.value)};
-        session.metadata.capturePersistenceFailures=capturePersistenceFailures;
+        metadata.capturePersistenceFailures=capturePersistenceFailures;
     }
     async function drainCaptureWriters() {
       for(const file of captureWriters){
@@ -583,6 +584,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         let phase=write?'file_open':'directory_open',primary;
         const failed=value=>{primary??={phase,value};rememberCapturePersistence(value,phase)};
         const callback=invoke=>{
+          assertCaptureEvidenceBinding();
           captureIOAssert?.();
           const operation={pending:true,phase};file.io=operation;let projection;
           const completion=new Promise((resolve,reject)=>{
@@ -619,17 +621,26 @@ export async function createBridge(config, session, { browserTransport: managedB
       await persist(session.directory,false);
       if(captureWriters.size)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
     }
+    function assertCaptureEvidenceBinding() {
+      if(captureEvidenceBinding && (captureEvidenceBinding.directory!==session.directory
+          || captureEvidenceBinding.metadata!==session.metadata
+          || captureEvidenceBinding.sessionId!==session.metadata.sessionId))
+        throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+    }
     async function persistCapture() {
       const bytes=JSON.stringify(captureEvidence,null,2)+'\n';
       captureEvidenceBinding??=Object.freeze({evidence:captureEvidence,bytes,
-        directory:session.directory,sessionId:session.metadata.sessionId});
+        directory:session.directory,metadata:session.metadata,sessionId:session.metadata.sessionId});
       if(captureEvidenceBinding.evidence!==captureEvidence || captureEvidenceBinding.bytes!==bytes
           || captureEvidenceBinding.directory!==session.directory
           || captureEvidenceBinding.sessionId!==session.metadata.sessionId)
         throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+      assertCaptureEvidenceBinding();
       await drainCaptureWriters();
+      assertCaptureEvidenceBinding();
       if(!captureReceiptWritten){
         await writeCaptureEvidence('acceptance-capture.json',captureEvidenceBinding.bytes);
+        assertCaptureEvidenceBinding();
         captureReceiptWritten=true;
       }
       if(!captureJournalWritten){
@@ -637,6 +648,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         try{await recordExecution({event:'acceptance_capture',...captureEvidence})}
         catch(value){rememberCapturePersistence(value,'journal');throw value}
         captureJournalWritten=true;
+        assertCaptureEvidenceBinding();
       }
     }
     async function captureAcceptance({signal} = {}) {
