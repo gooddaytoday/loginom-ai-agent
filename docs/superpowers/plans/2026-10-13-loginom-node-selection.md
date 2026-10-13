@@ -972,7 +972,7 @@ connection.close()
   соответствующего runtime-каталога — неполнота. Snapshot сохраняет все parts
   и messages, чтобы проверить финальный ответ, фактическую модель и variant.
 
-- [ ] По save/export receipts получить точные собственные пакет и CSV. После
+- [x] По save/export receipts получить точные собственные пакет и CSV. После
   подтверждения соответствия контейнера/аккаунта разрешён read-only copy-out:
 
   `selection_container=loginom-server-7.4.2-test` — обнаруженный кандидат.

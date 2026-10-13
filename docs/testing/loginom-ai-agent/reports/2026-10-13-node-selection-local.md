@@ -400,6 +400,8 @@ Task 3: 18 отдельных CLI-процессов шли последоват
 
 Task 3: у всех 18 сохранены единственная own Session, полная история и read-only snapshot; runtime identity/settlement подтверждены.
 
+Task 3: 18 пакетов/CSV привязаны к own Save/Export receipts; SHA, exporter/execution lineage и 252 ZIP members проверены.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.
