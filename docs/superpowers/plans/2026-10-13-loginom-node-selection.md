@@ -1188,4 +1188,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Исходная серия stopped 3/18: date_format исправлен TDD в 263df9620; далее native proof и новая matched 18+25 серия.
+- Исходная серия stopped 3/18: date_format TDD в 263df9620; новые build/native proof PASS, full18+25 пока не начаты.

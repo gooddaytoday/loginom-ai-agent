@@ -78,7 +78,7 @@ Audit version: `1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d
 Baseline skill digest: `74cc9ac0b5a22724909bd1ba3123e8f6e3abedbe85a3b87dee6596119bbfb340`.
 Candidate skill digest: `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
 
-## Условия и выполненные попытки
+## Условия и сохранённые попытки исходной серии
 
 Текущий местный Loginom: `http://localhost/app/`, user, `/user`, существующий
 `loginom-server-7.4.2-test`. Нового стенда нет. CLI использует frozen payload,
@@ -109,7 +109,7 @@ oracle-pass. Это промежуточные числа, не результа
 Первый отказ OAuth до inference сохранён отдельно в `incidents/`; после успешной
 авторизации по коду этот запланированный слот впервые дошёл до модели.
 
-## Блокер и продолжение
+## Исходный блокер ABC и его восстановление
 
 `pareto-cumulative-1` осталась `AMBIGUOUS` на `output_mapping` с
 `cleanup_complete:false`. Собственный package cleanup завершился
@@ -152,11 +152,12 @@ Recovery UUID-записей нет. История, storage и сервер н�
 `profile-recovery-attestation.json`, `recovery-status.json`, `recovery-check.json`,
 `playwright-mcp-installation.json`. Техническое восстановление не превращает
 исторический runtime cleanup ABC в успешный и не подтверждает её oracle.
-Провалы ABC и monthly остаются в знаменателе; повторять их слоты 1 нельзя.
-Осталось 15 запланированных baseline. Candidate начинается после baseline:
-сначала девять случаев, затем повторы только после чистой первой волны.
+Провалы ABC и monthly остаются в исходной остановленной серии; её слоты 1
+не повторяются. После общей runtime-правки начата подготовка новой полной
+сопоставимой серии. Candidate начинается после нового baseline: сначала девять
+случаев, затем повторы только после чистой первой волны.
 
-## Новый runtime-блокер monthly
+## Исходный runtime-блокер monthly и принятое решение
 
 `monthly-demand/1`, Session `ses_ecac06e84ffet1Rxb3IuG67J54`: CLI exit 1,
 wrapper exit 3, 111.993 секунды; modelStarted true, cleanupConfirmed false.
@@ -168,12 +169,15 @@ null_marker/decimal_separator. Это дефект настройки станд
 а не основание переходить на JavaScript или менять правило skill.
 
 Evidence: `baseline/monthly-demand/1/forensic/monthly-import-001-diagnosis.json`.
-Строгая server identity ещё не подтверждена: own GUID/input path/Dock IDs в
-server log отсутствуют, backups пусты. Одного совпадения времени `user:15`
-недостаточно для CloseSession. Новый guard сохранён, серию остановили.
-Запрошено отдельное решение владельца: исправление runtime по TDD с новой
-сопоставимой серией либо сохранение исходного scope с блокером приёмки.
-Текущие frozen payload/pins и первоначальные evidence не изменены.
+Тогда строгая server identity не была подтверждена: own GUID/input path/Dock IDs
+в server log отсутствовали, backups были пусты. Одного совпадения времени
+`user:15` недостаточно для CloseSession, поэтому адресного закрытия не выполняли.
+Позднее свежая admin inventory показала только собственную admin-сессию и
+отсутствие всех user-сессий; после проверки own процессов и nonce архивирован
+только monthly guard. Evidence: `monthly-profile-recovery-attestation.json`.
+Пользователь затем поручил самостоятельно устранять блокеры; принято решение
+о минимальном TDD-исправлении runtime и новой сопоставимой паре, описанной выше.
+Исходные frozen payload/pins и первоначальные evidence не изменены.
 
 Не проверены live explicit-js/tags/recovery, candidate no-JS 18/18, сравнение
 oracle-pass всей серии и обязательное содержательное review. Не проверены
