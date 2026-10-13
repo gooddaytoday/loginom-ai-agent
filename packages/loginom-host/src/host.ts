@@ -225,6 +225,7 @@ export async function createLoginomHost(options: {
     },
     bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
       if (!options.acceptanceCapture) return
+      service.assertLease(lease,`${owner}:${run}`)
       if (options.acceptanceCapture.harness === "field-parameters-preservation-v1") {
         if (!fpStartup) throw Error("LOGINOM_HANDSHAKE_INVALID")
         fpStartup.guard()
@@ -238,12 +239,13 @@ export async function createLoginomHost(options: {
         packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: options.acceptanceCapture.harness === "field-parameters-preservation-v1"
           ? Math.min(fpStartup?.control.deadline ?? 0, Date.now()+120000) : Date.now()+600000 }
       if (binding.harness === 'field-parameters-preservation-v1') {
-        const original = Object.freeze({...binding}), generation=current, connection=current.connection
+        const original = Object.freeze({...binding}), generation=current, connection=current.connection, credentials={...connection}
         const guard=()=>{
           fpStartup!.guard()
-          lease.assertCurrent()
+          service.assertLease(lease,`${owner}:${run}`)
           if (captures.get(chat)!==binding || generations.get(lease.generation)!==generation
               || generation.connection!==connection || connection.username!==original.account
+              || Object.keys(credentials).some(key=>connection[key as keyof ActiveConnection]!==credentials[key as keyof ActiveConnection])
               || Object.keys(original).some(key=>binding[key as keyof CaptureBinding]!==original[key as keyof CaptureBinding])
               || lease.generation!==original.generation || Date.now()>=original.expires)
             throw Error('LOGINOM_HANDSHAKE_INVALID')

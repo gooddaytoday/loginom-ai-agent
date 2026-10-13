@@ -42,6 +42,7 @@ export async function connectionService(
     { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
+  const leaseHandles = new WeakMap<object, {run:string; current():void; snapshot:Record<string,unknown>}>()
   state.active = await store.read().catch(() => {
     state.phase = "recoverable-error"
     return undefined
@@ -324,6 +325,13 @@ export async function connectionService(
   progress()
   return {
     api,
+    assertLease(value: object, run: string) {
+      const original=leaseHandles.get(value)
+      if(!original || original.run!==run
+          || Object.keys(original.snapshot).some(key=>(value as Record<string,unknown>)[key]!==original.snapshot[key]))
+        throw Error('LOGINOM_GENERATION_UNAVAILABLE')
+      original.current()
+    },
     acquire(run: string) {
       if (
         state.closing ||
@@ -339,7 +347,7 @@ export async function connectionService(
         return
       const lease = { generation: state.active.generation, recovery: false, active: true }
       leases.set(run, lease)
-      return {
+      const handle = {
         generation: lease.generation,
         // Private capability held by the acquiring host, never an IPC tuple.
         // A matching generation number alone cannot prove this lease is live.
@@ -368,6 +376,8 @@ export async function connectionService(
           progress()
         },
       }
+      leaseHandles.set(handle,{run,current:handle.assertCurrent,snapshot:{...handle}})
+      return handle
     },
     async settled() {
       try {

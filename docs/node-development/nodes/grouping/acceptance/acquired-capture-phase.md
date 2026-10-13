@@ -9,6 +9,10 @@ The actual connection service returns an internal lease capability with
 `assertCurrent()`. It checks the original map entry, active/recovery state,
 connection generation, readiness and ongoing connection work. Released or
 reacquired same-run/same-generation labels cannot revive that original object.
+The service also retains the exact returned object and original callbacks in a
+private WeakMap; assertLease checks its owner/run and currentness without ever
+consulting a substituted callback on a structural clone. bindCapture uses this
+provider check before creating the root and on every later guard.
 This is host lease currentness, not native Page/document/mutation authority.
 
 Only the existing HostPort acquire route passes its actual lease to
