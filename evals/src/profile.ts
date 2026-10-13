@@ -315,6 +315,14 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
       throw new EvalFailure("Секрет попал в вывод loginom setup", 2)
     if (setup.exitCode !== 0)
       throw new EvalFailure(`loginom setup завершился кодом ${setup.exitCode}:\n${setup.stderr.trim()}`, 2)
+    if (config.slotsFile) {
+      const prepared = parseView(setup.stdout)
+      if (!prepared || prepared.url !== config.loginom.url || prepared.username !== config.loginom.username)
+        throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+      const saved = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+      if (!saved || saved.url !== config.loginom.url || saved.username !== config.loginom.username)
+        throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+    }
   }
   await Bun.write(
     path.join(config.profileDir, "config", "loginom-ai-agent.json"),
