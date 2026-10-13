@@ -8,6 +8,7 @@ import { collectTextImportEvidence } from "../src/text-import"
 import { prepareTextImportCold, validateTextImportCold } from "../src/text-import-cold"
 import { finalizeTextImportCase } from "../src/text-import-finalize"
 import importCases from "../src/text-import-cases.json"
+import cliPins from "../script/text-import-cold/cli-pins.json"
 
 async function rejectionFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
@@ -380,6 +381,31 @@ with zipfile.ZipFile(p/'package.lgp','w') as z:z.writestr('Unit_1/Unit.xml',data
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+test("cold preparation binds the approved TSV CLI tuple without rewriting the original package", async () => {
+  const f = await positiveFixture()
+  try {
+    const pin = { sourceCommit: "d73a13fabf358d281942f7885ba7afe7b007423b", sourceDirty: false,
+      manifestSha256: "fb984e9becfbf0979a7712265916c7253b01843b2238ed9fe0f893ad09a612b0",
+      binarySha256: "a0b9be76107d82575ba28d348e60ac4f2497a608252552895a6131bca9a2029a" }
+    const cold = path.join(f.root, "candidate-cold")
+    const original = await Bun.file(path.join(f.attempt, "artifact/package.lgp")).bytes()
+    await prepareTextImportCold(f.task, f.attempt, cold, "/eval/result.lgp", pin)
+    expect(await Bun.file(path.join(cold, "preparation.json")).json()).toMatchObject({ cli_sha: pin.sourceCommit, cli_pin: pin, runtime: "NOT_RUN" })
+    expect(await Bun.file(path.join(f.attempt, "artifact/package.lgp")).bytes()).toEqual(original)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("cold preparation rejects dirty/unknown/mismatched tuples without creating evidence", async () => {
+  const f = await positiveFixture()
+  try {
+    for (const patch of [{ sourceCommit: "unknown" }, { sourceDirty: true }, { manifestSha256: "0".repeat(64) }, { binarySha256: "0".repeat(64) }]) {
+      const target = path.join(f.root, "rejected-cold")
+      await expect(prepareTextImportCold(f.task, f.attempt, target, "/eval/result.lgp", { ...cliPins[1]!, ...patch })).rejects.toThrow("pin not admitted")
+      expect(await Bun.file(path.join(target, "preparation.json")).exists()).toBe(false)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("cold preparation binds the exact saved package and independent typed expectations without running Loginom", async () => {
   const f = await positiveFixture()
   try {
@@ -422,7 +448,7 @@ test("cold verdict requires original downloaded bytes, fresh complete values and
     const source = await Bun.file(path.join(f.task, expected.source.path)).bytes()
     await Bun.write(path.join(cold, "source-0.csv"), source)
     const port = JSON.parse(JSON.stringify(f.port)); port.execution_id = "cold-execution"
-    const report = { status: "CHECK_VALUES", package_path: "/eval/result.lgp", graph_verified: true,
+    const report = { status: "CHECK_VALUES", cli_pin: cliPins[0], package_path: "/eval/result.lgp", graph_verified: true,
       fresh_execution: { status: "completed", execution_id: "cold-execution", verified: true, owner_verified: true }, port,
       source: { bytes: source.byteLength, sha256: expected.source.sha256, bytes_verified: true, download_completion_verified: true },
       configuration: f.output.configuration.readback, cleanup: { package_closed: true, logged_out: true } }
@@ -450,7 +476,7 @@ test("cold verdict rejects a saved graph with another import GUID despite a posi
     const source = await Bun.file(path.join(f.task, spec.inputs[0].path)).bytes()
     await Bun.write(path.join(cold, "source-0.csv"), source)
     const port = JSON.parse(JSON.stringify(f.port)); port.execution_id = "cold-execution"
-    await Bun.write(path.join(cold, "result.json"), JSON.stringify({ status: "CHECK_VALUES", package_path: "/eval/result.lgp", graph_verified: true,
+    await Bun.write(path.join(cold, "result.json"), JSON.stringify({ status: "CHECK_VALUES", cli_pin: cliPins[0], package_path: "/eval/result.lgp", graph_verified: true,
       fresh_execution: { status: "completed", execution_id: "cold-execution", verified: true, owner_verified: true }, port,
       source: { bytes: source.byteLength, sha256: spec.inputs[0].sha256, bytes_verified: true, download_completion_verified: true },
       configuration: f.output.configuration.readback, cleanup: { package_closed: true, logged_out: true } }))

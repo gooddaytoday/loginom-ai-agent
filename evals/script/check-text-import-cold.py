@@ -22,9 +22,18 @@ def audit(task, attempt, cold):
     report = json.loads((cold / 'result.json').read_text())
     package = (attempt / 'artifact/package.lgp').read_bytes()
     events = (attempt / 'events.jsonl').read_bytes()
+    pins = json.loads((pathlib.Path(__file__).parent / 'text-import-cold/cli-pins.json').read_text())
+    pin = prepared.get('cli_pin')
+    if pin is None:
+        # Original accepted attempts predate the explicit tuple. Preserve their
+        # exact old-source proof, without extending this legacy path to new CLI.
+        warm.require(prepared.get('cli_sha') == pins[0]['sourceCommit'] and report.get('cli_pin') is None,
+            'cold: legacy CLI source differs')
+    else:
+        warm.require(pin in pins and prepared.get('cli_sha') == pin['sourceCommit'] and report.get('cli_pin') == pin,
+            'cold: exact CLI tuple differs')
     warm.require(prepared.get('case_id') == spec['id'] and prepared.get('package_sha256') == hashlib.sha256(package).hexdigest()
-        and prepared.get('events_sha256') == hashlib.sha256(events).hexdigest()
-        and prepared.get('cli_sha') == '5cd74d8ee5d6125692d953eb327b4d4f833c27a1', 'cold: exact preparation package/events required')
+        and prepared.get('events_sha256') == hashlib.sha256(events).hexdigest(), 'cold: exact preparation package/events required')
     checked = warm.audit(task, attempt, saved['path'])
     warm.require(not checked['errors'] and not checked['failures'], 'cold: warm admission failed')
     warm.require(report.get('status') == 'CHECK_VALUES' and report.get('package_path') == saved['path']

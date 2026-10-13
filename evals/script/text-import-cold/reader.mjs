@@ -7,11 +7,11 @@ import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {withDiagnosticSession} from './diagnostic-session.mjs';
 import {verifyStaticSourceBytes} from './static-source-proof.mjs';
+import {verifyTextImportCli} from './cli-pin.mjs';
 const args=parseArgs({options:Object.fromEntries(['config','resources','saved','expected','events','output'].map(k=>[k,{type:'string'}])),strict:true}).values;
 const need=(v,m)=>{if(!v)throw Error(m);};
 const root=resolve(args.resources),output=resolve(args.output),load=name=>import(pathToFileURL(join(root,'runtime',name)).href);
-const cliManifest=JSON.parse(await readFile(resolve(root,'../..','cli-manifest.json'),'utf8'));
-need(cliManifest.metadata?.sourceCommit==='5cd74d8ee5d6125692d953eb327b4d4f833c27a1'&&cliManifest.metadata.sourceDirty===false,'TEXT_IMPORT_CLI_PIN_DIFFERS');
+const cliPin=await verifyTextImportCli(root);
 const config=JSON.parse(await readFile(args.config,'utf8')),saved=JSON.parse(await readFile(args.saved,'utf8')),expected=JSON.parse(await readFile(args.expected,'utf8'));
 // Bind the independent native source read to the CLI's admitted transfer,
 // without using the model's table values as expected data.
@@ -59,7 +59,7 @@ const record=async event=>{const saved=await journal(event);
 const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(output,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:true,keepOpen:true});
 const page=context.pages()[0],execute=code=>new Function('page',`return (${code})(page)`)(page);
 const identity={sessionId:session,account,packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
-let report={status:'FAIL',all_values_compared:false};
+let report={status:'FAIL',cli_pin:cliPin,all_values_compared:false};
 try{
  await withDiagnosticSession({context,execute,directory:output,identity,makeCleanupCode:options=>makePackageCleanupCode({...options,diagnosticDiscard:true})},async({bindPrepared})=>{
   await page.setViewportSize({width:1920,height:1080});
@@ -117,7 +117,7 @@ try{
   const data=decodeTableOutput(raw,{formatProof:precision,readSettings,expectedColumns:precision.fields.map(f=>({name:f.key,label:f.label,type:f.type,data_kind:fields.find(c=>c.name===f.key)?.data_kind})),requireExactNumbers:true});
   await returnFromOutputTable(channel,opened.table);
   const port={...data,fresh:true,execution_id:importExecution.execution_id};
-  report={status:'CHECK_VALUES',case_id:expected.case_id,cli_delivery:transfer,package_path:saved.path,source:proofs.get(settings.source_path),configuration:{source:settings,format,columns:fields.map(f=>({...f,used:true}))},graph_verified:true,fresh_execution:importExecution,port};
+  report={status:'CHECK_VALUES',cli_pin:cliPin,case_id:expected.case_id,cli_delivery:transfer,package_path:saved.path,source:proofs.get(settings.source_path),configuration:{source:settings,format,columns:fields.map(f=>({...f,used:true}))},graph_verified:true,fresh_execution:importExecution,port};
   await writeFile(join(output,'readback.json'),JSON.stringify(report,null,2));
  });
 }catch(error){report={...report,status:'FAIL',error:String(error.message).slice(0,1000)};}

@@ -29,9 +29,28 @@
         "final source delivery with exact one/two count",
         "bind unique import by original GUID rather than optional node label",
         "headless:true through exact CLI launcher for runtime without a display server",
-        "1920x1080 viewport through supported page API inside diagnostic session before workspace preparation; native ownership remains mandatory"
+        "1920x1080 viewport through supported page API inside diagnostic session before workspace preparation; native ownership remains mandatory",
+        "explicit approved immutable CLI source/manifest/binary tuple, with original legacy pins preserved"
       ],
-      "sha256": "8f1f2d3ada78d35e5b95ee986aa9b90107720d8dec41b4b185983bd3772a26f6"
+      "sha256": "49d1fbefeec9430608579a65cf2a19a4378358cdedb90df9365acaf987ecd940"
+    },
+    {
+      "file": "cli-pin.mjs",
+      "source": "LAB57 authored CLI compatibility adaptation",
+      "source_base": "49522d83318bac29779e497798becb2f799bc84e",
+      "adaptations": [
+        "bind separate exact5cd and approved d73 prefix without changing upstream source/original hashes"
+      ],
+      "sha256": "86da67324a41ced59f4c270dbbe273b8c1c53d315fe71ad12ec9e0ca8776df12"
+    },
+    {
+      "file": "cli-pins.json",
+      "source": "LAB57 authored CLI compatibility adaptation",
+      "source_base": "49522d83318bac29779e497798becb2f799bc84e",
+      "adaptations": [
+        "bind separate exact5cd and approved d73 prefix without changing upstream source/original hashes"
+      ],
+      "sha256": "ce6028e91cec4fd0bb9270e54880ad1ce5d328610729ebccf56110d7f914e19f"
     }
   ]
 }
