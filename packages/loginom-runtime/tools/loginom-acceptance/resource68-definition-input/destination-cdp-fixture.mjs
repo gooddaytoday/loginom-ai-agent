@@ -16,7 +16,7 @@ export function retainDestinationLockFixture(owner) {
  if(original.purpose!=='resource68-destination-fixture-v1'||!Number.isSafeInteger(original.generation)||original.generation<1||original.page.context()!==original.context||original.page.url()!=='about:blank'||url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.pathname!=='/destination.html'||!Number.isSafeInteger(original.deadline))throw fail('DESTINATION_ORIGINAL_INVALID');
  let sessionCreation='not_started';
  let session,targetId,frameId,initialContext,defaultContext,breakpoint;
- let realmLost=false;
+ let realmLost=false,pendingRealmRefusal;
  let installed=false,pending=0,first,held=false,disposal='not_started';
  let installPromise,navigationPromise,armPromise,boundaryPromise,readPromise,disposePromise,normalBreakpoint;
  let navigation='not_started',boundary='not_started',readState='not_started';
@@ -154,7 +154,15 @@ export function retainDestinationLockFixture(owner) {
   },
   acquire() {
    if(arguments.length)throw fail('DESTINATION_EXTERNAL_INPUT_FORBIDDEN');
-   if(readPromise){if(readState==='confirmed'||realmLost)guard();return readPromise;}
+   if(readPromise){
+    // Refuse new admission without committing a secondary ahead of the
+    // original pending transport's raw rejection (including falsy reasons).
+    if(readState==='pending'&&realmLost&&!held){
+     if(!pendingRealmRefusal){pendingRealmRefusal=fail('DESTINATION_REALM_LOST');secondary.push(pendingRealmRefusal);}
+     throw pendingRealmRefusal;
+    }
+    if(readState==='confirmed'||realmLost)guard();return readPromise;
+   }
    guard();if(navigation!=='confirmed'||boundary!=='confirmed'||pending)throw fail('DESTINATION_NOT_READY');
    readState='pending';pending++;
    readPromise=Promise.resolve().then(async()=>{
