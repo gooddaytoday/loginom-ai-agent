@@ -2,10 +2,11 @@ import os from "node:os"
 import path from "node:path"
 import { lstat, mkdir, mkdtemp, readdir, realpath, unlink } from "node:fs/promises"
 import { agentCommand } from "./cli"
+import { listStorage } from "./artifact"
 import type { EvalConfig } from "./config"
 import { archiveDiagnostics } from "./diagnostics"
 import { EvalFailure } from "./fail"
-import { acquireJudgeLease, writeLeaseReceipt } from "./lease"
+import { acquireJudgeLease, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { archiveProfileEvidence } from "./profile-archive"
 import { assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter } from "./profile"
 import type { ProcessCleanup } from "./process-supervisor"
@@ -145,10 +146,7 @@ export async function beginFixtureAttempt(context: Awaited<ReturnType<typeof pre
 }
 
 async function cleanupFixtureStorage(context: Awaited<ReturnType<typeof prepareFixture>>[number], result: AttemptResult, out: string) {
-  const root = await lstat(context.storage.path)
-  if (!root.isDirectory() || root.dev !== context.storage.device || root.ino !== context.storage.inode ||
-    root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 || await realpath(context.storage.path) !== context.storage.path)
-    throw Error("Fixture storage identity changed")
+  await requireFixtureStorage(context)
   if (!result.package_path) return { deleted: [] }
   const prefix = `eval-${path.basename(path.dirname(path.dirname(out)))}-${result.task_id}-${result.attempt}`
   const names = [path.basename(result.package_path), ...await readdir(path.join(out, "artifact/results"))]
@@ -169,6 +167,24 @@ async function cleanupFixtureStorage(context: Awaited<ReturnType<typeof prepareF
     await unlink(file.file)
   }
   return { deleted: files.map(file => file.name) }
+}
+
+async function requireFixtureStorage(context: Awaited<ReturnType<typeof prepareFixture>>[number]) {
+  const root = await lstat(context.storage.path)
+  if (!root.isDirectory() || root.dev !== context.storage.device || root.ino !== context.storage.inode ||
+    root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 || await realpath(context.storage.path) !== context.storage.path)
+    throw Error("Fixture storage identity changed")
+}
+
+export async function inspectFixtureStorage(context: Awaited<ReturnType<typeof prepareFixture>>[number], runId: string) {
+  return requireFixtureStorage(context).then(async () => ({ names: (await listStorage({ kind: "dir", dir: context.storage.path }))
+    .map(entry => entry.name).filter(name => name.startsWith(`eval-${runId}-`)).sort(), error: null as string | null }))
+    .catch((error: unknown) => ({ names: null, error: error instanceof Error ? error.message : String(error) }))
+}
+
+export async function fenceFixtureStorage(context: Awaited<ReturnType<typeof prepareFixture>>[number], storage: Awaited<ReturnType<typeof inspectFixtureStorage>>) {
+  await writeLeaseReceipt(context.cleanup, { ...await readLeaseReceipt(context.cleanup) as object, status: "failed",
+    storageDeletionAllowed: false, nextAdmissionAllowed: false, storage })
 }
 
 function fixtureCleanup(lease: SlotLease, archivePath: string) {
