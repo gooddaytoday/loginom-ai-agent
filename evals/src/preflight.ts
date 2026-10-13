@@ -1,6 +1,6 @@
 import path from "node:path"
 import os from "node:os"
-import { mkdir, mkdtemp, rm, stat, realpath, statfs } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readlink, readdir, rm, stat, realpath, statfs } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
@@ -127,6 +127,93 @@ export async function agentInfo(config: EvalConfig) {
     sourceDirty: typeof metadata?.sourceDirty === "boolean" ? metadata.sourceDirty : null,
     sourceTreeSha256: typeof metadata?.sourceTreeSha256 === "string" ? metadata.sourceTreeSha256 : null,
   }
+}
+
+export async function verifyAdminRuntime(binary: string) {
+  const installation = path.dirname(path.dirname(await realpath(binary)))
+  if (installation === repoRoot || installation.startsWith(repoRoot + path.sep)) throw new EvalFailure("ADMIN_RUNTIME_PATH", 2)
+  const resources = path.join(installation, "resources/loginom")
+  const resource = (await runtimeDocument(path.join(resources, "resource-manifest.json"))).value
+  const document = await runtimeDocument(path.join(installation, "cli-manifest.json"))
+  const manifest = document.value
+  if (!runtimeObject(resource) || !runtimeObject(manifest) || manifest.format !== "loginom-cli-artifact-v1" || !runtimeObject(manifest.metadata) ||
+    typeof resource.node !== "string" || typeof resource.browser !== "string" ||
+    typeof manifest.metadata.sourceCommit !== "string" || !/^[a-f0-9]{40}$/.test(manifest.metadata.sourceCommit) ||
+    typeof manifest.metadata.sourceTreeSha256 !== "string" || !/^[a-f0-9]{64}$/.test(manifest.metadata.sourceTreeSha256)) throw new EvalFailure("ADMIN_RUNTIME_INVALID", 2)
+  if (process.platform !== "linux" || process.arch !== "x64" || manifest.metadata.platform !== process.platform || manifest.metadata.arch !== process.arch ||
+    resource.protocol !== 1 || resource.target !== `${process.platform}-${process.arch}`) throw new EvalFailure("ADMIN_RUNTIME_TARGET", 2)
+  const entries = runtimeEntries(manifest.files, true)
+  // Sequential streams bound open descriptors and memory for the browser/dependency inventory.
+  for (const entry of entries) {
+    const file = path.join(installation, entry.path)
+    const canonical = await realpath(file)
+    if (!canonical.startsWith(installation + path.sep)) throw new EvalFailure("ADMIN_RUNTIME_PATH", 2)
+    const hash = new Bun.CryptoHasher("sha256")
+    const info = await lstat(file)
+    if ((!info.isFile() && !info.isSymbolicLink()) || (info.mode & 0o777) !== entry.mode ||
+      (info.isSymbolicLink() ? await readlink(file) : undefined) !== entry.link) throw new EvalFailure("ADMIN_RUNTIME_MODE", 2)
+    if (info.isSymbolicLink() && (await stat(file)).isDirectory()) hash.update(await readlink(file))
+    else for await (const chunk of Bun.file(file).stream()) hash.update(chunk)
+    if (hash.digest("hex") !== entry.sha256) throw new EvalFailure("ADMIN_RUNTIME_HASH", 2)
+  }
+  const actual = (await runtimeInventory(installation)).filter(file => file !== "cli-manifest.json").sort()
+  if (JSON.stringify(actual) !== JSON.stringify(entries.map(entry => entry.path).sort())) throw new EvalFailure("ADMIN_RUNTIME_INVENTORY", 2)
+  if (![resource.node, resource.browser].every(runtimePath)) throw new EvalFailure("ADMIN_RUNTIME_PATH", 2)
+  const claimed = new Map(entries.map(entry => [entry.path, entry]))
+  for (const entry of runtimeEntries(resource.files, false)) {
+    const outer = claimed.get(`resources/loginom/${entry.path}`)
+    if (!outer || outer.sha256 !== entry.sha256 || outer.link !== entry.link) throw new EvalFailure("ADMIN_RUNTIME_RESOURCE", 2)
+  }
+  if (resource.nodeSha256 !== claimed.get(`resources/loginom/${resource.node}`)?.sha256 ||
+    resource.browserSha256 !== claimed.get(`resources/loginom/${resource.browser}`)?.sha256 ||
+    !["bin/loginom-ai-agent-cli", `resources/loginom/${resource.node}`, `resources/loginom/${resource.browser}`,
+      "resources/loginom/resource-manifest.json", "resources/loginom/runtime/client/package.json",
+      "resources/loginom/runtime/client/node_modules/playwright-core/package.json", "resources/loginom/runtime/client/node_modules/playwright-core/index.js"]
+      .every(file => claimed.has(file))) throw new EvalFailure("ADMIN_RUNTIME_RESOURCE", 2)
+  for (const file of [binary, path.join(resources, resource.node), path.join(resources, resource.browser)]) {
+    if (!((await stat(file)).mode & 0o111)) throw new EvalFailure("ADMIN_RUNTIME_MODE", 2)
+    const header = Buffer.from(await Bun.file(file).slice(0, 64).arrayBuffer())
+    if (header.length !== 64 || !header.subarray(0, 6).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1])) || header.readUInt16LE(18) !== 62)
+      throw new EvalFailure("ADMIN_RUNTIME_EXECUTABLE", 2)
+  }
+  return { installation, resources, node: path.join(resources, resource.node), browser: path.join(resources, resource.browser),
+    clientPackage: path.join(resources, "runtime/client/package.json"),
+    manifestHash: document.hash }
+}
+
+async function runtimeDocument(file: string) {
+  const bytes = await Bun.file(file).arrayBuffer().catch(() => { throw new EvalFailure("ADMIN_RUNTIME_INVALID", 2) })
+  try { return { value: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown,
+    hash: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") } }
+  catch { throw new EvalFailure("ADMIN_RUNTIME_INVALID", 2) }
+}
+
+function runtimeObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function runtimeEntries(value: unknown, modes: boolean) {
+  if (!Array.isArray(value) || !value.length || value.some(entry => !runtimeObject(entry) || typeof entry.path !== "string" ||
+    typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
+    (modes && (typeof entry.mode !== "number" || !Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777)) ||
+    (entry.link !== undefined && typeof entry.link !== "string"))) throw new EvalFailure("ADMIN_RUNTIME_INVALID", 2)
+  const entries = value as { path: string; sha256: string; mode?: number; link?: string }[]
+  if (new Set(entries.map(entry => entry.path)).size !== entries.length || entries.some(entry => !runtimePath(entry.path)))
+    throw new EvalFailure("ADMIN_RUNTIME_PATH", 2)
+  return entries
+}
+
+function runtimePath(value: string) {
+  return !!value && !path.isAbsolute(value) && !value.includes("\\") && !value.split("/").some(part => !part || part === "." || part === "..")
+}
+
+async function runtimeInventory(directory: string, prefix = ""): Promise<string[]> {
+  return (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async entry => {
+    const key = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) return runtimeInventory(path.join(directory, entry.name), key)
+    if (!entry.isFile() && !entry.isSymbolicLink()) throw new EvalFailure("ADMIN_RUNTIME_INVENTORY", 2)
+    return [key]
+  }))).flat()
 }
 
 export async function gitInfo() {

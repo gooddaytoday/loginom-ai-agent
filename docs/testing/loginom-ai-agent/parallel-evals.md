@@ -244,3 +244,18 @@ peer, без реализации Loginom RPC/пользователей. Дет
 Это transport qualification, не admin/browser readiness. Durable intent before
 send, runtime verifier/driver launch, dispose ack/process proof и live RPC ещё
 не реализованы; полный suite последнего factory коммита не включает этот codec.
+
+verifyAdminRuntime реализован в preflight. До запуска проверяет CLI artifact
+format/source/target, весь declared/actual inventory, SHA-256, modes/links и
+canonical containment, resource↔CLI claims и required Node/browser/client payload.
+Executable headers ограничены квалифицированным Linux/x64. Hash относится к тем
+же прочитанным manifest bytes, которые были разобраны. В памяти/FD остаётся один
+file stream при проверке payload; monorepo bundle отвергается.
+
+Девять real-filesystem RED/GREEN tests: valid fixture, changed dependency,
+unsafe/undeclared paths, modes, malformed/target manifest, resource mismatch,
+wrong ELF, external symlink, checkout bundle. Fixture binaries не исполняются;
+они проверяют manifest admission. Вместе с preflight/admin — 35 PASS, typecheck/
+diff check PASS. Новый verifier реально проверил установленный prod CLI 0.1.17;
+manifest SHA 797c018f95255f805fa1ee05a2ef4d69e44c723f5b1cd3e0772bbee73855fed8 совпал
+с прежним private inventory receipt. Browser/admin/model не запускались.
