@@ -446,9 +446,15 @@ Skill не меняется из-за ошибки runtime. В публичны�
   существующий bound native dropdown; public RED воспроизводит исходный отказ,
   GREEN, foreign input и same-value проверки проходят. Коммит `263df9620`:
   только runtime procedure и `text-import-wide.test.mjs`, 144 text-import теста PASS.
-- [ ] Подтвердить точный формат `yyyy/mm/dd` детерминированным native Host proof
+- [x] Подтвердить точный формат `yyyy/mm/dd` детерминированным native Host proof
   с датами и проверенными output/readback/cleanup, без внешней LLM и без зачёта
   этого smoke в модельные 43 попытки.
+  Повторный proof `date-format-native-2` завершился exit 0: readback формата и
+  разделителя, datetime schema, две ненулевые даты 13–14.10.2026, Save и package
+  cleanup/logout PASS. Preview сохраняет `datetime_display_precision` limitation;
+  точное время не заявляется. Первый smoke провалился на ошибочной проверке
+  `cell.value`, сохранён отдельно; только его own `user:17` закрыта диспетчером
+  после GUID/log/admin-сверки, закрытие подтверждено журналом и свежей inventory.
 - [x] Создать новый общий managed build worktree на согласованном HEAD; выполнить
   обе сборки последовательно в нём с одинаковой явной VERSION=0.1.17 и resources.
   Baseline получает только два old skill bytes, затем эти файлы восстанавливаются
@@ -1169,7 +1175,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Collector реализован TDD; cleanup guard `d73fa9def`, независимое review проведено.
 - Skill изменён только в двух Product файлах: `fdb90ca1e`; staging 13/13 без SKIP.
 - Модель закреплена: openai/gpt-6-sol-fast, medium, requested priority; каталог SHA в pins.
-- Новая matched пара: `20261013T132356Z-0a3983`, source `6768520a0`, build/inventory PASS; native proof в работе.
+- Новая matched пара: `20261013T132356Z-0a3983`, source `6768520a0`; build/inventory/native proof PASS, далее full18+25.
 - Используется существующий local профиль analytic-evals; status/check и Docker routing подтверждены.
 - Node/npm/Chromium совпали с release pins; Chromium сохранён в постоянном собственном каталоге.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.

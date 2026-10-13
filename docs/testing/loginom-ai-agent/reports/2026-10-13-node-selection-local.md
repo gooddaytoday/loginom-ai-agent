@@ -6,7 +6,7 @@
 исправлен по TDD в `263df9620`, 144 теста PASS. После проверки отсутствия
 собственных Loginom-сессий адресно архивирован также guard monthly.
 Новая сопоставимая серия `20261013T132356Z-0a3983`: baseline 0/18, candidate 0/25;
-обе сборки готовы, deterministic native proof в работе. Ни один старый провал
+обе сборки и deterministic native proof проверены. Ни один старый провал
 не переименован в успех и не включён в новую серию.
 
 ## Новая сопоставимая пара
@@ -26,6 +26,24 @@ Node/Chromium побайтно одинаковы. Разница build-inputs �
 представления import paths; входные inventories и outputs совпадают.
 Private evidence: `baseline-attestation.json`, `candidate-attestation.json`,
 обе skill inventories и `pair-independent-review.json` в новом run.
+
+## Native proof исправления дат
+
+`date-format-native-2` через настоящий Host без LLM завершился exit 0.
+`imports.text` SUCCEEDED/settled/cleanup_complete: readback `yyyy/mm/dd` и
+`Слэш (/)`, datetime schema, две ненулевые даты `13.10.2026`, `14.10.2026`.
+Save SUCCEEDED/save_completed; package cleanup SUCCEEDED/package_closed,
+logged_out true, unsaved_changes_discarded false. Точность времени preview
+не подтверждает (`datetime_display_precision`); она здесь не заявляется.
+
+Первый smoke сохранён как неуспешный: импорт был успешен, но проверка ошибочно
+ожидала ISO `cell.value` вместо публичного formatted display и остановилась
+до Save. Cleanup BLOCKED/CONFIRMED_SAVE_REQUIRED не переименован в успех.
+Точный native GUID связал собственную сессию `user:17` с init 13:39:18.798 UTC;
+после проверки текущей admin inventory она адресно закрыта в 13:54:11.952 UTC.
+Readback отсутствия и серверный close закреплены в `native-first-session-closure.json`
+и before/after PNG. Admin logout проверен, MCP завершён. Сторонние сессии,
+storage и профиль не изменялись. Ни один smoke не занимает модельный слот.
 
 ## Изменение и проверки
 
