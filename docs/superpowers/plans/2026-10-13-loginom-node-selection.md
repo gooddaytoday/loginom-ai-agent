@@ -1150,6 +1150,6 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Baseline ABC/1: CLI exit 1, cleanup unconfirmed, 1 JS apply; модельный слот сохраняется.
 - Candidate собран/verify PASS; digest `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
-- Административный вход и адресное восстановление разрешены; IAB control timeout, Loginom HTTP 200, session mapping нет.
-- .writer сохранён; все own процессы завершены, новые CLI run не запускаются.
-- Следующий шаг: проверить Loginom и восстановить профиль; далее monthly-demand/1 и остальные 16 baseline.
+- Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
+- Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
+- Следующий шаг: monthly-demand/1 и остальные 16 baseline; ABC/1 остаётся в знаменателе.
