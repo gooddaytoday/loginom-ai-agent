@@ -201,8 +201,12 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const interruptedAttempts = attempts.filter(result => result.status === "interrupted")
   const summary: RunSummary = {
     run_id: runId,
-    ...(fixture ? { slots: fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
-      liveQualified: false, ...(config.dryRun ? { state: "planned" as const } : slotStates.get(slot.id)!) })) } : {}),
+    slots: fixture ? fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
+      liveQualified: false, ...(config.dryRun ? { state: "planned" as const } : slotStates.get(slot.id)!) }))
+      : [{ id: "default", username: config.loginom.username, profileDir: config.profileDir,
+        historyDir: `${config.profileDir}.history`, workspaceRoot: path.resolve(config.agent.workspaceRoot), liveQualified: false,
+        state: config.dryRun ? "planned" : state.stopped || attempts.some(result => result.environment_cleanup?.status !== "confirmed") ? "quarantined" : "closed",
+        ...(attempts.at(-1) ? { cleanup_receipt: path.join(runDir, attempts.at(-1)!.task_id, String(attempts.at(-1)!.attempt), "cleanup.json") } : {}) }],
     label: config.label,
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
