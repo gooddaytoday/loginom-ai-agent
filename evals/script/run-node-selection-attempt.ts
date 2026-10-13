@@ -1,4 +1,5 @@
 import path from "node:path"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import type { SelectionMode } from "../src/node-selection"
 
 export type SelectionPins = {
@@ -62,6 +63,18 @@ export function selectionAttempt(raw: unknown, taskID: string, number: number) {
     workspace: path.join(pins.workspaceRoot, pins.runID, pins.phase, taskID, String(number)),
     packagePath: `${pins.connection.folder}/${prefix}.lgp`, resultName: `${prefix}.result.csv`,
   }
+}
+
+export async function reserveAttempt(plan: ReturnType<typeof selectionAttempt>) {
+  await mkdir(path.dirname(plan.directory), { recursive: true, mode: 0o700 })
+  await mkdir(plan.directory, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "EEXIST") throw Error("SELECTION_SLOT_EXISTS")
+    throw error
+  })
+  await mkdir(plan.workspace, { recursive: true, mode: 0o700 })
+  const workspace = await mkdtemp(path.join(plan.workspace, "inputs-"))
+  await mkdir(path.join(plan.directory, "artifact/results"), { recursive: true, mode: 0o700 })
+  return { ...plan, workspace }
 }
 
 function record(value: unknown): value is Record<string, unknown> {

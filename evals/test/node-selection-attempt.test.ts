@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
-import { selectionAttempt } from "../script/run-node-selection-attempt"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import { reserveAttempt, selectionAttempt } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -21,6 +24,19 @@ test("unsafe or incomplete pins are rejected before any CLI or filesystem work",
     { storageDir: "/workdir/UserStorage/other" }, { deadlineSeconds: 0 },
     { container: { id: "loginom-server", name: "loginom-server" } },
   ]) expect(() => selectionAttempt({ ...pins(), ...change }, "sales-by-category", 1)).toThrow("SELECTION_PINS_INVALID")
+})
+
+test("reserving an existing slot refuses a rerun and preserves its evidence", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-attempt-test-"))
+  try {
+    const plan = selectionAttempt({ ...pins(), resultsRoot: path.join(root, "results"), workspaceRoot: path.join(root, "inputs") }, "sales-by-category", 1)
+    await reserveAttempt(plan)
+    await Bun.write(path.join(plan.directory, "sentinel.txt"), "original evidence")
+    await expect(reserveAttempt(plan)).rejects.toThrow("SELECTION_SLOT_EXISTS")
+    expect(await Bun.file(path.join(plan.directory, "sentinel.txt")).text()).toBe("original evidence")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 function pins() {
