@@ -5,7 +5,7 @@ import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
 import { EvalFailure } from "../src/fail"
-import { judgeCommand, judgedFields, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
+import { createJudgeGate, judgeCommand, judgedFields, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
 import { aggregate } from "../src/report"
 import { loadTasks } from "../src/task"
 import { analyzeComparison, parseComparisonSummary } from "../src/compare-analysis"
@@ -134,6 +134,140 @@ const settings = (env: Record<string, string> = {}): JudgeSettings => ({
   timeoutMs: 30_000,
   passThreshold: 70,
   env,
+})
+
+async function gateFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-gate-"))
+  const artifact = await fixtureArtifact()
+  const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+  const trace = path.join(root, "intervals.jsonl")
+  const records = async () => await Bun.file(trace).exists()
+    ? (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line) as { kind: "start" | "end"; pid: number; dir: string; at: string }) : []
+  return {
+    root, records,
+    input(id: string, env: Record<string, string> = {}, signal?: AbortSignal) {
+      return { task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(root, id, "judge"),
+        judge: settings({ FAKE_CODEX_GATE_LOG: trace, FAKE_CODEX_DELAY_MS: "200", ...env }), signal }
+    },
+    async started(id: string) {
+      const deadline = Date.now() + 5_000
+      while (Date.now() < deadline) {
+        const row = (await records()).find(row => row.kind === "start" && row.dir === path.join(root, id, "judge"))
+        if (row) return row
+        await Bun.sleep(5)
+      }
+      throw Error("fake-codex did not start")
+    },
+    async close() { await rm(root, { recursive: true, force: true }); await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true }) },
+  }
+}
+
+test("judge gate: actual fake-codex intervals do not overlap", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  try {
+    const [a, b] = await Promise.all([gate(fixture.input("a")), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ ok: true, attempts: 1 })
+    expect(b).toMatchObject({ ok: true, attempts: 1 })
+    const rows = await fixture.records()
+    expect(rows.map(row => [path.basename(path.dirname(row.dir)), row.kind])).toEqual([["a", "start"], ["a", "end"], ["b", "start"], ["b", "end"]])
+    expect(BigInt(rows[2]!.at)).toBeGreaterThanOrEqual(BigInt(rows[1]!.at))
+  } finally { await fixture.close() }
+})
+
+test("judge gate: abort during waiting skips the child and preserves the queue predecessor", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  const abort = new AbortController()
+  let aSettled = false
+  const a = gate(fixture.input("a", { FAKE_CODEX_DELAY_MS: "1000" })).finally(() => { aSettled = true })
+  const b = gate(fixture.input("b", {}, abort.signal))
+  const pending = [a, b]
+  try {
+    await fixture.started("a")
+    abort.abort()
+    expect(await b).toEqual({ ok: false, error: "interrupted before judge", attempts: 0 })
+    expect(aSettled).toBe(false)
+    expect(await Bun.file(path.join(fixture.root, "b/judge/TASK.md")).exists()).toBe(false)
+    const c = gate(fixture.input("c"))
+    pending.push(c)
+    expect(await a).toMatchObject({ ok: true })
+    expect(await c).toMatchObject({ ok: true })
+    expect((await fixture.records()).map(row => [path.basename(path.dirname(row.dir)), row.kind]))
+      .toEqual([["a", "start"], ["a", "end"], ["c", "start"], ["c", "end"]])
+  } finally { abort.abort(); await Promise.allSettled(pending); await fixture.close() }
+})
+
+test("judge gate: the entire internal retry precedes the next actual child", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  try {
+    const [a, b] = await Promise.all([gate(fixture.input("a", { FAKE_CODEX_FLAKY_MARKER: path.join(fixture.root, "flaky") })), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ ok: true, attempts: 2 })
+    expect(b).toMatchObject({ ok: true, attempts: 1 })
+    const rows = await fixture.records()
+    expect(rows.map(row => [path.basename(path.dirname(row.dir)), row.kind]))
+      .toEqual([["a", "start"], ["a", "end"], ["a", "start"], ["a", "end"], ["b", "start"], ["b", "end"]])
+    expect(BigInt(rows[4]!.at)).toBeGreaterThanOrEqual(BigInt(rows[3]!.at))
+  } finally { await fixture.close() }
+})
+
+test("judge gate: a preparation exception releases the next judge", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  const input = fixture.input("a")
+  try {
+    await cp(input.task.dir, path.join(fixture.root, "bad-task"), { recursive: true })
+    await cp(path.join(evalsRoot, "fixtures/storage/not-a-package.lgp"), path.join(fixture.root, "bad-task", input.task.reference))
+    const [a, b] = await Promise.allSettled([gate({ ...input, task: { ...input.task, dir: path.join(fixture.root, "bad-task") } }), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ status: "rejected", reason: expect.any(EvalFailure) })
+    expect(b).toMatchObject({ status: "fulfilled", value: { ok: true, attempts: 1 } })
+    expect((await fixture.records()).map(row => [path.basename(path.dirname(row.dir)), row.kind])).toEqual([["b", "start"], ["b", "end"]])
+  } finally { await fixture.close() }
+})
+
+for (const stop of ["error", "timeout", "abort"] as const) test(`judge gate: ${stop} drains A before releasing B`, async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  const abort = new AbortController()
+  const input = fixture.input("a", { FAKE_CODEX_DELAY_MS: stop === "error" ? "200" : "5000", ...(stop === "error" ? { FAKE_CODEX_EXIT: "9" } : {}) }, abort.signal)
+  let finishedAt = 0
+  const a = gate({ ...input, judge: { ...input.judge, timeoutMs: stop === "timeout" ? 500 : 30_000 } }).finally(() => { finishedAt = Date.now() })
+  const b = gate(fixture.input("b"))
+  try {
+    if (stop === "abort") { await fixture.started("a"); abort.abort() }
+    const [first, second] = await Promise.all([a, b])
+    expect(first).toMatchObject({ ok: false, attempts: stop === "abort" ? 1 : 2 })
+    expect(second).toMatchObject({ ok: true, attempts: 1 })
+    const rows = await fixture.records()
+    const owned = rows.filter(row => row.kind === "start" && row.dir === path.join(fixture.root, "a/judge"))
+    expect(owned).toHaveLength(stop === "abort" ? 1 : 2)
+    expect(await Promise.all(owned.map(row => Bun.file(`/proc/${row.pid}/stat`).exists()))).toEqual(owned.map(() => false))
+    expect(Number(rows.find(row => row.kind === "start" && row.dir === path.join(fixture.root, "b/judge"))!.at)).toBeGreaterThanOrEqual(finishedAt)
+  } finally { abort.abort(); await Promise.allSettled([a, b]); await fixture.close() }
+})
+
+test("judge gate: actual child uses judge CODEX_HOME without inherited model or admin environment", async () => {
+  const fixture = await gateFixture()
+  const probe = path.join(fixture.root, "environment.json")
+  const wrapper = path.join(fixture.root, "probe.ts")
+  await Bun.write(wrapper, `await Bun.write(${JSON.stringify(probe)},JSON.stringify(Object.fromEntries(["LOGINOM_AI_AGENT_SHARED_AUTH_DIR","LOGINOM_DOCK_API_KEY","LOGINOM_AI_AGENT_CLI_PROFILE","EVAL_ADMIN_CREDENTIALS_FILE","CODEX_HOME"].map(key=>[key,process.env[key]??null]))));await import(${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))});`)
+  const input = fixture.input("probe")
+  const configured = { ...input, judge: { ...input.judge, command: [process.execPath, wrapper],
+    env: { ...input.judge.env, CODEX_HOME: path.join(fixture.root, "judge-codex") }, timeoutMs: 2_000 } }
+  const child = Bun.spawn([process.execPath, "-e", `import {createJudgeGate} from ${JSON.stringify(path.join(evalsRoot, "src/judge.ts"))};console.log(JSON.stringify(await createJudgeGate()(${JSON.stringify(configured)})));`], {
+    env: { ...process.env, LOGINOM_AI_AGENT_SHARED_AUTH_DIR: "model-auth-canary", LOGINOM_DOCK_API_KEY: "dock-canary",
+      LOGINOM_AI_AGENT_CLI_PROFILE: "agent-profile-canary", EVAL_ADMIN_CREDENTIALS_FILE: "admin-canary", CODEX_HOME: "desktop-home-canary" },
+    stdout: "pipe", stderr: "pipe",
+  })
+  try {
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, attempts: 1 })
+    expect(await Bun.file(probe).json()).toEqual({ LOGINOM_AI_AGENT_SHARED_AUTH_DIR: null, LOGINOM_DOCK_API_KEY: null,
+      LOGINOM_AI_AGENT_CLI_PROFILE: null, EVAL_ADMIN_CREDENTIALS_FILE: null, CODEX_HOME: path.join(fixture.root, "judge-codex") })
+    expect(stdout + stderr).not.toContain("canary")
+  } finally { child.kill(); await child.exited; await fixture.close() }
 })
 
 const judgeFixture = async (env: Record<string, string> = {}) => {
