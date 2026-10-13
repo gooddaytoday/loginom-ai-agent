@@ -18,11 +18,14 @@ export function retainEarlyLockFixture(owner) {
   }
   const group = `resource68-fixture-${crypto.randomUUID()}`;
   let session, targetId, frameId, installed = false, began = false, acquired = false;
-  let disposed = false, pending = 0, first, held = false;
+  let disposed = false, pending = 0, first, held = false, disposalPromise, disposalState = 'not_started';
+  let disposalFailed = false, disposalFailure;
   const scripts = [], contexts = [], trace = [];
-  let exportHandle, getterHandle, scopeHandle;
+  let exportHandle, getterHandle, scopeHandle, globalHandle, bgHandle;
   function hold(value) { if (!held) { first = value; held = true; } return first; }
   function guard({ early = false } = {}) {
+    // Refused new work cannot replace the original disposal's eventual cause.
+    if (disposalState === 'pending') throw refusal('EARLY_CDP_DISPOSAL_PENDING');
     try {
     if (held) throw first;
     if (original.signal.aborted) throw original.signal.reason;
@@ -51,6 +54,14 @@ export function retainEarlyLockFixture(owner) {
   }
   function location(result) {
     return result.internalProperties?.find(row => row.name === '[[FunctionLocation]]')?.value?.value;
+  }
+  function dataHandle(rows, name, type) {
+    const matches = rows.result?.filter(row => row.name === name);
+    const row = matches?.length === 1 ? matches[0] : undefined;
+    if (!row || row.get || row.set || row.value?.type !== type || !row.value.objectId) {
+      throw refusal('EARLY_CDP_MISSING_EXPORT');
+    }
+    return row.value.objectId;
   }
   return {
     async install() {
@@ -99,11 +110,13 @@ export function retainEarlyLockFixture(owner) {
         const source = (await query('Debugger.getScriptSource', { scriptId: script.scriptId })).scriptSource;
         if (hash(source) !== LOCK_SHA256) throw refusal('EARLY_CDP_WRONG_SOURCE');
         const result = await query('Runtime.evaluate', {
-          expression: 'globalThis.bg.LockDeferred', contextId: context.id,
+          expression: 'this', contextId: context.id,
           objectGroup: group, returnByValue: false, silent: true,
         });
-        if (result.exceptionDetails || result.result.type !== 'function') throw refusal('EARLY_CDP_MISSING_EXPORT');
-        exportHandle = result.result.objectId;
+        if (result.exceptionDetails || result.result.type !== 'object') throw refusal('EARLY_CDP_MISSING_EXPORT');
+        globalHandle = result.result.objectId;
+        bgHandle = dataHandle(await properties(globalHandle), 'bg', 'object');
+        exportHandle = dataHandle(await properties(bgHandle), 'LockDeferred', 'function');
         const exported = await properties(exportHandle);
         const exportedLocation = location(exported);
         if (exportedLocation?.scriptId !== script.scriptId) throw refusal('EARLY_CDP_FOREIGN_EXPORT');
@@ -123,8 +136,12 @@ export function retainEarlyLockFixture(owner) {
         if (location(await properties(getterHandle))?.scriptId !== script.scriptId) {
           throw refusal('EARLY_CDP_FOREIGN_LEXICAL');
         }
+        // Re-read own data descriptors atomically and compare raw handles.
+        // No export getter or exported function is invoked by this proof.
         const same = await query('Runtime.callFunctionOn', {
-          objectId: exportHandle, functionDeclaration: 'function(){return this===globalThis.bg.LockDeferred}',
+          objectId: exportHandle,
+          functionDeclaration: 'function(root,bg){const r=Object.getOwnPropertyDescriptor(root,"bg");if(!r||!("value" in r)||r.value!==bg)return false;const e=Object.getOwnPropertyDescriptor(bg,"LockDeferred");return !!e&&"value" in e&&e.value===this}',
+          arguments: [{ objectId: globalHandle }, { objectId: bgHandle }],
           returnByValue: true, silent: true,
         });
         if (same.exceptionDetails || same.result.value !== true) throw refusal('EARLY_CDP_EXPORT_REPLACED');
@@ -136,21 +153,34 @@ export function retainEarlyLockFixture(owner) {
       finally { pending--; }
     },
     validate() { guard(); },
-    async dispose() {
-      if (pending) throw refusal('EARLY_CDP_PENDING_DISPOSAL');
-      if (disposed) return;
-      if (session) {
-        await session.send('Runtime.releaseObjectGroup', { objectGroup: group });
-        for (const objectId of [exportHandle, getterHandle, scopeHandle].filter(Boolean)) {
+    dispose() {
+      if (disposalPromise) return disposalPromise;
+      if (pending) return Promise.reject(refusal('EARLY_CDP_PENDING_DISPOSAL'));
+      const originalSession = session;
+      const handles = [globalHandle, bgHandle, exportHandle, getterHandle, scopeHandle].filter(Boolean);
+      disposalState = 'pending'; pending++;
+      // Store one operation synchronously before release, including re-entry
+      // from the transport. Unknown completion never permits replacement IO.
+      disposalPromise = Promise.resolve().then(async () => {
+      if (originalSession) {
+        await originalSession.send('Runtime.releaseObjectGroup', { objectGroup: group });
+        for (const objectId of handles) {
           let inaccessible = false;
-          try { await session.send('Runtime.getProperties', { objectId, ownProperties: true }); }
-          catch { inaccessible = true; }
+          try { await originalSession.send('Runtime.getProperties', { objectId, ownProperties: true }); }
+          catch (error) {
+            if (String(error?.message).includes('Could not find object with given id')) inaccessible = true;
+            else throw error;
+          }
           if (!inaccessible) throw refusal('EARLY_CDP_RELEASE_NOT_CONFIRMED');
         }
-        await session.detach();
+        await originalSession.detach();
       }
-      disposed = true; trace.push('original-group-released-session-detached');
+      disposed = true; disposalState = 'confirmed'; trace.push('original-group-released-session-detached');
+      }).catch(error => { disposalState = 'unknown'; disposalFailed = true; disposalFailure = error;
+        throw hold(error); }).finally(() => { pending--; });
+      return disposalPromise;
     },
-    facts() { return { held, first, pending, disposed, trace: [...trace], nativeProvider: false }; },
+    facts() { return { held, first, pending, disposed, disposalState, disposalFailed, disposalFailure,
+      trace: [...trace], nativeProvider: false }; },
   };
 }

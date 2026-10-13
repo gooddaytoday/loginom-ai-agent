@@ -1,6 +1,6 @@
 # Resource68 early Chromium scope component
 
-node-orchestration-v2 / MAS-artifacts-v1. Independent offline tool component on
+node-orchestration-v3 / MAS-artifacts-v1. Independent offline tool component on
 49a0e65b; no host/managed/bridge/start-input, generation69 or FP startup bytes
 change. No production provider or new owner-retention registry is installed.
 
@@ -30,6 +30,12 @@ function/scope handles stay private to the captured session/object group. Only
 non-authoritative diagnostic IDs/hashes/locations are returned; they cannot mint
 scope.inputs, openRead, a native provider or completion authority.
 
+Corrective on7f4ba31d: obtain the original global object, then use CDP own data
+descriptors for bg and LockDeferred before accepting their remote handles.
+Accessor descriptors refuse before invocation. The final fixed comparison reads
+own descriptors atomically in the original realm; it never reads bg.LockDeferred
+through a getter. A replacement during that awaited comparison refuses too.
+
 Every awaited read validates the original owner/signal/deadline on both sides.
 Unsettled/pending/UNKNOWN/overlap gate, missing completion, foreign/replaced tuple,
 wrong source/context/export and duplicate script refuse. The first rejected raw
@@ -44,6 +50,17 @@ handles are inaccessible, then detaches that same session. Fixture Page/context
 and browser close orderly; browser disconnected and local server closed are
 checked. These are fixture CDP/browser lifecycle facts, not native Close/logout,
 host ACK, transport release or a durable cleanup receipt.
+
+Disposal now claims one retained Promise/pending state synchronously before any
+release IO. New acquire/load/install refuse during pending disposal without
+replacing its eventual raw first cause. Success verifies captured original
+global/bg/export/getter/scope handles, then detaches the same session. Only the
+specific CDP inaccessible-object rejection proves handle release; unrelated
+transport/falsy rejection remains UNKNOWN. Repeated disposal returns that exact
+original Promise, including rejection, never another release/detach attempt.
+Original first refusal and a secondary disposal failure are retained separately.
+Error/lost-reply controls close only their own fixture Page/context/browser;
+that orderly fixture teardown is not a confirmed original disposal or native ACK.
 
 Checks exercise actual pinned Chromium1243 and Playwright1.63 from verified
 immutable product8c0c6ff/202610131135. Source Node24 and that product's bundled
