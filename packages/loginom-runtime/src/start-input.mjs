@@ -27,7 +27,10 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
+  const amountStartup=input.amountStartup
+  if(amountStartup!==undefined) validateAmountStartup(input,amountStartup)
   const fpStartup=input.fpStartup
+  if(fpStartup!==undefined && amountStartup!==undefined)throw Error("LOGINOM_START_INVALID")
   if(fpStartup!==undefined && (!fpStartup || typeof fpStartup!=="object"
       || fpStartup.harness!=="field-parameters-preservation-v1" || typeof fpStartup.authorization!=="string" || !/^[a-f0-9]{64}$/.test(fpStartup.authorization)
       || typeof fpStartup.requestId!=="string" || !/^[a-zA-Z0-9_-]{1,160}$/.test(fpStartup.requestId)
@@ -61,5 +64,27 @@ export function validateStartInput(input) {
         || capture.packagePath.split('/').some(x => x === '.' || x === '..'))
       throw Error('LOGINOM_START_INVALID')
   }
-  return { ...(fpStartup?{fpStartup}:{}), acceptanceCleanupPackage: cleanup, ...(capture ? {acceptanceCapture:capture} : {}) }
+  return { ...(amountStartup?{amountStartup}:{}), ...(fpStartup?{fpStartup}:{}), acceptanceCleanupPackage: cleanup, ...(capture ? {acceptanceCapture:capture} : {}) }
+}
+
+// A separate closed Amount packet. Scalar IPC claims are cancellation/routing
+// bindings only; they cannot establish an acquired parent lease/native owner.
+function validateAmountStartup(input,tuple) {
+  const fixed='authorization,deadline,operation,purpose,request,requestId'
+  if(!tuple || typeof tuple!=='object' || tuple.purpose!=='amount-import-type-v1'
+      || typeof tuple.authorization!=='string' || !/^[a-f0-9]{64}$/.test(tuple.authorization)
+      || !['requestId','operation','request'].every(k=>typeof tuple[k]==='string' && /^[a-zA-Z0-9_-]{1,160}$/.test(tuple[k]))
+      || !Number.isSafeInteger(tuple.deadline) || tuple.deadline<=Date.now() || tuple.deadline>Date.now()+180000
+      || input.validation===true)throw Error('LOGINOM_START_INVALID')
+  const keys=Object.keys(tuple).sort().join(',')
+  if(keys===fixed) {
+    if(input.chat!=='readiness' || input.acceptanceCapture!==undefined)throw Error('LOGINOM_START_INVALID')
+  } else if(keys==='authorization,binding,deadline,operation,phase,purpose,request,requestId' && tuple.phase==='capture') {
+    const capture=input.acceptanceCapture,binding=tuple.binding
+    if(input.chat==='readiness' || !capture || capture.harness!=='amount-import-type-v1'
+        || !binding || typeof binding!=='object'
+        || Object.keys(binding).sort().join(',')!==Object.keys(capture).sort().join(',')
+        || Object.keys(capture).some(k=>binding[k]!==capture[k]) || capture.expires>tuple.deadline)
+      throw Error('LOGINOM_START_INVALID')
+  } else throw Error('LOGINOM_START_INVALID')
 }

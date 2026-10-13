@@ -1,9 +1,20 @@
+import {validateStartInput} from './start-input.mjs'
 import {decodePreReadyRejection} from './qualified-pre-ready.mjs'
 
 // IPC carries the original accepted startup tuple, never an AbortSignal or
 // readiness grant. Reuse the managed startup's one original controller.
 export function retainFPManagedStartup(message,input,state,controller) {
-  const id=message.id,tuple=input.fpStartup,connection=input.connection
+  return retainManagedStartup(message,input,state,controller,'fpStartup')
+}
+
+// Closed wrappers retain their own packet; neither purpose aliases the other.
+export function retainAmountManagedStartup(message,input,state,controller) {
+  validateStartInput(input)
+  return retainManagedStartup(message,input,state,controller,'amountStartup')
+}
+
+function retainManagedStartup(message,input,state,controller,key) {
+  const id=message.id,tuple=input[key],connection=input.connection
   const fixed={...tuple}, primitives={...input}, credentials={...connection}
   const capture=input.acceptanceCapture,binding=tuple.binding,originalBinding=binding&&{...binding}
   if(message.deadline!==fixed.deadline)throw Error('LOGINOM_START_INVALID')
@@ -15,7 +26,8 @@ export function retainFPManagedStartup(message,input,state,controller) {
     if(controller.signal.aborted){refuse(controller.signal.reason);throw primary.value}
     if(Date.now()>=fixed.deadline){refuse(Error('LOGINOM_INITIAL_READINESS_DEADLINE'));throw primary.value}
     if(state.startupController!==controller || message.id!==id || message.input!==input || message.deadline!==fixed.deadline
-        || input.fpStartup!==tuple || Object.keys(fixed).some(k=>tuple[k]!==fixed[k])
+        || input[key]!==tuple || Object.keys(fixed).some(k=>tuple[k]!==fixed[k])
+        || (key==='amountStartup' && Object.keys(tuple).sort().join(',')!==Object.keys(fixed).sort().join(','))
         || (originalBinding && (tuple.binding!==binding || input.acceptanceCapture!==capture
           || Object.keys(binding).sort().join(',')!==Object.keys(originalBinding).sort().join(',')
           || Object.keys(capture).sort().join(',')!==Object.keys(originalBinding).sort().join(',')
@@ -41,7 +53,8 @@ export function retainFPManagedStartup(message,input,state,controller) {
     propagate(value){primary??={value,origin:"guard"};return primary.value},
     cancel(value){
       if(!pending || value?.phase!=='startup' || value.requestId!==id || value.startupRequestId!==fixed.requestId
-          || value.authorization!==fixed.authorization || value.harness!==fixed.harness || value.deadline!==fixed.deadline)return false
+          || value.authorization!==fixed.authorization || value.harness!==(fixed.harness??fixed.purpose) || value.deadline!==fixed.deadline
+          || (key==='amountStartup' && (value.operation!==fixed.operation || value.request!==fixed.request)))return false
       if(originalBinding && (value.bindingPhase!=='capture' || !value.captureBinding
           || Object.keys(value.captureBinding).sort().join(',')!==Object.keys(originalBinding).sort().join(',')
           || Object.keys(originalBinding).some(k=>value.captureBinding[k]!==originalBinding[k])))return false

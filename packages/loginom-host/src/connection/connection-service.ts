@@ -1,4 +1,4 @@
-import type { retainFPStartup } from "../fp-startup-control"
+import type { HostStartup } from "../fp-startup-control"
 import { randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
@@ -9,7 +9,7 @@ import type { recoveryStore } from "./recovery-store"
 export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void> }
 export type ConnectionRuntime = {
   check(candidate: ActiveConnection): Promise<void>
-  prepare(candidate: ActiveConnection, startup?:ReturnType<typeof retainFPStartup>): Promise<RuntimeHandle>
+  prepare(candidate: ActiveConnection, startup?:HostStartup): Promise<RuntimeHandle>
   close?(): Promise<void>
 }
 const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
@@ -18,7 +18,7 @@ export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
-  startup?: ReturnType<typeof retainFPStartup>,
+  startup?: HostStartup,
 ) {
   const state: {
     active?: ActiveConnection

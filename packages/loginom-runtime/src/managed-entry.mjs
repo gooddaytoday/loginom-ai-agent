@@ -1,4 +1,4 @@
-import {retainFPManagedStartup} from "./fp-managed-startup.mjs"
+import {retainFPManagedStartup,retainAmountManagedStartup} from "./fp-managed-startup.mjs"
 import {decodePreReadyRejection} from "./qualified-pre-ready.mjs"
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
@@ -271,7 +271,7 @@ function close() {
   return state.closing
 }
 const stop = () => {
-  if(state.fpStartup && !state.fpStartup.accepted) {state.closeFailure=Error("LOGINOM_NOT_READY");return}
+  if(state.controlledStartup && !state.controlledStartup.accepted) {state.closeFailure=Error("LOGINOM_NOT_READY");return}
   void close().then(
     () => process.exit(0),
     error => { state.closeFailure = error },
@@ -298,16 +298,17 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, acceptanceCapture, fpStartup } = validateStartInput(input)
-      if(fpStartup) {
+      const { acceptanceCleanupPackage, acceptanceCapture, fpStartup, amountStartup } = validateStartInput(input)
+      if(fpStartup || amountStartup) {
         state.startupController=new AbortController()
-        state.fpStartup=retainFPManagedStartup(message,input,state,state.startupController)
+        state.controlledStartup=fpStartup ? retainFPManagedStartup(message,input,state,state.startupController)
+          : retainAmountManagedStartup(message,input,state,state.startupController)
       }
       const observed=async(work)=>{
-        let value;try {value=await work}catch(error){throw state.fpStartup?state.fpStartup.reject(error):error}
-        state.fpStartup?.guard();return value
+        let value;try {value=await work}catch(error){throw state.controlledStartup?state.controlledStartup.reject(error):error}
+        state.controlledStartup?.guard();return value
       }
-      state.fpStartup?.guard()
+      state.controlledStartup?.guard()
       if (Object.hasOwn(message,"deadline") && (!Number.isSafeInteger(message.deadline) || message.deadline<=Date.now()))
         throw Error("LOGINOM_INITIAL_READINESS_DEADLINE")
       const resources = await observed(verifyResources(input.resources))
@@ -346,7 +347,7 @@ async function handle(message) {
         deadline:Number.isSafeInteger(message.deadline)?message.deadline:null,
         deadlineSource:Number.isSafeInteger(message.deadline)?"supervisor.request.start":"NOT_SUPPLIED",
         signal:state.startupController.signal}
-      state.fpStartup?.bindOwner(state.startupOwner)
+      state.controlledStartup?.bindOwner(state.startupOwner)
       const login = {
         owner:state.startupOwner,
         browserPath: resources.browserPath,
@@ -356,14 +357,14 @@ async function handle(message) {
       }
       if (input.validation === true) {
         try {await checkConnection({ ...login, endpoint: input.endpoint })}
-        finally {if(!state.fpStartup)state.startupController=undefined}
+        finally {if(!state.controlledStartup)state.startupController=undefined}
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
       let authenticated
       try {authenticated = await observed(loginBrowser({ ...login, keepOpen: true }))}
-      finally {if(!state.fpStartup)state.startupController=undefined}
-      if(state.fpStartup && (authenticated?.context!==state.startupOwner.context || !state.startupOwner.page
+      finally {if(!state.controlledStartup)state.startupController=undefined}
+      if(state.controlledStartup && (authenticated?.context!==state.startupOwner.context || !state.startupOwner.page
           || authenticated.context.pages().length!==1 || authenticated.context.pages()[0]!==state.startupOwner.page))
         throw Error("LOGINOM_STARTUP_OWNER_CHANGED")
       state.browser = authenticated.context
@@ -400,7 +401,7 @@ async function handle(message) {
       const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
         originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
       const assertStartup=()=>{
-        state.fpStartup?.guard();
+        state.controlledStartup?.guard();
         if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
             || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
             || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
@@ -450,7 +451,7 @@ async function handle(message) {
       assertStartup();
       await observed(state.client.connect(clientTransport))
       assertStartup();
-      state.fpStartup?.accept()
+      state.controlledStartup?.accept()
       send({
         id: message.id,
         result: {
@@ -466,10 +467,10 @@ async function handle(message) {
       return
     }
     if(message.operation==="readonly.preReady.cancel" && message.input?.phase==="startup") {
-      if(!state.fpStartup?.cancel(message.input))throw Error("LOGINOM_HANDSHAKE_INVALID")
-      send({id:message.id,result:{accepted:true,pending:state.fpStartup.pending,nativeCancellationConfirmed:false}});return
+      if(!state.controlledStartup?.cancel(message.input))throw Error("LOGINOM_HANDSHAKE_INVALID")
+      send({id:message.id,result:{accepted:true,pending:state.controlledStartup.pending,nativeCancellationConfirmed:false}});return
     }
-    if(state.fpStartup && !state.fpStartup.accepted) throw Error("LOGINOM_NOT_READY")
+    if(state.controlledStartup && !state.controlledStartup.accepted) throw Error("LOGINOM_NOT_READY")
     if(state.preReadyReadHeld && !["readonly.preReady","readonly.preReady.cancel","interrupt"].includes(message.operation))
       throw Error("LOGINOM_RECOVERY_REQUIRED")
     if (message.operation === "close") {
@@ -562,8 +563,8 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    if(message.operation==="start" && state.fpStartup)send({id:message.id,rejection:closeRejection(state.fpStartup.propagate(error)),rejectionOrigin:state.fpStartup.rejectionOrigin,
-      ...(state.fpStartup.secondary?{secondaryRejection:closeRejection(state.fpStartup.secondary.value)}:{})})
+    if(message.operation==="start" && state.controlledStartup)send({id:message.id,rejection:closeRejection(state.controlledStartup.propagate(error)),rejectionOrigin:state.controlledStartup.rejectionOrigin,
+      ...(state.controlledStartup.secondary?{secondaryRejection:closeRejection(state.controlledStartup.secondary.value)}:{})})
     else send({ id: message.id, error: code })
     if (message.operation === "start") {
       state.startupFailure=error
@@ -573,9 +574,9 @@ async function handle(message) {
       }
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
-      if(!state.fpStartup) setImmediate(() => {
+      if(!state.controlledStartup) setImmediate(() => {
         void close().catch(() => undefined)
       })
     }
-  } finally { if(message.operation==="start")state.fpStartup?.settle() }
+  } finally { if(message.operation==="start")state.controlledStartup?.settle() }
 }

@@ -31,7 +31,17 @@ export function retainAmountStartup(message: {id:string; deadline?:unknown}, inp
         original[key as keyof AmountStartup] !== snapshot[key as keyof AmountStartup]))
       throw Error('LOGINOM_HANDSHAKE_INVALID')
   }
-  return retainStartup(message,input,'amount-import-type-v1',snapshot,guard)
+  const startup=retainStartup(message,input,'amount-import-type-v1',snapshot,guard)
+  return {...startup, assertHostOptions(options: Record<string,unknown>) {
+    startup.guard()
+    const capture=options.acceptanceCapture as typeof input.acceptanceCapture | undefined
+    if(!capture || capture.authorization!==snapshot.authorization || capture.harness!==snapshot.purpose
+        || capture.packagePath!==input.acceptanceCapture.packagePath
+        || options.strictRecovery !== (input.strictRecovery===true)
+        || ['root','resources','headless','acceptanceCleanupPackage'].some(key=>
+          options[key] !== input[key as keyof typeof input]))throw Error('LOGINOM_HANDSHAKE_INVALID')
+  }, tuple:Object.freeze({...startup.tuple,operation:snapshot.operation,request:snapshot.request}),
+    get pending(){return startup.pending},get accepted(){return startup.accepted},get secondary(){return startup.secondary}}
 }
 
 function retainStartup<H extends 'field-parameters-preservation-v1' | 'amount-import-type-v1'>(
@@ -130,3 +140,18 @@ function decode(value: unknown): unknown {
 const hostStarts = new WeakMap<object, ReturnType<typeof retainFPStartup>>()
 export function bindFPHostStartup(options: object, startup: ReturnType<typeof retainFPStartup>) { hostStarts.set(options,startup) }
 export function getFPHostStartup(options: object) { return hostStarts.get(options) }
+
+// The early receiver is the only producer of this private Stage-A capability.
+// Keep Amount separate from the FP WeakMap and literal FP wrapper.
+const amountHostStarts = new WeakMap<object, ReturnType<typeof retainAmountStartup>>()
+export function bindAmountHostStartup(options: object, startup: ReturnType<typeof retainAmountStartup>) {
+  if(startup.tuple.harness!=='amount-import-type-v1' || !startup.tuple.operation || !startup.tuple.request)
+    throw Error('LOGINOM_HANDSHAKE_INVALID')
+  if(hostStarts.has(options) || amountHostStarts.has(options))throw Error('LOGINOM_HANDSHAKE_INVALID')
+  startup.assertHostOptions(options as Record<string,unknown>)
+  const guard=()=>startup.assertHostOptions(options as Record<string,unknown>)
+  amountHostStarts.set(options,{...startup,guard,get pending(){return startup.pending},
+    get accepted(){return startup.accepted},get secondary(){return startup.secondary}})
+}
+export function getAmountHostStartup(options: object) { return amountHostStarts.get(options) }
+export type HostStartup = ReturnType<typeof retainFPStartup> | ReturnType<typeof retainAmountStartup>

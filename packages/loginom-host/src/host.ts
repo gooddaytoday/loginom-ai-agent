@@ -1,4 +1,4 @@
-import { getFPHostStartup } from "./fp-startup-control"
+import { getFPHostStartup, getAmountHostStartup } from "./fp-startup-control"
 import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
@@ -23,7 +23,8 @@ export async function createLoginomHost(options: {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   // Retain the accepted private grant before any startup await. The caller's
   // mutable options cannot change the kind/package/authorization later.
-  const fpStartup = getFPHostStartup(options)
+  const originalOptions=options
+  const fpStartup = getFPHostStartup(options) ?? getAmountHostStartup(options)
   try {
   fpStartup?.guard()
   const acceptedCapture = options.acceptanceCapture
@@ -213,7 +214,7 @@ export async function createLoginomHost(options: {
     assertCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
       const phase=captureStarts.get(chat)
       if (!phase) {
-        if (captures.get(chat)?.harness==='field-parameters-preservation-v1')throw Error('ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE')
+        if (captures.get(chat)?.harness==='field-parameters-preservation-v1' || getAmountHostStartup(originalOptions))throw Error('ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE')
         return
       }
       phase.guard()
@@ -226,7 +227,7 @@ export async function createLoginomHost(options: {
     bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
       if (!options.acceptanceCapture) return
       service.assertLease(lease,`${owner}:${run}`)
-      if (options.acceptanceCapture.harness === "field-parameters-preservation-v1") {
+      if (options.acceptanceCapture.harness === "field-parameters-preservation-v1" || fpStartup?.tuple.harness === "amount-import-type-v1") {
         if (!fpStartup) throw Error("LOGINOM_HANDSHAKE_INVALID")
         fpStartup.guard()
       }
@@ -236,9 +237,9 @@ export async function createLoginomHost(options: {
         throw Error("LOGINOM_HANDSHAKE_INVALID")
       const binding: CaptureBinding = { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
-        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: options.acceptanceCapture.harness === "field-parameters-preservation-v1"
+        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: options.acceptanceCapture.harness === "field-parameters-preservation-v1" || fpStartup?.tuple.harness === "amount-import-type-v1"
           ? Math.min(fpStartup?.control.deadline ?? 0, Date.now()+120000) : Date.now()+600000 }
-      if (binding.harness === 'field-parameters-preservation-v1') {
+      if (binding.harness === 'field-parameters-preservation-v1' || fpStartup?.tuple.harness === 'amount-import-type-v1') {
         const original = Object.freeze({...binding}), generation=current, connection=current.connection, credentials={...connection}
         const guard=()=>{
           fpStartup!.guard()
