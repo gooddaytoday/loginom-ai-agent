@@ -491,7 +491,7 @@ mkdir -- "$selection_resources"
   к `loginom-server-7.4.2-test:8080/ws/` в той же Docker network, а /user существует
   в UserStorage этого server. Настройки профиля не изменялись. Профиль default
   указывает на публичный app.loginom.ai и не соответствует локальному copy-out.
-- [ ] Проверить текущее подключение, без изменения настроек:
+- [x] Проверить текущее подключение, без изменения настроек:
 
 ```bash
 LOGINOM_AI_AGENT_CLI_PROFILE="$selection_profile" \
