@@ -16,6 +16,16 @@ type NodeHostInput = {
   strictRecovery?: boolean
   acceptanceCleanupPackage?: string
 }
+type FPStart = {
+  control: {signal: AbortSignal; deadline: number}
+  guard(): void
+  observed<T>(work: Promise<T>): Promise<T>
+  retain(host: Awaited<ReturnType<typeof launchNodeHost>>): void
+  dispose(): void
+}
+const fpStarts = new WeakMap<object, FPStart>()
+const fpRetained = new WeakMap<object, Awaited<ReturnType<typeof launchNodeHost>>>()
+const fpAttempts = new WeakSet<object>()
 const diagnostics = new WeakMap<object, { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "field-parameters-preservation-v1" }>()
 
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
@@ -26,40 +36,80 @@ export async function launchCalculatorDiagnostic(input: NodeHostInput & { packag
 export async function launchAmountDiagnostic(input: NodeHostInput & { packagePath: string }) {
   return launchDiagnostic(input, "amount-import-type-v1")
 }
-export async function launchFieldParametersDiagnostic(input: NodeHostInput & { packagePath: string }) {
-  return launchDiagnostic(input, "field-parameters-preservation-v1")
-}
-async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1" | "field-parameters-preservation-v1") {
+export const launchFieldParametersDiagnostic = Object.assign(async (input: NodeHostInput & {packagePath:string}, control: {signal:AbortSignal;deadline:number}) => {
+  if (fpAttempts.has(input)) throw Error("LOGINOM_RECOVERY_REQUIRED")
+  const signal = control.signal, deadline = control.deadline
+  signal.throwIfAborted()
+  if (!Number.isSafeInteger(deadline) || Date.now() >= deadline || deadline - Date.now() > 180_000) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+  const snapshot = {...input, environment: runtimeEnvironment(input.environment ?? process.env)}
+  const environment = input.environment
+  const keys = ["node", "entry", "root", "resources", "headless", "packagePath", "strictRecovery", "acceptanceCleanupPackage"] as const
+  const state: {primary?: {value:unknown}; secondary?:{value:unknown}} = {}
+  const refuse = (value:unknown) => { state.primary ??= {value} }
+  const abort = () => refuse(signal.reason)
+  signal.addEventListener("abort", abort, {once:true})
+  const timer = setTimeout(() => refuse(Error("LOGINOM_PRE_READY_READ_EXPIRED")), deadline-Date.now())
+  const fp: FPStart = {
+    control: {signal, deadline},
+    guard() {
+      if (signal.aborted) refuse(signal.reason)
+      if (Date.now() >= deadline) refuse(Error("LOGINOM_PRE_READY_READ_EXPIRED"))
+      if (state.primary) throw state.primary.value
+      if (control.signal !== signal || control.deadline !== deadline || keys.some(key=>input[key] !== snapshot[key])
+          || input.environment !== environment || JSON.stringify(runtimeEnvironment(input.environment ?? process.env)) !== JSON.stringify(snapshot.environment))
+        { refuse(Error("LOGINOM_HANDSHAKE_INVALID")); throw state.primary!.value }
+    },
+    async observed(work) {
+      let value
+      try { value = await work }
+      catch (error) { if (state.primary) { state.secondary ??= {value:error}; throw state.primary.value }; refuse(error); throw error }
+      fp.guard()
+      return value
+    },
+    retain(host) { fpRetained.set(input, host) },
+    dispose() {clearTimeout(timer);signal.removeEventListener("abort",abort)},
+  }
+  fpAttempts.add(input)
+  try { fp.guard(); return await launchDiagnostic(snapshot, "field-parameters-preservation-v1", fp) }
+  finally { fp.dispose() }
+}, {
+  // Same original private child only; no minted readiness/authority or replay.
+  retained(input: object) { return fpRetained.get(input) },
+})
+async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1" | "field-parameters-preservation-v1", fp?: FPStart) {
+  const observed = <T>(work:Promise<T>) => fp ? fp.observed(work) : work
+  fp?.guard()
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
-  const manifest = JSON.parse(await readFile(join(input.resources, "resource-manifest.json"), "utf8"))
+  const manifest = JSON.parse(await observed(readFile(join(input.resources, "resource-manifest.json"), "utf8")))
   // The post-staging Node host belongs to the product inventory, not the
   // runtime resource inventory. Use its canonical receiving product location.
   const product = resolve(input.resources, "../..")
-  if (await realpath(input.resources) !== join(product, "resources/loginom"))
+  if (await observed(realpath(input.resources)) !== join(product, "resources/loginom"))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
-  const cli = JSON.parse(await readFile(join(product, "cli-manifest.json"), "utf8"))
+  const cli = JSON.parse(await observed(readFile(join(product, "cli-manifest.json"), "utf8")))
   const hosts = cli.files?.filter((file: { path: string }) => file.path === "resources/loginom/host/node-host.mjs")
   const hostItem = hosts?.[0]
   if (cli.format !== "loginom-cli-artifact-v1" || hosts?.length !== 1 || !/^[a-f0-9]{64}$/.test(hostItem.sha256)
-      || await realpath(input.entry) !== join(product, "resources/loginom/host/node-host.mjs")
-      || createHash("sha256").update(await readFile(input.entry)).digest("hex") !== hostItem.sha256)
+      || await observed(realpath(input.entry)) !== join(product, "resources/loginom/host/node-host.mjs")
+      || createHash("sha256").update(await observed(readFile(input.entry))).digest("hex") !== hostItem.sha256)
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   const fixedResources = [`runtime/src/acceptance/${harness}.mjs`,
     ...(harness === "amount-import-type-v1" ? ["runtime/src/acceptance/ui-scan-collector.mjs"] : harness === "field-parameters-preservation-v1" ? ["runtime/src/acceptance/field-parameters-native-context.mjs"] : [])]
   for (const [path, actual] of [["bin/node", input.node], ...fixedResources.map(path => [path, join(input.resources, path)])]) {
     const items = manifest.files?.filter((file: { path: string }) => file.path === path)
     const item = items?.[0]
-    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
-        || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
+    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await observed(realpath(actual!)) !== resolve(input.resources, path!)
+        || createHash("sha256").update(await observed(readFile(actual!))).digest("hex") !== item.sha256)
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
   const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath,
     ...(harness !== "calculator-grouped-before-done-v1" ? { harness } : {}) }
   const options = { ...input }
   diagnostics.set(options, grant)
-  const host = await launchNodeHost(options)
+  if (fp) fpStarts.set(options, fp)
+  const host = await observed(launchNodeHost(options))
   return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
 }
 
@@ -67,6 +117,8 @@ export async function launchNodeHost(input: NodeHostInput) {
   // Ordinary product callers cannot turn structural fields into authority.
   if ("acceptanceCapture" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
   const diagnostic = diagnostics.get(input)
+  const fp = fpStarts.get(input)
+  fp?.guard()
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const environment = runtimeEnvironment(input.environment ?? process.env)
@@ -118,27 +170,29 @@ export async function launchNodeHost(input: NodeHostInput) {
   }
   const fpClient = diagnostic?.harness === "field-parameters-preservation-v1" ? privateFPTransport(port) : undefined
   const client = fpClient ?? transport(port)
-  const ready = await client
-    .request(
-      "start",
-      {
-        protocol: 1,
-        ...(diagnostic ? { acceptanceCapture: diagnostic } : {}),
-        root: input.root,
-        resources: input.resources,
-        headless: input.headless,
-        ...(input.acceptanceCleanupPackage !== undefined ? { acceptanceCleanupPackage: input.acceptanceCleanupPackage } : {}),
-        ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
-      },
-      // Startup restores the saved connection and waits for browser/MCP readiness.
-      // Use the normal bounded RPC budget; browser login alone can exceed 30s.
-      180_000,
-    )
-    .catch(async (error: unknown) => {
-      child.kill("SIGTERM")
-      client.close()
+  const startupInput = {
+    protocol: 1 as const,
+    ...(diagnostic ? {acceptanceCapture: diagnostic} : {}),
+    root: input.root, resources: input.resources, headless: input.headless,
+    ...(input.acceptanceCleanupPackage !== undefined ? {acceptanceCleanupPackage: input.acceptanceCleanupPackage} : {}),
+    ...(input.strictRecovery !== undefined ? {strictRecovery: input.strictRecovery} : {}),
+  }
+  const handle = {
+    port, exited, request: client.request,
+    ...(fpClient && diagnostic ? {readPreReady: (run:string, control:{signal:AbortSignal;deadline:number}) => fpClient.readPreReady({run,authorization:diagnostic.authorization},control)} : {}),
+    get alive() { return !state.closed },
+    close,
+  }
+  fp?.retain(handle)
+  const ready = await (fp && fpClient && diagnostic
+    ? fpClient.start(startupInput as Parameters<typeof fpClient.start>[0], fp.control)
+    : client.request("start", startupInput, 180_000))
+    .catch(async (error:unknown) => {
+      // Keep the original FP child UNKNOWN after dispatch, without kill/replay.
+      if (!fp) { child.kill("SIGTERM"); client.close() }
       throw error
     })
+  fp?.guard()
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -149,19 +203,11 @@ export async function launchNodeHost(input: NodeHostInput) {
     !("pid" in ready) ||
     ready.pid !== child.pid
   ) {
-    child.kill("SIGTERM")
-    client.close()
+    if (!fp) { child.kill("SIGTERM"); client.close() }
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   }
-  return {
-    port,
-    exited,
-    request: client.request,
-    ...(fpClient && diagnostic ? { readPreReady: (run: string, control: {signal:AbortSignal;deadline:number}) => fpClient.readPreReady({run,authorization:diagnostic.authorization},control) } : {}),
-    get alive() {
-      return !state.closed
-    },
-    close() {
+  return handle
+  function close() {
       if (state.closing) return state.closing
       state.closing = (async () => {
         const result = await client.request("close", {}, 30_000)
@@ -189,6 +235,5 @@ export async function launchNodeHost(input: NodeHostInput) {
       const attempt = state.closing
       attempt.catch(() => { if (state.closing === attempt) state.closing = undefined })
       return attempt
-    },
   }
 }

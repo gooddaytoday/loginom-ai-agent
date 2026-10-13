@@ -19,6 +19,13 @@ export function privateFPTransport(port: Port) {
   const client = requests(port), consumed = new Set<string>()
   return {
     request: client.request, close: client.close,
+    start(input: {protocol: 1; acceptanceCapture: {authorization: string; harness: "field-parameters-preservation-v1"}}, control: Control) {
+      const {signal, deadline} = control
+      signal.throwIfAborted()
+      if (!Number.isSafeInteger(deadline) || Date.now() >= deadline) return Promise.reject(Error("LOGINOM_PRE_READY_READ_EXPIRED"))
+      const authorization = input.acceptanceCapture.authorization, harness = input.acceptanceCapture.harness
+      return client.startControlled(input, {signal, deadline}, {phase: "startup", authorization, harness, deadline})
+    },
     readPreReady(input: { run: string; authorization: string }, control: Control) {
       const { signal, deadline } = control
       const { run, authorization } = input
@@ -68,7 +75,7 @@ function requests(port: Port) {
   removeClose = port.onClose?.(close)
   if (state.closed && typeof removeClose === "function") removeClose()
   port.start()
-  function send(method: string, input: unknown, timeout: number, control?: Control) {
+  function send(method: string, input: unknown, timeout: number, control?: Control, cancellation?: object) {
     if (state.closed) return Promise.reject(Error("LOGINOM_HOST_CLOSED"))
     if (control) {
       control.signal.throwIfAborted()
@@ -83,7 +90,7 @@ function requests(port: Port) {
         if (!pending.has(id)) return
         if (control && dispatched) {
           try { port.postMessage({ id: randomUUID(), method: "readonly.preReady.cancel",
-            input: { ...(input as object), requestId: id, rejection: encode(value) } }) } catch { /* Original refusal remains primary. */ }
+            input: { ...(cancellation ?? input as object), requestId: id, rejection: encode(value) } }) } catch { /* Original refusal remains primary. */ }
         }
         settle(id, true, value)
       }
@@ -97,5 +104,6 @@ function requests(port: Port) {
     })
   }
   return { request: (method: string, input: unknown, timeout = 180_000) => send(method, input, timeout),
+    startControlled: (input: unknown, control:Control, cancellation:object) => send("start", input, 0, control, cancellation),
     controlled: (input: {run:string;authorization:string}, control:Control) => send("readonly.preReady", input, 0, control), close }
 }
