@@ -2,7 +2,7 @@ import path from "node:path"
 import { realpath } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { parseArgs } from "node:util"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, readSelectionReceipt } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview, readSelectionReceipt } from "../src/node-selection"
 import type { SelectionMode, SelectionRuntime } from "../src/node-selection"
 import { inspectSelectionGraph } from "../src/node-selection-graph"
 import { readNodeXml } from "../src/node-xml"
@@ -99,10 +99,21 @@ async function main() {
   if (allowed && xml && !("invalid" in xml) && applied.filter((call) => call.type === "programming.javascript")
     .some((call) => !xml.nodes.some((node) => node.id === call.node.node_id
       && ["TBGCodeModelComponentEngine", "TBGJavaScriptEngine"].includes(node.type)))) failures.push("JAVASCRIPT_IDENTITY_UNVERIFIED")
+  const packageSha256 = exists ? await hash(path.join(artifactDir, "package.lgp")) : null
+  const review = await json(path.join(directory, "graph-review.json"))
+  const reviewed = inspectSelectionReview({ review, mode: args.mode, sessionID: record(snapshot) ? snapshot.sessionID : undefined, packageSha256 })
+  const reviewFiles = record(review) && Array.isArray(review.evidence) ? await Promise.all(review.evidence.map(async (file) => {
+    if (typeof file !== "string") return false
+    const resolved = await realpath(path.join(directory, file)).catch(() => null)
+    return !!resolved && resolved.startsWith(await realpath(directory) + path.sep) && await Bun.file(resolved).exists()
+  })) : []
+  const reviewStatus = reviewed.reviewStatus === "not-required" ? "not-required"
+    : reviewFiles.length && reviewFiles.every(Boolean) ? reviewed.reviewStatus : "pending"
   const evidenceFailures = [...history.failures, ...settlement.failures, ...provenance.failures,
     ...selection.failures.filter((failure) => !failure.startsWith("JAVASCRIPT_")),
     ...failures.filter((failure) => !["PACKAGE_MISSING", "PACKAGE_RECEIPT_MISSING", "RESULT_RECEIPT_UNVERIFIED", "ORACLE_MISSING"].includes(failure))]
-  const policyStatus = selection.failures.includes("JAVASCRIPT_NOT_ALLOWED") ? "failed"
+  const policyStatus = !provenance.identityVerified ? "incomplete"
+    : selection.failures.includes("JAVASCRIPT_NOT_ALLOWED") || reviewStatus === "failed" ? "failed"
     : evidenceFailures.length ? "incomplete"
     : allowed && (selection.failures.length || !roleGraph.complete) ? "incomplete" : "passed"
   const calculationPassed = history.historyComplete && settlement.runtimeSettled && provenance.identityVerified
@@ -111,12 +122,12 @@ async function main() {
   const result = { auditStage: "complete", taskID: args.task, mode: args.mode, ...selection,
     policyStatus, oraclePassed: oracle.passed, oracleError: oracle.error, oracleSha256, calculationPassed,
     historyComplete: history.historyComplete, runtimeSettled: settlement.runtimeSettled,
-    identityVerified: provenance.identityVerified, graphComplete: graph.complete, reviewStatus: "not-required",
+    identityVerified: provenance.identityVerified, graphComplete: graph.complete, packageSha256, reviewStatus,
     failures: [...new Set([...failures, ...evidenceFailures, ...selection.failures, ...graph.failures, ...roleGraph.failures])],
   }
   await Bun.write(path.join(directory, "selection-audit.json"), JSON.stringify(result, null, 2) + "\n")
   process.exitCode = policyStatus === "failed" || (!evidenceFailures.length && resultVerified && oracle.passed === false)
-    ? 1 : policyStatus === "passed" && calculationPassed && !allowed && args.mode !== "standard-recovery" ? 0 : 2
+    ? 1 : policyStatus === "passed" && calculationPassed && ["passed", "not-required"].includes(reviewStatus) ? 0 : 2
 }
 
 async function completeOutputs(directory: string, parts: unknown[], failures: string[]) {

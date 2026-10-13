@@ -2,6 +2,21 @@ export type SelectionMode = "standard" | "explicit-js" | "capability-gap" | "sta
 
 export type SelectionRuntime = { path: string; session: unknown; events: unknown[] }
 
+export function inspectSelectionReview(input: { review: unknown; mode: SelectionMode; sessionID: unknown; packageSha256: unknown }) {
+  if (input.mode === "standard") return { reviewStatus: "not-required" }
+  const value = input.review
+  if (!record(value) || !["passed", "failed"].includes(String(value.verdict))
+    || typeof value.reviewer !== "string" || !value.reviewer.trim() || typeof value.notes !== "string" || !value.notes.trim()
+    || value.sessionID !== input.sessionID || typeof input.packageSha256 !== "string" || !/^[a-f0-9]{64}$/.test(input.packageSha256)
+    || value.packageSha256 !== input.packageSha256 || !Array.isArray(value.evidence) || !value.evidence.length
+    || value.evidence.some((file) => typeof file !== "string" || file.startsWith("/") || file.includes("\\")
+      || file.split("/").some((part) => !part || part === "." || part === ".."))
+    || (input.mode === "explicit-js" && value.javascriptRole !== "requested-aggregation")
+    || (input.mode === "capability-gap" && value.javascriptRole !== "variable-unpack-only")
+    || (input.mode === "standard-recovery" && value.recoveryObserved !== true)) return { reviewStatus: "pending" }
+  return { reviewStatus: String(value.verdict) }
+}
+
 export function inspectSelectionProvenance(input: {
   snapshot: unknown; runtime: SelectionRuntime[]; model: unknown; variant: unknown; expectedSkillDigest: unknown
 }) {

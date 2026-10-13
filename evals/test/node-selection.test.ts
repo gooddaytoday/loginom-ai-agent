@@ -4,11 +4,25 @@ import path from "node:path"
 import os from "node:os"
 import { createHash } from "node:crypto"
 import { unzip } from "../src/artifact"
-import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance } from "../src/node-selection"
+import { inspectSelection, inspectSelectionHistory, inspectSelectionRuntime, inspectSelectionProvenance, inspectSelectionReview } from "../src/node-selection"
 import type { SelectionRuntime } from "../src/node-selection"
 import applyWait from "./fixtures/node-selection/apply-wait.json"
 import pilotHistory from "./fixtures/node-selection/pilot-history.json"
 import pilotRuntime from "./fixtures/node-selection/pilot-runtime.json"
+
+test.each(["valid", "missing", "wrong-session", "wrong-package", "no-evidence", "wrong-role"])(
+  "exception review binds the current session and saved bytes: %s", (kind) => {
+    const review = { verdict: "passed", reviewer: "independent reviewer", notes: "Checked the requested aggregation and its native surroundings.",
+      sessionID: pilotHistory.snapshot.sessionID, packageSha256: "a".repeat(64), evidence: ["parts.json"], javascriptRole: "requested-aggregation" }
+    if (kind === "wrong-session") review.sessionID = "different-session"
+    if (kind === "wrong-package") review.packageSha256 = "b".repeat(64)
+    if (kind === "no-evidence") review.evidence = []
+    if (kind === "wrong-role") review.javascriptRole = "variable-unpack-only"
+    expect(inspectSelectionReview({ review: kind === "missing" ? null : review, mode: "explicit-js",
+      sessionID: pilotHistory.snapshot.sessionID, packageSha256: "a".repeat(64),
+    }).reviewStatus).toBe(kind === "valid" ? "passed" : "pending")
+  },
+)
 
 test("offline audit certifies the complete native pilot independently of selection policy", async () => {
   const directory = await pilotDirectory()
