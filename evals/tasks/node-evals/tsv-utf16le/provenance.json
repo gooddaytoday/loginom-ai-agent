@@ -1,0 +1,10 @@
+{
+  "case_id": "tsv-utf16le",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "3844fe245b8425b3ca638b3139cb784528acd6f170aaeb3a2520074aad9a77f8",
+  "reference_sha256": "e5d92d13e3cb3083bf58fb4f04ee7f084e96a088b4d72a60a76c77100a204b7d",
+  "cold_report_sha256": "b7d1124ce9ff28af8304552bb03d5429d3ffb163d1b0e1b7ef91c7c6658c6f3b",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}
