@@ -436,7 +436,7 @@ writer.writerows(sorted(totals.items(), key=lambda pair: (-pair[1], pair[0])))
 baseline payload и 18 каталогов попыток. Одна команда wrapper запускает ровно
 одну модельную попытку; цикл/scheduler/автоматические retries не добавляются.
 
-- [ ] Реализовать wrapper с `parseArgs`: обязательные `--pins` (абсолютный путь),
+- [x] Реализовать wrapper с `parseArgs`: обязательные `--pins` (абсолютный путь),
   `--task` (ID из pins), `--attempt` (плановый номер). Запуск из `evals/`:
 
 ```bash
