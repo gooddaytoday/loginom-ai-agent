@@ -458,7 +458,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
   runtime-журналы → точный receipt-based `docker cp` → `unzip` → offline-аудит.
   Запускать дочерние команды массивом argv, без shell-интерполяции имён.
   Не использовать общий `runAttempt/runAgent`: у них контракт выделенного стенда.
-- [ ] Переиспользовать функции загрузки задач/prompt/unzip/audit; runner занимается
+- [x] Переиспользовать функции загрузки задач/prompt/unzip/audit; runner занимается
   только оркестрацией одной попытки. Унаследованный `LOGINOM_AI_AGENT_CLI_BUNDLE`
   убрать из env ребёнка, иначе он может подменить frozen resources.
   Все flags, формат snapshot, правила copy-out и supervisor описаны ниже как
