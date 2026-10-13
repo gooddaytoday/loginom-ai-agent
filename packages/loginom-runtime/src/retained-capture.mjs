@@ -48,6 +48,12 @@ export function captureData(value, seen = new Set()) {
   if (!value || typeof value !== 'object' || seen.has(value)
       || ![Object.prototype,Array.prototype,null].includes(Object.getPrototypeOf(value)))
     throw Error('LOGINOM_CAPTURE_RESULT_INVALID');
+  if(Array.isArray(value)) {
+    const keys=Reflect.ownKeys(value);
+    if(keys.length!==value.length+1 || keys.some(key=>key!=='length' &&
+        (typeof key!=='string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key)>=value.length)))
+      throw Error('LOGINOM_CAPTURE_RESULT_INVALID');
+  }
   seen.add(value);
   for (const key of Reflect.ownKeys(value)) {
     if (Array.isArray(value) && key === 'length') continue;
