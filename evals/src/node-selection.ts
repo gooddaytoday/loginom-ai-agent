@@ -13,7 +13,7 @@ export function inspectSelection(input: {
     const target = record(state?.input) && record(state.input.target) ? state.input.target : undefined
     return {
       nodeType: typeof target?.type === "string" ? target.type : undefined,
-      failure: !target?.type ? "TOOL_INPUT_INCOMPLETE" : undefined,
+      failure: typeof target?.type !== "string" || !target.type.trim() ? "TOOL_INPUT_INCOMPLETE" : undefined,
     }
   })
   const jsCalls = calls.filter((call) => call.nodeType === "programming.javascript").length

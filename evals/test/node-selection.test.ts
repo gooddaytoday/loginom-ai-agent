@@ -43,6 +43,14 @@ test("missing input remains incomplete instead of proving no JavaScript attempts
   expect(result.failures).toContain("TOOL_INPUT_INCOMPLETE")
 })
 
+test("a malformed target type cannot establish a non-JavaScript call", () => {
+  const result = inspectSelection({ mode: "standard", nodeTypes: null, parts: [{
+    id: "part-invalid", type: "tool", tool: "loginom_dock_node_apply",
+    state: { status: "completed", input: { target: { type: 123 } } },
+  }] })
+  expect(result.failures).toContain("TOOL_INPUT_INCOMPLETE")
+})
+
 test("pilot audit reads real native XML and oracle but does not certify unfinished evidence checks", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-"))
   try {
