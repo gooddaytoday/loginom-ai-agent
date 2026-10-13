@@ -391,9 +391,19 @@ gap attestation c485ce08… поддерживает known-standard capability g
 невозможность произвольной композиции151элемента. Model acceptance ещёpending.
 Текущий run192418 требует полный новый denominator18+25.
 
-Новая baseline192418 начата: sales1 полный machinePASS/CLI0/cleanuptrue/JS0,
-actual baseline prepare16types/7.4.2/JSavailable подтвердил pins. ABC1 active,
-candidate0; полная18+25 ещёpending. Ранее завершённые18baseline не включены.
+Baseline192418 остановлена после2слотов: sales1 machinePASS/CLI0/cleanuptrue/JS0,
+ABC1 CLI1/wrapper3/cleanupfalse, standardGroup target ещё не создан после
+успешного managedJS. Actual runtime: native script source output0 active/visible/
+enabled/pointbound, но generic JS deny даёт actions[]; Group требуетclick/F3.
+Request validate/resolve PASS. New Sort с обязательными keys имеет тот же путь;
+это мешает обязательным JS→Group и JS→newSort сценариям, не capability gap.
+Исправляется только private owned temporary-preview для этих двух consumers:
+latest successful managedJS execution/cleanup, nativeowner/doc/workflow/port0GUID,
+fixedgestures/ACK/rebind/fresh complete schema. Cached mapping/active port не
+заменяют свежесть (actual freshness_verified:false). Public JS click/F3/editor/
+execute deny и Calculator/Union остаются; skill не меняется из-за runtime.
+После TDD/runtime review нужны новая matched пара/native proof и полные18+25.
+Исходные2baseline192418 сохраняются отдельно; предыдущие18 также не переносятся.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

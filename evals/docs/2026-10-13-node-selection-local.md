@@ -27,7 +27,13 @@ Container ID, сеть и UserStorage проверены read-only, public routi
  версии skill не запускаются. До model dispatch инцидент не занимает слот;
 после dispatch провал сохраняется в знаменателе.
 
-Текущая серия — `20261013T192418Z-c71363`, общий source05b645eec9. Обе сборки
+Текущая серия `20261013T192418Z-c71363` остановлена после2baseline/0candidate.
+Sales1 полный machinePASS; ABC1 CLI1/wrapper3/cleanupfalse на стандартном Group
+после successfulJS. Exactgeneric script output click deny конфликтует с Group/
+newSort preview. План требует private owned-preview fix без общегоJSallow, новую
+matchedпару/native proof и полный18+25; старые outcomes не переносятся.
+
+Серия `20261013T192418Z-c71363` использует общий source05b645eec9. Обе сборки
 sourceverify0, independent pair/pins Approved; native canonical Join core
 подтвердил оба hiddeninputs/output/Save/cleanup/logout. Full private driverexit1
 на дополнительном stale retained import reread сохранён, inputsUnchanged не

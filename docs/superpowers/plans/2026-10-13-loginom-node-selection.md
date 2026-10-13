@@ -643,6 +643,44 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   прежние18 baseline/2 candidate этой серии сохранить как диагностическую серию.
   Это необходимая общая runtime-правка, не policy revision и не замена model slot.
 
+## Предпосылка продолжения: Group/Sort от управляемого JavaScript
+
+Серия192418-c71363 остановлена после2baseline/0candidate. Sales1 full machine
+PASS/JS0; ABC1 CLI1/wrapper3/cleanupfalse, без пакета/CSV, timeoutfalse,
+CLI362.070s. Import и managedJS pareto-001 SUCCEEDED (последний reconciled через
+inspect после response-budget refusal). Standard group-001 остановился до
+создания target: AMBIGUOUS/target, node:null, execution not_requested.
+Это общая runtime-несовместимость, не capability gap и не policy revision.
+
+- [x] Установить точный failed predicate и корректность Group request по actual
+  own runtime/public evidence и immutable source. В execution-events1358/1359
+  unique JS output0 verified/active/enabled/visible/point_observed, native_graph
+  script/javascript icon, allowed_actions[]. Generic script deny сохраняет
+  отсутствие click; grouping-preflight16–17 требует click до select/F3/parameters.
+  Group параметры resolve/validate PASS. Source Sort new с обязательными keys
+  неизбежно использует тот же preview (existing-target ветка отличается).
+  Diagnosis SHA `70579325b07531b76ab0412f5e3a0916a8ece9e48f7e08996111c3777e7a10cd`,
+  actual trace SHA `a63c069f86bb4920b08104dca3c5408199132cfb490141742937c42420c87a42`,
+  design review SHA `c9e0075fd8fa66bd6a142b391c5de841d16ca4f1b0558780bc14de21de6ca2e0`.
+  Upstream freshness_verified:false не заменяется наличием active порта или
+  cached schema; generic JS click/F3/editor/execute запреты не снимаются.
+- [ ] Выполнить strict own server/profile recovery с GUID/log/admin/process/
+  guard SHA+mtime binding, подтвердить status/check и сохранить original failure.
+- [ ] По TDD исправить только управляемый preview JS-источника для Group и new
+  Sort: private owned native lease/fixed select-port→F3/fresh complete preview,
+  latest successful managedJS history/execution/cleanup, owner/doc/workflow/
+  nativeport0GUID guards и ACK/uncertain receipts. General public JS deny и
+  Calculator/Union не расширять; public parameters/Protocol/schema/skill не менять.
+  Нужны actual RED→GREEN, отрицательные случаи, runtime suites и independent review.
+- [ ] Собрать новую matched baseline/candidate пару с этой общей runtime-правкой,
+  прежними version/model/fixtures/seed/двумя skill версиями. Native без LLM
+  подтвердить JS→Group и JS→newSort→Export, сохранённый пакет/выход/cleanup,
+  generic JS gestures remain denied и обе hidden Join роли на новой сборке.
+- [ ] Провести новые полные18+25 и Tasks3–6 на итоговых pins. Исходные2baseline
+  серии192418 и native full-driver failure остаются диагностическими и не
+  включаются в новый denominator. Policy revision limit прежний; не заменять
+  начатые model slots и не менять skill из-за runtime failure.
+
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
 **Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под
@@ -1387,3 +1425,4 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Новая пара192418-c71363 собрана/verify0 из общего05b645eec9; immutablepins43слота и effectiveaudit2654… закреплены. Независимый pair/pins review и nativebothhiddenroles proof pending; model0/current-run ещё historical142936. Новыйdescribeprobe15схем ACK/exit0, actualprepare/gapbinding pending.
 - Новая192418-c71363 допущена к новой полной18+25: paired/pins/nativecore Approved; fullprivate driverexit1 сохранён (extra stale retained reread). Новая actualgapattestation c485ce08… completed, tags/model ещёpending; historical18+2 не переносятся.
 - Серия192418 baseline1/18 complete: sales1 CLI0/wrapper0/cleanuptrue/oracle+calculation+allmachineaxesPASS/JS0, CLI337.121s. ABC1 следующийactive; candidate0/25. Actualbaselineprepare16/7.4.2/JSapplyavailable bound (a81a317b…).
+- Серия192418 stopped2baseline/0candidate: sales1PASS; ABC1CLI1/wrapper3/cleanupfalse group-target genericJSsourceclickdeny. Exactactualpredicateconfirmed; JS→Group/newSort privateTDDintegrationongoing, noGeneralJSallow/policyrevision. Ownuser81closed20:15:37.094Z/adminabsenceverified; guardarchived/status0/checkpending.

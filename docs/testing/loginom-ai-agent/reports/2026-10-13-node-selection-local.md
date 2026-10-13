@@ -1,7 +1,7 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
-Статус: приёмка не завершена. Новая пара192418-c71363 допущена к полной18+25
-после independent paired/pins/native core проверки; model acceptance pending.
+Статус: приёмка не завершена. Серия192418-c71363 остановлена после2baseline/0candidate: salesPASS, ABC group-target runtime blocker.
+Independent paired/pins/native core подтверждены, model acceptance pending.
 Full private native driver exit1 сохранён отдельно от подтверждённого core.
 
 Исторически: Исходная серия `20261013T093809Z-f5d429`
@@ -85,6 +85,36 @@ baseline-catalog-attestation SHA
 `a81a317b9eac9d44e581281e2dd1051b60bf651874f3884433e3ecee38658bd9`.
 Baseline semantic review не выполнялся; это штатный machine audit новой попытки.
 abc-pareto-groups/1 запущен следующим отдельным CLI; candidate0/25.
+
+## Серия192418: ABC1 runtime blocker
+
+Session `ses_ec92a595affeAmCk6ZCQSA00tU`, CLI1/wrapper3/cleanupfalse,
+CLI362.070s (19:55:30.744–20:01:32.814Z), timeoutfalse. Package/resultnull,
+oracleunverified/calculationfalse/policyincomplete. Import9f015907… и managedJS
+b169b022… SUCCEEDED (JS terminal redelivery после response-budget отказа).
+Group-001 AMBIGUOUS/target до нового node/Execute: `Upstream port is not interactable`.
+
+Exact own runtime1358/1359: JS output0/nativeGUID58f7e6c3…/verified owner,
+active/enabled/visible/pointbound, native_graph script/jsicon, allowed_actions[].
+Grouping requires genericclick/F3, publicscriptdeny намеренно запрещает это;
+request validate/resolve PASS. NewSort(keys required) использует ту же preview;
+это общий runtime-блокер обязательных JS→nativeGroup/Sort, не policy revision.
+Forensic SHA70579325… и actualtrace a63c069f…; designreview c9e0075f… .
+Freshness_verified:false не повышен до true по одному active marker.
+
+Own server user:81/init19:55:47.707Z установлен по двум executedGUID/log/runtime.
+Админ CreateTime07:55PM/точный confirm сверены; закрытие20:15:37.094Z и refreshed
+absence20:15:37.234Z подтверждены независимо, остальные UIrows сохранены.
+Closure review SHA86b9bd1a… . Только own guard архивирован после nonce SHA/mtime
+и no-own-process checks,19 originalfiles unchanged; recovery SHAd3891697… .
+Status0, checkpending; adminlogout20:19:38.404Z/MCPexit0. Первые management
+команды с неподдержанным --profile далиCLI_ARGUMENT_INVALID/exit2 и сохранены
+`.invalid-argument`; корректный envCLI_PROFILE используется затем. Original
+ABCcleanupfalse/CLI1/wrapper3 не переписаны; новая попытка не запускается.
+
+Private managed preview integration Group+Sort по TDD в работе, общий publicJS
+click/F3deny и соседниеhandlers не расширяются. После новой общей runtimeправки
+обязательны новые matchedpins/native proof/18+25; эти2слота остаются диагностикой.
 
 ## Историческая вторая сопоставимая пара
 
