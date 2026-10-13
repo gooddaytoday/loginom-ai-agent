@@ -1,3 +1,4 @@
+import { bindUnionInvocationProcessor } from "./union-invocation"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { Image } from "@/image/image"
@@ -696,7 +697,7 @@ const layer = Layer.effect(
         })
       })
 
-      return {
+      const handle = {
         get message() {
           return ctx.assistantMessage
         },
@@ -704,6 +705,8 @@ const layer = Layer.effect(
         completeToolCall,
         process,
       } satisfies Handle
+      bindUnionInvocationProcessor(handle, ctx.assistantMessage)
+      return handle
     })
 
     return Service.of({ create })
