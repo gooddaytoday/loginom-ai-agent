@@ -32,8 +32,12 @@ export function retainAmountStartup(message: {id:string; deadline?:unknown}, inp
       throw Error('LOGINOM_HANDSHAKE_INVALID')
   }
   const startup=retainStartup(message,input,'amount-import-type-v1',snapshot,guard)
-  return {...startup, assertHostOptions(options: Record<string,unknown>) {
+  return {...startup, settle(accepted: boolean) {
+    if (startup.pending) startup.settle(accepted)
+  }, assertHostOptions(options: Record<string,unknown>) {
     startup.guard()
+    if (!startup.pending && !startup.accepted)
+      throw startup.propagate(Error('LOGINOM_HOST_NOT_READY'))
     const capture=options.acceptanceCapture as typeof input.acceptanceCapture | undefined
     if(!capture || capture.authorization!==snapshot.authorization || capture.harness!==snapshot.purpose
         || capture.packagePath!==input.acceptanceCapture.packagePath
