@@ -3581,6 +3581,81 @@ test('input port overflow caption requires native binding and the exact hidden c
  }
 });
 
+async function joinInputPortOverflowFixture(mode='valid',port=1) {
+  const caption=port===0?'Главная таблица':'Присоединяемая таблица';
+  const {page,panel,crumbs}=await inputPortContextFixture();
+  // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
+  // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
+  page.context.innerWidth=1280;page.context.innerHeight=800;
+  panel.box={x:182,y:35,width:1054,height:36};
+  const rects=[[182,47],[229,94.875],[324,118.859375],[443,101.984375],[545,110.03125],[656,251.734375],[908,142.53125]];
+  for(const [i,c] of crumbs.entries()) {
+    c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('Root_diagnostic_20260906_1753','JoinDiagnostic')
+      .replaceAll('Revenue','Общая_выручка_к_каждому_товару').replaceAll('Входной_источник_данных',caption.replaceAll(' ','_'));
+    c.ownText=i===2?'JoinDiagnostic':i===5?'Общая выручка к каждому товару':i===7?' '+caption:c.ownText;
+    c.box=i<7?{x:rects[i][0],y:41,width:rects[i][1],height:24}:{x:0,y:0,width:0,height:0};
+    if(i>=7)c.style.display='none';
+    for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
+  }
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-joindata';
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
+  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
+    c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),caption.replaceAll(' ','_')+'_2');
+    if(c===crumbs[7])c.ownText=caption+' 2';
+  }
+  if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+  if(mode==='hidden_ancestor')panel.style.display='none';
+  if(mode==='missing_wizard_icon')crumbs[8].children[0].remove();
+  const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
+    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
+  let reads=0;
+  if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
+      const next=structuredClone(binding);reads++;
+      if(mode==='unverified_owner')return {verified:false,reason:'node'};
+      if(mode==='missing_native_port')delete next.input_port;
+      if(reads>1&&mode.startsWith('changed_')) {
+        const key=mode.slice(8);
+        if(key in next.input_port)next.input_port[key]=key==='native_index'?1-port:'foreign';
+        else next[key]='foreign';
+      }
+      return next;
+    }));
+  return {page};
+}
+
+test('owned Join input observes its actual hidden joined-table breadcrumb',async()=>{
+  const {page}=await joinInputPortOverflowFixture();
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  assert.equal(full.wizard.input_port_context.opening_verified,false);
+  assert.deepEqual(page.events,[]);
+});
+
+test('owned Join input observes its known main-table caption when overflow hides it',async()=>{
+  // The same native Join exposed Главная таблица with verified input0/GUID/opening;
+  // hidden geometry comes from the captured input1 overflow, not a claimed input0 live failure.
+  const {page}=await joinInputPortOverflowFixture('valid',0);
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Главная таблица');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  assert.deepEqual(page.events,[]);
+});
+
+test('hidden Join caption cannot replace native identity, opening or visible ancestor evidence',async()=>{
+  for(const port of [0,1])for(const mode of ['unbound','unverified_owner','missing_native_port','wrong_port','unknown_port','wrong_icon','wrong_caption','foreign_path',
+    'hidden_ancestor','missing_wizard_icon','changed_document_id','changed_workflow_id','changed_node_id','changed_port_guid','changed_native_index','changed_opening_operation_id']) {
+    const {page}=await joinInputPortOverflowFixture(mode,port),result=await page.execute({mode:'observe'});
+    if(mode==='unverified_owner'||mode.startsWith('changed_'))assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+    else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('input port context rejects foreign duplicated hidden and incomplete breadcrumb evidence',async()=>{
   for(const mode of ['wrong_wizard','hidden','duplicate','duplicate_panel','foreign','wrong_folder','caption_number','broken_chain','clipped','missing_icon','hidden_icon','foreign_tab','bounded']){
     const {page}=await inputPortContextFixture(mode),r=await page.observe();assert.notEqual(r.wizard.input_port_context?.status,'observed',mode);
