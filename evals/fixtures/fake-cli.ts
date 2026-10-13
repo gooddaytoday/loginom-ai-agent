@@ -141,6 +141,7 @@ const retryOutcomes: Record<string, string> = {
 }
 const id = infraRetry ? launch === 1 ? "host-timeout" : retryOutcomes[process.env.EVAL_TASK_ID!] ?? "group-sum-qty"
   : transition ? ({ failed: "transition-failed", completed: "group-sum-qty" }[transition[2]!] ?? "default")
+  : process.env.EVAL_TASK_ID === "parallel-a-stop" ? "stop-case"
   : process.env.EVAL_TASK_ID?.match(/^a-exit[23]$/) ? "stop-case" : process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
