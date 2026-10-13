@@ -86,7 +86,11 @@ export async function createLoginomHost(options: {
   async function launch(connection: ActiveConnection, chat: string, validation = false, acceptanceCapture?: CaptureBinding, startup = undefined as typeof fpStartup) {
     startup?.guard()
     guardOwners()
-    const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+    // This owned read/parse can fail after cancellation. Register that event
+    // here; connection startup only propagates the retained primary afterward.
+    const manifest = await readFile(join(resources, "resource-manifest.json"), "utf8")
+      .then(text => JSON.parse(text))
+      .catch(error => { throw startup ? startup.forward(startup.reject(error)) : error })
     startup?.guard()
     const key = `${validation ? "validation" : "runtime"}:${connection.generation}:${chat}`
     const owner: { child?: Runtime; settled: Promise<void>; failure?: { value: unknown } } = { settled: Promise.resolve() }
