@@ -6,7 +6,7 @@ import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
-import { checkIsolatedLoginom, preflight } from "./preflight"
+import { checkIsolatedLoginom, gitInfo, preflight } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
@@ -14,10 +14,17 @@ import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
+import { buildJobs, runSlotQueue } from "./scheduler"
+import { finishFixtureAttempt, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
-export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
-  const config = loadConfig(argv, env)
+export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
+  const config = loadConfig(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env)
+  const fixture = options?.fixture ? await validateFixture(config, options.fixture, env) : undefined
+  if (fixture) {
+    config.artifactSource = `dir:${fixture.storage}`
+    return executeRun(config, fixture)
+  }
   if (config.judgeOnly !== undefined) {
     const { rejudge } = await import("./rejudge")
     return rejudge(config, config.judgeOnly)
@@ -35,12 +42,14 @@ export async function main(argv: string[], env: Record<string, string | undefine
   return result
 }
 
-async function executeRun(config: EvalConfig) {
+async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeof validateFixture>>) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   if (!config.skipJudge && tasks.some(task => task.outputMode === "diagnostic"))
     throw new EvalFailure("diagnostic tasks require --skip-judge", 2)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
-  const environment = await preflight(config, source)
+  const environment = fixture
+    ? { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
+    : await preflight(config, source)
   const controller = new AbortController()
   installSigint(controller)
   const startedAt = new Date()
@@ -48,6 +57,9 @@ async function executeRun(config: EvalConfig) {
     `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`)
   const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
+  if (fixture && config.dryRun) await Bun.write(path.join(runDir, "fixture-plan.json"), JSON.stringify({
+    liveQualified: false, ready: false, jobs: buildJobs(tasks.map(task => task.id), config.repeat),
+  }, null, 2))
   const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
   const judge = config.skipJudge ? null : await judgeInfo(config)
@@ -68,10 +80,32 @@ async function executeRun(config: EvalConfig) {
     stopped: null,
     interruptedCleanup: null,
   }
-  if (!config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
+  if (fixture && !config.dryRun) {
+    const contexts = await prepareFixture(config, fixture, runId, runDir)
+    try {
+      const queued = await runSlotQueue({ jobs: buildJobs(tasks.map(task => task.id), config.repeat),
+        slots: contexts.map(context => context.lease.slot.id), signal: controller.signal,
+        async execute(slotId, job) {
+          const context = contexts.find(context => context.lease.slot.id === slotId)!
+          const { result, stop } = await runAttempt({ config: context.config, command: context.command,
+            source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
+            task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
+            signal: controller.signal, profileRecovered: false, slotId, judge: settings,
+            skipJudge: config.skipJudge, evaluationHash })
+          attempts[job.index] = result
+          await finishFixtureAttempt(context, result, path.join(runDir, job.taskId, String(job.attempt)))
+          return { result, quarantine: stop }
+        } })
+      if (queued.quarantined.length) state.stopped = `Stopped slots: ${queued.quarantined.join(", ")}`
+      for (const context of contexts) await context.lease.release(context.cleanup)
+    } catch (error) { state.stopped = describe(error) }
+    finally { await Promise.all(contexts.map(context => context.lease.close())) }
+  }
+  if (!fixture && !config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
     for (const task of tasks) {
+      if (fixture) break outer
       if (controller.signal.aborted || state.stopped) break outer
       const history: { initial?: AttemptResult } = {}
       for (const retry of [0, 1]) {
@@ -130,6 +164,7 @@ async function executeRun(config: EvalConfig) {
   }
   const summary: RunSummary = {
     run_id: runId,
+    ...(fixture ? { slots: fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot, liveQualified: false })) } : {}),
     label: config.label,
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
@@ -165,6 +200,7 @@ async function executeRun(config: EvalConfig) {
     rubric_hash: rubric,
     task_ids: tasks.map((task) => task.id),
     config: {
+      parallel: config.parallel,
       repeat: config.repeat,
       tasks_dir: config.tasksDir,
       task_timeout_ms: Object.fromEntries(tasks.map((task) => [task.id, taskTimeoutMs(config, task)])),
@@ -196,6 +232,7 @@ export async function runAttempt(input: {
   runDir: string
   signal: AbortSignal
   profileRecovered: boolean
+  slotId?: string
   initialInfraAttempt?: AttemptResult
   skipJudge: boolean
   judge?: JudgeSettings
@@ -203,6 +240,7 @@ export async function runAttempt(input: {
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base: AttemptResult = {
     ...emptyResult(input.task.id, input.attempt, input.profileRecovered),
+    slot_id: input.slotId ?? "legacy",
     ...(input.initialInfraAttempt ? { infra_retry: { initial: input.initialInfraAttempt } } : {}),
   }
   return attemptBody(input, base).catch(async (error: unknown) => {

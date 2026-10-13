@@ -32,6 +32,7 @@ export function statusFor(
 }
 
 export type AttemptResult = {
+  slot_id?: string
   task_id: string
   attempt: number
   infra_retry?: { initial: AttemptResult }
@@ -142,6 +143,7 @@ export type RubricSnapshot = {
   oracle_tolerance: number
 }
 export type RunSummary = {
+  slots?: { id: string; username: string; profileDir: string; workspaceRoot: string; historyDir: string; liveQualified: boolean }[]
   run_id: string
   label: string | null
   started_at: string
@@ -162,6 +164,7 @@ export type RunSummary = {
   rubric_hash: string
   task_ids: string[]
   config: {
+    parallel?: number
     repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean
     tasks_dir?: string; task_timeout_ms?: Record<string, number>
   }

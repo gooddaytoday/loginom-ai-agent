@@ -114,6 +114,17 @@ if (command === "loginom") {
   process.exit(0)
 }
 
+if (command === "run" && /^parallel-(fast|slow)$/.test(process.env.EVAL_TASK_ID ?? "")) {
+  const startedAt = Date.now()
+  const profile = process.env.LOGINOM_AI_AGENT_CLI_PROFILE!
+  const workdir = Bun.argv[Bun.argv.indexOf("--dir") + 1]!
+  await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), JSON.stringify({ task: process.env.EVAL_TASK_ID, workdir }))
+  await Bun.write(path.join(profile, "data/loginom-ai-agent.db-wal"), "fixture WAL")
+  await Bun.write(path.join(profile, "data/loginom-ai-agent.db-shm"), "fixture SHM")
+  await Bun.sleep(process.env.EVAL_TASK_ID === "parallel-slow" ? 3_000 : 20)
+  await Bun.write(path.join(workdir, "parallel-trace.json"), JSON.stringify({ pid: process.pid, profile, startedAt, finishedAt: Date.now() }))
+}
+
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
 const orphanFile = command === "run" ? Bun.argv.find((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "fake-storage-export.json") : undefined
 const orphanFixture = orphanFile ? await Bun.file(orphanFile).json() as { storage: string; readonly?: boolean } : undefined
