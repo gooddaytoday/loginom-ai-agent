@@ -224,3 +224,8 @@ Username/display name не заменяет identity. 4 selector tests, вмес
 16 PASS; typecheck/diff check PASS. Это сравнение доверенных проекций, не proof
 production session identity и не разрешение CloseSession. Driver, JSONL codec,
 live composite identity race qualification и административные операции впереди.
+
+Дополнительный RED/GREEN route preflight: planPair принимает только pinned
+Studio /app/ и backend alias loginom-server-7.4.2-test. Иной path/alias отклоняется
+PAIR_CONFIGURATION при построении плана, до provision mutations. 16 targeted
+tests/typecheck PASS; исходный full unit относится к factory commit96338cbc32.
