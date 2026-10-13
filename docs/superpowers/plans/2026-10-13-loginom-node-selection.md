@@ -390,7 +390,7 @@ writer.writerow(["Category", "Profit"])
 writer.writerows(sorted(totals.items(), key=lambda pair: (-pair[1], pair[0])))
 ```
 
-- [ ] В recovery SPEC требовать верхний `NODE_APPLY_STOPPED` с вложенным
+- [x] В recovery SPEC требовать верхний `NODE_APPLY_STOPPED` с вложенным
   `error.cause.code:"WIZARD_CALCULATOR_VALIDATION_FAILED"` и собственное событие
   `node_phase_refused` с
   `receipt.verification:"calculator_syntax_rejected_draft_restored"`,
