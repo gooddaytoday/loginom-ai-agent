@@ -45,3 +45,18 @@ python3 -m unittest discover -s scripts/multica -p 'test_*.py'
 ```
 
 Тесты включают завершение адресата между preview и POST, устойчивый successor, coalesced/deferred link, потерю ответа после завершения, заблокированный dispatch, неизвестный POST и exact retry без повторной отправки. Они выполняют реальные HTTP-запросы и отдельные процессы CLI на локальном contract fixture: потеря ответа, повтор, смена текста, закрытый run, неверный target, несовпадающий readback, запрещённые mentions и неизвестный результат отправки. Они не заменяют проверку живых серверных прав и фактической доставки в Multica.
+
+## Условное обновление checkpoint
+
+```sh
+python3 checkpoint.py --issue <UUID> --revision <fresh-revision> \
+  --checkpoint /private/checkpoint.txt --receipt /private/checkpoint-receipt.json
+```
+
+Только `PUT /api/issues/{id}` с `description` и `expected_revision`, 1–20 строк до 500 символов. До PUT — свежее GET и приватная receipt; после — точное GET. Конфликт означает перечитать и согласовать новый текст, затем новую revision/receipt. Не повторять старый текст поверх чужих изменений. После неизвестного ответа сначала GET; повторная receipt только сверяет результат, не пишет. 401/403 сохраняют draft и отказ без подмены agent token токеном владельца. Статус, assignee и запуск не меняются.
+
+Контракт проверен в исходниках Multica `7ab92d7622ecd81d179a8d83ae2dea74835a5069`: `server/internal/handler/issue.go` (`UpdateIssueRequest`, `UpdateIssue`, `updateIssueAtomically`), `server/cmd/server/router.go`, `server/internal/middleware/auth.go`, `server/internal/service/issue_trigger.go`. Task token проходит штатную авторизацию workspace; human-only guard для description отсутствует. Проверка revision выполняется также при атомарной записи. Dispatch зависит от status/assignee transition, а не description. Совместимость с установленным сервером и правами конкретного task token проверяется отдельно живым агентом.
+
+## Допуск прогона
+
+См. [admission.md](admission.md). Проверки обвязки: из `scripts/multica` выполнить `python3 -m unittest discover -s . -p 'test_*.py'`. Эти HTTP/process тесты не означают модельную или узловую приёмку.
