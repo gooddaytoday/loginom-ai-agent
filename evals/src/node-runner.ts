@@ -9,11 +9,12 @@ import { textImportIds, textImportChecks, collectTextImportEvidence, assertTextI
 import type { RunSummary } from "./report"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>, options?: Parameters<typeof main>[2]) {
-  try { return await executeNodeEvals(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env, options) }
-  catch (error) { return { code: 2, runDir: null, error: error instanceof Error ? error.message : String(error) } }
+  const state = { runDir: null as string | null }
+  try { return await executeNodeEvals(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env, options, state) }
+  catch (error) { return { code: 2, runDir: state.runDir, error: error instanceof Error ? error.message : String(error) } }
 }
 
-async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>, options?: Parameters<typeof main>[2]) {
+async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>, options: Parameters<typeof main>[2], state: { runDir: string | null }) {
   if (argv.some((arg) => ["--calibrate", "--judge-only", "--keep-storage", "--dry-run", "--reset-profile"].includes(arg.split("=")[0]!)))
     return { code: 2, runDir: null, error: "unsupported mode: code-only live runner" }
   const args = ["--tasks", path.join(evalsRoot, "tasks/node-evals"), ...argv, "--skip-judge", "--repeat", "1"]
@@ -26,6 +27,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
       throw Error(`unknown required ID: ${item.id}`)
   }
   const run = await main(args, env, options)
+  state.runDir = run.runDir
   const summary=await Bun.file(path.join(run.runDir,"summary.json")).json() as RunSummary
   for (const task of summary.tasks) for (const attempt of task.attempts) {
     if (attempt.status !== "completed" || attempt.environment_cleanup?.status !== "confirmed") continue

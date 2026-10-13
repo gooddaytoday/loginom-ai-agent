@@ -5,6 +5,13 @@ import { appendFile, chmod, mkdir, rm, rmdir } from "node:fs/promises"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 const packageFixture = command === "run" && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-package.json")
+const collision = command === "run" ? Bun.argv.find((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "node-output-collision.json") : undefined
+if (collision) {
+  const input = await Bun.file(collision).json() as { resultsDir: string }
+  const workdir = Bun.argv[Bun.argv.indexOf("--dir") + 1]!
+  await mkdir(path.join(input.resultsDir, path.basename(path.dirname(path.dirname(workdir))), process.env.EVAL_TASK_ID!,
+    path.basename(workdir), "native-crosstable.json"), { recursive: true, mode: 0o700 })
+}
 if (command === "run" && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-native.json")) {
   const state = await Bun.file(process.env.EVAL_FAKE_STATE_FILE!).json() as { username: string }
   await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "loginom/runtime/generations/1/chats/same-session/attempts/same-attempt/execution-events.jsonl"),
