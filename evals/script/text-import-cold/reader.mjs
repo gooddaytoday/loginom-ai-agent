@@ -103,7 +103,7 @@ try{
   const store=await createArtifactStore({directory:join(output,'artifacts'),sessionId:session,storageDirectories});
   const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2',allowCandidate:true,artifactStore:store,...createCandidateNodeSupport({targetOrigin:origin,targetBuild:'7.4.2',storageDirectories})});
   const sources={imports:[{node_id:source.ref.node_id,configuration:{source:settings,format,output_mapping:{fields}}}]};
-  const proofs=await verifyStaticSourceBytes({load,runtime,execute,sources,allowed:[{...expected.source,columns:expected.columns.map(({name,label,type})=>({name,label,type}))}],account,origin,output});
+  const proofs=await verifyStaticSourceBytes({load,runtime,execute,sources,allowed:[{...expected.source,columns:expected.columns.map(({name,label,type})=>({name,label,type}))}],account,origin,output,record});
   const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'txt-cold-return'});
   need(returned.status==='SUCCEEDED'&&returned.verified&&returned.cleanup_complete,'SOURCE_READ_RETURN_UNCONFIRMED');
   const importDriver=createNodeExecutionProcedure(channel,source.ref);

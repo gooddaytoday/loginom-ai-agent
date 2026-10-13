@@ -181,6 +181,7 @@ def native_application(events, call, receipt):
         typed_table(checkpoints[0])
         require(all(output[key] is True for key in ('verified', 'cleanup_complete') if key in output), 'native: output not verified')
     require(public_output(output) == receipt.get('output'), 'native: settled checkpoint differs')
+    native_execution(rows, call, checkpoints[0])
     phases = [event['receipt'] for event in rows if event.get('phase') == 'node_phase_completed'
         and event.get('receipt', {}).get('phase') == 'configure']
     require(len(phases) == 1 and phases[0].get('status') == 'verified', 'native: one verified configure phase required')
@@ -196,6 +197,59 @@ def native_application(events, call, receipt):
     require(all(field.get('status') == 'observed' and field.get('index') == i for i, field in enumerate(columns)), 'native: column coverage differs')
     observed['columns'] = columns
     return observed, rows
+
+
+def native_execution(rows, call, checkpoint):
+    """Bind the exact producer's terminal owner proof to its target and launch."""
+    def phase(name):
+        matches = [(index, row) for index, row in enumerate(rows) if row.get('phase') == 'node_phase_completed'
+            and row.get('receipt', {}).get('phase') == name]
+        require(len(matches) == 1, 'native: ' + name + ' phase must be unique')
+        index, event = matches[0]
+        receipt = event['receipt']
+        value = receipt.get('value', {})
+        require(receipt.get('status') == 'verified' and receipt.get('receipt_id') == call['input']['operation_id'] + ':' + name
+            and value.get('verified') is True and value.get('cleanup_complete') is True,
+            'native: ' + name + ' phase not verified')
+        return index, event, value
+
+    execute_index, execute_event, execution = phase('execute')
+    require(execution.get('owner_verified') is True, 'native: execute owner not verified')
+    target_index, target_event, target = phase('target')
+    finish_index, finish_event, finish = phase('finish')
+    checkpoints = [(index, row) for index, row in enumerate(rows) if row.get('phase') == 'node_checkpoint']
+    require(len(checkpoints) == 1 and target_index < finish_index < execute_index < checkpoints[0][0],
+        'native: target/finish/execute order differs')
+    checkpoint_event = checkpoints[0][1]
+    for key in ('session_id', 'runtime_revision', 'manifest_sha256'):
+        require(isinstance(checkpoint_event.get(key), str) and checkpoint_event[key]
+            and all(event.get(key) == checkpoint_event[key] for event in (target_event, finish_event, execute_event)),
+            'native: execution journal lineage differs: ' + key)
+    node = checkpoint.get('node', {})
+    require(all(isinstance(node.get(key), str) and node[key] for key in ('document_id', 'workflow_id', 'node_id'))
+        and target.get('node') == node, 'native: target owner differs')
+    group = finish.get('execution_group', {})
+    terminal = checkpoint.get('execution', {})
+    require(finish.get('mode') == 'execute' and finish.get('execution_started') is True
+        and group.get('node') == node and isinstance(group.get('root_id'), str) and group['root_id']
+        and isinstance(group.get('group_id'), str) and re.fullmatch(r'[1-9][0-9]*', group['group_id'])
+        and isinstance(group.get('group_record_id'), str) and group['group_record_id']
+        and terminal.get('execution_id') == node['document_id'] + ':' + group['root_id'] + ':' + group['group_id']
+        and finish.get('execution_id') == group.get('execution_id') == execution.get('execution_id') == terminal.get('execution_id')
+        and execution.get('status') == terminal.get('status') and execution.get('group_id') == group['group_id'],
+        'native: execute launch lineage differs')
+    if execution.get('status') == 'completed':
+        require(isinstance(execution.get('process_id'), str)
+            and re.fullmatch(re.escape(group['group_id']) + r'(?:\.[1-9][0-9]*)+', execution['process_id'])
+            and isinstance(execution.get('process_record_id'), str) and execution['process_record_id']
+            and execution['process_record_id'] != group['group_record_id'], 'native: execute child lineage differs')
+    if call['input'].get('target', {}).get('kind') == 'new':
+        targets = [row.get('target_state', {}) for row in rows if row.get('phase') == 'node_target_checkpoint'
+            and row.get('target_state', {}).get('completed') is True]
+        require(len(targets) == 1 and targets[0].get('targetId') == node['node_id']
+            and targets[0].get('result', {}).get('status') == 'SUCCEEDED'
+            and targets[0].get('result', {}).get('node', {}).get('ref') == node,
+            'native: target checkpoint lineage differs')
 
 
 def public_output(output):

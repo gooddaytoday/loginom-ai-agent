@@ -1,10 +1,11 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
+import {navigateStorageWithFreshObservation} from './source-navigation.mjs';
 const need=(v,m)=>{if(!v)throw Error('COLD_SOURCE:'+m);};
 const one=(xs,m)=>{need(xs.length===1,m);return xs[0];};
 const pick=(f,ks)=>Object.fromEntries(ks.map(k=>[k,f[k]]));
-export async function verifyStaticSourceBytes({load,runtime,execute,sources,allowed,account,origin,output}){
+export async function verifyStaticSourceBytes({load,runtime,execute,sources,allowed,account,origin,output,record}){
  const {findNativeStorageRow}=await load('client/lib/text-export-output.mjs');
  const {makeArtifactDownloadCode}=await load('client/lib/executor.mjs');
  const read=async options=>{
@@ -13,7 +14,23 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
   while(cursor){need(++pages<=32,'storage page bound');const n=await runtime.observe({cursor});need(n.status==='SUCCEEDED'&&n.output.observation_id===s.observation_id,'storage observation changed');for(const k of ['elements','dialogs','masks'])s.ui[k].push(...n.output.ui[k]);cursor=n.output.page?.next_cursor;}
   return s;
  };
- const act=async(s,e,verb='click',extra={})=>{const r=await runtime.uiAct({verb,ref:e.ref,...extra},{operationId:'cold-source-nav-'+randomId(),observationId:s.observation_id});need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');};
+ const act=async(s,e,verb='click',extra={})=>{
+  const r=await navigateStorageWithFreshObservation({snapshot:s,element:e,verb,extra,record,
+   observe:async()=>{
+    const r=await roots();
+    if(e.storage_entry){
+     const issued=await read({scope:'roots',storageName:e.label});
+     return detail(issued,one(issued.ui.elements.filter(x=>x.tid===e.tid),'source navigation issued row'));
+    }
+    const direct=r.ui.elements.filter(x=>x.tid===e.tid);
+    if(direct.length===1)return detail(r,direct[0]);
+    const parents=r.ui.elements.filter(x=>e.tid.startsWith(x.tid+';')).sort((a,b)=>b.tid.length-a.tid.length);
+    need(parents.length>0&&(parents.length===1||parents[0].tid.length>parents[1].tid.length),'source navigation root ambiguous');
+    return detail(r,parents[0]);
+   },act:(fresh,current,v,params)=>runtime.uiAct({verb:v,ref:current.ref,...params},
+    {operationId:'cold-source-nav-'+randomId(),observationId:fresh.observation_id})});
+  need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');
+ };
  const ready=async(fn,predicate)=>{const deadline=Date.now()+15000;for(;;){const s=await fn();if(s&&predicate(s))return s;need(Date.now()<deadline,'storage readiness timeout');await new Promise(r=>setTimeout(r,100));}};
  const roots=async()=>{
   // Storage navigation may finish while observation pages are being read.
@@ -56,4 +73,3 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
  return proofs;
 }
 let id=0;const randomId=()=>String(++id);
-
