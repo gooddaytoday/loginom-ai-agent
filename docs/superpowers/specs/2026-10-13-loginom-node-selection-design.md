@@ -4,7 +4,7 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Текущая серия `20261013T142936Z-072953`: завершены baseline 6/18, oracle/calculation 6;
+Текущая серия `20261013T142936Z-072953`: завершены baseline 7/18, oracle/calculation 7;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
@@ -272,7 +272,8 @@ risky-approved-claims/1 также прошёл full audit/CLI cleanup без JS
 полный audit/cleanup без JS. First-last-touch/1 завершился CLI0, oracle/calculation
 и все evidence axes true, один JS node/call; wrapper1 только из-за baseline
 JAVASCRIPT_NOT_ALLOWED. Первый проход всех шести baseline завершён: четыре без JS,
-ABC с двумя JS и attribution с одним. Начат sales-by-category/2,
+ABC с двумя JS и attribution с одним. Sales-by-category/2 также завершился
+CLI/wrapper0, полный audit/cleanup PASS без JS. Начат abc-pareto-groups/2,
 candidate 0/25, полная приёмка ещё впереди.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
