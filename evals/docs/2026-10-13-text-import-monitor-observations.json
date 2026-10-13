@@ -196,6 +196,21 @@
         "all_eight_done_verified": false
       },
       "next_step": "Allow active Evaler to finish the one existing approval task; verify published Rich handoff/stage budget/evidence when available. No duplicate dispatch or repeated owner permission."
+    },
+    {
+      "checked_utc": "2026-10-13T10:07:27.070110+00:00",
+      "full8_reads_utc": "2026-10-13T10:01:34.432687+00:00",
+      "LAB-56": "in_review65/ACCEPT+cleanup",
+      "LAB-57": "in_progress157/Rich failedcapacity/Evaler inspecting",
+      "LAB-58-63": "in_progress9/no runs",
+      "LAB-55": "in_review16/no runs",
+      "runtime": "online",
+      "same_capacity_cause_charge": 1,
+      "confirmed_total_Rich_repeats": 3,
+      "official_metadata_before_reconciliation": 2,
+      "receipt": "evals/docs/2026-10-13-text-import-capacity-failure-monitor-verification.json",
+      "root_duplicate_dispatch": 0,
+      "all_eight_done_verified": false
     }
   ]
 }

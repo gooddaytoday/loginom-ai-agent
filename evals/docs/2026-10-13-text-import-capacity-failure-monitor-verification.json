@@ -1,0 +1,194 @@
+{
+  "checked_utc": "2026-10-13T10:07:27.070110+00:00",
+  "first_full_card_reads_utc": "2026-10-13T10:01:34.432687+00:00",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "handoff": {
+    "comment_id": "01a134a1-0f2a-73b1-a498-097ac584a3d2",
+    "parent_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "Rich_task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+    "attachment_id": "01a134a1-0ef2-738e-9504-3b7038f6fdf0",
+    "ZIP_bytes": 21053,
+    "ZIP_sha256": "dc22e99ea30366f700ac7b6006731acbb98a401a6d8fbc27097e6e9ef223e4c7",
+    "ZIP_CRC_safe_regular_paths": "PASS",
+    "members": [
+      {
+        "name": "lab57-cli-approved-autonomous-stage.json",
+        "bytes": 9727,
+        "sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147"
+      },
+      {
+        "name": "lab57-cli-approved-history-snapshot.json",
+        "bytes": 20672,
+        "sha256": "9fd19b5806c54a8b53dd7b4e2d88ef1dc4e57edd3f62a5a6062bcf1487664001"
+      },
+      {
+        "name": "cli-approved-resource-receipt.json",
+        "bytes": 1325,
+        "sha256": "6f198da5d5d860a9859009850d2861ba0ea8d9b375ae7150e00ce3878b0c06aa"
+      },
+      {
+        "name": "cli-approved-dependency-receipt.json",
+        "bytes": 1573,
+        "sha256": "7b8ce8cb5700784452b395097d45acb1206e41c91c1c43bdfa7e1b4bae6c28ca"
+      },
+      {
+        "name": "lab57-utf16-blocker-ledger.json",
+        "bytes": 13371,
+        "sha256": "c18181e35692e0c14e8f3a98a96122bb3fbc7ca8fb590d7e86c5773288387ebf"
+      },
+      {
+        "name": "lab57-combined-tsv-proposal-review.json",
+        "bytes": 2296,
+        "sha256": "53cfe82b5485683bf5d410b2242ee5f6e696c76bac08b2651f3edd1a1c58a339"
+      },
+      {
+        "name": "tsv-combined-proposal.patch",
+        "bytes": 4606,
+        "sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465"
+      }
+    ],
+    "stage_document_sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147"
+  },
+  "new_bounded_stage": {
+    "authorization_comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "stage_id": "LAB57-RICH-TSV-PIN-01a13471",
+    "started_utc": "2026-10-13T09:33:29.538616+00:00",
+    "deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+    "wall_seconds": 21600,
+    "reset_on_new_blocker_or_task": false,
+    "document_sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147",
+    "cost": "Unchanged cumulative scenario/repeat limits; remaining author products6 and reference allowances attached; actual usage recorded",
+    "cold_native": "Repair verification authorized; cumulative8/7/5 retained",
+    "status": "accepted queued",
+    "attachment_id": "01a134a1-0ef2-738e-9504-3b7038f6fdf0"
+  },
+  "handoff_approved_task_local_PIN_scope_verified": true,
+  "source_partial": "49522d83318bac29779e497798becb2f799bc84e",
+  "source_CLI": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+  "failed_task": {
+    "id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+    "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+    "status": "failed",
+    "attempt": 1,
+    "max_attempts": 2,
+    "created_at": "2026-10-13T12:38:52+03:00",
+    "started_at": "2026-10-13T12:41:17+03:00",
+    "completed_at": "2026-10-13T13:01:26+03:00",
+    "failure_reason": "agent_error.model_not_found_or_unavailable",
+    "error": "Selected model is at capacity. Please try a different model.",
+    "trigger_comment_id": "01a134a1-0f2a-73b1-a498-097ac584a3d2"
+  },
+  "capacity_blocker_ledger": {
+    "fingerprint": "multica-codex:gpt-6.1-sol:model-capacity",
+    "component": "worker model admission",
+    "first_evidence": "01a12efc-bca2-7a84-86ec-b3e1e239cc84",
+    "events": [
+      {
+        "task_id": "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+        "classification": "unique",
+        "charge": 0,
+        "reason": "first exact model capacity failure"
+      },
+      {
+        "task_id": "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+        "classification": "repeated",
+        "charge": 1,
+        "reason": "same model, failure reason and exact original error"
+      },
+      {
+        "task_id": "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+        "classification": "repeated",
+        "charge": 1,
+        "reason": "same unchanged worker model/runtime, terminal failure kind and exact original task error",
+        "evidence_comment_id": "01a12ffb-158c-7b75-bd4c-3842d9d84fef"
+      },
+      {
+        "task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "classification": "repeated",
+        "charge": 1,
+        "reason": "Same unchanged worker modelgpt-6.1-sol, exact capacity error and failure kind as preserved capacity group; new task/stage/partial source does not make capacity cause unique. Final failure is confirmed before charging.",
+        "completed_at": "2026-10-13T13:01:26+03:00",
+        "evidence_comment_id": "01a134b5-be27-70f8-a6d7-ab772f57c745",
+        "failure_callback_comment_id": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+        "Evaler_inspection_task_id": "01a134b5-be18-7d51-9dea-1da404125e2a"
+      }
+    ],
+    "error": "Selected model is at capacity. Please try a different model."
+  },
+  "confirmed_Rich_repeat_counter": {
+    "before": 2,
+    "current": 3,
+    "limit": 10,
+    "remaining": 7,
+    "new_charge": 1,
+    "no_precharge_or_reset": true,
+    "source": "Previous exact attached blocker ledger plus newly confirmed final same-cause failure."
+  },
+  "Evaler_metadata_counter_at_read": {
+    "consumed": 2,
+    "remaining": 8,
+    "classification_pending": "No precharge; actual classified report required; repeats remain2/10",
+    "meaning": "Still records pre-failure2/10 while active Evaler inspects failure. Monitor preserves confirmed3/10 locally and does not edit coordinator metadata; reconcile before next continuation."
+  },
+  "saved_work_observation": {
+    "native_messages": 181,
+    "tools_called": 82,
+    "last_native_UTC": "2026-10-13T10:01:24.382335Z",
+    "observed": "Copied exact dependency tree into isolated checkout; original drafts5 ready references/history retained; partial supervised unit outputs exist. Full suite/typecheck/build/admission/cleanup have no delivered final PASS receipt at this check.",
+    "initial_preflight_failure": "Author reported unclassified lower cause; keep UNKNOWN/deferred until diagnosis, do not automatically call unique or repeat.",
+    "physical_unit_process_lease_cleanup_status": "UNKNOWN after model failure; taskfailed and Richidle do not prove cleanup/FREE. Evaler must inspect original ownership and preserved work before continuation."
+  },
+  "Evaler_failure_coordination": {
+    "task_id": "01a134b5-be18-7d51-9dea-1da404125e2a",
+    "status": "running",
+    "trigger_comment_id": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+    "already_notified_by_platform": true,
+    "no_duplicate_root_comment_or_Rich_dispatch": true
+  },
+  "current_card_status": "in_progress",
+  "current_revision": 157,
+  "current_declared_scenario_budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "current_CLI_pin": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+  "new_CLI_admission_verified": false,
+  "new_frozen_SHA_or_Ben_ACCEPT_verified": false,
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "online",
+    "last_seen_at": "2026-10-13T13:01:18+03:00",
+    "updated_at": "2026-10-13T12:22:43+03:00",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+  },
+  "worker_model_settings": "All3 gpt-6.1-sol/xhigh/max1 unchanged; no model substitute.",
+  "monitor_model_native_reference_product_recovery_operations": 0,
+  "new_monitor_dispatches_or_routed_comments": 0,
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "interval_minutes": 30,
+    "all_eight_done_verified": false
+  },
+  "next_step": "Active Evaler diagnoses failed partial work and initial preflight, waits for/verifies owned unit/process cleanup without stealing lease, reconciles repeat3/10 and coordinates continuation within same fixed15:33:29Z deadline and original budgets. No new approval request for already-approved CLI repair; no unchanged undiagnosed retry.",
+  "failed_task_actual_worker_usage_models": [
+    "gpt-6.1-sol"
+  ],
+  "worker_actual_model_matches_retained_capacity_fingerprint": true
+}
