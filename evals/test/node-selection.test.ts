@@ -1,4 +1,8 @@
 import { expect, test } from "bun:test"
+import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import path from "node:path"
+import os from "node:os"
+import { unzip } from "../src/artifact"
 import { inspectSelection } from "../src/node-selection"
 
 test.each(["pending", "running", "completed", "error"])(
@@ -37,4 +41,30 @@ test("missing input remains incomplete instead of proving no JavaScript attempts
   })
   expect(result.jsNodes).toBeNull()
   expect(result.failures).toContain("TOOL_INPUT_INCOMPLETE")
+})
+
+test("pilot audit reads real native XML and oracle but does not certify unfinished evidence checks", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-selection-"))
+  try {
+    await mkdir(path.join(directory, "artifact/results"), { recursive: true })
+    await Bun.write(path.join(directory, "attempt.json"), JSON.stringify({
+      sessionID: "pilot-session", cliExitCode: 0, mode: "standard", taskID: "sales-by-category",
+    }))
+    await Bun.write(path.join(directory, "parts.json"), JSON.stringify({
+      sessionID: "pilot-session", messages: [], parts: [],
+    }))
+    await Bun.write(path.join(directory, "events.jsonl"), "")
+    await Bun.write(path.join(directory, "artifact/package.lgp"), Bun.file("tasks/analytic/sales-by-category/reference.lgp"))
+    await Bun.write(path.join(directory, "artifact/results/pilot.result.csv"), Bun.file("tasks/analytic/sales-by-category/oracle.csv"))
+    await unzip(path.join(directory, "artifact/package.lgp"), path.join(directory, "artifact/unpacked"))
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(2)
+    expect(await Bun.file(path.join(directory, "selection-audit.json")).json()).toMatchObject({
+      jsNodes: 0, jsCalls: 0, oraclePassed: true, policyStatus: "incomplete", calculationPassed: false,
+      historyComplete: false, runtimeSettled: false, failures: ["AUDIT_NOT_FINALIZED"],
+    })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
