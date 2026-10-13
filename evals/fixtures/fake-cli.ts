@@ -23,7 +23,7 @@ const launch = infraRetry ? await (async () => {
 })() : undefined
 
 if (process.env.EVAL_FAKE_ARGS_FILE) await Bun.write(process.env.EVAL_FAKE_ARGS_FILE, JSON.stringify(Bun.argv.slice(2)))
-if (command === "run" && process.env.EVAL_TASK_ID === "a-cleanup-failure") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
+if (command === "run" && ["a-cleanup-failure", "parallel-cleanup-failure"].includes(process.env.EVAL_TASK_ID ?? "")) process.env.EVAL_FAKE_CHANGED_WRITER = "1"
 if (command === "run" && transition) {
   if (transition[1] === "process") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
   if (transition[1] === "archive" || transition[1] === "ready") {
@@ -114,7 +114,7 @@ if (command === "loginom") {
   process.exit(0)
 }
 
-if (command === "run" && /^parallel-(fast|slow|infra-retry)$/.test(process.env.EVAL_TASK_ID ?? "")) {
+if (command === "run" && /^parallel-/.test(process.env.EVAL_TASK_ID ?? "")) {
   const startedAt = Date.now()
   const profile = process.env.LOGINOM_AI_AGENT_CLI_PROFILE!
   const workdir = Bun.argv[Bun.argv.indexOf("--dir") + 1]!

@@ -154,3 +154,76 @@ test("fixture main: one infra retry keeps the same slot and archives the initial
     expect(await Bun.file(path.join(slot.profileDir, "data/loginom-ai-agent.db")).exists()).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
+
+test("fixture main: cleanup failure quarantines one slot while the healthy slot drains and releases", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-quarantine-"))
+  try {
+    const input = await fixture(root, ["parallel-cleanup-failure", "parallel-fast", "parallel-fast-next", "parallel-fast-last"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
+      input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    const failed = summary.tasks.find(task => task.id === "parallel-cleanup-failure")!.attempts[0]!
+    expect(failed).toMatchObject({ slot_id: "a", status: "completed", environment_cleanup: { status: "failed" } })
+    expect(summary.tasks.filter(task => task.id !== failed.task_id).flatMap(task => task.attempts))
+      .toMatchObject([0, 1, 2].map(() => ({ slot_id: "b", status: "completed", environment_cleanup: { status: "confirmed" } })))
+    expect(summary.metrics.total).toBe(4)
+    expect(summary.metrics.environment_cleanup_error_count).toBe(1)
+    const leases = await Promise.all((await readdir(input.slots.controller.stateDir)).filter(name => name.endsWith(".lease.json"))
+      .map(name => Bun.file(path.join(input.slots.controller.stateDir, name)).json()))
+    expect(leases.find(lease => lease.slot.id === "a").state).toBe("retained")
+    expect(leases.find(lease => lease.slot.id === "b").state).toBe("released")
+    expect(await Bun.file(path.join(input.slots.slots[0]!.profileDir, ".writer/owner")).exists()).toBe(true)
+    expect(await Bun.file(path.join(run.runDir!, failed.task_id, "1/result.json")).json()).toEqual(failed)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: a common archive writer failure stops new assignments and drains the active slot", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-writer-"))
+  try {
+    const input = await fixture(root, ["parallel-infra-retry", "parallel-slow", "parallel-z-next"])
+    const pending = main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
+      input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const deadline = Date.now() + 10_000
+    const collision = await (async () => {
+      while (Date.now() < deadline) {
+        const prompts = await Array.fromAsync(new Bun.Glob("results/*/parallel-infra-retry/1/prompt.txt").scan({ cwd: root, absolute: true }))
+        if (prompts[0]) return path.join(path.dirname(prompts[0]), "infra-error")
+        await Bun.sleep(10)
+      }
+      throw Error("Fixture dispatch not observed")
+    })()
+    await Bun.write(collision, "writer collision")
+    const run = await pending
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.stopped_reason).toContain("EEXIST")
+    const result = summary.tasks.find(task => task.id === "parallel-infra-retry")!.attempts[0]!
+    expect(result).toMatchObject({ status: "infra_error", environment_cleanup: { status: "failed" } })
+    expect(result.infra_retry).toBeUndefined()
+    expect(summary.tasks.find(task => task.id === "parallel-z-next")!.attempts).toEqual([])
+    const slow = summary.tasks.find(task => task.id === "parallel-slow")!.attempts[0]!
+    expect(slow).toMatchObject({ status: "completed", slot_id: "b", environment_cleanup: { status: "confirmed" } })
+    const trace = await Bun.file(path.join(input.slots.slots[1]!.workspaceRoot, summary.run_id, slow.task_id, "1/parallel-trace.json")).json()
+    expect(Date.parse(summary.finished_at)).toBeGreaterThanOrEqual(trace.finishedAt)
+    expect(await Bun.file(collision).text()).toBe("writer collision")
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("fixture main: quarantine of all slots leaves the remaining jobs unmeasured", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-all-quarantined-"))
+  try {
+    const input = await fixture(root, ["parallel-cleanup-failure"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--repeat", "3", "--skip-judge"],
+      input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts.map(result => result.slot_id)).toEqual(["a", "b"])
+    expect(summary.metrics.total).toBe(2)
+    expect(summary.metrics.environment_cleanup_error_count).toBe(2)
+    expect(await Bun.file(path.join(run.runDir!, "parallel-cleanup-failure/3/prompt.txt")).exists()).toBe(false)
+    const leases = await Promise.all((await readdir(input.slots.controller.stateDir)).filter(name => name.endsWith(".lease.json"))
+      .map(name => Bun.file(path.join(input.slots.controller.stateDir, name)).json()))
+    expect(leases.map(lease => lease.state)).toEqual(["retained", "retained"])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)

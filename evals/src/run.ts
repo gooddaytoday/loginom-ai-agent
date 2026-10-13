@@ -82,6 +82,7 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
   }
   if (fixture && !config.dryRun) {
     const contexts = await prepareFixture(config, fixture, runId, runDir)
+    const unconfirmed = new Set<string>()
     try {
       const queued = await runSlotQueue({ jobs: buildJobs(tasks.map(task => task.id), config.repeat),
         slots: contexts.map(context => context.lease.slot.id), signal: controller.signal,
@@ -89,24 +90,38 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
           const context = contexts.find(context => context.lease.slot.id === slotId)!
           const out = path.join(runDir, job.taskId, String(job.attempt))
           const perform = async (initialInfraAttempt?: AttemptResult) => {
+            unconfirmed.add(slotId)
             const completed = await runAttempt({ config: context.config, command: context.command,
               source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
               task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
               signal: controller.signal, profileRecovered: false, slotId, judge: settings,
               initialInfraAttempt, skipJudge: config.skipJudge, evaluationHash })
             attempts[job.index] = completed.result
-            await finishFixtureAttempt(context, completed.result, out)
-            return { result: completed.result, quarantine: completed.stop }
+            const cleanup = await finishFixtureAttempt(context, completed.result, out).then(() => true, async (error: unknown) => {
+              completed.result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
+              await Bun.write(path.join(out, "result.json"), JSON.stringify(completed.result, null, 2))
+              return false
+            })
+            if (cleanup) unconfirmed.delete(slotId)
+            return { result: completed.result, quarantine: completed.stop || !cleanup }
           }
           const first = await perform()
           if (first.result.status !== "infra_error" || first.quarantine || controller.signal.aborted) return first
-          await archiveInfraAttempt(out)
+          await archiveInfraAttempt(out).catch(async (error: unknown) => {
+            unconfirmed.add(slotId)
+            first.result.environment_cleanup = { status: "failed", evidence: "infra-error", error: describe(error) }
+            await Bun.write(path.join(out, "result.json"), JSON.stringify(first.result, null, 2))
+            throw error
+          })
           return perform(first.result)
         } })
       if (queued.quarantined.length) state.stopped = `Stopped slots: ${queued.quarantined.join(", ")}`
-      for (const context of contexts) await context.lease.release(context.cleanup)
-    } catch (error) { state.stopped = describe(error) }
-    finally { await Promise.all(contexts.map(context => context.lease.close())) }
+    } catch (error) { state.stopped = error instanceof AggregateError ? error.errors.map(describe).join("; ") : describe(error) }
+    finally {
+      for (const context of contexts.filter(context => !unconfirmed.has(context.lease.slot.id)))
+        await context.lease.release(context.cleanup).catch((error: unknown) => { state.stopped ??= describe(error) })
+      await Promise.all(contexts.map(context => context.lease.close()))
+    }
   }
   if (!fixture && !config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
