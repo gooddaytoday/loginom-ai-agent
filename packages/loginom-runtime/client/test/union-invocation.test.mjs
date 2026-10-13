@@ -11,7 +11,7 @@ function fixture(full=false){
  ipc.port2.on('message',()=>started.resolve());const owner={generation:3,call(...args){calls++;delivered=args;ipc.port1.postMessage('host-call');return done.promise}};
  const request={operation_id:'original',target:{type:'transform.union_data'},document_id:'document',...(full?{budgets:{configure_ms:10000,execute_ms:1000,total_ms:10000}}:{})};
  const definition={name:'dock_node_apply',inputSchema:{required:['operation_id',...(full?['budgets']:[])]}},options={toolCallId:'call',abortSignal:controller.signal};
- const user={info:{id:'user'}},input={loginom:owner,session:{id:'chat'},processor:{message:{id:'message'}}};
+ const user={info:{id:'user'}},message={id:'message'},processor={get message(){return message}};bindUnionInvocationProcessor(processor,message);const input={loginom:owner,session:{id:'chat'},processor};
  return {controller,done,started,owner,request,definition,options,input,user,get calls(){return calls},get delivered(){return delivered},
   acquire(){return acquire(retainUnionInvocation,definition,owner,input,user,request,options)},close(){ipc.port1.close();ipc.port2.close()}};
 }
@@ -37,7 +37,7 @@ for(const reason of [Error('abort',{cause:0}),null,false,0,''])test('preabort ex
 for(const mutation of ['request','signal','call','owner','generation','creation','budget'])test('awaited binding drift '+mutation,async()=>{
  const f=fixture(true);try{registerUnionInvocationCarrier(f.owner);const p=f.acquire(),work=p.invoke(),seen=work.catch(e=>e);await f.started.promise;
   if(mutation==='request')f.request.target.type='foreign';if(mutation==='signal')f.options.abortSignal=new AbortController().signal;if(mutation==='call')f.owner.call=()=>{};
-  if(mutation==='owner')f.input.loginom={...f.owner};if(mutation==='generation')f.owner.generation=4;if(mutation==='creation')f.input.processor.message={id:'message'};if(mutation==='budget')f.request.budgets.total_ms=20000;
+  if(mutation==='owner')f.input.loginom={...f.owner};if(mutation==='generation')f.owner.generation=4;if(mutation==='creation')f.input.processor={message:{id:'message'}};if(mutation==='budget')f.request.budgets.total_ms=20000;
   f.done.resolve('old reply');assert.match((await seen).message,/BINDING/);assert.equal(f.calls,1);
  }finally{f.close()}
 });
@@ -66,4 +66,8 @@ test('actual fixed processor getter source is retained; replaced/unknown getters
   let foreignGets=0;Object.defineProperty(processor,'message',{get(){foreignGets++;return message}});assert.throws(()=>p.guard(),/PROCESSOR/);assert.equal(foreignGets,0);assert.equal(f.calls,0);
  }finally{f.close()}
  const g=fixture();try{let gets=0;g.input.processor={get message(){gets++;return {id:'message'}}};assert.throws(()=>g.acquire(),/PROCESSOR/);assert.equal(gets,0)}finally{g.close()}
+});
+
+test('initial copied data-message holder cannot qualify original typed creation',()=>{
+ const f=fixture();try{f.input.processor={message:f.input.processor.message};assert.throws(()=>f.acquire(),/PROCESSOR/);assert.equal(f.calls,0)}finally{f.close()}
 });

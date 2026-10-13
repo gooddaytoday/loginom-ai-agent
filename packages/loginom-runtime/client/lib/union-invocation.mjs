@@ -24,7 +24,7 @@ export function bindUnionInvocationProcessor(processor,message){
  processors.set(processor,{get:d.get,message});
 }
 function processorMessage(processor){
- const d=descriptor(processor,'message');if(d&&Object.hasOwn(d,'value'))return d.value;
+ const d=descriptor(processor,'message');
  const original=processors.get(processor);need(original&&d?.get===original.get&&!d.set,'UNION_INVOCATION_PROCESSOR_UNKNOWN');
  const current=original.get.call(processor);need(current===original.message,'UNION_INVOCATION_BINDING_CHANGED');return current;
 }
