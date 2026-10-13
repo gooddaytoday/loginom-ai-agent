@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 14/18, oracle/calculation 14;
+серия `20261013T142936Z-072953`: завершены baseline 15/18, oracle/calculation 15;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -349,6 +349,15 @@ calls 2/2/2; oracle/calculation/history/runtime/identity/graph/export true.
 Все три ABC расчётно успешны; original ABC/1 collection failure и ABC/2 prior
 settlement assessment сохранены отдельно. Всего 14/18, policy 9/14, JS8/8/8;
 следующий monthly-demand/3 запущен, candidate 0/25.
+
+## Monthly-demand/3
+
+Session `ses_ec9b11270ffeU4LKty64fCXG8F`: CLI/wrapper exit 0, cleanupConfirmed true,
+CLI 474.881 секунды, timeout false. JS nodes/calls 0/0; oracle/calculation/history/
+runtime/identity/graph/export true, failures []. Package SHA
+`10d9312119e3258164f948130df59223f773642ccdd022e219ed764fc85901fd`.
+Все три monthly baseline успешны без JS. Всего 15/18, policy 10/15, JS8/8/8;
+следующий risky-approved-claims/3 запущен, candidate 0/25.
 
 ## Native proof исправления дат
 
