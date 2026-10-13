@@ -135,6 +135,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.lease.holdRecovery()
             service.recoveries.set(run.chat, run.lease)
             await service.journal.settle(id, false)
+            assertCaptureGeneration()
             reply({id:data.id,result})
             return
           }
