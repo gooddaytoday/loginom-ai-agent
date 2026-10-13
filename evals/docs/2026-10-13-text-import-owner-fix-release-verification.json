@@ -1,0 +1,561 @@
+{
+  "format": "text-import-owner-fix-release-coordinator-verification-v1",
+  "checked_utc": "2026-10-13T22:48:54.171925+00:00",
+  "owner_policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+  "cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "done",
+      "revision": 70,
+      "phase": "in_review",
+      "metadata_sha256": "07f0c42e23c6bfe44c26e10b529f25803e7a4ade3b0636f77516231c1a812963",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "in_progress",
+      "revision": 267,
+      "phase": "ben",
+      "metadata_sha256": "939bb845e1b359d6d703c2152a03879bcbcc4296a3161688b613f720574d3731",
+      "active_queued": [
+        {
+          "id": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+          "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "status": "running",
+          "started_at": "2026-10-14T01:24:49+03:00"
+        }
+      ]
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "e764ccd644a7734a0d9534cbea83b3089b75691e5440a447544751364036cd71",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "b4113127941a5d52f15437b33dd972f35835c52d28bb0905357113848c5b986c",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "68a0253f1c69dc43f3f0922348d803ab9c6abc23a252e344f06f9b841539d632",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "a36ce57a0ac88194eb12122a444c325e44f389b62c25721b775506779b8d6735",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "fe2418ea13f32267ae5f348010fc9adc063122f1d027eb525bad6479ccacc5ca",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "dc2448cfc26a0470e70d9014574c5d7676f00995ef5698d6de1c47bcf8ace97d",
+      "active_queued": []
+    }
+  ],
+  "author_report": {
+    "id": "01a13753-5c9f-7ba5-9380-a064ca7e9699",
+    "parent_id": "01a13706-c38d-7390-bc21-492dc11cf742",
+    "task_id": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+    "outcome": "READY_FOR_BEN",
+    "new_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "rejected_previous_sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa",
+    "archive_bytes": 6680249,
+    "delivery": {
+      "archive_sha256": "d951f398afb6eb6f7e21e2b2519c080bbe9906cc6eb2e983149807fed3a12093",
+      "manifest_sha256": "6c4991afcb3235d4279a2c53040d24d6719de7c543f94e2237925a1f8dc7b634",
+      "payload_files_verified": 339,
+      "paths_unique_types_safe": true,
+      "embedded_manifest_exact": true
+    },
+    "archive_attachment": "01a13753-5c28-7703-b90e-dca7143e483c",
+    "manifest_attachment": "01a13753-5c60-7186-8929-138a9783f411"
+  },
+  "source_and_support": {
+    "verified": {
+      "support_files_verified": 785,
+      "support_git_source_byte_equal": true,
+      "delivered_author_blobs": 7,
+      "delivered_support_blobs": 26,
+      "author_support_checker_equal": true,
+      "lifecycle_src_diff_empty": true,
+      "support_manifest_sha256": "760017f84ae1ebe8144a512243e3e80812db4b757b2407c2c24d82fec2671e5b",
+      "support_bundle_sha256": "e299a15660831a5542216350fb29efe2f8f9448b5b4c56acc752ebb2c5416e19"
+    },
+    "source_changes": "7 author files: native execute-owner gate, bounded reader refresh and regressions; no case/oracle/input/collection changes",
+    "support_changes": "26 files: SAME author checker + one regression +24 minimal native task fixtures; all other 99a files unchanged",
+    "actual_installation_delivered_receipt": {
+      "source_sha": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+      "parent": "99a285107ea2f3969ceeda7bcd78eedcf01b2107",
+      "installed_utc": "2026-10-13T21:44:15.608018+00:00",
+      "target": "/home/user/.local/share/loginom-evals-runtime/support/evalrunner-0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+      "manifest_sha256": "760017f84ae1ebe8144a512243e3e80812db4b757b2407c2c24d82fec2671e5b",
+      "files_verified": 785,
+      "bundle_sha256": "e299a15660831a5542216350fb29efe2f8f9448b5b4c56acc752ebb2c5416e19",
+      "atomic_no_replace": true,
+      "lifecycle_byte_identical": true,
+      "shared_config_CLI_skill_old_supports_unchanged": true,
+      "author_checker_exact_sha256": "f27adf6cbe8666a4306f510d002f16266b3bd1f9d9dec3e32c4b436d938d2875"
+    },
+    "installation_verified_by": "delivered 785 manifest/Git hashes and Evaler original-host validation; root did not install or alter runtime",
+    "old_supports_cli_models_shared_config_defaults": "UNCHANGED"
+  },
+  "validator_fix": {
+    "required": "Unique verified execute phase with boolean owner_verified=true; exact target/finish/execution/group/child/session/runtime/manifest/checkpoint/order bindings",
+    "saved_TDD": "13 RED ->13 GREEN; native producer fields from actual pinned receipts",
+    "author_saved_original_reference_replay": "6 warm +6 cold PASS",
+    "support_saved_replay": {
+      "actual_checks": 22,
+      "warm_positive": 6,
+      "cold_checks_in_this_support_replay": 0,
+      "author_original_warm_cold_already_verified": "12/12 PASS",
+      "warm_native_mutants": 12,
+      "full_run_mutant_attempts": 12,
+      "preserved_product": "4PASS2FAIL0ERROR",
+      "original_stdout_retained": true,
+      "stdout_label_correction": "The static warm+cold label refers to the separately verified author replay; operational derivative has no cold checker. Actual result array is22 checks, not28."
+    },
+    "additional_lineage_negatives": "20 per recorded author tests; stale/foreign/duplicate/inconsistent proof rejection",
+    "root_focused_offline": {
+      "new_source": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "support": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+      "original_references_changed_warm_gate": [
+        {
+          "case_id": "txt-comma-utf8",
+          "changed_warm_gate": "PASS",
+          "original_journals_inventory_unchanged": true
+        },
+        {
+          "case_id": "csv-comma-utf8",
+          "changed_warm_gate": "PASS",
+          "original_journals_inventory_unchanged": true
+        },
+        {
+          "case_id": "txt-semicolon-cp1251-decimal",
+          "changed_warm_gate": "PASS",
+          "original_journals_inventory_unchanged": true
+        },
+        {
+          "case_id": "csv-pipe-multiline",
+          "changed_warm_gate": "PASS",
+          "original_journals_inventory_unchanged": true
+        },
+        {
+          "case_id": "tsv-utf8",
+          "changed_warm_gate": "PASS",
+          "original_journals_inventory_unchanged": true
+        },
+        {
+          "case_id": "tsv-utf16le",
+          "changed_warm_gate": "PASS",
+          "original_journals_inventory_unchanged": true
+        }
+      ],
+      "Ben_false_owner_fixture_full_run": [
+        {
+          "source": "author",
+          "full_run_owner_false": "REJECTED_FAIL_1",
+          "failures": [
+            "txt-comma-utf8#1: native: execute owner not verified"
+          ],
+          "fixture": "SYNTHETIC_DIAGNOSTIC_ONLY"
+        },
+        {
+          "source": "support",
+          "full_run_owner_false": "REJECTED_FAIL_1",
+          "failures": [
+            "txt-comma-utf8#1: native: execute owner not verified"
+          ],
+          "fixture": "SYNTHETIC_DIAGNOSTIC_ONLY"
+        }
+      ],
+      "temp_copies_and_git_exports_only": true,
+      "native_model_scenario_calls": 0,
+      "unchanged_cold_full_suites_repeated": false
+    },
+    "Ben_first_REJECT_and_old_false_PASS_proof": "PRESERVED",
+    "root_has_not_claimed_reexecution_of_all_author_negative_matrix": true
+  },
+  "reader_fix": {
+    "contract": "Fresh public observation/capability with same authenticated document/origin/build/workflow/tab/package/directory/geometry/unique target/verb intent; at most3 attempts; repeat only NOT_APPLIED/preconditions/UI_EPOCH_CHANGED/effect_possible=false/cleanup true with no preconditions-verified or gesture-applied trace; durable binding/intent acknowledgement; exactly one applied gesture on success",
+    "saved_TDD": "navigation1PASS3FAIL RED ->4PASS GREEN",
+    "both_native_repair_results": {
+      "repair1": {
+        "case_id": "txt-semicolon-cp1251-decimal",
+        "reader_exit": 0,
+        "checker_exit": 0,
+        "verdict": {
+          "errors": [],
+          "failures": []
+        },
+        "native_status": "CHECK_VALUES",
+        "native_cleanup_confirmed": true,
+        "storage_cleanup_confirmed": true,
+        "new_model_generations": 0,
+        "repair_cold_calls": 1,
+        "repair_cold_launches": 1,
+        "repair_cold_completed": 1,
+        "this_call_only": true,
+        "base_rich_cold_calls_launches_completed": [
+          9,
+          8,
+          6
+        ],
+        "ben_cold_unchanged": [
+          3,
+          3,
+          2
+        ],
+        "ben_cold_error": 1,
+        "ben_product_consumed": 0,
+        "original_rich_model_budgets_unchanged": true
+      },
+      "repair2": {
+        "case_id": "txt-semicolon-cp1251-decimal",
+        "reader_exit": 0,
+        "checker_exit": 0,
+        "verdict": {
+          "errors": [],
+          "failures": []
+        },
+        "native_status": "CHECK_VALUES",
+        "native_cleanup_confirmed": true,
+        "storage_cleanup_confirmed": true,
+        "new_model_generations": 0,
+        "repair_cold_calls": 1,
+        "repair_cold_launches": 1,
+        "repair_cold_completed": 1,
+        "this_call_only": true,
+        "base_rich_cold_calls_launches_completed": [
+          9,
+          8,
+          6
+        ],
+        "ben_cold_unchanged": [
+          3,
+          3,
+          2
+        ],
+        "ben_cold_error": 1,
+        "ben_product_consumed": 0,
+        "original_rich_model_budgets_unchanged": true
+      }
+    },
+    "root_saved_typed_bytes_comparison": {
+      "results": [
+        {
+          "repair_call": 1,
+          "3rows5typed_fields": "EXACT_MATCH_WITH_BEN_PRIOR_BLIND_CALCULATION",
+          "downloaded_source_original_bytes": "MATCH",
+          "live_calls_by_root": 0
+        },
+        {
+          "repair_call": 2,
+          "3rows5typed_fields": "EXACT_MATCH_WITH_BEN_PRIOR_BLIND_CALCULATION",
+          "downloaded_source_original_bytes": "MATCH",
+          "live_calls_by_root": 0
+        }
+      ],
+      "historical_First_Sol_header_preserved": true,
+      "final_Luna_header_verified": true,
+      "current_Ben_work_not_touched": true
+    },
+    "Ben_original_CP1251_ERROR": "PRESERVED; no unchanged retry",
+    "historical_model_header_mistake": {
+      "actual_native_ready_model_header": "openai/gpt-6-sol/default",
+      "lower_cause": "role eval.env defaults loaded without task-local explicit override",
+      "model_generations": 0,
+      "historical_native_READY_receipt_unchanged": true,
+      "shared_defaults_unchanged": true,
+      "correction": "explicit Luna/high/providerID after with-env role loading; ordinary current cold completion/release, then fresh corrected admission and needed verification",
+      "charge": 0,
+      "new_model_admission_generations": 0
+    },
+    "corrected_actual_native_READY": {
+      "code": 0,
+      "status": "READY",
+      "sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "dirty": false,
+      "cliSourceSha": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "model": "openai/gpt-6-luna",
+      "variant": "high"
+    },
+    "corrected_task_local_model_declaration": {
+      "model": "openai/gpt-6-luna",
+      "variant": "high",
+      "provider_model_id": "gpt-6-luna",
+      "timeout_ms": "900000"
+    }
+  },
+  "genuine_unit_cleanup_release": {
+    "proofs": {
+      "ordinary_completion_release_bindings": [
+        {
+          "kind": "unit",
+          "ordinal": null,
+          "owner": {
+            "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+            "task": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+            "role": "rich",
+            "phase": "unit",
+            "sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa"
+          },
+          "acquiredAt": "2026-10-13T20:54:43.803Z",
+          "releasedAt": "2026-10-13T21:41:45.934Z",
+          "completion_sha256": "88ff678f32909846dbfc0815164bb7e921a2ee4e0a201868efc59f19d4469538",
+          "binding": "MATCH"
+        },
+        {
+          "kind": "cold",
+          "ordinal": 1,
+          "owner": {
+            "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+            "task": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+            "role": "rich",
+            "phase": "cold",
+            "sha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
+          },
+          "acquiredAt": "2026-10-13T21:45:26.592Z",
+          "releasedAt": "2026-10-13T21:54:28.870Z",
+          "completion_sha256": "779c43d136a457c743a87545eae4367b320b905dc4216d11f0cfb3fc0237ca6e",
+          "binding": "MATCH"
+        },
+        {
+          "kind": "cold",
+          "ordinal": 2,
+          "owner": {
+            "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+            "task": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+            "role": "rich",
+            "phase": "cold",
+            "sha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
+          },
+          "acquiredAt": "2026-10-13T21:54:33.731Z",
+          "releasedAt": "2026-10-13T21:58:27.542Z",
+          "completion_sha256": "09b8bcdf90aa9477b3169c8f75423fcc47b3bdf3becd89d980fe9ad35168b624",
+          "binding": "MATCH"
+        }
+      ],
+      "reported_post_Rich_FREE_utc": "2026-10-13T21:58:32.355362+00:00",
+      "current_Ben_resource_state_not_claimed_FREE": true,
+      "both_cold_cleanup_verdict_pass": true,
+      "both_cold_staged_files_removed": true,
+      "both_cold_model_generations": 0,
+      "corrected_native_READY_Luna_high": true,
+      "historical_wrong_header": "openai/gpt-6-sol/default preserved; no model generations per command+saved ledger",
+      "final_unit_supervised_COMPLETE_code0": true,
+      "source_diff_matches_all_delivered_changed_files": true,
+      "local_inspector_initial_error": "Expected bare errors/failures object but actual cold-verdict receipt wraps {exit,verdict}; read schema and validated exact nested verdict, no operational call or mutation"
+    },
+    "final_saved_suite": "555 PASS/15 SKIP/0 FAIL; final typecheck PASS; clean eb1 supervised COMPLETE/code0",
+    "initial_full555PASS_typecheckFAIL": "PRESERVED; first final-author-unit COMPLETE/code1 is not successful completion",
+    "initial_unit_acquisition_sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa retained; checked source eb1 separate, no rebind",
+    "support_saved_targeted": "23 PASS/typecheck PASS",
+    "root_unchanged_full_suites_rerun": 0,
+    "Rich_post_cleanup_FREE": "21:58:32.355362UTC in delivered receipt; not asserted current FREE while Ben runs"
+  },
+  "preserved_experiment": {
+    "product": {
+      "PASS": 4,
+      "quality_FAIL": 2,
+      "ERROR": 0,
+      "errors": [],
+      "failures": [
+        "tsv-utf16le#1: no_artifact",
+        "txt-semicolon-cp1251-decimal#1: sequence: exact import apply count required"
+      ],
+      "original_live_run_sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa",
+      "new_run": false
+    },
+    "original_live_run_sha": "c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa",
+    "new_Rich_product_run": false,
+    "Rich_actual_model_provenance": "8 historical original DB/WAL/SHM,101 assistant rows Luna/high per prior Ben/Evaler validation; original bytes preserved; root no private DB access",
+    "billed_cost": "UNKNOWN",
+    "ledger": {
+      "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "task_id": "01a13706-c39f-78bc-bb86-4c92173aa6a9",
+      "review_cycle": 1,
+      "reject_count": 1,
+      "reference_case_order": [
+        "txt-comma-utf8",
+        "csv-comma-utf8",
+        "txt-semicolon-cp1251-decimal",
+        "csv-pipe-multiline",
+        "tsv-utf8",
+        "tsv-utf16le"
+      ],
+      "rich_reference_consumed": [
+        1,
+        1,
+        2,
+        1,
+        1,
+        3
+      ],
+      "reference_limit_each": 3,
+      "rich_product_consumed": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "rich_product_limit_each": 1,
+      "ben_product_consumed": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "ben_initial_repeat1_budget_preserved": true,
+      "rich_original_cold_calls_launches_completed": [
+        9,
+        8,
+        6
+      ],
+      "rich_repair_cold_delta": [
+        2,
+        2,
+        2
+      ],
+      "rich_cumulative_cold_calls_launches_completed": [
+        11,
+        10,
+        8
+      ],
+      "ben_cold_calls_launches_completed": [
+        3,
+        3,
+        2
+      ],
+      "ben_cold_ERROR": 1,
+      "ben_three_other_cold": "NOT_RUN",
+      "historical_cleanup_browser_continuations": 2,
+      "new_ordinary_browser_close_calls": 2,
+      "same_cause_repeats_consumed": 3,
+      "same_cause_repeat_limit": 10,
+      "same_cause_repeats_remaining": 7,
+      "new_dispatch_precharge": 0,
+      "new_reference_builder_generations": 0,
+      "new_product_generations": 0,
+      "new_model_smoke_probe_generations": 0,
+      "LAB56_admission_generations": "3/3 exhausted",
+      "diagnostic_wrapper": "1/1 exhausted",
+      "helper_recovery": 0,
+      "local_checker_type_orchestration_model_header_errors": "charge0; precise receipts retained; no counter reset",
+      "cold_second_call_reason": "First fresh native READY inherited role defaults. Genuine first cold/release preserved; task-local explicit model pins corrected, then fresh READY/Luna-high and required final cold/release.",
+      "time_human_approval_stop_gates": "SUPERSEDED_BY_OWNER_POLICY_743f98; technical command timeouts retained"
+    },
+    "Ben_product0_at_handoff": "initial repeat1 each preserved; do not infer current inflight execution counters from handoff",
+    "all_old_FAIL_ERROR_UNKNOWN_original27_archives_inputs_oracle_graph_GUID_bytes": "PRESERVED"
+  },
+  "actual_Ben_second_review": {
+    "handoff_id": "01a1375d-ce31-732b-b616-f42b85a9d0fe",
+    "parent_id": "01a13753-5c9f-7ba5-9380-a064ca7e9699",
+    "task_id": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "status": "running",
+    "started_at": "2026-10-14T01:24:49+03:00",
+    "review_cycle": 2,
+    "reject_count": 1,
+    "delivered_handoff": {
+      "archive_sha256": "c0e2246e5c2c8e31fc104f6a7189028ca2221d56bc463e89fc4ef4b9f3168567",
+      "manifest_sha256": "75ac98fd5653b9d672d0e8599e5fcbefb0ef8487d453fb221bb4c2316528f2b8",
+      "payload_files_verified": 8,
+      "CRC_paths_types_hashes_verified": true
+    },
+    "native_receipt_task_and_official_pins_verified_in_server_metadata": true,
+    "safe_progress": {
+      "checked_utc": "2026-10-13T22:49:37.542522+00:00",
+      "task_id": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+      "since_seq": 0,
+      "message_count": 150,
+      "type_counts": {
+        "text": 22,
+        "tool_use": 64,
+        "tool_result": 64
+      },
+      "safe_tail": [
+        {
+          "seq": 146,
+          "type": "tool_result",
+          "created_at": "2026-10-13T22:48:45.644993Z",
+          "tool": "exec_command"
+        },
+        {
+          "seq": 147,
+          "type": "text",
+          "created_at": "2026-10-13T22:49:17.035347Z"
+        },
+        {
+          "seq": 148,
+          "type": "text",
+          "created_at": "2026-10-13T22:49:18.391452Z"
+        },
+        {
+          "seq": 149,
+          "type": "tool_use",
+          "created_at": "2026-10-13T22:49:23.941267Z",
+          "tool": "exec_command"
+        },
+        {
+          "seq": 150,
+          "type": "tool_result",
+          "created_at": "2026-10-13T22:49:23.9432Z",
+          "tool": "exec_command"
+        }
+      ],
+      "raw_contents_not_saved_or_printed": true
+    },
+    "ACCEPT": "NOT_RETURNED",
+    "required": "Independent final cases AND validator/harness/support negatives; execute owner/lineage + bounded zero-effect reader refresh; preserve earlier blind calculation chronology; own fresh READY/cold and initial6 product repeat1 actual Luna/high/providerID/timeout after role env; own ordinary cleanup/release"
+  },
+  "coordinator_decision": "Verified existing autonomous repair and second Ben dispatch fit human delegation; no extra owner gate/comment/duplicate worker. Await independent ACCEPT/evidence/cleanup before owner done or LAB58.",
+  "root_actions": {
+    "new_comments_dispatches_server_mutations": 0,
+    "new_experimental_model_native_reference_product_cold_calls": 0,
+    "temporary_exports_copies_cleaned": true,
+    "focused_changed_warm_positive_checks": 6,
+    "focused_full_run_Ben_ownerfalse_rejections": 2,
+    "known_secrets_full_env_raw_private_diagnostics_saved_in_Git": false
+  },
+  "all_eight_done": false,
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "every_minutes": 30,
+    "delete_only_after_all8_server_done_ACCEPT_evidence_cleanup": true
+  }
+}
