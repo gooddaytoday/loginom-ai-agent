@@ -9,7 +9,7 @@
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
 серия `20261013T142936Z-072953`: завершены baseline 18/18, oracle/calculation 18;
-ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 1/25: первый standard full PASS без JS.
+ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 2/25 начаты: sales full PASS, ABC runtime-blocked без JS.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
 не переименован в успех и не включён в новую серию.
@@ -450,6 +450,27 @@ Session указаны явно. У 14 схем static bytes совпадают,
 невозможности конечной композиции для 151 элемента. Этот пункт закрывает только
 предусловие до tags; роль JS, oracle и граф каждой tags-попытки ещё предстоит
 проверить. Отдельного Help retrieval, cold reuse и explicit probe logout не было.
+
+## Candidate ABC/1: стандартный узел, runtime-блокер
+
+Session `ses_ec98d483fffe34m8OF1Sp2FA2W`: CLI exit 1, wrapper exit 3,
+CLI 560.048 секунды, timeout false; cleanupConfirmed false,
+SELECTION_CLEANUP_UNCONFIRMED. Импорт, сортировка, Калькулятор накопленной суммы
+и Группировка выполнялись стандартными узлами. Первый запрос Соединения
+`abc-join-1` отклонён до эффекта: REQUEST_REJECTED, Explicit join keys and options
+required, cleanup true. Новый стандартный `abc-join-2` остановился AMBIGUOUS
+в input_mapping: Node procedure readiness timeout: calculator done available;
+no mutation was authorized. Inspect/resume/recover/cancel не разрешили состояние;
+partial Save заблокирован. JS apply calls 0, успешных JS 0; пакет/CSV не сохранены,
+JS nodes неизвестны, oracle не проверен, calculation false.
+
+Исходный attempt сохранился: policy incomplete. Дополнительный offline audit
+exit2 подтверждает history/identity, но settlement/graph/export не подтверждены;
+TOOL_OUTPUT_MANIFEST_INVALID ожидает отдельного выяснения, итоговый успешный
+audit не заявляется. Evidence `candidate/abc-pareto-groups/1/`. Live-серия
+приостановлена на двух начатых candidate; это runtime-блокер, не доказанное
+нарушение политики и не основание менять skill. Проверка причины и собственная
+server-session recovery выполняются отдельно; исходные outcomes не переписываются.
 
 ## Native proof исправления дат
 

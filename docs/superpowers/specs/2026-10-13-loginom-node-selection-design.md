@@ -7,7 +7,9 @@ review; реальный baseline-пилот прошёл финальную off
 Текущая серия `20261013T142936Z-072953`: завершены baseline 18/18, oracle/calculation 18;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; sales-by-category/1 прошёл full audit/cleanup без JS,
-completed candidate 1/25. Начат ABC/1; первая волна 1/9, повторы ещё закрыты.
+candidate 2/25 начаты: sales/1 full PASS; ABC/1 runtime-blocked на стандартном
+Соединении (input_mapping readiness timeout), JS calls0, cleanup false. Live-серия
+приостановлена для diagnosis/own recovery; первая волна не чистая, повторы закрыты.
 Статические контракты candidate для tags сверены с baseline и исходниками;
 реальные 15 стандартных `parameter_schema` получены native Host probe candidate
 без LLM (ACK/exit0) и связаны с successful sales/1 `prepare` по build/catalog/digest.
