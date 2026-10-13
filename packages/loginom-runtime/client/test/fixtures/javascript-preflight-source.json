@@ -1,0 +1,283 @@
+{
+  "sequence": 1,
+  "request": {
+    "operation_id": "pareto-001",
+    "document_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6",
+    "workflow_ref": {
+      "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+      "prefix": "MF;TF-1",
+      "navigation_path": [
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+          "label": "Package1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ],
+      "workflow_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6-1"
+    },
+    "target": {
+      "kind": "new",
+      "type": "programming.javascript",
+      "label": "Сортировка и накопленная доля выручки"
+    },
+    "contract_revision": "1.0.0"
+  },
+  "outcome": {
+    "operation_id": "pareto-001",
+    "status": "SUCCEEDED",
+    "action_key": "node.apply",
+    "action_revision": "1.0.0",
+    "cleanup_complete": true,
+    "output": {
+      "operation_id": "pareto-001",
+      "status": "SUCCEEDED",
+      "node": {
+        "document_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6",
+        "workflow_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6-1",
+        "node_id": "b169b022-01fd-459c-ac04-48e367ebe2ac"
+      },
+      "execution": {
+        "status": "completed",
+        "execution_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6:1197:4"
+      },
+      "cleanup_complete": true,
+      "phases": [
+        {
+          "phase": "source",
+          "receipt_id": "pareto-001:source",
+          "status": "verified",
+          "effect_possible": false
+        },
+        {
+          "phase": "workflow",
+          "receipt_id": "pareto-001:workflow",
+          "status": "verified",
+          "effect_possible": false
+        },
+        {
+          "phase": "target",
+          "receipt_id": "pareto-001:target",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "input_mapping",
+          "receipt_id": "pareto-001:input_mapping",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "open",
+          "receipt_id": "pareto-001:open",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "configure",
+          "receipt_id": "pareto-001:configure",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "node_finish",
+          "receipt_id": "pareto-001:node_finish",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "materialization_start",
+          "receipt_id": "pareto-001:materialization_start",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "materialization_execute",
+          "receipt_id": "pareto-001:materialization_execute",
+          "status": "verified",
+          "effect_possible": false
+        },
+        {
+          "phase": "output_mapping",
+          "receipt_id": "pareto-001:output_mapping",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "finish",
+          "receipt_id": "pareto-001:finish",
+          "status": "verified",
+          "effect_possible": true
+        },
+        {
+          "phase": "execute",
+          "receipt_id": "pareto-001:execute",
+          "status": "verified",
+          "effect_possible": false
+        },
+        {
+          "phase": "read",
+          "receipt_id": "pareto-001:read",
+          "status": "verified",
+          "effect_possible": true
+        }
+      ],
+      "configuration": {
+        "status": "applied",
+        "readback": {
+          "kind": "javascript",
+          "scope": "observed_after_verified_finish",
+          "node": {
+            "document_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6",
+            "workflow_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6-1",
+            "node_id": "b169b022-01fd-459c-ac04-48e367ebe2ac"
+          },
+          "receipt_ids": [
+            "pareto-001:source",
+            "pareto-001:workflow",
+            "pareto-001:target",
+            "pareto-001:input_mapping",
+            "pareto-001:open",
+            "pareto-001:configure",
+            "pareto-001:node_finish",
+            "pareto-001:materialization_start",
+            "pareto-001:materialization_execute",
+            "pareto-001:output_mapping",
+            "pareto-001:finish",
+            "pareto-001:execute",
+            "pareto-001:read"
+          ],
+          "values_are": "independent_owned_source_readback",
+          "schema_mode": "declared",
+          "source": {
+            "sha256": "e9706401216ba0af6e6eb4b8f4f6107c82a119473d5c8f7556d651ac16ae7295",
+            "utf8_bytes": 1214,
+            "lf_lines": 28
+          },
+          "settings_preserved": true,
+          "wizard_commit_verified": true,
+          "execution_effects": {
+            "explicit_execute_requested": true,
+            "internal_execution_started": null
+          },
+          "output_mapping": {
+            "port": 0,
+            "autosync": true,
+            "fields": [
+              {
+                "index": 0,
+                "name": "item_id",
+                "label": "item_id",
+                "type": "integer",
+                "data_kind": "Непрерывный",
+                "source_name": "item_id",
+                "excluded": false
+              },
+              {
+                "index": 1,
+                "name": "item_name",
+                "label": "item_name",
+                "type": "string",
+                "data_kind": "Дискретный",
+                "source_name": "item_name",
+                "excluded": false
+              },
+              {
+                "index": 2,
+                "name": "annual_revenue",
+                "label": "annual_revenue",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "source_name": "annual_revenue",
+                "excluded": false
+              },
+              {
+                "index": 3,
+                "name": "profit",
+                "label": "profit",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "source_name": "profit",
+                "excluded": false
+              },
+              {
+                "index": 4,
+                "name": "total_storage_cost",
+                "label": "total_storage_cost",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "source_name": "total_storage_cost",
+                "excluded": false
+              },
+              {
+                "index": 5,
+                "name": "cumulative_revenue",
+                "label": "cumulative_revenue",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "source_name": "cumulative_revenue",
+                "excluded": false
+              },
+              {
+                "index": 6,
+                "name": "total_revenue",
+                "label": "total_revenue",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "source_name": "total_revenue",
+                "excluded": false
+              },
+              {
+                "index": 7,
+                "name": "cumulative_share",
+                "label": "cumulative_share",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "source_name": "cumulative_share",
+                "excluded": false
+              },
+              {
+                "index": 8,
+                "name": "abc_class",
+                "label": "abc_class",
+                "type": "string",
+                "data_kind": "Дискретный",
+                "source_name": "abc_class",
+                "excluded": false
+              }
+            ]
+          }
+        }
+      },
+      "output": {
+        "verified": true,
+        "status": "partial",
+        "execution_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6:1197:4",
+        "cleanup_complete": true,
+        "ports": [
+          {
+            "port": 0,
+            "port_guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+            "fresh": true,
+            "execution_id": "7abdcbbe-0d9d-4439-9d8b-5ff80aab2ef6:1197:4"
+          }
+        ]
+      }
+    }
+  },
+  "cleanup_confirmed": true
+}
