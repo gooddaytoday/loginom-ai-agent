@@ -2,6 +2,9 @@ import path from "node:path"
 import { mkdir } from "node:fs/promises"
 import { validateTextImportAttempt } from "./text-import"
 import { evalsRoot } from "./config"
+import cliPins from "../script/text-import-cold/cli-pins.json"
+
+export type TextImportCliPin = typeof cliPins[number]
 
 export async function validateTextImportCold(taskDir: string, attemptDir: string, coldDir: string) {
   const child = Bun.spawn(["python3", path.join(evalsRoot, "script/check-text-import-cold.py"), taskDir, attemptDir, coldDir],
@@ -11,7 +14,9 @@ export async function validateTextImportCold(taskDir: string, attemptDir: string
   return JSON.parse(output) as { errors: string[]; failures: string[] }
 }
 
-export async function prepareTextImportCold(taskDir: string, attemptDir: string, outputDir: string, packagePath: string) {
+export async function prepareTextImportCold(taskDir: string, attemptDir: string, outputDir: string, packagePath: string, pin: TextImportCliPin = cliPins[0]!) {
+  if (!cliPins.some(allowed => Object.keys(pin).length === Object.keys(allowed).length &&
+    Object.entries(allowed).every(([key, value]) => pin[key as keyof TextImportCliPin] === value))) throw Error("cold CLI pin not admitted")
   const verdict = await validateTextImportAttempt(taskDir, attemptDir, packagePath)
   if (verdict.errors.length || verdict.failures.length) throw Error(`cold admission: ${[...verdict.errors, ...verdict.failures].join("; ")}`)
   const spec = await Bun.file(path.join(taskDir, "SPEC.json")).json() as {
@@ -37,5 +42,5 @@ export async function prepareTextImportCold(taskDir: string, attemptDir: string,
   await Bun.write(path.join(outputDir, "preparation.json"), JSON.stringify({ case_id: spec.id, runtime: "NOT_RUN",
     package_sha256: new Bun.CryptoHasher("sha256").update(packageBytes).digest("hex"),
     events_path: path.resolve(attemptDir, "events.jsonl"), events_sha256: new Bun.CryptoHasher("sha256").update(events).digest("hex"),
-    cli_sha: "5cd74d8ee5d6125692d953eb327b4d4f833c27a1" }, null, 2) + "\n")
+    cli_sha: pin.sourceCommit, cli_pin: pin }, null, 2) + "\n")
 }

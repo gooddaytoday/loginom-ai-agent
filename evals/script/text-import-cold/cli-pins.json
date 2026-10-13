@@ -1,0 +1,14 @@
+[
+  {
+    "sourceCommit": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+    "sourceDirty": false,
+    "manifestSha256": "0979167ab953c65c59d630c2dc62756c43b0c11d30b2a94446c7a0caab7a116e",
+    "binarySha256": "6c47ba2ee0285e4f6a2287af99d3a7f58e16aff3793ed5dfe149925e2ef059cf"
+  },
+  {
+    "sourceCommit": "d73a13fabf358d281942f7885ba7afe7b007423b",
+    "sourceDirty": false,
+    "manifestSha256": "fb984e9becfbf0979a7712265916c7253b01843b2238ed9fe0f893ad09a612b0",
+    "binarySha256": "a0b9be76107d82575ba28d348e60ac4f2497a608252552895a6131bca9a2029a"
+  }
+]

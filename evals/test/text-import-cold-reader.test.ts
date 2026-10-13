@@ -21,6 +21,24 @@ test("cold reader rejects a different CLI source pin before loading browser reso
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("cold CLI binding verifies both exact immutable prefixes and rejects changed binary bytes", async () => {
+  const { verifyTextImportCli } = await import(path.join(evalsRoot, "script/text-import-cold/cli-pin.mjs"))
+  const prefixes = ["cli-rich-text-5cd74d8", "cli-rich-tsv-d73a13fabf358d281942f7885ba7afe7b007423b"]
+  const base = "/home/user/.local/share/loginom-evals-runtime"
+  // Runtime-local immutable pins are optional in portable unit execution.
+  for (const prefix of prefixes) {
+    const manifest = path.join(base, prefix, "cli-manifest.json")
+    if (!await Bun.file(manifest).exists()) continue
+    const root = await mkdtemp(path.join(os.tmpdir(), "cold-cli-byte-pin-"))
+    try {
+      expect((await verifyTextImportCli(path.join(base, prefix, "resources/loginom"))).sourceDirty).toBe(false)
+      await Bun.write(path.join(root, "cli-manifest.json"), await Bun.file(manifest).bytes())
+      await Bun.write(path.join(root, "bin/loginom-ai-agent-cli"), "tampered binary")
+      await expect(verifyTextImportCli(path.join(root, "resources/loginom"))).rejects.toThrow("BINARY_DIFFERS")
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }
+})
+
 test.skipIf(!process.env.EVAL_TEXT_IMPORT_COLD_REGRESSION)("cold reader without DISPLAY verifies the admitted saved reference through exact resources", async () => {
   const admission = await Bun.file(process.env.EVAL_TEXT_IMPORT_COLD_REGRESSION!).json() as {
     config: string; resources: string; task: string; attempt: string; output: string; lease: string; runtimeRoot: string
