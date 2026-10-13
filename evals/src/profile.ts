@@ -55,12 +55,15 @@ async function assertProfileSettled(profile: string) {
 }
 
 /** Move every attempt's durable evidence outside the single mounted profile. */
-export async function archiveProfileHistory(profileDir: string, archiveId: string) {
+export async function archiveProfileHistory(profileDir: string, archiveId: string, historyDir?: string) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(archiveId)) throw new EvalFailure("Неверный ID архива профиля", 2)
   const profile = await realpath(profileDir)
   await assertProfileSettled(profile)
   const files = await profileHistory(profile)
-  const root = `${profile}.history`
+  const root = historyDir ?? `${profile}.history`
+  if (!path.isAbsolute(root) || path.resolve(root) !== root || await realpath(path.dirname(root)).catch(() => undefined) !== path.dirname(root) ||
+    root === profile || root.startsWith(profile + path.sep) || profile.startsWith(root + path.sep))
+    throw new EvalFailure("PROFILE_HISTORY_ROOT", 2)
   await mkdir(root, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
   const info = await lstat(root)
   if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0)
