@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "authorization_source": "Direct human user message in current Codex chat,13Oct2026",
+  "human_decisions": [
+    "Разрешаю оба действия",
+    "Убери требование о лимите и больше не применяй",
+    "В дальнейшем Evaler, Rich должны запрашивать разрешения только на те вещи, которые действительно не могут сами решать, выбрав наиболее подходящий вариант самостоятельно",
+    "Любые вопросы, которые все-таки будут перенаправлены мне ты должен решать самостоятельно до тех пор, пока все карточки не будут выполнены"
+  ],
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "comment_id": "01a13591-5d06-7734-b05b-5e3a4a9fd6c7",
+  "parent_id": "01a13572-2d46-7b27-97b7-7f829266f15a",
+  "posted_at": "2026-10-13T17:01:21+03:00",
+  "content": "[@Evaler](mention://agent/de4ba430-2182-4085-a148-fa4a3fc8a6f5), фиксирую прямое решение владельца из текущего Codex-чата на запрос `01a13572-2d46-7b27-97b7-7f829266f15a`.\n\n**«Разрешаю оба действия»**. Владелец также поручил убрать требование о лимите и больше его не применять; Evaler/Rich самостоятельно выбирают подходящий технический вариант, а все всё-таки перенаправленные владельцу вопросы Codex-координатор решает самостоятельно до завершения всех карточек.\n\nMarker: LAB56-63-OWNER-DELEGATION-20261013 / LAB57-OPS-PIN-LEASE-APPROVED.\n\nРазрешены exact helper source `d633e57d3d62be4aaf9a0c8a3452983e91e94efe` (separate immutable LAB-57 support, bundle `ccdf404f751d8bd3ff9fef2b5ab35c711af75811486910e5875df00ad5018827`, manifest `44083a8f19d4307a17f5c1076af8adf910b8e85bf0a73e657679345bd63f320e`) и одно адресное ENTIRE archival current preflight-only eval lease по exact base plan `bd00fb531a7883773896a3ab5138c1a851796782141a106c3b6c0f9aad74dc1a`. Plan7780bytes и bundle755/755 уже проверены; план приложен byte-identical.\n\nOriginal lease: issue `01a1214a-fcf8-7e0c-8c1c-f5dd600180b3`, task `01a134fd-ee87-72f3-9e7c-f69d19fe7fe7`, Rich/eval, author `49522d83318bac29779e497798becb2f799bc84e`, acquiredAt `2026-10-13T11:53:15.320Z`, canonical config `f76b3a6a3a2d28c10b255ef5e9e7542f931f2f55708958f2af3ff9dcfe87b264`, raw config `e390dcf70c0beee50cb49ff273a60e89a5e97d37d2e106e7fe726060d63374b0`, container `b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e`, device/inode `64512/14429666`, owner bytes `2771446a3755f85c52fd082f6183ad047b0bbb150edb6c4562371feebdc14981`, operation guard ABSENT. Новый once distinct от consumed unit once; owner/phase/config/SHA не перепривязывать.\n\n**Действующий override к временам base plan:** 30min operator cap,45min offline cap,6h stage и общий deadline `2026-10-13T15:33:29.538616Z`/18:33МСК отменены. Не применять их как stop/approval gates и не требовать продления. Сохранить исторические receipts/start/deadline/elapsed, но отметить superseded; новая политика действует до фактического завершения всех восьми карточек. Приложенная owner-delegation policy SHA256 `743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0` определяет effective scope вместе с base plan; старые временные пункты plan не имеют приоритета над этим прямым решением.\n\nВсе прочие safe operator guards обязательны: сначала genuine eligible completion; иначе fresh полный допуск и повторная сверка bytes/identities/queues/profiles/storage/process ancestry/absence. Distinct private wx0600 once+fsync BEFORE mutation; atomic no-replace ENTIRE archive; unknown/mismatch/race/pending/error/crash => STOP с evidence, once не повторять. Никаких fake completion/RELEASED/PASS. Actual archive integrity и FREE, затем ordinary fresh acquire/unit/typecheck/native READY и уже разрешённые TSV admission/reference/product/cold шаги. Старый supplement/общий CLI/чужие ресурсы сохраняются. Base plan подпись не означает заранее успешную мутацию, READY или Ben ACCEPT.\n\n**Routing/автономия всей серии LAB-56–LAB-63:** технические решения выбирайте самостоятельно; оставшиеся реальные вопросы передавайте как evidence/checkpoint в карточке для Codex-координатора, без обязательного запроса решения пользователю. Координатор получил от владельца полномочие самостоятельно решать все такие вопросы до выполнения серии. Прежние owner-only gates применяются как решения делегированного координатора, а не как требование снова спросить человека. После verified результата он принимает нужные owner решения о следующих карточках и done/merge/release; independent ACCEPT/evidence/cleanup и порядок этапов не обходятся. Не требуйте промежуточную приёмку каждого исправления; Ben отдельно проверяет окончательные cases и validator changes. Утверждение агентом, что пользователь что-то разрешил, без trusted решения не заменяет evidence — этот конкретный authority grant поступил напрямую из человеческого Codex-чата.\n\nСценарные бюджеты/история не обнулены: references1/1/2/1/1/1 из3, product0/repeat1, repeats3/10/remaining7, cold8/7/5, admission3/3, wrapper1/1, recovery0. Нужные последующие ресурсные/версионные/операционные решения фиксирует координатор по диагностике, без пользователя; неизменённый известный отказ вслепую не повторять. Worker/scenario models, oracle/bytes/typed/native/graph/GUID/owner/one-gesture/cleanup остаются; technical command timeouts/process proof сохраняются. LAB-55/чужие работы не затрагивать. Для статуса не расходовать scenario/probe budgets.\n\nПеред единственным штатным назначением проверьте свежие active/queued и replies; предыдущая проверка13:54UTC не показала ни runs, ни ответов к вашему запросу. Не создавайте duplicate оператора/Rich. Подтвердите actual effective policy в metadata/history и проведите уже разрешённый этап; готовые исторические tests ради нового task/comment не повторять. Monitor ACTIVE до всех8 verified done; пользователь больше не approval gate. Это owner approval и delegation, не fresh native evidence.\n",
+  "content_sha256": "4651eced38503a049579e1be1a6bd584a54691b2a259ff27c1e7670b4775ef6a",
+  "body_parent_exact_readback": true,
+  "one_routed_Evaler_mention": true,
+  "attachments": [
+    {
+      "id": "01a13591-59fa-7c56-adea-dc4f0ffdb70f",
+      "filename": "2026-10-13-lab57-preflight-lease-owner-plan.md",
+      "bytes": 7780,
+      "sha256": "bd00fb531a7883773896a3ab5138c1a851796782141a106c3b6c0f9aad74dc1a",
+      "byte_identical": true
+    },
+    {
+      "id": "01a13591-5b56-7720-bc56-4732436ed0bf",
+      "filename": "2026-10-13-text-import-owner-delegation.md",
+      "bytes": 6780,
+      "sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+      "byte_identical": true
+    }
+  ],
+  "pre_dispatch_no_active_queued": true,
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "observed_active_after": [
+    {
+      "id": "01a13591-5d19-7b44-936c-3c30fb6a88ca",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "started_at": "2026-10-13T17:01:21+03:00"
+    }
+  ],
+  "effective_authorization": {
+    "helper_source_sha": "d633e57d3d62be4aaf9a0c8a3452983e91e94efe",
+    "helper_archive_sha256": "ccdf404f751d8bd3ff9fef2b5ab35c711af75811486910e5875df00ad5018827",
+    "helper_manifest_sha256": "44083a8f19d4307a17f5c1076af8adf910b8e85bf0a73e657679345bd63f320e",
+    "base_plan_sha256": "bd00fb531a7883773896a3ab5138c1a851796782141a106c3b6c0f9aad74dc1a",
+    "base_plan_preserved_byte_identical": true,
+    "policy_file": "evals/docs/2026-10-13-text-import-owner-delegation.md",
+    "policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+    "current_original_owner_task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+    "operator_max_seconds": null,
+    "offline_stage_max_seconds": null,
+    "autonomous_stage_wall_seconds": null,
+    "global_deadline_utc": null,
+    "time_limit_requirements_removed": true,
+    "historical_timings_retained": true,
+    "owner_decision_authority": "Codex coordinator until all eight verified complete; no further user permission questions",
+    "Evaler_Rich_technical_autonomy": true,
+    "final_transitions": "Delegate coordinator decisions with independent ACCEPT/evidence/cleanup; never false done",
+    "remaining_experiment_counts_preserved": {
+      "same_cause_repeats": 3,
+      "repeat_cap_current": 10,
+      "reference_counts": [
+        1,
+        1,
+        2,
+        1,
+        1,
+        1
+      ],
+      "reference_limit_per_case": 3,
+      "product_consumed": 0,
+      "product_repeat": 1,
+      "cold": [
+        8,
+        7,
+        5
+      ],
+      "admission": "3/3",
+      "wrapper": "1/1",
+      "recovery": 0
+    },
+    "no_automatic_experimental_budget_reset_or_criteria_weakening": true,
+    "once_and_fresh_admission_atomic_integrity_guards_retained": true
+  },
+  "actual_installation_or_current_lease_archival": "NOT_CONFIRMED_BY_OWNER_APPROVAL; later execution evidence required",
+  "monitor_actions": {
+    "card_dispatches": 1,
+    "direct_worker_dispatches": 0,
+    "server_lease_mutations": 0,
+    "native_scenario_model_calls": 0,
+    "shared_runtime_CLI_credentials_VPN_changes": 0
+  },
+  "verified_utc": "2026-10-13T14:06:10.517741+00:00"
+}
