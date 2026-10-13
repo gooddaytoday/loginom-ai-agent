@@ -26,6 +26,12 @@ test("unsafe or incomplete pins are rejected before any CLI or filesystem work",
   ]) expect(() => selectionAttempt({ ...pins(), ...change }, "sales-by-category", 1)).toThrow("SELECTION_PINS_INVALID")
 })
 
+test("the verified local Docker container name may contain version dots", () => {
+  const input = pins()
+  input.container.name = "loginom-server-7.4.2-test"
+  expect(selectionAttempt(input, "sales-by-category", 1).pins.container.name).toBe("loginom-server-7.4.2-test")
+})
+
 test("reserving an existing slot refuses a rerun and preserves its evidence", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "selection-attempt-test-"))
   try {

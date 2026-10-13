@@ -47,7 +47,8 @@ export function selectionAttempt(raw: unknown, taskID: string, number: number) {
     typeof raw.variant !== "string" || !identifier(raw.variant) ||
     raw.deadlineSeconds !== 1800 || raw.graceSeconds !== 90 ||
     !record(raw.connection) || !record(raw.container) || !digest(raw.container.id) ||
-    !identifier(raw.container.name) || typeof raw.connection.username !== "string" ||
+    typeof raw.container.name !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(raw.container.name) ||
+    typeof raw.connection.username !== "string" ||
     !raw.connection.username || [".", ".."].includes(raw.connection.username) ||
     /[\\/\x00-\x1f\x7f]/.test(raw.connection.username) || raw.connection.folder !== "/" + raw.connection.username ||
     raw.storageDir !== "/workdir/UserStorage" + raw.connection.folder ||
