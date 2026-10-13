@@ -260,13 +260,13 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
     const admission = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, containerId: storage.containerId, configSha256: configDigest(config),
       profiles: Object.values(config.roles).flatMap(roleProfiles), checkedAt: new Date().toISOString() }
     await writeFile(path.join(admissionRoot, "admission.json"), JSON.stringify(admission), { mode: 0o600 })
-    const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+    const view = parseView((await management(command, nodePreflightCommand("status"))).stdout)
     if (view?.state !== "ready" || view.recoveries?.length) throw new NodeOpsFailure("PROFILE_NOT_READY")
     // Validate Loginom credentials, websocket and licence with the installed product's real browser.
     // No run/model command is admitted here, and no settings or credentials are replaced.
     const workdir = await mkdtemp(path.join(nodeRole(config, lease.role).workRoots[0]!, ".ops-check-"))
     const checkDir = await nodeProcessOutput(config, lease, "native-check")
-    const cmd = [...command.cmd, "loginom", "check", "--format", "json"]
+    const cmd = [...command.cmd, ...nodePreflightCommand("check")]
     const boundary = await sandboxCommand({ cmd, profileDir: current.profileDir, workdir, env: command.env })
     const check = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir: current.profileDir, outDir: checkDir, timeoutMs: 120_000 })
     await verifyProcesses(check.processCleanup, lease)
@@ -286,6 +286,10 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
       cliSourceSha: environment.agent?.sourceCommit ?? null, model: current.agent.model, variant: current.agent.variant,
       admission: path.join(admissionRoot, "admission-complete.json"), processEvidence: path.join(checkDir, "process-cleanup.json"), historyArchive }
   })
+}
+
+export function nodePreflightCommand(operation: "status" | "check") {
+  return ["loginom", operation, "--headless", "--format", "json"]
 }
 
 async function assertOriginalAdmission(config: NodeOpsConfig, lease: NodeStandLease) {

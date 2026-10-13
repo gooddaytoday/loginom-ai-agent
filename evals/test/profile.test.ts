@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readFile, stat, symlink, writeFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
@@ -9,6 +9,7 @@ import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth,
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
+import { nodePreflightCommand } from "../src/node-eval-ops"
 
 test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
@@ -68,6 +69,20 @@ const fakeProfile = async (env: Record<string, string> = {}) => {
   return { config, command: { ...command, env: { ...command.env, ...env } }, profileDir }
 }
 
+test("preflight: status и check выбирают headless через реальные management процессы", async () => {
+  const context = await fakeProfile({ EVAL_FAKE_REQUIRE_HEADLESS: "1" })
+  try {
+    const status = await management(context.command, nodePreflightCommand("status"))
+    expect(status.exitCode).toBe(0)
+    expect(JSON.parse(status.stdout).state).toBe("ready")
+    expect(status.processCleanup.status).toBe("confirmed")
+    const check = await management(context.command, nodePreflightCommand("check"))
+    expect(check.exitCode).toBe(0)
+    expect(JSON.parse(check.stdout)).toEqual({ ok: true, code: "LOGINOM_CONNECTION_VALID" })
+    expect(check.processCleanup.status).toBe("confirmed")
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
 test("management: закрывает собственный detached host и сохраняет ready", async () => {
   const context = await fakeProfile()
   const pidFile = path.join(context.profileDir, "management-child.pid")
@@ -118,6 +133,79 @@ test("management: сохраняет отдельное процессное д�
   expect(evidence).not.toContain("private-password")
   expect(evidence).not.toContain("stdin")
   expect(result.exitCode).toBe(0)
+})
+
+test("management: сохраняет private terminal outcome отказа без sensitive view и argv", async () => {
+  const context = await fakeProfile()
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-outcome-"))
+  const file = path.join(out, "view.json")
+  const view = { state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED", code: "LOGINOM_RUNTIME_START_FAILED",
+    recoveries: ["private-recovery-id"], password: "private-password", token: "private-token", url: "https://private.example" }
+  await writeFile(file, JSON.stringify(view))
+  try {
+    const result = await management({ ...context.command, cleanupDir: out, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: file } },
+      ["loginom", "status", "--headless", "--format", "json", "private-argv"], "private-stdin")
+    expect(JSON.parse(result.stdout)).toEqual(view)
+    const directories = (await readdir(out, { withFileTypes: true })).filter((entry) => entry.isDirectory())
+    expect(directories).toHaveLength(1)
+    const receipt = path.join(out, directories[0]!.name, "result.json")
+    const text = await readFile(receipt, "utf8")
+    expect(JSON.parse(text)).toMatchObject({ command: { family: "loginom", operation: "status", unrecognized: false },
+      exitCode: 0, timedOut: false, interrupted: false, capture_complete: true, cleanup_status: "confirmed",
+      view_state: "recoverable-error", view_failure: "LOGINOM_RUNTIME_START_FAILED", view_code: "LOGINOM_RUNTIME_START_FAILED",
+      recovery_count: 1, stdout_bytes: Buffer.byteLength(result.stdout), stderr_bytes: 0 })
+    expect((await stat(receipt)).mode & 0o777).toBe(0o600)
+    for (const secret of ["private-password", "private-token", "private.example", "private-recovery-id", "private-argv", "private-stdin"])
+      expect(text).not.toContain(secret)
+  } finally {
+    await rm(out, { recursive: true, force: true })
+    await rm(context.profileDir, { recursive: true, force: true })
+  }
+})
+
+test("management: неизвестные command/state/failure/code не копируются в outcome", async () => {
+  const context = await fakeProfile()
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-unknown-"))
+  const file = path.join(out, "view.json")
+  await writeFile(file, JSON.stringify({ state: "private-state", failure: "private-failure", code: "private-code", recoveries: "private-recovery" }))
+  try {
+    await management({ ...context.command, cleanupDir: out, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: file } },
+      ["loginom", "private-operation"])
+    const directory = (await readdir(out, { withFileTypes: true })).find((entry) => entry.isDirectory())!
+    const text = await readFile(path.join(out, directory.name, "result.json"), "utf8")
+    expect(JSON.parse(text)).toMatchObject({ command: { family: "loginom", operation: null, unrecognized: true },
+      view_state: null, view_failure: null, view_code: null, recovery_count: null,
+      unrecognized_state: true, unrecognized_failure: true, unrecognized_code: true, unrecognized_recoveries: true })
+    expect(text).not.toContain("private-")
+    await management({ ...context.command, cleanupDir: out }, ["private-family", "private-operation"])
+    const other = (await readdir(out, { withFileTypes: true })).filter((entry) => entry.isDirectory() && entry.name !== directory.name)
+    const otherText = await readFile(path.join(out, other[0]!.name, "result.json"), "utf8")
+    expect(JSON.parse(otherText).command).toEqual({ family: null, operation: null, unrecognized: true })
+    expect(otherText).not.toContain("private-")
+  } finally {
+    await rm(out, { recursive: true, force: true })
+    await rm(context.profileDir, { recursive: true, force: true })
+  }
+})
+
+test("management: cleanup rejection сохраняет terminal outcome и заменённый writer guard", async () => {
+  const context = await fakeProfile({ EVAL_FAKE_CHANGED_WRITER: "1" })
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-rejected-"))
+  try {
+    await expect(management({ ...context.command, cleanupDir: out }, ["loginom", "status", "--format", "json"]))
+      .rejects.toThrow("Management cleanup failed: Writer identity changed")
+    const directories = await readdir(out)
+    expect(directories).toHaveLength(1)
+    const receipt = path.join(out, directories[0]!, "result.json")
+    expect(await Bun.file(receipt).json()).toMatchObject({ exitCode: 0, capture_complete: true,
+      cleanup_status: "failed", view_state: "ready", timedOut: false, interrupted: false })
+    expect((await stat(receipt)).mode & 0o777).toBe(0o600)
+    expect(await Bun.file(path.join(context.profileDir, ".writer/owner")).text()).toBe("replacement")
+  } finally {
+    await rm(out, { recursive: true, force: true })
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(`${context.profileDir}.process-group`, { force: true })
+  }
 })
 
 for (const key of ["LOGINOM_AI_AGENT_CLI_PROFILE", "LOGINOM_AI_AGENT_CLI_ROOT"]) {

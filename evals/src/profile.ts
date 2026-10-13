@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises"
+import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
@@ -96,7 +96,11 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
     env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
-  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
+  if (out) {
+    // Persist the terminal diagnosis even when the existing cleanup gate rejects the attempt.
+    await writeFile(path.join(out, "result.json"), JSON.stringify(managementOutcome(args, result), null, 2), { mode: 0o600, flag: "wx" })
+    await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
+  }
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
@@ -104,6 +108,31 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
     await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
   return result
+}
+
+function managementOutcome(args: string[], result: Awaited<ReturnType<typeof superviseProcess>>) {
+  const parsed = parseJson(result.stdout.trim().split("\n").at(-1) ?? "")
+  const view = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : undefined
+  const state = typeof view?.state === "string" && ["unconfigured", "ready", "pending", "starting", "recoverable-error"].includes(view.state)
+    ? view.state : null
+  const failures = ["LOGINOM_STORE_READ_FAILED", "LOGINOM_STORE_WRITE_FAILED", "LOGINOM_RUNTIME_START_FAILED",
+    "LOGINOM_KNOWLEDGE_AUTH_FAILED", "LOGINOM_BROWSER_START_FAILED", "LOGINOM_CONNECTION_CHECK_FAILED"]
+  const failure = typeof view?.failure === "string" && failures.includes(view.failure) ? view.failure : null
+  const code = typeof view?.code === "string" && [...failures, "LOGINOM_CONNECTION_VALID", "LOGINOM_REPLY_INVALID",
+    "CLI_ARGUMENT_INVALID", "LOGINOM_CONFIG_REQUIRED", "LOGINOM_RECOVERY_REQUIRED"].includes(view.code) ? view.code : null
+  const family = args[0] === "loginom" ? "loginom" : null
+  const operation = family && ["status", "check", "setup", "recover", "cancel-pending"].includes(args[1] ?? "") ? args[1] : null
+  return { version: 1, command: { family, operation, unrecognized: !family || !operation },
+    exitCode: result.exitCode, timedOut: result.timedOut, interrupted: result.interrupted,
+    capture_complete: result.processCleanup.capture_complete, cleanup_status: result.processCleanup.status,
+    stdout_present: result.stdout.length > 0, stderr_present: result.stderr.length > 0,
+    stdout_bytes: Buffer.byteLength(result.stdout), stderr_bytes: Buffer.byteLength(result.stderr),
+    reply_present: view !== undefined, view_state: state, view_failure: failure, view_code: code,
+    recovery_count: Array.isArray(view?.recoveries) ? view.recoveries.length : null,
+    unrecognized_state: view?.state !== undefined && state === null,
+    unrecognized_failure: view?.failure !== undefined && failure === null,
+    unrecognized_code: view?.code !== undefined && code === null,
+    unrecognized_recoveries: view?.recoveries !== undefined && !Array.isArray(view.recoveries) }
 }
 
 export async function managementRuntimeDirectories(command: AgentCommand) {

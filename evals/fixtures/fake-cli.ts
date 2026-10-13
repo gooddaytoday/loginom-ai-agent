@@ -76,6 +76,16 @@ if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
 if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
 
 if (command === "loginom") {
+  if (process.env.EVAL_FAKE_REQUIRE_HEADLESS === "1") {
+    if (!Bun.argv.includes("--headless")) {
+      process.stdout.write(JSON.stringify({ state: "recoverable-error", failure: "LOGINOM_BROWSER_START_FAILED" }) + "\n")
+      process.exit(1)
+    }
+    if (sub === "check") {
+      process.stdout.write(JSON.stringify({ ok: true, code: "LOGINOM_CONNECTION_VALID" }) + "\n")
+      process.exit(0)
+    }
+  }
   if (process.env.EVAL_FAKE_ENFORCE_WRITER && await Bun.file(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")).exists()) {
     process.stderr.write("PROFILE_BUSY\n")
     process.exit(3)

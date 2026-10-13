@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "source_base": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+  "prepared_utc": "2026-10-13T13:10:46.223892+00:00",
+  "status": "OFFLINE_PASS_WITH_EXISTING_SKIPS",
+  "checks": {
+    "mechanical_green": {
+      "log_sha256": "e7f59bb81bfb70f18ac074e6a3f2383e6e520aba7ac6697da15f8b0edcc5c253",
+      "log_bytes": 9450,
+      "counts": {
+        "pass": 68,
+        "skip": 6,
+        "fail": 0
+      },
+      "meaning": "Legacy argv extracted without behavior change; existing tests remained green"
+    },
+    "headless_red": {
+      "log_sha256": "f29797a589fd4c81837370b6f4a53282fcd3a6aba33b7f540a22da0bee97cc54",
+      "log_bytes": 854,
+      "counts": {
+        "pass": 0,
+        "fail": 1
+      },
+      "meaning": "Real fake child exited1 with legacy status argv lacking --headless; expected exit0 assertion failed"
+    },
+    "headless_green": {
+      "log_sha256": "6520ec4375c16b8d215aec4840296b83ccf49b28c0cfbcc60978d99556b6e326",
+      "log_bytes": 269,
+      "counts": {
+        "pass": 1,
+        "fail": 0
+      }
+    },
+    "diagnostic_red": {
+      "log_sha256": "2ce215cb7841edab81d05e8db54da35c124ce4e3e9c1d082725668568a880574",
+      "log_bytes": 1179,
+      "counts": {
+        "pass": 0,
+        "fail": 1
+      },
+      "meaning": "Real management process completed; public result.json read failed ENOENT before production change"
+    },
+    "diagnostic_green": {
+      "log_sha256": "672a9aeff6199ab1099fb8b9feb1cb0f030daa41f6a422eff29720c93367485a",
+      "log_bytes": 258,
+      "counts": {
+        "pass": 1,
+        "fail": 0
+      }
+    },
+    "unknown_and_cleanup_negative": {
+      "log_sha256": "46ffc5ec944f22087cffd1ed81454d34023438620f00830c8e90d4b2141cf316",
+      "log_bytes": 378,
+      "counts": {
+        "pass": 2,
+        "fail": 0
+      },
+      "meaning": "Unrecognized command/state/failure/code/recoveries excluded; cleanup still rejects replaced writer and preserves replacement guard"
+    },
+    "typecheck": {
+      "log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "log_bytes": 15,
+      "counts": {}
+    }
+  },
+  "native_ready": "NOT_RUN",
+  "server_installation": "NOT_APPLIED",
+  "live_model_reference_product_recovery_calls": 0,
+  "criteria_or_budget_changes": false,
+  "full_suite": {
+    "command": "bun test",
+    "cwd": "evals",
+    "exit_code": 0,
+    "counts": {
+      "pass": 578,
+      "skip": 9,
+      "fail": 0
+    },
+    "test_files": 51,
+    "duration_seconds": 657.64,
+    "log_sha256": "6d0fedb5f0d3a1a68762b47bfadc70f91850d0b3ba1cd27a3191963e9c950f5b",
+    "log_bytes": 198782,
+    "skip_titles": [
+      "writer-release settlement creates a separate fresh two-pass proof without changing the original error",
+      "writer-release settlement refuses a changed writer and unknown runtime directory",
+      "owned registration release admits only its exact lease-local attested settlement",
+      "writer-release settlement binds immutable source/admission and refuses altered proof before recovery reservation",
+      "baseline writer settlements preserve separate executions without resetting the same source",
+      "fixed unit commands produce process proof and release only after actual profile and storage checks",
+      "baseline cleanup verification binds its execution and checks actual archives, profiles and isolated storage",
+      "real harness summary format releases a measured product FAIL and rejects missing process proof",
+      "owned registration releases the attested original marker with an already absent writer"
+    ]
+  },
+  "baseline_skips_reason": "Existing browser-busy guards prevent six Docker/browser-dependent cases while foreign Chrome is running; guards not bypassed",
+  "independent_acceptance": "NOT_CONFIRMED; Ben final review remains required",
+  "finished_utc": "2026-10-13T13:12:50.131033+00:00",
+  "typecheck": {
+    "command": "bun typecheck",
+    "cwd": "evals",
+    "exit_code": 0
+  },
+  "diff_check": "PASS",
+  "limitations": [
+    "Nine existing browser/ownership-dependent checks skipped by their environment guards; no bypass/foreign process stop",
+    "Fake-mode supervised child processes are real, but native stand READY is NOT_RUN",
+    "Original PROFILE_NOT_READY underlying exception remains unclassified",
+    "No installed supplement/pin/lease/budget/model changes; active Rich offline task not duplicated"
+  ]
+}
