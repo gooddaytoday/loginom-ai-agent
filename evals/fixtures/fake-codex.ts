@@ -17,12 +17,12 @@ if (args.includes("--version")) {
 }
 const dir = args[args.indexOf("-C") + 1] ?? "."
 const out = args[args.indexOf("-o") + 1] ?? path.join(dir, "verdict.json")
-const trace = process.env.FAKE_CODEX_GATE_LOG
+const trace = process.env.FAKE_CODEX_GATE_LOG ?? (args.includes("--gate-log") ? args[args.indexOf("--gate-log") + 1] : undefined)
 if (trace) {
-  const record = (kind: "start" | "end") => appendFileSync(trace, JSON.stringify({ kind, pid: process.pid, dir, at: Date.now().toString() }) + "\n", { mode: 0o600 })
+  const record = (kind: "start" | "end") => appendFileSync(trace, JSON.stringify({ kind, pid: process.pid, dir, at: Date.now().toString(), codexHome: process.env.CODEX_HOME }) + "\n", { mode: 0o600 })
   record("start")
   process.on("exit", () => record("end"))
-  await Bun.sleep(Number(process.env.FAKE_CODEX_DELAY_MS ?? "0"))
+  await Bun.sleep(Number(process.env.FAKE_CODEX_DELAY_MS ?? (args.includes("--delay-ms") ? args[args.indexOf("--delay-ms") + 1] : "0")))
 }
 // FAKE_CODEX_FLAKY_MARKER: первый вызов падает и создаёт маркер, второй проходит.
 const marker = process.env.FAKE_CODEX_FLAKY_MARKER

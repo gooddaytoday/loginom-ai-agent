@@ -64,7 +64,7 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
         { state: "ready", hasApiKey: true, url: own.loginom.url, username: slot.username })
       const base = agentCommand(own)
       const command = { ...base, cleanupDir: path.join(runDir, "preparation", slot.id),
-        env: { ...base.env, EVAL_FAKE_STATE_FILE: stateFile } }
+        env: { ...base.env, EVAL_FAKE_STATE_FILE: stateFile, EVAL_FAKE_SLOT_STORAGE: path.join(input.storage, slot.id) } }
       await ensureProfile(own, command)
       await assertAuth(own, command)
       await recoverIfNeeded(command, 2)
