@@ -59,6 +59,28 @@ test("offline audit refuses an oracle whose bytes differ from the pinned task", 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test.each(["verified", "corrupt", "unknown-entry"])("truncated tool output requires its complete verified manifest: %s", async (kind) => {
+  const directory = await pilotDirectory()
+  try {
+    const original = pilotHistory.snapshot.parts.find((part) => part.tool === "loginom_dock_node_wait")!
+    const content = original.state!.output!
+    const truncated = { ...original, state: { ...original.state, output: "truncated...",
+      metadata: { ...original.state!.metadata, truncated: true, outputPath: "/private/complete-output" } } }
+    await Bun.write(path.join(directory, "parts.json"), JSON.stringify({ ...pilotHistory.snapshot,
+      parts: pilotHistory.snapshot.parts.map((part) => part.id === original.id ? truncated : part) }))
+    await Bun.write(path.join(directory, "events.jsonl"), pilotHistory.events.map((event) => JSON.stringify(
+      event.part?.id === original.id ? { ...event, part: truncated } : event)).join("\n"))
+    await mkdir(path.join(directory, "tool-outputs"))
+    await Bun.write(path.join(directory, "tool-outputs/complete.txt"), content)
+    const entry = { partID: original.id, source: "/private/complete-output", path: "tool-outputs/complete.txt",
+      sha256: kind === "corrupt" ? "0".repeat(64) : createHash("sha256").update(content).digest("hex") }
+    await Bun.write(path.join(directory, "tool-outputs.json"), JSON.stringify(kind === "unknown-entry" ? [entry, {}] : [entry]))
+    const run = Bun.spawn([process.execPath, "script/audit-node-selection.ts", "--tasks", "tasks/analytic",
+      "--task", "sales-by-category", "--attempt", directory, "--mode", "standard"], { stdout: "pipe", stderr: "pipe" })
+    expect(await run.exited).toBe(kind === "verified" ? 0 : 2)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("a failed semantic review blocks acceptance without changing native selection policy", async () => {
   const directory = await pilotDirectory()
   try {

@@ -138,7 +138,10 @@ async function main() {
 
 async function completeOutputs(directory: string, parts: unknown[], failures: string[]) {
   const manifest = await json(path.join(directory, "tool-outputs.json"))
-  if (!Array.isArray(manifest)) failures.push("TOOL_OUTPUT_MANIFEST_INVALID")
+  if (!Array.isArray(manifest) || manifest.some((entry) => !record(entry) || typeof entry.partID !== "string"
+    || !parts.some((part) => record(part) && part.id === entry.partID && record(part.state)
+      && record(part.state.metadata) && part.state.metadata.truncated === true && entry.source === part.state.metadata.outputPath)))
+    failures.push("TOOL_OUTPUT_MANIFEST_INVALID")
   return Promise.all(parts.map(async (part) => {
     if (!record(part) || !record(part.state) || !record(part.state.metadata) || part.state.metadata.truncated !== true) return part
     const entries = Array.isArray(manifest) ? manifest.filter((entry) => record(entry) && entry.partID === part.id) : []
