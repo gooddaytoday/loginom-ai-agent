@@ -463,7 +463,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/baseline-pins.j
   убрать из env ребёнка, иначе он может подменить frozen resources.
   Все flags, формат snapshot, правила copy-out и supervisor описаны ниже как
   спецификация реализации wrapper — не как ручные команды каждого прогона.
-- [ ] Существующий каталог попытки означает отказ до model dispatch, а не
+- [x] Существующий каталог попытки означает отказ до model dispatch, а не
   перезапись/повтор. Сохранять `attempt.json` также при неудаче, с отдельными
   `modelStarted`, CLI exit/null, blocker, policy/oracle/calculation/review statuses.
   Коды wrapper: 0 — машинные проверки прошли, 1 — измеренный провал, 2 —
