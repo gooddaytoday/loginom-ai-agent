@@ -71,3 +71,13 @@ Durable reservations/OS guards задачи 1 ещё не реализованы
 реализация. Dev-зависимости Bun устанавливаются локально для повторных проверок.
 
 После переноса в 96cd повторены те же 88 тестов: PASS/0 FAIL (23.65s), bun typecheck и git diff --check PASS.
+
+Примитивы resource lease: постоянный private OS flock guard, атомарный fsync
+reservation/tombstone, matching evidence release, recovery-only CAS token/revision
+и incident lineage. SIGKILL освобождает guard, retained запись запрещает обычный
+run. Guard FD не наследуется child; живой owner/потерянный journal/подменённый
+inode/повреждённая lineage отклоняются. Два recovery процесса не принимают одну
+revision. Проверены `bun test test/config.test.ts test/slots.test.ts test/lease.test.ts`:
+77 PASS/0 FAIL, bun typecheck/git diff --check PASS. Native проверки — отдельные
+Bun процессы, временные private roots, без Docker/Loginom/admin mocks.
+SlotLease, server generation binding и полноценная recovery CLI ещё впереди.
