@@ -1,0 +1,48 @@
+{
+  "checked_utc": "2026-10-13T08:47:59.482385+00:00",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+  "parent_id": "01a1315c-afd7-7588-a622-313a9a772eb7",
+  "created_at": "2026-10-13T11:46:38+03:00",
+  "user_authorization": "Direct human instruction in current Codex chat: напиши в карточку что разрешаю, following explanation of isolated TSV CLI build/test/admission and pin approval for LAB-57.",
+  "comment_body": "[@Evaler](mention://agent/de4ba430-2182-4085-a148-fa4a3fc8a6f5), по прямому поручению владельца из текущего Codex-чата фиксирую его решение в ответ на ваш запрос о CLI pin:\n\n**Разрешаю для LAB-57 собрать и проверить отдельную исправленную версию CLI по подготовленному TSV proposal, а после успешных проверок и штатного допуска закрепить новый CLI pin для продолжения карточки.**\n\nРазрешение относится к combined proposal `d68d433bed8cc2be72eec3f590c0ffd09cc47af6`, patch SHA256 `7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465`: расширению существующего provider-text shim с CSV на inline TSV с сохранением original file part и исходных UTF16 bytes/BOM/SHA. Готовить поставку от exact CLI source `5cd74d8ee5d6125692d953eb327b4d4f833c27a1`; новый pin зафиксировать после адресных регрессий, functional tests/typecheck/build и штатного допуска. Это отдельное решение владельца по п.6 поручения `01a130f3-a16d-719a-a3b5-1930817d7cb4`.\n\nПеред продолжением повтори fresh active/queued, ресурсы, dependency ACCEPT/cleanup и сохранённую работу; Rich при активном/queued run не дублировать. Прежний этап с deadline 2026-10-12T22:40:20Z истёк; для нового продолжения зафиксируй ограниченный этап по времени/стоимости в рамках разрешённых лимитов, сохранив историю и накопленный учёт. Rich самостоятельно доводит разрешённый авторский этап до READY_FOR_BEN либо доказанного внешнего BLOCKED; Ben независимо проверяет итоговые кейсы и изменения валидатора.\n\nМодели, runtime, skill/supplement, inputs/oracle/критерии, общий установленный CLI/defaults/credentials/VPN и чужие ресурсы этим решением не меняются. Исторические FAIL/ERROR и ledgers сохраняются: reference 1/1/2/1/1/1 из3, product0, cold8/7/5, repeats2/10 (остаток8), admission3/3 и wrapper1/1 исчерпаны, recovery0; сброса или расширения бюджетов нет. Статус done/merge/release остаётся владельцу.",
+  "comment_body_sha256": "97931dbabd8fbc1213b79c2c2acb031b1ba73026595d47ff7548ded103886746",
+  "readback_exact_body_parent_and_one_Evaler_mention": true,
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "active_queued_before_post": 0,
+  "active_queued_after_post": [
+    {
+      "id": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "queued",
+      "trigger_comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea"
+    }
+  ],
+  "issue_status_after_post": "blocked",
+  "issue_revision_after_post": 150,
+  "approved_scope": "Isolated LAB-57 CLI TSV shim from exact5cd, targeted regressions/functional tests/typecheck/build/native admission; new pin permitted after successful checks. Evaler coordinates bounded continuation preserving cumulative ledgers and original criteria.",
+  "proposal_commit": "d68d433bed8cc2be72eec3f590c0ffd09cc47af6",
+  "patch_sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465",
+  "installed_CLI_or_actual_pin_changed_by_this_delivery": false,
+  "new_Rich_or_Ben_dispatches_by_monitor": 0,
+  "scenario_model_native_operations": 0,
+  "Rich_budget_charge": 0,
+  "original_stage_expired_and_not_automatically_extended": true,
+  "approval_is_not_test_build_or_admission_success": true,
+  "remaining_work": "Evaler must coordinate authorized repair/testing/admission and subsequent Rich stage; approval delivered, model/budget/criteria/shared-resource changes not authorized.",
+  "heartbeat_prompt_updated": {
+    "automation_id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "interval_minutes": 30,
+    "owner_approval_comment_and_scope_added": true,
+    "do_not_reask_same_pin_approval": true,
+    "tool_confirmation": "Updated automation in the app."
+  }
+}
