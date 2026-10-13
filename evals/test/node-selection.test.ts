@@ -4,6 +4,15 @@ import path from "node:path"
 import os from "node:os"
 import { unzip } from "../src/artifact"
 import { inspectSelection } from "../src/node-selection"
+import applyWait from "./fixtures/node-selection/apply-wait.json"
+
+test("an admitted JavaScript apply counts as successful only after its matching real wait receipt", () => {
+  const parts = structuredClone(applyWait)
+  parts[0]!.state.input.target!.type = "programming.javascript"
+  const result = inspectSelection({ mode: "explicit-js", nodeTypes: ["TBGCodeModelComponentEngine"], parts })
+  expect(result.successfulJsCalls).toBe(1)
+  expect(result.failures).toEqual([])
+})
 
 test.each(["pending", "running", "completed", "error"])(
   "standard rejects a JavaScript call in state %s even without a saved JS node",

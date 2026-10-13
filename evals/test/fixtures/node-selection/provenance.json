@@ -1,0 +1,10 @@
+{
+  "sourceAttempt": "20261013T093809Z-f5d429/baseline/sales-by-category/1",
+  "sourceEventSha256": [
+    "40e1d47bc79981dd51252950305677c6cd06df0fc4c9d98cb43d83794b9632de",
+    "65300d2a8ae2c9ece651e121f9ec3a13adc41c6c7e4050be540a0392976b6226",
+    "b970497eace6cc0fb3bb8f755d3b1da544338dc4552526d2e344ac1176b03eed"
+  ],
+  "fixture": "apply-wait.json",
+  "sanitization": "Consistent part/message/session/document/node UUID and storage path replacement; statuses and request/response shapes preserved. Public synthetic analytic dataset preview retained."
+}
