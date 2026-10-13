@@ -156,15 +156,18 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
           || target.kind === "existing" && !sameNode(publicTarget?.ref, target.ref)
       })) failures.push("RUNTIME_APPLY_MISMATCH")
       const terminalNode = record(submitted?.node) ? submitted.node : record(outcome?.node) ? outcome.node : undefined
-      const publicTerminal = calls.filter((call) => call.dockID === session.sessionId && record(call.result)
-        && call.result.operation_id === admission.operation_id).at(-1)?.result
+      const publicTerminalCall = calls.filter((call) => call.dockID === session.sessionId && record(call.result)
+        && call.result.operation_id === admission.operation_id).at(-1)
+      const publicTerminal = publicTerminalCall?.result
       if (outcome?.status === "SUCCEEDED" && !terminalNode || terminalNode && (terminalNode.document_id !== request?.document_id
         || !record(request?.workflow_ref) || terminalNode.workflow_id !== request.workflow_ref.workflow_id
         || target?.kind === "existing" && !sameNode(terminalNode, target.ref)
-        || !record(publicTerminal) || !sameNode(terminalNode, publicTerminal.node))) failures.push("RUNTIME_APPLY_MISMATCH")
+        || !record(publicTerminal) || !sameNode(terminalNode, publicTerminal.node)
+        || publicTerminalCall?.part.tool === "loginom_dock_operation_inspect" && !sameNodeExecution(submitted, publicTerminal)))
+        failures.push("RUNTIME_APPLY_MISMATCH")
     }
   }
-  for (const { part, result, dockID } of calls) {
+  for (const [index, { part, result, dockID }] of calls.entries()) {
     if (!record(part.state) || !record(part.state.input)) continue
     if (!/^loginom_dock_(node_apply|node_wait|node_resume|node_read|artifact_deliver|action_run|operation_inspect)$/.test(String(part.tool))) continue
     if (record(result) && ["source", "context"].includes(String(result.kind))) {
@@ -199,6 +202,18 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
             && event.phase === "source_discard_settled"))) failures.push("SOURCE_READ_UNSETTLED")
       continue
     }
+    if (part.state.status === "error" && record(result) && result.result_delivery === "refused"
+      && record(result.error) && result.error.code === "USER_RESPONSE_BUDGET" && result.error.scope === "whole_response"
+      && typeof operationID === "string" && result.original_operation_id === operationID
+      && record(result.next_step) && result.next_step.tool === "dock_operation_inspect"
+      && record(result.next_step.arguments) && result.next_step.arguments.operation_id === operationID
+      && calls.slice(index + 1).some((call) => call.dockID === dockID && call.part.sessionID === part.sessionID
+        && call.part.tool === "loginom_dock_operation_inspect" && record(call.result) && call.result.operation_id === operationID
+        && input.runtime.some((runtime) => record(runtime.session) && runtime.session.sessionId === dockID
+          && runtime.events.some((event) => record(event) && event.operation_id === operationID
+            && ["completed", "reconciled"].includes(String(event.phase)) && record(event.outcome)
+            && event.outcome.operation_id === operationID && event.outcome.status === "SUCCEEDED"
+            && event.outcome.cleanup_complete === true && sameNodeExecution(event.outcome.output, call.result))))) continue
     if (!record(result) || typeof result.operation_id !== "string") { failures.push("TOOL_RECEIPT_INCOMPLETE"); continue }
     if (part.state.input.operation_id !== result.operation_id) failures.push("TOOL_OPERATION_MISMATCH")
     if (!(result.request_rejected === true && result.status === "NOT_APPLIED" && result.effect_possible === false)
@@ -305,11 +320,12 @@ function readApply(part: unknown, parts: unknown[]) {
   const request = record(state?.input) ? state.input : undefined
   const target = record(request?.target) ? request.target : undefined
   const reference = record(target?.ref) ? target.ref : undefined
-  const receipts = parts.filter(record).filter((candidate) => candidate.sessionID === part.sessionID
-    && ["loginom_dock_node_apply", "loginom_dock_node_wait", "loginom_dock_node_resume"].includes(String(candidate.tool))
+  const terminalPart = parts.filter(record).filter((candidate) => candidate.sessionID === part.sessionID
+    && ["loginom_dock_node_apply", "loginom_dock_node_wait", "loginom_dock_node_resume", "loginom_dock_operation_inspect"].includes(String(candidate.tool))
     && record(candidate.state) && ["completed", "error"].includes(String(candidate.state.status)) && record(candidate.state.input)
-    && candidate.state.input.operation_id === request?.operation_id).map(receipt).filter(record)
-  const terminal = receipts.at(-1)
+    && candidate.state.input.operation_id === request?.operation_id).at(-1)
+  const value = terminalPart ? receipt(terminalPart) : undefined
+  const terminal = record(value) ? value : undefined
   const node = record(terminal?.node) ? terminal.node : undefined
   return [{
     node,
@@ -318,7 +334,7 @@ function readApply(part: unknown, parts: unknown[]) {
     nodeType: typeof target?.type === "string" ? target.type : undefined,
     succeeded: typeof part.id === "string" && typeof part.sessionID === "string" && typeof request?.operation_id === "string"
       && state?.status === "completed" && terminal?.operation_id === request.operation_id
-      && terminal?.state === "settled" && terminal.status === "SUCCEEDED"
+      && (terminal?.state === "settled" || terminalPart?.tool === "loginom_dock_operation_inspect") && terminal?.status === "SUCCEEDED"
       && terminal.cleanup_complete === true && record(terminal.execution) && terminal.execution.status === "completed"
       && node?.document_id === request?.document_id && record(request?.workflow_ref)
       && node?.workflow_id === request.workflow_ref.workflow_id && typeof node?.node_id === "string"
@@ -335,15 +351,44 @@ export function readSelectionReceipt(part: unknown): unknown {
   if (!record(part.state)) return undefined
   if (record(part.state.metadata) && part.state.metadata.truncated === true) return undefined
   const value = part.state.status === "error" ? part.state.error : part.state.output
-  if (typeof value !== "string") return value
+  if (typeof value !== "string") return inspectedNodeReceipt(part, value)
   try {
     const values: unknown[] = value.split(/\n\s*\n/).map((text) => JSON.parse(text) as unknown)
     const first = values[0]
     if (!record(first) || values.slice(1).some((extra) => !record(extra)
       || !["dock_saved_package_state", "dock_outcome_verification"].includes(String(extra.kind))
       || (extra.operation_id ?? extra.save_operation_id) !== first.operation_id)) return undefined
-    return first
+    return inspectedNodeReceipt(part, first)
   } catch { return undefined }
+}
+
+function inspectedNodeReceipt(part: Record<string, unknown>, value: unknown): unknown {
+  if (part.tool !== "loginom_dock_operation_inspect") return value
+  const input = record(part.state) && record(part.state.input) ? part.state.input : undefined
+  const output = record(value) && record(value.output) ? value.output : undefined
+  const outcome = record(output?.outcome) ? output.outcome : undefined
+  const node = record(outcome?.output) ? outcome.output : undefined
+  const reference = record(node?.node) ? node.node : undefined
+  if (!record(part.state) || part.state.status !== "completed" || !record(value)
+    || value.status !== "SUCCEEDED" || value.action_key !== "operation.inspect" || value.effect_possible !== false || value.error !== null
+    || typeof input?.operation_id !== "string" || value.operation_id !== input.operation_id
+    || output?.operation_id !== input.operation_id || output.state !== "resolved"
+    || output.cleanup_confirmed !== true || output.effect_state !== "verified"
+    || outcome?.action_key !== "node.apply" || outcome.operation_id !== input.operation_id || outcome.status !== "SUCCEEDED"
+    || outcome.cleanup_complete !== true || outcome.error !== null || node?.operation_id !== input.operation_id
+    || node.status !== "SUCCEEDED" || node.cleanup_complete !== true || !reference
+    || !["document_id", "workflow_id", "node_id"].every((key) => typeof reference[key] === "string" && reference[key])
+    || !record(node.execution) || node.execution.status !== "completed" || typeof node.execution.execution_id !== "string"
+    || !node.execution.execution_id) return undefined
+  // Inspection retains the original node outcome; its resolved state is verified above, not invented on the inner receipt.
+  return { ...outcome, ...node, output: node.output }
+}
+
+function sameNodeExecution(left: unknown, right: unknown) {
+  return record(left) && record(right) && sameNode(left.node, right.node)
+    && record(left.execution) && record(right.execution) && left.execution.status === "completed"
+    && right.execution.status === "completed" && typeof left.execution.execution_id === "string"
+    && left.execution.execution_id === right.execution.execution_id
 }
 
 function receipt(part: Record<string, unknown>): unknown { return readSelectionReceipt(part) }

@@ -308,6 +308,94 @@ test("an admitted JavaScript apply counts as successful only after its matching 
   expect(result.failures).toEqual([])
 })
 
+test("a retained node outcome delivered by resolved inspection settles the earlier response-budget refusal", () => {
+  const evidence = inspectedDelivery()
+  expect(inspectSelectionRuntime(evidence)).toEqual({ runtimeSettled: true, failures: [] })
+  expect(inspectSelection({ mode: "standard", nodeTypes: ["TBGCodeModelComponentEngine"], ...evidence })).toMatchObject({
+    jsCalls: 1, successfulJsCalls: 1, failures: ["JAVASCRIPT_NOT_ALLOWED"],
+  })
+})
+
+test.each(["pending", "cleanup-false", "inner-cleanup-false", "effect-unverified", "missing-outcome", "wrong-action"])(
+  "outer inspection success cannot certify a node outcome: %s", (kind) => {
+    const evidence = inspectedDelivery()
+    if (kind === "pending") evidence.inspection.output.state = "pending"
+    if (kind === "cleanup-false") evidence.inspection.output.cleanup_confirmed = false
+    if (kind === "inner-cleanup-false") evidence.inspection.output.outcome.cleanup_complete = false
+    if (kind === "effect-unverified") evidence.inspection.output.effect_state = "observed_unverified"
+    if (kind === "missing-outcome") Object.assign(evidence.inspection.output, { outcome: null })
+    if (kind === "wrong-action") evidence.inspection.action_key = "another.action"
+    evidence.parts.at(-1)!.state.output = JSON.stringify(evidence.inspection)
+    expect(inspectSelectionRuntime(evidence).runtimeSettled).toBe(false)
+    expect(inspectSelection({ mode: "explicit-js", nodeTypes: ["TBGCodeModelComponentEngine"], ...evidence }).successfulJsCalls).toBe(0)
+  },
+)
+
+test.each(["inner-id", "node", "document", "workflow", "execution", "session"])(
+  "inspection must retain its admitted operation and runtime identity: %s", (kind) => {
+    const evidence = inspectedDelivery()
+    const outcome = evidence.inspection.output.outcome
+    if (kind === "inner-id") outcome.operation_id = "foreign-operation"
+    if (kind === "node") outcome.output.node.node_id = "foreign-node"
+    if (kind === "document") outcome.output.node.document_id = "foreign-document"
+    if (kind === "workflow") outcome.output.node.workflow_id = "foreign-workflow"
+    if (kind === "execution") outcome.output.execution.execution_id = "foreign-execution"
+    if (kind === "session") evidence.parts.at(-1)!.sessionID = "foreign-session"
+    evidence.parts.at(-1)!.state.output = JSON.stringify(evidence.inspection)
+    expect(inspectSelectionRuntime(evidence).runtimeSettled).toBe(false)
+  },
+)
+
+test.each(["original-id", "input-id", "unknown-error", "missing-inspection", "earlier-inspection"])(
+  "only a later bound terminal inspection resolves this delivery refusal: %s", (kind) => {
+    const evidence = inspectedDelivery()
+    if (kind === "original-id") evidence.refusal.original_operation_id = "foreign-operation"
+    if (kind === "input-id") evidence.parts[3]!.state.input.operation_id = "foreign-operation"
+    if (kind === "unknown-error") evidence.refusal.error.code = "UNKNOWN_FAILURE"
+    evidence.parts[3]!.state.error = JSON.stringify(evidence.refusal)
+    if (kind === "missing-inspection") evidence.parts.pop()
+    if (kind === "earlier-inspection") evidence.parts.splice(3, 0, evidence.parts.pop()!)
+    const result = inspectSelectionRuntime(evidence)
+    expect(result.runtimeSettled).toBe(false)
+    expect(result.failures).toContain("TOOL_RECEIPT_INCOMPLETE")
+  },
+)
+
+// Minimal projection of ABC baseline/2: retained outcome, delivery refusal and the instructed inspection.
+function inspectedDelivery() {
+  const operation = "pareto-rows-01"
+  const request = { operation_id: operation, document_id: "document", workflow_ref: { workflow_id: "workflow" },
+    target: { kind: "new", type: "programming.javascript" } }
+  const outcome = { status: "SUCCEEDED", action_key: "node.apply", operation_id: operation, phase: "node_ready",
+    effect_possible: true, cleanup_complete: true, error: null, output: {
+      operation_id: operation, status: "SUCCEEDED", cleanup_complete: true,
+      node: { document_id: "document", workflow_id: "workflow", node_id: "pareto-node" },
+      execution: { status: "completed", execution_id: "document:1091:4" },
+    } }
+  const inspection = { status: "SUCCEEDED", action_key: "operation.inspect", operation_id: operation,
+    phase: "observed", effect_possible: false, error: null, output: {
+      operation_id: operation, state: "resolved", outcome, cleanup_confirmed: true, effect_state: "verified",
+    } }
+  const refusal = { result_delivery: "refused", error: { code: "USER_RESPONSE_BUDGET", scope: "whole_response" },
+    original_operation_id: operation, next_step: { tool: "dock_operation_inspect", arguments: { operation_id: operation } } }
+  const parts = [
+    { id: "prepare", sessionID: "session", type: "tool", tool: "loginom_dock_prepare",
+      state: { status: "completed", input: {}, output: JSON.stringify({ prepared: true, sessionId: "dock" }) } },
+    { id: "apply", sessionID: "session", type: "tool", tool: "loginom_dock_node_apply",
+      state: { status: "completed", input: request, output: JSON.stringify({ operation_id: operation, state: "running" }) } },
+    { id: "wait", sessionID: "session", type: "tool", tool: "loginom_dock_node_wait",
+      state: { status: "completed", input: { operation_id: operation }, output: JSON.stringify({ operation_id: operation, state: "running" }) } },
+    { id: "refusal", sessionID: "session", type: "tool", tool: "loginom_dock_node_wait",
+      state: { status: "error", input: { operation_id: operation }, error: JSON.stringify(refusal) } },
+    { id: "inspect", sessionID: "session", type: "tool", tool: "loginom_dock_operation_inspect",
+      state: { status: "completed", input: { operation_id: operation }, output: JSON.stringify(inspection) } },
+  ]
+  return { parts, inspection, refusal, runtime: [{ path: "own-runtime", session: { sessionId: "dock" }, events: [
+    { session_id: "dock", operation_id: operation, phase: "node_apply_prepared", request },
+    { session_id: "dock", operation_id: operation, phase: "completed", outcome: structuredClone(outcome) },
+  ] }] }
+}
+
 test.each(["valid", "wrong-existing-ref", "foreign-workflow", "duplicate-xml-id", "different-xml-node"])(
   "successful JS belongs to the unique saved node and exported workflow: %s", (kind) => {
     const parts: unknown[] = structuredClone(applyWait)
