@@ -1,0 +1,80 @@
+{
+  "revision": 1,
+  "kind": "FP_NEXT_NATIVE_PREFLIGHT_CONTRACT_ONLY",
+  "native_authorized_now": false,
+  "release_replay_allowed": false,
+  "fixed_type": "transform.reform_columns",
+  "fixed_input_port": 0,
+  "installed_prerequisite": "reviewed fixed FP private launcher/inventory entry with original launch signal/deadline and immutable startup inputs",
+  "authority_source": {
+    "grant": "private WeakMap populated only after canonical installed node/host/FP component/native-context inventory verification",
+    "owner_run_lease_generation_chat": "actual retained HostPort/service binding and connection generation, never model JSON",
+    "original_page_context_session_directory": "same retained supervisor/managed startup tuple, independently qualified Page and document binding",
+    "known_operation": "actual owned existing configure/input_mapping operation; foreign or historical UNKNOWN cannot be replayed or cleared"
+  },
+  "required_fresh_inputs": [
+    "exact account/profile/stand and observed rights",
+    "observed server session/holder, not UUID or PID inference",
+    "exact package/path/document/workflow/node/input-port0/root/store/editor identities",
+    "original owner and serial Page/context/session/metadata/directory refs",
+    "original AbortSignal, exact request ID and absolute upstream deadline",
+    "known dirty/running/unsettled/pending/unknown-effect state, before and after awaited bounded reads",
+    "source bytes: 167 bytes SHA256 5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3, canonical CSV format and independent five-column import schema",
+    "operator-only literal oracle outside model input and independently proven model isolation"
+  ],
+  "bounded_read_contract": "installed fixed native-context reader on the original prepared Page only, with exact preparation/document/node/workflow, package owner and account; context recheck before/after native read; IsPackageModified/HasRunningNodes must yield known false without normalization",
+  "remaining_not_verified": [
+    "installed fixed launcher is missing on36",
+    "fresh original native Page/authority/resources and applicability of LAB-66 opening to FP",
+    "wrong workflow/node/port and late native dirty/UNKNOWN/running/unsettled cases beyond the missing launcher boundary",
+    "native source proof, baseline persistent IDs/5x4 values/Extra preservation/cache2",
+    "model isolation, persistence/cold/wide/empty/scalar/full node acceptance"
+  ],
+  "pre_ready_projection": {
+    "kind": "PRE_READY_CLOSED_READ",
+    "ready": false,
+    "cleanupComplete": false,
+    "creates_storage_or_mutation_authority": false
+  },
+  "source_proof": {
+    "bytes": 167,
+    "sha256": "5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3",
+    "provenance": "authored_fixture_bytes_contract",
+    "format": {
+      "delimiter": ";",
+      "decimal_separator": ".",
+      "null_marker": "NULL",
+      "text_qualifier": "\""
+    },
+    "columns": [
+      {
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer"
+      },
+      {
+        "name": "A",
+        "label": "Same",
+        "type": "string"
+      },
+      {
+        "name": "B",
+        "label": "Same",
+        "type": "integer"
+      },
+      {
+        "name": "C",
+        "label": "Unused",
+        "type": "boolean"
+      },
+      {
+        "name": "Extra",
+        "label": "Unrequested",
+        "type": "string"
+      }
+    ],
+    "operator_paths": "exact package path and model input source path must be explicitly bound by the operator; placeholders are not proof",
+    "output_orders_alternatives_allowed": false,
+    "cache2": "authored baseline; native mismatch must refuse"
+  }
+}
