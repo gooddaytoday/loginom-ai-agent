@@ -19,16 +19,123 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
   })
 }
 import { EvalFailure } from "./fail"
-import type { ServerIdentity } from "./slots"
+import type { ServerIdentity, SlotDefinition, SlotFile } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
-import { lstat, open, readdir, realpath } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, open, readdir, realpath } from "node:fs/promises"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
+import { verifyAdminRuntime } from "./preflight"
+import { readServerIdentity } from "./parallel-pair"
+import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
 export type AdminReply = { v: 1; id: string; outcome: "confirmed" | "not_applied" | "unknown"; data: unknown }
 const frameLimit = 1024 * 1024
+
+export type AdminConnection = {
+  identity: ServerIdentity
+  inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
+  reconcileUser(slot: SlotDefinition, secretFile: string): Promise<{ userKey: string; aclHash: string }>
+  closeSession(session: ServerSession): Promise<void>
+  dispose(): Promise<void>
+}
+
+export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity, options: { binary?: string; signal?: AbortSignal } = {}): Promise<AdminConnection> {
+  if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
+  const binary = options.binary ?? process.env.EVAL_CLI_BIN ?? Bun.which("loginom-ai-agent-cli")
+  if (!binary) throw new EvalFailure("ADMIN_RUNTIME_UNAVAILABLE", 2)
+  const runtime = await verifyAdminRuntime(binary)
+  if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+  const info = await lstat(file.controller.stateDir)
+  if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700 ||
+    await realpath(file.controller.stateDir) !== file.controller.stateDir) throw new EvalFailure("ADMIN_JOURNAL_PRIVATE", 2)
+  const directory = await mkdtemp(path.join(file.controller.stateDir, "admin-"))
+  await mkdir(path.join(directory, "commands"), { mode: 0o700 })
+  await mkdir(path.join(directory, "profile"), { mode: 0o700 })
+  const driver = path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")
+  const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "starting", initialization: "not_started", dispose: "not_started",
+    runtimeManifestHash: runtime.manifestHash, driverHash: new Bun.CryptoHasher("sha256").update(await Bun.file(driver).bytes()).digest("hex"),
+    processes: null as ProcessCleanup | null }
+  await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
+  let stopInput = (_error: EvalFailure) => {}, stopOutput = (_error: EvalFailure) => {}
+  const input = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopInput = error => controller.error(error) } })
+  const output = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopOutput = error => controller.error(error) } })
+  const abort = new AbortController()
+  const stop = () => abort.abort()
+  options.signal?.addEventListener("abort", stop, { once: true })
+  if (options.signal?.aborted) stop()
+  const pending = superviseProcess({ cmd: [runtime.node, driver], cwd: directory,
+    env: { PATH: "/usr/bin:/bin", HOME: directory, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
+    timeoutMs: null, profileDir: path.join(directory, "profile"), stdin: input.readable, stdout: output.writable, signal: abort.signal })
+  void pending.catch(() => { stopInput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)); stopOutput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)) })
+  const channel = createJournaledAdminChannel(output.readable, input.writable, path.join(directory, "commands"))
+  let sequence = Promise.resolve()
+  const request = (op: AdminOperation, payload: unknown) => {
+    const result = sequence.then(async () => {
+      if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + 30_000, payload })
+    })
+    sequence = result.then(() => undefined, () => undefined)
+    return result
+  }
+  let disposal: Promise<void> | undefined
+  const connection: AdminConnection = {
+    identity,
+    async inspect() {
+      const data = requireAdminReply(await request("inspect", {}))
+      if (!jsonObject(data) || data.sessionIdentityQualified !== true || !Array.isArray(data.sessions)) throw new EvalFailure("SESSION_IDENTITY_UNSUPPORTED", 2)
+      return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
+    },
+    async reconcileUser(slot, secretFile) {
+      const data = requireAdminReply(await request("reconcile-user", { slot, secretFile }))
+      if (!jsonObject(data) || typeof data.userKey !== "string" || typeof data.aclHash !== "string") throw new EvalFailure("ADMIN_PROTOCOL", 2)
+      return { userKey: data.userKey, aclHash: data.aclHash }
+    },
+    async closeSession(session) {
+      const data = requireAdminReply(await request("close-session", { session }))
+      if (!jsonObject(data) || data.closed !== true || selectOwnedSessions((await connection.inspect()).sessions, [session]).length)
+        throw new EvalFailure("ADMIN_CLOSE_UNCONFIRMED", 2)
+    },
+    dispose() {
+      disposal ??= (async () => {
+        const ack = await request("dispose", {}).catch(() => undefined)
+        receipt.dispose = ack?.outcome ?? "unknown"
+        const disposed = ack?.outcome === "confirmed" && jsonObject(ack.data) && ack.data.disposed === true
+        if (!disposed) stop()
+        await channel.end().catch(stop)
+        const result = await pending.catch(() => undefined)
+        await channel.close().catch(stop)
+        options.signal?.removeEventListener("abort", stop)
+        receipt.processes = result?.processCleanup ?? null
+        receipt.status = disposed && result?.exitCode === 0 && result.processCleanup.status === "confirmed" &&
+          result.processCleanup.capture_complete && !result.interrupted && !result.timedOut ? "disposed" : "quarantined"
+        await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
+        if (receipt.status !== "disposed") throw new EvalFailure("ADMIN_DISPOSE_UNKNOWN", 2)
+      })()
+      return disposal
+    },
+  }
+  try {
+    const initialized = await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url: file.server.url,
+      credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(directory, "profile/loginom/runtime/admin/attempts/context/browser-profile") })
+    receipt.initialization = initialized.outcome
+    receipt.status = "initializing"
+    await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
+    const data = requireAdminReply(initialized)
+    if (!jsonObject(data) || data.initialized !== true) throw new EvalFailure("ADMIN_PROTOCOL", 2)
+    if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+    receipt.status = "ready"
+    await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
+    return connection
+  } catch (error) { await connection.dispose(); throw error }
+}
+
+function requireAdminReply(reply: AdminReply): unknown {
+  if (reply.outcome === "confirmed") return reply.data
+  const code = jsonObject(reply.data) && typeof reply.data.code === "string" && /^(ADMIN|SESSION|SERVER)_[A-Z_]{1,64}$/.test(reply.data.code) ? reply.data.code : "ADMIN_OPERATION_UNKNOWN"
+  throw new EvalFailure(code, 2)
+}
 
 export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, output: WritableStream<Uint8Array>, journalDir: string) {
   const channel = createAdminChannel(input, output)
@@ -84,6 +191,7 @@ export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, o
       sequence = result.then(() => undefined, () => undefined)
       return result
     },
+    end: channel.end,
     close: channel.close,
   }
 }
@@ -97,6 +205,8 @@ export function createAdminChannel(input: ReadableStream<Uint8Array>, output: Wr
   let bufferBytes = 0
   let failed = false
   let sequence = Promise.resolve()
+  let ended: Promise<void> | undefined
+  const end = () => ended ??= writer.close()
   return {
     request(input: unknown) {
       const result = sequence.then(async (): Promise<AdminReply> => {
@@ -136,7 +246,8 @@ export function createAdminChannel(input: ReadableStream<Uint8Array>, output: Wr
       sequence = result.then(() => undefined, () => undefined)
       return result
     },
-    async close() { await writer.close(); await reader.cancel() },
+    end,
+    async close() { await end(); await reader.cancel() },
   }
 }
 

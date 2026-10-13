@@ -128,7 +128,7 @@ async function bounded(request, promise) {
 }
 
 async function readCredentials(file) {
-  if (!path.isAbsolute(file) || await realpath(path.dirname(file)) !== path.dirname(file)) throw Error("ADMIN_CREDENTIAL_PRIVATE")
+  if (!path.isAbsolute(file) || await realpath(path.dirname(file)).catch(() => undefined) !== path.dirname(file)) throw Error("ADMIN_CREDENTIAL_PRIVATE")
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => { throw Error("ADMIN_CREDENTIAL_PRIVATE") })
   try {
     const info = await handle.stat()
