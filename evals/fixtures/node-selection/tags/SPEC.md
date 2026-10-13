@@ -35,6 +35,16 @@ red,153
 - `packages/loginom-runtime/client/lib/node-contracts.mjs`: доступные типы не
   объявляют dynamic split-to-rows, цикл или генератор произвольных строк.
 
+Экспорты этих схем frozen baseline проверены: они совпадают с текущими исходниками.
+Официальная Help подтверждает границы операций:
+[Калькулятор](https://help.loginom.ru/userguide/processors/transformation/calc/index.html)
+вычисляет поля каждой строки;
+[Свёртка столбцов](https://help.loginom.ru/userguide/processors/transformation/collapse-columns.html)
+разворачивает выбранные колонки;
+[Объединение](https://help.loginom.ru/userguide/processors/transformation/union.html)
+добавляет строки поданных таблиц. Конкретное отсутствующее действие — вывод
+произвольного числа строк из списка переменной длины внутри одной ячейки.
+
 Перед live подтвердить эти ограничения актуальными схемами установленного
 candidate. Если каталог предлагает стандартную композицию для произвольной
 длины без изменения графа/полей, этот fixture не разрешает JS и покрытие

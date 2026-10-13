@@ -66,6 +66,14 @@ offline-аудит; он не запускает модель или Loginom.
 - `graph-review.json` для всех исключений/аномалий и трёх заранее воспроизводимо
   выбранных standard-успехов. Seed закрепляется до пилота.
 
+Содержательное review записывает отдельный reviewer после чтения кода и трассы:
+`{verdict:"passed"|"failed", reviewer, sessionID, packageSha256, evidence, notes}`.
+`evidence` — непустой список существующих относительных путей внутри попытки;
+`notes` объясняет verdict. Session и SHA связывают review с фактическим пакетом.
+Для explicit-js обязателен `javascriptRole:"requested-aggregation"`, для tags —
+`javascriptRole:"variable-unpack-only"`, для recovery — `recoveryObserved:true`.
+Без обязательного review машинные оси сохраняются, общий PASS исключения закрыт.
+
 `modelStarted:false` подтверждается только до запуска CLI либо явным отсутствием
 dispatch при подтверждённом завершении. Preflight incident хранится отдельно
 в новом `incidents/<task>/<attempt>/<timestamp-uuid>/`; исходные квитанции не удаляются.

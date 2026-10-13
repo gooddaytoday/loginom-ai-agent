@@ -279,6 +279,11 @@ bun script/audit-node-selection.ts --tasks tasks/analytic \
   Стандартный успех закрывается машинно: полные evidence, settlement, exit 0,
   no-JS, oracle и связность. Reviewer смотрит исключения/аномалии и выборку
   успехов по Task 6; его verdict хранится в `<attempt>/graph-review.json`.
+  Контракт review: `verdict:passed|failed`, reviewer, sessionID, packageSha256,
+  непустые evidence (существующие относительные пути собственной попытки), notes.
+  Привязка Session/SHA обязательна. Explicit-js требует
+  `javascriptRole:requested-aggregation`, tags — `variable-unpack-only`,
+  recovery — `recoveryObserved:true`; это результат чтения кода/трассы reviewer.
   Отсутствие обязательного review у исключения не даёт полного PASS.
   Не запускать модель, браузер, судью или cleanup из этого entrypoint.
 

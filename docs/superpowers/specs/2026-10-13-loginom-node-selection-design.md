@@ -374,6 +374,12 @@ server container/UserStorage текущего аккаунта. В продук�
 Машинные условия explicit-js: ровно один JS, штатные импорт/сортировка/экспорт,
 нет GroupData; tags: ровно один JS и штатные GroupData/Sorting/Export после него.
 Смысл кода и checklist проверяет отдельный reviewer без права менять skill.
+Его `graph-review.json` содержит verdict (`passed|failed`), reviewer, sessionID,
+packageSha256, непустые evidence (существующие относительные пути попытки) и notes
+с основанием verdict. Session/SHA совпадают с проверенными evidence; explicit-js
+требует `javascriptRole:requested-aggregation`, tags — `variable-unpack-only`,
+recovery — `recoveryObserved:true`. Без обязательного review раздельные машинные
+статусы доступны, но общий PASS исключения не подтверждён.
 Обязательное содержательное review охватывает все 6 JS-попыток, единственный
 targeted recovery, все candidate-аномалии и 3 случайно выбранных стандартных
 candidate-успеха. Seed фиксируется до pilot, выборка воспроизводима и не меняется
