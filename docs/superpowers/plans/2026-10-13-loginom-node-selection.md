@@ -365,7 +365,7 @@ writer.writerow(["Tag", "Occurrences"])
 writer.writerows(sorted(counts.items()))
 ```
 
-- [ ] Записать в tags SPEC доказательство пробела: `calculator-parameters.mjs`
+- [x] Записать в tags SPEC доказательство пробела: `calculator-parameters.mjs`
   задаёт фиксированные scalar-поля; `collapse-parameters.mjs` — фиксированные
   колонки; `union-parameters.mjs` — фиксированное число таблиц; в фактическом
   каталоге отсутствует dynamic split-to-rows/цикл/генератор. Перед live сверить
