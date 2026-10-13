@@ -1,9 +1,18 @@
 import { expect, test } from "bun:test"
+import path from "node:path"
 import { planPair, reconcilePairResource, serverEpoch, usersMarker } from "../src/parallel-pair"
 
 const server = { container: "loginom-evals-users", studioContainer: "loginom-evals-studio", network: "loginom-evals-users",
   alias: "loginom-server-7.4.2-test", url: "http://127.0.0.1:32771/app/", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" }
 const nonce = "11111111-1111-4111-8111-111111111111"
+
+test("pair CLI: missing explicit ownership arguments fails before Docker with exit 2", async () => {
+  const child = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-pair.ts"), "destroy"],
+    { env: { PATH: "/not-available" }, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(code).toBe(2)
+  expect(stdout + stderr).toContain("PAIR_ARGUMENTS")
+})
 
 test("pair reconciliation: an unknown create reply adopts only the single intended full ID", () => {
   const snapshot = [{ Id: "a".repeat(64), Name: `/${server.container}`, Labels: {
@@ -23,6 +32,10 @@ test("pair reconciliation: foreign labels, missing owned ID and duplicate networ
   expect(() => reconcilePairResource(server.network, "research", nonce, [], item.Id)).toThrow("PAIR_OWNERSHIP")
   expect(() => reconcilePairResource(server.network, "acceptance", nonce, [item])).toThrow("PAIR_OWNERSHIP")
   expect(() => reconcilePairResource(server.network, "research", nonce, [{ ...item, Labels: {} }])).toThrow("PAIR_OWNERSHIP")
+})
+
+test("pair reconciliation: an unresolved create with no visible resource remains unknown", () => {
+  expect(() => reconcilePairResource(server.network, "research", nonce, [], undefined, true)).toThrow("PAIR_CREATE_UNKNOWN")
 })
 
 test("pair plan: one private network, no server ports and loopback Studio on the configured port", () => {

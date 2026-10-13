@@ -155,3 +155,64 @@ Pure reconciliation unknown create принимает только единст�
 точным именем и kind/purpose/nonce из сохранённого намерения. Отсутствующий ранее
 подтверждённый ID, чужие labels и дублирующееся имя network дают PAIR_OWNERSHIP.
 Девять pair tests и typecheck PASS; Docker поведение этим unit не квалифицировано.
+
+Factory create/destroy и readServerIdentity реализованы; CLI всегда использует
+/var/lib/loginom-evals/locks. Stable provision keys включают Docker daemon ID
+и отдельные names сети/контейнеров; добавляется server full-ID guard. Private
+ownership journal хранит image pins/nonce/IDs и mutation intent до Docker argv.
+Reconciliation принимает только свои labels/IDs. Unknown create без видимого
+ресурса сохраняет fence; copy/start не повторяются при unresolved read-back.
+Существующий ready Server автоматически не перезапускается. Destroy проверяет
+retained incidents и полные IDs, включая renamed containers, до удаления.
+
+Новый disposable research integration: real create + idempotent create +
+readServerIdentity/restart same-ID + legacy cleaner refusal/контрольные A/B hashes +
+busy-port/foreign-name refusal + SIGKILL/recovery-only fence + renamed-ID refusal +
+destroy. 1 PASS/0 FAIL, 24 assertions, 23.98s. 12 pair/CI unit tests и typecheck PASS.
+Dev Server/Studio full ID/StartedAt сравнивались до/после и не менялись. Запуск
+explicit EVAL_PAIR_INTEGRATION=1; отсутствие flag — SKIP, не qualification.
+Проверка не создаёт browser/CLI/admin sessions, model/judge не вызываются.
+
+Observed pinned bootstrap: /workdir существует, Components.cfg отсутствует;
+factory создаёт минимальный XML для Python-disabled до первого start и проверяет
+xmllint/read-back. В image присутствуют исходные users/storage материалы;
+factory не очищает их. Studio server.json должен быть читаем Apache daemon
+(644 внутри контейнера; private 0700 host parent). NetworkID пуст до первого start:
+prestart проверяет NetworkMode/alias/mounts/ports, после start — полный network ID.
+
+Постоянные acceptance/research slots.json созданы 0600, отдельные names/ports/roots.
+Оба bootstrap admin файла отсутствуют, loadSlots реально отказал SLOT_PATH_PRIVATE
+до mutations. [Блокер](../../../eval_parallel_blockers.md) остаётся открыт;
+постоянные пары не созданы, admin/route/backup/admission/LLM ещё не квалифицированы.
+Три старых own fixtures удалены после destroy/absence и released-reservations
+read-back; private receipt factory-development-cleanup.json сохранён в evidence.
+Чужой loginom-evals-isolated вновь обнаружен на хосте и сохранён без изменений.
+
+Trusted adapter research: prod CLI root
+/home/kiselev/.local/share/loginom-ai-agent-cli/0.1.17-prod, source
+5588651a291c59f53d1c14941d5ba768071a0018, sourceDirty=false. Read-only full
+inventory проверил 5393 CLI и 4381 resource entries: relative/canonical paths,
+SHA-256, mode/link/inventory equality, resource↔CLI manifest mapping и ELF/x64/
+executable Node/Chromium. Private admin-runtime-inventory.json хранит receipt.
+CLI manifest SHA 797c018f95255f805fa1ee05a2ef4d69e44c723f5b1cd3e0772bbee73855fed8;
+resource manifest SHA 12542127ff87bdb6828355bcbc148e6ed729dc1e4a8f03c68cdbc93a454e6baf.
+Bundled Node --version v24.19.0; Chromium --version 153.0.8010.12; createRequire
+от runtime/client/package.json реально resolve/import playwright-core/index.js
+внутри установленного client, chromium.launch — function. Browser не запускался,
+профили/default CODEX_HOME/credentials не читались и не менялись. Product verifier
+algorithm прочитан из packages/loginom-host/src/cli-manifest.ts; будущий harness
+не импортирует monorepo runtime. Source-managed row подтверждает getters Name/
+CreateTime, CloseSession(ASession,ATimeout), но это пока не live identity proof.
+
+Factory full-unit diagnosis: первый frozen run дал 594 PASS/3 SKIP/1 FAIL
+(458.53s). loadSlots private-file negative fixture запросил mode0644, но мой
+shell umask077 (ради logfile) создал фактический0600; validator корректно принял
+private config. Independent test-signal-collector: 5/5 PASS при022, 1/1 FAIL при077;
+отдельный fs probe подтвердил modes0644/0600. Host default0002 эквивалентен022
+для этого fixture. Classification: command/environment, не code regression;
+breaking commit не установлен и bisect не требуется. slots runtime/tests не
+менялись, assertions не ослаблялись. Повтор полного suite без изменения umask:
+595 PASS/3 SKIP/0 FAIL, 598 tests/52 files, 2962 assertions, 457.92s, exit0;
+post-suite typecheck PASS. Factory source/test SHA до/после совпали. Private
+factory-unit-receipt.json сохранён в evidence; временный logfile удалён после
+сохранения результата. Три прежних skipped checks остаются непроверенными.
