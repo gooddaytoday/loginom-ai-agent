@@ -141,12 +141,18 @@ async function dispatch(message: unknown) {
         await host.settled()
         guardFPStartup()
       })
-      try { await state.starting; guardFPStartup() }
-      finally { fpStartup?.settle() }
+      let accepted = false
+      try {
+        await state.starting
+        guardFPStartup()
+        if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+        accepted = true
+      } finally { fpStartup?.settle(accepted) }
       if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
     }
+    if (state.fpStartup && !state.fpStartup.accepted) throw new Error("LOGINOM_HOST_NOT_READY")
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "close") {
       // Stop admission now, but exclude this close request from its own drain.

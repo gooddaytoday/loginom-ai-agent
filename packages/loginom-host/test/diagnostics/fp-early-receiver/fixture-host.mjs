@@ -24,6 +24,8 @@ export async function fixtureCreateHost(input){
  await new Promise((resolve,reject)=>{pending={resolve,reject}})
  rows.push({phase:'host-created'})
  return {
+  recoveries:new Map(),
+  acquire:()=>{rows.push({effect:"admission-dispatch"});process.send({fixture:"admission-dispatched"});return null},
   settled:async()=>{process.send({fixture:'settled-entered'});await new Promise(resolve=>{settling=resolve});rows.push({phase:'settled-finished'})},
   interruptAll:async()=>{},close:async()=>{},
  }

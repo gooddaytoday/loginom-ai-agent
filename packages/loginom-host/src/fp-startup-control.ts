@@ -14,7 +14,7 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
     throw Error('LOGINOM_PRE_READY_READ_EXPIRED')
   const deadline = rawDeadline
   const controller = new AbortController()
-  const state: {pending: boolean; disposed: boolean; refusal?: {value: unknown}} = { pending: true, disposed: false }
+  const state: {pending: boolean; disposed: boolean; accepted?: boolean; refusal?: {value: unknown}} = { pending: true, disposed: false }
   function refuse(value: unknown) {
     if (state.refusal) return
     state.refusal = {value}
@@ -35,6 +35,7 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
     control: {signal: controller.signal, deadline},
     guard,
     get pending() { return state.pending },
+    get accepted() { return state.accepted === true },
     cancel(value: unknown) {
       if (state.disposed || !state.pending || !value || typeof value !== 'object') return false
       const tuple = value as Record<string, unknown>
@@ -44,7 +45,7 @@ export function retainFPStartup(message: { id: string; deadline?: unknown }, inp
       refuse(decode(tuple.rejection))
       return true
     },
-    settle() { state.pending = false; state.disposed = true; clearTimeout(timer) },
+    settle(accepted: boolean) { state.accepted = accepted; state.pending = false; state.disposed = true; clearTimeout(timer) },
   }
 }
 function decode(value: unknown): unknown {
