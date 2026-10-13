@@ -75,6 +75,18 @@ test("journaled admin: reopening cannot bypass a retained durable intent", async
   } finally { await peer.close(); await rm(root, { recursive: true, force: true }) }
 })
 
+test("journaled admin: a claimed completion without its durable reply evidence cannot admit mutations", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-journal-invalid-"))
+  await writeFile(path.join(root, "previous.json"), JSON.stringify({ version: 1, kind: "loginom-admin-command", id: "previous", op: "close-session",
+    expectedIdentity: identity, desiredHash: "a".repeat(64), state: "confirmed", at: new Date().toISOString() }), { mode: 0o600 })
+  const peer = await pipe('process.stdout.write(JSON.stringify({v:1,id:request.id,outcome:"confirmed",data:{}})+"\\n")', false, root)
+  try {
+    await expect(peer.channel.request({ v: 1, id: "next", op: "reconcile-user", expectedIdentity: identity, deadline: Date.now() + 2000, payload: {} }))
+      .rejects.toThrow("ADMIN_JOURNAL_INVALID")
+    expect(peer.events).toEqual([])
+  } finally { await peer.close(); await rm(root, { recursive: true, force: true }) }
+})
+
 test("journaled admin: replaced journal directory is preserved after dispatch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-journal-replaced-"))
   const peer = await pipe(`const {rename,mkdir,writeFile}=await import("node:fs/promises");await rename(${JSON.stringify(root)},${JSON.stringify(root + ".old")});await mkdir(${JSON.stringify(root)},{mode:0o700});await writeFile(${JSON.stringify(root)}+"/"+request.id+".json","foreign-preserve",{mode:0o600});process.stdout.write(JSON.stringify({v:1,id:request.id,outcome:"confirmed",data:{}})+"\\n")`, false, root)
