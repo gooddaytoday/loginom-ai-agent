@@ -252,7 +252,7 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
     }
     if (result.modelStarted === null) throw Error("SELECTION_DISPATCH_UNCONFIRMED")
     const completeParts = await fullToolOutputs(snapshot.parts, plan.pins.profile, attempt.directory)
-    const receipts = readNodeEvents(completeParts.map((part) => JSON.stringify({ type: "tool_use", part })).join("\n"))
+    const receipts = readSelectionAttemptReceipts(completeParts)
     if (receipts.failures.length) result.collectionFailures.push(...receipts.failures)
     const saves = receipts.calls.filter((call) => call.tool === "loginom_dock_action_run" && successful(call) &&
       ["package.save_checkpoint", "package.save_as"].includes(String(call.input.action_key)))
@@ -309,6 +309,12 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
   result.finishedAt = new Date().toISOString()
   await save()
   return result
+}
+
+export function readSelectionAttemptReceipts(parts: Record<string, unknown>[]) {
+  return readNodeEvents(parts
+    .filter((part) => typeof part.tool === "string" && part.tool.startsWith("loginom_dock_"))
+    .map((part) => JSON.stringify({ type: "tool_use", part })).join("\n"))
 }
 
 export function selectionExitCode(result: { exitCode: number; cliExitCode: number | null; timedOut: boolean; cleanupConfirmed?: boolean | null }) {

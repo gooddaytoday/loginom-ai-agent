@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
+import { readSelectionAttemptReceipts, readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -127,6 +127,70 @@ test("the observed OAuth refresh failure proves no inference, while assistant cr
   unknown.messages[1]!.error!.data.message = "An unknown failure"
   expect(selectionModelStarted(unknown, 1)).toBe(null)
 })
+
+test("collector preserves export and save receipts alongside completed Help with JavaScript imports", () => {
+  const result = readSelectionAttemptReceipts(receiptParts())
+  expect(result.failures).toEqual([])
+  expect(result.calls).toHaveLength(2)
+  expect(result.calls[0]).toMatchObject({
+    tool: "loginom_dock_node_wait", start: 1791903896883, end: 1791903929126,
+    output: { status: "SUCCEEDED", cleanup_complete: true, execution: { status: "completed", execution_id: "document:1055:9" },
+      output: { file_artifacts: [{ destination: "/user/selection.result.csv", bytes: 228, sha256: "a".repeat(64) }] } },
+  })
+  expect(result.calls[1]).toMatchObject({
+    tool: "loginom_dock_action_run", start: 1791903932305, end: 1791903934472,
+    input: { action_key: "package.save_checkpoint", operation_id: "abc-save-001" },
+    output: { status: "SUCCEEDED", cleanup_complete: true,
+      output: { save_completed: true, package_ref: { kind: "package", path: "/user/selection.lgp" } } },
+  })
+})
+
+test("collector ignores Help even when its content resembles a successful managed receipt", () => {
+  const parts = receiptParts()
+  parts[0]!.state.output = parts[2]!.state.output
+  const result = readSelectionAttemptReceipts(parts)
+  expect(result.failures).toEqual([])
+  expect(result.calls.map((call) => call.tool)).toEqual(["loginom_dock_node_wait", "loginom_dock_action_run"])
+})
+
+test("collector still refuses damaged managed receipt JSON", () => {
+  const parts = receiptParts()
+  parts[2]!.state.output = parts[2]!.state.output.slice(0, -1)
+  expect(() => readSelectionAttemptReceipts(parts)).toThrow("Incomplete tool output JSON")
+})
+
+test("collector receipt projection preserves the complete original parts", () => {
+  const parts = receiptParts()
+  const original = structuredClone(parts)
+  readSelectionAttemptReceipts(parts)
+  expect(parts).toEqual(original)
+})
+
+// Minimal 2026-10-13 ABC evidence: exact Help import fragment, projected receipts, sanitized identities and paths.
+function receiptParts() {
+  return [
+    { id: "help", type: "tool", tool: "loginom_find", state: {
+      status: "completed", input: { query: "JavaScript" }, time: { start: 1791903600000, end: 1791903600001 },
+      output: '# export.js [JavaScript]\nimports: import { OutputTable, DataType } from "builtIn/Data";\n\ndef Summ()\ndef Multi()',
+    } },
+    { id: "export", type: "tool", tool: "loginom_dock_node_wait", state: {
+      status: "completed", input: { operation_id: "abc-export-001", timeout_ms: 60000 },
+      time: { start: 1791903896883, end: 1791903929126 }, output: JSON.stringify({
+        operation_id: "abc-export-001", state: "settled", status: "SUCCEEDED", cleanup_complete: true,
+        execution: { status: "completed", execution_id: "document:1055:9" }, output: { file_artifacts: [{
+          destination: "/user/selection.result.csv", bytes: 228, sha256: "a".repeat(64), execution_id: "document:1055:9",
+        }] },
+      }),
+    } },
+    { id: "save", type: "tool", tool: "loginom_dock_action_run", state: {
+      status: "completed", input: { action_key: "package.save_checkpoint", operation_id: "abc-save-001" },
+      time: { start: 1791903932305, end: 1791903934472 }, output: JSON.stringify({
+        status: "SUCCEEDED", cleanup_complete: true,
+        output: { save_completed: true, package_ref: { kind: "package", path: "/user/selection.lgp" } },
+      }),
+    } },
+  ]
+}
 
 function pins() {
   return {
