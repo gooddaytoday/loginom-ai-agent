@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "checked_utc": "2026-10-13T13:33:11.703900+00:00",
+  "cards": {
+    "LAB-56": {
+      "status": "in_review",
+      "revision": 65,
+      "phase": "in_review",
+      "active": [],
+      "unchanged_independent_acceptance_cleanup": true
+    },
+    "LAB-57": {
+      "status": "blocked",
+      "revision": 194,
+      "phase": "blocked",
+      "active": []
+    },
+    "LAB-58": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-59": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-60": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-61": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-62": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    },
+    "LAB-63": {
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "active": [],
+      "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+    }
+  },
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "online",
+    "last_seen_at": "2026-10-13T16:32:48+03:00",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+  },
+  "workers": {
+    "Rich": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    "Ben": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    "Evaler": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    }
+  },
+  "owner_request": {
+    "comment_id": "01a13572-2d46-7b27-97b7-7f829266f15a",
+    "parent_id": "01a13562-9da0-7c32-bf96-75b42e8bf004",
+    "request": "LAB57 helper pin + one targeted current preflight-only eval lease archival",
+    "status": "PREPARED_NOT_APPLIED_PERMISSION_NOT_GRANTED"
+  },
+  "exact_plan": {
+    "file": "evals/docs/proposals/2026-10-13-lab57-preflight-lease-owner-plan.md",
+    "bytes": 7780,
+    "sha256": "bd00fb531a7883773896a3ab5138c1a851796782141a106c3b6c0f9aad74dc1a",
+    "byte_identical_attachment_member": true
+  },
+  "checkpoint_archive": {
+    "attachment_id": "01a13572-2bfa-7c22-a2bc-6e043d4d4fb0",
+    "bytes": 55082,
+    "sha256": "a7fc8a6087513ef91ec60a03786affc3b9f933a5bbe2b1640ec196f38060d458",
+    "payload_files_verified": 9,
+    "paths_types_crc_verified": true
+  },
+  "helper_bundle": {
+    "attachment_id": "01a13572-2d22-72d7-8f2a-6129d30800e4",
+    "bytes": 1693405,
+    "sha256": "ccdf404f751d8bd3ff9fef2b5ab35c711af75811486910e5875df00ad5018827",
+    "manifest_sha256": "44083a8f19d4307a17f5c1076af8adf910b8e85bf0a73e657679345bd63f320e",
+    "source_sha": "d633e57d3d62be4aaf9a0c8a3452983e91e94efe",
+    "sourceDirty": false,
+    "payload_files_verified": 755,
+    "regular_members": 756,
+    "source_matches_previously_Git_verified_manifest": true,
+    "installed": false,
+    "old_supplement_preserved": true
+  },
+  "current_original_lease": {
+    "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+    "role": "rich",
+    "phase": "eval",
+    "sha": "49522d83318bac29779e497798becb2f799bc84e",
+    "acquiredAt": "2026-10-13T11:53:15.320Z",
+    "configSha256": "f76b3a6a3a2d28c10b255ef5e9e7542f931f2f55708958f2af3ff9dcfe87b264",
+    "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+    "device": 64512,
+    "inode": 14429666
+  },
+  "owner_bytes_sha256": "2771446a3755f85c52fd082f6183ad047b0bbb150edb6c4562371feebdc14981",
+  "config_raw_sha256": "e390dcf70c0beee50cb49ff273a60e89a5e97d37d2e106e7fe726060d63374b0",
+  "guard": "ABSENT",
+  "lease_status": "BUSY_NOT_RELEASED",
+  "classification": {
+    "code": "OPERATIONAL_PIN_AND_PREFLIGHT_LEASE_OWNER_DECISION",
+    "report_id": "01a13562-9da0-7c32-bf96-75b42e8bf004",
+    "root": "UNCLASSIFIED; missing management view/exit/trace",
+    "current_owner_task": "01a134fd-ee87-72f3-9e7c-f69d19fe7fe7",
+    "current_phase": "eval",
+    "current_acquiredAt": "2026-10-13T11:53:15.320Z",
+    "configSha256": "f76b3a6a3a2d28c10b255ef5e9e7542f931f2f55708958f2af3ff9dcfe87b264",
+    "release": "BUSY; no eval completion",
+    "charge": 0,
+    "ready_for_ben": false
+  },
+  "repeat_accounting": {
+    "repeat_limit": 10,
+    "repeat_consumed": 3,
+    "repeat_remaining": 7,
+    "ledger_sha256": "c204d5e5324becc225c0b67c41033fd73ee90b9c6ecc499cb741435adca17d06",
+    "pending_task_classification": "task14 completed; offline proposal; charge0"
+  },
+  "budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "autonomous_stage": {
+    "authorization_comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "stage_id": "LAB57-RICH-TSV-PIN-01a13471",
+    "started_utc": "2026-10-13T09:33:29.538616+00:00",
+    "deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+    "wall_seconds": 21600,
+    "reset_on_new_blocker_or_task": false,
+    "document_sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147",
+    "cost": "Cumulative scenario/repeat limits; usage recorded, billing unknown",
+    "cold_native": "Repair verification authorized,8/7/5 retained",
+    "status": "Offline proposal; original deadline",
+    "attachment_id": "01a134a1-0ef2-738e-9504-3b7038f6fdf0"
+  },
+  "operator_limit": {
+    "max_seconds": 1800,
+    "global_deadline_utc": "2026-10-13T15:33:29.538616Z",
+    "reset": false,
+    "once": "new distinct private wx/0600, fsync before mutation; no retry after error/crash",
+    "fresh_full_admission": "mandatory immediately before mutation",
+    "no_fake_completion_release_pass": true
+  },
+  "monitor_actions": {
+    "card_comments_or_dispatches": 0,
+    "server_installation_or_lease_mutations": 0,
+    "model_native_reference_product_recovery_calls": 0,
+    "immutable_checks_repeated": false,
+    "new_artifact_bytes_hashes_checked": true,
+    "all_eight_done": false,
+    "automation_active": true
+  },
+  "permission_reason": {
+    "owner_instruction": "01a130f3 paragraph6; CLI/runtime/general operational contract changes require explicit owner",
+    "contract": "evals/docs/evaler-orchestration.md:106",
+    "previous_unit_once": "consumed; scoped to other task01a134a1, not current eval task01a134fd"
+  },
+  "LAB56_acceptance_verification": "Fresh server metadata exactly matches previous verified ACCEPT/evidence/cleanup snapshot",
+  "automation_persistence": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "same_schedule_name_kind": true,
+    "new_pending_request_prompt_exact": true
+  }
+}

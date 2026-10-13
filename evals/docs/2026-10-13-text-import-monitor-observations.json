@@ -589,6 +589,102 @@
       "stand_lease_mutations": 0,
       "all_eight_done": false,
       "remaining_scope": "New helper pin adoption + exact current preflight-only lease settlement; NOT_APPLIED, no new owner approval inferred"
+    },
+    {
+      "checked_utc": "2026-10-13T13:33:11.703900+00:00",
+      "cards": {
+        "LAB-56": {
+          "status": "in_review",
+          "revision": 65,
+          "phase": "in_review",
+          "active": [],
+          "unchanged_independent_acceptance_cleanup": true
+        },
+        "LAB-57": {
+          "status": "blocked",
+          "revision": 194,
+          "phase": "blocked",
+          "active": []
+        },
+        "LAB-58": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-59": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-60": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-61": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-62": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        },
+        "LAB-63": {
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "active": [],
+          "dependency_gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP"
+        }
+      },
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "name": "Codex (eval-tests)",
+        "status": "online",
+        "last_seen_at": "2026-10-13T16:32:48+03:00",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+      },
+      "worker_settings": {
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "status": "idle"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "status": "idle"
+        },
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "status": "idle"
+        }
+      },
+      "owner_request": "01a13572-2d46-7b27-97b7-7f829266f15a",
+      "new_operator_plan_sha256": "bd00fb531a7883773896a3ab5138c1a851796782141a106c3b6c0f9aad74dc1a",
+      "helper_payloads_verified": 755,
+      "checkpoint_payloads_verified": 9,
+      "repeat_consumed": 3,
+      "status": "AWAITING_NEW_OWNER_DECISION; no active or queued runs",
+      "new_tests_or_live_calls": 0,
+      "server_mutations": 0,
+      "all_eight_done": false
     }
   ]
 }
