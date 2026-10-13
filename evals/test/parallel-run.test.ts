@@ -227,3 +227,20 @@ test("fixture main: quarantine of all slots leaves the remaining jobs unmeasured
     expect(leases.map(lease => lease.state)).toEqual(["retained", "retained"])
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
+
+test("fixture main: clean stop releases the stopped slot and lets the other slot finish", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-clean-stop-"))
+  try {
+    const input = await fixture(root, ["parallel-a-stop", "parallel-fast", "parallel-fast-next"])
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
+      input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts[0]).toMatchObject({ slot_id: "a", status: "harness_error", environment_cleanup: { status: "confirmed" } })
+    expect(summary.tasks.slice(1).flatMap(task => task.attempts).map(result => result.slot_id)).toEqual(["b", "b"])
+    expect(summary.slots?.map(slot => slot.state)).toEqual(["closed", "closed"])
+    const leases = await Promise.all((await readdir(input.slots.controller.stateDir)).filter(name => name.endsWith(".lease.json"))
+      .map(name => Bun.file(path.join(input.slots.controller.stateDir, name)).json()))
+    expect(leases.map(lease => lease.state)).toEqual(["released", "released"])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)

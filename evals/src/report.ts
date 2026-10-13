@@ -143,7 +143,7 @@ export type RubricSnapshot = {
   oracle_tolerance: number
 }
 export type RunSummary = {
-  slots?: { id: string; username: string; profileDir: string; workspaceRoot: string; historyDir: string; liveQualified: boolean }[]
+  slots?: { id: string; username: string; profileDir: string; workspaceRoot: string; historyDir: string; liveQualified: boolean; state?: "planned" | "closed" | "quarantined" }[]
   run_id: string
   label: string | null
   started_at: string

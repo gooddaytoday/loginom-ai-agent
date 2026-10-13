@@ -121,3 +121,13 @@ test("slot queue: an already aborted run assigns no jobs", async () => {
   })).toEqual({ results: [], quarantined: [], unassigned: jobs })
   expect(starts).toEqual([])
 })
+
+test("slot queue: a cleanly stopped slot is distinct from quarantine and leaves the healthy slot running", async () => {
+  const run = await runSlotQueue({ jobs: buildJobs(["task"], 4), slots: ["a", "b"], signal: new AbortController().signal,
+    async execute(slotId, job) { return { result: job.index, quarantine: false, stop: slotId === "a" } },
+  })
+  expect(run.quarantined).toEqual([])
+  expect(run.stopped).toEqual(["a"])
+  expect(run.results.map(row => [row.slotId, row.result])).toEqual([["a", 0], ["b", 1], ["b", 2], ["b", 3]])
+  expect(run.unassigned).toEqual([])
+})

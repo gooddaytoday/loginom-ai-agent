@@ -76,6 +76,7 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
   const rubric = await rubricHash(tasks)
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
+  const slotStates = new Map<string, "closed" | "quarantined">()
   const state: { stopped: string | null; interruptedCleanup: { recovered: boolean } | null } = {
     stopped: null,
     interruptedCleanup: null,
@@ -103,10 +104,10 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
               return false
             })
             if (cleanup) unconfirmed.delete(slotId)
-            return { result: completed.result, quarantine: completed.stop || !cleanup }
+            return { result: completed.result, quarantine: !cleanup, stop: completed.stop }
           }
           const first = await perform()
-          if (first.result.status !== "infra_error" || first.quarantine || controller.signal.aborted) return first
+          if (first.result.status !== "infra_error" || first.quarantine || first.stop || controller.signal.aborted) return first
           await archiveInfraAttempt(out).catch(async (error: unknown) => {
             unconfirmed.add(slotId)
             first.result.environment_cleanup = { status: "failed", evidence: "infra-error", error: describe(error) }
@@ -115,11 +116,16 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
           })
           return perform(first.result)
         } })
-      if (queued.quarantined.length) state.stopped = `Stopped slots: ${queued.quarantined.join(", ")}`
+      const stopped = [...queued.quarantined, ...(queued.stopped ?? [])]
+      if (stopped.length) state.stopped = `Stopped slots: ${stopped.join(", ")}`
     } catch (error) { state.stopped = error instanceof AggregateError ? error.errors.map(describe).join("; ") : describe(error) }
     finally {
-      for (const context of contexts.filter(context => !unconfirmed.has(context.lease.slot.id)))
-        await context.lease.release(context.cleanup).catch((error: unknown) => { state.stopped ??= describe(error) })
+      for (const context of contexts) {
+        slotStates.set(context.lease.slot.id, "quarantined")
+        if (unconfirmed.has(context.lease.slot.id)) continue
+        await context.lease.release(context.cleanup).then(() => slotStates.set(context.lease.slot.id, "closed"),
+          (error: unknown) => { state.stopped ??= describe(error) })
+      }
       await Promise.all(contexts.map(context => context.lease.close()))
     }
   }
@@ -186,7 +192,8 @@ async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeo
   }
   const summary: RunSummary = {
     run_id: runId,
-    ...(fixture ? { slots: fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot, liveQualified: false })) } : {}),
+    ...(fixture ? { slots: fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
+      liveQualified: false, state: config.dryRun ? "planned" as const : slotStates.get(slot.id)! })) } : {}),
     label: config.label,
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
