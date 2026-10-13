@@ -1,0 +1,963 @@
+{
+  "checked_utc": "2026-10-13T11:02:09.010045+00:00",
+  "full_eight_reads_utc": "2026-10-13T11:01:44.911981+00:00",
+  "initial_read_error": {
+    "query": "LAB-56 roots",
+    "exit_code": 2,
+    "root_cause": "not established",
+    "read_only_retry": "PASS",
+    "paid_model_or_scenario_attempts": 0
+  },
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "server_status": "blocked",
+  "revision": 169,
+  "active_queued_tasks": [],
+  "Rich_report": {
+    "comment_id": "01a134de-4efe-7f40-827e-d2f9ad68b5bc",
+    "parent_id": "01a134d6-c645-73f7-897b-f4c5670c4419",
+    "author_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+    "created_at": "2026-10-13T13:45:46+03:00",
+    "result": "BLOCKED",
+    "followup_native_task": "01a134d6-c65f-7976-92aa-353b9b6a6770",
+    "status": "completed",
+    "charge": 0
+  },
+  "Evaler_owner_request": {
+    "comment_id": "01a134ea-fe1f-79a7-ac72-2f2d1811935a",
+    "parent_id": "01a134de-4efe-7f40-827e-d2f9ad68b5bc",
+    "author_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "created_at": "2026-10-13T13:59:38+03:00",
+    "request_already_present": true,
+    "root_did_not_duplicate_comment_or_dispatch": true
+  },
+  "archives": {
+    "Rich": {
+      "attachment_id": "01a134de-4e9b-74e2-8056-0e6e26fde87a",
+      "bytes": 35867,
+      "sha256": "45b166d0aea28ef9289b062d2b3de48b0831aa0a1088fd645b906c6b87e56c65",
+      "manifest_attachment_id": "01a134de-4ecb-7007-b6e2-e20554d949be",
+      "manifest_sha256": "fff3645b590e8c289b2010b0706b3ca4403748939cc79db23ce313b13ee3b135",
+      "files_verified": 18,
+      "manifest_self_copy_identical": true,
+      "all_regular_files_safe_paths_no_links": true,
+      "members": [
+        {
+          "path": "lab57-own-unit-blocked-evidence/approved-combined-proposal.patch",
+          "bytes": 4606,
+          "sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/ben-tasks.json",
+          "bytes": 20,
+          "sha256": "42b962cf11b88e69387ddad24aea2cb96997e4e5b9b8734573d1fa5e4c08ad0d"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/cumulative-ledger.json",
+          "bytes": 1088,
+          "sha256": "216411200b151f038e146d36dc9368f7622f54b699cadf5cc4e38e7418e7b8b4"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/immutable-owner.json",
+          "bytes": 409,
+          "sha256": "91e07b424346b1ebce46816f3423743db6a9a5943cc993f361b37e078004ce52"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/initial-preflight-boundary.json",
+          "bytes": 958,
+          "sha256": "6f87b33a0a533b27681f42800d134f8aeeba11db50826ee7a023a4c358a8fac1"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/initial-resource-pin-receipt.json",
+          "bytes": 2439,
+          "sha256": "a9160e13a62334e5b9c1968d1d4c0a9f8141604069378382d5d8bbca3356f37e"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/inspection-command.py",
+          "bytes": 8243,
+          "sha256": "cf5164663e91e387f7ed6bcd303d0a856c0c7b16305e90a91e95689295cd6dc8"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/manifest.json",
+          "bytes": 3191,
+          "sha256": "fff3645b590e8c289b2010b0706b3ca4403748939cc79db23ce313b13ee3b135"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/original-native-task.json",
+          "bytes": 570,
+          "sha256": "147c086ae4c0505eef2cee5e2b238d4f656f260349fae043be9df69a966a7018"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/original-output-inventory.json",
+          "bytes": 440,
+          "sha256": "c8f5e78906b1347c37558c09506de1f0be5f107304c1884e0a4ec478ca1d0637"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/original-partial-unit-stderr.txt",
+          "bytes": 63312,
+          "sha256": "9baeb6e0a73abd24f86fdbbb1aeac7b80b738269a2cae13e2072a661e1f148b3"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/original-partial-unit-stdout.jsonl",
+          "bytes": 99620,
+          "sha256": "c9e70d704e10ec4fbca35621d3f63acb2b2bf0a94134cbad56a4740e3b9d66f6"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/original-stand-inventory.json",
+          "bytes": 1336,
+          "sha256": "48a4e7917b7a00d66a780caf8cf0b95a5773f532b77db7c901b9061d42012e9a"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/preserved-candidate-test.patch",
+          "bytes": 3504,
+          "sha256": "17e68c322748e0b58b13d9b25cfeb2d804fbd4d00a8abf2c3e5edf46f4214edc"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/process-observations.json",
+          "bytes": 368,
+          "sha256": "489fb2d34689e9627d0947eaa20bea4afc9fd54fc52be2f8a2405d8b81248cc1"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/receipt.json",
+          "bytes": 2396,
+          "sha256": "1de0d13bced8b3e5466d8841a3e9f49063a761a6c1db592cd0f575ef1648f2b3"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/resource-observations.json",
+          "bytes": 2056,
+          "sha256": "39513c445578353addb464660463efb16612ea6136a1cbb7a5d16434a7fcdc9e"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/rich-tasks.json",
+          "bytes": 229,
+          "sha256": "9a4856d0900bd5429c40fb92daf8391f94435d8d4805b089860f867d09c45f78"
+        },
+        {
+          "path": "lab57-own-unit-blocked-evidence/usage-provenance.json",
+          "bytes": 924,
+          "sha256": "2d042203916cc02e139ed37eb5bf1c2c8ca79b8fcefb8e3db26eed471d1cea5a"
+        }
+      ]
+    },
+    "Evaler": {
+      "attachment_id": "01a134ea-fdf3-7702-bf2d-ac6a25e52345",
+      "bytes": 18930,
+      "sha256": "af591759e21003775fc364193d865f04fce6fd28ced1d6bb6fb2a8f3cab55729",
+      "CRC": "PASS",
+      "all_8_payload_members_match_manifest_hashes_and_sizes": true,
+      "all_regular_files_safe_paths_no_links": true,
+      "members": [
+        {
+          "path": "lab57-interrupted-unit-evaler-verification.json",
+          "bytes": 6510,
+          "sha256": "dcf119493694f21266c18b634a1c0ad6bece6a96a30125a10d6ccd5db8285171"
+        },
+        {
+          "path": "lab57-interrupted-unit-ledger.json",
+          "bytes": 15540,
+          "sha256": "55989ee31a652422d6ab52d46de61ded23d42e0dc135e1b20f94464c828014c4"
+        },
+        {
+          "path": "lab57-interrupted-unit-history.json",
+          "bytes": 12735,
+          "sha256": "13ecb6cac13b56189dec5448a4cb752621fc2b7579cf95bbcd4b5c0fa1b2568d"
+        },
+        {
+          "path": "lab57-interrupted-unit-settlement-proposal.md",
+          "bytes": 8012,
+          "sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6"
+        },
+        {
+          "path": "lab57-interrupted-unit-handoff-input.json",
+          "bytes": 1274,
+          "sha256": "f67b5eeb6079ad30663319436074b1382b4219d1e878de6b53263a3008a38d98"
+        },
+        {
+          "path": "lab57-interrupted-unit-handoff-decision.json",
+          "bytes": 1020,
+          "sha256": "0cba4987f55e8bee57f6b7495ea36cd742c7b849d9bb40c78fbd0d81f6017ede"
+        },
+        {
+          "path": "unit-blocked-fresh-status.json",
+          "bytes": 248,
+          "sha256": "0b64d129ff57d16214ed37d82c13370d0ab6484aefa71dfe367430aee99f608b"
+        },
+        {
+          "path": "unit-blocked-fresh-resources.json",
+          "bytes": 1438,
+          "sha256": "dd69b98c1dc33ae384d4464b41e448ea3fa06093b67290aa2039fac8ccd706e0"
+        },
+        {
+          "path": "lab57-interrupted-unit-checkpoint-manifest.json",
+          "bytes": 1622,
+          "sha256": "865cbb5da6ed3579b556df8210761aa7abafb1b58a31c10e7ab2e68bfd4fa75b"
+        }
+      ]
+    }
+  },
+  "immutable_owner_guard_and_prior_inspection_cross_match": true,
+  "Evaler_independent_verification": {
+    "version": 1,
+    "checked_utc": "2026-10-13T10:58:14.004438+00:00",
+    "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "report_id": "01a134de-4efe-7f40-827e-d2f9ad68b5bc",
+    "report_author": "edc52e36-a965-4f93-9118-6fa5640840b4",
+    "report_attachment_id": "01a134de-4e9b-74e2-8056-0e6e26fde87a",
+    "archive_sha256": "45b166d0aea28ef9289b062d2b3de48b0831aa0a1088fd645b906c6b87e56c65",
+    "manifest_sha256": "fff3645b590e8c289b2010b0706b3ca4403748939cc79db23ce313b13ee3b135",
+    "files_verified": 18,
+    "safe_archive_paths_regular_files_no_links": true,
+    "original_owner": {
+      "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+      "role": "rich",
+      "phase": "unit",
+      "sha": "49522d83318bac29779e497798becb2f799bc84e",
+      "acquiredAt": "2026-10-13T09:49:32.777Z",
+      "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "configSha256": "58435fbe4aca6ac2e40629800594526a7cec48af3d9306e02fa5b7163be96d71"
+    },
+    "guard_identity": {
+      "device": 64512,
+      "inode": 12748661,
+      "uid": 1000,
+      "mode": "0o700",
+      "empty": true
+    },
+    "lease_identity": {
+      "device": 64512,
+      "inode": 12748659
+    },
+    "private_receipt_matches_owner": true,
+    "canonical_config_matches_owner": true,
+    "capture_bytes_match_delivered_and_prior_inspection": true,
+    "unit_stdout_clarification": "unit-result.json is 0 bytes; partial test events.jsonl is 99620 bytes and stderr is 63312 bytes; no terminal/completion inferred",
+    "original_unit_session": {
+      "id": 74784,
+      "worker_report": "Unknown process id; execution host session no longer resumable",
+      "coordinator_direct_session_resumption": "not available; worker claim kept distinct from directly verified file/guard absence proofs"
+    },
+    "missing": [
+      "terminal exit",
+      "supervisor process cleanup",
+      "typecheck capture",
+      "helper unit completion",
+      "native admission"
+    ],
+    "fresh_helper": {
+      "status": "BUSY",
+      "owner": {
+        "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "role": "rich",
+        "phase": "unit",
+        "sha": "49522d83318bac29779e497798becb2f799bc84e",
+        "acquiredAt": "2026-10-13T09:49:32.777Z"
+      },
+      "code": 2
+    },
+    "fresh_resources": {
+      "utc": "2026-10-13T10:55:06.579547+00:00",
+      "cli_hashes_verified": 5389,
+      "supplement_hashes_verified": 751,
+      "profiles": [
+        {
+          "role": "rich",
+          "kind": "referenceProfile",
+          "writer_exists": false,
+          "harness_lease_exists": false,
+          "process_registration_exists": false
+        },
+        {
+          "role": "rich",
+          "kind": "evalProfile",
+          "writer_exists": false,
+          "harness_lease_exists": false,
+          "process_registration_exists": false
+        },
+        {
+          "role": "ben",
+          "kind": "referenceProfile",
+          "writer_exists": false,
+          "harness_lease_exists": false,
+          "process_registration_exists": false
+        },
+        {
+          "role": "ben",
+          "kind": "evalProfile",
+          "writer_exists": false,
+          "harness_lease_exists": false,
+          "process_registration_exists": false
+        },
+        {
+          "role": "evalbaseline",
+          "kind": "evalProfile",
+          "writer_exists": false,
+          "harness_lease_exists": false,
+          "process_registration_exists": false
+        },
+        {
+          "role": "evalrunner",
+          "kind": "evalProfile",
+          "writer_exists": false,
+          "harness_lease_exists": false,
+          "process_registration_exists": false
+        }
+      ],
+      "container_id": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "container_running": true,
+      "storage_files": [],
+      "qualification": "read-only evidence; not historical supervisor cleanup, not READY or release"
+    },
+    "worker_process_observations": {
+      "scope": "read-only absence observations; not supervisor cleanup or ancestry proof",
+      "observations": [
+        {
+          "utc": "2026-10-13T10:43:45.144600+00:00",
+          "selected_names": [],
+          "unreadable_same_uid_pids": []
+        },
+        {
+          "utc": "2026-10-13T10:43:47.148030+00:00",
+          "selected_names": [],
+          "unreadable_same_uid_pids": []
+        }
+      ]
+    },
+    "process_qualification": "selected-name read-only absence is not historical supervisor cleanup or full operator settlement proof",
+    "native_task_observations": [
+      {
+        "id": "01a134d6-c65f-7976-92aa-353b9b6a6770",
+        "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+        "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "status": "completed",
+        "error": null,
+        "failure_reason": null,
+        "created_at": "2026-10-13T13:37:33+03:00",
+        "started_at": "2026-10-13T13:40:09+03:00",
+        "completed_at": "2026-10-13T13:46:25+03:00"
+      },
+      {
+        "id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+        "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "status": "failed",
+        "error": "Selected model is at capacity. Please try a different model.",
+        "failure_reason": "agent_error.model_not_found_or_unavailable",
+        "created_at": "2026-10-13T12:38:52+03:00",
+        "started_at": "2026-10-13T12:41:17+03:00",
+        "completed_at": "2026-10-13T13:01:26+03:00"
+      }
+    ],
+    "pending_workers": 0,
+    "ordinary_resolution": "no supported release/unit/recover while exclusive operation is held; no genuine completion; no stale-PID bypass",
+    "pinned_source_boundaries": {
+      "unit": "evals/src/node-eval-ops.ts:209",
+      "exclusive": "evals/src/node-eval-ops.ts:603",
+      "crash_not_delete_permission": "evals/docs/evaler/operations.md:88"
+    },
+    "partial_sha": "49522d83318bac29779e497798becb2f799bc84e",
+    "main_checkout_clean": true,
+    "candidate": "exact5cd; approved test-only diff preserved, production shim not applied; RED/functional/typecheck/build/admission NOT_RUN",
+    "actual_cleanup": "UNCONFIRMED",
+    "actual_release": "NOT_PERFORMED",
+    "native_READY": false,
+    "this_diagnosis_charge": 0,
+    "initial_preflight_root": "UNCLASSIFIED/charge0",
+    "deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+    "deadline_reset": false,
+    "new_scenario_model_probe_recovery_wrapper_calls": 0,
+    "owner_decision_required": "one-off exact interrupted unit settlement/abandon; TSV CLI permission remains valid and is not requested again",
+    "proposal_sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6"
+  },
+  "full_blocker_ledger": {
+    "version": 9,
+    "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "authorization_comment_id": "01a12f9e-6ca3-73d7-acbf-c0180d51fef5",
+    "policy": "confirmed same-cause repeat only; unique/first work/success=0; unclassified deferred; never charge dispatch upfront or reset tally",
+    "confirmed_repeats": {
+      "limit": 10,
+      "consumed": 3,
+      "remaining": 7
+    },
+    "native_task_history": [
+      {
+        "task_id": "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+        "status": "failed"
+      },
+      {
+        "task_id": "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+        "status": "completed"
+      },
+      {
+        "task_id": "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+        "status": "failed"
+      },
+      {
+        "task_id": "01a12f9d-99bf-79a6-a978-026c32df932e",
+        "status": "completed"
+      },
+      {
+        "task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+        "status": "completed"
+      },
+      {
+        "task_id": "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+        "status": "failed"
+      },
+      {
+        "task_id": "01a13004-e856-7bd2-9cc7-6f5c5b922c3d",
+        "status": "completed",
+        "quality": "BLOCKED cold before graph"
+      },
+      {
+        "task_id": "01a13042-dc9d-72d8-b324-60d52c04ebf8",
+        "status": "completed",
+        "quality": "BLOCKED CP1251 cold wizard owner; addressed cleanup RELEASED/FREE"
+      },
+      {
+        "task_id": "01a130cf-f462-77ae-925b-7883730d80b7",
+        "status": "completed",
+        "quality": "offline repair completed and verified; native GREEN not run",
+        "charge": 0
+      },
+      {
+        "task_id": "01a130ff-f583-7158-a212-250ff18600cf",
+        "status": "completed",
+        "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+        "quality": "5/6 warm+cold PASS; external pinned CLI TSV serialization blocker before UTF16 generation",
+        "charge": 0
+      },
+      {
+        "task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "status": "failed",
+        "quality": "model capacity after partial work; original own unit lease/completion unresolved",
+        "charge": 1
+      },
+      {
+        "task_id": "01a134d6-c65f-7976-92aa-353b9b6a6770",
+        "status": "completed",
+        "report_id": "01a134de-4efe-7f40-827e-d2f9ad68b5bc",
+        "quality": "BLOCKED interrupted original unit; ordinary proof unavailable; read-only diagnosis, no new execution",
+        "charge": 0
+      }
+    ],
+    "blockers": [
+      {
+        "fingerprint": "multica-codex:gpt-6.1-sol:model-capacity",
+        "component": "worker model admission",
+        "first_evidence": "01a12efc-bca2-7a84-86ec-b3e1e239cc84",
+        "events": [
+          {
+            "task_id": "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+            "classification": "unique",
+            "charge": 0,
+            "reason": "first exact model capacity failure"
+          },
+          {
+            "task_id": "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+            "classification": "repeated",
+            "charge": 1,
+            "reason": "same model, failure reason and exact original error"
+          },
+          {
+            "task_id": "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+            "classification": "repeated",
+            "charge": 1,
+            "reason": "same unchanged worker model/runtime, terminal failure kind and exact original task error",
+            "evidence_comment_id": "01a12ffb-158c-7b75-bd4c-3842d9d84fef"
+          },
+          {
+            "task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+            "classification": "repeated",
+            "charge": 1,
+            "reason": "Same original task error, configured gpt-6.1-sol/xhigh and runtime; terminal failure independently verified; automatic text and platform notification are one failed task",
+            "platform_comment_id": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+            "automatic_comment_id": "01a134b5-be27-70f8-a6d7-ab772f57c745",
+            "work_started": true
+          }
+        ],
+        "error": "Selected model is at capacity. Please try a different model."
+      },
+      {
+        "fingerprint": "text-import:source-admission:inputStore-artifact-name",
+        "component": "check-text-import.py source bindings",
+        "first_evidence": "01a12f1f-fd9e-78ee-b002-c31786073d83",
+        "task_ids": [
+          "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+          "01a12f45-6763-7cd4-ab17-e12d502dd8bc"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "first legacy-basename incompatibility; original reference FAIL retained; subsequent offline repair passed",
+        "resolved_partial_sha": "2c02eb9c5fde7eea2ff013ccd40c8a4417a1e9a7"
+      },
+      {
+        "fingerprint": "text-import:native-binding:compactNodeResult-projection",
+        "component": "native/public checkpoint equality",
+        "first_evidence_sha256": "4db62756a66ec3fbfb3273f8e32dd725614d804699ad251dfe697d3487209026",
+        "task_ids": [
+          "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+          "01a12f9d-99bf-79a6-a978-026c32df932e"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "distinct proven producer projection defect; repaired without new scenario run",
+        "resolved_partial_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b"
+      },
+      {
+        "fingerprint": "text-import:package-graph:unused-structural-input-ports",
+        "component": "persisted import graph admission",
+        "first_evidence_sha256": "0cb9dbdfdabf11bd79c4028037076148abb515003431700319f87218b205d82e",
+        "task_ids": [
+          "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+          "01a12f9d-99bf-79a6-a978-026c32df932e"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "distinct Connection/ControlVariables port representation with links=[]; RED/GREEN and independent full warm PASS",
+        "resolved_partial_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b"
+      },
+      {
+        "fingerprint": null,
+        "component": "pinned node-eval-ops native preflight before admission.json",
+        "observed_signature": "exit=2; OPERATION_FAILED; no admission or native browser-check capture",
+        "first_evidence": "01a12fb8-eb87-7749-9397-35fbf2a38024",
+        "task_ids": [
+          "01a12f9d-99bf-79a6-a978-026c32df932e"
+        ],
+        "classification": "unclassified",
+        "charge": 0,
+        "reason": "generic wrapper hides lower exception; no confirmed repetition and no cause fingerprint assigned"
+      },
+      {
+        "fingerprint": "cold:verifyResources:node-realpath-mismatch",
+        "component": "pinned resources.mjs verifyResources:28",
+        "first_evidence": "01a1301d-608a-7385-8a14-298f4142e610",
+        "task_ids": [
+          "01a13004-e856-7bd2-9cc7-6f5c5b922c3d"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "wrong separate Node realpath even with matching version/hash; corrected to manifest bin/node without modifying verifier",
+        "resolution": "command corrected, resource verification passed"
+      },
+      {
+        "fingerprint": null,
+        "component": "cold reader -> pinned loginBrowser launchPersistentContext",
+        "first_evidence": "01a1301d-608a-7385-8a14-298f4142e610",
+        "task_ids": [
+          "01a13004-e856-7bd2-9cc7-6f5c5b922c3d"
+        ],
+        "observed_signature": "LOGINOM_BROWSER_START_FAILED",
+        "classification": "unclassified",
+        "charge": 0,
+        "reason": "lower exception discarded; confirmed headful request/no admitted display is a prerequisite gap, not recovered exact root cause"
+      },
+      {
+        "fingerprint": "text-import:cp1251:source_name-Id-vs-Identifikator",
+        "component": "reference1 import column source selection",
+        "first_evidence": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+        "task_ids": [
+          "01a13042-dc9d-72d8-b324-60d52c04ebf8"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "original two-Apply sequence failure retained; reference2 explicit source_name passed one-Apply warm gate; separate reference budget consumed"
+      },
+      {
+        "fingerprint": null,
+        "component": "exact node-wizard-open -> ui.act begin_wizard owner completion",
+        "first_evidence": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+        "journal_sha256": "0c0a3678ac7c4d53006f9bc8044672b568bdc01c3c1f389d5eeaa15be00969cd",
+        "task_ids": [
+          "01a13042-dc9d-72d8-b324-60d52c04ebf8"
+        ],
+        "classification": "unclassified",
+        "charge": 0,
+        "reason": "one opening gesture effect_possible=true with owner_context unobserved; labels and missing visible wizard breadcrumb are observations, not proven lower cause",
+        "resolution": {
+          "task_id": "01a130ff-f583-7158-a212-250ff18600cf",
+          "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+          "partial_sha": "49522d83318bac29779e497798becb2f799bc84e",
+          "native_owner": "observed",
+          "one_gesture": true,
+          "full_cold_checker": "PASS",
+          "cleanup": "confirmed",
+          "historical_root": "UNCLASSIFIED; viewport repair works but exact overflow cause is not reconstructed"
+        }
+      },
+      {
+        "fingerprint": "pinned-cli:MessageV2.toModelMessages:csv-only-inline-shim:unsupported-tsv-file-part",
+        "component": "packages/agent/src/session/message-v2.ts; run.ts immutable snapshot; provider file serialization",
+        "first_evidence": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+        "task_ids": [
+          "01a130ff-f583-7158-a212-250ff18600cf"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "First proven CSV-only provider shim rejects original non-UTF8 TSV in SDK getArgs before generation; original bytes/BOM/SHA retained",
+        "pin": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+        "proposal_attachment_id": "01a13138-6bef-777d-83fc-f5a0c6a5b42a",
+        "proposal_sha256": "a5b4b73372a048dcb37b846d007f652f19c03327024f84097ef8ce620b742420",
+        "proposal_status": "NOT_APPLIED",
+        "decision_required": "Owner instruction 01a130f3 point 6: separately authorized/admitted CLI pin"
+      },
+      {
+        "fingerprint": "node-eval-ops:unit:interrupted-without-durable-completion:retained-exclusive-guard",
+        "component": "unit supervisor lifecycle / exclusive operation",
+        "first_evidence": "01a134de-4efe-7f40-827e-d2f9ad68b5bc",
+        "task_ids": [
+          "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+          "01a134d6-c65f-7976-92aa-353b9b6a6770"
+        ],
+        "classification": "unique proven operational blocker; loss cause not reconstructed",
+        "charge": 0,
+        "reason": "original genuine completion/cleanup/typecheck absent; exact unchanged guard blocks ordinary resolution; no repeat dispatched"
+      }
+    ],
+    "diagnostic_wrapper": {
+      "authorization_comment_id": "01a12fd4-7b9e-7dc6-a74f-162f70abc945",
+      "task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+      "limit": 1,
+      "consumed": 1,
+      "report_id": "01a12fe8-badc-75f0-b6d1-d73d6233c83c"
+    },
+    "scenario_budgets": {
+      "reference_consumed": {
+        "txt-comma-utf8": 1,
+        "csv-comma-utf8": 1,
+        "txt-semicolon-cp1251-decimal": 2,
+        "csv-pipe-multiline": 1,
+        "tsv-utf8": 1,
+        "tsv-utf16le": 1
+      },
+      "reference_limit_per_case": 3,
+      "product": 0,
+      "cold": 5,
+      "LAB-56_admission": "3/3 PASS, exhausted",
+      "new_smoke_probes_generations": 0,
+      "recovery": 0,
+      "product_consumed": {
+        "txt-comma-utf8": 0,
+        "csv-comma-utf8": 0,
+        "txt-semicolon-cp1251-decimal": 0,
+        "csv-pipe-multiline": 0,
+        "tsv-utf8": 0,
+        "tsv-utf16le": 0
+      }
+    },
+    "successful_diagnostic": {
+      "task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+      "result": "READY/cleanup independently verified",
+      "charge": 0,
+      "proof_attachment_id": "01a12ff5-e35b-7604-85ab-fcea6df41c63"
+    },
+    "cold_history": {
+      "reader_invocations": 8,
+      "launch_attempts": 7,
+      "completed": 5,
+      "historical_failures_preserved": true,
+      "normal_cleanup_browser_continuations": 2
+    },
+    "next_stage_charge": "deferred until actual confirmed repetition; source/SHA/task changes alone do not establish new cause",
+    "current_cleanup": {
+      "confirmed": false,
+      "owner_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+      "phase": "unit",
+      "status": "BUSY; original operation retained; terminal/process/typecheck/completion absent",
+      "settlement_authorized": false,
+      "helper_recovery": 0
+    },
+    "headless_resolution": {
+      "partial_sha": "1cdbc18ad6c87e3f6f584cdb7cfa1c52d4eaed8a",
+      "txt_cold": "PASS",
+      "csv_cold": "PASS",
+      "charge": 0,
+      "historical_lower_launch_cause": "UNCLASSIFIED; original failure unchanged"
+    },
+    "latest_verified_delivery": {
+      "report_id": "01a134de-4efe-7f40-827e-d2f9ad68b5bc",
+      "files_verified": 18,
+      "archive_sha256": "45b166d0aea28ef9289b062d2b3de48b0831aa0a1088fd645b906c6b87e56c65",
+      "manifest_sha256": "fff3645b590e8c289b2010b0706b3ca4403748939cc79db23ce313b13ee3b135",
+      "charge": 0,
+      "quality": "BLOCKED, no current cleanup/release"
+    },
+    "autonomous_stage": {
+      "marker": "LAB57-RICH-AUTONOMY-20261012",
+      "started_utc": "2026-10-13T09:33:29.538616+00:00",
+      "deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+      "status": "BLOCKED awaiting exact operator exception; deadline not reset",
+      "scenario_usage": {
+        "rows": 77,
+        "attempts": [
+          {
+            "case": "txt-comma-utf8",
+            "attempt": 1,
+            "assistant_rows": 13,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "csv-comma-utf8",
+            "attempt": 1,
+            "assistant_rows": 12,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "txt-semicolon-cp1251-decimal",
+            "attempt": 1,
+            "assistant_rows": 16,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "txt-semicolon-cp1251-decimal",
+            "attempt": 2,
+            "assistant_rows": 12,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "csv-pipe-multiline",
+            "attempt": 1,
+            "assistant_rows": 12,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "tsv-utf8",
+            "attempt": 1,
+            "assistant_rows": 11,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "tsv-utf16le",
+            "attempt": 1,
+            "assistant_rows": 1,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": true
+          }
+        ],
+        "utf16_original_bytes_bom_sha": true,
+        "utf16_native_calls": 0,
+        "utf16_failed_request_not_generation": true,
+        "usage_matches_database": true,
+        "billing": "reported usage only; external billing unavailable"
+      },
+      "native_worker_usage": [
+        {
+          "cache_read_tokens": 21745280,
+          "cache_write_tokens": 0,
+          "input_tokens": 351295,
+          "model": "gpt-6.1-sol",
+          "output_tokens": 94627,
+          "provider": "codex"
+        }
+      ],
+      "external_billing": "unavailable; recorded values do not prove billing charge",
+      "same_cause_repeats": "3/10; remaining7"
+    },
+    "owned_unfinished_execution": {
+      "first_evidence": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+      "owner_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+      "classification": "proven ordinary resolution unavailable; historical interruption cause not reconstructed; charge0",
+      "unit_completion": "missing",
+      "initial_preflight": "OPERATION_FAILED unclassified, charge0",
+      "no_dispatch_precharge": true,
+      "report_id": "01a134de-4efe-7f40-827e-d2f9ad68b5bc"
+    }
+  },
+  "old_native_history_and_blocker_events_preserved": true,
+  "server_metadata_ledger_byte_SHA256_matches": true,
+  "proposal": {
+    "status": "NOT_AUTHORIZED_NOT_APPLIED",
+    "path": "evals/docs/proposals/2026-10-13-lab57-interrupted-unit-settlement.md",
+    "sha256": "464bf627a2a1ee377b4618d126bada6262489f15af592b245ad59f146f7377a6",
+    "scope": "one exact interrupted unit ABANDONED archival, not historical unit success/release",
+    "duration_seconds_max": 1800,
+    "stage_deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+    "requires_fresh_full_process_ancestry_profile_storage_concurrency_and_identity_checks_before_mutation": true,
+    "current_selected_name_absence_is_not_settlement_admission": true,
+    "tokens_and_raw_config_stay_on_execution_host": true
+  },
+  "approval_boundary": {
+    "pin": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+    "path": "evals/docs/evaler/operations.md",
+    "line": 88,
+    "pinned_doc_sha256": "70bea11a5889e1c89e00367d032cb89c3fa75460c1c5f055fac74466a0d903fa",
+    "quote": "Crash, завершённая задача Multica или мёртвый PID не являются разрешением его удалить.",
+    "pinned_source_read_directly_from_git": true,
+    "current_checkout_doc_identical_to_pin": false,
+    "existing_owner_TSV_CLI_approval_preserved": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "existing_approval_does_not_include_manual_shared_lease_abandon": true
+  },
+  "unit_result_clarification": {
+    "unit-result.json_bytes": 0,
+    "test_events_jsonl_bytes": 99620,
+    "test_stderr_bytes": 63312,
+    "partial_capture_is_not_PASS_or_confirmed_cleanup": true
+  },
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "online",
+    "last_seen_at": "2026-10-13T14:01:18+03:00",
+    "updated_at": "2026-10-13T12:22:43+03:00",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+  },
+  "worker_model_settings": {
+    "Rich": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    "Ben": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    "Evaler": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    }
+  },
+  "other_cards": {
+    "LAB-56": {
+      "status": "in_review",
+      "revision": 65,
+      "active": [],
+      "evaler_phase": "in_review"
+    },
+    "LAB-58": {
+      "status": "in_progress",
+      "revision": 9,
+      "active": [],
+      "evaler_phase": "admission",
+      "dependency_gate": {
+        "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "identifier": "LAB-57",
+        "gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": false,
+        "cleanup_confirmed": false
+      }
+    },
+    "LAB-59": {
+      "status": "in_progress",
+      "revision": 9,
+      "active": [],
+      "evaler_phase": "admission",
+      "dependency_gate": {
+        "issue_id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+        "identifier": "LAB-58",
+        "gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": false,
+        "cleanup_confirmed": false
+      }
+    },
+    "LAB-60": {
+      "status": "in_progress",
+      "revision": 9,
+      "active": [],
+      "evaler_phase": "admission",
+      "dependency_gate": {
+        "issue_id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+        "identifier": "LAB-59",
+        "gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": false,
+        "cleanup_confirmed": false
+      }
+    },
+    "LAB-61": {
+      "status": "in_progress",
+      "revision": 9,
+      "active": [],
+      "evaler_phase": "admission",
+      "dependency_gate": {
+        "issue_id": "01a1214b-38c2-753b-9da5-c6575e143343",
+        "identifier": "LAB-60",
+        "gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": false,
+        "cleanup_confirmed": false
+      }
+    },
+    "LAB-62": {
+      "status": "in_progress",
+      "revision": 9,
+      "active": [],
+      "evaler_phase": "admission",
+      "dependency_gate": {
+        "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+        "identifier": "LAB-61",
+        "gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": false,
+        "cleanup_confirmed": false
+      }
+    },
+    "LAB-63": {
+      "status": "in_progress",
+      "revision": 9,
+      "active": [],
+      "evaler_phase": "admission",
+      "dependency_gate": {
+        "issue_id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+        "identifier": "LAB-62",
+        "gate": "WAITING_FOR_INDEPENDENT_ACCEPT_AND_CONFIRMED_CLEANUP",
+        "accept_confirmed": false,
+        "cleanup_confirmed": false
+      }
+    },
+    "note": "Actual active/queued issue APIs are empty; saved metadata pending tasks do not supersede current run APIs."
+  },
+  "LAB56_prior_independent_ACCEPT_evidence_cleanup_retained": true,
+  "new_CLI_build_admission_ready_for_Ben_verified": false,
+  "monitor_system_or_native_model_reference_product_recovery_mutations": 0,
+  "monitor_new_routed_comments_or_dispatches": 0,
+  "all_eight_done_verified": false,
+  "automation": "lab-56-lab-63 ACTIVE every30minutes",
+  "next_step": "Owner decides exact operator exception; no known unchanged retry or lease/guard mutation. If authorized, fresh admission and genuine same-host proof search first, bounded one-time ABANDONED archive only; then real FREE and standard new unit/typecheck/lease/release within unchanged stage. Independent Ben ACCEPT still pending.",
+  "final_blocker_comment_active_read_utc": "2026-10-13T11:09:15.700353+00:00",
+  "fresh_final_read_still_blocked169_no_runs_no_owner_approval": true,
+  "LAB56_fresh_server_acceptance_matches_previously_verified_archive": {
+    "attachment_id": "01a12edf-8584-746b-a62e-f0db3d7717f2",
+    "manifest_sha256": "cfe057d770165013eb684a363cfb9d5a70c3aec0a38eedce1142bce530edac5f",
+    "checked_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+    "validation": "confirmed",
+    "cleanup": "confirmed",
+    "product": "PASS",
+    "report_id": "01a12edf-8658-7aa6-8336-cf4d3bfe8c22",
+    "quality": "ACCEPT",
+    "scope": "LAB-56 prepared suite and native/model admission",
+    "archive_sha256": "741b74f4c8818d2f9eda01bcc33bb57466e88f5753b62efc29438b6ab47ad4c3",
+    "internal_files_verified": 148,
+    "independent_calculation_sha256": "0505444a9c777fc5d3104b023479c46113da486b1ee33deb35b1bd049f69150c",
+    "calculation_reproduced": true,
+    "independence_native_chronology": "CONFIRMED",
+    "case_count": 58,
+    "input_count": 59,
+    "typed_tables": 49,
+    "diagnostic_contracts": 10,
+    "CLI_files_verified": 5389,
+    "source_git_files_verified": 1303,
+    "unit": {
+      "pass": 539,
+      "skip": 5,
+      "fail": 0,
+      "typecheck": "PASS"
+    },
+    "actual_model": "openai/gpt-6-luna",
+    "actual_variant": "high",
+    "admission_product": "PASS",
+    "scenario_reference_product_cold": "NOT_RUN",
+    "completion_sha256": "d35d7ca54acbae1ff14639b41155dd56b3a03631acbc78e95ec41035e658d879",
+    "internal_release_verified": true,
+    "stand": "FREE",
+    "storage_empty": true
+  }
+}

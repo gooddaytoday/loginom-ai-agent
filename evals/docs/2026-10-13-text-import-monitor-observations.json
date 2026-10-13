@@ -230,6 +230,29 @@
       "receipt": "evals/docs/2026-10-13-text-import-owned-unit-continuation-monitor-verification.json",
       "root_duplicate_dispatch": 0,
       "all_eight_done_verified": false
+    },
+    {
+      "checked_utc": "2026-10-13T11:02:09.010045+00:00",
+      "full_eight_reads_utc": "2026-10-13T11:01:44.911981+00:00",
+      "LAB-56": "in_review65/independent_ACCEPT+cleanup retained",
+      "LAB-57": "blocked169/OWNER_ACTION_REQUIRED_INTERRUPTED_UNIT/no runs",
+      "LAB-58-63": "in_progress9/no runs; dependency ACCEPT/cleanup gates remain closed",
+      "LAB-55": "in_review16/no runs; untouched",
+      "runtime": "online/same daemon",
+      "Rich_total_native_tasks": 12,
+      "Rich_repeat_consumed": 3,
+      "Rich_repeat_remaining": 7,
+      "new_followup_diagnosis_charge": 0,
+      "held_original_owner_config_guard_unchanged": true,
+      "cleanup": "UNCONFIRMED",
+      "new_external_blocker": "node-eval-ops:unit:interrupted-without-durable-completion:retained-exclusive-guard",
+      "operator_proposal_status": "NOT_AUTHORIZED_NOT_APPLIED",
+      "owner_request_comment": "01a134ea-fe1f-79a7-ac72-2f2d1811935a",
+      "receipt": "evals/docs/2026-10-13-text-import-interrupted-unit-owner-action-verification.json",
+      "root_new_dispatches": 0,
+      "all_eight_done_verified": false,
+      "final_blocker_comment_active_read_utc": "2026-10-13T11:09:15.700353+00:00",
+      "final_state_unchanged_blocked_no_runs_no_approval": true
     }
   ]
 }
