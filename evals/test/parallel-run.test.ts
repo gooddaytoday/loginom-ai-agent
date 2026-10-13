@@ -215,6 +215,59 @@ test("fixture main: failed profile admission also releases its SIGINT handler", 
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("fixture main: consecutive interrupted parallel runs drain both slots and retain interruption metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-interruption-"))
+  const input = await fixture(root, ["parallel-slow"])
+  const payload = path.join(root, "input.json")
+  await Bun.write(payload, JSON.stringify({ ...input, root }))
+  const script = path.join(root, "controller.ts")
+  await Bun.write(script, `import { main } from ${JSON.stringify(path.resolve(import.meta.dir, "../src/run.ts"))}
+const input = await Bun.file(process.argv[2]).json()
+for (const round of [1, 2]) {
+  const run = await main(["--tasks", input.root + "/tasks", "--parallel", "2", "--repeat", "3", "--skip-judge"],
+    input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+  await Bun.write(input.root + "/done-" + round + ".json", JSON.stringify(run))
+}
+process.exit(0)
+`)
+  const child = Bun.spawn([process.execPath, script, payload], { stdout: "pipe", stderr: "pipe" })
+  const stdout = new Response(child.stdout).text()
+  const stderr = new Response(child.stderr).text()
+  const exited = child.exited
+  const wait = async (check: () => Promise<boolean>) => {
+    const deadline = Date.now() + 15_000
+    while (!await check()) {
+      if (Date.now() > deadline) throw Error("Fixture progress not observed")
+      await Bun.sleep(10)
+    }
+  }
+  try {
+    for (const round of [1, 2]) {
+      await wait(async () => (await Promise.all(input.slots.slots.map(slot => Bun.file(path.join(slot.profileDir, "data/loginom-ai-agent.db")).exists()))).every(Boolean))
+      if (round === 1) {
+        const state = path.join(input.slots.controller.stateDir, "fixture-a.json")
+        await Bun.write(state, JSON.stringify({ ...await Bun.file(state).json(), recoveries: ["fixture-recovery"] }))
+      }
+      child.kill("SIGINT")
+      await wait(() => Bun.file(path.join(root, `done-${round}.json`)).exists())
+      const run = await Bun.file(path.join(root, `done-${round}.json`)).json()
+      expect(run.code).toBe(0)
+      const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+      expect(summary.interrupted).toBe(true)
+      expect(summary.interrupted_cleanup).toEqual({ recovered: round === 1 })
+      expect(summary.tasks[0]!.attempts).toHaveLength(2)
+      expect(summary.tasks[0]!.attempts.every(result => result.status === "interrupted" && result.environment_cleanup?.status === "confirmed")).toBe(true)
+      expect(summary.slots?.map(slot => slot.state)).toEqual(["closed", "closed"])
+    }
+    expect(await exited).toBe(0)
+    await Promise.all([stdout, stderr])
+  } finally {
+    if (child.exitCode === null) { child.kill("SIGINT"); await exited }
+    await Promise.all([stdout, stderr])
+    await rm(root, { recursive: true, force: true })
+  }
+}, 60_000)
+
 test("fixture main: binary/source modes and ordinary CLI cannot acquire synthetic admission", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-mode-"))
   try {
@@ -256,6 +309,7 @@ test("fixture main: one infra retry keeps the same slot and archives the initial
       initial: { status: "infra_error", slot_id: "a", environment_cleanup: { status: "confirmed" } },
     } })
     expect(summary.metrics.infra_error_count).toBe(1)
+    expect(summary.interrupted_cleanup).toBeNull()
     expect(summary.metrics.total).toBe(2)
     const initial = await Bun.file(path.join(run.runDir!, result.task_id, "1", "infra-error/result.json")).json()
     expect(initial).toEqual(result.infra_retry!.initial)

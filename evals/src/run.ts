@@ -83,10 +83,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
   const slotStates = new Map<string, "closed" | "quarantined">()
-  const state: { stopped: string | null; interruptedCleanup: { recovered: boolean } | null } = {
-    stopped: null,
-    interruptedCleanup: null,
-  }
+  const state: { stopped: string | null } = { stopped: null }
   if (fixture && !config.dryRun) {
     const contexts = await prepareFixture(config, fixture, runId, runDir)
     const unconfirmed = new Set<string>()
@@ -111,7 +108,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
               return false
             })
             if (cleanup) unconfirmed.delete(slotId)
-            return { result: completed.result, quarantine: !cleanup, stop: completed.stop }
+            return { result: completed.result, quarantine: !cleanup, stop: completed.stop && completed.result.status !== "interrupted" }
           }
           const first = await perform()
           if (first.result.status !== "infra_error" || first.quarantine || first.stop || controller.signal.aborted) return first
@@ -178,7 +175,6 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
           })
           if (state.stopped) break outer
           if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
-          if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
         }
         if (result.cleanup_error || result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
           state.stopped = result.cleanup_error ?? result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
@@ -197,6 +193,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
       }
     }
   }
+  const interruptedAttempts = attempts.filter(result => result.status === "interrupted")
   const summary: RunSummary = {
     run_id: runId,
     ...(fixture ? { slots: fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
@@ -205,7 +202,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
     interrupted: controller.signal.aborted,
-    interrupted_cleanup: state.interruptedCleanup,
+    interrupted_cleanup: interruptedAttempts.length ? { recovered: interruptedAttempts.some(result => result.profile_recovered) } : null,
     stopped_reason: state.stopped,
     agent: {
       cli_mode: config.agent.cliMode,
