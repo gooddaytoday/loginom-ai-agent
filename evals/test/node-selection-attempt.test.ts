@@ -39,6 +39,11 @@ test("a confirmed cancellation preserves exit 130 when evidence is incomplete", 
   expect(selectionExitCode({ exitCode: 3, cliExitCode: 130, timedOut: false })).toBe(3)
 })
 
+test("unconfirmed cleanup remains a series blocker after secondary collection failure or cancellation", () => {
+  expect(selectionExitCode({ exitCode: 2, cliExitCode: 1, timedOut: false, cleanupConfirmed: false })).toBe(3)
+  expect(selectionExitCode({ exitCode: 2, cliExitCode: 130, timedOut: false, cleanupConfirmed: false })).toBe(3)
+})
+
 test("reserving an existing slot refuses a rerun and preserves its evidence", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "selection-attempt-test-"))
   try {

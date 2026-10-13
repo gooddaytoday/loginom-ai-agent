@@ -92,14 +92,14 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
   const evidence = await mkdtemp(path.join(plan.pins.resultsRoot, "incidents", `${plan.prefix}-`))
   const result: {
     exitCode: number; evidence: string; modelStarted: boolean | null; blocker: string | null
-    sessionID: string | null; cliExitCode: number | null; mode: SelectionMode; taskID: string
+    sessionID: string | null; cliExitCode: number | null; cleanupConfirmed: boolean | null; mode: SelectionMode; taskID: string
     model: string; variant: string; expectedSkillDigest: string; binaryManifestSha256: string
     startedAt: string; finishedAt: string | null; cliStartedAt: string | null; cliFinishedAt: string | null
     timedOut: boolean; interruptSentAt: string | null
     packagePath: string | null; resultPath: string | null; policyStatus: string; oraclePassed: boolean | null
     calculationPassed: boolean; reviewStatus: string; collectionFailures: string[]
   } = {
-    exitCode: 3, evidence, modelStarted: false, blocker: null, sessionID: null, cliExitCode: null,
+    exitCode: 3, evidence, modelStarted: false, blocker: null, sessionID: null, cliExitCode: null, cleanupConfirmed: null,
     mode: plan.task.mode, taskID, model: plan.pins.model, variant: plan.pins.variant,
     expectedSkillDigest: plan.pins.expectedSkillDigest, binaryManifestSha256: plan.pins.manifestSha256,
     startedAt: new Date().toISOString(), finishedAt: null, cliStartedAt: null, cliFinishedAt: null,
@@ -213,9 +213,10 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       result.evidence = incident
       throw Error("PROFILE_BUSY")
     }
-    if (await exists(path.join(plan.pins.profile, ".writer")) ||
-      stderr.includes("LOGINOM_HOST_CLEANUP_FAILED"))
-      throw Error("SELECTION_CLEANUP_UNCONFIRMED")
+    result.cleanupConfirmed = false
+    result.cleanupConfirmed = !await exists(path.join(plan.pins.profile, ".writer")) &&
+      !stderr.includes("LOGINOM_HOST_CLEANUP_FAILED")
+    await save()
     const events: unknown[] = (await Bun.file(path.join(attempt.directory, "events.jsonl")).text())
       .split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line) as unknown)
     const sessions = [...new Set(events.flatMap((event) => record(event) && typeof event.sessionID === "string" && event.sessionID ? [event.sessionID] : []))]
@@ -240,6 +241,9 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       journals.push({ source, path: path.relative(attempt.directory, destination), sha256: await hashFile(destination) })
     }
     await Bun.write(path.join(attempt.directory, "runtime-journals.json"), JSON.stringify(journals, null, 2) + "\n")
+    // A terminated CLI permits read-only diagnostics even if host cleanup remains unconfirmed.
+    // Block before moving a model slot or accessing Loginom artifacts.
+    if (!result.cleanupConfirmed) throw Error("SELECTION_CLEANUP_UNCONFIRMED")
     if (result.modelStarted === false) {
       const incident = path.join(evidence, "auth-rejected")
       await rename(attempt.directory, incident)
@@ -295,7 +299,9 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
     }
     if (result.collectionFailures.length && result.exitCode === 0) result.exitCode = 2
   } catch (error) {
-    result.blocker = error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "SELECTION_COLLECTION_FAILED"
+    const failure = error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "SELECTION_COLLECTION_FAILED"
+    if (result.cleanupConfirmed === false && failure !== "SELECTION_CLEANUP_UNCONFIRMED") result.collectionFailures.push(failure)
+    result.blocker = result.cleanupConfirmed === false ? "SELECTION_CLEANUP_UNCONFIRMED" : failure
     result.exitCode = result.modelStarted === false || ["CLI_EXIT_UNCONFIRMED", "SELECTION_CLEANUP_UNCONFIRMED", "PROFILE_BUSY"].includes(result.blocker) ? 3 : 2
     if (result.blocker === "SELECTION_SLOT_EXISTS") result.exitCode = 2
   }
@@ -305,7 +311,8 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
   return result
 }
 
-export function selectionExitCode(result: { exitCode: number; cliExitCode: number | null; timedOut: boolean }) {
+export function selectionExitCode(result: { exitCode: number; cliExitCode: number | null; timedOut: boolean; cleanupConfirmed?: boolean | null }) {
+  if (result.cleanupConfirmed === false) return 3
   return result.cliExitCode === 130 && !result.timedOut && result.exitCode !== 3 ? 130 : result.exitCode
 }
 
