@@ -1,3 +1,4 @@
+import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
 import {retainFPManagedStartup,retainAmountManagedStartup} from "./fp-managed-startup.mjs"
 import {decodePreReadyRejection} from "./qualified-pre-ready.mjs"
 import { createRequire } from "node:module"
@@ -348,6 +349,7 @@ async function handle(message) {
         deadlineSource:Number.isSafeInteger(message.deadline)?"supervisor.request.start":"NOT_SUPPLIED",
         signal:state.startupController.signal}
       state.controlledStartup?.bindOwner(state.startupOwner)
+      const originalStartupSignal=state.startupOwner.signal,originalStartupDeadline=state.startupOwner.deadline
       const login = {
         owner:state.startupOwner,
         browserPath: resources.browserPath,
@@ -404,6 +406,7 @@ async function handle(message) {
         state.controlledStartup?.guard();
         if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
             || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalOwner.signal!==originalStartupSignal || originalOwner.deadline!==originalStartupDeadline
             || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
             || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
             || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
@@ -436,6 +439,8 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await observed(state.browserServer.connect(browserServerTransport))
       assertStartup();
+      retainOriginalPrepareStartup(session,{startup:originalStartup,owner:originalOwner,
+        readiness:state.authenticatedReadiness,assertStartup});
       state.bridge = await observed(createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture: acceptanceCapture ? { binding: Object.freeze({...acceptanceCapture, session:session.metadata.sessionId}),
