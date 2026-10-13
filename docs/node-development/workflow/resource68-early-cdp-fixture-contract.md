@@ -84,3 +84,21 @@ require a separate qualified original-owner lifecycle composition. Neither the
 fixture loader gate nor source/event timestamps supply those missing facts.
 Existing Import, terminal content and Replacement reviews remain separate;
 closed Node8+1/3+3/SDK/facade/adapter/FP/static suites are not repeated.
+
+Atomic descriptor primitive corrective
+
+The isolated fixture retains Object.getOwnPropertyDescriptor as a raw CDP
+function handle on its original pristine default realm BEFORE loader admission.
+Runtime.getProperties requires an own data-method; native CDP description, no
+JavaScript FunctionLocation and no bound TargetFunction qualify the primitive.
+No getter/function is invoked to qualify it. The original root/context and
+primitive handles stay in the same existing object group/session. A replaced
+realm refuses; there is no late recapture or serialization fallback.
+
+Final comparison calls that retained native primitive directly, atomically,
+with original root/bg/export raw handles. It never reads ambient Object/Reflect
+methods. Descriptor value fields are checked using the same native primitive
+so inherited accessor fields cannot substitute for native own data fields.
+Disposal retains and verifies release of the primitive/root/constructor handles
+as well as existing export/lexical handles. These are offline same-realm fixture
+facts, not a native defining provider or before-goto runtime registration.

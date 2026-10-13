@@ -22,6 +22,7 @@ export function retainEarlyLockFixture(owner) {
   let disposalFailed = false, disposalFailure;
   const scripts = [], contexts = [], trace = [];
   let exportHandle, getterHandle, scopeHandle, globalHandle, bgHandle;
+  let primitiveRoot, objectHandle, descriptorHandle, primitiveContext;
   function hold(value) { if (!held) { first = value; held = true; } return first; }
   function guard({ early = false } = {}) {
     // Refused new work cannot replace the original disposal's eventual cause.
@@ -48,9 +49,9 @@ export function retainEarlyLockFixture(owner) {
     } catch (error) { throw hold(error); }
     finally { pending--; }
   }
-  async function properties(objectId) {
+  async function properties(objectId, early = false) {
     if (!objectId) throw refusal('EARLY_CDP_MISSING_HANDLE');
-    return query('Runtime.getProperties', { objectId, ownProperties: true });
+    return query('Runtime.getProperties', { objectId, ownProperties: true }, early);
   }
   function location(result) {
     return result.internalProperties?.find(row => row.name === '[[FunctionLocation]]')?.value?.value;
@@ -79,6 +80,26 @@ export function retainEarlyLockFixture(owner) {
       frameId = (await query('Page.getFrameTree', {}, true)).frameTree.frame.id;
       await query('Runtime.enable', {}, true);
       await query('Debugger.enable', {}, true);
+      // Retain the native data-method on the original pristine fixture realm
+      // before the loader is admitted. CDP descriptors never invoke getters.
+      try {
+      const realm = contexts.filter(c => c.auxData?.isDefault && c.auxData.frameId === frameId);
+      if (realm.length !== 1) throw refusal('EARLY_CDP_FOREIGN_CONTEXT');
+      primitiveContext = realm[0].id;
+      const root = await query('Runtime.evaluate', {expression:'this', contextId:primitiveContext,
+        objectGroup:group, returnByValue:false, silent:true}, true);
+      if (root.exceptionDetails || root.result?.type !== 'object') throw refusal('EARLY_CDP_MISSING_HANDLE');
+      primitiveRoot = root.result.objectId;
+      objectHandle = dataHandle(await properties(primitiveRoot, true), 'Object', 'function');
+      const objectProperties = await properties(objectHandle, true);
+      descriptorHandle = dataHandle(objectProperties, 'getOwnPropertyDescriptor', 'function');
+      const descriptor = objectProperties.result.find(r => r.name === 'getOwnPropertyDescriptor').value;
+      const primitive = await properties(descriptorHandle, true);
+      if (descriptor.description !== 'function getOwnPropertyDescriptor() { [native code] }'
+          || location(primitive) || primitive.internalProperties?.some(r => r.name === '[[TargetFunction]]')) {
+        throw refusal('EARLY_CDP_UNQUALIFIED_DESCRIPTOR');
+      }
+      } catch (error) { throw hold(error); }
       guard({ early: true });
       installed = true;
       trace.push('install-ack-before-loader');
@@ -104,7 +125,7 @@ export function retainEarlyLockFixture(owner) {
         if (matches.length !== 1) throw refusal('EARLY_CDP_MISSING_OR_DUPLICATE_SCRIPT');
         const script = matches[0];
         const context = contexts.find(row => row.id === script.executionContextId);
-        if (!context?.auxData?.isDefault || context.auxData.frameId !== frameId) {
+        if (!context?.auxData?.isDefault || context.auxData.frameId !== frameId || context.id !== primitiveContext) {
           throw refusal('EARLY_CDP_FOREIGN_CONTEXT');
         }
         const source = (await query('Debugger.getScriptSource', { scriptId: script.scriptId })).scriptSource;
@@ -139,9 +160,10 @@ export function retainEarlyLockFixture(owner) {
         // Re-read own data descriptors atomically and compare raw handles.
         // No export getter or exported function is invoked by this proof.
         const same = await query('Runtime.callFunctionOn', {
-          objectId: exportHandle,
-          functionDeclaration: 'function(root,bg){const r=Object.getOwnPropertyDescriptor(root,"bg");if(!r||!("value" in r)||r.value!==bg)return false;const e=Object.getOwnPropertyDescriptor(bg,"LockDeferred");return !!e&&"value" in e&&e.value===this}',
-          arguments: [{ objectId: globalHandle }, { objectId: bgHandle }],
+          objectId: descriptorHandle,
+          functionDeclaration: 'function(root,bg,exported,originalRoot){if(root!==originalRoot)return false;const r=this(root,"bg"),rv=r&&this(r,"value");if(!rv||rv.value!==bg)return false;const e=this(bg,"LockDeferred"),ev=e&&this(e,"value");return !!ev&&ev.value===exported}',
+          arguments: [{ objectId: globalHandle }, { objectId: bgHandle },
+            { objectId: exportHandle }, { objectId: primitiveRoot }],
           returnByValue: true, silent: true,
         });
         if (same.exceptionDetails || same.result.value !== true) throw refusal('EARLY_CDP_EXPORT_REPLACED');
@@ -157,7 +179,7 @@ export function retainEarlyLockFixture(owner) {
       if (disposalPromise) return disposalPromise;
       if (pending) return Promise.reject(refusal('EARLY_CDP_PENDING_DISPOSAL'));
       const originalSession = session;
-      const handles = [globalHandle, bgHandle, exportHandle, getterHandle, scopeHandle].filter(Boolean);
+      const handles = [primitiveRoot, objectHandle, descriptorHandle, globalHandle, bgHandle, exportHandle, getterHandle, scopeHandle].filter(Boolean);
       disposalState = 'pending'; pending++;
       // Store one operation synchronously before release, including re-entry
       // from the transport. Unknown completion never permits replacement IO.
