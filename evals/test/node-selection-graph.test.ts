@@ -53,6 +53,26 @@ test("full audit requires lineage from an unambiguous confirmed input import", a
   expect(inspectSelectionGraph(ambiguous, "standard", [`${imported.scope}/${imported.id}`]).complete).toBe(true)
 })
 
+test("allowed JavaScript modes keep the required native processing on the export path", async () => {
+  const xml = await reference("sales-by-category")
+  expect(inspectSelectionGraph(xml, "explicit-js").complete).toBe(false)
+  const group = xml.nodes.find((node) => node.type === "TBGGroupDataEngine")!
+  const nativeGroup = structuredClone(group)
+  group.type = "TBGJavaScriptEngine"
+  expect(inspectSelectionGraph(xml, "explicit-js").complete).toBe(true)
+  expect(inspectSelectionGraph(xml, "capability-gap").complete).toBe(false)
+  const sorting = xml.nodes.find((node) => node.type === "TBGSortingEngine")!
+  const sorted = xml.links.find((link) => link.target.NodeGuid === sorting.id)!
+  const added = { ...nativeGroup, id: "gap-group" }
+  xml.nodes.push(added)
+  expect(inspectSelectionGraph(xml, "capability-gap").complete).toBe(false)
+  xml.links.push({ scope: group.scope, source: { ...sorted.source },
+    target: { NodeGuid: added.id, PortGuid: Object.keys(added.inputs).find((port) => added.inputs[port] === "DataSource")! } })
+  sorted.source = { NodeGuid: added.id, PortGuid: Object.keys(added.outputs).find((port) => added.outputs[port] === "DataSource")! }
+  expect(inspectSelectionGraph(xml, "capability-gap").complete).toBe(true)
+  expect(inspectSelectionGraph(xml, "explicit-js").complete).toBe(false)
+})
+
 async function reference(id: string) {
   const root = await mkdtemp(path.join(tmpdir(), "selection-graph-"))
   try {

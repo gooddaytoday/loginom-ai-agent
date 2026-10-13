@@ -21,6 +21,7 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
     }))
   if (!imports.size) failures.add("GRAPH_IMPORT_IDENTITY_UNCONFIRMED")
   const incoming = new Map<string, string[]>()
+  const upstream = new Map<string, string[]>()
   if (!xml.nodes.some((node) => node.type === "TBGImportTextFile") ||
     !xml.nodes.some((node) => node.type === "TBGExportTextFile")) failures.add("GRAPH_IMPORT_EXPORT_REQUIRED")
   for (const node of xml.nodes) {
@@ -42,6 +43,8 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
     if (!outputs.has(output)) continue
     const key = `${link.scope}/${link.target.NodeGuid}/${link.target.PortGuid}`
     incoming.set(key, [...(incoming.get(key) ?? []), `${link.scope}/${link.source.NodeGuid}`])
+    const targetKey = `${link.scope}/${link.target.NodeGuid}`
+    upstream.set(targetKey, [...(upstream.get(targetKey) ?? []), `${link.scope}/${link.source.NodeGuid}`])
     if (incoming.get(key)!.length > 1) failures.add("GRAPH_INPUT_COMPETING")
   }
   const visiting = new Set<string>()
@@ -65,5 +68,34 @@ export function inspectSelectionGraph(xml: Awaited<ReturnType<typeof readNodeXml
   }
   for (const node of xml.nodes.filter((node) => node.type === "TBGExportTextFile"))
     if (!reachesImport(`${node.scope}/${node.id}`)) failures.add("GRAPH_IMPORT_LINEAGE_REQUIRED")
+  if (mode === "explicit-js" || mode === "capability-gap") {
+    const javascript = xml.nodes.filter((node) => ["TBGJavaScriptEngine", "TBGCodeModelComponentEngine"].includes(node.type))
+    if (javascript.length !== 1) failures.add("GRAPH_SINGLE_JAVASCRIPT_REQUIRED")
+    if (mode === "explicit-js" && xml.nodes.some((node) => node.type === "TBGGroupDataEngine"))
+      failures.add("GRAPH_EXPLICIT_JS_NATIVE_AGGREGATION")
+    if (javascript.length === 1) {
+      const jsKey = `${javascript[0]!.scope}/${javascript[0]!.id}`
+      for (const exported of xml.nodes.filter((node) => node.type === "TBGExportTextFile")) {
+        const exportedAncestors = ancestors(`${exported.scope}/${exported.id}`)
+        if (!xml.nodes.some((sorted) => sorted.type === "TBGSortingEngine" &&
+          exportedAncestors.has(`${sorted.scope}/${sorted.id}`) && ancestors(`${sorted.scope}/${sorted.id}`).has(jsKey) &&
+          (mode === "explicit-js" || xml.nodes.some((group) => group.type === "TBGGroupDataEngine" &&
+            ancestors(`${sorted.scope}/${sorted.id}`).has(`${group.scope}/${group.id}`) &&
+            ancestors(`${group.scope}/${group.id}`).has(jsKey))))) failures.add("GRAPH_JAVASCRIPT_NATIVE_CHAIN_REQUIRED")
+      }
+    }
+  }
   return { complete: !failures.size, failures: [...failures] }
+
+  function ancestors(key: string) {
+    const seen = new Set<string>()
+    const stack = [key]
+    while (stack.length) {
+      const current = stack.pop()!
+      if (seen.has(current)) continue
+      seen.add(current)
+      stack.push(...(upstream.get(current) ?? []))
+    }
+    return seen
+  }
 }
