@@ -1,0 +1,21 @@
+--- a/etc/systemd/system/loginom-evals-routes.service
++++ b/etc/systemd/system/loginom-evals-routes.service
+@@ -11,6 +11,8 @@
+ ExecStart=/usr/sbin/ip rule add priority 8998 to 151.244.228.56/32 lookup main
+ ExecStart=/usr/sbin/ip rule add priority 8998 to 10.200.11.224/32 lookup main
+ ExecStart=/usr/sbin/ip rule add priority 8998 to 194.156.118.61/32 lookup main
++ExecStart=/usr/sbin/ip rule add priority 8998 to 78.17.1.143/32 lookup main
++ExecStop=-/usr/sbin/ip rule del priority 8998 to 78.17.1.143/32 lookup main
+ ExecStop=-/usr/sbin/ip rule del priority 8998 to 194.156.118.61/32 lookup main
+ ExecStop=-/usr/sbin/ip rule del priority 8998 to 10.200.11.224/32 lookup main
+ ExecStop=-/usr/sbin/ip rule del priority 8998 to 151.244.228.56/32 lookup main
+--- a/etc/vpn-egress-lockdown/rules.nft
++++ b/etc/vpn-egress-lockdown/rules.nft
+@@ -8,6 +8,7 @@
+   ip daddr 185.21.15.251 tcp dport 443 accept
+     ip daddr { 62.113.108.18, 151.244.228.56 } tcp dport 443 accept comment "loginom-evals-services"
+   ip daddr { 62.113.108.18, 194.156.118.61 } tcp dport { 80, 443 } counter accept comment "loginom-evals-vpn-exceptions"
++  ip daddr 78.17.1.143 tcp dport 443 counter accept comment "loginom-evals-mas-20261013"
+   udp sport 68 udp dport 67 accept
+  }
+  chain input {

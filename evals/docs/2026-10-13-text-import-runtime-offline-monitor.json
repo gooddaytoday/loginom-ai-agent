@@ -1,0 +1,188 @@
+{
+  "checked_utc": "2026-10-13T08:54:05.384651+00:00",
+  "card_reads_completed_utc": "2026-10-13T08:50:58.748497+00:00",
+  "snapshot": "evals/.bundle/text-import-monitor-20261013T085052Z",
+  "workspace_project_and_host_match": true,
+  "case_ids_preserved": 58,
+  "cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "in_review",
+      "revision": 65,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-12T10:07:12+03:00"
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "blocked",
+      "revision": 150,
+      "active_queued": [
+        {
+          "id": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+          "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+          "status": "queued"
+        }
+      ],
+      "latest_root_activity": "2026-10-13T11:46:38+03:00"
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-10T23:15:17+03:00"
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-10T23:15:05+03:00"
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-10T23:14:56+03:00"
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-10T23:14:07+03:00"
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-10T23:14:35+03:00"
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": [],
+      "latest_root_activity": "2026-10-10T23:20:36+03:00"
+    }
+  ],
+  "LAB-56": "Owner considers completed; independent ACCEPT/evidence/cleanup still confirmed in current metadata. Status remains in_review; no mutation.",
+  "LAB-57_owner_approval": {
+    "comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "parent_id": "01a1315c-afd7-7588-a622-313a9a772eb7",
+    "body_SHA256": "97931dbabd8fbc1213b79c2c2acb031b1ba73026595d47ff7548ded103886746",
+    "body_readback_match": true,
+    "new_replies": 0,
+    "task_id": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+    "task_status": "queued",
+    "dispatched_at": null,
+    "started_at": null
+  },
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "offline",
+    "online": null,
+    "connected": null,
+    "last_seen_at": "2026-10-12T22:37:33+03:00",
+    "last_heartbeat_at": null,
+    "updated_at": "2026-10-12T22:40:33+03:00",
+    "current_tasks": null,
+    "active_tasks": null,
+    "capacity": null,
+    "max_concurrent_tasks": null,
+    "version": null,
+    "cli_version": null
+  },
+  "blocker_ledger_entry": {
+    "fingerprint": "monitor:Multica:eval-tests-runtime-offline:queued-task-not-dispatched",
+    "component": "Multica runtime connection for a5fa993f-2903-4997-a832-955ffbb1203c",
+    "first_evidence_utc": "2026-10-13T08:54:05.384651+00:00",
+    "evidence": "Fresh runtime list reports offline; last_seen_at2026-10-12T22:37:33+03:00, updated_at22:40:33+03:00; owner-approval Evaler task still queued with no dispatch/start.",
+    "related_issue_UUID": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "related_task_UUIDs": [
+      "01a13471-3a07-73a0-bb1f-08cfbd62345f"
+    ],
+    "classification": "Newly observed runtime connectivity blocker; reason daemon/server connection is offline remains UNCLASSIFIED. This is not a started Rich failure or confirmed repeat of capacity cause.",
+    "charged": false,
+    "charge_reason": "No Rich attempt executed; monitoring reads and queued Evaler delivery consume no Rich same-cause repeat budget."
+  },
+  "old_TSV_blocker": {
+    "code": "PINNED_CLI_PROVIDER_INPUT_SERIALIZATION_UNSUPPORTED_TSV",
+    "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+    "fingerprint": "pinned-cli:MessageV2.toModelMessages:csv-only-inline-shim:unsupported-tsv-file-part",
+    "status": "OWNER_DECISION_REQUIRED: CLI pin change, autonomy point 6",
+    "charge": 0,
+    "proposal_attachment_id": "01a13138-6bef-777d-83fc-f5a0c6a5b42a",
+    "proposal_sha256": "a5b4b73372a048dcb37b846d007f652f19c03327024f84097ef8ce620b742420",
+    "proposal_status": "NOT_APPLIED",
+    "ready_for_ben": false,
+    "owner_decision_requested_comment_id": "01a1315c-afd7-7588-a622-313a9a772eb7",
+    "proposal_revision": {
+      "commit": "d68d433bed8cc2be72eec3f590c0ffd09cc47af6",
+      "sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465",
+      "comment_id": "01a13153-b51a-7a8b-811a-3ad541305164",
+      "dry_run": "PASS exact5cd",
+      "syntax": "PASS",
+      "functional": "NOT_RUN",
+      "admission": "NOT_ADMITTED",
+      "review_sha256": "53cfe82b5485683bf5d410b2242ee5f6e696c76bac08b2651f3edd1a1c58a339",
+      "review_attachment_id": "01a13165-07b6-7bf6-a667-d3a2081cea41"
+    }
+  },
+  "old_metadata_owner_decision_required_label": "STALE relative to verified new human approval; Evaler task has not executed, monitor does not edit Evaler metadata.",
+  "budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "Rich_repeat_consumed": 2,
+  "Rich_repeat_limit": 10,
+  "Rich_budget_charge_this_check": 0,
+  "new_dispatches_routed_comments_or_shared_config_changes": 0,
+  "model_native_reference_product_recovery_operations": 0,
+  "runtime_restarts_process_stops_leases_or_routing_changes": 0,
+  "current_physical_process_and_lease_state": "UNAVAILABLE; API offline does not prove remote daemon stopped or foreign work absent. No unsafe duplicate/restart.",
+  "access_limit": "Existing read-only SSH attempt to documented user@10.200.13.152 previously failed authentication; no new authorized access profile supplied. No credentials/VPN/defaults changed or unrelated credential search.",
+  "required_operator_action": "Restore the existing Codex (eval-tests) runtime connection to Multica using the server operator's normal access; preserve existing pending task and process/lease history.",
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "interval_minutes": 30,
+    "all_eight_done_verified": false
+  },
+  "next_step": "Monitor runtime and queued approval task every30 minutes. After runtime reconnects, Evaler can process the one existing approval and coordinate isolated CLI test/build/admission and bounded Rich stage. Do not re-send approval or duplicate workers.",
+  "diagnosis_followup": {
+    "checked_utc": "2026-10-13T09:10:18.163584+00:00",
+    "owner_backup_restore_confirmed": true,
+    "SSH_operator_access_now_available": true,
+    "daemon_active_registered_but_TLS_fails": true,
+    "proposal_not_applied": "evals/docs/proposals/2026-10-13-mas-runtime-route.patch",
+    "same_monitor_blocker_refined_not_new_Rich_failure": true,
+    "receipt": "evals/docs/2026-10-13-text-import-runtime-ssh-diagnosis.json"
+  }
+}

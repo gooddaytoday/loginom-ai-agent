@@ -1,0 +1,107 @@
+{
+  "checked_utc": "2026-10-13T09:10:18.163584+00:00",
+  "owner_context": "Owner reports Multica was recently restored from backup and provided SSH/sudo access for runtime recovery; credentials are excluded from this receipt and Git.",
+  "host": "user@10.200.13.152 (eval-tests)",
+  "service": {
+    "name": "loginom-evals-multica.service",
+    "ActiveState": "active",
+    "SubState": "running",
+    "MainPID_before": 1018766,
+    "NRestarts_before": 0,
+    "ActiveEnterTimestamp_before": "2026-10-10T16:36:04Z",
+    "daemon_version": "0.6.1",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+    "registered_runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "registered_workspace_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b",
+    "active_task_count": 0,
+    "running_task_count": 0,
+    "resource_wait_task_count": 0,
+    "pending_terminal_report_count": 0,
+    "failed_terminal_report_count": 0,
+    "child_processes": 0
+  },
+  "resource_status": {
+    "helper": "exact operational supplement89b416c257a43a187edef4c40b68f3c9b1fa4d53 node-eval-ops.ts status",
+    "result": "FREE",
+    "exit_code": 0,
+    "meaning": "Read-only lease status; no preflight/acquire/native/model operation performed."
+  },
+  "observed_network": {
+    "daemon_log": "Recurring TLS handshake timeout for /api/daemon/heartbeat; claim context deadline exceeded; websocket unavailable. Raw logs not committed.",
+    "public_API_host": "mas.kartamyshev.dev",
+    "local_system_DNS": [
+      "78.17.1.143"
+    ],
+    "remote_system_DNS": [
+      "78.17.1.143"
+    ],
+    "public_DNS_1_1_1_1": [
+      "78.17.1.143"
+    ],
+    "public_DNS_8_8_8_8": [
+      "78.17.1.143"
+    ],
+    "local_existing_proxy_HTTPS_root": {
+      "HTTP": 200,
+      "exit_code": 0
+    },
+    "remote_existing_proxy": "http://10.200.13.152:2080",
+    "proxy_listeners": "127.0.0.1:2080 and10.200.13.152:2080 LISTEN; xray serviceactive",
+    "remote_HTTPS_tests": [
+      {
+        "mode": "current daemon env",
+        "curl_exit": 28,
+        "HTTP": 0
+      },
+      {
+        "mode": "per-call direct",
+        "curl_exit": 28,
+        "HTTP": 0
+      },
+      {
+        "mode": "per-call TLS1.2 maximum",
+        "curl_exit": 28,
+        "HTTP": 0
+      }
+    ],
+    "remote_proxy_tunnel": "CONNECT200 succeeds; verified TLS fails after ClientHello with timeout. Certificate validation was never disabled.",
+    "remote_route_to_78_17_1_143": "via172.19.0.2 devtun0 table2022",
+    "existing_direct_rules_priority8998": [
+      "62.113.108.18/32",
+      "151.244.228.56/32",
+      "10.200.11.224/32",
+      "194.156.118.61/32"
+    ],
+    "firewall": "vpn_egress_lockdown output policyDROP retained; fixed eval exceptions omit current78.17.1.143",
+    "diagnosis": "Current MAS destination missing from fixed direct-route/firewall exception set; eval-tests daemon cannot complete TLS on existing path. Proposed repair still requires runtime/network verification after application; full causal confirmation pending."
+  },
+  "proposal": {
+    "path": "evals/docs/proposals/2026-10-13-mas-runtime-route.patch",
+    "sha256": "9e848793da646579bd99dc91319a2f458f74c392741a74c142bbfb4da7430452",
+    "remote_staging": "/home/user/.local/share/loginom-evals-runtime/operator-work/20261013-mas-route-proposal",
+    "files": [
+      "/etc/systemd/system/loginom-evals-routes.service",
+      "/etc/vpn-egress-lockdown/rules.nft"
+    ],
+    "scope": "Add one /32 destination rule for78.17.1.143 using existing priority8998/main and one output accept for that IP/TCP443. Retain prior routes, addresses, DROP policy, VPN, existing proxy and credential settings. No Xray/sing-box restart required by proposal.",
+    "status": "NOT_APPLIED",
+    "systemd_analyze_verify_exit": 0,
+    "nft_check_exit": 0,
+    "model_or_runtime_registration_pin_changes": false
+  },
+  "application_plan_after_owner_network_permission": [
+    "Re-read service tasks, child processes and lease before any daemon lifecycle operation; back up exact two network files with existing owners/modes.",
+    "Install validated three-line patch; daemon-reload only for route unit; add the one live ip rule and one live nft accept without restarting VPN/routes/stand services or flushing rules.",
+    "Verify current configured-proxy certificate-valid HTTPS200, same runtime online/heartbeat and the one original queued Evaler approval dispatch; let existing daemon retry reconnect first.",
+    "Only if daemon stays disconnected after TLS is verified and no task/results/cleanup are active, one targeted restart of loginom-evals-multica.service preserving registration/config; no duplicate daemon/run."
+  ],
+  "rollback_plan": "Remove only newly added nft rule by verified comment+handle and only /32 priority8998 ip rule; restore exact two backed-up files and daemon-reload. Preserve pre-existing rules/services/tasks/leases; no broad flush.",
+  "permission_boundary": "Owner autonomy point6 reserves changes to shared credentials/VPN/system defaults for separate decision. New SSH access authorizes diagnostics/runtime recovery; it does not explicitly revoke the network/VPN boundary. Prepared narrow network patch awaiting this decision.",
+  "mutations_so_far": "Only isolated proposal files under operator-work and repository proposal/receipts; live system network/CLI/config unchanged; no service restarted, foreign process stopped or lease acquired.",
+  "queued_task_preserved": "01a13471-3a07-73a0-bb1f-08cfbd62345f (Evaler approval)",
+  "same_Rich_repeat_consumed": 2,
+  "same_Rich_repeat_limit": 10,
+  "charge_this_diagnosis": 0,
+  "scenario_native_reference_product_recovery_operations": 0,
+  "heartbeat": "lab-56-lab-63 remains ACTIVE every30 minutes; all eight done not verified"
+}
