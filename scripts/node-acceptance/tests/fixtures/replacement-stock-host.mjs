@@ -11,6 +11,8 @@ process.send=(value,...args)=>{
  if(envelope){
   const scenario=process.env.STOCK_SCENARIO;
   if(scenario==='lost')return true;
+  if(scenario==='wrong-message')value.id='foreign-message';
+  if(scenario==='deadline-sibling')envelope.original.deadline=Date.now()-1;
   if(scenario==='missing')delete value.replacementOriginal;
   if(scenario==='foreign')envelope.original.run='foreign';
   if(scenario==='generation')envelope.original.generation++;
