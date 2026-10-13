@@ -536,6 +536,28 @@ Wrapper exit 2 (`SELECTION_COLLECTION_FAILED`) возник при разбор�
   единственный отказ — baseline JAVASCRIPT_NOT_ALLOWED (2 JS nodes/calls).
   Original CLI0/wrapper2 и collector blocker сохранены, модель не повторяли.
 
+## Предпосылка продолжения: вложенная квитанция operation_inspect
+
+ABC/2 завершился CLI0/Save/Export/cleanup и oracle true. После USER_RESPONSE_BUDGET
+runtime явно предложил operation_inspect; его resolved/verified response содержит
+полный успешный node.apply outcome, совпавший с runtime. Аудитор ошибочно читал
+внешнюю оболочку как node receipt, поэтому прежний calculation false сохранён.
+
+- [x] Поддержать наблюдённую inspection/delivery форму по TDD без ослабления
+  identity/cleanup/runtime gates. `e871bf81d2` меняет только node-selection.ts и
+  его тесты. RED воспроизвёл три отказа; GREEN и 106 tests/236 assertions PASS,
+  final 18 regressions/30 assertions после type narrowing, typecheck/diff PASS.
+  Independent review Approved: 38 negative protocol mutations, сохранены raw
+  history/receipts. Неизвестная/неполная inspection и generic error отклоняются.
+  `settlement-fix-lock.json` закрепляет auditVersion
+  `2654bfc1c61d4d0ecc73c7a6f4fa9613b5d5244ea83a7fdb8712be2ed452e445`;
+  historical locks/pins неизменны, 70 прежних hashes и два исправленных файла.
+- [ ] Переоценить все восемь уже начатых baseline одной финальной версией аудита
+  в отдельных проекциях. Сохранить original CLI/wrapper/attempt и prior audit
+  hashes, подтвердить отсутствие model rerun и неизменность входов/пакетов.
+  Независимо проверить новые оценки/lock; продолжить ту же серию без пересборки
+  runtime/payload и без повторного занятия прежних модельных слотов.
+
 ## Task 3: Единый скрипт попытки, закреплённый baseline и пилот
 
 **Files:** `evals/script/run-node-selection-attempt.ts`, приватное evidence под
@@ -1180,6 +1202,8 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   используется зафиксированный результат Task 4, а не заявляется новый запуск.
   Runtime 310 tests и build/native offline evidence отдельно сверены с source.
   Этот пункт не закрывает live candidate и содержательный review.
+  После нового audit fix `e871bf81d2` проверки обновлены: 106 tests/236 assertions,
+  final 18 regressions/30 assertions, typecheck/diff и independent review PASS.
 - [ ] Независимый reviewer проверяет два skill-файла, контракт аудита и выборку:
   все 6 JS-попыток, одну recovery, все candidate-провалы/аномалии и три случайных
   успешных standard. Это 7 exception/recovery, а не 9 JS-попыток. Baseline
@@ -1259,11 +1283,11 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
 - Baseline собран/проверен до изменения skill, source attestation и pins сохранены.
 - Первый pre-dispatch OAuth 401 сохранён как incident; авторизация по коду завершилась exit 0.
 - Пилот sales-by-category/1: CLI exit 0; native offline audit PASS, включая oracle/history/runtime/graph.
-- Финальный auditVersion: `1f1e63ba844350aa21b9722ced44579050d12eaade0b78217085d5ae797eb34d`.
+- Актуальный auditVersion: `2654bfc1c61d4d0ecc73c7a6f4fa9613b5d5244ea83a7fdb8712be2ed452e445`; старые оценки сохранены.
 - Historical lock: 95 tests/219 assertions, 72 файла; collector f5eb5373e2: 88/206 PASS, новый addendum и independent review PASS.
 - Baseline ABC/1 и monthly/1: CLI exit 1, cleanup unconfirmed; оба модельных слота сохраняются.
 - Candidate собран/verify PASS; digest `ff18dc5f2b4da3d7b6c66d0419d48aae7590b2a07e0d2e50f7a01cd9f3f34261`.
 - Candidate pins: first wave 9/всего 25; статические tags-контракты сверены, actual prepare ещё нет.
 - Playwright MCP 0.0.83 установлен в Codex; admin login/inventory/logout проверены, own ABC session закрыта сервером.
 - Только own .writer архивирован после GUID/log/admin-сверки; status/check PASS, история/evidence сохранены.
-- Серия142936-072953: baseline8/18, oracle8/calculation7; ABC2 CLI0/cleanuptrue, settlement mismatch диагностируется; следующие модели не запущены; candidate0/25.
+- Серия142936-072953: baseline8/18, oracle/calculation8 после offline reassessment; inspect fix e871bf81d2/review PASS, monthly2 в работе; candidate0/25.

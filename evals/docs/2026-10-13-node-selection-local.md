@@ -70,6 +70,16 @@ review PASS. Historical lock сохранён; `collector-fix-lock.json` зак�
 runner hash, 71 прежний hash и неизменные runtime/pins/auditVersion. Та же текущая
 серия продолжается без пересборки matched payload и без повторения ABC модели.
 
+Второй audit fix `e871bf81d2` распознаёт успешный retained node.apply outcome в
+resolved/verified operation_inspect после USER_RESPONSE_BUDGET. Identity/cleanup/
+execution/runtime gates сохранены; 106 tests/typecheck/independent review PASS.
+`settlement-fix-lock.json` закрепляет новый auditVersion `2654bfc1…`, прежние pins
+и historical locks. Для первых восьми baseline текущие оценки находятся в
+`evidence/settlement-reassessment-e871bf81d2`; original attempts и прежние audits
+читать вместе с `audit-reassessment-originals.json`/`settlement-reassessment.json`.
+Дальнейшие слоты используют тот же финальный audit напрямую. Новые модельные
+попытки вместо этих восьми не запускались; runtime/payload не пересобирались.
+
 ## Доказательства
 
 `<resultsRoot>/<phase>/<taskID>/<attemptNo>/` содержит:

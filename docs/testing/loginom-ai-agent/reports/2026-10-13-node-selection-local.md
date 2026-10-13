@@ -8,7 +8,7 @@
 Серия `20261013T132356Z-0a3983` остановлена: два baseline неуспешны, candidate 0/25.
 Обнаружен и исправлен второй общий runtime-блокер `c2c898aca5` (dataset output
 socket в overflow), TDD/310 tests/independent review PASS. Следующая сопоставимая
-серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle 8/calculation 7;
+серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle/calculation 8;
 ABC CLI exit 0, wrapper exit 2, evidence восстановлены offline; candidate 0/25.
 Обе сборки/pins и native overflow proof проверены.
 Ни один старый провал
@@ -254,6 +254,30 @@ Package SHA `dd9604cf371586fd9092f0cd885805dead3f4a81b03101fdb4cf51b80b890513`.
 Collector fix подтверждён в обычном live CLI: один полный loginom_find содержит
 named import `{ OutputTable, DataType }`, но сбор Save/Export/пакета/CSV и audit
 завершился без collection failure. Исходные outcomes и audit сохранены.
+
+Диагностика доказала delivery-path false negative: wait получил USER_RESPONSE_BUDGET
+с next_step operation_inspect; успешная resolved/verified inspection содержит
+полный canonical node.apply outcome, deep-equal runtime completed.outcome.
+Все original hashes совпали. `e871bf81d2` исправил разбор только в auditor/test:
+106 tests/236 assertions PASS, final 18 regressions/30 assertions, typecheck/diff
+PASS. Independent review Approved, 38 отрицательных mutations прошли.
+Для inspect проверены operation ID, внутренний status, cleanup, node/execution
+и runtime; generic error не скрывается. Raw outcomes не менялись.
+
+Новый lock SHA `cf81c625a3dd354e8cd4659b636fc5a8ac231acc814f6aab858805b5569ca140`,
+auditVersion `2654bfc1c61d4d0ecc73c7a6f4fa9613b5d5244ea83a7fdb8712be2ed452e445`.
+70 historical hashes неизменны; изменены только runner и node-selection,
+historical locks и оба pins сохранены. Runtime/payload/skill не пересобирались.
+
+Восемь сохранённых baseline переоценены в отдельных hardlink-проекциях
+`evidence/settlement-reassessment-e871bf81d2`, без overwrite прежних audits.
+Original inventory SHA `361a0dc13228d7b0fa4fb437635031ddebcbbfb7601bdf96ee7554aec48c26d6`;
+`settlement-reassessment.json` SHA
+`0ac9ee23bb8286d4221534cb281caed75fb58a9f0380dd7f18bc6ee5e345939c`.
+Итог: oracle/calculation 8/8, policy 5/8, JS nodes/calls/successful calls 5/5/5.
+ABC/2 теперь runtimeSettled/calculation true, единственный отказ JAVASCRIPT_NOT_ALLOWED;
+исходный wrapper1/calculationfalse отдельно сохранён. Повтора модели нет.
+Независимый review reassessment идёт; monthly-demand/2 запущен.
 
 ## Native proof исправления дат
 

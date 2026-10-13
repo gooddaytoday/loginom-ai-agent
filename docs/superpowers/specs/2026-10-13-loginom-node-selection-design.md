@@ -4,7 +4,7 @@
 Статус: дизайн согласован пользователем; реализация идёт, live-приёмка ещё не завершена.
 Основной skill изменён в двух Product файлах. Аудит/runner прошли TDD и независимый
 review; реальный baseline-пилот прошёл финальную offline-проверку без JS.
-Текущая серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle 8/calculation 7;
+Текущая серия `20261013T142936Z-072953`: завершены baseline 8/18, oracle/calculation 8;
 ABC CLI exit 0, wrapper exit 2 из-за сборщика evidence, расчёт восстановлен offline.
 Candidate payload собран и проверен; все 25 live-попыток ещё предстоят.
 Статические контракты candidate для tags сверены с baseline и исходниками;
@@ -281,9 +281,24 @@ ABC с двумя JS и attribution с одним. Sales-by-category/2 такж�
 CLI/wrapper0, полный audit/cleanup PASS без JS. ABC/2 завершился CLI0/cleanup true,
 oracle true, wrapper1: public/runtime settlement одного JS не подтверждён
 (RUNTIME_APPLY_MISMATCH, TOOL_OPERATION_UNSETTLED, TOOL_RECEIPT_INCOMPLETE).
-Calculation false сохраняется до диагностики `operation_inspect`; следующая
-модель пока не запускается. Collector корректно обработал реальный Help с import.
+Исходный calculation false сохранён; ниже зафиксирована отдельная повторная
+оценка после исправления `operation_inspect`. Collector обработал реальный Help.
 candidate 0/25, полная приёмка ещё впереди.
+
+`e871bf81d2` исправляет только аудит inspection: resolved/verified envelope,
+полный bound successful node.apply outcome, cleanup/node/execution/runtime
+binding и поздняя inspection после точного USER_RESPONSE_BUDGET refusal.
+RED → GREEN, 106 tests, typecheck/diff и independent review PASS (38 negative
+mutations). Generic error или внешний SUCCEEDED без terminal outcome не принимается.
+Runtime, skill, payload и pins прежние. Новый auditVersion
+`2654bfc1c61d4d0ecc73c7a6f4fa9613b5d5244ea83a7fdb8712be2ed452e445`
+закреплён `settlement-fix-lock.json`; historical locks сохранены.
+
+Все восемь baseline переоценены offline в `evidence/settlement-reassessment-e871bf81d2`:
+oracle/calculation 8/8, standard policy 5/8 старого skill, JS 5 nodes/calls/successful
+calls. Original attempt/outcomes/raw и предыдущие оценки побайтно сохранены;
+только ABC/2 получил ранее недостающий settlement и расчётный PASS. Повтор модели
+не выполнялся. Независимая сверка reassessment идёт, начат monthly-demand/2.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill
