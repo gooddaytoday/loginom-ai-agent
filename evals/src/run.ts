@@ -209,7 +209,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const summary: RunSummary = {
     run_id: runId,
     slots: fixture ? fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
-      liveQualified: false, ...(config.dryRun ? { state: "planned" as const } : slotStates.get(slot.id)!) }))
+      liveQualified: false, ...(config.dryRun ? { state: "planned" as const, storage_root: path.join(fixture.storage, slot.id) } : slotStates.get(slot.id)!) }))
       : [{ id: "default", username: config.loginom.username, profileDir: config.profileDir,
         historyDir: `${config.profileDir}.history`, workspaceRoot: path.resolve(config.agent.workspaceRoot), liveQualified: false,
         state: config.dryRun ? "planned" : state.stopped || attempts.some(result => result.environment_cleanup?.status !== "confirmed") ? "quarantined" : "closed",
@@ -243,7 +243,8 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
     loginom: {
       image_digest: environment.loginom?.imageDigest ?? null,
       container: source.kind === "dir" ? null : config.loginom.container,
-      storage_dir: source.kind === "dir" ? null : config.loginom.storageDir,
+      storage_dir: fixture ? config.parallel === 1 ? path.join(fixture.storage, fixture.file.slots[0]!.id) : null
+        : source.kind === "dir" ? null : config.loginom.storageDir,
     },
     agent_inputs_hash: inputsHash,
     rubric_hash: rubric,
