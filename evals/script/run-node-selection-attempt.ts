@@ -326,7 +326,7 @@ export function selectionModelStarted(snapshot: ReturnType<typeof readSelectionS
       assistant.tokens.cache.write].some((value) => value !== 0) || !snapshot.parts.length ||
     snapshot.parts.some((part) => part.messageID !== users[0]!.id)) return null
   // Observed pilot failure: OpenAI OAuth refresh is awaited before the inference fetch.
-  // A durable assistant row is created earlier and, on its own, proves no dispatch.
+  // A durable assistant row is created earlier and does not prove dispatch on its own.
   return false
 }
 
@@ -349,7 +349,7 @@ export function readSelectionSnapshot(filename: string, sessionID: string,
       "SELECT id, message_id, session_id, data FROM part WHERE session_id = ? ORDER BY time_created, id").all(ownID)
     return { sessionID: ownID, parentID: session.parent_id, childSessionIDs: children.map((child) => child.id),
       messages: messages.map((row): Record<string, unknown> => ({ ...jsonRecord(row.data), id: row.id, sessionID: row.session_id })),
-      parts: parts.map((row) => ({ ...jsonRecord(row.data), id: row.id, messageID: row.message_id, sessionID: row.session_id })),
+      parts: parts.map((row): Record<string, unknown> => ({ ...jsonRecord(row.data), id: row.id, messageID: row.message_id, sessionID: row.session_id })),
     }
   } finally { database.close() }
 }
