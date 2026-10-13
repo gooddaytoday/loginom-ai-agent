@@ -184,5 +184,18 @@
     "proposal_not_applied": "evals/docs/proposals/2026-10-13-mas-runtime-route.patch",
     "same_monitor_blocker_refined_not_new_Rich_failure": true,
     "receipt": "evals/docs/2026-10-13-text-import-runtime-ssh-diagnosis.json"
+  },
+  "resolution_observation": {
+    "checked_utc": "2026-10-13T09:26:20.276782+00:00",
+    "status": "RESOLVED_VERIFIED",
+    "owner_network_permission": "Explicit Разрешаю",
+    "patch_applied": true,
+    "verified_HTTPS_200_TLS0": true,
+    "same_runtime_online": true,
+    "original_queued_task_running": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+    "receipt": "evals/docs/2026-10-13-text-import-runtime-route-recovery-verification.json",
+    "historical_failure_receipts_preserved": true,
+    "no_daemon_or_VPN_restart": true,
+    "cause_confirmed_by_targeted_change": true
   }
 }

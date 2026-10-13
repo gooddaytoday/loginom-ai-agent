@@ -1,0 +1,46 @@
+{
+  "applied_utc": "2026-10-13T09:22:41.524485+00:00",
+  "authorized_by_owner": true,
+  "patch_sha256": "9e848793da646579bd99dc91319a2f458f74c392741a74c142bbfb4da7430452",
+  "backups": "/home/user/.local/share/loginom-evals-runtime/operator-work/20261013-mas-route-proposal/backup-20261013T092240Z",
+  "network_files": [
+    {
+      "path": "/etc/systemd/system/loginom-evals-routes.service",
+      "before_sha256": "4625d4c33947a4effd1ad5c810d9ef824a9035d25b48250ec971a2c20b0214a6",
+      "after_sha256": "2dbbd4360d9ea4612cd7c7ea94096f916476467ba6239231a57290cf0c494835",
+      "mode": "0o644"
+    },
+    {
+      "path": "/etc/vpn-egress-lockdown/rules.nft",
+      "before_sha256": "5f18f9558cd70ca9c2abdbe43a96a01c782de4c28be1d64d2ce1a78bc47292a2",
+      "after_sha256": "83691f6cfbbf90cb1fe1d496e307ea5f8be4a077aaa8c90271974e84c9beb470",
+      "mode": "0o644"
+    }
+  ],
+  "route": [
+    {
+      "dst": "78.17.1.143",
+      "gateway": "10.200.0.1",
+      "dev": "enp3s0",
+      "prefsrc": "10.200.13.152",
+      "flags": [],
+      "uid": 0,
+      "cache": []
+    }
+  ],
+  "current_daemon_proxy_HTTPS": {
+    "exit_code": 0,
+    "result": "HTTP=200 TLS_VERIFY=0",
+    "error": ""
+  },
+  "protected_config_registration_env_binary_bytes_unchanged": {
+    "/home/user/.multica/config.json": true,
+    "/home/user/.multica/daemon.id": true,
+    "/home/user/.local/share/loginom-evals-runtime/runtime.env": true,
+    "/usr/local/bin/multica": true
+  },
+  "daemon_or_VPN_or_stand_restart": false,
+  "old_rules_or_policy_removed": false,
+  "new_rule": "Only78.17.1.143/32 main at8998 and TCP443 output accept",
+  "systemd_verify_and_nft_check": "PASS"
+}

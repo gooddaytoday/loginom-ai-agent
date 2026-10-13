@@ -106,9 +106,23 @@
   "scenario_native_reference_product_recovery_operations": 0,
   "heartbeat": "lab-56-lab-63 remains ACTIVE every30 minutes; all eight done not verified",
   "owner_network_permission": {
-    "state": "ASKED_PENDING",
+    "state": "AUTHORIZED_APPLIED_VERIFIED",
     "question": "Apply only78.17.1.143/32 main route and TCP443 firewall rule on eval-tests; preserve existing policy/services/models/counters.",
     "reason": "Owner autonomy point6 explicitly reserves shared network/VPN/system defaults changes for a separate owner decision.",
-    "approval_not_inferred_from_SSH_access": true
+    "approval_not_inferred_from_SSH_access": true,
+    "historical_state": "ASKED_PENDING"
+  },
+  "resolution_observation": {
+    "checked_utc": "2026-10-13T09:26:20.276782+00:00",
+    "status": "RESOLVED_VERIFIED",
+    "owner_network_permission": "Explicit Разрешаю",
+    "patch_applied": true,
+    "verified_HTTPS_200_TLS0": true,
+    "same_runtime_online": true,
+    "original_queued_task_running": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+    "receipt": "evals/docs/2026-10-13-text-import-runtime-route-recovery-verification.json",
+    "historical_failure_receipts_preserved": true,
+    "no_daemon_or_VPN_restart": true,
+    "cause_confirmed_by_targeted_change": true
   }
 }

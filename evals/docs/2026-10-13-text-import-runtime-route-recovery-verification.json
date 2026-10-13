@@ -1,0 +1,184 @@
+{
+  "checked_utc": "2026-10-13T09:26:20.276782+00:00",
+  "owner_network_permission": "Explicit human Разрешаю on13 October, responding to prepared /32 + TCP443 network patch request.",
+  "patch_sha256": "9e848793da646579bd99dc91319a2f458f74c392741a74c142bbfb4da7430452",
+  "safe_remote_apply_receipt": "evals/docs/2026-10-13-text-import-runtime-route-applied.json",
+  "remote_local_receipt_byte_SHA256": "c2816b4d611174f0f84192d22f2c16309292f145de2aab2ee74cb0bb14293e60",
+  "remote_local_receipt_byte_match": true,
+  "applied_utc": "2026-10-13T09:22:41.524485+00:00",
+  "HTTPS": "Existing daemon HTTP proxy to MAS now returns HTTP200 with TLS verification0. Same destination had timed out before targeted network change.",
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "online",
+    "last_seen_at": "2026-10-13T12:26:18+03:00",
+    "updated_at": "2026-10-13T12:22:43+03:00",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+  },
+  "daemon_PID_preserved": 1018766,
+  "daemon_restart_required": false,
+  "VPN_Xray_singbox_stand_restart": false,
+  "protected_configs_registration_env_and_Multica_binary_byte_unchanged": true,
+  "causal_confirmation": "Adding approved78.17.1.143/32 main rule and TCP443 accept restored verified HTTPS; the existing daemon reconnected and claimed the original queued approval task two seconds after apply receipt. Heartbeats remained current at12:26:18+03.",
+  "resumed_task": {
+    "id": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+    "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "status": "running",
+    "trigger_comment_id": "01a13471-39bb-7677-a48c-2fb247c3beea",
+    "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "dispatched_at": "2026-10-13T12:22:43+03:00",
+    "started_at": "2026-10-13T12:22:43+03:00",
+    "completed_at": null,
+    "failure_reason": null
+  },
+  "new_native_task_dispatches_by_monitor": 0,
+  "new_routed_comments": 0,
+  "current_cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "in_review",
+      "revision": 65,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "blocked",
+      "revision": 150,
+      "active_queued": [
+        {
+          "id": "01a13471-3a07-73a0-bb1f-08cfbd62345f",
+          "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+          "status": "running"
+        }
+      ]
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "active_queued": []
+    }
+  ],
+  "worker_models": [
+    {
+      "id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "name": "Evaler",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "working"
+    },
+    {
+      "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "name": "Rich",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    },
+    {
+      "id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+      "name": "Ben",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "status": "idle"
+    }
+  ],
+  "LAB-56": "Fresh independent ACCEPT and cleanup confirmed; owner considers completed, server remains in_review65. No status mutation.",
+  "LAB-57": "Network blocker resolved. Existing Evaler approval is running; CLI source blocker still awaits actual isolated build/tests/admission and new pin evidence. Approval is already granted and must not be requested again.",
+  "latest_budget_evidence": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "same_cause_Rich_repeats": {
+    "consumed": 2,
+    "limit": 10,
+    "charge_this_recovery": 0
+  },
+  "operator_scenario_reference_product_cold_model_probes": 0,
+  "owner_note": "Another runtime needs VPN to reach Multica. This confirmed route repair is specific to eval-tests; no general direct-connect requirement or change to another runtime is inferred.",
+  "rollback_backups": "/home/user/.local/share/loginom-evals-runtime/operator-work/20261013-mas-route-proposal/backup-20261013T092240Z",
+  "persistent_files": [
+    {
+      "path": "/etc/systemd/system/loginom-evals-routes.service",
+      "before_sha256": "4625d4c33947a4effd1ad5c810d9ef824a9035d25b48250ec971a2c20b0214a6",
+      "after_sha256": "2dbbd4360d9ea4612cd7c7ea94096f916476467ba6239231a57290cf0c494835",
+      "mode": "0o644"
+    },
+    {
+      "path": "/etc/vpn-egress-lockdown/rules.nft",
+      "before_sha256": "5f18f9558cd70ca9c2abdbe43a96a01c782de4c28be1d64d2ce1a78bc47292a2",
+      "after_sha256": "83691f6cfbbf90cb1fe1d496e307ea5f8be4a077aaa8c90271974e84c9beb470",
+      "mode": "0o644"
+    }
+  ],
+  "persistence_validation": "Network files installed preserving root ownership/modes; systemd daemon-reload completed; original systemd verify/nft check PASS. Reboot not performed.",
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "interval_minutes": 30,
+    "all_eight_done_verified": false
+  },
+  "remaining_work": "Evaler coordinates authorized TSV CLI testing/build/admission and bounded Rich continuation; Ben independently verifies delivery. Monitor fresh status every30min and avoid duplicates while original task is active.",
+  "heartbeat_prompt_reconciled": {
+    "automation_id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "interval_minutes": 30,
+    "network_resolution_and_owner_other_runtime_VPN_note_preserved": true,
+    "tool_result": "Updated automation in the app."
+  }
+}
