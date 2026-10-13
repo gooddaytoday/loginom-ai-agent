@@ -485,6 +485,28 @@ unobserved, finish_wizard отсутствует. Input0 в том же runtime 
 instrumented diagnostic с fixed read-only NavigationPanel capture готовится
 без LLM и без изменения acceptance payload.
 
+## Join: адресное восстановление
+
+Четыре GUID import/sort/calculator/group связывают own user:67 с init
+18:07:44.200 UTC; Join ещё не исполнялся и его GUID отсутствует в server log.
+Admin сверил точное имя/CreateTime, закрыл только own user:67. Server close
+18:22:08.767 UTC и отсутствие после refresh18:22:19.194 подтверждены независимо
+по log continuity и screenshots; server immutable GUID неизвестен (не выдуман).
+User61/63/64/66 не трогали. `server-session-binding.json` SHA256
+`8de63d95c1b5d76932e41247a7d697c73baf0c21f12fca62a4b555012cf57bdc`.
+
+Exact guard SHA/mtime соответствуют initial observation; own процессов нет,
+он атомарно перенесён в `profile-guard-archive/candidate-abc-1.writer`.
+Original attempt/events/parts/pins/runtime hashes неизменны. `profile-recovery.json`
+SHA256 `a11971af9878734774e5887df9a9b2c3f9706650a9755ee7e29c7eb99e3af1eb`.
+Admin logout/Browser close/MCP exit0 подтверждены. Model-free `loginom status`
+и `loginom check --headless --format json` exit0, Help ready/browser verified,
+writer absent. `profile-management-verification.json` SHA256
+`525aa7bd088329162072d957182b03c89eeb51e0703601100d0cdfbfa91cb743`.
+Первый operator status вызов ошибочно использовал --json (exit2); исходные
+логи `.invalid-option` сохранены, исправлена только команда. Recovery не
+изменяет original CLI1/wrapper3/cleanupfalse и не подтверждает ABC oracle.
+
 ## Native proof исправления дат
 
 `date-format-native-2` через настоящий Host без LLM завершился exit 0.

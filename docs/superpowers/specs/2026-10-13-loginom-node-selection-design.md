@@ -348,6 +348,9 @@ enabled/visible во всех 44 финальных polls; конкретный 
 не сохранён. Это не подтверждённый capability gap и не повод менять skill.
 Для причины готовится отдельный native diagnostic без LLM с fixed read-only
 NavigationPanel capture; immutable candidate и original model slot не меняются.
+Own user:67 закрыт адресно по четырём GUID/server/admin binding; fresh log и
+refresh absence подтверждены. Exact guard архивирован после SHA/mtime/proc
+проверки; status/check0. Это recovery, original cleanup false сохранён.
 
 Это перезапуск сравнения из-за необходимой общей runtime-правки, а не повтор
 неудачного модельного слота. Ограничение двух последующих policy-исправлений skill

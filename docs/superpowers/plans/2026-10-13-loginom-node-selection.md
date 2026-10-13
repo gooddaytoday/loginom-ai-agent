@@ -577,6 +577,15 @@ Candidate ABC/1 серии `20261013T142936Z-072953` остановился бе
   conjunct/caption отсутствует в сохранённом trace и пока не доказан.
   Evidence `candidate/abc-pareto-groups/1/forensic/join-diagnosis.json`, SHA256
   `5bd0562275400f8cd4be775795da17807fb93a2a1dbc2204907635ddaf218b2c`.
+- [x] После строгой own identity выполнить адресное server/profile recovery.
+  Четыре native GUID привязали own incarnation user:67 (init18:07:44.200Z).
+  Admin CreateTime сверено; закрытие18:22:08.767Z подтверждено свежим server log,
+  отсутствие после refresh18:22:19.194Z и screenshots проверены независимо.
+  Только own guard архивирован после SHA/mtime и no-own-process проверки;
+  original attempt/history/runtime/pins hashes неизменны. Admin logout/MCP exit
+  и model-free status/check0 (Help ready/browser verified) подтверждены.
+  Evidence `forensic/server-session-binding.json`, `profile-recovery.json`,
+  `profile-management-verification.json`. Original cleanup false не переименован.
 - [ ] Выполнить отдельный deterministic native diagnostic без LLM, с неизменными
   candidate resources и явно отдельным instrumented entry для fixed read-only
   NavigationPanel capture. Сохранить actual input1 caption/visibility/bounds/icon
