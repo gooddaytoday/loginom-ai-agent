@@ -8,6 +8,8 @@ const builtin={'node:module':module,'node:crypto':crypto,'node:path':path,'node:
 const entry=new vm.SourceTextModule(await readFile(file,'utf8')+'\nexport {state,requests};',{context,identifier:url.pathToFileURL(file).href,initializeImportMeta(meta){meta.url=url.pathToFileURL(file).href}});
 await entry.link(specifier=>{
  const exports=builtin[specifier]??({
+ './original-prepare-lender.mjs':{retainOriginalPrepareStartup(){throw Error('fixture forbids start')}},
+ './fp-managed-startup.mjs':{retainFPManagedStartup(){throw Error('fixture forbids start')}},
  './resources.mjs':{verifyResources:()=>{throw Error('fixture forbids start')}},
  './start-input.mjs':{validateStartInput:()=>{throw Error('fixture forbids start')}},
  './connection-check.mjs':{loginBrowser(){throw Error('fixture forbids login')},checkConnection(){throw Error('fixture forbids login')},loginomAddress(){}},

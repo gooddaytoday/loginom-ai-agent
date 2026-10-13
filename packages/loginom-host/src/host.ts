@@ -1,3 +1,4 @@
+import {getFPHostStartup} from "./fp-startup-control"
 import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
@@ -17,9 +18,12 @@ export async function createLoginomHost(options: {
   strictRecovery?: boolean
   // Acceptance-only forwarding of the existing managed shutdown binding.
   acceptanceCleanupPackage?: string
-  acceptanceCapture?: { authorization: string; packagePath: string; harness: "sorting-before-close-v1" }
+  acceptanceCapture?: { authorization: string; packagePath: string; harness: "sorting-before-close-v1" | "field-parameters-preservation-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  const fpStartup=getFPHostStartup(options)
+  try {
+  fpStartup?.guard()
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
@@ -28,7 +32,8 @@ export async function createLoginomHost(options: {
   // model calls use advisory recovery. Caller settings cannot weaken admission.
   const journal = await recoveryStore(join(root, "recovery"), {
     strict: options.acceptanceCapture !== undefined || options.strictRecovery === true,
-  })
+  }).catch(error=>{throw fpStartup?fpStartup.forward(fpStartup.reject(error)):error})
+  fpStartup?.guard()
   const generations = new Map<
     number,
     { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }
@@ -75,9 +80,11 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false, acceptanceCapture?: CaptureBinding) {
+  async function launch(connection: ActiveConnection, chat: string, validation = false, acceptanceCapture?: CaptureBinding, startup=undefined as typeof fpStartup) {
+    startup?.guard()
     guardOwners()
-    const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+    const manifest = await readFile(join(resources, "resource-manifest.json"), "utf8").then(text=>JSON.parse(text)).catch(error=>{throw startup?startup.forward(startup.reject(error)):error})
+    startup?.guard()
     const key = `${validation ? "validation" : "runtime"}:${connection.generation}:${chat}`
     const owner: { child?: Runtime; settled: Promise<void>; failure?: { value: unknown } } = { settled: Promise.resolve() }
     owners.set(key, owner)
@@ -97,10 +104,11 @@ export async function createLoginomHost(options: {
       actionManifestSha256: manifest.actionManifestSha256,
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
-    })
+    }, startup ? {...startup.control,...startup.tuple,guard:startup.guard,reject:startup.propagate,
+      receive:startup.receive,retain:child=>{owner.child=child}} : undefined)
     owner.settled = launched.then(child => { owner.child = child }, error => {
       owner.failure = { value: error }
-      owner.child = error?.runtime
+      owner.child = error?.runtime ?? owner.child
       if (!owner.child && owners.get(key) === owner) owners.delete(key)
     })
     return launched
@@ -127,8 +135,8 @@ export async function createLoginomHost(options: {
         }
       },
       close: closeOwners,
-      async prepare(connection) {
-        const child = await launch(connection, "readiness")
+      async prepare(connection,startup) {
+        const child = await launch(connection, "readiness",false,undefined,startup)
         const generation = { connection, children: new Map<string, Promise<Runtime>>() }
         generations.set(connection.generation, generation)
         retain(generation, "readiness", Promise.resolve(child))
@@ -157,7 +165,9 @@ export async function createLoginomHost(options: {
       },
     },
     journal,
+    fpStartup,
   )
+  fpStartup?.guard()
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
@@ -193,6 +203,7 @@ export async function createLoginomHost(options: {
         && !lost.has(chat!) && !stale.has(chat!)
     },
     bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
+      if(fpStartup)throw Error("LOGINOM_FP_CAPTURE_NOT_ADMITTED")
       if (!options.acceptanceCapture) return
       const current = generations.get(lease.generation)
       if (!current || current.children.has(chat) || captures.has(chat) || captures.size !== 0
@@ -252,5 +263,5 @@ export async function createLoginomHost(options: {
       }
       return retain(current, chat, launch(current.connection, chat, false, captures.get(chat)))
     },
-  }
+  }  }catch(error){throw fpStartup?fpStartup.forward(error):error}
 }

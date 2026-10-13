@@ -1,3 +1,5 @@
+import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
+import {retainFPManagedStartup} from './fp-managed-startup.mjs'
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
@@ -94,6 +96,7 @@ function close() {
   return state.closing
 }
 const stop = () => {
+  if(state.controlledStartup && !state.controlledStartup.accepted){state.closeFailure=Error("LOGINOM_NOT_READY");return}
   void close().then(
     () => process.exit(0),
     error => { state.closeFailure = error },
@@ -120,8 +123,17 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, acceptanceCapture } = validateStartInput(input)
-      const resources = await verifyResources(input.resources)
+      const { acceptanceCleanupPackage, acceptanceCapture, fpStartup } = validateStartInput(input)
+      if(fpStartup) {
+        state.startupController=new AbortController()
+        state.controlledStartup=retainFPManagedStartup(message,input,state,state.startupController)
+      }
+      const observed=async work=>{
+        let value;try {value=await work}catch(error){throw state.controlledStartup?state.controlledStartup.reject(error):error}
+        state.controlledStartup?.guard();return value
+      }
+      state.controlledStartup?.guard()
+      const resources = await observed(verifyResources(input.resources))
       let captureHarness
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
@@ -142,14 +154,17 @@ async function handle(message) {
         "attempts",
         randomUUID(),
       )
-      await mkdir(directory, { recursive: true, mode: 0o700 })
+      await observed(mkdir(directory, { recursive: true, mode: 0o700 }))
       // Chromium creates nested files below user-data-dir. The normal Desktop
       // state path is already close to MAX_PATH on Windows, so a valid profile
       // can otherwise fail before Loginom authentication even starts.
       const browserProfile =
-        process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
+        process.platform === "win32" ? await observed(mkdtemp(join(tmpdir(), "lb"))) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
-      state.startupOwner={directory,generation:input.generation,chat:input.chat}
+      state.startupOwner={directory,generation:input.generation,chat:input.chat,
+        ...(fpStartup?{signal:state.startupController.signal,deadline:fpStartup.deadline}:{} )}
+      state.controlledStartup?.bindOwner(state.startupOwner)
+      const originalStartupSignal=state.startupOwner.signal,originalStartupDeadline=state.startupOwner.deadline
       const login = {
         owner:state.startupOwner,
         browserPath: resources.browserPath,
@@ -162,7 +177,7 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      const authenticated = await loginBrowser({ ...login, keepOpen: true })
+      const authenticated = await observed(loginBrowser({ ...login, keepOpen: true }))
       state.browser = authenticated.context
       state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:input.generation,chat:input.chat})
       const config = {
@@ -189,16 +204,18 @@ async function handle(message) {
         },
         inputUploadDirectory: `/${input.connection.username}`,
       }
-      const session = await createSession(config, {
+      const session = await observed(createSession(config, {
         headless: input.headless === true,
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
-      })
+      }))
       state.session = session
       const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
         originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
       const assertStartup=()=>{
+        state.controlledStartup?.guard();
         if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
             || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalOwner.signal!==originalStartupSignal || originalOwner.deadline!==originalStartupDeadline
             || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
             || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
             || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
@@ -209,7 +226,7 @@ async function handle(message) {
       // Bind only the document owned by this successful private login. This is
       // not workspace preparation and confers no package-close authority.
       const documentId=randomUUID()
-      state.authenticatedReadiness=await authenticated.context.pages()[0].evaluate(o=>{
+      state.authenticatedReadiness=await observed(authenticated.context.pages()[0].evaluate(o=>{
         const app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
         if(location.origin!==o.origin||app?.Version!=='7.4.2'||m?.FServerConnection?.UserName!==o.account
             ||m.FServerConnection.Connected!==true||globalThis.__loginomDockReadinessV1)
@@ -218,31 +235,34 @@ async function handle(message) {
           account:o.account,loginomBuild:app.Version};
         return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
       },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
-        origin:new URL(config.loginomUrl).origin})
+        origin:new URL(config.loginomUrl).origin}))
       assertStartup();
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
-      state.browserServer = await createConnection(
-        JSON.parse(await readFile(session.browserConfig, "utf8")),
+      state.browserServer = await observed(createConnection(
+        JSON.parse(await observed(readFile(session.browserConfig, "utf8"))),
         async () => authenticated.context,
-      )
+      ))
       assertStartup();
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
-      await state.browserServer.connect(browserServerTransport)
+      await observed(state.browserServer.connect(browserServerTransport))
       assertStartup();
-      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+      if(state.controlledStartup)retainOriginalPrepareStartup(session,{startup:originalStartup,owner:originalOwner,
+        readiness:state.authenticatedReadiness,assertStartup});
+      state.bridge = await observed(createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
-        acceptanceCapture: acceptanceCapture ? {binding:Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}),harness:captureHarness} : undefined })
+        acceptanceCapture: acceptanceCapture ? {binding:Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}),harness:captureHarness} : undefined }))
       assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       state.readonlyBinding=Object.freeze({startup:state.startupBinding,owner:state.startupOwner,
         bridge:state.bridge,client:state.client,session,metadata:originalMetadata,directory:originalDirectory,sessionId:originalSessionId})
-      await state.bridge.server.connect(serverTransport)
+      await observed(state.bridge.server.connect(serverTransport))
       assertStartup();
-      await state.client.connect(clientTransport)
+      await observed(state.client.connect(clientTransport))
       assertStartup();
+      state.controlledStartup?.accept()
       send({
         id: message.id,
         result: {
@@ -257,6 +277,11 @@ async function handle(message) {
       })
       return
     }
+    if(message.operation==='readonly.preReady.cancel' && message.input?.phase==='startup') {
+      if(!state.controlledStartup?.cancel(message.input))throw Error('LOGINOM_HANDSHAKE_INVALID');
+      send({id:message.id,result:{accepted:true,pending:state.controlledStartup.pending,nativeCancellationConfirmed:false}});return
+    }
+    if(state.controlledStartup && !state.controlledStartup.accepted)throw Error('LOGINOM_NOT_READY');
     if (message.operation === "close") {
       await close()
       send({ id: message.id, result: { closed: true } }, true)
@@ -339,15 +364,17 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code })
+    if(message.operation==='start' && state.controlledStartup)send({id:message.id,rejection:closeRejection(state.controlledStartup.propagate(error)),rejectionOrigin:state.controlledStartup.rejectionOrigin,
+      ...(state.controlledStartup.secondary?{secondaryRejection:closeRejection(state.controlledStartup.secondary.value)}:{})});
+    else send({ id: message.id, error: code })
     if (message.operation === "start") {
       state.startupFailure=error
       if(state.startupOwner?.context) state.browser=state.startupOwner.context
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
-      setImmediate(() => {
+      if(!state.controlledStartup)setImmediate(() => {
         void close().catch(() => undefined)
       })
     }
-  }
+  } finally {if(message.operation==='start')state.controlledStartup?.settle()}
 }

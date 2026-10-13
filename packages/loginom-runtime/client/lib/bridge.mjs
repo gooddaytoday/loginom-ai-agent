@@ -1,3 +1,4 @@
+import {originalPrepareLenderForSession} from '../../src/original-prepare-lender.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -136,6 +137,8 @@ function shutdownRejection(value) {
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, authenticatedReadiness, acceptanceCapture } = {}) {
+  const prepareLender=originalPrepareLenderForSession(session);
+  const lenderObserved=work=>prepareLender ? prepareLender.observed(work) : work();
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -199,18 +202,18 @@ export async function createBridge(config, session, { browserTransport: managedB
   const recordExecution = createExecutionJournal({ directory: session.directory,
     metadata: session.metadata, knownSecrets: [config.apiKey] });
   try {
-    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]);
+    const connections = await lenderObserved(async()=>{const results=await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]);const failure=results.find(r=>r.status==='rejected');if(failure)throw failure.reason;return results;});
     const failed = connections.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
-    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote), readCatalog(browser)]);
+    const [remoteTools, browserTools] = await lenderObserved(()=>Promise.all([readCatalog(remote), readCatalog(browser)]));
     if (!browserTools.some(tool => tool.name === 'browser_run_code_unsafe')) {
       throw new Error('The pinned browser runtime lacks the verified clipboard execution tool');
     }
     if (['executor-preview', 'executor-replay'].includes(config.mode)) {
       const replay = config.mode === 'executor-replay';
-      const pinned = await pinActionCatalog(remote, { runtimeIdentity: session.metadata, ...(replay ? {
+      const pinned = await lenderObserved(()=>pinActionCatalog(remote, { runtimeIdentity: session.metadata, ...(replay ? {
         manifestUri: config.actionManifestUri, manifestSha256: config.actionManifestSha256, allowCandidate: true,
-      } : {}) });
+      } : {}) }));
       pinnedActions = pinned;
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
@@ -245,7 +248,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         if(catalog.tools.some(t=>t.name===name))catalog.routes.set(name,'action');
       for(const tool of actionRuntime.tools.filter(tool=>isNodeApiTool(tool.name)))catalog.routes.set(tool.name,'action');
     }
-    await session.save(catalog);
+    await lenderObserved(()=>session.save(catalog));
     const server = new Server({ name: 'loginom-dock', version: session.metadata.client }, {
       capabilities: { tools: {} },
       instructions: userProfile ? 'Call dock_prepare, then get the selected node parameter schema with dock_action_describe. Use dock_artifact_deliver for attachments and dock_node_apply for each complete node lifecycle. Keep issued identities and wait on the original operation_id. Follow next_step on failure; inspect uncertain effects before continuing. Save the package at the end. Low-level UI actions are unavailable in this profile.' : ['executor-preview', 'executor-replay'].includes(config.mode)
@@ -933,10 +936,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (name!=='dock_workspace_observe') return false;
       try {validateActionParameters(workspaceObserveTool.inputSchema,args??{});return true;} catch {return false;}
     }
-    return {server,catalog,captureAcceptance,readonlyContinuation,
+    const bridge={server,catalog,captureAcceptance,readonlyContinuation,
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};
+    prepareLender?.bind(bridge);return bridge;
   } catch (error) {
     await closeClients();
     throw error;

@@ -1,3 +1,4 @@
+import type { HostStartup } from "../fp-startup-control"
 import { randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
@@ -8,7 +9,7 @@ import type { recoveryStore } from "./recovery-store"
 export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void> }
 export type ConnectionRuntime = {
   check(candidate: ActiveConnection): Promise<void>
-  prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
+  prepare(candidate: ActiveConnection, startup?:HostStartup): Promise<RuntimeHandle>
   close?(): Promise<void>
 }
 const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
@@ -17,6 +18,7 @@ export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
+  startup?: HostStartup,
 ) {
   const state: {
     active?: ActiveConnection
@@ -32,6 +34,9 @@ export async function connectionService(
     closing?: boolean
     recovering?: Promise<void>
   } = { revision: 0, generation: 0, phase: "unconfigured" }
+  startup?.guard()
+  let startupFailure:{value:unknown}|undefined
+  let startupChecked=false
   const validations = new Map<
     string,
     { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
@@ -41,12 +46,14 @@ export async function connectionService(
     state.phase = "recoverable-error"
     return undefined
   })
+  startup?.guard()
   state.revision = state.active?.revision ?? 0
   const pending = await store.pending().catch(() => {
     state.phase = "recoverable-error"
     state.failure = "LOGINOM_STORE_READ_FAILED"
     return undefined
   })
+  startup?.guard()
   if (pending && pending.generation > (state.active?.generation ?? 0)) {
     state.pending = pending
     state.revision = pending.revision
@@ -59,22 +66,27 @@ export async function connectionService(
       return 0
     }),
   )
+  startup?.guard()
+  startup?.guard()
   if (state.active) {
     state.phase = "starting"
     state.applying = runtime
-      .prepare(state.active)
+      .prepare(state.active,startup)
       .then(
         (handle) => {
+          startup?.guard()
           state.handle = handle
           state.phase = state.pending ? "pending" : "ready"
         },
-        () => {
+        (error) => {
+          if (startup) startupFailure={value:startup.propagate(error)}
           state.phase = "recoverable-error"
         },
       )
+      .catch(error=>{if(startup)startupFailure={value:startup.propagate(error)};else throw error})
       .finally(() => {
         state.applying = undefined
-        progress()
+        if (!startupFailure) progress()
       })
   }
 
@@ -102,7 +114,7 @@ export async function connectionService(
     }
   }
   function progress() {
-    if (state.closing || !state.pending || leases.size || state.applying || state.checking || state.checking || state.writing || recovery?.pending().length)
+    if (startupFailure || state.closing || !state.pending || leases.size || state.applying || state.checking || state.checking || state.writing || recovery?.pending().length)
       return
     const candidate = state.pending
     state.phase = "starting"
@@ -351,7 +363,7 @@ export async function connectionService(
       }
     },
     async settled() {
-      while (state.applying) await state.applying
+      try{while (state.applying) await state.applying;if(startupFailure)throw startupFailure.value;if(!startupChecked){startup?.guard();startupChecked=true}}catch(error){throw startup?startup.forward(error):error}
     },
     close() {
       const lifecycle = state as typeof state & { closingAttempt?: Promise<void> }

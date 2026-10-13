@@ -106,7 +106,7 @@ for(const validation of [true,false])for(const phase of [undefined,'init','goto'
  const start=managed.slice(managed.indexOf('state.startupOwner={directory,'),managed.indexOf('      const config =',managed.indexOf('state.startupOwner={directory,')));
  f.context.inspect=()=>assert.equal(state.startupOwner.context,f.context);
  const run=vm.runInNewContext('(async()=>{'+start+'})',{
-  state,directory:root,browserProfile:root,resources:{browserPath:'/fixture'},input:{connection:f.options.candidate,endpoint:f.options.endpoint,validation},
+  state,fpStartup:undefined,observed:work=>work,directory:root,browserProfile:root,resources:{browserPath:'/fixture'},input:{connection:f.options.candidate,endpoint:f.options.endpoint,validation},
   message:{id:'original'},send:reply=>replies.push(reply),checkConnection:f.functions.checkConnection,loginBrowser:f.functions.loginBrowser});
  try{
   if(phase){await assert.rejects(run());assert.equal(state.startupOwner.context,f.context);if(phase==='goto')assert.equal(f.contextClose(),0)}

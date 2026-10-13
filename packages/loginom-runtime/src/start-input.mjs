@@ -27,6 +27,19 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
+  if(input.amountStartup!==undefined)throw Error('LOGINOM_START_INVALID')
+  const fpStartup=input.fpStartup
+  if(fpStartup!==undefined && (!fpStartup || typeof fpStartup!=="object"
+      || fpStartup.harness!=="field-parameters-preservation-v1" || typeof fpStartup.authorization!=="string" || !/^[a-f0-9]{64}$/.test(fpStartup.authorization)
+      || typeof fpStartup.requestId!=="string" || !/^[a-zA-Z0-9_-]{1,160}$/.test(fpStartup.requestId)
+      || !Number.isSafeInteger(fpStartup.deadline) || fpStartup.deadline<=Date.now() || fpStartup.deadline>Date.now()+180000
+      || input.validation===true)) throw Error("LOGINOM_START_INVALID")
+  if(fpStartup!==undefined) {
+    const keys=Object.keys(fpStartup).sort().join(',')
+    if(keys==='authorization,deadline,harness,requestId') {
+      if(input.chat!=='readiness' || input.acceptanceCapture!==undefined)throw Error('LOGINOM_START_INVALID')
+    } else throw Error('LOGINOM_START_INVALID')
+  }
   const capture = input.acceptanceCapture
   if (capture !== undefined) {
     const keys = 'account,admission,chat,expires,generation,harness,lease,owner,packagePath,revision,run'
@@ -42,5 +55,5 @@ export function validateStartInput(input) {
         || capture.packagePath.split('/').some(x => x === '.' || x === '..'))
       throw Error('LOGINOM_START_INVALID')
   }
-  return { acceptanceCleanupPackage: cleanup, ...(capture ? {acceptanceCapture:capture} : {}) }
+  return { ...(fpStartup?{fpStartup}:{}), acceptanceCleanupPackage: cleanup, ...(capture ? {acceptanceCapture:capture} : {}) }
 }
