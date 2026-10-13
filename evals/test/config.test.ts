@@ -1,12 +1,76 @@
 import { expect, test } from "bun:test"
 import { loadConfig } from "../src/config"
 import { EvalFailure } from "../src/fail"
+import { mkdtemp, readdir, rm } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
 
 const full = {
   LOGINOM_DOCK_API_KEY: "dock-key",
   EVAL_AGENT_MODEL: "openai/gpt-5.6-sol",
   JUDGE_MODEL: "gpt-6-astra",
 }
+
+test("loadConfig: parallel selects slots v2 and defaults to legacy singleton", () => {
+  expect(loadConfig([], full)).toMatchObject({ parallel: 1, slotsFile: undefined })
+  expect(loadConfig(["--parallel", "2"], { ...full, EVAL_SLOTS_FILE: "/private/slots.json" })).toMatchObject({ parallel: 2, slotsFile: "/private/slots.json" })
+})
+
+test.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992"])("loadConfig: invalid parallel %s is refused before other requirements", value => {
+  expect(() => loadConfig([`--parallel=${value}`], {})).toThrow("PARALLEL_COUNT")
+  expect(() => loadConfig([`--parallel=${value}`], {})).toThrow(expect.objectContaining({ exitCode: 2 }))
+})
+
+test("loadConfig: multiple slots require slots file even for dry run", () => {
+  expect(() => loadConfig(["--parallel", "2", "--dry-run"], {})).toThrow("PARALLEL_SLOTS_REQUIRED")
+})
+
+test.each(["--keep-storage", "--reset-profile"])("loadConfig: v2 refuses %s before agent requirements", flag => {
+  expect(() => loadConfig([flag], { EVAL_SLOTS_FILE: "/private/slots.json" })).toThrow("SLOT_MODE_FLAGS")
+  expect(() => loadConfig([flag], { EVAL_SLOTS_FILE: "/private/slots.json" })).toThrow(expect.objectContaining({ exitCode: 2 }))
+  expect(loadConfig([flag, "--dry-run"], {}).parallel).toBe(1)
+})
+
+test.each([{ argv: ["--judge-only", "/missing-run"] }, { argv: ["--calibrate"] }])("loadConfig: parallel refuses offline mode %j before judge requirements", item => {
+  expect(() => loadConfig(["--parallel", "2", ...item.argv], { EVAL_SLOTS_FILE: "/private/slots.json" })).toThrow("PARALLEL_MODE")
+  expect(() => loadConfig(["--parallel", "2", ...item.argv], { EVAL_SLOTS_FILE: "/private/slots.json" })).toThrow(expect.objectContaining({ exitCode: 2 }))
+})
+
+test.each(["EVAL_NODE_OPS_CONFIG", "EVAL_NODE_STAND_LEASE", "EVAL_HARNESS_LEASE_RECEIPT"])("loadConfig: parallel refuses legacy %s independently", name => {
+  expect(() => loadConfig(["--parallel", "2", "--dry-run"], { EVAL_SLOTS_FILE: "/private/slots.json", [name]: "/missing-private-file" })).toThrow("PARALLEL_LEGACY_LEASE")
+  expect(loadConfig(["--dry-run"], { [name]: "/missing-private-file" }).parallel).toBe(1)
+})
+
+test.each([
+  ["EVAL_NODE_OPS_CONFIG", "EVAL_NODE_STAND_LEASE"],
+  ["EVAL_NODE_OPS_CONFIG", "EVAL_HARNESS_LEASE_RECEIPT"],
+  ["EVAL_NODE_STAND_LEASE", "EVAL_HARNESS_LEASE_RECEIPT"],
+])("loadConfig: parallel refuses combined legacy leases %s/%s", (first, second) => {
+  expect(() => loadConfig(["--parallel", "2", "--dry-run"], { EVAL_SLOTS_FILE: "/private/slots.json", [first]: "missing", [second]: "missing" })).toThrow("PARALLEL_LEGACY_LEASE")
+})
+
+test("CLI: parallel incompatibilities exit 2 without run directory or private config reads", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-flags-"))
+  try {
+    const scenarios = [
+      { args: ["--judge-only", "missing"], extra: {} }, { args: ["--calibrate"], extra: {} },
+      ...["EVAL_NODE_OPS_CONFIG", "EVAL_NODE_STAND_LEASE", "EVAL_HARNESS_LEASE_RECEIPT"].map(name => ({ args: [], extra: { [name]: path.join(root, "private-missing") } })),
+    ]
+    for (const scenario of scenarios) {
+      const child = Bun.spawn([process.execPath, "--no-env-file", path.resolve(import.meta.dir, "../src/run.ts"), "--parallel", "2", ...scenario.args], {
+        env: { PATH: process.env.PATH, EVAL_SLOTS_FILE: path.join(root, "slots.json"), EVAL_RESULTS_DIR: path.join(root, "results"), ...scenario.extra },
+        stdout: "pipe", stderr: "pipe",
+      })
+      const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+      expect(code).toBe(2)
+      expect(stdout).toBe("")
+      expect(stderr).toContain("PARALLEL_")
+      expect(stderr).not.toContain("ENOENT")
+    }
+    expect(await readdir(root)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 
 test("loadConfig: значения по умолчанию при полном .env", () => {
   const config = loadConfig([], full)

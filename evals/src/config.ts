@@ -10,9 +10,18 @@ type Env = Record<string, string | undefined>
 
 export function loadConfig(argv: string[], env: Env = process.env) {
   const values = parseEvalArgs(argv)
+  const parallel = Number(values.parallel ?? 1)
+  if (!Number.isSafeInteger(parallel) || parallel < 1) throw new EvalFailure("PARALLEL_COUNT: ожидается положительное целое", 2)
+  const slotsFile = env.EVAL_SLOTS_FILE ? path.resolve(evalsRoot, env.EVAL_SLOTS_FILE) : undefined
+  if (parallel > 1 && !slotsFile) throw new EvalFailure("PARALLEL_SLOTS_REQUIRED", 2)
+  if (parallel > 1 && [env.EVAL_NODE_OPS_CONFIG, env.EVAL_NODE_STAND_LEASE, env.EVAL_HARNESS_LEASE_RECEIPT].some(Boolean))
+    throw new EvalFailure("PARALLEL_LEGACY_LEASE: node-ops/stand/harness receipts требуют N=1", 2)
   const dryRun = values["dry-run"]
   const judgeOnly = values["judge-only"]
   const calibrate = values.calibrate
+  if (parallel > 1 && (judgeOnly !== undefined || calibrate)) throw new EvalFailure("PARALLEL_MODE: judge-only/calibrate требуют N=1", 2)
+  if (slotsFile && (values["keep-storage"] || values["reset-profile"]))
+    throw new EvalFailure("SLOT_MODE_FLAGS: --keep-storage и --reset-profile запрещены с EVAL_SLOTS_FILE", 2)
   if (judgeOnly !== undefined && values["skip-judge"]) throw new EvalFailure("Несовместимые флаги: --judge-only и --skip-judge", 2)
   if (judgeOnly !== undefined && dryRun) throw new EvalFailure("Несовместимые флаги: --judge-only и --dry-run", 2)
   if (calibrate && values["skip-judge"]) throw new EvalFailure("Несовместимые флаги: --calibrate и --skip-judge", 2)
@@ -44,6 +53,8 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   }
   const providerId = env.EVAL_AGENT_PROVIDER_ID
   return {
+    parallel,
+    slotsFile,
     dryRun,
     calibrate,
     judgeOnly,
@@ -118,6 +129,7 @@ function parseEvalArgs(argv: string[]) {
         tasks: { type: "string" },
         label: { type: "string" },
         repeat: { type: "string" },
+        parallel: { type: "string" },
         "timeout-ms": { type: "string" },
         "skip-judge": { type: "boolean", default: false },
         "keep-storage": { type: "boolean", default: false },
