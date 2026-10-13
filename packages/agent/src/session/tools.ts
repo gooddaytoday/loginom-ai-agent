@@ -1,4 +1,4 @@
-import { retainUnionInvocation } from "@loginom-ai-agent/loginom-host/union-invocation"
+import { retainUnionInvocation } from "./union-invocation"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"

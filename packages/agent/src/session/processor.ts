@@ -1,4 +1,4 @@
-import { bindUnionInvocationProcessor } from "@loginom-ai-agent/loginom-host/union-invocation"
+import { bindUnionInvocationProcessor } from "./union-invocation"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { Image } from "@/image/image"
