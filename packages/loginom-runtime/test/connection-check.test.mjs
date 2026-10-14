@@ -102,7 +102,7 @@ test('native readiness never accepts unknown running or a foreign connection', a
   let captured
   const page = {
     goto: async () => {},
-    locator: () => ({ isVisible: async () => true, waitFor: async () => {} }),
+    locator: () => ({ isVisible: async () => true, waitFor: async () => {}, or() { return this }, first() { return this } }),
     evaluate: async () => 'User',
     waitForFunction: async fn => { captured=fn },
   }
