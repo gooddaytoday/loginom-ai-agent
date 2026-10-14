@@ -455,7 +455,7 @@ test("supervisor: новый противоречащий profile после bin
 }, 20_000)
 
 
-test("supervisor: новый чужой Chromium с другим profile остаётся живым", async () => {
+test("supervisor: unmanaged Chromium with an outside profile stays unknown and alive", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-bundle-"))
   await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
@@ -469,7 +469,10 @@ test("supervisor: новый чужой Chromium с другим profile ост�
   const exited = new Promise((resolve) => foreign.once("exit", resolve))
   try {
     const run = await pending
-    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toContain("Unexplained browser/helper")
+    expect(run.processCleanup.unknownProcesses?.some(entry => entry.pid === foreign.pid)).toBe(true)
+    expect(run.processCleanup.processes.some(entry => entry.pid === foreign.pid)).toBe(false)
     expect(foreign.exitCode).toBeNull()
     process.kill(foreign.pid!, 0)
   } finally { foreign.kill("SIGKILL"); await exited }
