@@ -86,3 +86,5 @@ HTTP/process/filesystem fixtures. It redirects all requests to loopback, uses an
 offline token, and never invokes admission/model/native work. Installed pinned kit
 replacement and central source/catalog pins require the existing publisher/owner
 workflow after independent review; changing this checkout does not install it.
+
+Legacy read-only adoption scans every descriptor-bound original comment, including originals without a standalone Handoff-ID header. Multiple original IDs refuse as ambiguous. A supplied Handoff-ID/Source-SHA/Action header must agree with the descriptor action and may not contain duplicate fields; explicit --existing-comment does not override it. Receiver release results may repeat descriptors only with verified linkage to the selected original run. Full body/wrapper fingerprints, sender/issue/source-task proof and UNKNOWN/no-rePOST guards remain mandatory; historic receipts are not migrated.

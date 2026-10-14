@@ -135,31 +135,50 @@ def select_assignment(comments, runs, existing, text, key, issue, agent, sha, sc
     # Generated headers identify an action. A release result can quote the same
     # marker later in its body; the marker alone is never an assignment identity.
     assignments = []
+    descriptor_comments = []
     for comment in comments:
         body = comment.get('content', '')
         header = body.split('\n\n', 1)[0]
         markers = re.findall(r'^Handoff-ID: `?([0-9a-f]{64})`?$', header, re.M)
         release_marker = re.search(r'^Artifact-release: [0-9a-f]{64}$', body, re.M)
         action_header = re.search(r'^(Source-SHA|Action): ', header, re.M)
+        descriptors = re.findall(r'^Artifact-handoff: (.+)$', body, re.M)
+        try:
+            rows = json.loads(descriptors[0]) if len(descriptors) == 1 else []
+        except ValueError:
+            rows = []
+        descriptor_bound = isinstance(rows, list) and any(
+            isinstance(row, dict) and row.get('handoff') == key for row in rows)
+        if not descriptor_bound and any(key in raw for raw in descriptors):
+            raise DeliveryError('Legacy descriptor identity is ambiguous')
+        if descriptor_bound:
+            descriptor_comments.append(comment)
         if key in markers and (action_header or not release_marker):
             if (markers != [key] or re.findall(r'^Source-SHA: ([0-9a-f]{40})$', header, re.M) != [sha]
                     or re.findall(r'^Action: (.+)$', header, re.M) != [scope]):
                 raise DeliveryError('Action identity conflicts; reconcile existing assignments')
             assignments.append(comment)
-    if existing:
-        # Legacy explicit adoption can have no generated header. Its exact
-        # original body binds the action through its already-pinned descriptors.
-        if existing not in assignments:
-            descriptors = re.findall(r'^Artifact-handoff: (.+)$', existing['content'], re.M)
-            try:
-                rows = json.loads(descriptors[0]) if len(descriptors) == 1 else []
-            except ValueError:
-                rows = []
-            if (not isinstance(rows, list) or not rows or any(not isinstance(row, dict)
-                    or row.get('handoff') != key for row in rows)
+        elif descriptor_bound:
+            # Legacy descriptors bind the action only when every supplied header
+            # agrees. A foreign canonical header cannot be bypassed by adoption.
+            for field, expected in (('Handoff-ID', key), ('Source-SHA', sha), ('Action', scope)):
+                values = re.findall(r'^' + field + r': (.*)$', header, re.M)
+                if field == 'Handoff-ID':
+                    values = [value[1:-1] if value.startswith('`') and value.endswith('`') else value
+                              for value in values]
+                if values and values != [expected]:
+                    raise DeliveryError('Action identity conflicts; reconcile existing assignments')
+            receiver = [r for r in runs if r.get('id') == comment.get('source_task_id')]
+            if (release_marker and comment.get('author_id') == agent and len(receiver) == 1
+                    and receiver[0].get('agent_id') == agent):
+                # Validate its exact original run linkage below, after selection.
+                continue
+            if (not rows or any(not isinstance(row, dict) or row.get('handoff') != key for row in rows)
                     or not any(row.get('sha') == sha for row in rows)):
                 raise DeliveryError('Legacy assignment action/source/scope is not bound')
-            assignments.append(existing)
+            assignments.append(comment)
+    if existing and existing not in assignments:
+        raise DeliveryError('Legacy assignment action/source/scope is not bound')
     if len(assignments) > 1 or (assignments and assignments[0]['content'] != (existing['content'] if existing else text)):
         raise DeliveryError('Action identity conflicts; reconcile existing assignments')
     found = assignments[0] if assignments else None
@@ -169,7 +188,7 @@ def select_assignment(comments, runs, existing, text, key, issue, agent, sha, sc
         if comment in assignments:
             continue
         body = comment.get('content', '')
-        if not re.search(r'^Handoff-ID: `?' + re.escape(key) + r'`?$', body, re.M):
+        if comment not in descriptor_comments and not re.search(r'^Handoff-ID: `?' + re.escape(key) + r'`?$', body, re.M):
             continue
         receiver = [r for r in runs if r.get('id') == comment.get('source_task_id')]
         release = re.findall(r'^Artifact-release: ([0-9a-f]{64})$', body, re.M)

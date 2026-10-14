@@ -96,3 +96,36 @@ class AdoptionIdentityTest(unittest.TestCase):
         self.comments[-1]['content'] = (f'[@Receiver](mention://agent/{AGENT})\nHandoff-ID: {key}\n'
             f'Source-SHA: {"a" * 40}\nAction: different-scope\n\nArtifact-release: {"b" * 64}')
         self.assertNotEqual(self.client(existing=COMMENT).returncode, 0); self.assertEqual(self.posts, 0)
+
+    def test_duplicate_descriptor_bound_legacy_original_refuses(self):
+        self.original(legacy=True)
+        self.comments.append({**self.comments[0], 'id': RELEASE})
+        result = self.client(existing=COMMENT)
+        self.assertNotEqual(result.returncode, 0); self.assertEqual(self.posts, 0)
+        self.assertEqual(json.loads((self.root / 'receipt').read_text())['state'], 'prepared')
+
+    def test_foreign_header_cannot_hide_behind_legacy_descriptors(self):
+        self.original(legacy=True)
+        text = 'Handoff-ID: ' + '0' * 64 + '\nSource-SHA: ' + 'c' * 40 + '\nAction: foreign-action\n\n' + self.comments[0]['content']
+        self.comments[0]['content'] = text; (self.root / 'message').write_text(text)
+        result = self.client(existing=COMMENT)
+        self.assertNotEqual(result.returncode, 0); self.assertEqual(self.posts, 0)
+        self.assertEqual(json.loads((self.root / 'receipt').read_text())['state'], 'prepared')
+
+    def test_duplicate_legacy_header_fields_refuse(self):
+        key, text = self.original(legacy=True)
+        text = f'Source-SHA: {"a" * 40}\nSource-SHA: {"a" * 40}\n\n' + text
+        self.comments[0]['content'] = text; (self.root / 'message').write_text(text)
+        self.assertNotEqual(self.client(existing=COMMENT).returncode, 0); self.assertEqual(self.posts, 0)
+
+    def test_descriptor_bound_receiver_release_requires_run_linkage(self):
+        key, _ = self.original(legacy=True); self.release(key)
+        self.comments[-1]['content'] += '\nArtifact-handoff: ' + json.dumps([{'handoff': key, 'sha': 'a' * 40}])
+        result = self.client(existing=COMMENT); self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.posts, 0)
+
+    def test_descriptor_bound_unlinked_release_refuses(self):
+        key, _ = self.original(legacy=True); self.release(key)
+        self.comments[-1]['content'] += '\nArtifact-handoff: ' + json.dumps([{'handoff': key, 'sha': 'a' * 40}])
+        self.runs[-1]['trigger_comment_id'] = RELEASE
+        self.assertNotEqual(self.client(existing=COMMENT).returncode, 0); self.assertEqual(self.posts, 0)
