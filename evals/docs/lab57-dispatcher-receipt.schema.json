@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LAB57 addressed Dispatcher server cessation only",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version","status","source","issue","ownerTask","frozen","originalSha","beforeSha","afterSha","serverName","serverCreated","observerKey","packagePath","container","containerStartedAt","cleanup","originalOutcome"],
+  "properties": {
+    "version": {"const": 1},
+    "status": {"const": "SERVER_OWNERSHIP_SCOPE_CEASED"},
+    "source": {"const": "vendor-dispatcher"},
+    "issue": {"const": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3"},
+    "ownerTask": {"const": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589"},
+    "frozen": {"const": "eb1c2b0da02210a9d95569849ae056fa4784440c"},
+    "originalSha": {"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "beforeSha": {"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "afterSha": {"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "serverName": {"oneOf":[{"type":"null"},{"type":"string","pattern":"^user:[0-9]+$"}]},
+    "serverCreated": {"type":["number","null"]},
+    "observerKey": {"type":"string","minLength":1,"maxLength":1024},
+    "packagePath": {"const":"/user/eval-20261013-225027-eb1c2b0da-txt-semicolon-cp1251-decimal-1.lgp"},
+    "container": {"const":"b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e"},
+    "containerStartedAt": {"type":"string","format":"date-time"},
+    "cleanup": {"const":"UNCONFIRMED"},
+    "originalOutcome": {"const":"ERROR"}
+  }
+}
