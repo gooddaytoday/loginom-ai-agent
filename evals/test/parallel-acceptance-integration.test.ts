@@ -442,10 +442,13 @@ test("resource timeline covers an actual owned command through confirmed cleanup
     expect(samples.every(sample => sample.missed_intervals === 0)).toBe(true)
     const receipt = await writeResourceSummary({ samplesFile, out: path.join(root, "summary.json") })
     const request = { file: path.join(root, "summary.json"), samplesFile, runId: "timeline-smoke",
-      startedAt, finishedAt, coverage: { paths: [root], containers: [], owners: [] }, view: samples[0].host.collector_cgroup.view, budget: budget.source }
+      startedAt, finishedAt, coverage: { paths: [root], containers: [], owners: [] }, processWindows: [], view: samples[0].host.collector_cgroup.view, budget: budget.source }
     const result = await checkResourceEvidence(request)
     expect(result).toMatchObject({ status: "passed", codes: [], source: receipt.source, budget_source: budget.source })
-    expect(Object.keys(result.checks)).toEqual(["timeline", "coverage", "cgroups", "budget", "incidents"])
+    expect(Object.keys(result.checks)).toEqual(["timeline", "coverage", "processTimeline", "cgroups", "budget", "incidents"])
+    expect((await checkResourceEvidence({ ...request, coverage: { ...request.coverage,
+      owners: [{ kind: "command", id: "timeline-smoke", launcher: { pid: process.pid, starttime: "unverified" } }] } })).checks.processTimeline)
+      .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] })
     expect(await checkResourceEvidence({ ...request, budget: null })).toMatchObject({ status: "incomplete", codes: ["RESOURCE_BUDGET_MISSING"] })
     expect(await checkResourceEvidence({ ...request, finishedAt: new Date(Date.parse(finishedAt) + 10000).toISOString(),
       budget: exceeded.source }))

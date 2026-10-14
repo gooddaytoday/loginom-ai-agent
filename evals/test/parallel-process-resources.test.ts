@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readlink, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
-import { assessProcessResourceTimeline, assessResourceCoverage } from "../src/parallel-acceptance"
+import { assessProcessResourceTimeline, assessResourceCoverage, checkResourceEvidence } from "../src/parallel-acceptance"
+import { freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { superviseProcess } from "../src/process-supervisor"
 
 test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
@@ -43,6 +44,8 @@ test("resource sampling observes two admitted supervisors and retains B after dr
     sample.scopes.find(scope => scope.owner.id === owners[0]!.id)!.processes![0]!.identity.starttime = "changed"
     expect((await sampleSupervisedResources()).scopes.find(scope => scope.owner.id === owners[0]!.id)?.processes?.every(item => item.verified)).toBe(true)
     const out = path.join(root, "resources.jsonl")
+    const budget = await freezeResourceBudget({ out: path.join(root, "budget.json"), runId: "owned-process-smoke",
+      bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })
     const abortCollector = new AbortController()
     const collecting = collectHostResources({ paths: [root], out, intervalMs: 1000, runId: "owned-process-smoke", phase: "run",
       signal: abortCollector.signal, processes: sampleSupervisedResources })
@@ -71,6 +74,22 @@ test("resource sampling observes two admitted supervisors and retains B after dr
       // This measured active subwindow does not claim a durable launch-to-exit receipt.
       expect(assessProcessResourceTimeline({ samples: rows, intervalMs: 1000,
         owners: expected.map(owner => ({ ...owner, startedAt, finishedAt })) })).toEqual({ status: "passed", codes: [] })
+      const file = path.join(root, "summary.json")
+      await writeResourceSummary({ samplesFile: out, out: file })
+      const request = { file, samplesFile: out, runId: "owned-process-smoke", startedAt, finishedAt,
+        coverage: { paths: [root], containers: [], owners: expected }, processWindows: expected.map(owner => ({ ...owner, startedAt, finishedAt })),
+        view: rows[0].host.collector_cgroup.view, budget: budget.source }
+      expect(await checkResourceEvidence(request)).toMatchObject({ status: "passed", codes: [] })
+      for (const processWindows of [[], request.processWindows.slice(0, 1),
+        request.processWindows.map((window, index) => index ? window : { ...window, id: "unobserved" }),
+        request.processWindows.map((window, index) => index ? window : { ...window, launcher: { ...window.launcher, starttime: "unobserved" } }),
+        [request.processWindows[0]!, request.processWindows[0]!]]) {
+        expect((await checkResourceEvidence({ ...request, processWindows })).checks.processTimeline)
+          .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] })
+      }
+      expect((await checkResourceEvidence({ ...request,
+        coverage: { ...request.coverage, owners: [expected[0]!, expected[0]!] } })).checks.processTimeline)
+        .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] })
     } finally { abortCollector.abort(); await collecting }
     aborts[0]!.abort()
     while (!(await readers[0]!.read()).done) {}
