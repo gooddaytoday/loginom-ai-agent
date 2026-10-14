@@ -1612,3 +1612,13 @@ source hashes; старыеfailed/native/modeloutcomes не перенесены
 18standard/3explicit/3tags/1recovery candidate +baseline6singlepercase,
 firstABC/firstlast; technicalfailure remainsfailed +strictrelease permitsnext,
 confirmedcandidateJSviolation stops. Fullacceptancependingactual31outputs.
+
+Checkpoint 2026-10-14 11:47 UTC — новая модельная серия112452 фактически запущена.
+Effective31lock834620b93866078023dd988c283fcf9ddbc1651158503cbcf8c072458d79b3c0
+закреплён доdispatch11:44:00.194; current-run переведён на112452 послеadmission.
+ABC/1 candidate Session ses_ec5c5d610ffebZFU1G7WFWq9aV, CLI1760120 подтверждёнlive;
+Rootseriesexec2562 и series.active process live. Started1/closed0/accepted0,
+никакой provisional exit3/incomplete не считаетсяотказом. Typed imports.text
+выполняется, модельgpt-6-sol-fast/medium; следующие слоты через existing sequential
+runnerпослеобязательныхgates. Source/pins/payload/modelparams frozen, старыеoutcomes0credit.
+Next: pollsamehandle/CLI; не перезапускатьadmittedslot приobservationtimeout.
