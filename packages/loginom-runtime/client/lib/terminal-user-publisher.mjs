@@ -24,11 +24,47 @@ function installOriginalUserPublisher(origin) {
     const chain=[];let owner,d;
     for(let p=object;p;p=prototype(p)){chain.push(p);d=descriptor(p,name);if(d){owner=p;break}}
     if(!d||!('value'in d))unavailable();
+    const ownerPrototype=prototype(owner);
     checks.push(()=>{
       let p=object;for(const expected of chain){if(p!==expected)unavailable();if(descriptor(p,name))break;p=prototype(p)}
-      const now=descriptor(p,name);if(p!==owner||!now||!('value'in now)||now.value!==d.value
+      const now=descriptor(p,name);if(p!==owner||prototype(owner)!==ownerPrototype||!now||!('value'in now)||now.value!==d.value
         ||now.writable!==d.writable||now.enumerable!==d.enumerable||now.configurable!==d.configurable)unavailable();
     });return d.value;
+  };
+  // Snapshot fixed defining exports before the original application acquisition.
+  // Missing exports remain explicit evidence; a later publication cannot repair
+  // this attempt. Function identity is not proof of hidden lexical closures.
+  const retainLoadedDefinitions=()=>{
+    const bindings={};let complete=true;
+    const optional=(object,name)=>{
+      if(object==null){complete=false;return undefined}
+      const chain=[];
+      for(let p=object;p;p=prototype(p)){
+        chain.push(p);
+        if(descriptor(p,name))return hold(object,name);
+      }
+      complete=false;
+      checks.push(()=>{let p=object;for(const expected of chain){
+        if(p!==expected||descriptor(p,name))unavailable();p=prototype(p);
+      }if(p!==null)unavailable()});
+      return undefined;
+    };
+    const capture=(name,object,key)=>bindings[name]=optional(object,key);
+    const bg=capture('bg',root,'bg'),rpc=capture('rpc',root,'rpc');
+    const bgRpc=capture('bgRpc',bg,'rpc'),ss=capture('ss',root,'ss');
+    capture('ObjectProxy',rpc,'TBGObjectProxy');capture('FileStorage',bgRpc,'TIBGFileStorage_Proxy');
+    capture('StreamPersistProxy',bgRpc,'TIBGStreamPersist_Proxy');capture('StreamPersist',bg,'IBGStreamPersist');
+    capture('GuidHelper',rpc,'GuidHelper');capture('MessageDynamicData',rpc,'TBGMessageDynamicData');capture('HResult',rpc,'HResult');
+    capture('ObjectProxyPrototype',bindings.ObjectProxy,'prototype');capture('FileStoragePrototype',bindings.FileStorage,'prototype');
+    capture('StreamPersistPrototype',bindings.StreamPersistProxy,'prototype');
+    capture('query',bindings.ObjectProxyPrototype,'QueryInterface');capture('connected',bindings.FileStoragePrototype,'get_Connected');
+    capture('currentDirectory',bindings.FileStoragePrototype,'get_CurrentDirectory');capture('ownDirectory',bindings.FileStoragePrototype,'get_IsOwnCurrentDirectory');
+    capture('rootPath',bindings.FileStoragePrototype,'get_RootPath');capture('persist',bindings.StreamPersistPrototype,'SaveToStream');
+    capture('taskConstructor',ss,'TaskCompletionSource');capture('mkdel',ss,'mkdel');
+    capture('exceptionWrap',optional(ss,'Exception'),'wrap');capture('awaiter',root,'__awaiter');
+    capture('selectAsync',bg,'selectAsync');capture('objectEquals',bg,'ObjectEquals');
+    if(Object.values(bindings).some(value=>value==null))complete=false;
+    return Object.freeze({bindings:Object.freeze(bindings),complete,closureIdentityQualified:false});
   };
   const guard=()=>{
     if(acquisition?.failed)throw acquisition.error;
@@ -54,6 +90,7 @@ function installOriginalUserPublisher(origin) {
       task:sample.task,originalSet:sample.originalSet,originalInit:sample.originalInit,
       bindings:sample.bindings,acquisition:acquisition?Object.freeze({receiver:acquisition.receiver,
         task:acquisition.task,user:acquisition.user,session:acquisition.session,originalGet:acquisition.originalGet,
+        loadedDefinitions:acquisition.loadedDefinitions,
         rpcCompletionVerified:!!(acquisition.lower?.completed&&acquisition.lower.sourceVerified),
         lower:acquisition.lower?.completed?Object.freeze({session:acquisition.lower.session,transport:acquisition.lower.transport,
           method:acquisition.lower.originalMethod,task:acquisition.lower.task,dispatchTask:acquisition.lower.dispatchTask,
@@ -217,6 +254,7 @@ function installOriginalUserPublisher(origin) {
             ||Reflect.ownKeys(reader).some(k=>now[k]!==reader[k]))unavailable();
         });
         acquisition={receiver:this,session,originalGet,settled:false,failed:false,sourceVerified:false};
+        acquisition.loadedDefinitions=retainLoadedDefinitions();
         if(!('value'in reader))acquisition.lower=captureLower(session);
         hold(app,'ServerConnection');hold(Connection,'prototype');hold(proto,'GetCurrentUser');
         hold(root,'__awaiter');guard();

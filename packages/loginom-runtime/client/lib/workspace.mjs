@@ -92,6 +92,16 @@ export async function prepareWorkspace(page, options, terminal) {
           Object.assign(bindings,{userAcquisitionReceiver:receiptRef(acquisition,'receiver'),
             userAcquisitionTask:receiptRef(acquisition,'task'),userAcquisitionSession:receiptRef(acquisition,'session'),
             originalUserGet:receiptRef(acquisition,'originalGet')});
+          const loadedDefinitions=receiptRef(acquisition,'loadedDefinitions');
+          if(!loadedDefinitions||!Object.isFrozen(loadedDefinitions)||receiptRef(loadedDefinitions,'complete')!==true
+            ||receiptRef(loadedDefinitions,'closureIdentityQualified')!==false)throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          const initialExports=receiptRef(loadedDefinitions,'bindings');
+          if(!Object.isFrozen(initialExports))throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          for(const key of ['ObjectProxy','FileStorage','StreamPersistProxy','StreamPersist','ss','GuidHelper','MessageDynamicData','HResult',
+            'ObjectProxyPrototype','FileStoragePrototype','StreamPersistPrototype','query','connected','currentDirectory','ownDirectory','rootPath','persist']){
+            if(receiptRef(initialExports,key)!==bindings[key])throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          }
+          bindings.userLoadedDefinitions=loadedDefinitions;
           const lower=receiptRef(acquisition,'lower');
           if(lower){
             if(receiptRef(acquisition,'rpcCompletionVerified')!==true||receiptRef(lower,'user')!==bindings.user

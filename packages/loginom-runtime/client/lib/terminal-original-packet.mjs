@@ -197,6 +197,14 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
             ||data(acquisition,'session')!==data(realm,'userAcquisitionSession')
             ||data(acquisition,'originalGet')!==data(realm,'originalUserGet')
             ||data(acquisition,'user')!==start.nativeRefs.currentUser)fail('NATIVE_REPLACED');
+          const loadedDefinitions=data(acquisition,'loadedDefinitions');
+          if(loadedDefinitions!==data(realm,'userLoadedDefinitions')||data(loadedDefinitions,'complete')!==true
+            ||data(loadedDefinitions,'closureIdentityQualified')!==false)fail('NATIVE_REPLACED');
+          const initialExports=data(loadedDefinitions,'bindings');
+          for(const key of ['ObjectProxy','FileStorage','StreamPersistProxy','StreamPersist','ss','GuidHelper','MessageDynamicData','HResult',
+            'ObjectProxyPrototype','FileStoragePrototype','StreamPersistPrototype','query','connected','currentDirectory','ownDirectory','rootPath','persist']){
+            if(data(initialExports,key)!==data(realm,key))fail('NATIVE_REPLACED');
+          }
           if(Object.hasOwn(realm,'userRpcTask')){const lower=data(acquisition,'lower');
             if(data(acquisition,'rpcCompletionVerified')!==true||!lower
               ||data(lower,'task')!==data(realm,'userRpcTask')||data(lower,'dispatchTask')!==data(realm,'userDispatchTask')
