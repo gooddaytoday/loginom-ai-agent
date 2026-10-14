@@ -51,15 +51,14 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   const ownerPath = path.join(directory, "owner")
   const ownerBefore = await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
-    await observeWriterRelease(directory, info)
-    return undefined
+    return observeWriterTransition(directory, info, true)
   })
   if (!ownerBefore) return null
   if (!ownerBefore.isFile() || ownerBefore.isSymbolicLink()) throw Error("Writer owner is not a private file")
   const file = await open(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW)
     .catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
-      await observeWriterRelease(directory, info)
+      await observeWriterTransition(directory, info)
       return undefined
     })
   if (!file) return null
@@ -70,7 +69,7 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
     const owner = await file.readFile("utf8")
     const observed = await Promise.all([lstat(directory), lstat(ownerPath)]).catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error
-      await observeWriterRelease(directory, info)
+      await observeWriterTransition(directory, info)
       return undefined
     })
     if (!observed) return null
@@ -82,8 +81,8 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   } finally { await file.close() }
 }
 
-/** CLI release unlinks owner before rmdir. Only that bounded ENOENT window is retried. */
-async function observeWriterRelease(directory: string, expected: Awaited<ReturnType<typeof lstat>>) {
+/** Initial creation and release both have bounded ownerless windows; an observed owner cannot be replaced. */
+async function observeWriterTransition(directory: string, expected: Awaited<ReturnType<typeof lstat>>, acquiring = false) {
   let absent = 0
   for (let attempt = 0; attempt < 6; attempt++) {
     const current = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
@@ -98,7 +97,10 @@ async function observeWriterRelease(directory: string, expected: Awaited<ReturnT
         if (error.code === "ENOENT") return undefined
         throw error
       })
-      if (owner) throw Error("Writer owner identity changed during release")
+      if (owner) {
+        if (!acquiring) throw Error("Writer owner identity changed during release")
+        return owner
+      }
     } else if (++absent === 2) return
     if (attempt < 5) await Bun.sleep(20)
   }

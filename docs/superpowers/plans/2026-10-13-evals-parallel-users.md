@@ -497,6 +497,8 @@ expect(await Bun.file(foreignSentinel).text()).toBe("preserve")
 
 ### Задача 6. Два supervisor и доверенный административный browser
 
+- [x] Подзадача 6/7 (2026-10-14): writerIdentity различает начальное окно mkdir(.writer)→owner write и release после уже наблюдённого owner. Real-FS RED STABLE 3/3 через public API (owner опубликован через 40ms); GREEN возвращает точную device/inode/nonce без удаления guard. Persistent ownerless guard и symlink остаются отказами. 3 target tests PASS/5 assertions, cold profile/supervisor 95 PASS/315 assertions (139.26s), typecheck/diff PASS. Mixed run с одновременным native smoke дал 94 PASS/1 FAIL (linuxProfileOwners PID532038); narrow cold 3/3 PASS, PID не атрибутирован, причинность bwrap не доказана. Registry/foreign-process proof остаётся открытым.
+
 **Files:** Modify `evals/src/process-supervisor.ts`, `evals/src/process-launcher.ts`, `evals/test/process-supervisor.test.ts`, `evals/fixtures/fake-cli.ts`; Create `evals/test/process-supervisor-integration.test.ts`.
 
 **Interfaces:** Existing `superviseProcess` получает доказанную информацию о других живых launcher контроллера; registry хранит `(pid,starttime,uid,executable identity)` и владение slot/admin, а не строки argv.
@@ -777,4 +779,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 14. Product worktree evals-oauth@04ff82be4d: five cherry-pick -x + independent installer fix; dependency lineage/diagnosis в contract.
 15. Evals full regression: 754 PASS/12 SKIP/3 FAIL/3715 assertions (787.37s). Два lifecycle failures: narrow 3/3 pairs PASS, root cause неизвестен; третья outdated report assertion исправлена: 11 infra-retry PASS/79 assertions (53.66s), typecheck PASS. Guards не ослаблены, full PASS не заявлен.
 16. Cold parallel module: 25 PASS/160 assertions (114.56s); 36 proof versions/31 paths/43 PID:starttime, live birth matches=0. Два historical lifecycle failures не воспроизведены; PID344630 не атрибутирован. Probe/collector завершены; safe logs600 /tmp/evals-parallel-cold-signal-msu69vi4.{events,proofs}.jsonl.
-17. Task7 shared status: product87c7d497d6 (26 PASS), harness105+4 PASS; current installed eb85403ce4 build/install/verifiers PASS. Installed status smoke получил STATUS_INVALID, collector расследует; publicStatus/bwrap/liveOAuth/refresh=false. FS chmod fixture при umask077 исправлен (3 PASS). Далее protocol fix/qualification и Task6 registry; historical PROFILE_BUSY не доказан, bare unknown CLI/исключение unknown PID запрещены.
+17. Current candidate eb85403ce4 build/install/verifiers PASS; installed schema/status N=2 bwrap smoke 4 PASS/29 assertions (20.29s), без live OAuth/refresh. Writer creation RED3/3→GREEN, cold profile/supervisor95 PASS/315 assertions. Mixed /proc PID532038 failure не атрибутирован, narrow3/3 PASS. Далее сохранить qualification receipt/cleanup старых artifact и Task6 registry; historical PROFILE_BUSY остаётся открыт.
