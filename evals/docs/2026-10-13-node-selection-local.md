@@ -1745,3 +1745,24 @@ Host closed_acktrue/exit0/noSignal/noError. Branch_base ownsmanualreview тол�
 artifacts; reportготовитсяпараллельно. Доgraph-review+auditrefresh+puregate accepted3.
 Started5/closed5/technicalfailed1/pendingreview1/notstarted26/baseline0.
 Истории/исходныеevidence/pins/lock/модель/runtime не менялись; повторовmodelsнет.
+
+Checkpoint 2026-10-14 12:59 UTC — claims/1 independent PASS, ROI/1 live.
+Wx graph-review674b63693a3849e26e11b84d1a157279b795e0c882135ac825f9523125bcb751
+passed; detailscb76fd8d…/independentDecimaloracle468237ac… подтверждают400→72,
+все20ячеек/4строки, maxerror3E-10. Отказfilter1=request.validate NOT_APPLIED/
+effectfalse/cleanuptrue доruntimeadmission из-за label сзапрещённым«>»; filter2
+убралтолькоlabel, обаусловия сохранены. Первый runtimebaseline — Import+Variables,
+безраннегоFilter/orphan/reconciliation; LGP5businessnodes/4links/единственныеFilter
+иExport/0JS. Export304B receiptlinked.35protectedoriginalfiles unchanged.
+Во входе нетровно0.8/alternate-caseApproved: строгийfrtGreater0.8/CaseSensitive=true
+подтвержденыXML, новогоboundaryliveтеста не было. Ограничение остаётсявотчёте.
+Rootauditrefresh exit0: единственнаяразница reviewStatus not-required→passed,
+новыйSHA70408e2fd37181b6f123eb9bc35c1ed170daea832ac2d79b7a3b08eeee765e20,
+original0bb6…0400сохранён. Rootpuregate advance/null,0400binding saved.
+Same frozen31series resume3/exec45876/runner1992739; ledgerclaimsadvance12:58:24.593Z.
+ROI/1 admitted12:58:24.601Z/CLI1993214start12:58:34.419Z,
+Session ses_ec581b16affet18cuk4byCEIIz, actualPIDalive. Всеsource/pins/runtime/skill/
+model/inputs/lock прежние, моделипервых5слотовнеповторялись.
+Started6/closed5/accepted4/technicalfailed1/notstarted25/baseline0.
+Reportamendment005/cd5b8785… сохраняетinitialreviewhold; последующеерешение отдельно.
+Main31/полнаяприёмка/сравнение остаютсяоткрытыми; новыхправокstandardruntimeнет.
