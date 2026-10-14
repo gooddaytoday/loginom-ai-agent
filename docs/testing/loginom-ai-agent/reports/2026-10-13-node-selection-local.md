@@ -1,17 +1,16 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
-Текущий checkpoint 2026-10-14 14:11 UTC: серия `20261014T112452Z-5e223f`,
+Текущий checkpoint 2026-10-14 14:17 UTC: серия `20261014T112452Z-5e223f`,
 общий runtime `659588af…`. Первые девять candidate закрыты: пять приняты
 (first-last-touch, sales, monthly, claims/1 и explicit-js/1), четыре technical-failed
 (ABC, ROI, tags, recovery/1). Чистый проход и полная приёмка не подтверждены.
-Recovery initial Calculator выполнен, native parse error наблюдён; required
-restored-draft receipt, исправление и итоговый LGP/CSV не подтверждены, JS0.
-Own user:200/admin:201 закрыты, все девять собственных PID отсутствуют, точный
-guard архивирован. Descriptor `3a492045…`, release-review `607cd451…` и root gate
-подтвердили только освобождение неуспешной попытки и продолжение другими слотами.
-Baseline sales/1 выполняется: dispatch14:09:31.860Z, CLI2137066,
-Session `ses_ec5408ffbffeKCgRXPRQT2Iukc`, exec96749. Всего started10/closed9/
-accepted5/technicalfailed4/notstarted21; baseline started1/closed0.
+Baseline sales/1 принят автоматически: CLI0/normalcleanuptrue, oracle и graph
+PASS, JS0calls/nodes; actualHost2138065 ACKexit0, ownCLI/Host завершены.
+Runner автоматически начал baseline ABC/1: dispatch14:15:25.531Z,
+CLI2151728/Session `ses_ec53b2afaffeQZj5knUAPWS0kN`, exec96749 живой.
+Всего started11/closed10/accepted6/technicalfailed4/notstarted20;
+baseline started2/closed1/accepted1. Исходы candidate failures и их доказательства
+сохранены; recovery own release независимо подтверждён `607cd451…`.
 Матрица31, runtime/модель/inputs/oracle/условия прежние; повторов слотов нет.
 
 Статус: приёмка не завершена. Новая пара203142-5bf175 статически проверена;
@@ -2756,3 +2755,16 @@ Resume7 rechecked девять слотов без моделей и начал 
 Dispatch14:09:31.860Z/CLI14:09:43.101Z/PID2137066/Session ses_ec5408ffbffeKCgRXPRQT2Iukc;
 exec96749 живой. Command/observed/gate wx0400 сохранены; следующая попытка только
 после машинных gates либо независимого review и strict own release при отказе.
+
+### 2026-10-14 14:17 UTC — baseline sales PASS и автоматический ABC admission
+
+Baseline sales/1 CLI2137066 start14:09:43.101Z/end14:15:24.530Z (341.429с),
+attempt finish14:15:25.403Z (353.541с). Audit `e82b58e1…` complete/no failures,
+policy/calculation/oracle/history/runtime/identity/graph/export PASS, JS0calls/nodes,
+manual review not-required, historyAnomalyfalse. LGP `2d660bd9…`, CSV `86846451…`,
+oracle `ba7e5d7f…`. ActualHost2138065 ACKtrue/exit0/noSignal и CLI отсутствуют.
+Ledger advance14:15:25.526Z и новый baselineABC dispatch14:15:25.531Z подтверждают
+автоматическое продолжение без operator resume. ABC CLI2151728 start14:15:36.979Z,
+Session ses_ec53b2afaffeQZj5knUAPWS0kN живой в том же exec96749. Никакие прежние
+модели не повторялись, разница phases остаётся только skill. Observed receipt
+`root-auto-baseline-sales-to-abc-observed.json` сохранён wx0400.
