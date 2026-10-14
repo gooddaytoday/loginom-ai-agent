@@ -31,9 +31,11 @@ export function loginomAddress(value) {
 // Pre-widget diagnostics only: no response bodies, headers, query, console text
 // or input values. The collector grants no readiness/cleanup authority.
 export function startupPageDiagnostics(page, origin) {
-  const evidence={version:1,started_at:new Date().toISOString(),requests:[],dropped_requests:0,page_errors:[],console_counts:{},stopped:false};
+  const evidence={version:1,started_at:new Date().toISOString(),requests:[],dropped_requests:0,static_requests:0,page_errors:[],console_counts:{},stopped:false};
   const requests=new WeakMap();
   const request=r=>{try {
+    // Hundreds of startup assets must not evict the later config/credential RPC.
+    if(!['document','xhr','fetch'].includes(r.resourceType())){evidence.static_requests++;return}
     if(evidence.requests.length>=64){evidence.dropped_requests++;return}
     const url=new URL(r.url()),item={same_origin:url.origin===origin,pathname:url.pathname.slice(0,256),method:r.method(),started_at:new Date().toISOString(),state:'pending'};
     requests.set(r,item);evidence.requests.push(item);
