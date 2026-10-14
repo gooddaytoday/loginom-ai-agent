@@ -5,7 +5,9 @@ import {readFile,mkdir,writeFile,mkdtemp,rm,rename} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
 const path=process.env.STARTUP_SOURCE??new URL('../src/connection-check.mjs',import.meta.url);
+const {terminalSourceForOwner,retainTerminalSourceStartup}=await import(new URL('./terminal-source-startup.mjs',typeof path==='string'?pathToFileURL(path):path));
 const source=await readFile(path,'utf8');
 const code=source.slice(source.indexOf('export function browserEnvironment')).replaceAll('export ','');
 const managed=await readFile(process.env.STARTUP_MANAGED??new URL('../src/managed-entry.mjs',import.meta.url),'utf8');
@@ -44,7 +46,7 @@ function fixture(directory,phase,rejected){
  class Client {async connect(){events.push('knowledge');if(phase==='knowledge')throw rejected}async close(){events.push('knowledge-close');if(phase==='knowledge-close')throw rejected}}
  const require=name=>{if(phase==='require'||phase==='knowledge-require')throw rejected;return name==='playwright-core'?{chromium:{async launchPersistentContext(){events.push('launch');if(phase==='launch')throw rejected;return context}}}:
   name.includes('streamableHttp')?{StreamableHTTPClientTransport:class{}}:{Client}};
- const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,writeFile,join,randomUUID,URL,process,Error,
+ const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,writeFile,join,randomUUID,URL,process,Error,terminalSourceForOwner,
   browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>'',terminalUserPublisherScript:()=>''});
  const options={profile:directory,browserPath:'/fixture',candidate:{url:'https://loginom.invalid/app',username:'user',password:'',apiKey:'fixture'},endpoint:'https://knowledge.invalid',owner};
  return {owner,options,functions,events,context,page,logout:()=>logout,contextClose:()=>contextClose};
@@ -105,7 +107,7 @@ for(const validation of [true,false])for(const phase of [undefined,'init','goto'
  const root=await mkdtemp(join(tmpdir(),'startup-entry-'));const f=fixture(root,phase,0),state={},replies=[];
  const start=managed.slice(managed.indexOf('state.startupOwner={directory,'),managed.indexOf('      const config =',managed.indexOf('state.startupOwner={directory,')));
  f.context.inspect=()=>assert.equal(state.startupOwner.context,f.context);
- const run=vm.runInNewContext('(async()=>{'+start+'})',{
+ const run=vm.runInNewContext('(async()=>{'+start+'})',{retainTerminalSourceStartup,sourceLoad:retainTerminalSourceStartup({input:{}},state),
   state,fpStartup:undefined,observed:work=>work,directory:root,browserProfile:root,resources:{browserPath:'/fixture'},input:{connection:f.options.candidate,endpoint:f.options.endpoint,validation},
   message:{id:'original'},send:reply=>replies.push(reply),checkConnection:f.functions.checkConnection,loginBrowser:f.functions.loginBrowser});
  try{

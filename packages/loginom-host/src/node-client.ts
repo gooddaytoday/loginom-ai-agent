@@ -1,4 +1,4 @@
-import {parentRootMessage} from './original-root-association'
+import {parentRootMessage,bindSortingLoadPurpose,createSortingDiagnosticGrant} from './original-root-association'
 import {retainOriginalRunOrigin} from "./original-run-control"
 import {bindOriginalRootPort} from "./original-root-port"
 import { fork } from "node:child_process"
@@ -113,34 +113,49 @@ async function launchFPDiagnostic(input: NodeHostInput & { packagePath: string }
 export async function launchSortingDiagnostic(input: NodeHostInput & { packagePath?: string }, originalControl?: object) {
   const root = originalControl ? retainOriginalRunOrigin(originalControl) : undefined
   root?.guard()
+  const hold = (value:object) => {
+    const prototype=Object.getPrototypeOf(value),entries=Reflect.ownKeys(value).map(key=>[key,Object.getOwnPropertyDescriptor(value,key)!] as const)
+    if(entries.some(([,d])=>!('value'in d)))throw Error('LOGINOM_ORIGINAL_LOAD_CHANGED')
+    return ()=>{if(Object.getPrototypeOf(value)!==prototype||Reflect.ownKeys(value).length!==entries.length)throw Error('LOGINOM_ORIGINAL_LOAD_CHANGED')
+      for(const[key,d]of entries){const now=Object.getOwnPropertyDescriptor(value,key);if(!now||Reflect.ownKeys(d).some(k=>(now as any)[k]!== (d as any)[k]))throw Error('LOGINOM_ORIGINAL_LOAD_CHANGED')}
+    }
+  }
+  const checkInput=root?hold(input):undefined
+  const environment=root&&Object.getOwnPropertyDescriptor(input,'environment')?.value
+  const checkEnvironment=environment&&typeof environment==='object'?hold(environment):undefined
+  const guard=()=>{root?.guard();checkInput?.();checkEnvironment?.()}
+  const observed=async<T>(work:Promise<T>)=>{let result;try{result=await work}catch(error){if(root?.origin.signal.aborted)root.guard();throw error}guard();return result}
+  guard()
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
-  const manifest = JSON.parse(await readFile(join(input.resources, "resource-manifest.json"), "utf8"))
+  const manifest = JSON.parse(await observed(readFile(join(input.resources, "resource-manifest.json"), "utf8")))
   // The post-staging Node host belongs to the product inventory, not the
   // runtime resource inventory. Use its canonical receiving product location.
   const product = resolve(input.resources, "../..")
-  if (await realpath(input.resources) !== join(product, "resources/loginom"))
+  if (await observed(realpath(input.resources)) !== join(product, "resources/loginom"))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
-  const cli = JSON.parse(await readFile(join(product, "cli-manifest.json"), "utf8"))
+  const cli = JSON.parse(await observed(readFile(join(product, "cli-manifest.json"), "utf8")))
   const hosts = cli.files?.filter((file: { path: string }) => file.path === "resources/loginom/host/node-host.mjs")
   const hostItem = hosts?.[0]
   if (cli.format !== "loginom-cli-artifact-v1" || hosts?.length !== 1 || !/^[a-f0-9]{64}$/.test(hostItem.sha256)
-      || await realpath(input.entry) !== join(product, "resources/loginom/host/node-host.mjs")
-      || createHash("sha256").update(await readFile(input.entry)).digest("hex") !== hostItem.sha256)
+      || await observed(realpath(input.entry)) !== join(product, "resources/loginom/host/node-host.mjs")
+      || createHash("sha256").update(await observed(readFile(input.entry))).digest("hex") !== hostItem.sha256)
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   for (const [path, actual] of [["bin/node", input.node],
-    ["runtime/src/acceptance/sorting-before-close-v1.mjs", join(input.resources, "runtime/src/acceptance/sorting-before-close-v1.mjs")]]) {
+    ["runtime/src/acceptance/sorting-before-close-v1.mjs", join(input.resources, "runtime/src/acceptance/sorting-before-close-v1.mjs")],
+    ...(root?["runtime/src/terminal-source-startup.mjs","runtime/src/terminal-root-association.mjs","runtime/src/connection-check.mjs","runtime/src/managed-entry.mjs"].map(path=>[path,join(input.resources,path)]):[])]) {
     const items = manifest.files?.filter((file: { path: string }) => file.path === path)
     const item = items?.[0]
-    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
-        || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
+    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await observed(realpath(actual!)) !== resolve(input.resources, path!)
+        || createHash("sha256").update(await observed(readFile(actual!))).digest("hex") !== item.sha256)
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
-  const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath, harness: "sorting-before-close-v1" as const }
+  guard()
+  const grant = createSortingDiagnosticGrant(randomBytes(32).toString("hex"),input.packagePath)
   const options = { ...input }
   diagnostics.set(options, grant)
-  root?.guard()
+  guard()
   const host = await launchNodeHost(options, originalControl)
   return { ...host, auditAuthorization: grant.authorization, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
 }
@@ -207,7 +222,7 @@ export async function launchNodeHost(input: NodeHostInput, originalControl?: obj
     },
     start() {},
   }
-  if (originalControl) bindOriginalRootPort(port, originalControl, child)
+  if (originalControl) {bindOriginalRootPort(port, originalControl, child);if(diagnostic?.harness==="sorting-before-close-v1")bindSortingLoadPurpose(port,diagnostic)}
   const fpClient = diagnostic?.harness === "field-parameters-preservation-v1" ? privateFPTransport(port) : undefined
   const client = fpClient ?? transport(port)
   const startupInput = {

@@ -1,4 +1,4 @@
-import {rootHostOptions} from './original-root-association'
+import {rootHostOptions,bindRuntimeLoadPurpose} from './original-root-association'
 import {getFPHostStartup} from "./fp-startup-control"
 import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
@@ -92,7 +92,7 @@ export async function createLoginomHost(options: {
     const key = `${validation ? "validation" : "runtime"}:${connection.generation}:${chat}`
     const owner: { child?: Runtime; settled: Promise<void>; failure?: { value: unknown } } = { settled: Promise.resolve() }
     owners.set(key, owner)
-    const launched = supervise({
+    const launchInput = {
       node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
       entry: join(resources, "runtime/src/managed-entry.mjs"),
       resources,
@@ -108,7 +108,9 @@ export async function createLoginomHost(options: {
       actionManifestSha256: manifest.actionManifestSha256,
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
-    }, startup ? {...startup.control,...startup.tuple,guard:startup.guard,reject:startup.propagate,
+    }
+    if(rootOrigin?.loadPurpose && acceptanceCapture && captures.get(chat)===acceptanceCapture){if(rootHostOptions(options)!==rootOrigin)throw Error('LOGINOM_ORIGINAL_LOAD_CHANGED');bindRuntimeLoadPurpose(launchInput,rootOrigin)}
+    const launched = supervise(launchInput, startup ? {...startup.control,...startup.tuple,guard:startup.guard,reject:startup.propagate,
       receive:startup.receive,retain:child=>{owner.child=child}} : undefined,rootOrigin)
     owner.settled = launched.then(child => { owner.child = child }, error => {
       owner.failure = { value: error }

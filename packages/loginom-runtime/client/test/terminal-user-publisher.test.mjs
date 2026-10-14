@@ -65,6 +65,7 @@ test('foreign document refuses held receiver without any new acquisition',async(
 
 test('actual loginBrowser registers fixed publisher before navigation; no live browser or SDK',async()=>{
  const runtime=process.env.TERMINAL_RUNTIME_ROOT??new URL('../../',import.meta.url).pathname;
+ const {terminalSourceForOwner}=await import(pathToFileURL(runtime+'/src/terminal-source-startup.mjs'));
  const code=(await readFile(runtime+'/src/connection-check.mjs','utf8')).split('export function browserEnvironment')[1];
  const directory=await mkdtemp(join(tmpdir(),'terminal-user-startup-'));let script,f,task;const events=[];
  const page={async goto(){events.push('goto');assert(script);f=await setup({script});
@@ -75,7 +76,7 @@ test('actual loginBrowser registers fixed publisher before navigation; no live b
  const context={pages:()=>[page],async addInitScript(input){events.push('init');script=input.content}};
  const require=()=>({chromium:{async launchPersistentContext(){events.push('launch');return context}}});
  const {loginBrowser}=runInContext(('function browserEnvironment'+code).replaceAll('export ','')+';({loginBrowser})',
-   createContext({require,mkdir,writeFile,join,randomUUID,URL,process,browserDownloadScript,browserLaunch,terminalUserPublisherScript}));
+   createContext({require,mkdir,writeFile,join,randomUUID,URL,process,browserDownloadScript,browserLaunch,terminalUserPublisherScript,terminalSourceForOwner}));
  try{const owner={directory};const result=await loginBrowser({profile:directory,browserPath:'/fixture',keepOpen:true,owner,
    candidate:{url:'https://app.loginom.ai/app/',username:'worker',password:''}});
   assert.equal(result.context,context);assert.equal(owner.page,page);assert.deepEqual(events,['launch','init','goto']);

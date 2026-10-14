@@ -1,3 +1,4 @@
+import {terminalSourceForOwner} from './terminal-root-association.mjs'
 import { createRequire } from "node:module"
 import { mkdir, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
@@ -28,35 +29,38 @@ export function loginomAddress(value) {
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, owner) {
+  const sourceLoad=owner&&terminalSourceForOwner(owner)
+  sourceLoad?.admitPage(page,candidate)
+  const observed=work=>sourceLoad?sourceLoad.observed(work):work
   if(owner) owner.navigationStarted=true
-  await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
+  await observed(page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 }))
   if(owner) {
-    await page.evaluate(o=>{
+    await observed(page.evaluate(o=>{
       if(location.origin!==o.origin||globalThis.__loginomStartupV1) throw Error('LOGINOM_STARTUP_IDENTITY_REQUIRED')
       globalThis.__loginomStartupV1={document,id:o.id,account:o.account}
-    },{id:owner.id,account:candidate.username,origin:new URL(candidate.url).origin})
+    },{id:owner.id,account:candidate.username,origin:new URL(candidate.url).origin}))
     owner.documentBound=true
   }
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-  await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
-  if (!(await avatar.isVisible())) {
-    await field("edtUsername").locator("input").fill(candidate.username)
+  await observed(avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 }))
+  if (!(await observed(avatar.isVisible()))) {
+    await observed(field("edtUsername").locator("input").fill(candidate.username))
     const password = field("edtPassword").locator("input")
     // Loginom resolves password availability when username loses focus.
     // fill() waits for editability before focusing, so focus explicitly first.
-    await password.click()
+    await observed(password.click())
     // Passwordless accounts may make an already empty field readonly after username lookup.
-    if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
+    if (candidate.password !== "" || (await observed(password.inputValue())) !== "") await observed(password.fill(candidate.password))
     if(owner) owner.loginSubmitted=true
-    await field("btnLogin").click()
-    await avatar.waitFor({ state: "visible", timeout: 30_000 }).catch(cause => {
+    await observed(field("btnLogin").click())
+    await observed(avatar.waitFor({ state: "visible", timeout: 30_000 }).catch(cause => {
       throw new Error("LOGINOM_LOGIN_REJECTED",{cause})
-    })
+    }))
   }
-  const identity = await page.evaluate(
+  const identity = await observed(page.evaluate(
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
-  )
+  ))
   if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
   return { authenticated: true }
 }
@@ -184,12 +188,16 @@ function startupOwner(owner, profile, candidate) {
 }
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, owner = {} }) {
   startupOwner(owner,profile,candidate)
+  const sourceLoad=terminalSourceForOwner(owner)
+  sourceLoad?.admitBrowser(owner,candidate,profile)
+  const observed=work=>sourceLoad?sourceLoad.observed(work):work
   try {
     const { chromium } = require('playwright-core')
     const launch=browserLaunch(headless)
-    await mkdir(profile,{recursive:true,mode:0o700})
+    sourceLoad?.guard()
+    await observed(mkdir(profile,{recursive:true,mode:0o700}))
     owner.launchAttempted=true
-    owner.context = await chromium
+    owner.context = await observed(chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
       headless,
@@ -214,10 +222,13 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
           : []),
       ],
       viewport: launch.viewport,
-    })
-    owner.page=owner.context.pages()[0]??await owner.context.newPage()
-    await owner.context.addInitScript({content:browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)})
-    const result=await loginPage(owner.page,candidate,owner)
+    }))
+    sourceLoad?.bindContext(owner.context)
+    owner.page=(sourceLoad?sourceLoad.contextCall('pages'):owner.context.pages())[0]??await observed(sourceLoad?sourceLoad.contextCall('newPage'):owner.context.newPage())
+    sourceLoad?.bindPage(owner.page)
+    const content=browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)
+    await observed(sourceLoad?sourceLoad.init(content):owner.context.addInitScript({content}))
+    const result=await observed(loginPage(owner.page,candidate,owner))
     if(!keepOpen) {await owner.close();return result}
     return {...result,context:owner.context}
   } catch(error) {

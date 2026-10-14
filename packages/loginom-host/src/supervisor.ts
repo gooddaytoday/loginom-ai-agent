@@ -1,5 +1,5 @@
 import {retainOriginalCallArguments} from './original-run-control'
-import {runtimeRootStart,runtimeRootCall,rootCallMessage} from './original-root-association'
+import {runtimeRootStart,runtimeRootCall,rootCallMessage,guardRuntimeLoadPurpose} from './original-root-association'
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { mkdir } from "node:fs/promises"
@@ -96,7 +96,8 @@ type ClosedStartupControl = FPStartupControl
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
 export async function supervise(input: Launch, startup?:ClosedStartupControl, rootOrigin?:Parameters<typeof runtimeRootStart>[0]) {
   startup?.guard()
-  const rootInputGuard=rootOrigin?retainOriginalCallArguments(input):undefined
+  const originalInputGuard=rootOrigin?retainOriginalCallArguments(input):undefined
+  const rootInputGuard=rootOrigin?()=>{originalInputGuard!();guardRuntimeLoadPurpose(input,rootOrigin)}:undefined
   const originalStartup=startup
   if(startup)startup=Object.freeze({...startup})
   const original=input, originalConnection=input.connection
@@ -179,7 +180,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl, ro
     }
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
-    const rootWire=rootOrigin && operation==='start'?runtimeRootStart(rootOrigin,child.pid!,input.generation,input.chat)
+    const rootWire=rootOrigin && operation==='start'?runtimeRootStart(rootOrigin,child.pid!,input.generation,input.chat,input)
       : rootOrigin && ['call','interrupt'].includes(operation)?runtimeRootCall(rootOrigin,rootCall,child.pid!,input.generation,input.chat,id):undefined
     return new Promise<unknown>((resolve, reject) => {
       const deadline=control?.deadline??Date.now()+timeout

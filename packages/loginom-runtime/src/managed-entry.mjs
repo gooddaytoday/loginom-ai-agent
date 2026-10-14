@@ -1,3 +1,4 @@
+import {retainTerminalSourceStartup} from './terminal-root-association.mjs'
 import {receiveManagedRootStart,receiveManagedRootCall,managedRootCall,decodeRootRejection} from './terminal-root-association.mjs'
 import {beginTerminalManagedCall,isTerminalManagedCall,terminalManagedPrepareMessage} from './terminal-managed-call.mjs'
 import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
@@ -131,14 +132,15 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
+      const sourceLoad=retainTerminalSourceStartup(message,state)
       const { acceptanceCleanupPackage, acceptanceCapture, fpStartup } = validateStartInput(input)
       if(fpStartup) {
         state.startupController=new AbortController()
         state.controlledStartup=retainFPManagedStartup(message,input,state,state.startupController)
       }
       const observed=async work=>{
-        let value;try {value=await work}catch(error){throw state.controlledStartup?state.controlledStartup.reject(error):error}
-        state.controlledStartup?.guard();return value
+        let value;try {value=await work}catch(error){throw state.controlledStartup?state.controlledStartup.reject(error):sourceLoad?sourceLoad.reject(error):error}
+        state.controlledStartup?.guard();sourceLoad?.guard();return value
       }
       state.controlledStartup?.guard()
       const resources = await observed(verifyResources(input.resources))
@@ -171,6 +173,7 @@ async function handle(message) {
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
       state.startupOwner={directory,generation:input.generation,chat:input.chat,
         ...(fpStartup?{signal:state.startupController.signal,deadline:fpStartup.deadline}:{} )}
+      sourceLoad?.bindOwner(state.startupOwner,browserProfile)
       state.controlledStartup?.bindOwner(state.startupOwner)
       const originalStartupSignal=state.startupOwner.signal,originalStartupDeadline=state.startupOwner.deadline
       const login = {

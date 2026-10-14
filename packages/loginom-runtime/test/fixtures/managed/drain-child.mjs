@@ -9,6 +9,7 @@ const entry=new vm.SourceTextModule(await readFile(file,'utf8')+'\nexport {state
 await entry.link(async specifier=>{
  if(['./terminal-managed-call.mjs','./terminal-root-association.mjs'].includes(specifier))return new vm.SourceTextModule(await readFile(new URL(specifier,url.pathToFileURL(file)),'utf8'),{context,identifier:new URL(specifier,url.pathToFileURL(file)).href});
  const exports=builtin[specifier]??({
+ './terminal-source-startup.mjs':{retainTerminalSourceStartup(){throw Error('fixture forbids start')}},
  './original-prepare-lender.mjs':{retainOriginalPrepareStartup(){throw Error('fixture forbids start')}},
  './fp-managed-startup.mjs':{retainFPManagedStartup(){throw Error('fixture forbids start')}},
  './resources.mjs':{verifyResources:()=>{throw Error('fixture forbids start')}},
