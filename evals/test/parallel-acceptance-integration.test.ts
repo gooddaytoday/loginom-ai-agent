@@ -3,7 +3,7 @@ import path from "node:path"
 import os from "node:os"
 import { mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
-import { collectHostResources, sampleContainerResources } from "../src/parallel-resources"
+import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
@@ -178,4 +178,24 @@ console.log(JSON.stringify(await sampleCgroupResources()))
   expect(sample.errors).toContain("CGROUP_MEMORY_CURRENT_BYTES_UNAVAILABLE")
   expect(sample.errors).toContain("CGROUP_MEMORY_EVENTS_UNAVAILABLE")
   expect(sample.cpu_usage.usage_usec).toBeGreaterThan(0)
+}, 10_000)
+
+test.skipIf(!Bun.which("bwrap"))("cgroup sampler preserves an unavailable ancestor quota without substituting an unlimited budget", async () => {
+  const baseline = await sampleCgroupResources()
+  const target = baseline.ancestors?.find(ancestor => ancestor.cpu_max !== null)
+  expect(target?.cpu_max).not.toBeNull()
+  expect(target).toBeDefined()
+  const child = Bun.spawn([Bun.which("bwrap")!, "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc",
+    "--dev", "/dev", "--ro-bind", "/dev/null", path.join("/sys/fs/cgroup", target!.path!, "cpu.max"),
+    "--chdir", evalsRoot, process.execPath, "-e", `
+import {sampleCgroupResources} from ${JSON.stringify(path.join(evalsRoot, "src/parallel-resources.ts"))}
+console.log(JSON.stringify(await sampleCgroupResources()))
+`], { env: { PATH: process.env.PATH! }, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+  const sample = JSON.parse(stdout)
+  const ancestor = sample.ancestors.find((item: { path: string }) => item.path === target!.path)
+  expect(ancestor.cpu_max).toBeNull()
+  expect(ancestor.errors).toContain("CGROUP_CPU_MAX_UNAVAILABLE")
+  expect(sample.memory_current_bytes).toBeGreaterThan(0)
 }, 10_000)

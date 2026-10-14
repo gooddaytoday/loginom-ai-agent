@@ -83,6 +83,14 @@ device/inode/path, PGID/SID и cgroup path сверяются повторно; 
 runtime producer ещё требуется. С остальным sampling: 27 PASS/228 assertions
 (17.58s), typecheck/diff PASS; model/Loginom calls не выполнялись.
 
+Cgroup sample содержит ancestors (parent → /), CPU quota/period из cpu.max и
+memory/swap limits/counters каждого scope. Это чтение применимой иерархии,
+описанной в [kernel cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html),
+без изменения настроек. Missing/noncanonical membership и недоступные fields
+остаются unknown; literal max сохраняется только после чтения. Shared ancestor
+load/OOM не приписывается отдельному slot. Actual proc/sysfs и private ancestor
+quota mask: 29 resource tests PASS/251 assertions (16.11s), typecheck/diff PASS.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —
