@@ -724,7 +724,10 @@ export async function superviseProcess(input: {
   const deadline = Date.now() + 60_000
   if (timedOut || interrupted) {
     await signalOwned("SIGINT")
-    await Promise.race([exited, Bun.sleep(30_000)])
+    const grace = Promise.withResolvers<void>()
+    const graceTimer = setTimeout(grace.resolve, 30_000)
+    try { await Promise.race([exited, grace.promise]) }
+    finally { clearTimeout(graceTimer) }
   }
   await signalOwned("SIGTERM")
   const remaining = async (wrappers = false) => {

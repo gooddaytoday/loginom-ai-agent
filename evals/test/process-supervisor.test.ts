@@ -8,6 +8,38 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
+test("supervisor releases its interrupt grace timer when the owned command exits", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-interrupt-timer-"))
+  let cleanupConfirmed = true
+  try {
+    const script = path.join(root, "supervise.ts")
+    const result = path.join(root, "result.json")
+    await Bun.write(script, `import { superviseProcess } from ${JSON.stringify(path.join(evalsRoot, "src/process-supervisor.ts"))}
+const abort = new AbortController()
+const output = new TransformStream()
+const reader = output.readable.getReader()
+const pending = superviseProcess({cmd:[process.execPath,"-e","console.log('ready'); await Bun.sleep(120000)"],
+  cwd:${JSON.stringify(root)},env:{PATH:process.env.PATH},timeoutMs:10000,stdout:output.writable,signal:abort.signal})
+await reader.read()
+abort.abort()
+while (!(await reader.read()).done) {}
+reader.releaseLock()
+const run = await pending
+await Bun.write(${JSON.stringify(result)}, JSON.stringify({interrupted:run.interrupted,cleanup:run.processCleanup}))
+`)
+    cleanupConfirmed = false
+    const run = await superviseProcess({ cmd: [process.execPath, script], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 10_000 })
+    cleanupConfirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.processCleanup.status).toBe("confirmed")
+    const saved = await Bun.file(result).json()
+    expect(saved.interrupted).toBe(true)
+    expect(saved.cleanup.status).toBe("confirmed")
+    expect(run.timedOut).toBe(false)
+    expect(run.exitCode).toBe(0)
+  } finally { if (cleanupConfirmed) await rm(root, { recursive: true, force: true }) }
+}, 45_000)
+
 test("supervisor streams repeated pipe exchanges and confirms process exit", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-stream-transport-"))
   const input = new TransformStream<Uint8Array, Uint8Array>()
