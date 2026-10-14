@@ -360,6 +360,10 @@ function startupOwner(owner, profile, candidate) {
                 &&m.FServerConnection.UserName===o.account&&m.FServerConnection.Connected===true&&m.PackageNodes?.Count===0&&m.HasRunningNodes()===false
             },{id:owner.id,account:owner.account,origin:owner.origin})
             if(!same) throw Error('LOGINOM_STARTUP_IDENTITY_CHANGED')
+            if(!await at('MF;AppMenuForm;btnLogOut').isVisible()) {
+              nativeStage='native_menu_reopen'
+              await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:8000})
+            }
             nativeStage='native_logout'
             await at('MF;AppMenuForm;btnLogOut').click({timeout:8000})
             nativeStage='native_logout_confirmation'
