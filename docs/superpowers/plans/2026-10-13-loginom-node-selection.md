@@ -1,14 +1,14 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint 2026-10-14 12:30 UTC: разрешённые исправления восстановлены
+Текущий checkpoint 2026-10-14 12:40 UTC: разрешённые исправления восстановлены
 (d3cd4e46f9, 713 targeted PASS). Итоговая matched пара112452/runtime659588…;
 обычный живой Import→Sort→Export прошёл до модельной серии.
 ABC/1 technical-failed сохранён; own release независимо подтверждён.
-First-last-touch/1 принят: machine+independent semantic PASS, JS calls/nodes0,
-правильные25ячеек/500входныхстрок, связныйLGP8nodes/8links, штатное закрытие.
-Same frozen31 sequential runner продолжен: sales-by-category/1 admitted12:29:58.383Z,
-CLI1931252 started12:30:09.794Z, Session ses_ec59bb705ffeER56yPWSw7JG1h.
-Started3/closed2/technicalfailed1/accepted1/notstarted28/baseline0.
+First-last-touch/1 и sales-by-category/1 приняты, JS calls/nodes0, oracle/graph/close PASS.
+Sales принят автоматически12:36:04.913Z; тот же frozen31 sequential runner
+без ручной паузы начал monthly-demand/1, CLI1945851 started12:36:14.690Z,
+Session ses_ec5962735ffeyM1A97EXc2G6y6, сейчас выполняется стандартныйDate/time.
+Started4/closed3/technicalfailed1/accepted2/notstarted27/baseline0.
 Полная приёмка открыта; повторы admittedslots запрещены, старые outcomes исторические.
 
 
@@ -3365,3 +3365,16 @@ Current coverage — успешный standalone exportgate и один авто
 firstlastcase; ABC blocked. Сравнение skill ещё невозможно; полнаяприёмка открыта.
 Report amendments ae428436…/2dc1917b… подготовлены параллельно, старый skeleton сохранён.
 Новых правок производственных обработчиков стандартных узлов не внесено.
+
+Checkpoint 2026-10-14 12:40 UTC — sales/1 принят автоматически; monthly/1 running.
+Sales CLI1931252exit0/normalcleanuptrue/finished12:36:04.794Z; CLI354.077с,
+wrapper366.408с. Audit7f783432… complete policy/oracle/calculation/history/runtime/
+identity/graph/export PASS, JS0/failures[]/reviewnotrequired/historyAnomalyfalse.
+SavedLGP5e83a6a9…/oracleba7e5d7f…; Host1931579ACKtrue/exit0/noError/noSignal,
+ledger12:36:04.913Zadvance. Все обязательные release gates прошли вrunner.
+Sameexec36709 автоматически начал monthly-demand/1, CLI1945851 started
+12:36:14.690Z, Session ses_ec5962735ffeyM1A97EXc2G6y6; живойPID подтверждён.
+Импорт дат settledSUCCEEDED; месяц извлекает стандартныйtransform.date_time.
+Reportamendment003/e2edbba1… подготовлен параллельно; oracle/модель не повторялись.
+Started4/closed3/accepted2/technicalfailed1/notstarted27/baseline0; сравнительный
+вывод и полная приёмка пока невозможны. Runtime/skill/source/pins/lock неизменны.

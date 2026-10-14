@@ -2545,3 +2545,16 @@ Current coverage — успешный standalone exportgate и один авто
 firstlastcase; ABC blocked. Сравнение skill ещё невозможно; полнаяприёмка открыта.
 Report amendments ae428436…/2dc1917b… подготовлены параллельно, старый skeleton сохранён.
 Новых правок производственных обработчиков стандартных узлов не внесено.
+
+Checkpoint 2026-10-14 12:40 UTC — sales/1 принят автоматически; monthly/1 running.
+Sales CLI1931252exit0/normalcleanuptrue/finished12:36:04.794Z; CLI354.077с,
+wrapper366.408с. Audit7f783432… complete policy/oracle/calculation/history/runtime/
+identity/graph/export PASS, JS0/failures[]/reviewnotrequired/historyAnomalyfalse.
+SavedLGP5e83a6a9…/oracleba7e5d7f…; Host1931579ACKtrue/exit0/noError/noSignal,
+ledger12:36:04.913Zadvance. Все обязательные release gates прошли вrunner.
+Sameexec36709 автоматически начал monthly-demand/1, CLI1945851 started
+12:36:14.690Z, Session ses_ec5962735ffeyM1A97EXc2G6y6; живойPID подтверждён.
+Импорт дат settledSUCCEEDED; месяц извлекает стандартныйtransform.date_time.
+Reportamendment003/e2edbba1… подготовлен параллельно; oracle/модель не повторялись.
+Started4/closed3/accepted2/technicalfailed1/notstarted27/baseline0; сравнительный
+вывод и полная приёмка пока невозможны. Runtime/skill/source/pins/lock неизменны.
