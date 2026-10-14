@@ -561,3 +561,10 @@ inspect не требует этого допуска. `reconcileOwnedAcl` по�
 в одном fenced admin context. Полученные user/ACL hashes описывают staged user;
 активация выполняется readiness controller после physical/effective-access gates.
 Чужое существующее имя отвергается до claim и настройки account.
+
+Research fixed package-crash probe attests one empty package after closing its
+writer context. Its private volatile binding permits native close of that exact
+pending Count1 row; ordinary probes retain the Count0 requirement. Fresh account
+and tuple checks plus RPC absence remain mandatory. Production parent session
+ledger does not accept this phase; arbitrary operations/CLI crash/backup/recovery
+authority remain unqualified.

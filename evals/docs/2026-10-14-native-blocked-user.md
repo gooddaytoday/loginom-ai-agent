@@ -154,3 +154,31 @@ paired session-crash-probe.json и command/process proofs. Own disposable pair
 общего режима: active/nonempty packages, real CLI crash, reconnect, durable
 ledger/recovery и SessionBackup требуют следующих проверок. Bootstrap rights
 не менялись; generic parent close без probe proof по-прежнему unsupported.
+
+Controlled retained-package research (2026-10-15): fixed
+`session-package-crash-probe` не вызывает ClosePackage для одного только что
+созданного пустого пакета; own writer context закрывается с прежним onpagehide
+fault. Native row Count0→1→1 остаётся pending. Volatile binding хранит Count1
+attestation только для этой phase; ordinary probes не получают этот допуск.
+Fresh native account/epoch/Name/CreateTime guard и pending проверка предшествуют
+CloseSession; confirmed RPC и bounded fresh absence завершили именно этот row.
+Changed name/time rejected; повтор подтвердил absence. Нет file deletion и model calls.
+
+RED1 unsupported phase → controlled probe GREEN; RED2 SESSION_NOT_IDLE → scoped
+Count1 close GREEN. Target1 PASS/84 (32.90s), combined106 PASS/454 (86.55s),
+bun typecheck/diff PASS. Final private evidence:
+`research/evidence/native-user-4f487b81-7f03-4bc8-8ae1-2d5600fb52c4`
+с session-package-crash-{probe,close}.json и process proofs; own fixture pair
+удалена после confirmed native disposal. Qualification=false: production ledger
+не принимает новый phase, CLI SIGKILL/произвольные операции/B survival/backup
+и reconnect/recovery ещё не проверены.
+
+Следующий backup research имеет опубликованные первичные интерфейсы:
+IBGBaseDeductorServerSession.PackageAutoSavePeriod и SessionBackupManager;
+IBGDeductorServerSessionBackupManager.GetSessionsList (remote1819) возвращает
+list Count/getItem(index), backup row содержит PackageCount/StartTime/BackupTime.
+Pinned bg.model.js:5085/6013 и соответствующие interface metadata подтверждают
+API shape; actual calls ещё не проверены. MainForm.js:1133–1135 и
+PackagesAutoSavePanel.js:50–58 переводят минуты в milliseconds и используют -1
+для disabled. Период должен быть прочитан обратно; источник сам по себе не
+доказывает ненулевой backup, его user isolation, GUID mapping или safe deletion.
