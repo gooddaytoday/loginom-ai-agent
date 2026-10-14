@@ -60,7 +60,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       context = await chromium.launchPersistentContext(payload.profileDir, { executablePath: browser, headless: true, timeout: remaining(request) })
       page = context.pages()[0] ?? await context.newPage()
       page.on("console", message => {
-        if (/^ADMIN_USER_STAGE_(ENUMERATE|ADD|BLOCK|READBACK)$/.test(message.text())) process.stderr.write(message.text() + "\n")
+        if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|READBACK)|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
       })
       page.setDefaultTimeout(remaining(request))
       process.stderr.write("ADMIN_INIT_STAGE_NAVIGATION\n")
@@ -98,19 +98,21 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (payload?.phase !== "blocked") throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== 7 || payload.phase !== "blocked" || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (!["blocked", "configure"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== 7 || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
-        payload.owned !== null && (!payload.owned || Object.keys(payload.owned).length !== 4 || typeof payload.owned.objectId !== "string" || !payload.owned.objectId ||
-          payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce))
+        payload.phase === "configure" && !payload.owned || payload.owned !== null && (!payload.owned ||
+          Object.keys(payload.owned).length !== (payload.phase === "configure" ? 5 : 4) || typeof payload.owned.objectId !== "string" || !payload.owned.objectId ||
+          payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
+          payload.phase === "configure" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
       const credentials = await readCredentials(payload.secretFile)
       if (credentials.username !== payload.slot.username || createHash("sha256").update(JSON.stringify(credentials)).digest("hex") !== payload.secretHash)
         throw Error("ADMIN_CREDENTIAL_INVALID")
       dispatched = true
-      const result = await bounded(request, page.evaluate(async ({ username, owned }) => {
+      const result = await bounded(request, page.evaluate(async ({ username, owned, phase, password, secretHash }) => {
         let applied = false
         let stage = "ENUMERATE"
         try {
@@ -139,14 +141,32 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           stage = "BLOCK"
           console.info("ADMIN_USER_STAGE_BLOCK")
           if (!owned) await user.set_Blocked(true)
+          const authModeChanged = phase === "configure" && await user.AuthMode !== bg.TBGDeductorUserAuthMode.uamLocal
+          const passwordChanged = phase === "configure" && (authModeChanged || owned.secretHash !== secretHash)
+          if (phase === "configure") {
+            stage = "CONFIGURE"
+            console.info("ADMIN_USER_STAGE_CONFIGURE")
+            if (authModeChanged) { applied = true; console.info("ADMIN_USER_WRITE_AUTHMODE"); await user.set_AuthMode(bg.TBGDeductorUserAuthMode.uamLocal) }
+            if (passwordChanged) { applied = true; console.info("ADMIN_USER_WRITE_PASSWORD"); await user.SetPassword(password) }
+            for (const [name, value] of [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false]]) {
+              if (await user[name] === value) continue
+              applied = true
+              await user["set_" + name](value)
+            }
+          }
           stage = "READBACK"
           console.info("ADMIN_USER_STAGE_READBACK")
           const observed = { objectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), name: await user.Name,
-            userKind: await user.UserKind, blocked: await user.Blocked }
+            userKind: await user.UserKind, blocked: await user.Blocked, ...(phase === "configure" ? { authMode: await user.AuthMode,
+              isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner, isViewer: await user.IsViewer,
+              useGlobalFileStorage: await user.UseGlobalFileStorage, schedulerFullAccess: await user.SchedulerFullAccess } : {}) }
           if (observed.name !== username || observed.userKind !== 0 || observed.blocked !== true) throw Error("readback")
-          return { outcome: "confirmed", data: { created: !owned, user: observed } }
+          if (phase === "configure" && (observed.authMode !== bg.TBGDeductorUserAuthMode.uamLocal || observed.isAdmin !== false ||
+            observed.isDesigner !== true || observed.isViewer !== false || observed.useGlobalFileStorage !== false || observed.schedulerFullAccess !== false)) throw Error("readback")
+          return { outcome: "confirmed", data: phase === "configure" ? { authModeChanged, passwordChanged, secretHash, user: observed } : { created: !owned, user: observed } }
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
-      }, { username: payload.slot.username, owned: payload.owned }))
+      }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
+        password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash }))
       respond(id, result.outcome, result.data)
       continue
     }
@@ -177,7 +197,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               isAdmin: await listed.IsAdmin, isDesigner: await listed.IsDesigner, isViewer: await listed.IsViewer, blocked: await listed.Blocked,
               useGlobalFileStorage: await listed.UseGlobalFileStorage, schedulerFullAccess: await listed.SchedulerFullAccess })
           }
-        } finally { await ReleaseObject(enumerator) }
+        } finally { await ReleaseObject(enumerator, true) }
         const sharedDirectories = []
         const directories = await session.GetSharedDirectories()
         const directoryEnumerator = await directories.GetEnumerator()
@@ -192,10 +212,10 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 const principal = await permissionEnumerator.Current
                 permissions.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(principal)).toString(), name: await principal.Name, userKind: await principal.UserKind })
               }
-            } finally { await ReleaseObject(permissionEnumerator) }
+            } finally { await ReleaseObject(permissionEnumerator, true) }
             sharedDirectories.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(directory)).toString(), name: await directory.Name, permissions })
           }
-        } finally { await ReleaseObject(directoryEnumerator) }
+        } finally { await ReleaseObject(directoryEnumerator, true) }
         return { sessions: rows, ownSession: { guid: String(await session.Guid),
           username: await user.Name, userObjectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(),
           isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner,
