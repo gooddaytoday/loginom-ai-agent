@@ -30,7 +30,7 @@ for (const headless of [true, false]) {
   const packagePath = `/${username}/artifact-download-${chat}.lgp`
   const child = await supervise({
     node: join(resources, manifest.node),
-    entry: join(resources, "runtime/src/managed-entry.mjs"),
+    entry: join(resources, "runtime/src/managed-entry.cjs"),
     resources,
     stateDir: directory,
     generation: 1,

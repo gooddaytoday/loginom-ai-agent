@@ -86,7 +86,7 @@ try {
     ? await rejectSetup(resources, directory, `http://127.0.0.1:${server.port}/`)
     : await supervise({
         node: join(resources, "bin/node"),
-        entry: join(resources, "runtime/src/managed-entry.mjs"),
+        entry: join(resources, "runtime/src/managed-entry.cjs"),
         resources,
         stateDir: directory,
         generation: 1,

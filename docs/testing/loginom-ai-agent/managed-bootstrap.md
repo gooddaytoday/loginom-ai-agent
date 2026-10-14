@@ -1,13 +1,24 @@
 Managed IPC boot boundary
 
-Continues bounded7f36a88e. managed-entry.mjs has no static imports. It registers
-one listener and private linked records (no ambient Array queue readers), then dynamically imports the fixed managed-session.mjs body. Early
-messages are stored as the exact channel objects, never cloned/reconstructed.
-Once the body is available, the original handler receives each object once in
-FIFO order, including messages arriving reentrantly while draining. No new opcode,
-reply, send, timer, controller, operation task or budget is introduced. The body
-creates and retains its own original handle/SDK tasks and controller at the same
-places as before. Existing parent fork/execArgv are unchanged.
+Continues bounded7f36a88e. The selected private fork entry is now
+managed-entry.cjs: CommonJS installs one listener synchronously, before the fixed
+dynamic import of managed-session.mjs. Messages are private linked records (no
+ambient Array readers), with exact objects and FIFO/reentrant ordering. No new
+opcode, reply, second send, timer, controller, operation task or budget is created.
+The original body creates/retains its own handle/SDK task/controller at the same
+places as before. Parent fork/execArgv are unchanged; only the fixed entry path
+changes. The no-start test follows that supported path and still uses execArgv:[].
+
+An import-free .mjs entry was tried first. SOURCE/rebound controls passed, but the
+final installed cold no-start again timed out15/1: removing static imports cannot
+promise listener registration before Node's asynchronous initial ESM evaluation.
+Its files, manifest and FAIL are intermediate evidence, not a repaired verdict.
+The supported entry was therefore changed to .cjs without a parent preload or
+readiness protocol. managed-entry.mjs remains an awaitable compatibility shim to
+the same cached bootstrap; no cold pre-first-statement delivery claim is made for
+legacy callers that still fork that ESM shim. Fixed host/acceptance callsites use
+.cjs. The existing owner-crash filter recognizes both precise old/new filenames
+under its unchanged owned-runtime IDs check; no cleanup script was executed.
 
 The body is the old entry with only process.on('message',callback) changed to an
 exported receiveManagedMessage function. Whole-file normalized bytes are equal;

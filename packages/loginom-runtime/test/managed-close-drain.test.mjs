@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {fork} from 'node:child_process';
 import {mkdtemp,readFile,writeFile,rm,mkdir} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-const entry=process.env.MANAGED_DRAIN_ENTRY??fileURLToPath(new URL('../src/managed-entry.mjs',import.meta.url));
+const entry=process.env.MANAGED_DRAIN_ENTRY??fileURLToPath(new URL('../src/managed-entry.cjs',import.meta.url));
 const fixture=fileURLToPath(new URL('./fixtures/managed/drain-child.mjs',import.meta.url));
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function child(scenario){

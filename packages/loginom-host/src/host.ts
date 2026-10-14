@@ -94,7 +94,7 @@ export async function createLoginomHost(options: {
     owners.set(key, owner)
     const launchInput = {
       node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-      entry: join(resources, "runtime/src/managed-entry.mjs"),
+      entry: join(resources, "runtime/src/managed-entry.cjs"),
       resources,
       stateDir: join(root, validation ? "validation" : "runtime"),
       generation: connection.generation,
