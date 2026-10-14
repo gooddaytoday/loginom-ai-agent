@@ -3,7 +3,7 @@
 export async function createStartupStaticLoader(page, context, owner, deadline) {
   const identity={id:owner.id,account:owner.account,origin:owner.origin,generation:owner.generation,chat:owner.chat,directory:owner.directory};
   const evidence={version:1,reads:[],stopped:false};
-  const pending=new Set(),seen=new Set(),nativeFetchFailures=new WeakSet();
+  const pending=new Set(),seen=new Set(),nativeFetchFailures=new WeakSet(),reads=new WeakSet(),reading=new Set();
   const key='__loginomStartupStatic_'+owner.id;
   let sealing=false,stopped=false,failed=false,primary,rejectFailure,documentHandle,totalBytes=0,stopping;
   const failure=new Promise((_,reject)=>{rejectFailure=reject});failure.catch(()=>{});
@@ -82,7 +82,7 @@ export async function createStartupStaticLoader(page, context, owner, deadline) 
     const failedRequest=r=>{
       try{if(r.url()===url.href&&r.resourceType()==='fetch'&&r.method()==='GET'&&r.frame()===page.mainFrame()&&r.failure()?.errorText==='net::ERR_CERT_VERIFIER_CHANGED')witness=true}catch(error){fail(error)}
     };
-    page.on('requestfailed',failedRequest);
+    reading.add(url.href);page.on('requestfailed',failedRequest);
     let value;
     try {
       item.attempts++;try{value=await read(url.href,h)}catch(error){firstFailed=true;first=error}
@@ -95,17 +95,20 @@ export async function createStartupStaticLoader(page, context, owner, deadline) 
       if(totalBytes>128*1024*1024)throw Error('LOGINOM_STARTUP_STATIC_TOTAL_SIZE_REFUSED');
       await route.fulfill({status:200,contentType:value.mime,body:Buffer.from(value.body,'base64')});
       bound();item.completed=true;item.bytes=value.bytes;
-    }finally{page.off('requestfailed',failedRequest)}
+    }finally{reading.delete(url.href);page.off('requestfailed',failedRequest)}
   };
   const routed=route=>{
     const job=handler(route).catch(async error=>{fail(error);try{await route.abort('failed')}catch{}});
     pending.add(job);job.finally(()=>pending.delete(job));return job;
   };
+  const classify=request=>{try{if(reading.has(request.url())&&request.resourceType()==='fetch'&&request.method()==='GET'&&request.frame()===page.mainFrame())reads.add(request)}catch(error){fail(error)}};
+  page.on('request',classify);
   await page.route(identity.origin+'/app/**',routed);bound();
-  return {evidence,failure,stop(){return stopping??=(async()=>{
+  return {evidence,failure,owns:request=>reads.has(request),stop(){return stopping??=(async()=>{
     if(stopped){if(failed)throw primary;return}
     sealing=true;while(pending.size)await Promise.all([...pending]);
     try{await page.unroute(identity.origin+'/app/**',routed)}catch(error){if(!failed)throw error;evidence.unroute_refused=true}
+    page.off('request',classify);
     if(!failed){bound();if(documentHandle)await retained();bound()}
     if(documentHandle){try{const h=await documentHandle;await h.dispose()}catch(error){if(!failed)throw error}}
     if(!failed)bound();stopped=true;evidence.stopped=true;if(failed)throw primary;

@@ -7,7 +7,7 @@ async function fixture(options={}) {
  const realm={document:doc,location:{origin:owner.origin,pathname:'/app/'},AbortController,setTimeout,clearTimeout,Date,btoa};
  const request=(u=url,type='script',method='GET',f=frame,witness=null)=>({url:()=>u,resourceType:()=>type,method:()=>method,frame:()=>f,failure:()=>({errorText:witness})});
  realm.fetch=async(u,input)=>{
-  calls.push({url:u,input});const i=reads++;
+  const pointer=request(u,'fetch');page.emit('request',pointer);calls.push({url:u,input,pointer});const i=reads++;
   const result=options.results?.[i];
   if(result?.witness)page.emit('requestfailed',request(result.witness_url??u,'fetch','GET',result.foreign_frame?other:frame,result.witness));
   options.afterFetch?.(i,{owner,realm,page});
@@ -97,4 +97,8 @@ test('unknown cleanup reply is cached; stop does not replay unroute',async()=>{
 
 test('native fetch refusal retains its original error and cause across serialization',async()=>{
  const first=new TypeError('native first',{cause:Error('native cause')});const f=await fixture({results:[{reject:first,witness:'net::ERR_CERT_VERIFIER_CHANGED'},{reject:Error('later')}]});await f.invokeRoute();await assert.rejects(f.loader.stop(),e=>e.name==='TypeError'&&e.message==='native first'&&e.cause.message==='native cause');
+});
+
+test('diagnostic classification uses the original owned request object',async()=>{
+ const f=await fixture();await f.invokeRoute();assert.equal(f.loader.owns(f.calls.find(x=>x.input).pointer),true);assert.equal(f.loader.owns(f.request(url,'fetch')),false);await f.loader.stop();
 });

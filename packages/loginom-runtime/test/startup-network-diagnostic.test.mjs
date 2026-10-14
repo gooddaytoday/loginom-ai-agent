@@ -36,3 +36,10 @@ test('unknown static failure text cannot enter the diagnostic receipt',()=>{
  page.emit('requestfailed',{resourceType:()=> 'stylesheet',url:()=> 'https://foreign.invalid/app/style.css?password=SECRET',failure:()=>({errorText:'SECRET arbitrary error'})});
  assert.equal(d.evidence.static_failures[0].same_origin,false);assert.equal(d.evidence.static_failures[0].error_name,'UNKNOWN');assert.equal(JSON.stringify(d.evidence).includes('SECRET'),false);d.stop();
 });
+
+test('owned browser asset fetches do not evict config and credential diagnostics',()=>{
+ const page=new EventEmitter(),owned=new WeakSet(),d=module.startupPageDiagnostics(page,'https://own.invalid',r=>owned.has(r));
+ for(let i=0;i<500;i++){const r={url:()=> 'https://own.invalid/app/bg/a.js',method:()=> 'GET',resourceType:()=> 'fetch',failure:()=>({errorText:'net::ERR_CERT_VERIFIER_CHANGED'})};owned.add(r);page.emit('request',r);if(i===0)page.emit('requestfailed',r)}
+ const rpc={url:()=> 'https://own.invalid/GetCredential?private=omitted',method:()=> 'GET',resourceType:()=> 'fetch'};page.emit('request',rpc);
+ assert.equal(d.evidence.static_requests,500);assert.equal(d.evidence.requests.length,1);assert.equal(d.evidence.requests[0].pathname,'/GetCredential');assert.equal(d.evidence.static_failures[0].error_name,'net::ERR_CERT_VERIFIER_CHANGED');d.stop();
+});

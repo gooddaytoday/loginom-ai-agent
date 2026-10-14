@@ -31,12 +31,12 @@ export function loginomAddress(value) {
 
 // Pre-widget diagnostics only: no response bodies, headers, query, console text
 // or input values. The collector grants no readiness/cleanup authority.
-export function startupPageDiagnostics(page, origin) {
+export function startupPageDiagnostics(page, origin, isStaticRead = () => false) {
   const evidence={version:1,started_at:new Date().toISOString(),requests:[],dropped_requests:0,static_requests:0,static_failures:[],dropped_static_failures:0,page_errors:[],console_counts:{},stopped:false};
   const requests=new WeakMap();
   const request=r=>{try {
     // Hundreds of startup assets must not evict the later config/credential RPC.
-    if(!['document','xhr','fetch'].includes(r.resourceType())){evidence.static_requests++;return}
+    if(isStaticRead(r)||!['document','xhr','fetch'].includes(r.resourceType())){evidence.static_requests++;return}
     if(evidence.requests.length>=64){evidence.dropped_requests++;return}
     const url=new URL(r.url()),item={same_origin:url.origin===origin,pathname:url.pathname.slice(0,256),method:r.method(),started_at:new Date().toISOString(),state:'pending'};
     requests.set(r,item);evidence.requests.push(item);
@@ -44,7 +44,7 @@ export function startupPageDiagnostics(page, origin) {
   const finish=r=>{const item=requests.get(r);if(item){item.state='finished';item.settled_at=new Date().toISOString()}};
   const fail=r=>{const item=requests.get(r);if(item){item.state='failed';item.settled_at=new Date().toISOString();return}
     try {
-      if(['document','xhr','fetch'].includes(r.resourceType()))return;
+      if(!isStaticRead(r)&&['document','xhr','fetch'].includes(r.resourceType()))return;
       if(evidence.static_failures.length>=64){evidence.dropped_static_failures++;return}
       const url=new URL(r.url()),failure=r.failure()?.errorText;
       evidence.static_failures.push({same_origin:url.origin===origin,pathname:url.pathname.slice(0,256),
@@ -64,7 +64,7 @@ export async function loginPage(page, candidate, owner) {
   if(owner) {
     owner.navigationStarted=true
     if(typeof page.on==='function'&&typeof page.off==='function') {
-      owner.startupDiagnostics??=startupPageDiagnostics(page,owner.origin)
+      owner.startupDiagnostics??=startupPageDiagnostics(page,owner.origin,r=>owner.staticLoader?.owns(r)===true)
       owner.evidence.startup_diagnostics=owner.startupDiagnostics.evidence
     }
   }
