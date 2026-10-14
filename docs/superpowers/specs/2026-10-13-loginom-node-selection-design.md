@@ -1443,3 +1443,53 @@ Candidate completed5/25 (four full PASS и original ABC/1 incomplete),
 firstwave5/9 нечистая. Baseline18/18,17oracle/расчёт PASS,11policy PASS.
 JS-вызовов в candidate standard пока не наблюдалось; это не policyPASS
 несохранённого ABC/1. Повторы закрыты, полная приёмка не завершена.
+
+
+На 2026-10-14 04:43 UTC candidate `first-last-touch/1` завершён технически
+неполно: Session `ses_ec75aae26ffel7visXjzm5Wf31`, CLI exit1 / wrapper3,
+cleanup false, attempt SHA
+`284f23435c2cc4bfbfb4ecaceffb60970d1409715702fd7a66633976d8cd119b`.
+Save, CSV и oracle отсутствуют; observed JS0 не является policy PASS.
+Семь стандартных узлов выполнены успешно: Import, Calculator, два Group,
+Join, Reform Columns (подготовка имени канала) и Sort. Ранее в progress
+Reform Columns ошибочно назван Calculator; здесь сохранён фактический тип.
+
+При Export3 native input0 имеет bbox (1164,780,15,24), нижняя граница own
+canvas794, viewport800, scrollTop0/max82. После Link штатный cleanup
+восстанавливает прежний scrollTop. Native GUID/роль/владелец проходят проверку,
+но все девять hit points не принадлежат целевому PortCell; rightclick
+не выполняется. Два covering div имеют role=presentation; точные владельцы
+не установлены. Внутренний отказ NOT_APPLIED/effect false/cleanup true
+не отменяет уже созданные Export и Link: внешняя операция AMBIGUOUS.
+Это ошибка видимости поддерживаемого стандартного узла, не capability gap
+и не основание для JS fallback. Патч для неповторившейся второй маски ABC
+не выбран; V1/V2 evidence сохраняется как диагностика.
+
+Строгая привязка собственных семи native GUID и latest server init04:22:10.525Z
+подтвердила user:158; binding SHA
+`f59e17748719e8d91affb42ca73a72074440f77e1690b1b8a2b87aab36a177c7`.
+Закрыта только user:158 в04:40:31.099Z, admin:159 logout04:40:41.218Z,
+две refresh подтвердили отсутствие собственной сессии, MCP69805 exit0.
+После independent archive admission `df46f231…` guard перемещён intact
+atomic rename в `.writer-recovered-node-selection-20261013T233119Z-4699a5-user158`;
+receipt `ba16e90049a306a9aae2cf10a0d501478f8089574aaf11ae3089e59c564fe3b5`.
+Original attempt не переписан и не повышен до PASS. Финальная независимая
+проверка сохранности recovery boundary ожидается; Product/tests ещё неизменны.
+
+Решение: непосредственно перед input0 mapping стандартного exports.text,
+после Link, при доказанном обрезании порта выполнить максимум одну bounded
+прокрутку собственной canvas через существующий guarded scroll.
+Использовать свежий видимый non-script graph anchor с тем же container_ref,
+не obscured port. Затем fresh observe должен подтвердить прежние document,
+workflow, Export и canvas. Исходный openInputPort(0), native ownership,
+роль и все девять hit checks остаются обязательными; если порт всё ещё
+перекрыт, stale, masked/locked или диапазон недостаточен, клика нет.
+Не добавляются public tools, JS grants, alias, обход guard или общий layout.
+
+Серия233119 остановлена после18baseline и6candidate: baseline17oracle/расчёт PASS,
+11policy PASS,6FAIL,1incomplete; candidate4full PASS и2technical incomplete,
+firstwave6/9 нечистая. Явные JS/tags/recovery и повторы этой сборки не запускаются.
+Необходимая правка общего runtime требует новой immutable matched пары и
+полных18baseline+25candidate на новой сборке. Старые попытки сохраняются
+исключёнными из итоговой приёмки; их нельзя заменять, переносить или повторно
+считать. Политика skill и критерии приёмки unchanged; задача не завершена.
