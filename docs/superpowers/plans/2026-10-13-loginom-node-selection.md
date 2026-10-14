@@ -3,9 +3,11 @@
 Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты восемь candidate,
 policy PASS во всех восьми: шесть стандартных, explicit-JS и gap tags.
 Один итоговый расчёт правильный, семь результатов не получены. Одна сессия
-завершена штатно, семь адресно освобождены после отказа. Собственных процессов
-нет, профиль свободен;17candidate ещё не начаты. Tags final release review и
-actual gate ожидаются до recovery/1; first9 и общая приёмка ещё не завершены.
+завершена штатно, семь адресно освобождены после отказа. Перед новым запуском
+все процессы Tags завершились, профиль был свободен. Final release review `908f88b6…`/readback `e35c96cc…`
+одобрены; actual gate22:20:22.877Z разрешил technical-failed при неизменном attempt32c059e5….
+Recovery/1 запущен последовательно runner3345412/exec87739 в22:20:42.901Z;
+один candidate активен,16ещё не начаты. First9 и общая приёмка ещё не завершены.
 
 Tags/1 closed22:13:55.083Z: policy PASS sidecar `703d7a98…`, mandatory JS+failure
 review `e82a62ff…`;26messages/100parts/29tools/82events/1095runtime, nochildren.
@@ -24,7 +26,9 @@ Own254closed22:16:38.630Z/admin255logout22:16:40.250Z/wholebrowserclosed22:16:41
 подготовленную другим агентом привязку перед close;253сохранилась в двух UIreadbacks.
 250автоматически истекла сервером22:15:11.671Z до действияRoot и им не закрывалась.
 17original неизменны, rawsource+review дают19casefiles;26recovery.
-Descriptor `f07c9e9a…`; finalrelease review и actual gate ещё не подтверждены.
+Descriptor `f07c9e9a…`; finalrelease review `908f88b6…`/readback `e35c96cc…`
+и actual public gate22:20:22.877Z завершены; попытка сохранила originalFAIL.
+Перед recovery start все собственные процессы отсутствовали, профиль освобождён.
 
 Explicit-js/1 closed21:52:03.471Z, CLI1/cleanupfalse/Host3248443ACKfalse:
 policy PASS sidecar `3d6688ad…`, mandatory JS+failure review `0c89212f…`.
