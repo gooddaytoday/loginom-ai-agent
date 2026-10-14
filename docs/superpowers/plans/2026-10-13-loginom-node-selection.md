@@ -1,13 +1,27 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты одиннадцать
-candidate, policy PASS во всех одиннадцати. Один итоговый расчёт правильный,
-десять результатов не получены. Одна сессия завершена штатно, десять адресно
-освобождены после отказа. Полная приёмка25candidate и финальная seeded выборка
-ещё не завершены. Осталось14 candidate, включая текущий Monthly-demand/2.
-Sequential runner3573775/exec21013 продолжил серию23:19:56.541928Z; следующий
-модельный CLI запускается только после проверки предыдущих закрытых слотов.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты12 candidate,
+policy PASS во всех12. Один итоговый расчёт правильный,11 результатов не получены.
+Одна сессия завершена штатно,11 адресно освобождены после отказа.
+Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
+Осталось13 candidate, включая текущую risky-approved-claims/2. Sequential
+runner3632025/exec40960 продолжил серию2026-10-14T23:33:43.966231+00:00;
+следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
+
+Monthly-demand/2 closed23:26:55.016Z: policy PASS `6b12f878…`, mandatory failure
+review `61ffcb75…`;24messages/92parts/26tools/76events/2314runtime, JS0/nochildren.
+Std Import365(datetime date)→DateTimeMonth→Group countdate/sumavgmaxdemand/sumpromotion→
+SortMonthASC SUCCEEDED,12rows1..12. Native Export execution completed, file verification
+AMBIGUOUS/scrollbudget; только same-operation inspect/observe/blockedresume/save/recover
+и честный блокер, без новыхnodeapply/JS. CSV/LGP/oracle не получены, originalCLI1/
+cleanupfalse/runtimeMismatch сохранены. Own266closed23:30:22.307Z/admin267logout
+23:30:35.670Z/browserclosed23:30:36.867Z;9actualPIDgone/exactguardarchive23:31:29.277819Z,
+unknown265 сохранён в двух UI readbacks. Root publicreader независимо подтвердил
+native scope доclose.17original bytes unchanged,18case/26recovery readonly;
+descriptor `ca3e0c53…`, finalrelease review `14419b9e…`/readback `be03abe9…`
+approved; actualgate2026-10-14T23:33:13.209Z разрешил technical-failed.
+Originalattempt `15798d5c…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 ABC/Pareto/2 closed23:05:51.032Z: policy PASS `46c50f47…`, mandatory failure
 review `6c2c1c7a…`;36messages/134parts/40tools/113events/4329runtime,
