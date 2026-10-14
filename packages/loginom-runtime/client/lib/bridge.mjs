@@ -606,16 +606,31 @@ export async function createBridge(config, session, { browserTransport: managedB
         assertCaptureEvidenceBinding();
         captureIOAssert?.();
         publication.pending=true;
-        let projection;
+        let projection,callbackSettled=false;
         const completion=new Promise((resolve,reject)=>{
           try{projection=captureRename(publication.temporary,join(publication.directory,name),error=>{
-            publication.pending=false;
+            callbackSettled=true;
             if(error===null||error===undefined){publication.succeeded=true;resolve()}
             else{publication.failure={value:error};reject(error)}
-          })}catch(value){publication.projectedFailure={value};reject(value)}
+          })}catch(value){
+            publication.projectedFailure={value};
+            if(callbackSettled)projection=Promise.reject(value);
+            else reject(value);
+          }
         });
-        try{await Promise.all([completion,projection])}
-        catch(value){rememberCapturePersistence(value,'rename');throw capturePersistencePrimary.value}
+        // An early rejection returns the first boxed reason, but does not release
+        // the original publication while its peer await is still unsettled.
+        const observe=(promise,kind)=>Promise.resolve(promise).catch(value=>{
+          publication[kind]??={value};
+          rememberCapturePersistence(value,'rename');throw value;
+        });
+        const owned=[observe(completion,'failure'),observe(projection,'projectedFailure')];
+        publication.settlement=Promise.allSettled(owned).then(()=>{
+          // A throw without an original callback is still physically uncertain.
+          if(callbackSettled)publication.pending=false;
+        });
+        try{await Promise.all(owned)}
+        catch(value){throw capturePersistencePrimary.value}
       }
       assertCaptureEvidenceBinding();
       await persist(original.directory,captureConstants.O_RDONLY|captureConstants.O_DIRECTORY|captureConstants.O_NOFOLLOW,false);
