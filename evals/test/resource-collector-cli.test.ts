@@ -36,6 +36,10 @@ test("resource collector CLI observes private slots and drains on SIGINT under i
     expect(rows.length).toBeGreaterThanOrEqual(3)
     expect(JSON.parse(run.stdout).samples).toBe(rows.length)
     expect(rows.every(row => row.run_id === "run-1" && row.phase === "before")).toBe(true)
+    const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+    expect(rows[0].host.collector_cgroup?.path).toBe(group)
+    expect(rows[0].host.collector_cgroup.cpu_usage.usage_usec).toBeGreaterThan(0)
+    expect(rows[0].host.collector_cgroup.memory_events.oom_kill).toBeGreaterThanOrEqual(0)
     expect(rows[0].host.filesystems.map((entry: { path: string }) => entry.path)).toEqual([
       fixture.slots.controller.stateDir, ...fixture.slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]),
     ])
