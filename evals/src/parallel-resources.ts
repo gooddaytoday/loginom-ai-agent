@@ -105,7 +105,7 @@ async function sampleBoundContainerResources(target: NonNullable<Awaited<ReturnT
   if (sample.inspect?.name === `/${target.name}` && sample.inspect.image === target.image &&
     sample.inspect.owner_kind === "users" && sample.inspect.owner_nonce === target.nonce && sample.inspect.purpose === target.purpose)
     return { ...sample, role: target.role }
-  return { ...sample, role: target.role, cpu: null, memory: null, pids: null, io: null, raw_stats: null,
+  return { ...sample, role: target.role, cpu: null, memory: null, pids: null, io: null, raw_stats: null, cgroup: null,
     errors: [...sample.errors, "CONTAINER_IDENTITY_UNVERIFIED"] }
 }
 
@@ -187,6 +187,7 @@ function cgroupNumber(value?: string) {
 export async function sampleContainerResources(id: string) {
   if (!/^[0-9a-f]{64}$/.test(id)) throw new EvalFailure("RESOURCE_CONTAINER_ID", 2)
   const inspect = await containerInspection(id).catch(() => null)
+  const observedCgroup = inspect?.running && inspect.pid ? await sampleCgroupResources(inspect.pid) : null
   const version = await fetch("http://localhost/version", { unix: "/var/run/docker.sock", signal: AbortSignal.timeout(2000) })
     .then(async response => response.ok ? resourceObject(await response.json()).ApiVersion : undefined).catch(() => undefined)
   const payload = typeof version === "string" && /^1\.\d+$/.test(version)
@@ -196,6 +197,11 @@ export async function sampleContainerResources(id: string) {
         const raw = await response.text()
         return { raw, data: resourceObject(JSON.parse(raw)) }
       }).catch(() => undefined) : undefined
+  const final = await containerInspection(id).catch(() => null)
+  const stable = inspect?.running && final?.running && inspect.pid === final.pid && inspect.started_at === final.started_at &&
+    inspect.image === final.image && inspect.name === final.name && inspect.owner_nonce === final.owner_nonce &&
+    inspect.owner_kind === final.owner_kind && inspect.purpose === final.purpose
+  const cgroup = stable && observedCgroup?.path ? observedCgroup : null
   // Engine 1.48 omits id in one-shot stats; the request uses the immutable full ID.
   const matched = payload && (payload.data.id === undefined || payload.data.id === id) ? payload : undefined
   const cpu = resourceObject(matched?.data.cpu_stats)
@@ -206,6 +212,7 @@ export async function sampleContainerResources(id: string) {
   const sample = {
     container_id: id, observed_at: new Date().toISOString(),
     inspect,
+    epoch_stable: Boolean(stable), cgroup,
     cpu: resourceCounter(usage.total_usage) !== null ? { total_usage_ns: resourceCounter(usage.total_usage),
       system_cpu_usage_ns: resourceCounter(cpu.system_cpu_usage), online_cpus: resourceCounter(cpu.online_cpus) } : null,
     memory: resourceCounter(memory.usage) !== null && resourceCounter(memory.limit) !== null
@@ -219,6 +226,7 @@ export async function sampleContainerResources(id: string) {
     raw_stats: matched?.raw ?? null,
   }
   return { ...sample, errors: [...(matched ? [] : ["CONTAINER_STATS_UNAVAILABLE"]), ...(inspect ? [] : ["CONTAINER_INSPECT_UNAVAILABLE"]),
+    ...(stable ? [] : ["CONTAINER_EPOCH_UNVERIFIED"]), ...(cgroup ? [] : ["CONTAINER_CGROUP_UNAVAILABLE"]),
     ...["cpu", "memory", "pids", "io"].flatMap(key => sample[key as "cpu" | "memory" | "pids" | "io"] === null ? [`CONTAINER_${key.toUpperCase()}_UNAVAILABLE`] : [])] }
 }
 

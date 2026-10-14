@@ -90,6 +90,13 @@ test("container resource sampler observes a labelled bounded disposable containe
     expect(sample.inspect?.memory_bytes).toBe(64 * 1024 * 1024)
     expect(sample.inspect?.nano_cpus).toBe(250_000_000)
     expect(sample.inspect?.pids_limit).toBe(16)
+    expect(sample.epoch_stable).toBe(true)
+    const membership = (await Bun.file(`/proc/${sample.inspect!.pid}/cgroup`).text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+    expect(sample.cgroup?.path).toBe(membership)
+    expect(sample.cgroup?.memory_limit_bytes).toBe(64 * 1024 * 1024)
+    expect(Number(sample.cgroup?.cpu_max?.quota_usec) / Number(sample.cgroup?.cpu_max?.period_usec)).toBe(0.25)
+    expect(sample.cgroup?.memory_events?.oom_kill).toBeGreaterThanOrEqual(0)
+    expect(sample.cgroup?.cpu_throttling?.nr_throttled).toBeGreaterThanOrEqual(0)
     expect(JSON.stringify(sample)).not.toContain("collector-private-env-canary")
     expect(JSON.parse(sample.raw_stats!).cpu_stats.cpu_usage.total_usage).toBe(sample.cpu?.total_usage_ns)
     expect(sample.io === null ? sample.errors.includes("CONTAINER_IO_UNAVAILABLE") : sample.io.every(item => Number(item.bytes) >= 0)).toBe(true)
@@ -127,7 +134,7 @@ test("container resource sampler observes a labelled bounded disposable containe
         await wrong
         const row = JSON.parse((await Bun.file(rejected).text()).trim().split("\n")[0]!)
         expect(row.containers[0].inspect.running).toBe(true)
-        expect([row.containers[0].cpu, row.containers[0].memory, row.containers[0].raw_stats]).toEqual([null, null, null])
+        expect([row.containers[0].cpu, row.containers[0].memory, row.containers[0].raw_stats, row.containers[0].cgroup]).toEqual([null, null, null, null])
         expect(row.containers[0].errors).toContain("CONTAINER_IDENTITY_UNVERIFIED")
         expect(JSON.stringify(row)).not.toContain("collector-private-env-canary")
       } finally { abortWrong.abort(); await wrong }
@@ -142,6 +149,8 @@ test("container resource sampler observes a labelled bounded disposable containe
   expect([removed.cpu, removed.memory, removed.pids, removed.io, removed.raw_stats]).toEqual([null, null, null, null, null])
   expect(removed.errors).toContain("CONTAINER_STATS_UNAVAILABLE")
   expect(removed.inspect).toBeNull()
+  expect(removed.cgroup).toBeNull()
+  expect(removed.epoch_stable).toBe(false)
   expect(removed.errors).toContain("CONTAINER_INSPECT_UNAVAILABLE")
 }, 15_000)
 
