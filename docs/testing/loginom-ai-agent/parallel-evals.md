@@ -45,7 +45,16 @@ env -i PATH="$PATH" bun --no-env-file run script/sample-parallel-resources.ts --
 ```
 
 Output parent должен уже быть canonical private0700; existing evidence не
-перезаписывается. SIGINT/SIGTERM завершает запись и закрывает collector. Labels
+перезаписывается. SIGINT/SIGTERM завершает запись и закрывает collector. После
+закрытия JSONL CLI создаёт exclusive0600 `<out>.summary.json` и возвращает
+summary_file: source path/SHA-256, run/phase, min/peak/delta, observed/missing
+и counter resets. Неподтверждённая epoch/birth не даёт числового sample;
+container epochs, process births, cgroups/ancestors и I/O device/op имеют
+раздельные серии. Внутренние пропуски между наблюдениями той же identity
+учитываются, samples не дописываются. Series counts относятся к наблюдённому
+окну identity; acceptance coverage ещё требует отдельной проверки.
+Actual sampler/private files/Docker/namespace:42 PASS/321 assertions,
+typecheck/diff PASS. Summary не является acceptance PASS. Labels
 обозначают заявленный контекст, без flags остаются null и не доказывают связь с
 измеренным run. Standalone CLI не подключён к реестру другого процесса: processes=null. Controller
 binding и итоговая resource/licence acceptance ещё открыты; этот CLI не выдаёт readiness.
