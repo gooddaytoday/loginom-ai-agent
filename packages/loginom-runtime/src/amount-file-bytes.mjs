@@ -50,24 +50,24 @@ export async function amountFilePhase(o) {
    return {namespace,available:true,entries};
   });
  };
- const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name]){const v=Error('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name,{cause:{name,expected:o.functions[name],observed:typeof fn==='function'?Function.prototype.toString.call(fn):typeof fn,...(name==='constructor'?{provider_descriptors:providerDescriptors()}:{} )}});refusals.add(v);throw v}};
+ const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name]){const v=Error('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name,{cause:{name,expected:o.functions[name],observed:typeof fn==='function'?Function.prototype.toString.call(fn):typeof fn,...(['constructor','disposeAsync'].includes(name)?{provider_descriptors:providerDescriptors()}:{} )}});refusals.add(v);throw v}};
  const getter=(obj,name)=>{for(let d=0;obj&&d<8;d++,obj=Object.getPrototypeOf(obj)){const p=Object.getOwnPropertyDescriptor(obj,name);if(p)return p.get}};
- const construct=()=>{
-  pin('constructor',s.bg.filestorage?.FileDownloader);const name=s.path.split('/').at(-1),dir=s.path.slice(0,-name.length);
-  const d=new s.bg.filestorage.FileDownloader(name,dir,s.storage);
-  pin('ReleaseStreamObj',d.ReleaseStreamObj);pin('Dispose',d.Dispose);
-  pin('IsStreamReleased',d.IsStreamReleased);pin('IsDisposed',getter(d,'IsDisposed'));
-  if(d.FullFilename!==s.path)fail('ORIGINAL_FILE_PATH_CHANGED');return d;
+ const bindRelease=handle=>{
+  if(!handle||handle.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');
+  pin('disposeAsync',handle.disposeAsync);pin('DoDispose',handle.$DoDispose);pin('nativeRelease',handle.$_Release);
+  s.releaseBindings??=new Map();if(!s.releaseBindings.has(handle))s.releaseBindings.set(handle,{handle,invoke:handle.disposeAsync,dispose:handle.$DoDispose,release:handle.$_Release});
  };
- const release=async(d,handle)=>{
-  owned();if(!s.releases?.has(d)&&d.FFileStream!==handle)fail('ORIGINAL_FILE_HANDLE_CHANGED');
-  // ReleaseStreamObj delegates to the same generic ReleaseObject used by native
-  // GetFileSize for file-info, with async=true. A flag alone is never completion.
-  s.releases??=new Map();let entry=s.releases.get(d);
-  if(!entry){entry={d,handle,pending:d.ReleaseStreamObj()};s.releases.set(d,entry)}
-  if(entry.d!==d||entry.handle!==handle||!entry.pending||typeof entry.pending.then!=='function')fail('ORIGINAL_FILE_RELEASE_UNCONFIRMED');
-  if(entry.completed)return;const value=await entry.pending;owned();if(value===false)throw value;if(!d.IsStreamReleased())fail('ORIGINAL_FILE_RELEASE_UNCONFIRMED');
-  await d.Dispose();owned();if(!d.IsDisposed)fail('ORIGINAL_FILE_DISPOSE_UNCONFIRMED');entry.completed=true;
+ let repeatReleaseFailure=false;
+ const release=async(handle)=>{
+  owned();if(!handle||handle.$S!==s.transport&&!s.releases?.has(handle))fail('ORIGINAL_FILE_FOREIGN_HANDLE');
+  const binding=s.releaseBindings?.get(handle);if(!binding||binding.handle!==handle||handle.disposeAsync!==binding.invoke||handle.$DoDispose!==binding.dispose||handle.$_Release!==binding.release)fail('ORIGINAL_FILE_RELEASE_BINDING_CHANGED');
+  s.releases??=new Map();let entry=s.releases.get(handle);
+  if(!entry){const invoke=binding.invoke;entry={handle,invoke};s.releases.set(handle,entry);try{entry.pending=invoke.call(handle,true)}catch(v){entry.failed=true;entry.failure=v;throw v}}
+  if(entry.handle!==handle)fail('ORIGINAL_FILE_HANDLE_CHANGED');
+  if(entry.completed)return;if(entry.failed){repeatReleaseFailure=true;throw entry.failure}if(!entry.pending||typeof entry.pending.then!=='function'){entry.failed=true;entry.failure=Error('ORIGINAL_FILE_RELEASE_UNCONFIRMED');refusals.add(entry.failure);throw entry.failure}let value;try{value=await entry.pending}catch(v){entry.failed=true;entry.failure=v;throw v}owned();if(handle.disposeAsync!==binding.invoke||handle.$DoDispose!==binding.dispose||handle.$_Release!==binding.release)fail('ORIGINAL_FILE_RELEASE_BINDING_CHANGED');if(value!==null){entry.failed=true;entry.failure=value;throw value}
+  // Exact observed $DoDispose awaits $_Release, then disconnects the proxy.
+  // Confirmation is the original async result, not a flag, fd, or new callback.
+  entry.completed=true;
  };
  if(s.busy)fail('ORIGINAL_FILE_CALLBACK_PENDING');
  if(o.phase==='release'&&s.phase==='released')return {ok:true,phase:'released',released:true,operation:e.operation,path:s.path};
@@ -75,24 +75,24 @@ export async function amountFilePhase(o) {
  if(o.phase!=='release'&&s.phase!==previous[o.phase])fail('ORIGINAL_FILE_PHASE_CHANGED');
  s.busy=true;let result;
  try{
-  if(o.phase==='storage'){authority();if(typeof s.session.get_FileStorage!=='function')fail('NATIVE_FILE_STORAGE_UNAVAILABLE');retain('storage',await s.session.get_FileStorage());authority();if(!s.storage)fail('NATIVE_FILE_STORAGE_UNAVAILABLE');if(!s.session.$S||s.storage.$S!==s.session.$S)fail('NATIVE_FILE_PROXY_OWNER_UNAVAILABLE');retain('transport',s.session.$S);pin('GetFileInfo',s.storage.GetFileInfo);pin('OpenFile',s.storage.OpenFile);retain('getInfo',s.storage.GetFileInfo);retain('openFile',s.storage.OpenFile);if(s.bg.TBGFileOpenMode.fomRead!==0)fail('NATIVE_FILE_MODE_UNAVAILABLE');const preflight=construct();await preflight.Dispose();authority();s.phase='storage';}
-  if(o.phase==='info'){authority();retain('info',await s.getInfo.call(s.storage,s.path));if(!s.info)fail('NATIVE_FILE_INFO_UNAVAILABLE');if(s.info.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.infoOwned=true;if(typeof s.info.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('infoSize',s.info.get_Size);retain('infoRelease',construct());s.infoRelease.FFileStream=s.info;authority();s.phase='info';}
+  if(o.phase==='storage'){authority();if(typeof s.session.get_FileStorage!=='function')fail('NATIVE_FILE_STORAGE_UNAVAILABLE');retain('storage',await s.session.get_FileStorage());authority();if(!s.storage)fail('NATIVE_FILE_STORAGE_UNAVAILABLE');if(!s.session.$S||s.storage.$S!==s.session.$S)fail('NATIVE_FILE_PROXY_OWNER_UNAVAILABLE');retain('transport',s.session.$S);pin('GetFileInfo',s.storage.GetFileInfo);pin('OpenFile',s.storage.OpenFile);retain('getInfo',s.storage.GetFileInfo);retain('openFile',s.storage.OpenFile);if(s.bg.TBGFileOpenMode.fomRead!==0)fail('NATIVE_FILE_MODE_UNAVAILABLE');pin('disposeAsync',s.storage.disposeAsync);pin('DoDispose',s.storage.$DoDispose);pin('nativeRelease',s.storage.$_Release);authority();s.phase='storage';}
+  if(o.phase==='info'){authority();retain('info',await s.getInfo.call(s.storage,s.path));if(!s.info)fail('NATIVE_FILE_INFO_UNAVAILABLE');if(s.info.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.infoOwned=true;bindRelease(s.info);if(typeof s.info.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('infoSize',s.info.get_Size);authority();s.phase='info';}
   if(o.phase==='size'){authority();retain('size',await s.infoSize.call(s.info));authority();if(!Number.isSafeInteger(s.size)||s.size<1||s.size>262144)fail('NATIVE_FILE_SIZE_UNAVAILABLE');s.phase='size';}
-  if(o.phase==='info_release'){await release(s.infoRelease,s.info);authority();s.infoReleased=true;s.phase='info_released';}
-  if(o.phase==='open'){authority();retain('downloader',construct());retain('stream',await s.openFile.call(s.storage,s.path,0,1));if(s.stream?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.streamOwned=true;s.downloader.FFileStream=s.stream;authority();pin('ReadBuffer',s.stream.ReadBuffer);retain('readBuffer',s.stream.ReadBuffer);s.phase='open';}
-  if(o.phase==='open_info'){authority();retain('openInfo',await s.getInfo.call(s.storage,s.path));if(s.openInfo?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.openInfoOwned=true;if(typeof s.openInfo.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('openInfoSize',s.openInfo.get_Size);retain('openInfoRelease',construct());s.openInfoRelease.FFileStream=s.openInfo;authority();s.phase='open_info';}
+  if(o.phase==='info_release'){await release(s.info);authority();s.infoReleased=true;s.phase='info_released';}
+  if(o.phase==='open'){authority();retain('stream',await s.openFile.call(s.storage,s.path,0,1));if(s.stream?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.streamOwned=true;bindRelease(s.stream);authority();pin('ReadBuffer',s.stream.ReadBuffer);retain('readBuffer',s.stream.ReadBuffer);s.phase='open';}
+  if(o.phase==='open_info'){authority();retain('openInfo',await s.getInfo.call(s.storage,s.path));if(s.openInfo?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.openInfoOwned=true;bindRelease(s.openInfo);if(typeof s.openInfo.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('openInfoSize',s.openInfo.get_Size);authority();s.phase='open_info';}
   if(o.phase==='open_size'){authority();const size=await s.openInfoSize.call(s.openInfo);authority();if(size!==s.size)fail('ORIGINAL_FILE_SIZE_CHANGED');s.phase='open_size';}
-  if(o.phase==='open_info_release'){await release(s.openInfoRelease,s.openInfo);s.openInfoReleased=true;authority();s.phase='open_info_released';}
+  if(o.phase==='open_info_release'){await release(s.openInfo);s.openInfoReleased=true;authority();s.phase='open_info_released';}
   if(o.phase==='read'){authority();const bytes=new Uint8Array(s.size);const reply=await s.readBuffer.call(s.stream,bytes);authority();if(reply!==null&&reply!==undefined)throw reply;s.base64=btoa(Array.from(bytes,x=>String.fromCharCode(x)).join(''));s.phase='read';result={base64:s.base64,bytes:s.size};}
   if(o.phase==='release'){
-   owned();if(s.openInfo&&!s.openInfoReleased){if(!s.openInfoOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.openInfoRelease,s.openInfo);s.openInfoReleased=true;}
-   if(s.stream&&!s.streamReleased){if(!s.streamOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.downloader,s.stream);s.streamReleased=true;}
-   if(s.info&&!s.infoReleased){if(!s.infoOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');if(!s.infoRelease){s.infoRelease=construct();s.infoRelease.FFileStream=s.info}await release(s.infoRelease,s.info);s.infoReleased=true;}
+   owned();if(s.openInfo&&!s.openInfoReleased){if(!s.openInfoOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.openInfo);s.openInfoReleased=true;}
+   if(s.stream&&!s.streamReleased){if(!s.streamOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.stream);s.streamReleased=true;}
+   if(s.info&&!s.infoReleased){if(!s.infoOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.info);s.infoReleased=true;}
    s.phase='released';result={released:true};
   }
   return {ok:true,phase:s.phase,operation:e.operation,path:s.path,...result};
- }catch(v){if(!s.firstPresent){s.firstPresent=true;s.first=v}else{s.secondaryPresent=true;s.secondary=v}
-  return {ok:false,phase:s.phase,operation:e.operation,path:s.path,origin:refusals.has(v)?'guard':'await',rejection:box(v),firstRejection:box(s.first),secondaryPresent:s.secondaryPresent===true,...(s.secondaryPresent?{secondary:box(s.secondary)}:{})};
+ }catch(v){if(!repeatReleaseFailure && !s.firstPresent){s.firstPresent=true;s.first=v}else if(!repeatReleaseFailure){s.secondaryPresent=true;s.secondary=v}
+  return {ok:false,phase:s.phase,operation:e.operation,path:s.path,origin:repeatReleaseFailure||refusals.has(v)?'guard':'await',rejection:box(v),firstRejection:box(s.first),secondaryPresent:s.secondaryPresent===true,...(s.secondaryPresent?{secondary:box(s.secondary)}:{})};
  }finally{s.busy=false}
 }
 export function createAmountFileRead(retained,{guard,record,signal}) {
