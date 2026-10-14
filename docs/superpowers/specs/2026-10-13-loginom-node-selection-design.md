@@ -2322,9 +2322,20 @@ rewriter suite не повторяются. Независимый design/source
 После одного run: capture → установление actual predicate; NO-REPRO → unknown,
 без автоматического третьего диагностического запуска или model retry.
 
-- [ ] После independent design review минимально реализовать и проверить внешний
+- [x] После independent design review минимально реализовать и проверить внешний
   pacing gate по TDD; новый immutable binding и independent source review.
 - [ ] Root выполнить один paced private native run, сохранить actual timing,
   same-frame capture/no-repro/unknown и exact own close.
 - [ ] Независимо прочитать закрытый результат и определить следующий шаг только
   по фактическим данным, сохранив исходный failed slot и условия приёмки31.
+
+Paced private подготовка завершена: helper11lines,3focusedPASS (реальный таймер
+~5035ms), typecheck0/syntax0; поведенческие RED→GREEN сохранены. Seven reused files
+byte-equal; runtime288×2/source4456/fixture3/protected2181 (включая predecessor2064)
+сохранены. Product и общие runner не менялись, live ещё не начинался.
+Design approval SHA `4942cab18e477a235ab8ef38fcf3f37aec64b9f4bb81653f8289dd7f32e1387f`;
+verification SHA `cba0b045dfbb8e648445f7e3af60d6447e3c8c303a1a0056c9bdeb7dd7de3d22`;
+independent source review SHA `831fb8ec460d4ff599b3da68f8ffde828d5a1da690672bc188282a05f2215a5f`.
+Readyfalse0400 binding SHA `7228e6f484f87d107bbfb310c69252702a108903053c2e25a11e72efddbfbd87`.
+Раннее пробуждение таймера fail-closed до target; не вводить дополнительное
+ожидание/повтор для подгонки результата. Root activation/one live остаются отдельно.
