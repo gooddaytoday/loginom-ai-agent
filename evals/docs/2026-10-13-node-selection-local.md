@@ -1766,3 +1766,25 @@ model/inputs/lock прежние, моделипервых5слотовнепо�
 Started6/closed5/accepted4/technicalfailed1/notstarted25/baseline0.
 Reportamendment005/cd5b8785… сохраняетinitialreviewhold; последующеерешение отдельно.
 Main31/полнаяприёмка/сравнение остаютсяоткрытыми; новыхправокstandardruntimeнет.
+
+Checkpoint 2026-10-14 13:16 UTC — ROI/1 failed; actualown recovery completed/review pending.
+CLI1993214exit1/normalcleanupfalse, finished13:03:19.978Z; exec45876 terminalexit1,
+ledger13:03:19.979Z SELECTION_CLEANUP_UNCONFIRMED. Host1993544 soleactualsource5588dbbc…
+ACKfalse/exit1/LOGINOM_RUNTIME_CLEANUP_FAILED preserved; PIDgone. Snapshot74parts/19messages,
+JS0/noLGP/noCSV/calculationfalse/policyincomplete; Import6c5f107e…/Group79c88dda…
+SUCCEEDED. calculate-roi-01 node95ef7c78… AMBIGUOUS/open/WIZARD_OPEN_NOT_CONFIRMED,
+executionnotrequested. НаблюдаемыйкодкакABC, underlyingUIcauseunknown; новыхdiag/fixloopsнет.
+Independentpre-reviewee45412d… approved exactownbinding: backenduser192latestinit
+12:58:50.403 внутриCLIinterval/2actualGUIDs/doc61fe9498…/Docka22383f4… совпадают.
+UIexactownconfirmation192 идваrefresh подтвердилизавершение; serverclosed13:10:36.888.
+Соседние189/191 untouched. Ownadmin193created13:06:31.167/logout13:11:22.629/loginUI;
+единственныйadminbrowseractualCDP6IDs2006903/2006973/2006974/2006939/2006941/2006943
+завершёнBrowser.close; direct/proc подтверждаетall6+CLI+Hostgone13:11:56.785.
+Exactown.writer nonceSHA bcccb8…/dir7752449/owner7752450/mtimeMs1791982714439.0408
+архивированrename13:13:03.299 в .writer-recovered-node-selection-20261014T112452Z-5e223f-user192;
+original/archivedSHA/inodes/mtime unchanged/sourceabsent. История/evidence/pkgsсохранены.
+Descriptor45b24645844c1cb19190d8305a26408506e79974e98ce25ae7fc6582327fbe3f0400
+binds17original+14sealedrecovery; preparedByRoot/technicalfailure, безPASSилиreplacement.
+Finalindependentrelease review pending, затемpuregate→explicit-js/1 еслиapproved.
+Started6/closed6/accepted4/technicalfailed2/notstarted25/baseline0. Source/pins/lock/skill/
+model/runtime/inputs unchanged. Main31/сравнение/полнаяприёмка всёещёopen.
