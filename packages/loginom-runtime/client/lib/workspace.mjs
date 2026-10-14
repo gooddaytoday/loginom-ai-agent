@@ -248,16 +248,18 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
   const identity = request ? JSON.stringify(request) : null;
   let previous = metadata.workspacePreparation;
   if (previous && previous.identity !== identity) {
-    // An observed missing workflow did not create/open anything. A new explicit
+    // An observed missing workflow or expired entry read did not create/open anything. A new explicit
     // request can replace that terminal refusal; uncertain attempts keep their ID.
     const lostWithoutEffect = previous.effect_possible === false
-      && previous.state?.status === 'NOT_READY' && previous.state.reason === 'WORKFLOW_LOST'
+      && previous.state?.status === 'NOT_READY' && (previous.state.reason === 'WORKFLOW_LOST'
+        || previous.state.reason === 'DEADLINE' && previous.state.phase === 'workspace_entry_ready')
       && previous.state.effect_possible === false && previous.state.created_draft === false
       && previous.state.authenticated === true;
     if (previous.operation_id === request?.operation_id
         || !lostWithoutEffect && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
       throw new Error('Preparation operation conflict: reconcile the existing request first');
     }
+    await record({ event: 'workspace_preparation_replaced', previous: structuredClone(previous), request: structuredClone(request) });
     previous = null;
   }
   metadata.workspaceReady = false;

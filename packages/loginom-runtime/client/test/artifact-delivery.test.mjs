@@ -349,3 +349,32 @@ test('resume never extends the original delivery deadline',async()=>{
  assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.ok(!f.calls.includes('verify'));
 });
+
+for(const fault of ['none','pending','foreign-operation','foreign-outcome','artifact','grant','destination','digest','cleanup','proof','verification','changed-artifact'])
+ test('management-only reconciliation retains original transfer and refuses '+fault,async()=>{
+  const f=resumeFixture('verify');const first=await f.service.deliver(request);
+  assert.equal(first.outcome.status,'AMBIGUOUS');
+  const receipt=await f.runtime.inspect();const out=receipt.output.outcome;
+  out.action_key='artifact.upload';out.output.server_copy_verification.status='SUCCEEDED';Object.assign(out.output,{artifact_id:'artifact',upload_grant_id:'grant',destination:f.artifact.upload.destination,bytes:3,sha256:f.artifact.sha256,verification_required:false});
+  const before=[...f.calls];
+  if(fault==='pending')receipt.output.state='pending';
+  if(fault==='foreign-operation')receipt.output.operation_id='foreign';
+  if(fault==='foreign-outcome')out.operation_id='foreign';
+  if(fault==='artifact')out.output.artifact_id='foreign';
+  if(fault==='grant')out.output.upload_grant_id='foreign';
+  if(fault==='destination')out.output.destination='/foreign';
+  if(fault==='digest')out.output.sha256='foreign';
+  if(fault==='cleanup')receipt.output.cleanup_confirmed=false;
+  if(fault==='proof')out.output.server_copy_verification.bytes_verified=false;
+  if(fault==='verification')out.output.server_copy_verification.verification_id='foreign';
+  if(fault==='changed-artifact')f.artifact.bytes=4;
+  if(fault==='none'||fault==='pending')await f.service.reconcileInspection('delivery:upload',receipt);
+  else await assert.rejects(f.service.reconcileInspection('delivery:upload',receipt));
+  assert.deepEqual(f.calls,before);assert.equal(f.service.unsettled,fault!=='none');
+  assert.equal(first.outcome.status,'AMBIGUOUS');
+  if(fault==='none'){
+   const status=f.service.status('delivery');assert.equal(status.original_refusal.outcome.status,'AMBIGUOUS');
+   assert.equal(status.outcome.status,'SUCCEEDED');await f.service.reconcileInspection('delivery:upload',receipt);
+   assert.equal(f.events.filter(e=>e.phase==='artifact_delivery_completed').length,1);
+  }
+ });

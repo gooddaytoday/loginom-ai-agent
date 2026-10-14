@@ -2441,6 +2441,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       if(nodeJobs.busy&&!nodeControls.has(name)){const error=Error('A background node operation is running');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
+      if(name==='inspect')return (async()=>{
+        const result=await value(...args);
+        await delivery.reconcileInspection(result.output?.operation_id,result);
+        return result;
+      })();
       return value(...args);
     }]));
   return Object.freeze({...exposed,

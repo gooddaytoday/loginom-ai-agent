@@ -393,3 +393,25 @@ for(const variant of ['lost','effect','created','unauthenticated','cancelled','s
    await assert.rejects(prepareWorkspaceSession(next),/conflict/);assert.equal(calls,1);
   }
  });
+
+for(const fault of ['none','later-phase','effect','created','unauthenticated','same-id','unknown','record-failed'])
+ test('terminal entry deadline replacement preserves original preparation: '+fault,async()=>{
+  const old={identity:JSON.stringify({operation_id:'old'}),operation_id:'old',effect_possible:false,
+   state:{status:'NOT_READY',reason:'DEADLINE',phase:'workspace_entry_ready',effect_possible:false,created_draft:false,authenticated:true}};
+  if(fault==='later-phase')old.state.phase='exact_workflow_ready';
+  if(fault==='effect')old.state.effect_possible=true;
+  if(fault==='created')old.state.created_draft=true;
+  if(fault==='unauthenticated')old.state.authenticated=false;
+  if(fault==='unknown')old.effect_possible=undefined;
+  const metadata={workspacePreparation:structuredClone(old),workspaceReady:false},records=[];let calls=0;
+  const args={metadata,request:{operation_id:fault==='same-id'?'old':'new',intent:'existing_workflow'},assertAllowed(){},assertTarget(){},save:async()=>{},
+   record:async record=>{if(fault==='record-failed')throw Error('storage unavailable');records.push(record);},
+   prepare:async({recoverOnly})=>{calls++;assert.equal(recoverOnly,false);return {status:'READY',target:{},workflow_ref:{}};}};
+  if(fault==='none'){
+   assert.equal((await prepareWorkspaceSession(args)).status,'READY');assert.equal(calls,1);
+   assert.deepEqual(records[0].previous,old);
+  }else{
+   await assert.rejects(prepareWorkspaceSession(args));assert.equal(calls,0);
+   assert.deepEqual(metadata.workspacePreparation,old);
+  }
+ });
