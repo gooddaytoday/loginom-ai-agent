@@ -417,3 +417,19 @@ Claim связывает staged generation, exact Name/UserKind, controller user
 перепроверяет source semantic SHA и reconstruction исходного creation reply,
 staged credential binding и held lease. Эти fs/evidence codec проверки ещё
 не являются full native parent integration или подтверждением current idle.
+
+`verifyParallelPair(file, expectedIdentity)` читает существующий private ready
+pair journal, проверяет daemon ID, полные resource IDs/labels/names, pinned
+images, topology/no mounts/restart policy, marker v2 и canonical inventory,
+Python-disabled XML, DNS/proxy/served wsproxy и текущий ServerIdentity.
+Journal повторно проверяется после наблюдений; функция не создаёт/изменяет
+контейнеры или state. Parent reconcile-user вызывает guard до command intent
+и dispatch. Missing journal отказал до RPC на held native preparation.
+
+Native factory fixture проверил healthy read-only round trip, stale epoch,
+marker с `../` и Python-enabled refusal, восстановление исходных bytes и
+неизменность dev пары:12 PASS/76 assertions (28.55s). Native parent gate:
+1 PASS/3 assertions (6.48s); связанные codecs/preflight54 PASS/148 (6.75s),
+typecheck/diff PASS. Это infrastructure/config guard; server-run fence,
+protected user inventory publication и effective ACL/idle proof остаются
+обязательными отдельными границами перед полным prepare/admission.
