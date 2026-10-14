@@ -6,7 +6,7 @@ import { supervise } from "../src/supervisor"
 import { createLoginomHost } from "../src/host"
 import { credentials } from "../src/connection/credentials"
 
-for (const start of ["LOGINOM_LOGIN_UNAVAILABLE", "LOGINOM_KNOWLEDGE_UNAVAILABLE", "invalid-handshake", false])
+for (const start of ["LOGINOM_LOGIN_UNAVAILABLE", "LOGINOM_KNOWLEDGE_UNAVAILABLE", "invalid-handshake", false] as const)
   for (const cleanup of ["clean", "refused"])
     test(`start ${start} remains primary after ${cleanup} cleanup`, async () => {
       const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
