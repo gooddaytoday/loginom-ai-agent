@@ -13,6 +13,7 @@ function installOriginalUserPublisher(origin) {
   const key='__loginomOriginalUserPublisherV1';
   if(descriptor(root,key))return; // Never replace a previous/foreign publisher.
   let sample,acquisition,failure,checks=[],sealed=false,pendingSS;
+  let initialScript,modifierScript;
   let initializers=Object.freeze({complete:false,reason:'INITIAL_SS_NOT_OBSERVED',sourceExecutionQualified:false,closureIdentityQualified:false});
   const unavailable=()=>{throw Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE')};
   const remember=error=>{failure??={value:error}};
@@ -31,6 +32,50 @@ function installOriginalUserPublisher(origin) {
       const now=descriptor(p,name);if(p!==owner||prototype(owner)!==ownerPrototype||!now||!('value'in now)||now.value!==d.value
         ||now.writable!==d.writable||now.enumerable!==d.enumerable||now.configurable!==d.configurable)unavailable();
     });return d.value;
+  };
+  // Fixed original DOM readers are retained before application publication.
+  // This captures a script node/URL, not its executed bytes or lexical environment.
+  let scriptReaders;const domChecksStart=checks.length;
+  try{
+    const Document= data(root,'Document'),Script=data(root,'HTMLScriptElement'),Node=data(root,'Node');
+    const DocumentPrototype=data(Document,'prototype'),ScriptPrototype=data(Script,'prototype'),NodePrototype=data(Node,'prototype');
+    const reader=(owner,key)=>{
+      const d=descriptor(owner,key),parent=prototype(owner);
+      if(!d||typeof d.get!=='function'||'value'in d)unavailable();
+      checks.push(()=>{const now=descriptor(owner,key);if(prototype(owner)!==parent||!now
+        ||Reflect.ownKeys(d).some(k=>now[k]!==d[k]))unavailable()});
+      return Object.freeze({get:d.get,owner,key});
+    };
+    scriptReaders=Object.freeze({ScriptPrototype,URL:hold(root,'URL'),current:reader(DocumentPrototype,'currentScript'),
+      src:reader(ScriptPrototype,'src'),integrity:reader(ScriptPrototype,'integrity'),
+      owner:reader(NodePrototype,'ownerDocument'),connected:reader(NodePrototype,'isConnected')});
+    hold(root,'Document');hold(root,'HTMLScriptElement');hold(root,'Node');
+    hold(Document,'prototype');hold(Script,'prototype');hold(Node,'prototype');
+  }catch{checks.length=domChecksStart;scriptReaders=undefined} // Unsupported DOM remains an explicit partial witness.
+  const readScriptSlot=(reader,object)=>{
+    for(let p=object;p;p=prototype(p)){
+      const d=descriptor(p,reader.key);if(d){if(p!==reader.owner||d.get!==reader.get||'value'in d)unavailable();return apply(reader.get,object,[])}
+    }unavailable();
+  };
+  const captureScript=path=>{
+    if(!scriptReaders)return Object.freeze({complete:false,reason:'ORIGINAL_SCRIPT_READERS_UNAVAILABLE'});
+    guard();const r=scriptReaders,script=readScriptSlot(r.current,originalDocument);
+    let member=script;while(member&&member!==r.ScriptPrototype)member=prototype(member);
+    if(!member)unavailable();
+    const url=readScriptSlot(r.src,script),integrity=readScriptSlot(r.integrity,script);
+    const owner=readScriptSlot(r.owner,script),connected=readScriptSlot(r.connected,script);
+    if(typeof url!=='string'||typeof integrity!=='string')unavailable();
+    const parsed=new r.URL(url),expected=origin+'/app/'+path;
+    if(parsed.origin+parsed.pathname!==expected||parsed.hash||owner!==originalDocument||connected!==true
+      ||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search)))unavailable();
+    const chain=[];for(let p=script;p;p=prototype(p))chain.push(p);
+    checks.push(()=>{
+      let p=script;for(const expected of chain){if(p!==expected)unavailable();p=prototype(p)}if(p!==null)unavailable();
+      if(readScriptSlot(r.src,script)!==url||readScriptSlot(r.integrity,script)!==integrity
+        ||readScriptSlot(r.owner,script)!==owner||readScriptSlot(r.connected,script)!==true)unavailable();
+    });guard();
+    return Object.freeze({complete:true,script,document:originalDocument,url,integrity,
+      sourceExecutionQualified:false,closureIdentityQualified:false});
   };
   // Snapshot fixed defining exports before the original application acquisition.
   // Missing exports remain explicit evidence; a later publication cannot repair
@@ -321,11 +366,12 @@ function installOriginalUserPublisher(origin) {
           if(this!==ss||records.some(r=>r.kind===kind)||restored)unavailable();
           const checkMembers=snapshot(members),heldMethods={};
           for(const key of methods[kind]){const method=lookup(members,key);if(typeof method!=='function')unavailable();heldMethods[key]=method}
+          const execution=captureScript(kind==='ObjectProxy'?'bg/js/rpc.js':'bg/js/bg.rtl.rpc.js');
           const dependencies=Object.freeze({shallowCopy:hold(ss,'shallowCopy'),prepareProperties:hold(ss,'prepareProperties'),initialBase});
           if(interfaces)checks.push(snapshot(interfaces));
           hold(asm,'__types');hold(asm,'name');hold(ctor,'__typeName');
           const basePrototype=baseType?hold(baseType,'prototype'):undefined;
-          record=Object.freeze({kind,ctor,assembly:asm,members,baseType,basePrototype,interfaces,dependencies,receiver:this,
+          record=Object.freeze({kind,ctor,assembly:asm,members,baseType,basePrototype,interfaces,dependencies,execution,receiver:this,
             methods:Object.freeze(heldMethods),initializer:original,ss});
           checks.push(checkMembers);guard();
         }
@@ -342,7 +388,9 @@ function installOriginalUserPublisher(origin) {
         if(records.length===3){
           const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'?now.value!==retainedInitClass:now[key]!==d[key]))unavailable();
           define(ss,'initClass',d);restored=true;hold(root,'ss');hold(ss,'initClass');
-          initializers=Object.freeze({complete:true,records:Object.freeze(records.slice()),
+          const scriptIdentityComplete=!!(initialScript?.complete&&modifierScript?.complete&&records.every(r=>r.execution.complete));
+          if(scriptIdentityComplete&&records.find(r=>r.kind==='FileStorage').execution.script!==records.find(r=>r.kind==='StreamPersist').execution.script)unavailable();
+          initializers=Object.freeze({complete:true,records:Object.freeze(records.slice()),initialScript,modifierScript,scriptIdentityComplete,
             sourceExecutionQualified:false,closureIdentityQualified:false});
         }
       }catch(error){remember(error)}
@@ -362,7 +410,7 @@ function installOriginalUserPublisher(origin) {
       try{
         // Shape only: this does not qualify the executing module/lexical environment.
         if(typeof value!=='function'||apply(toString,value,[]).replace(/\r\n/g,'\n')!=="function bg$initClass(ctor, asm, members, baseType, interfaces, __options) {\n    if (baseType === undefined && arguments.length >= 4)\n        console.warn(\"BaseType for \" + ctor.__typeName + \" class is undefined\");\n    ss_initClass(ctor, asm, members, baseType, interfaces);\n\n    var xForcePrepareProperties = false;\n    var xDisablePrepareProperties = false;\n    if (typeof __options !== \"undefined\") {\n        var xForcePrepareProperties = !!__options.forcePrepareProperties;\n        var xDisablePrepareProperties = !!__options.disablePrepareProperties;\n    }\n\n    // \u041f\u0440\u043e\u043f\u0443\u0441\u043a\u0430\u0435\u043c \u0434\u0436\u0435\u043d\u0435\u0440\u0438\u043a\u0438\n    if (typeof ctor.__genericTypeDefinition === \"undefined\" || xForcePrepareProperties) {\n        if (!xDisablePrepareProperties/* && xForcePrepareProperties*/) {\n            ss.prepareProperties(ctor);\n        }\n    }\n}")unavailable();
-        bindInitializers(ss,initial.value);
+        modifierScript=captureScript('bg/js/bg.mscorlib.js');bindInitializers(ss,initial.value);
       }catch(error){remember(error)}
     };
     define(ss,'initClass',{get,set,enumerable:initial.enumerable,configurable:true});
@@ -370,7 +418,7 @@ function installOriginalUserPublisher(origin) {
   };
   // Only a namespace born after this init script can witness initializers.
   // Existing ss is deliberately left alone; no late reflection can repair it.
-  try{if(!descriptor(root,'ss')){arm(root,'ss',ss=>{pendingSS=undefined;awaitFinalInitializer(ss)});pendingSS=descriptor(root,'ss');}
+  try{if(!descriptor(root,'ss')){arm(root,'ss',ss=>{pendingSS=undefined;initialScript=captureScript('bg/js/mscorlib.js');awaitFinalInitializer(ss)});pendingSS=descriptor(root,'ss');}
     else initializers=Object.freeze({complete:false,reason:'INITIAL_SS_ALREADY_PRESENT',sourceExecutionQualified:false,closureIdentityQualified:false});
   }catch(error){remember(error)}
   try{arm(root,'bg',bg=>arm(bg,'app',app=>{

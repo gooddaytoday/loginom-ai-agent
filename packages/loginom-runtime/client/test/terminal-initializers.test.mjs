@@ -22,10 +22,11 @@ const tables={};for(const[file,targets]of[['rpc.js',{'$rpc_TBGObjectProxy':'Obje
   }
  });
 }
-async function fresh({initializer,realm}={}){
- const f=await fixture({realm,initializeSS(ss,c){ss.shallowCopy=runInContext('('+functions.shallowCopy+')',c);ss.initClass=initializer??runInContext('('+functions.initClass+')',c)}});
+export async function fresh({initializer,realm,scriptContext}={}){
+ const f=await fixture({realm,initializeDOM:scriptContext?.install,initializeSS(ss,c){ss.shallowCopy=runInContext('('+functions.shallowCopy+')',c);ss.initClass=initializer??runInContext('('+functions.initClass+')',c)}});
  const ss=f.c.ss;f.c.ss_initClass=ss.initClass; // The actual modifier saves the unwrapped original.
  ss.prepareProperties=()=>{}; // Explicit property-preparation dependency double.
+ scriptContext?.select('bg/js/bg.mscorlib.js');
  const finalInitializer=runInContext('('+bgInitializer+')',f.c);ss.initClass=finalInitializer;
  const original=ss.initClass; // fixed wrapper; restored value must be finalInitializer.
 
@@ -35,7 +36,7 @@ async function fresh({initializer,realm}={}){
  f.c.bg.rpc={TIBGFileStorage_Proxy:storage,TIBGStreamPersist_Proxy:persist};
  const constructors={ObjectProxy:rpc.TBGObjectProxy,FileStorage:storage,StreamPersist:persist};
  const asm={__types:{},name:'fixture'};const members={};
- const init=kind=>{const m=runInContext('('+tables[kind]+')',f.c);members[kind]=m;
+ const init=kind=>{scriptContext?.select(kind==='ObjectProxy'?'bg/js/rpc.js':'bg/js/bg.rtl.rpc.js');const m=runInContext('('+tables[kind]+')',f.c);members[kind]=m;
   return ss.initClass(constructors[kind],asm,m,kind==='ObjectProxy'?undefined:rpc.TBGObjectProxy)};
  return Object.assign(f,{ss,original,finalInitializer,constructors,asm,members,init});
 }
