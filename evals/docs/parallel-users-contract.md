@@ -539,3 +539,7 @@ recovery lineage, real CLI/setup/check producers и active packages ещё open.
 ServerIdentity и сохраняет наблюдение без user mutation. Возврат policy не означает
 квалифицированную session identity или effective ACL; `inspect()` сохраняет свой
 строгий session gate.
+
+Held slot ownership включает точное содержимое private composite manifest и обе
+resource reservations. Его подмена снимает held authority до provisioning/release;
+release проверяет manifest до первого resource tombstone.
