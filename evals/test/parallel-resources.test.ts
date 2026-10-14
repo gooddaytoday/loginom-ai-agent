@@ -3,6 +3,27 @@ import { chmod, mkdtemp, readdir, rm, stat, statfs } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources } from "../src/parallel-resources"
+import { loadResourceSlots } from "../src/slots"
+import { writeLeaseReceipt } from "../src/lease"
+import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("resource configuration reads private metadata without admin credentials or prepared profiles", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-config-"))
+  try {
+    const fixture = await parallelFixture(root)
+    const file = path.join(root, "slots.json")
+    await writeLeaseReceipt(file, fixture.slots)
+    const before = await Bun.file(file).text()
+    await rm(fixture.slots.slots[0]!.profileDir, { recursive: true })
+    const observed = await loadResourceSlots(file)
+    expect(observed).toEqual(fixture.slots)
+    expect(await Bun.file(file).text()).toBe(before)
+    expect(await Bun.file(observed.controller.adminCredentialsFile).exists()).toBe(false)
+    const sample = await sampleHostResources([observed.slots[0]!.profileDir])
+    expect(sample.filesystems[0]?.capacity).toBeNull()
+    expect(sample.errors).toContain("FILESYSTEM_UNAVAILABLE")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("resource collector persists ordered private samples and stops cleanly on abort", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-collector-"))
