@@ -283,7 +283,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
       value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
-    const readingOnly=request.mode===NODE_READ_MODE;
+    const readingOnly=request.mode===NODE_READ_MODE||handler.executionOnly?.(request)===true;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>drivers.openWizard(ctx));
