@@ -1497,3 +1497,9 @@ native-calculator-open-diagnostic/run/result.json SHA
 PID действительно отсутствует, .writer отсутствует; originals16/source74/4454
 и stopped/effective locks неизменны. Live-диагностика не входит в31модельный слот;
 завершённые runtime checks и Export/JS regression gates не повторялись.
+
+Независимый readback не установил причину original refusal: target прошёл,
+prethrow captures0. Наблюдённое штатное ожидание own wizard mask431ms — факт
+успешной диагностической попытки, не характеристика прежнего failed frame.
+Приёмка31 по-прежнему открыта: started1/failed1/notstarted30, baseline0;
+старая версия на другом runtime остаётся историей. Тесты и модели не повторялись.

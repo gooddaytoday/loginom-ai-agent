@@ -10,6 +10,14 @@
 
 **Spec:** [Согласованный дизайн](../specs/2026-10-13-loginom-node-selection-design.md).
 
+Актуальный checkpoint 2026-10-14 09:16 UTC: протокол31 =6baseline+25candidate
+закреплён до первой новой model попытки. Итоговый Export gate, JS downstream,
+runtime checks/builds и auto-next завершены; без изменения не повторять.
+Серия064745 остановлена после technical ABC/1 failure, остальные30 не начаты.
+Один private replay шести standard requests без LLM дал NO-REPRO с подтверждённым
+own close; причина прежнего отказа неизвестна. Acceptance ещё не завершена,
+failed slot не заменять успешным replay. Подробности — последние checkpoints.
+
 ## Global Constraints
 
 - Проверочные запуски выполняются локально в текущей системе с текущим подключением Loginom.
@@ -2970,7 +2978,7 @@ Design receipt `calculator-open-design-review.json` SHA
   evidence. Если закрытие не подтверждено — только адресное own admin recovery;
   остальные сессии/пакеты/guards не трогать. Результат capture / no-repro / unknown
   не является successful acceptance и не заменяет original ABC failure.
-- [ ] Прочитать actual frame независимо; установить exact false conjunct либо
+- [x] Прочитать actual frame независимо; установить exact false conjunct либо
   честно зафиксировать отсутствие необходимого доказательства. Лишь доказанная
   runtime correction идёт в TDD и ordinary gate; source/runtime change требует
   новой matched baseline/candidate пары и prospectively sealed31fresh modelslots.
@@ -3012,3 +3020,10 @@ native-calculator-open-diagnostic/run/result.json SHA
 PID действительно отсутствует, .writer отсутствует; originals16/source74/4454
 и stopped/effective locks неизменны. Live-диагностика не входит в31модельный слот;
 завершённые runtime checks и Export/JS regression gates не повторялись.
+
+Независимое чтение закрыто с явным unknown для причины original refusal:
+prethrow frame отсутствует, потому что private target SUCCEEDED. Его штатное
+ожидание own WizrdMCF mask431ms успешно; это не доказывает owner/mask/context
+исходного отказа. Верхнеуровневая задача получения actual refused frame остаётся
+открытой; Product fix, новая matched пара и model dispatch пока не допускаются.
+Ни тесты неизменного кода, ни модельная попытка повторно не запускались.

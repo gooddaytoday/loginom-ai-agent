@@ -1,12 +1,14 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Актуально на 2026-10-14 08:24 UTC: итоговый Product source `c5930ed689`, общий
+Актуально на 2026-10-14 09:16 UTC: итоговый Product source `c5930ed689`, общий
 runtime `21fcca85…`; принято 6 baseline + 25 candidate = 31 модельный запуск.
 Новая серия `20261014T064745Z-367f4b` остановлена на первой ABC-попытке:
 технический Calculator WIZARD_OPEN_NOT_CONFIRMED и normal cleanupfalse.
 Policyincomplete, JS calls0; 30 других слотов не запускались. Own recovery выполнен,
-профиль свободен, исходный failed outcome сохранён. Следующий шаг — actual
-prethrow frame диагностика без model retry. Ordinary
+профиль свободен, исходный failed outcome сохранён. Один private native replay
+выполнен и независимо проверен: шесть standard requests успешны, отказ не
+воспроизведён, причина исходного отказа неизвестна. Нужное prethrow evidence
+ещё не получено; новая модельная попытка не разрешена. Ordinary
 Import → Sort → Export с реальным перекрытием порта прошёл live и независимое
 чтение пакета/CSV/журналов/own logout и ACK/exit0. Fresh JS downstream тоже прошёл;
 runner независимо проверен, окончательный31-slot lock закреплён до моделей0.
@@ -2228,7 +2230,7 @@ Design receipt `calculator-open-design-review.json` SHA
   evidence. Если закрытие не подтверждено — только адресное own admin recovery;
   остальные сессии/пакеты/guards не трогать. Результат capture / no-repro / unknown
   не является successful acceptance и не заменяет original ABC failure.
-- [ ] Прочитать actual frame независимо; установить exact false conjunct либо
+- [x] Прочитать actual frame независимо; установить exact false conjunct либо
   честно зафиксировать отсутствие необходимого доказательства. Лишь доказанная
   runtime correction идёт в TDD и ordinary gate; source/runtime change требует
   новой matched baseline/candidate пары и prospectively sealed31fresh modelslots.
@@ -2270,3 +2272,10 @@ native-calculator-open-diagnostic/run/result.json SHA
 PID действительно отсутствует, .writer отсутствует; originals16/source74/4454
 и stopped/effective locks неизменны. Live-диагностика не входит в31модельный слот;
 завершённые runtime checks и Export/JS regression gates не повторялись.
+
+Независимое чтение закрыто с явным unknown для причины original refusal:
+prethrow frame отсутствует, потому что private target SUCCEEDED. Его штатное
+ожидание own WizrdMCF mask431ms успешно; это не доказывает owner/mask/context
+исходного отказа. Верхнеуровневая задача получения actual refused frame остаётся
+открытой; Product fix, новая matched пара и model dispatch пока не допускаются.
+Ни тесты неизменного кода, ни модельная попытка повторно не запускались.
