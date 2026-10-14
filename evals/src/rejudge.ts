@@ -7,7 +7,7 @@ import { agentInputsHash, loadTasks, rubricHash } from "./task"
 import type { AgentRun } from "./cli"
 import { parseArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
-import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
+import { createJudgeGate, judgeInfo, judgedFields, type JudgeSettings } from "./judge"
 import { aggregate, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
 import { describe, installSigint } from "./run"
 
@@ -29,6 +29,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
   const controller = new AbortController()
   const removeSigint = installSigint(controller)
   try {
+    const judgeAttempt = createJudgeGate()
     const settings: JudgeSettings = {
       command: config.judge.command,
       model: config.judge.model,
@@ -75,7 +76,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
         if (await Bun.file(previous).exists()) await cp(previous, path.join(dir, "verdict.prev.json"))
         const run = (await Bun.file(path.join(dir, "run.json")).json()) as AgentRun
         const prompt = await Bun.file(path.join(dir, "prompt.txt")).text()
-        const judged = await judgeTask({
+        const judged = await judgeAttempt({
           task,
           run,
           artifactDir,
