@@ -3281,3 +3281,21 @@ Rootseriesexec2562 и series.active process live. Started1/closed0/accepted0,
 выполняется, модельgpt-6-sol-fast/medium; следующие слоты через existing sequential
 runnerпослеобязательныхgates. Source/pins/payload/modelparams frozen, старыеoutcomes0credit.
 Next: pollsamehandle/CLI; не перезапускатьadmittedslot приobservationtimeout.
+
+Checkpoint 2026-10-14 12:06 UTC — ABC/1 завершена техническим отказом.
+CLI1760120/Host1760811 завершены, attemptCLI1/normalcleanupfalse/wrapper3;
+modelseriesexec2562 terminal1, ledger halt SELECTION_CLEANUP_UNCONFIRMED.
+История96parts/26messages/81events complete+identityverified,2275runtime rows
+bound; JS calls0/JS nodesunknown/policyincomplete, безSave/CSV/LGP/oracle.
+Три узла Import/Sort/cumulativeCalculator SUCCEEDED; classCalculator
+abc-class-001 AMBIGUOUS/open/WIZARD_OPEN_NOT_CONFIRMED, executionnotrequested.
+Причина UI не установлена, новые diagnostic/fix loops не запускаются.
+Started1/closed1/technicalfailed1/accepted0/notstarted30, baseline0.
+Own backenduser181 связан exact3successfulGUID/latestinit11:44:23.150;
+закрыт изownadmin18211:57:57.634/.669, neighbor180 untouched. Adminlogout
+11:58:48.757/loginUI; soleownbrowser actualCDP6processIDs завершеныBrowser.close.
+Свой guard nonce/hash fcbed76… архивированsameinode/mtime12:00:44, .writerabsent;
+история/evidence/modeloutcomes/pins неизменны. Technicaldescriptor584fb11e…
+0400 связывает17original+14recovery; independent release review pending.
+Дальше — pure continuation gate и first-last-touch/1, еслиindepreviewapproved;
+ABC1неповторятьиfailureнеподменять. Initialplaceholderexitнеиспользуетсякакoutcome.
