@@ -1,3 +1,4 @@
+import {rootCallMessage} from './original-root-association'
 import { retainOriginalCallArguments } from "./original-run-control"
 const mapGet = Map.prototype.get
 
@@ -18,8 +19,10 @@ export function retainTerminalCallAssociation(request: object, input: object, ru
     name:data(input,"name"),args:Object.hasOwn(input,"args")?data(input,"args"):undefined})
   const fields = [[run,"lease"],[run,"chat"],[lease,"generation"]] as const
   const descriptors = fields.map(([object,key])=>Object.getOwnPropertyDescriptor(object,key)!)
+  const rootAssociation=rootCallMessage(request)
   function guard() {
     try {
+      rootAssociation?.guard()
       inputGuard()
       const currentReader = Object.getOwnPropertyDescriptor(originalMapPrototype,"get")
       if (state.closed || Object.getPrototypeOf(runs)!==originalMapPrototype || Object.hasOwn(runs,"get")

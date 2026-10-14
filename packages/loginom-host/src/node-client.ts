@@ -1,3 +1,4 @@
+import {parentRootMessage} from './original-root-association'
 import {retainOriginalRunOrigin} from "./original-run-control"
 import {bindOriginalRootPort} from "./original-root-port"
 import { fork } from "node:child_process"
@@ -188,7 +189,7 @@ export async function launchNodeHost(input: NodeHostInput, originalControl?: obj
   const port: Port = {
     postMessage(value) {
       if (state.closed || !child.connected) throw new Error("LOGINOM_HOST_CLOSED")
-      child.send(value as object, (error) => {
+      child.send(parentRootMessage(port,value) as object, (error) => {
         if (error) closePort()
       })
     },

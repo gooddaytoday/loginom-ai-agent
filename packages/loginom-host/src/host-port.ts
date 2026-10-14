@@ -1,3 +1,4 @@
+import {rootCallMessage} from './original-root-association'
 import { retainTerminalCallAssociation } from "./terminal-call-association"
 import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
@@ -101,7 +102,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         run.calls++
         try {
           const request=input as Record<string,unknown>
-          const observed=await run.readonlyRuntime.request("call",{name:request.name,arguments:request.args})
+          const observed=await run.readonlyRuntime.request("call",{name:request.name,arguments:request.args},120_000,undefined,rootCallMessage(data))
           if (!observed || typeof observed!=='object' || !("result" in observed)
               || !("readonlyContinuation" in observed) || observed.readonlyContinuation!==true || service.journal.pending().length)
             throw Error("LOGINOM_RECOVERY_REQUIRED")
@@ -118,7 +119,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         run.calls++
         try {
           const runtime = await service.runtime(run.lease.generation, run.chat)
-          const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined})
+          const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined},120_000,undefined,rootCallMessage(data))
           if (!observed || typeof observed !== "object" || !("result" in observed)) throw Error("LOGINOM_REPLY_INVALID")
           reply({id:requestId,result:observed.result})
         } finally { run.calls-- }
@@ -205,7 +206,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         if (method === "interrupt") {
           const runtime = await service.runtime(run.lease.generation, run.chat)
-          await runtime.request("interrupt")
+          await runtime.request("interrupt",undefined,120_000,undefined,rootCallMessage(data))
           reply({ id: requestId, result: true })
           return
         }
@@ -244,7 +245,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const result = await runtime.request("call", {
             name: association?.tuple.name ?? input.name,
             arguments: association ? association.tuple.args : "args" in input ? input.args : undefined,
-          })
+          },120_000,undefined,rootCallMessage(data))
           association?.guard()
           if (
             !result ||

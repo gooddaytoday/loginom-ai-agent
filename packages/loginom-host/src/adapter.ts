@@ -95,6 +95,11 @@ export async function acquire(session: string) {
         guard()
         argumentsGuard?.()
         return result
+      } catch(error) {
+        // A root abort precedes a secondary host/SDK transport representation.
+        // Keep the actual parent reason; un-aborted failures remain unchanged.
+        if(control?.signal.aborted)control.guard()
+        throw error
       } finally {
         signal?.removeEventListener("abort", abort)
         control?.signal.removeEventListener("abort", abort)

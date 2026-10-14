@@ -1,3 +1,4 @@
+import {receiveManagedRootStart,receiveManagedRootCall,managedRootCall,decodeRootRejection} from './terminal-root-association.mjs'
 import {beginTerminalManagedCall,isTerminalManagedCall,terminalManagedPrepareMessage} from './terminal-managed-call.mjs'
 import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
 import {retainFPManagedStartup} from './fp-managed-startup.mjs'
@@ -108,7 +109,7 @@ process.on("SIGTERM", stop)
 process.on("message", (message) => {
   let invocation;
   // Fixed actual IPC producer: retain the original message before handle enters.
-  try {if(terminalManagedPrepareMessage(message))invocation=beginTerminalManagedCall(message,state)}
+  try {const op=message&&Object.getOwnPropertyDescriptor(message,'operation');if(op&&!('value'in op))throw Error('LOGINOM_ORIGINAL_CALL_CHANGED');if(op?.value==='start')receiveManagedRootStart(message,state);else if(['call','interrupt'].includes(op?.value))receiveManagedRootCall(message,state);if(terminalManagedPrepareMessage(message))invocation=beginTerminalManagedCall(message,state)}
   catch(error){const id=message&&Object.getOwnPropertyDescriptor(message,'id');send({id:id&&'value'in id?id.value:undefined,error:error?.message??'LOGINOM_ORIGINAL_CALL_UNAVAILABLE'});return}
   const request = handle(message,invocation)
   invocation?.bindTask(request)
@@ -329,7 +330,8 @@ async function handle(message) {
     }
     if (message.operation === "interrupt") {
       await recordClose("interrupt",{status:"received"})
-      state.controller?.abort()
+      const interrupt=managedRootCall(message);interrupt?.guard();
+      state.controller?.abort(interrupt?.wire.aborted?decodeRootRejection(interrupt.wire.rejection):undefined)
       send({ id: message.id, result: { interrupted: true } })
       return
     }

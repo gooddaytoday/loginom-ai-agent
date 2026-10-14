@@ -1,3 +1,5 @@
+import {retainOriginalCallArguments} from './original-run-control'
+import {runtimeRootStart,runtimeRootCall,rootCallMessage} from './original-root-association'
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { mkdir } from "node:fs/promises"
@@ -92,13 +94,15 @@ export type FPStartupControl = {
 }
 type ClosedStartupControl = FPStartupControl
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
-export async function supervise(input: Launch, startup?:ClosedStartupControl) {
+export async function supervise(input: Launch, startup?:ClosedStartupControl, rootOrigin?:Parameters<typeof runtimeRootStart>[0]) {
   startup?.guard()
+  const rootInputGuard=rootOrigin?retainOriginalCallArguments(input):undefined
   const originalStartup=startup
   if(startup)startup=Object.freeze({...startup})
   const original=input, originalConnection=input.connection
   const snapshot={...input,connection:{...input.connection},environment:runtimeEnvironment(input.environment??process.env)}
   const guard=()=>{
+    rootInputGuard?.()
     startup?.guard()
     if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","receive","retain","phase","binding","operation","request"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
     if(startup && (Object.keys(snapshot).some(key=>key!=="connection" && key!=="environment" && (original as any)[key] !== (snapshot as any)[key])
@@ -166,7 +170,8 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
     return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
   }
-  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}) {
+  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}, rootCall?:ReturnType<typeof rootCallMessage>) {
+    rootInputGuard?.()
     if(control) {
       control.signal.throwIfAborted()
       if(!Number.isSafeInteger(control.deadline) || Date.now()>=control.deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
@@ -174,6 +179,8 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     }
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
+    const rootWire=rootOrigin && operation==='start'?runtimeRootStart(rootOrigin,child.pid!,input.generation,input.chat)
+      : rootOrigin && ['call','interrupt'].includes(operation)?runtimeRootCall(rootOrigin,rootCall,child.pid!,input.generation,input.chat,id):undefined
     return new Promise<unknown>((resolve, reject) => {
       const deadline=control?.deadline??Date.now()+timeout
       const cancel = (reason: unknown) => {
@@ -193,7 +200,8 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
       pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
-      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => { if (error) fail() })
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),
+        ...(rootWire?{rootOrigin:rootWire}:{}) }, (error) => { if (error) fail() })
       if(control?.signal.aborted)abort()
     })
   }

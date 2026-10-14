@@ -1,3 +1,4 @@
+import {receiveHostRootStart,receiveHostRootCall,bindRootHostOptions} from './original-root-association'
 import {retainFPStartup,bindFPHostStartup} from "./fp-startup-control"
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
@@ -15,6 +16,7 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
 const state: {
+  rootOrigin?: ReturnType<typeof receiveHostRootStart>
   fpStartup?: ReturnType<typeof retainFPStartup>
   starting?: Promise<void>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
@@ -100,6 +102,7 @@ async function dispatch(message: unknown) {
           input.acceptanceCleanupPackage.split("/").some(segment => segment === "." || segment === "..")))
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      state.rootOrigin=receiveHostRootStart(message);
       const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
       if (capture !== undefined && (!capture || typeof capture !== "object"
           || Object.keys(capture).sort().join(",") !== "authorization,harness,packagePath"
@@ -128,6 +131,7 @@ async function dispatch(message: unknown) {
         || options.strictRecovery!==('strictRecovery' in input && input.strictRecovery===true)
         || options.acceptanceCleanupPackage!==('acceptanceCleanupPackage' in input?input.acceptanceCleanupPackage:undefined)))throw Error('LOGINOM_HANDSHAKE_INVALID')};
       guardFPStartup();if(fpStartup)bindFPHostStartup(options,fpStartup);
+      if(state.rootOrigin)bindRootHostOptions(options,state.rootOrigin);
       state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
@@ -155,6 +159,7 @@ async function dispatch(message: unknown) {
       return
     }
     if (!message.method.startsWith("connection.")) {
+      receiveHostRootCall(message,state.rootOrigin);
       events.emit("message", { data: message })
       return
     }

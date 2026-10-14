@@ -1,3 +1,4 @@
+import {rootHostOptions} from './original-root-association'
 import {getFPHostStartup} from "./fp-startup-control"
 import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
@@ -21,6 +22,7 @@ export async function createLoginomHost(options: {
   acceptanceCapture?: { authorization: string; packagePath: string; harness: "sorting-before-close-v1" | "field-parameters-preservation-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  const rootOrigin=rootHostOptions(options)
   const fpStartup=getFPHostStartup(options)
   if(options.acceptanceCapture?.harness==='field-parameters-preservation-v1' && !fpStartup)
     throw Error('LOGINOM_HANDSHAKE_INVALID')
@@ -107,7 +109,7 @@ export async function createLoginomHost(options: {
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
     }, startup ? {...startup.control,...startup.tuple,guard:startup.guard,reject:startup.propagate,
-      receive:startup.receive,retain:child=>{owner.child=child}} : undefined)
+      receive:startup.receive,retain:child=>{owner.child=child}} : undefined,rootOrigin)
     owner.settled = launched.then(child => { owner.child = child }, error => {
       owner.failure = { value: error }
       owner.child = error?.runtime ?? owner.child

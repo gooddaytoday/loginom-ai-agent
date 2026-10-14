@@ -1,3 +1,4 @@
+import {managedRootCall} from './terminal-root-association.mjs'
 // Fixed managed IPC listener only. Parsed SDK request/extra.signal are evidence,
 // never original message/task/controller membership or parent-origin authority.
 const bridges=new WeakMap(), tokens=new WeakMap();
@@ -18,10 +19,12 @@ export function beginTerminalManagedCall(message,state){
  const owners=['bridge','client','session'].map(key=>({key,d:data(state,key)}));
  const bridge=owners[0].d.value,client=owners[1].d.value,session=owners[2].d.value;
  if(!bridge||!client||!session||bridges.has(bridge))throw Error('LOGINOM_ORIGINAL_CALL_UNAVAILABLE');
+ const rootAssociation=managedRootCall(message);
  const initialController=data(state,'controller');if(initialController.value!==undefined)throw Error('LOGINOM_ORIGINAL_CALL_UNAVAILABLE');
  const caller=method(client,'callTool'),messagePrototype=Object.getPrototypeOf(message),inputPrototype=Object.getPrototypeOf(input);
  let handleTask,controller,signal,sdkTask,primary,phase='initial',controllerDescriptor;
  function custody(installing=false){
+    rootAssociation?.guard();
     if(bridges.get(bridge)!==token||Object.getPrototypeOf(message)!==messagePrototype||Object.getPrototypeOf(input)!==inputPrototype
       ||headers.some(x=>!equal(descriptor(message,x.key),x.d))||operands.some(x=>!equal(descriptor(input,x.key),x.d))
       ||owners.some(x=>!equal(descriptor(state,x.key),x.d))
@@ -31,7 +34,7 @@ export function beginTerminalManagedCall(message,state){
  }
  const token=Object.freeze({
   facts:Object.freeze({message,input,bridge,client,session,requestId:headers[0].d.value,operation:headers[1].d.value,method:caller.value,
-    parentOriginQualified:false,nativeAuthority:false}),
+    parentOriginQualified:false,rootAssociation:rootAssociation??null,nativeAuthority:false}),
   bindTask(task){if(handleTask||phase!=='initial'||!(task instanceof Promise))throw Error('LOGINOM_ORIGINAL_CALL_CHANGED');handleTask=task;phase='ready'},
   async beforeDispatch(){// Yield once so the listener can bind handle's actual Promise.
     await Promise.resolve();token.guard();

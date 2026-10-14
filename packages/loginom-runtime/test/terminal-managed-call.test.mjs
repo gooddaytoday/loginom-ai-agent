@@ -1,10 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import vm from 'node:vm';
 const root=process.env.MANAGED_CANDIDATE_ROOT?new URL('file://'+process.env.MANAGED_CANDIDATE_ROOT+'/'):new URL('../',import.meta.url);
-const helperSource=(await fs.readFile(new URL('src/terminal-managed-call.mjs',root),'utf8')).replaceAll('export function','function');
+const rootApi=await import(new URL('src/terminal-root-association.mjs',root));
+const helperSource=(await fs.readFile(new URL('src/terminal-managed-call.mjs',root),'utf8')).replaceAll('export function','function').replace(/^import .*$/m,'');
 const source=await fs.readFile(new URL('src/managed-entry.mjs',root),'utf8');
 function fixture(){const listeners={},sent=[],requests=new Set(),sdk=Promise.withResolvers();let calls=0,token;
  const state={controller:undefined,client:{callTool(input,unused,options){calls++;token=context.custody.terminalManagedCallForBridge(state.bridge);assert.equal(input,token.facts.input);assert.equal(options.signal,token.inspect().controller.signal);return sdk.promise}},bridge:{hasUnsettledWork:()=>false,hasActiveWork:()=>false},session:{}};
- const context={state,requests,process:{on:(name,fn)=>listeners[name]=fn},send:m=>sent.push(m),Error,AbortController,AbortSignal};
+ const context={state,requests,process:{on:(name,fn)=>listeners[name]=fn},send:m=>sent.push(m),Error,AbortController,AbortSignal,...rootApi};
  const listener=source.slice(source.indexOf('process.on("message"'),source.indexOf('async function handle(message'));
  const handle=source.slice(source.indexOf('async function handle(message'));
  vm.runInNewContext(helperSource+';'+listener+handle+';globalThis.custody={terminalManagedCallForBridge}',context);
@@ -34,7 +35,7 @@ for(const mode of ['missing','copied','foreign-message'])test('direct handler '+
  const f=fixture();f.listener();const original=[...f.requests][0];await flush();const t=f.token();
  const other={...f.message,input:{...f.message.input}};
  // Invoke the same fixed production body with an unowned token/message pair.
- const handle=vm.runInNewContext(helperSource+';'+source.slice(source.indexOf('async function handle(message'))+';handle',{state:f.state,send:m=>f.sent.push(m),Error,AbortController,AbortSignal});
+ const handle=vm.runInNewContext(helperSource+';'+source.slice(source.indexOf('async function handle(message'))+';handle',{state:f.state,send:m=>f.sent.push(m),Error,AbortController,AbortSignal,...rootApi});
  await handle(mode==='foreign-message'?other:f.message,mode==='missing'?undefined:mode==='copied'?{...t}:t);
  assert.equal(f.sent.at(-1).error,'LOGINOM_REQUEST_INVALID');assert.equal(f.calls(),1);assert.equal(t.inspect().sdkTask,f.sdk.promise);f.sdk.resolve({});await original;
 });
