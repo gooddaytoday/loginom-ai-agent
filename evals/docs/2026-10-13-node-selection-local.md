@@ -446,3 +446,12 @@ SHA attempt `335b6403…`, audit `2689a4a1…`.
 Во всех 12 baseline oracle/расчёт PASS, policy PASS у девяти. Root17410
 активен; текущий слот — `first-last-touch/2`, далее пять третьих прогонов.
 Итоговая приёмка ещё не завершена.
+
+
+На 2026-10-14 01:34 UTC завершены 13/18 baseline, 0/25 candidate.
+`first-last-touch/2`: oracle/полный расчёт PASS, CLI exit 0, wrapper exit 1,
+cleanup true, один JS-узел и `JAVASCRIPT_NOT_ALLOWED`.
+Session `ses_ec7f82e21ffe0w2dxt3HwdHP5M`, SHA attempt `b0ac60e4…`,
+audit `73f42f65…`. Во всех 13 baseline oracle/расчёт PASS, policy PASS
+у девяти. Root17410 активен; текущий слот — `abc-pareto-groups/3`,
+далее monthly/3, claims/3, ROI/3, first-last/3. Приёмка ещё не завершена.
