@@ -1,0 +1,84 @@
+{
+  "at": "2026-10-14T13:05:48.019316+00:00",
+  "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "status": "EXACT_SOURCE_ADOPTED_OPERATOR_SETUP_COMPLETE/EXECUTION_NOT_YET_PROVEN",
+  "operator": "Root main thread direct; original Ben owner/config/task/lease/acquiredAt unchanged",
+  "independentGate": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "49a8a1c0421c1b36c8313e7fedc0a037442ca1d2",
+    "comment": "01a13a7f-271b-7548-b15b-755452c3d8cc",
+    "admissionSha256": "c0cf041faa2ac34ec65ff8601a054d0be0140fd17279152165437454dd75a402",
+    "archiveSha256": "5ebde62bf68fb970aadc016537ae428187a2114bdabd2f55062a5faa6c5bfaf9",
+    "manifestSha256": "a434b6c66ebd763862aab94b80e946640582f3957de2538bde5e86036cd8af59",
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "verifiedPayloads": 23,
+    "independentTests": "55 PASS0FAIL110expects +25exactNodecases",
+    "ownCaptures": "65/2 complete/confirmed/errornull/unknown[]/2zero each",
+    "sourceManifestSha256": "66fda949ab194c4192110899b0bcb33d4401cab4262acdcdf4c89430e609bce9",
+    "executableSha256": "056e412d5b36ff723eb091bb04da627db1b04b9b3a4a9a3b45d6fb15c6a1ed13",
+    "operator": "Root direct; original Ben lease unmodified",
+    "effectsNowPermitted": "Scoped immutable support/helper/binding/exact single command policy/private Root admission then one foreground owned route with all immediately fresh G/once/history/cessation/completion/release guards",
+    "notProof": "No cleanup/nativeREADY/RELEASED/FREE/caseACCEPT yet",
+    "localInspectorError": "first external-manifest filename assumption corrected from actual delivery-manifest.json; no execution repeated"
+  },
+  "actualInstall": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "49a8a1c0421c1b36c8313e7fedc0a037442ca1d2",
+    "filesVerified": 855,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "actualReadOnlyHelper": {
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/49a8a1c0421c1b36c8313e7fedc0a037442ca1d2/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179837,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 11807,
+      "sha256": "302c261b0a07752cf9af81baa6efe211e64cb77e91676c53a46f5e70228a6733"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/49a8a1c0421c1b36c8313e7fedc0a037442ca1d2/binding.json",
+      "device": 64512,
+      "inode": 1179839,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 2303,
+      "sha256": "2012be6d93fc185de0ab401d41a0c60e4fce9f40e2fc8da5ba86302a84e71794"
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-49a8a1c04",
+      "device": 64512,
+      "inode": 1574624,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd"
+    },
+    "provisionAttempt": {
+      "path": "/root/lab57-root49a8-provision.once.json",
+      "device": 64512,
+      "inode": 5545233,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1042,
+      "sha256": "5699dc5827f04a178e1af2d1cdb1d193a715e05a12a451c5abda79f523ef36bc"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "privateKeyMaterialDisclosed": false
+  },
+  "rootPrivateAdmissionSha256": "19192f1d1a828d5a4cd1b0504c30bfcf251c853445ac670dfd757bd97785aba7",
+  "sourceEffectsBeforeExecution": "separate immutable support/helper/binding/one exact readonly sudo command/private Root admission only; original recovery/native/profile/history effects0",
+  "originalOnceRecovery": "ABSENT/0of1 before execution; route independently requires fresh complete G before reservation",
+  "next": "One foreground original-owned nonmodel cleanup with full source guards. Actual uncertain effect STOP, no blind retry. Ben final independent ACCEPT after real completion/RELEASED/FREE.",
+  "newModelReferenceProductCold": 0,
+  "historyBudgets": "Preserve original Ben ERROR/all6qualityEXCLUDED/product6of6; Rich4PASS2FAIL; repeats3of10/recovery original0of1. No reset.",
+  "MAS": "Foreign project/resources untouched. Local LAB57 gate only.",
+  "automation": "OFF"
+}
