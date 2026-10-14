@@ -15,6 +15,10 @@ smoke не подтверждает live Loginom/resource acceptance. CLI свя
 labels перед проекцией counters; Config.Env не читается. Missing journal означает
 неизвестный scope, invalid journal запрещает output. Зафиксированный до run бюджет,
 owned-process/cgroup coverage и итоговый acceptance gate ещё требуют реализации.
+CLI закрывает raw JSONL перед exclusive private summary с source SHA,
+min/peak/delta и missing/reset counts; исходные frames сохраняются. Summary
+разделяет container epochs/process births и не складывает shared ancestors;
+наличие summary не доказывает полноту наблюдений или успешную приёмку.
 
 ## Конфигурация и граница режимов
 

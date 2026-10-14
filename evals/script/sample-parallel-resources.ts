@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util"
 import path from "node:path"
 import { collectHostResources, loadResourceContainers } from "../src/parallel-resources"
+import { writeResourceSummary } from "../src/parallel-resource-evidence"
 import { loadResourceSlots } from "../src/slots"
 import { EvalFailure } from "../src/fail"
 import { globalLockRoot } from "../src/lease"
@@ -30,7 +31,9 @@ try {
     const result = await collectHostResources({ out, containers, intervalMs: Number(args.values["interval-ms"] ?? 1000),
       runId: args.values["run-id"] ?? null, phase: phase ?? null, signal: controller.signal,
       paths: [file.controller.stateDir, ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])] })
-    console.log(JSON.stringify(result))
+    const summaryFile = `${out}.summary.json`
+    await writeResourceSummary({ samplesFile: out, out: summaryFile })
+    console.log(JSON.stringify({ ...result, summary_file: summaryFile }))
   } finally { process.off("SIGINT", abort); process.off("SIGTERM", abort) }
 } catch (error) {
   console.error(error instanceof EvalFailure ? error.message : "RESOURCE_COMMAND_FAILED")
