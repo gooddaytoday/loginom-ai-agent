@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline } from "../src/parallel-acceptance"
 import { sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
 import os from "node:os"
 import { readlink, stat } from "node:fs/promises"
@@ -333,4 +333,47 @@ test("a known cgroup view mismatch remains failed alongside unavailable scope ev
   const wrong = { ...group, view: { ...view, namespace: "cgroup:[0]" } }
   for (const missing of [null, { ...group, view: null }]) expect(assessCgroupCoverage({ groups: [missing, wrong], view }))
     .toEqual({ status: "failed", codes: ["CGROUP_VIEW_MISMATCH"] })
+})
+
+
+test("resource timeline brackets the actual dispatch-to-cleanup window with ordered observations", () => {
+  const request = timelineFixture()
+  const samples = request.samples
+  expect(assessResourceTimeline(request)).toEqual({ status: "passed", codes: [] })
+  expect(assessResourceTimeline({ ...request, samples: samples.slice(1) })).toEqual({ status: "incomplete", codes: ["RESOURCE_TIMELINE_UNBRACKETED"] })
+  expect(assessResourceTimeline({ ...request, samples: samples.slice(0, 2) })).toEqual({ status: "incomplete", codes: ["RESOURCE_TIMELINE_UNBRACKETED"] })
+  expect(assessResourceTimeline({ ...request, samples: [] })).toEqual({ status: "incomplete", codes: ["RESOURCE_SAMPLES_MISSING"] })
+})
+
+
+test("resource timeline refuses unavailable clocks or an invalid execution window", () => {
+  const request = timelineFixture()
+  for (const change of [{ startedAt: "unverified" }, { finishedAt: "unverified" },
+    { samples: request.samples.map((sample, index) => index ? sample : { ...sample, host: { observed_at: "unverified" } }) },
+  ]) expect(assessResourceTimeline({ ...request, ...change })).toEqual({ status: "incomplete", codes: ["RESOURCE_TIME_UNVERIFIED"] })
+  expect(assessResourceTimeline({ ...request, finishedAt: "2026-10-14T09:59:00.000Z" }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_EXECUTION_WINDOW_INVALID"] })
+})
+
+function timelineFixture() {
+  const samples = [0, 1000, 2000].map((elapsed, index) => ({ sequence: index + 1, elapsed_ms: elapsed, interval_ms: 1000,
+    missed_intervals: 0, host: { observed_at: new Date(Date.parse("2026-10-14T10:00:00.000Z") + elapsed).toISOString() },
+  }))
+  return { samples, intervalMs: 1000, startedAt: "2026-10-14T10:00:00.500Z", finishedAt: "2026-10-14T10:00:01.500Z" }
+}
+
+test("resource timeline cannot pass reordered samples, changed cadence or whole observation gaps", () => {
+  const request = timelineFixture()
+  const changes = [
+    request.samples.map((sample, index) => index === 1 ? { ...sample, missed_intervals: 1 } : sample),
+    request.samples.map((sample, index) => index === 1 ? { ...sample, sequence: 1 } : sample),
+    request.samples.map((sample, index) => index === 1 ? { ...sample, interval_ms: 500 } : sample),
+    request.samples.map((sample, index) => index === 1 ? { ...sample, elapsed_ms: -1 } : sample),
+    request.samples.map((sample, index) => index === 1 ? { ...sample, elapsed_ms: 0 } : sample),
+    request.samples.map((sample, index) => index === 1 ? { ...sample, host: { observed_at: "2026-10-14T09:59:59.000Z" } } : sample),
+    request.samples.map((sample, index) => index === 2 ? { ...sample, elapsed_ms: 4000, host: { observed_at: "2026-10-14T10:00:04.000Z" } } : sample),
+  ]
+  for (const samples of changes) expect(assessResourceTimeline({ ...request, samples }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_CADENCE_INCOMPLETE"] })
+  expect(assessResourceTimeline({ ...request, intervalMs: 0 })).toEqual({ status: "incomplete", codes: ["RESOURCE_INTERVAL_INVALID"] })
 })

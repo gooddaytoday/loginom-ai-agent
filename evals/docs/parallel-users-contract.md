@@ -22,6 +22,11 @@ min/peak/delta и missing/reset counts; исходные frames сохраняю
 Readonly receipt verification получает expected source path/run/phase от
 controller, сверяет private source bytes/SHA и пересчитывает summary;
 изменённый receipt не выбирает произвольный source и не изменяет raw evidence.
+Temporal policy требует ordered samples с неизменным interval и monotonic elapsed,
+без missed intervals или whole gaps; observed timestamps охватывают dispatch до
+подтверждённого cleanup. Неизвестные clocks или неполное окно дают incomplete.
+Actual one-second owned-command smoke проверен; frozen manifest/coordinator
+и coverage всех actor lifetimes ещё требуют реализации.
 
 ## Конфигурация и граница режимов
 

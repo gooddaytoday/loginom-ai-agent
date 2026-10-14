@@ -154,6 +154,13 @@ inactive controller не превращает null в числовой0/max. Roo
 assertions, typecheck/diff PASS. Expected global anchor нельзя выбирать по
 непроверенному artifact; producer/frozen manifest/coordinator ещё не wired.
 
+assessResourceTimeline проверяет окно dispatch→confirmed cleanup, ordered sequence,
+monotonic elapsed, неизменный interval и отсутствие missed intervals/whole gaps.
+Unknown clocks либо неполное окно дают incomplete. Actual supervised Bun command
+охвачен real1000ms collector; 3 policy tests/16 assertions и smoke/4 assertions PASS.
+Ресурсный regression:81 PASS/564 assertions по семи files, typecheck/diff PASS.
+Frozen manifest и process lifetime coverage ещё не подключены к coordinator.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный

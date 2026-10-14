@@ -5,7 +5,7 @@ import { chmod, mkdtemp, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
-import { assessCgroupCoverage } from "../src/parallel-acceptance"
+import { assessCgroupCoverage, assessResourceTimeline } from "../src/parallel-acceptance"
 import { writeResourceSummary } from "../src/parallel-resource-evidence"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
@@ -316,4 +316,33 @@ console.log(JSON.stringify(await pending))
     expect(sample.ancestors).toBeNull()
     expect(sample.errors).toContain("CGROUP_MEMBERSHIP_UNVERIFIED")
   } finally { await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
+
+test("resource timeline covers an actual owned command through confirmed cleanup at one-second cadence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-timeline-"))
+  const samplesFile = path.join(root, "samples.jsonl"), abort = new AbortController()
+  const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "timeline-smoke", phase: "run", signal: abort.signal })
+  try {
+    const deadline = Date.now() + 5000
+    while (!await Bun.file(samplesFile).exists() || !(await Bun.file(samplesFile).text()).includes("\n")) {
+      if (Date.now() > deadline) throw Error("Timeline collector did not start")
+      await Bun.sleep(10)
+    }
+    const startedAt = new Date().toISOString()
+    const owned = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: root,
+      env: { PATH: process.env.PATH! }, timeoutMs: 3000, owner: { kind: "command", id: "timeline-smoke" } })
+    expect(owned.processCleanup.status).toBe("confirmed")
+    const finishedAt = new Date().toISOString()
+    while ((await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line)).at(-1).host.observed_at < finishedAt) {
+      if (Date.now() > deadline) throw Error("Timeline cleanup sample did not arrive")
+      await Bun.sleep(10)
+    }
+    abort.abort()
+    await collecting
+    const samples = (await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(assessResourceTimeline({ samples, intervalMs: 1000, startedAt, finishedAt })).toEqual({ status: "passed", codes: [] })
+    expect(samples.length).toBeGreaterThanOrEqual(2)
+    expect(samples.every(sample => sample.missed_intervals === 0)).toBe(true)
+  } finally { abort.abort(); await collecting; await rm(root, { recursive: true, force: true }) }
 }, 10000)
