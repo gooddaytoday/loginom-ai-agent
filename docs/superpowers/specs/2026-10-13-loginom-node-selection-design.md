@@ -44,8 +44,16 @@ Baseline описательный: один замер каждой задачи
 повторяемость baseline и статистическая эквивалентность не утверждаются.
 
 - [x] Исправить две инструкции skill по подтверждённому JS scope violation и проверить новый asset-only комплект без пересборки runtime.
-- [ ] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
+- [x] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
+- [ ] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
+
+Controller commit `ffbbac4220`:28tests/429assertions, typecheck0, семь RED→GREEN
+циклов. Independent source review `0bf150db…`, Root actual6existingOnly gates
+`583efad7…`:4normal/2technical,267originalSHA неизменны,0models/0dispatch.
+Два исходных отказа не повышены до PASS. Новый frozen protocol `f71e0c50…`,
+source archive79/index `dad5e372…`; execution draft пока readyfalse.
+Criteria v2 прежние, сравнительный порог и100%math в новом протоколе отсутствуют.
 
 Дизайн следующей версии: [JS gap scope correction](2026-10-14-loginom-js-gap-scope-correction.md).
 Перед JS проверяется соответствие каждой операции в коде обоснованному пробелу.
