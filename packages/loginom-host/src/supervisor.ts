@@ -220,7 +220,17 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
       pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
-      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),...(amountFrame?{amountCapture:amountFrame}:{}) }, (error) => { if (error) fail() })
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),...(amountFrame?{amountCapture:amountFrame}:{}) }, (error) => {
+        if(!error)return;
+        const original=pending.get(id);
+        if(original?.amount && startup){
+          // Register this new owned send failure before terminal loss drains the
+          // request. An already boxed cancel remains first, with a real secondary.
+          const reason=startup.reject(error);
+          original.primary??={value:reason};
+        }
+        fail();
+      })
       if(control?.signal.aborted)abort()
     })
   }
