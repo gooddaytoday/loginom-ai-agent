@@ -2,10 +2,28 @@ import { expect, test } from "bun:test"
 import { chmod, mkdtemp, readdir, rm, stat, statfs } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { collectHostResources, sampleHostResources } from "../src/parallel-resources"
+import { collectHostResources, sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
 import { loadResourceSlots } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("resource sampling observes its actual unified cgroup without inventing unavailable throttling counters", async () => {
+  const sample = await sampleCgroupResources()
+  const current = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+  expect(sample.path).toBe(current)
+  expect(sample.cpu_usage?.usage_usec).toBeGreaterThan(0)
+  expect(sample.memory_current_bytes).toBeGreaterThan(0)
+  expect(sample.memory_events?.oom).toBeGreaterThanOrEqual(0)
+  expect(sample.memory_events?.oom_kill).toBeGreaterThanOrEqual(0)
+  expect(sample.swap_current_bytes).toBeGreaterThanOrEqual(0)
+  expect(sample.memory_limit_bytes === "max" || Number.isSafeInteger(sample.memory_limit_bytes)).toBe(true)
+  const cpu = await Bun.file(path.join("/sys/fs/cgroup", current, "cpu.stat")).text()
+  if (!cpu.includes("nr_throttled ")) {
+    expect(sample.cpu_throttling).toBeNull()
+    expect(sample.errors).toContain("CGROUP_CPU_THROTTLING_UNAVAILABLE")
+  }
+  expect(JSON.stringify(sample)).not.toContain("NaN")
+})
 
 test("resource configuration reads private metadata without admin credentials or prepared profiles", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-config-"))
