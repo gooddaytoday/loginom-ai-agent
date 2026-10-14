@@ -405,3 +405,24 @@ symlink-object без чтения target. Fixture hashes/inodes реально 
 внутренних mocks нет. 80 archive/profile tests/267 assertions, typecheck/diff check
 PASS (40.10s). New private fixtures/processes удалены; cleanupSlot/recover/main и
 server close/backup/delete/release пока не подключены к этому примитиву.
+
+Проверки 2026-10-14 через harness5f0470d1f1: delayed Node browser helper B
+появляется после выхода launcher A во время cleanup, теряет parent/argv и
+продолжает heartbeat; A исключает его из signals, отдельный abort B подтверждает
+own cleanup. Полный supervisor25 PASS/138 assertions, typecheck/diff PASS.
+Это физическая fixture qualification; authenticated admin reconnect остаётся
+открытым. Superseded RED root /tmp/evals-parallel-browser-MsHk0J удалён только
+после двух confirmed/capture-complete/final[0,0] receipts и fresh birth checks;
+matchingBirths0/signals0, private late-peer-red-cleanup.json600 read-back PASS.
+
+Offline rejudge/calibrate сохраняют explicit judge.env при исполнении; saved
+config содержит только <set>/<unset> values, runtime config не изменяется.
+Rejudge снимает SIGINT handler после success/exception. Legacy summary остаётся
+без новых полей; parallel slot/time/infra-retry metadata и quality denominators
+сохранены: report/compare/analysis/rejudge86 PASS/337 assertions. После process
+cleanup uncertainty общий для одной команды judge gate запрещает последующие
+process invocations; rejudge сохраняет judge_cleanup_unconfirmed без изменения
+измеренного исхода агента. Judge/run/rejudge/calibrate85 PASS/557 assertions,
+typecheck/diff PASS. Межпроцессный private CODEX_HOME lease/admission этих
+entrypoints и live authorisation этим не квалифицированы; bootstrap credentials,
+model OAuth и judge OAuth по прежним private paths всё ещё отсутствуют.
