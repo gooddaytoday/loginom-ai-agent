@@ -3,9 +3,27 @@ import path from "node:path"
 import os from "node:os"
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { main, stamp } from "../src/run"
-import { evalsRoot } from "../src/config"
+import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
+import { calibrate } from "../src/calibrate"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("calibrate uses the configured private judge home for version and execution", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-home-"))
+  try {
+    const config: EvalConfig = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
+      EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+      EVAL_JUDGE_COMMAND: `${fakeJudge} --version-home-file ${path.join(root, "version.json")} --gate-log ${path.join(root, "judge.jsonl")}`,
+    })
+    config.judge.env = { CODEX_HOME: path.join(root, "private-judge") }
+    await mkdir(path.join(root, "corpus"))
+    expect((await calibrate(config, path.join(root, "corpus"))).code).toBe(0)
+    expect((await Bun.file(path.join(root, "version.json")).json()).codexHome).toBe(config.judge.env.CODEX_HOME)
+    const rows = (await Bun.file(path.join(root, "judge.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.map(row => row.kind)).toEqual(["start", "end"])
+    expect(rows.map(row => row.codexHome)).toEqual([config.judge.env.CODEX_HOME, config.judge.env.CODEX_HOME])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
 
 test("--calibrate: совпавшее время не перезаписывает прежнюю калибровку", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-calibration-collision-"))

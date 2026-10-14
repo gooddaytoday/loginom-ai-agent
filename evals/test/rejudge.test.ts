@@ -5,10 +5,27 @@ import { cp, mkdtemp, rm } from "node:fs/promises"
 import { evaluationContractHash } from "../src/evaluation"
 import { analyzeComparison } from "../src/compare-analysis"
 import { main } from "../src/run"
-import { evalsRoot } from "../src/config"
+import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
+import { rejudge } from "../src/rejudge"
 import type { RunSummary } from "../src/report"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("rejudge uses the configured private judge home for version and execution", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-home-"))
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --version-home-file ${path.join(root, "version.json")} --gate-log ${path.join(root, "judge.jsonl")}` }
+  try {
+    const dry = await main(["--dry-run", "--only", "group-sum-qty"], env)
+    const config: EvalConfig = loadConfig(["--judge-only", path.basename(dry.runDir!)], env)
+    config.judge.env = { CODEX_HOME: path.join(root, "private-judge") }
+    expect((await rejudge(config, path.basename(dry.runDir!))).code).toBe(0)
+    expect((await Bun.file(path.join(root, "version.json")).json()).codexHome).toBe(config.judge.env.CODEX_HOME)
+    const rows = (await Bun.file(path.join(root, "judge.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.map(row => row.kind)).toEqual(["start", "end"])
+    expect(rows.map(row => row.codexHome)).toEqual([config.judge.env.CODEX_HOME, config.judge.env.CODEX_HOME])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
 
 function overrideJudgeEnv() {
   const original = {
