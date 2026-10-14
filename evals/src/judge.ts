@@ -75,10 +75,10 @@ function parseJson(text: string): unknown {
 }
 
 export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env"> }) {
-  const version = await Bun.$`${config.judge.command} --version`.env(judgeEnvironment(config.judge.env)).quiet().nothrow()
+  const version = await judgeVersion(config.judge)
   return {
     backend: "codex" as const,
-    codex_version: version.exitCode === 0 ? version.text().trim() : null,
+    codex_version: version.exitCode === 0 ? version.stdout.trim() : null,
     model: config.judge.model,
     reasoning: config.judge.reasoning,
     prompt_sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(judgePromptFile).bytes()).digest("hex"),
@@ -86,6 +86,15 @@ export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" |
   }
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
+
+export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env">) {
+  const version = await superviseProcess({ cmd: [...judge.command, "--version"], cwd: evalsRoot,
+    env: judgeEnvironment(judge.env), timeoutMs: 10_000, owner: { kind: "judge", id: "version" } })
+    .catch(() => { throw new EvalFailure("Судья недоступен: проверка версии не подтверждена", 2) })
+  if (version.processCleanup.status !== "confirmed" || !version.processCleanup.capture_complete || version.timedOut || version.interrupted)
+    throw new EvalFailure("JUDGE_VERSION_UNCONFIRMED", 2)
+  return { exitCode: version.exitCode, stdout: version.stdout }
+}
 
 export function judgeEnvironment(env?: Record<string, string>) {
   return {
