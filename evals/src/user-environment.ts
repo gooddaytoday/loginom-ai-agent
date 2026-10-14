@@ -8,6 +8,7 @@ import type { AdminReply } from "./loginom-admin"
 
 export async function stageUserPreparation(file: SlotFile, lease: SlotLease, desiredHash: string) {
   await lease.assertHeld()
+  if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
   const configured = parseSlots(file, 1).slots.find(slot => slot.id === lease.slot.id)
   if (!configured || Object.entries(configured).some(([key, value]) => lease.slot[key as keyof typeof configured] !== value) ||
     path.dirname(lease.receipt) !== file.controller.stateDir || !/^[0-9a-f]{64}$/.test(desiredHash))
@@ -126,6 +127,8 @@ export async function readUserOwnership(file: SlotFile, lease: SlotLease, secret
 }
 
 export async function stageUserActivation(file: SlotFile, lease: SlotLease, secretFile: string) {
+  await lease.assertHeld()
+  if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
   const existing = await readUserActivation(file, lease, secretFile)
   if (existing) return existing
   const prepared = await readUserPreparation(file, lease, secretFile)
