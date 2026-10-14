@@ -1,0 +1,185 @@
+{
+  "format": "LAB57-MAS-UNKNOWN-STATUS-REJECT-VERIFICATION-v1",
+  "checked_utc": "2026-10-14T08:10:45.703511+00:00",
+  "source": "9642b2aa613e9b20acc4775664f437fadb4c4468",
+  "independent_report": {
+    "id": "01a13970-d9f2-7020-b297-be9380cf80cd",
+    "parent": "01a13961-f7bb-77a3-8a06-246de54634ad",
+    "author": "Rich; not author of this Ben derivative",
+    "archive_attachment": "01a13970-d998-78c4-8366-f88246adc27e",
+    "archive_bytes": 132984,
+    "archive_sha256": "fea976e67517adeee3489892ab7527b49bda96f47509e6a4485eac171fb6b43b",
+    "manifest_sha256": "81058ebf71bf75f03f4f821d737df47d36267f1a9b1a45edbb06ded647c5af22",
+    "external_embedded_receipt_bytes_equal": true
+  },
+  "finding": {
+    "id": "RICH-SOURCE-QUEUE-UNKNOWN-STATUS",
+    "priority": "P1",
+    "component": "Concrete queue collector and independently replayed G admission",
+    "locations": [
+      "evals/script/lab57-queue-pages.py:5",
+      "evals/script/lab57-queue-pages.py:57",
+      "evals/src/lab57-queue-scope.ts:40",
+      "evals/src/lab57-queue-scope.ts:42",
+      "evals/src/lab57-route-admission.ts:12"
+    ],
+    "problem": "Any nonempty task.status outside five pending strings is treated as terminal without a terminal-state proof. An unsupported UNKNOWN/null-runtime or future_active/original-runtime conflicting task is counted in inventory but omitted from pending/excluded/blocked/controller partitions. Consistent collector-produced hashes and ledger therefore pass production fresh admission.",
+    "contract": "Delivered operator plan and SOURCE scope require unknown state/bindings to refuse; unclassified status does not establish quiescence. This is an inherited collector predicate also reused by the new independent replay; historical parent SOURCE acceptance is not rewritten.",
+    "reproduction": "Fake authenticated external CLI -> exact candidate Python collector -> exact candidate production admission compiled to Node -> bundled Node24.19.0 yields exit0 FIXTURE_QUEUE_ELIGIBLE; expected refusal exit2. Records3/pending2/blocked0/excluded1/controller1. Pure TS gate reproduces the same false admission. Known running/original-runtime control refuses.",
+    "cases": [
+      {
+        "status": "UNKNOWN",
+        "task_runtime": null
+      },
+      {
+        "status": "future_active",
+        "task_runtime": "a5fa993f-2903-4997-a832-955ffbb1203c"
+      }
+    ],
+    "minimal_repair": "Verify supported pending and proven terminal state sets at both concrete collection and production replay; unsupported/missing/malformed state must refuse before partition. Preserve complete rows and scope ledger, exact MAS identity, original owner/controller and all other gates. Add concrete CLI/Node negative and terminal-positive controls; immutable new source/rebuild requires independent admission.",
+    "synthetic_only": true,
+    "live_occurrence_claimed": false
+  },
+  "root_evidence_verification": {
+    "external_embedded_receipt_exact": true,
+    "all100payload_verified": true,
+    "five_genuine_captures": [
+      {
+        "label": "rich-independent-build",
+        "exit": 0,
+        "processes": 2,
+        "result_sha256": "61511823fa26a496998c0baf84f36fc47e4b510e1c6e0c85cda7e3915c6988df",
+        "cleanup": "confirmed",
+        "zero_passes": 2
+      },
+      {
+        "label": "rich-independent-concrete-unknown",
+        "exit": 1,
+        "processes": 14,
+        "result_sha256": "f0307847f642fa2805e44f7808e92116f051e5f79919cb09ce50efb9dcee8fd7",
+        "cleanup": "confirmed",
+        "zero_passes": 2
+      },
+      {
+        "label": "rich-independent-integration",
+        "exit": 0,
+        "processes": 25,
+        "result_sha256": "aaedab4c6f09468aad72c7c6bb86be0abaa696a070132d9e322687de59206ace",
+        "cleanup": "confirmed",
+        "zero_passes": 2
+      },
+      {
+        "label": "rich-independent-types",
+        "exit": 0,
+        "processes": 1,
+        "result_sha256": "4a6089788cd7f26641252bdb9a0c94d3f090d4b0f8e794386daedb27bd13395b",
+        "cleanup": "confirmed",
+        "zero_passes": 2
+      },
+      {
+        "label": "rich-independent-unknown-status",
+        "exit": 1,
+        "processes": 2,
+        "result_sha256": "d280deb44d5f4938d236ca3fb7b865cf1745774b98e747f554e5820023b612ec",
+        "cleanup": "confirmed",
+        "zero_passes": 2
+      }
+    ],
+    "independent_rebuilt_executable_byte_equal": true,
+    "two_actual_saved_false_admissions": "Concrete candidate collector -> exact production Node; UNKNOWN/null runtime and future_active/original conflicting runtime -> actual exit0 ELIGIBLE; expected refusal. Source fixtures only, not observed live occurrence",
+    "root_new_reproduction_tests": 0,
+    "new_effects": 0
+  },
+  "coordinator_decision": {
+    "status": "SOURCE_REJECT_CONFIRMED; exact964 MUST_NOT_INSTALL",
+    "prior_root_acceptance": "Historical independent root75PASS/code/diff and owner01a13966 preserve their actual checks; they did not cover unknown status. New proven negative activates explicit STOP condition in that owner comment. Conditional exact964 operator/source admission is superseded; no rewriting previous receipts or old e46 history.",
+    "repair": "Minimal immutable collector+replay repair: supported pending and observed/proven terminal state sets; unsupported/missing/malformed status refuse before partition; actual CLI->production Node negatives plus terminal positive controls; clean new SHA and independent exact source decision before any install/effect",
+    "owner_authority": "Original delegated scope, supplied administrator credentials and exact mas resource nonoverlap remain valid. No further human/time gate; routine technical fix coordinated autonomously.",
+    "do_not_duplicate": "Existing Evaler coordinator task01a13966-2acb already running and can receive supplements; read latest stage before sending or dispatch; no extra Ben/Rich if Evaler has already selected repair",
+    "counter": "New unique SOURCE gate defect charge0; original same-cause ledger3/10 and recovery0/1 preserved"
+  },
+  "fresh_partial_LAB57": {
+    "at": "2026-10-14T08:08:11.607296+00:00",
+    "status": "in_progress",
+    "revision": 359,
+    "active_queued": [
+      {
+        "id": "01a13966-2acb-7dc1-8ff3-9fc5bc9b3c2c",
+        "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "status": "running",
+        "started_at": "2026-10-14T11:04:32+03:00"
+      }
+    ]
+  },
+  "preserved": {
+    "cleanup_owner_task": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "acquiredAt": "2026-10-13T22:28:17.228Z",
+    "frozen": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "active_pin": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+    "cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "original_outcome": "ERROR/code2/all6 Ben quality EXCLUDED",
+    "original_resource": "BUSY / cleanup UNCONFIRMED per accepted history; no fresh native readiness claimed",
+    "ledgers": {
+      "ben_product": 6,
+      "ben_product_budget": 6,
+      "recovery": 0,
+      "recovery_budget": 1,
+      "repeats": 3,
+      "repeats_budget": 10,
+      "repeats_remaining": 7,
+      "admission": 3,
+      "admission_budget": 3,
+      "wrapper": 1,
+      "wrapper_budget": 1,
+      "references": [
+        1,
+        1,
+        2,
+        1,
+        1,
+        3
+      ],
+      "reference_budget_per_case": 3,
+      "rich_product": 6,
+      "rich_quality": {
+        "pass": 4,
+        "fail": 2,
+        "error": 0
+      },
+      "rich_cold": [
+        11,
+        10,
+        8
+      ],
+      "ben_cold": [
+        9,
+        9,
+        8
+      ],
+      "ben_cold_errors": 1,
+      "cleanup_continuations": 2,
+      "billed": "UNKNOWN",
+      "charges_this_stage": 0
+    },
+    "full_original_171_pin_and_28972_history_scans": "Not repeated; authoritative prior receipts retained. No original profile/DB read/copied."
+  },
+  "source_review_effects": {
+    "candidate_edits": 0,
+    "install": 0,
+    "pin": 0,
+    "live": 0,
+    "browser": 0,
+    "model": 0,
+    "once": 0,
+    "recovery": 0,
+    "reference": 0,
+    "product": 0,
+    "cold": 0,
+    "original_resource_mutation": 0,
+    "budget_charge": 0
+  },
+  "root_new_tests_or_native_model_profile_resource_recovery_once_effects": 0,
+  "actual_cleanup_RELEASED_FREE_case_ACCEPT": "ABSENT; original BUSY retained",
+  "automation": "DELETED_BY_USER; remains off",
+  "next": "Existing Evaler coordinates source status classification repair once, exact independent new source gate, original-owned nonmodel cleanup, independent final cases/validators/attestation ACCEPT"
+}
