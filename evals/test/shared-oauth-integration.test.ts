@@ -6,6 +6,61 @@ import { spawn } from "node:child_process"
 import { agentCommand } from "../src/cli"
 import { loadConfig } from "../src/config"
 import { sandboxCommand } from "../src/sandbox"
+import { assertAuth } from "../src/profile"
+import { readLeaseReceipt } from "../src/lease"
+import { superviseProcess } from "../src/process-supervisor"
+
+test.skipIf(!process.env.EVAL_SHARED_CANDIDATE_RECEIPT)("installed candidate: public shared status and bwrap accept only consistent schema fixtures", async () => {
+  const receipt = await readLeaseReceipt(process.env.EVAL_SHARED_CANDIDATE_RECEIPT!) as {
+    binary: string; binarySha256: string; installedRoot: string; manifestSha256: string; metadata: { capabilities: string[] }
+  }
+  expect(receipt.metadata.capabilities).toContain("shared-oauth-v1")
+  expect(new Bun.CryptoHasher("sha256").update(await Bun.file(receipt.binary).bytes()).digest("hex")).toBe(receipt.binarySha256)
+  expect(new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(receipt.installedRoot, "cli-manifest.json")).bytes()).digest("hex")).toBe(receipt.manifestSha256)
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-installed-shared-status-"))
+  try {
+    const shared = path.join(root, "shared")
+    const profile = path.join(root, "profile")
+    const work = path.join(root, "workspace")
+    await Promise.all([shared, profile, work, path.join(root, "profile-b"), path.join(root, "workspace-b")].map(dir => mkdir(dir, { mode: 0o700 })))
+    const config = { ...loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: receipt.binary,
+      EVAL_SLOTS_FILE: "explicit-nonmodel-protocol-probe", EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: "fixture", EVAL_PROFILE_DIR: profile }),
+      auth: { sharedDir: shared } }
+    const command = { ...agentCommand(config), cleanupDir: path.join(root, "controller") }
+    await expect(assertAuth(config, command)).rejects.toThrow("SHARED_AUTH_OAUTH_REQUIRED")
+    const local = JSON.stringify({ openai: { type: "oauth", refresh: "local-fixture", access: "local-fixture", expires: 0 } })
+    await writeFile(path.join(profile, "data/auth.json"), local, { mode: 0o600 })
+    await expect(assertAuth(config, command)).rejects.toThrow("SHARED_AUTH_OAUTH_REQUIRED")
+    const generation = crypto.randomUUID()
+    const claims = { sub: "fixture-user", "https://api.openai.com/auth": { chatgpt_user_id: "fixture-user", chatgpt_account_id: "fixture-account" } }
+    const bytes = JSON.stringify({ openai: { type: "oauth", access: `fixture.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`,
+      refresh: "fixture-refresh", expires: 0, accountId: "fixture-account" },
+      $sharedOAuth: { version: 1, sessions: { openai: { generation, userId: "fixture-user", accountId: "fixture-account" } } } })
+    await writeFile(path.join(shared, "auth.json"), bytes, { mode: 0o600 })
+    const admitted = await assertAuth(config, command)
+    expect(admitted).toMatchObject({ generation, refresh_required: true })
+    const lock = await stat(path.join(shared, "auth.json.lock"))
+    const runs = await Promise.all([[profile, work], [path.join(root, "profile-b"), path.join(root, "workspace-b")]].map(async ([profileDir, workdir]) => {
+      const own = agentCommand({ ...config, profileDir: profileDir! })
+      const args = [...own.cmd, "providers", "status", "--provider", "openai", "--format", "json"]
+      const boundary = await sandboxCommand({ cmd: args, profileDir: profileDir!, workdir: workdir!, env: own.env })
+      return superviseProcess({ cmd: args, cwd: workdir!, env: boundary.env, sandbox: boundary.cmd, profileDir: profileDir!, timeoutMs: 20_000 })
+    }))
+    for (const run of runs) {
+      expect({ code: run.exitCode, cleanup: run.processCleanup.status }).toEqual({ code: 0, cleanup: "confirmed" })
+      expect(JSON.parse(run.stdout)).toEqual({ format: "shared-oauth-status-v1", provider: "openai", status: "ready", ...admitted })
+    }
+    expect(Math.min(...runs.map(run => run.startedAt + run.durationMs)) - Math.max(...runs.map(run => run.startedAt))).toBeGreaterThan(0)
+    const after = await stat(path.join(shared, "auth.json.lock"))
+    expect({ dev: after.dev, ino: after.ino }).toEqual({ dev: lock.dev, ino: lock.ino })
+    const pending = JSON.stringify({ provider: "openai", transaction: "uncommitted", generation })
+    await writeFile(path.join(shared, "refresh-pending.json"), pending, { mode: 0o600 })
+    await expect(assertAuth(config, command)).rejects.toThrow("SHARED_AUTH_REFRESH_UNCERTAIN_RELOGIN_REQUIRED")
+    expect(await Bun.file(path.join(shared, "refresh-pending.json")).text()).toBe(pending)
+    expect(await Bun.file(path.join(shared, "auth.json")).text()).toBe(bytes)
+    expect(await Bun.file(path.join(profile, "data/auth.json")).text()).toBe(local)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 90_000)
 
 test("shared directory bind: a hardlink to controller evidence is refused before child launch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-shared-hardlink-"))
@@ -34,6 +89,7 @@ test("shared directory bind: nonprivate files and symlinks never reach the child
     const input = { cmd: [path.join(root, "installation/bin/cli")], profileDir: path.join(root, "profile"),
       workdir: path.join(root, "workspace"), env: { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: path.join(root, "shared") } }
     await writeFile(file, "opaque fixture", { mode: 0o644 })
+    await chmod(file, 0o644)
     await expect(sandboxCommand(input)).rejects.toThrow("SHARED_AUTH_FILE_PRIVATE")
     await rm(file)
     await writeFile(path.join(root, "outside-canary.txt"), "private-canary", { mode: 0o600 })
