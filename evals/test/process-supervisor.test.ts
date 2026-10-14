@@ -271,7 +271,7 @@ test("supervisor: собственный detached browser закрыт, неиз
   } finally { unknown.kill("SIGKILL"); await exited }
 }, 20_000)
 
-test("parallel supervisors preserve a live sibling's reparented browser heartbeat", async () => {
+for (const delay of [0, 2800]) test(`parallel supervisors preserve a sibling's reparented browser heartbeat (helper delay ${delay})`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-browser-"))
   const bundle = path.join(root, "bundle")
   const a = path.join(root, "a"), b = path.join(root, "b")
@@ -283,7 +283,8 @@ test("parallel supervisors preserve a live sibling's reparented browser heartbea
   const abort = new AbortController()
   const commandA = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: a })
   const pendingA = runAgent({ command: { ...commandA, env: { ...commandA.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
-    EVAL_FAKE_BROWSER_PID_FILE: path.join(a, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "1500" } },
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(a, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "1500",
+    EVAL_FAKE_EXIT_MARKER: path.join(a, "exit-marker.json") } },
     taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: a, outDir: a, profileDir: a, timeoutMs: 30_000 })
   for (let wait = 0; wait < 200 && !await Bun.file(path.join(a, "browser.pid")).exists(); wait++) await Bun.sleep(10)
   await Bun.sleep(250)
@@ -291,15 +292,22 @@ test("parallel supervisors preserve a live sibling's reparented browser heartbea
   const heartbeat = path.join(b, "heartbeat")
   const pendingB = runAgent({ command: { ...commandB, env: { ...commandB.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
     EVAL_FAKE_BROWSER_PID_FILE: path.join(b, "browser.pid"), EVAL_FAKE_BROWSER_HELPER_PID_FILE: path.join(b, "helper.pid"),
-    EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_BROWSER_CLEAR_TITLE: "1", EVAL_FAKE_BROWSER_HEARTBEAT: heartbeat, EVAL_FAKE_EXIT_DELAY_MS: "20000" } },
+    EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_BROWSER_CLEAR_TITLE: "1", EVAL_FAKE_BROWSER_HEARTBEAT: heartbeat,
+    EVAL_FAKE_BROWSER_HELPER_DELAY_MS: String(delay), EVAL_FAKE_EXIT_DELAY_MS: "20000" } },
     taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: b, outDir: b, profileDir: b,
     timeoutMs: 30_000, signal: abort.signal })
   try {
-    for (let wait = 0; wait < 200 && !await Bun.file(heartbeat).exists(); wait++) await Bun.sleep(10)
+    for (let wait = 0; wait < 500 && !await Bun.file(heartbeat).exists(); wait++) await Bun.sleep(10)
     const before = await Bun.file(heartbeat).text()
     const helper = Number(await Bun.file(path.join(b, "helper.pid")).text())
     const birth = (await readFile(`/proc/${helper}/stat`, "utf8")).split(") ")[1]!.split(" ")[19]
     const finishedA = await pendingA
+    if (delay) {
+      const ended = await Bun.file(path.join(a, "exit-marker.json")).json()
+      const created = (await stat(path.join(b, "helper.pid"))).mtimeMs
+      expect(created).toBeGreaterThan(ended.at)
+      expect(created).toBeLessThan(Date.parse(finishedA.processCleanup.verification![0]!.observed_at))
+    }
     expect(finishedA.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
     expect(finishedA.processCleanup.processes.some(entry => entry.pid === helper)).toBe(false)
     expect(await Bun.file(heartbeat).text()).not.toBe(before)

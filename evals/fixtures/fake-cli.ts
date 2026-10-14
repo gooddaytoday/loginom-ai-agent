@@ -81,7 +81,8 @@ if (command === "run" && process.env.EVAL_FAKE_BROWSER_BUNDLE) {
   const child = spawn(path.join(process.env.EVAL_FAKE_BROWSER_BUNDLE, "chrome"), [...(process.env.EVAL_FAKE_BROWSER_SCRIPT ? [process.env.EVAL_FAKE_BROWSER_SCRIPT] : []), `--user-data-dir=${process.env.EVAL_FAKE_BROWSER_DATA_DIR ?? `${directory}/browser-profile`}`],
     { detached: true, stdio: "ignore", env: { PATH: process.env.PATH ?? "", EVAL_FAKE_BROWSER_CLEAR_TITLE: process.env.EVAL_FAKE_BROWSER_CLEAR_TITLE ?? "",
       EVAL_FAKE_BROWSER_HELPER_PID_FILE: process.env.EVAL_FAKE_BROWSER_HELPER_PID_FILE ?? "", EVAL_FAKE_BROWSER_HELPER_DETACHED: process.env.EVAL_FAKE_BROWSER_HELPER_DETACHED ?? "",
-      EVAL_FAKE_BROWSER_HEARTBEAT: process.env.EVAL_FAKE_BROWSER_HEARTBEAT ?? "", EVAL_FAKE_BROWSER_SCRIPT: process.env.EVAL_FAKE_BROWSER_SCRIPT ?? "" } })
+      EVAL_FAKE_BROWSER_HEARTBEAT: process.env.EVAL_FAKE_BROWSER_HEARTBEAT ?? "", EVAL_FAKE_BROWSER_SCRIPT: process.env.EVAL_FAKE_BROWSER_SCRIPT ?? "",
+      EVAL_FAKE_BROWSER_HELPER_DELAY_MS: process.env.EVAL_FAKE_BROWSER_HELPER_DELAY_MS ?? "" } })
   await Bun.write(process.env.EVAL_FAKE_BROWSER_PID_FILE!, String(child.pid))
   await Bun.sleep(400)
   if (validation) await rm(directory, { recursive: true })
@@ -198,4 +199,6 @@ if (process.env.EVAL_FAKE_HANG_AFTER_EVENTS) {
 const exit = Bun.file(path.join(fixtures, `${id}.exit`))
 const stderr = Bun.file(path.join(fixtures, `${id}.stderr`))
 if (await stderr.exists()) process.stderr.write(await stderr.text())
-process.exit(process.env.EVAL_TASK_ID === "a-exit3" ? 3 : (await exit.exists()) ? Number((await exit.text()).trim()) : 0)
+const exitCode = process.env.EVAL_TASK_ID === "a-exit3" ? 3 : (await exit.exists()) ? Number((await exit.text()).trim()) : 0
+if (process.env.EVAL_FAKE_EXIT_MARKER) await Bun.write(process.env.EVAL_FAKE_EXIT_MARKER, JSON.stringify({ at: Date.now() }))
+process.exit(exitCode)
