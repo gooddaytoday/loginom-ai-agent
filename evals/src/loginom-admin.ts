@@ -67,7 +67,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   if (options.signal?.aborted) stop()
   const pending = superviseProcess({ cmd: [runtime.node, driver], cwd: directory,
     env: { PATH: "/usr/bin:/bin", HOME: directory, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
-    timeoutMs: null, profileDir: path.join(directory, "profile"), stdin: input.readable, stdout: output.writable, signal: abort.signal })
+    timeoutMs: null, profileDir: path.join(directory, "profile"), stdin: input.readable, stdout: output.writable, signal: abort.signal,
+    owner: { kind: "admin", id: directory } })
   void pending.catch(() => { stopInput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)); stopOutput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)) })
   const channel = createJournaledAdminChannel(output.readable, input.writable, path.join(directory, "commands"))
   let sequence = Promise.resolve()
