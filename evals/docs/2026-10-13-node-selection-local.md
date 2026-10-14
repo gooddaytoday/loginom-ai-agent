@@ -23,6 +23,14 @@ runner3658207/exec58523 продолжил серию2026-10-14T23:45:28.591990+
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
+Итоговое ревью: отдельное уточнение `node-selection-final-review-v1` закреплено
+2026-10-14T23:48:53.959864+00:00 до следующей новой попытки; [критерии](../../docs/superpowers/specs/2026-10-15-loginom-node-selection-final-review-v1.md)
+SHA `b9d63fd3a8588f2b54eaab655085ef373f0f58d80868ccffcd69dca6e6a58add`. Fixedseed/ranking сохранены: первые min(3,N) математически
+успешныхstandardcandidate после full25. При N<3 reviewALLN, target3 explicitly
+unmet/ограничение выборки; нет extra models ради квоты. Всеfailure/anomaly reviews
+сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
+`a6c54942…`; actualsampling пока не выполнен.
+
 Risky-approved-claims/2 closed23:41:16.639Z: policy PASS `17d64357…`, mandatory
 review `a6d5a715…`;26messages/98parts/28tools/82events/2582runtime, JS0/nochildren.
 Std Import400→Filter Approved AND fraud_score>0.8 (72rows)→Group Count/SumClaim/
