@@ -75,6 +75,13 @@ export async function acquireOriginalNodeHostOwner(port:Port,run:string,session:
   return {capability,generation:p.value.generation}
  }catch(value){p.primary??={value};p.phase='refused';throw p.primary.value}
 }
+export function retainedOriginalNodeHostOwner(capability:object) {
+ const p=parentAcquisitions.get(capability)
+ if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ guardParent(p)
+ if(p.phase!=='acquired' || !p.value)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ return p.value
+}
 export async function assertOriginalNodeHostOwner(capability:object) {
  const p=parentAcquisitions.get(capability)
  if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')

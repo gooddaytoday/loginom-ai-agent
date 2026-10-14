@@ -17,9 +17,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       chat: string
       lease: NonNullable<ReturnType<typeof service.acquire>>
       calls: number
+      invocations: number
       dispatching: boolean
       released: boolean
       active: Set<string>
+      acquiredServiceOwner?: ReturnType<typeof service.retainAcquiredServiceOwner>
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
@@ -41,6 +43,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.closed) return
     port.postMessage(value)
   }
+  function originalReceipt(id:string) {
+    const run=runs.get(id)
+    if(state.closed || !run || run.released || !run.acquiredServiceOwner)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+    if(run.invocations || run.dispatching || run.active.size)throw Error('LOGINOM_RECOVERY_REQUIRED')
+    const b=service.assertAcquiredServiceOwner(run.acquiredServiceOwner,owner,id,run.chat,run.lease)
+    return {generation:b.generation,acquiredService:{phase:b.phase,owner:b.owner,run:b.run,lease:`${b.owner}:${b.run}`,generation:b.generation,chat:b.chat,account:b.account}}
+  }
   async function handle(data: unknown) {
     if (state.closed) return
     if (
@@ -59,6 +68,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     }
     try {
       if (data.method === "acquire") {
+        const receiver='receiverPurpose' in input
+        if(receiver && input.receiverPurpose!=='union-acquired-service-v1')throw Error('LOGINOM_METHOD_INVALID')
+        if(receiver && 'receiverPhase' in input) {
+          if(input.receiverPhase!=='current' || Object.keys(input).sort().join(',')!=='receiverPhase,receiverPurpose,run')throw Error('LOGINOM_METHOD_INVALID')
+          reply({id:data.id,result:originalReceipt(input.run)});return
+        }
+        if(receiver && Object.keys(input).sort().join(',')!=='receiverPurpose,run,session')throw Error('LOGINOM_METHOD_INVALID')
         if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
@@ -71,8 +87,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         await service.retireRuntime(chat)
         service.resetRestarts(chat)
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
-        reply({ id: data.id, result: { generation: lease.generation } })
+        let acquiredServiceOwner:ReturnType<typeof service.retainAcquiredServiceOwner>|undefined
+        try { if(receiver)acquiredServiceOwner=service.retainAcquiredServiceOwner(owner,input.run,chat,lease) }
+        catch(error){lease.release();throw error}
+        runs.set(input.run, { chat, lease, calls: 0, invocations: 0, dispatching: false, released: false, active: new Set(), acquiredServiceOwner })
+        reply({ id: data.id, result: receiver?originalReceipt(input.run):{ generation: lease.generation } })
         return
       }
       const run = runs.get(input.run)
@@ -91,6 +110,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
       if (data.method === "call") run.dispatching = true
       run.calls++
+      if(data.method!=="tools")run.invocations++
       try {
         if (data.method === "tools") {
           const runtime = await service.runtime(run.lease.generation, "readiness")

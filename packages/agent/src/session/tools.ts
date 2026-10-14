@@ -1,5 +1,5 @@
-import { retainSDKInvocation, assertSDKInvocation } from "@/cli/private-admission.mjs"
-import { retainUnionInvocation } from "./union-invocation"
+import { retainSDKInvocation } from "@/cli/private-admission.mjs"
+import { retainUnionInvocation, retainOriginalSDKCarrier, originalSDKCarrierInvocation } from "./union-invocation"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
@@ -566,16 +566,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ),
           execute(args, options) {
             const sdkInvocation = retainSDKInvocation(args, options)
-            if (sdkInvocation) {
-              // This same-process record is genuine SDK lineage, not an acquired
-              // host owner. Never fall back to a packetless call or mint Union
-              // authority until the original owner/purpose binder is available.
-              assertSDKInvocation(sdkInvocation, args, options)
-              throw new Error("ORIGINAL_SDK_ACQUIRED_CARRIER_UNAVAILABLE")
-            }
-            const invocation = retainUnionInvocation({ definition, request: args, options, owner: loginom, sessionInput: input, user: user.info })
+            const source = { definition, request: args, options, owner: loginom, sessionInput: input, user: user.info }
+            const invocation = sdkInvocation ? retainOriginalSDKCarrier(source, sdkInvocation) : retainUnionInvocation(source)
             return run.promise(
               Effect.gen(function* () {
+                if(sdkInvocation && invocation)originalSDKCarrierInvocation(invocation,loginom)
                 const ctx = context(args, options)
                 yield* plugin.trigger(
                   "tool.execute.before",
@@ -583,6 +578,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   { args },
                 )
                 yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+                if(sdkInvocation && invocation)originalSDKCarrierInvocation(invocation,loginom)
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
                     await (invocation ? invocation.invoke() : loginom.call(definition.name, args, user.info.id, options.abortSignal)),
