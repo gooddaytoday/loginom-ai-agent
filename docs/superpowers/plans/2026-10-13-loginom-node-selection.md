@@ -2030,3 +2030,30 @@ Live input доставлен, импорт выполняется. Model calls 
 Product/skill/payload/pins unchanged. Native diagnostic не является acceptance.
 Следующие модели не запускались; candidate 3/25, firstwave 3/9 нечистая,
 повторы и итоговая приёмка остаются незавершёнными.
+
+
+На 2026-10-14 03:58 UTC V2 native diagnostic завершён Root 26816 exit 0,
+без LLM: пять исходных apply и diagnostic-save SUCCEEDED, package_closed /
+logged_out true, no discard, Host ACK/exit 0. Result
+`2f2e995ca9db14ae9ed1565664c2abb5d2238de7b403c10ceb8c59a38f0ac19a`.
+Independent postlive review `cc0e67c3…` подтвердил 3988 journal rows одной
+session/runtime/actionManifest, 66 receipts, четыре journals и 73 raw,
+4458 source / 79 V1 / 74 acceptance / 10 pins / оба runtime 288 unchanged.
+
+Целевой Calculator в 557 ms показал единственную own wizard mask;
+штатное ожидание 394 ms закончилось masks 0 и verified open в 951 ms.
+Второй mask без TID из V1 не воспроизведён и не классифицирован. Это
+non-reproduction, не Product fix, не acceptance и не замена failed ABC/1.
+Save связан с own path `/user/ABCOpenDiag-d3f61ea4ba1e4fd4.lgp`, но
+reopened/persisted_content_verified false; проверки сохранённого содержимого
+и повторного открытия не заявляются. Дополнительная диагностика без нового
+actualfailure сейчас не нужна; Product/skill/runtime/pins не меняются.
+
+Диагностическая candidate firstwave продолжена в frozen порядке:
+`risky-approved-claims/1` запущен Root 78243; Session
+`ses_ec770db5bffeqJU4QzDZwcPh7p`, стандартный импорт выполняется, JS-вызовов
+пока нет. После terminal нужен exact own archive трёх успешных/copied
+candidate slots (sales/monthly/claims, девять файлов), с прежними статическими
+pre/postconditions и обратной картой; во время active CLI файлы не переносятся.
+Candidate completed 3/25, firstwave 3/9 нечистая, повторы закрыты;
+полная приёмка не завершена.
