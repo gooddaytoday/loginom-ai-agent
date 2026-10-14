@@ -105,7 +105,12 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
     }
     await checkGuard()
     await writeLeaseReceipt(receipt, reservation)
-    return { reservation, receipt, guardFile, close, async release(proof: string) {
+    return { reservation, receipt, guardFile, close, async assertHeld() {
+      if (closed) throw new EvalFailure("LEASE_NOT_HELD", 2)
+      await checkGuard()
+      if (JSON.stringify(await readReservation(receipt, input.key)) !== JSON.stringify(reservation))
+        throw new EvalFailure("LEASE_NOT_HELD", 2)
+    }, async release(proof: string) {
       await checkGuard()
       const evidence = await readLeaseReceipt(proof).catch(() => { throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2) })
       const current = await readReservation(receipt, input.key)

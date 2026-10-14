@@ -26,6 +26,7 @@ export type SlotLease = {
   identity: ServerIdentity
   receipt: string
   token: string
+  assertHeld(): Promise<void>
   close(): Promise<void>
   release(cleanupReceipt: string): Promise<void>
 }
@@ -112,7 +113,8 @@ export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, ide
     const manifest = { version: 2, token, slot, identity, commandId, resources: resources.map(resource => ({ receipt: resource.receipt,
       key: resource.reservation.key, token: resource.reservation.token, revision: resource.reservation.revision })) }
     await writeLeaseReceipt(receipt, { ...manifest, state: "retained" })
-    return { slot, identity, receipt, token, async close() { await Promise.all(resources.map(resource => resource.close())) }, async release(cleanupReceipt: string) {
+    return { slot, identity, receipt, token, async assertHeld() { await Promise.all(resources.map(resource => resource.assertHeld())) },
+      async close() { await Promise.all(resources.map(resource => resource.close())) }, async release(cleanupReceipt: string) {
       const evidence = record(await readLeaseReceipt(cleanupReceipt))
       if (evidence.status !== "confirmed" || evidence.slotId !== slot.id || evidence.leaseToken !== token || evidence.serverEpoch !== identity.serverEpoch ||
         evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || evidence.archive !== "committed" ||
