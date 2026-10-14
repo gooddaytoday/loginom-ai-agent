@@ -1,0 +1,43 @@
+{
+  "sourceSHA": "c44ae7bd0aae4952d05ae032c7c1b69197923b5b",
+  "productVersion": "0.0.0-dev-202610141641",
+  "runtimeChanges": false,
+  "files": {
+    "packages/loginom-host/src/adapter.ts": {
+      "sha256": "83f4f47be5aed8bf1dce6d6b04219070e079d921d237f5dc9bbb3505d42fb7cd"
+    },
+    "packages/loginom-host/src/host-port.ts": {
+      "sha256": "0bc04823e33cf92055079fbcb14445ece100d5f0c6def43d3dc01eeb4cd2a8e4"
+    },
+    "packages/loginom-host/src/supervisor.ts": {
+      "sha256": "83f2a556b7f519063af1f61ec3b88bc39453ce8e9de2c05f33429901b74781c9"
+    },
+    "packages/loginom-runtime/src/managed-entry.mjs": {
+      "sha256": "b47044563eb59166bd8360efb52d8dc6d1b5be76808a22789225338d04e976fe"
+    },
+    "packages/loginom-runtime/src/original-prepare-lender.mjs": {
+      "sha256": "b5c26dea7b02e4809fb8797c74f86dd2862ecebfc4d9113e1b07e6516c239ba5"
+    },
+    "packages/loginom-runtime/client/lib/bridge.mjs": {
+      "sha256": "c4e7240252c47ce8e5abacae3ec114cd7fed4fabe65b016688096580a0968701"
+    }
+  },
+  "sdkFiles": {
+    "dist/esm/shared/protocol.js": {
+      "sha256": "8de524602541771e084f7185e7d0fc418b8142a9cae1bd80a3ee7c70e9a9e132",
+      "sourceInstalledEqual": true
+    },
+    "dist/esm/client/index.js": {
+      "sha256": "db6cc643f5cc095b2fd0b70bf691d1775f07a317e97555e3928559e815f5e32a",
+      "sourceInstalledEqual": true
+    },
+    "dist/esm/server/index.js": {
+      "sha256": "8b4fbdc0d0bbdc9ad74f385c41c0152d85445187f47cfc3941ff0d2a14a2696e",
+      "sourceInstalledEqual": true
+    },
+    "dist/esm/inMemory.js": {
+      "sha256": "8eb57dc4b4c0993869273a5e01a35c71e8d84c3d5050e9871a8cf141360f883d",
+      "sourceInstalledEqual": true
+    }
+  }
+}
