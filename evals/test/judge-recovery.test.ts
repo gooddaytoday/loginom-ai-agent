@@ -6,7 +6,7 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { runOfflineJudge } from "../src/judge-environment"
-import { recoverOfflineJudge } from "../src/judge-recovery"
+import { recoverOfflineJudge, recoverOfflineJudgeIncident } from "../src/judge-recovery"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 test("offline recovery releases a dead command only after qualifying its actual closed judge proofs", async () => {
@@ -57,8 +57,16 @@ try{await recoverOfflineJudge(request.input,request.lockRoot);process.exitCode=1
     expect(failed).toMatchObject({ state: "recovery-only", revision: retained.revision + 1 })
     await expect(runOfflineJudge(loadConfig(["--calibrate", "--only", "group-sum-qty"], env), fixture.lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
     await writeLeaseReceipt(journal.processInventory, inventory)
-    expect(await recoverOfflineJudge({ slotsFile, journal: retained.journal, token: failed.token, revision: failed.revision, incidentToken: retained.token }, fixture.lockRoot))
-      .toMatchObject({ status: "released" })
+    const output = path.join(root, "cli-recovery")
+    const cli = Bun.spawn([Bun.which("bwrap")!, "--die-with-parent", "--unshare-net", "--ro-bind", "/", "/", "--dev", "/dev", "--bind", root, root,
+      "--tmpfs", "/var/lib", "--dir", "/var/lib/loginom-evals", "--bind", fixture.lockRoot, "/var/lib/loginom-evals/locks",
+      process.execPath, path.join(evalsRoot, "script/parallel-env.ts"), "recover", "--config", slotsFile, "--incident", retained.journal, "--out", output],
+      { cwd: evalsRoot, env: { PATH: process.env.PATH ?? "", HOME: root, EVAL_HARNESS_LOCK_ROOT: path.join(root, "ignored-parent-root") },
+        stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+    const [cliCode, cliStdout, cliStderr] = await Promise.all([cli.exited, new Response(cli.stdout).text(), new Response(cli.stderr).text()])
+    expect({ code: cliCode, stderr: cliStderr }).toEqual({ code: 0, stderr: "" })
+    expect(JSON.parse(cliStdout)).toMatchObject({ status: "released" })
+    expect(await Bun.file(path.join(output, "receipt.json")).json()).toMatchObject({ version: 2, kind: "offline-judge-recovery-result", status: "released" })
     const released = await Bun.file(files[0]!).json()
     expect(released).toMatchObject({ state: "released", revision: failed.revision + 1 })
     expect(released.lineage[0].token).toBe(retained.token)
@@ -84,7 +92,7 @@ try{await recoverOfflineJudge(request.input,request.lockRoot);process.exitCode=1
     expect((await Bun.file(released.journal).json()).state).toBe("released")
     expect((await runOfflineJudge(loadConfig(["--calibrate", "--only", "group-sum-qty"], env), fixture.lockRoot)).judgeCleanupConfirmed).toBe(true)
     const nextReservationBytes = await Bun.file(files[0]!).text()
-    expect(await recoverOfflineJudge({ slotsFile, journal: retained.journal, token: retained.token, revision: retained.revision }, fixture.lockRoot))
+    expect(await recoverOfflineJudgeIncident({ slotsFile, journal: retained.journal }, fixture.lockRoot))
       .toMatchObject({ status: "already_released" })
     expect(await Bun.file(files[0]!).text()).toBe(nextReservationBytes)
     const completed = await Bun.file(retained.journal).json(), completedProof = await Bun.file(completed.recovery.proof.path).json()
