@@ -397,3 +397,13 @@ enumerators освобождаются immediate: read-only inspect не ост�
 перед следующей mutation. Parent должен подтвердить protected ownership и idle
 closure до применения к ранее activated account; один Blocked getter этого
 не доказывает. ACL/unblock/admission пока не квалифицированы.
+
+Wire acl phase читает все shared dirs и grants, сверяет полный normalized
+expectedPolicy до Delete и снимает только Everyone/UserKind2 и exact own
+name/UserKind0/objectId grants. Same-name own principal с другим ID даёт отказ
+до mutation. Оба enumerators освобождаются immediate до записи. После Delete
+read-back должен точно совпасть с исходной policy без выбранных grants; чужие
+grants сохраняются. На disposable pair фактически сняты2 Everyone grants,
+shortened policy refused и второй вызов removed0. Это native capability:
+parent global configuration guard/ownership и effective negative access proof
+ещё обязательны; account остаётся blocked, ACL phase его не активирует.
