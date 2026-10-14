@@ -1026,3 +1026,12 @@ CLI/wrapper exit 0, cleanup подтверждён. Session `ses_ec818eb1cffeXh4
 SHA attempt `7fe5ccbf…`. Все три sales-прогона успешны. Root17410 продолжает
 ту же последовательную очередь; текущий слот — `abc-pareto-groups/2`.
 Новые результаты не переносятся из прежних серий; приёмка ещё не завершена.
+
+
+На 2026-10-14 01:07 UTC завершены 9/18 baseline, 0/25 candidate.
+`abc-pareto-groups/2`: oracle/полный расчёт PASS, CLI exit 0, wrapper exit 1,
+cleanup true, два JS-узла и policy failure `JAVASCRIPT_NOT_ALLOWED`.
+Session `ses_ec813c7c4ffel3RV1nTZWRsmwf`, SHA attempt `260d6b1b…`,
+audit `e061eec9…`. Во всех девяти baseline oracle/расчёт PASS, policy PASS
+у шести. Root17410 активен и последовательно перешёл к `monthly-demand/2`;
+следующий слот — `risky-approved-claims/2`. Приёмка ещё не завершена.
