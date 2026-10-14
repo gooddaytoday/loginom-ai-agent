@@ -477,6 +477,12 @@ export async function createBridge(config, session, { browserTransport: managedB
       captureConsumed=true;
       captureInFlight=browserGate(async () => {
         assertBound();
+        if (typeof acceptanceCapture.resourceReader?.read !== 'function') throw Error('LOGINOM_CAPTURE_RESOURCE_READER_MISSING');
+        const resources = await acceptanceCapture.resourceReader.read({deadline: binding.expires});
+        assertBound();
+        if (resources.scope !== 'current-owned-session' || resources.account !== binding.account
+            || resources.package_count !== 1 || resources.running !== false)
+          throw Error('LOGINOM_CAPTURE_RESOURCE_REFUSED');
         const identity=Object.freeze({session_id:binding.session, document_id:managedSave.documentId,
           tab_tid:managedSave.tabTid, account:binding.account, package_path:binding.packagePath,
           loginom_build:managedSave.loginomBuild});

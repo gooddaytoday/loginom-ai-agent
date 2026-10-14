@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { join, dirname } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
+import { createCalculatorResourceReader } from "./acceptance/calculator-resource-reader.mjs"
 
 const runtimeModulePath = fileURLToPath(import.meta.url)
 
@@ -286,6 +287,7 @@ function startupOwner(owner, profile, candidate) {
     owner.closing=(async()=>{
       let nativeStage
       try {
+        await owner.calculatorResourceReader?.dispose()
         if(owner.launchAttempted && !owner.context) throw Error('LOGINOM_STARTUP_LAUNCH_UNKNOWN')
         if(owner.contextCloseAttempted && !owner.contextClosed) throw new Error('LOGINOM_STARTUP_CONTEXT_UNKNOWN',{cause:owner.contextCloseFailure})
         if(owner.context && !owner.contextClosed && (owner.context.pages().length!==1||owner.context.pages()[0]!==owner.page)) throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
@@ -362,7 +364,7 @@ function startupOwner(owner, profile, candidate) {
   }
   return owner
 }
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, owner = {} }) {
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, owner = {}, calculatorResourceRead = false }) {
   startupOwner(owner,profile,candidate)
   owner.deadline??=null // No upstream absolute deadline is supplied by the existing start contract.
   owner.artifacts??={node:await startupFingerprint(process.execPath),browser:await startupFingerprint(browserPath),runtime:await startupFingerprint(runtimeModulePath),resource_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../resource-manifest.json')),cli_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../../../cli-manifest.json')),foreground_caller:{available:false,reason:'NOT_SUPPLIED_BY_START_CONTRACT'}}
@@ -401,6 +403,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     owner.readinessBinding=Object.freeze({id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page,deadline:owner.deadline,signal:owner.signal})
     await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
     const result=await loginPage(owner.page,candidate,owner)
+    if(calculatorResourceRead) await createCalculatorResourceReader(owner)
     const ready=await startupReadiness(owner,!owner.initialReadinessCompleted)
     if(!ready.authenticated)throw new Error('LOGINOM_INITIAL_READINESS_REFUSED',{cause:ready})
     if(!keepOpen) {await owner.close();return result}

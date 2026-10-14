@@ -136,6 +136,7 @@ function close() {
     try {
       await recordClose(stage,{status:"started"})
       await Promise.allSettled([...requests])
+      await state.startupOwner?.calculatorResourceReader?.dispose()
       if (state.startupOwner && !state.bridge) {
         stage="startup_owner"
         const owner=state.startupOwner
@@ -295,7 +296,7 @@ async function handle(message) {
         return
       }
       let authenticated
-      try {authenticated = await loginBrowser({ ...login, keepOpen: true })}
+      try {authenticated = await loginBrowser({ ...login, keepOpen: true, calculatorResourceRead: !!acceptanceCapture })}
       finally {state.startupController=undefined}
       state.browser = authenticated.context
       state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
@@ -339,7 +340,7 @@ async function handle(message) {
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         acceptanceCapture: acceptanceCapture ? { binding: Object.freeze({...acceptanceCapture, session:session.metadata.sessionId}),
-          harness: captureHarness } : undefined })
+          harness: captureHarness, resourceReader: state.startupOwner.calculatorResourceReader } : undefined })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       await state.bridge.server.connect(serverTransport)

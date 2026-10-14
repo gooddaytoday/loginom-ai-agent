@@ -57,7 +57,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 const {createBridge}=await import('../../lib/bridge.mjs');
 
 
-const scenarios=['success','no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved','cancel-missing','cancel-applied','identity-after','receipt-write','falsy-false','falsy-zero','falsy-empty','falsy-null','falsy-undefined'];
+const scenarios=(process.env.CALCULATOR_CAPTURE_CASES?.split(',')??['success','no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved','cancel-missing','cancel-applied','identity-after','receipt-write','falsy-false','falsy-zero','falsy-empty','falsy-null','falsy-undefined','resource-error','resource-falsy','resource-foreign','resource-count','resource-running']);
 for(const scenario of scenarios)test('private capture transaction: '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'capture-bridge-'));
  const f=current={scenario,events:[],busy:false,saves:0};
@@ -82,7 +82,13 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
  try{
   bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
    loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null},session,
-   {acceptanceCapture:scenario==='no-binding'?undefined:{binding,harness}});
+   {acceptanceCapture:scenario==='no-binding'?undefined:{binding,harness,resourceReader:{async read(){
+     f.events.push('resource-read');
+     if(scenario==='resource-error')throw Error('resource', {cause:0});
+     if(scenario==='resource-falsy')throw 0;
+     return {scope:'current-owned-session',account:scenario==='resource-foreign'?'foreign':binding.account,
+       package_count:scenario==='resource-count'?2:1,running:scenario==='resource-running'};
+   }}}});
   client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
   assert.equal(bridge.catalog.tools.some(t=>t.name==='acceptance.capture'),false);
   assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
@@ -105,7 +111,8 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
     assert.equal(close.ok,false);assert.equal(close.error,falsy[scenario]);assert.equal(f.events.includes('package-cleanup'),false);
     await assert.rejects(client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'replay'}}));
    }
-   if(['no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved'].includes(scenario))
+   if(['no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved',
+     'resource-error','resource-falsy','resource-foreign','resource-count','resource-running'].includes(scenario))
     assert.equal(f.events.includes('capture-before'),false);
   }
  }finally{await client?.close();await rm(directory,{recursive:true,force:true});}
