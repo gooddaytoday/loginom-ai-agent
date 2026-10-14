@@ -3,10 +3,18 @@ import { validateLab57EquivalentGuard } from "../src/lab57-guard-provenance"
 
 test("accepted original source and six parent edges bind the legacy guard without synthesizing admission", async () => {
   const original = await Bun.file(new URL("./fixtures/lab57-cleanup-proposal/input.json", import.meta.url)).json()
+  original.guardEntries = ["owner.json"]
   const provenance = await Bun.file(new URL("./fixtures/lab57-cleanup-proposal/equivalent-guard.json", import.meta.url)).json()
   expect(validateLab57EquivalentGuard(original, provenance)).toEqual({
     status: "ORIGINAL_GUARD_PROVENANCE_VERIFIED", applied: false,
     originalParentCapture: "NOT_PRESENT", originalHarnessAdmission: "NOT_PRESENT",
     serverCessation: "UNPROVEN", cleanup: "UNCONFIRMED", missing: [],
   })
+})
+
+test("unknown files in the legacy guard are refused even when owner bytes are unchanged", async () => {
+  const original = await Bun.file(new URL("./fixtures/lab57-cleanup-proposal/input.json", import.meta.url)).json()
+  const provenance = await Bun.file(new URL("./fixtures/lab57-cleanup-proposal/equivalent-guard.json", import.meta.url)).json()
+  original.guardEntries = ["owner.json", "foreign-owner.json"]
+  expect(validateLab57EquivalentGuard(original, provenance).missing).toContain("GUARD_INVENTORY_CHANGED")
 })

@@ -96,6 +96,7 @@ export function validateLab57EquivalentGuard(original: unknown, provenance: unkn
     "LEGACY_GUARD_PARENT_BIRTH_UNCAPTURED", "SERVER_CESSATION_UNPROVEN", "FRESH_OPERATOR_GUARDS_REQUIRED",
   ].includes(reason))
   if (input.guardParentCapture !== null && input.guardParentCapture !== undefined) missing.push("SYNTHESIZED_PARENT_CAPTURE_REFUSED")
+  if (JSON.stringify(input.guardEntries) !== '["owner.json"]') missing.push("GUARD_INVENTORY_CHANGED")
   for (const [file, expected] of Object.entries(accepted.source_file_hashes)) {
     const bytes = object(v.sources)[file]
     if (typeof bytes !== "string" || hash(bytes) !== expected) missing.push(`FROZEN_PRODUCER_CHANGED:${file}`)
