@@ -127,6 +127,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
     },
     async reconcileUser(lease, secretFile) {
+      await lease.assertHeld()
+      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
       if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       const data = requireAdminReply(await request("reconcile-user", { slot: lease.slot, secretFile,
@@ -138,6 +140,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       return { userKey: data.userKey, aclHash: data.aclHash }
     },
     async createBlockedUser(lease, secretFile) {
+      await lease.assertHeld()
+      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
       if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       const info = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
@@ -166,6 +170,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       return readUserOwnership(file, lease, secretFile)
     },
     async observeOwnedSession(lease, secretFile, policy) {
+      await lease.assertHeld()
+      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
       const owned = await readUserOwnership(file, lease, secretFile)
       const activation = await readUserActivation(file, lease, secretFile)

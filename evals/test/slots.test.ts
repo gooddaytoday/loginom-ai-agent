@@ -2,8 +2,9 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireSlotLease, loadSlots, parseSlots } from "../src/slots"
-import { globalLockRoot } from "../src/lease"
+import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation } from "../src/lease"
+import { stageUserPreparation } from "../src/user-environment"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
@@ -182,6 +183,80 @@ test("SlotLease: release needs confirmed cleanup bound to this slot token and se
     expect(next.token).not.toBe(lease.token)
     await next.close()
   } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("SlotLease: recovery adopts a dead owner's complete slot inventory without admitting a new run", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireSlotLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+      const file=${JSON.stringify(file)};const lease=await acquireSlotLease(file,file.slots[0],${JSON.stringify(identity)},${JSON.stringify(lockRoot)});
+      console.log(lease.receipt);await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    const incident = (await new Response(child.stdout).text()).trim()
+    const original = await readLeaseReceipt(incident) as { token: string; resources: { key: string; token: string; revision: number }[] }
+    const lease = await recoverSlotLease(file, file.slots[0]!, identity, incident, lockRoot)
+    try {
+      expect(lease.recoveryOnly).toBe(true)
+      expect(lease.token).not.toBe(original.token)
+      await lease.assertHeld()
+      await expect(stageUserPreparation(file, lease, "e".repeat(64))).rejects.toThrow("SLOT_RECOVERY_ONLY")
+      const recovered = await readLeaseReceipt(lease.receipt) as { state: string; incident: string; resources: { key: string; token: string }[] }
+      expect(recovered).toMatchObject({ state: "recovery-only", incident })
+      expect(recovered.resources).toHaveLength(2)
+      for (const resource of original.resources) {
+        const current = await readResourceReservation({ key: resource.key, lockRoot })
+        expect(current).toMatchObject({ state: "recovery-only", revision: resource.revision + 1,
+          lineage: [{ token: resource.token, revision: resource.revision, identity }] })
+      }
+      await expect(acquireSlotLease(file, file.slots[0]!, identity, lockRoot)).rejects.toThrow("BUSY")
+    } finally { await lease.close() }
+    await expect(acquireSlotLease(file, file.slots[0]!, identity, lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("SlotLease: recovery refuses a live controller without changing either reservation", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  const lease = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+  try {
+    const manifest = await readLeaseReceipt(lease.receipt) as { resources: { receipt: string }[] }
+    const before = await Promise.all(manifest.resources.map(resource => Bun.file(resource.receipt).text()))
+    await lease.close()
+    await expect(recoverSlotLease(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("BUSY")
+    expect(await Promise.all(manifest.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("SlotLease: the original incident resumes recovery after the recovery controller exits", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  const module = JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))
+  try {
+    const original = Bun.spawn([process.execPath, "-e", `const {acquireSlotLease}=await import(${module});const file=${JSON.stringify(file)};
+      const lease=await acquireSlotLease(file,file.slots[0],${JSON.stringify(identity)},${JSON.stringify(lockRoot)});console.log(lease.receipt);await lease.close()`],
+      { stdout: "pipe", stderr: "pipe" })
+    expect(await original.exited).toBe(0)
+    const incident = (await new Response(original.stdout).text()).trim()
+    const recovery = Bun.spawn([process.execPath, "-e", `const {recoverSlotLease}=await import(${module});const file=${JSON.stringify(file)};
+      const lease=await recoverSlotLease(file,file.slots[0],${JSON.stringify(identity)},${JSON.stringify(incident)},${JSON.stringify(lockRoot)});console.log(lease.receipt);await lease.close()`],
+      { stdout: "pipe", stderr: "pipe" })
+    expect(await recovery.exited).toBe(0)
+    const previous = (await new Response(recovery.stdout).text()).trim()
+    const lease = await recoverSlotLease(file, file.slots[0]!, identity, incident, lockRoot)
+    try {
+      await lease.assertHeld()
+      const manifest = await readLeaseReceipt(lease.receipt) as { resources: { key: string }[] }
+      for (const resource of manifest.resources) {
+        const current = await readResourceReservation({ key: resource.key, lockRoot })
+        expect(current).toMatchObject({ revision: 3, state: "recovery-only" })
+        expect(current!.lineage.map(entry => entry.journal)).toEqual([path.join(file.controller.stateDir, "run-journal.json"), previous])
+      }
+    } finally { await lease.close() }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
 })
 
 test("SlotLease: different containers cannot bypass a shared canonical profile guard", async () => {

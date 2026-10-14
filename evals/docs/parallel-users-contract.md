@@ -5,6 +5,11 @@
 нормативен до изменения кода; наличие документа не подтверждает готовность v2.
 Private CleanupReceipt включает leaseToken/serverEpoch: release сверяет их с
 текущим SlotLease; close только освобождает OS guards, сохраняя reservations.
+`recoverSlotLease` принимает исходный slot manifest только через текущую проверенную
+lineage и CAS каждого user/profile resource. Его `recoveryOnly=true` запрещает
+новое provisioning и probe admission. Незавершённый recovery сохраняет reservations;
+повтор от исходного incident возможен после подтверждённого выхода владельца.
+Это primitive владения: публичная recovery-команда и terminal cleanup ещё открыты.
 Фактические проверки и ограничения записываются в [runbook](../../docs/testing/loginom-ai-agent/parallel-evals.md).
 
 Resource sampler хранит неизвестные host/cgroup/container counters как null.

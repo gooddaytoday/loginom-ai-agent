@@ -1,8 +1,8 @@
 import path from "node:path"
 import { constants } from "node:fs"
-import { lstat, open, realpath } from "node:fs/promises"
+import { lstat, open, readFile, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { globalLockRoot } from "./lease"
+import { acquireResourceLease, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, writeLeaseReceipt } from "./lease"
 
 export type SlotDefinition = {
   id: string
@@ -26,6 +26,7 @@ export type SlotLease = {
   identity: ServerIdentity
   receipt: string
   token: string
+  recoveryOnly: boolean
   assertHeld(): Promise<void>
   close(): Promise<void>
   release(cleanupReceipt: string): Promise<void>
@@ -110,7 +111,6 @@ export async function loadResourceSlots(file: string) {
 export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease> {
   if (!file.slots.some(candidate => candidate.id === slot.id && candidate.username === slot.username && candidate.profileDir === slot.profileDir &&
     candidate.workspaceRoot === slot.workspaceRoot && candidate.historyDir === slot.historyDir)) throw new EvalFailure("SLOT_NOT_CONFIGURED", 2)
-  const { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } = await import("./lease")
   const journal = path.join(file.controller.stateDir, "run-journal.json")
   const commandId = text(record(await Bun.file(journal).json()).commandId)
   const resources = [] as Awaited<ReturnType<typeof acquireResourceLease>>[]
@@ -122,20 +122,7 @@ export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, ide
     const manifest = { version: 2, token, slot, identity, commandId, resources: resources.map(resource => ({ receipt: resource.receipt,
       key: resource.reservation.key, token: resource.reservation.token, revision: resource.reservation.revision })) }
     await writeLeaseReceipt(receipt, { ...manifest, state: "retained" })
-    return { slot, identity, receipt, token, async assertHeld() { await Promise.all(resources.map(resource => resource.assertHeld())) },
-      async close() { await Promise.all(resources.map(resource => resource.close())) }, async release(cleanupReceipt: string) {
-      const evidence = record(await readLeaseReceipt(cleanupReceipt))
-      if (evidence.status !== "confirmed" || evidence.slotId !== slot.id || evidence.leaseToken !== token || evidence.serverEpoch !== identity.serverEpoch ||
-        evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || evidence.archive !== "committed" ||
-        evidence.storageDeletionAllowed !== true || evidence.nextAdmissionAllowed !== true) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
-      for (const resource of resources) {
-        const proof = `${receipt}.${new Bun.CryptoHasher("sha256").update(resource.reservation.key).digest("hex")}.released.json`
-        await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: resource.reservation.key, token: resource.reservation.token,
-          revision: resource.reservation.revision, cleanupReceipt, serverEpoch: identity.serverEpoch })
-        await resource.release(proof)
-      }
-      await writeLeaseReceipt(receipt, { ...manifest, state: "released", cleanupReceipt })
-    } }
+    return slotLease(receipt, manifest, resources)
   } catch (error) {
     // No session, process or user storage has been admitted by this function.
     try {
@@ -148,6 +135,86 @@ export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, ide
     } finally { await Promise.all(resources.map(resource => resource.close())) }
     throw error
   }
+}
+
+export async function recoverSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, incident: string, lockRoot: string): Promise<SlotLease> {
+  if (path.dirname(incident) !== file.controller.stateDir || path.resolve(incident) !== incident)
+    throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
+  const original = record(await readLeaseReceipt(incident))
+  if (original.version !== 2 || original.state !== "retained" || typeof original.token !== "string" || !original.token ||
+    path.basename(incident) !== `slot-${slot.id}-${original.token}.lease.json` ||
+    JSON.stringify(original.slot) !== JSON.stringify(slot) || JSON.stringify(original.identity) !== JSON.stringify(identity) ||
+    !file.slots.some(candidate => JSON.stringify(candidate) === JSON.stringify(slot)) || !Array.isArray(original.resources) || original.resources.length !== 2)
+    throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
+  const journal = path.join(file.controller.stateDir, "run-journal.json")
+  if (record(await readLeaseReceipt(journal)).commandId !== original.commandId) throw new EvalFailure("SLOT_RECOVERY_LINEAGE_INVALID", 2)
+  const keys = [`user:${identity.containerId}:${slot.username}:0`, `profile:${await canonicalPath(slot.profileDir)}`].sort()
+  const inventory = await Promise.all(original.resources.map(async (value, index) => {
+    const source = record(value)
+    if (source.key !== keys[index] || source.receipt !== path.join(lockRoot, `${new Bun.CryptoHasher("sha256").update(keys[index]!).digest("hex")}.reservation.json`) ||
+      typeof source.token !== "string" || !source.token || !Number.isSafeInteger(source.revision) || Number(source.revision) < 1)
+      throw new EvalFailure("SLOT_RECOVERY_LINEAGE_INVALID", 2)
+    const current = await readResourceReservation({ key: keys[index]!, lockRoot })
+    const chain = current && [...current.lineage, current]
+    const position = chain?.findIndex(entry => entry.token === source.token && entry.revision === source.revision)
+    if (!current || current.state === "released" || position === undefined || position < 0 ||
+      chain![position]!.journal !== journal || chain![position]!.commandId !== original.commandId ||
+      chain!.slice(position).some(entry => JSON.stringify(entry.identity) !== JSON.stringify(identity)))
+      throw new EvalFailure("SLOT_RECOVERY_LINEAGE_INVALID", 2)
+    for (const entry of chain!.slice(position + 1)) {
+      const recovery = record(await readLeaseReceipt(entry.journal))
+      if (path.dirname(entry.journal) !== file.controller.stateDir || recovery.kind !== "slot-recovery" ||
+        recovery.incident !== incident || recovery.incidentToken !== original.token || recovery.commandId !== entry.commandId ||
+        JSON.stringify(recovery.identity) !== JSON.stringify(identity) || JSON.stringify(recovery.slot) !== JSON.stringify(slot))
+        throw new EvalFailure("SLOT_RECOVERY_LINEAGE_INVALID", 2)
+    }
+    const bootId = (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()
+    if (current.owner.uid !== process.getuid?.()) throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
+    const owner = current.owner.bootId === bootId ? await readFile(`/proc/${current.owner.pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
+    }) : undefined
+    if (owner && owner.slice(owner.lastIndexOf(")") + 2).split(" ")[19] === current.owner.starttime) throw new EvalFailure("BUSY", 2)
+    return { current, source }
+  }))
+  const commandId = crypto.randomUUID(), token = crypto.randomUUID()
+  const receipt = path.join(file.controller.stateDir, `slot-${slot.id}-${token}.recovery.json`)
+  const manifest = { version: 2, kind: "slot-recovery", token, slot, identity, commandId, incident, incidentToken: original.token,
+    resources: [] as { receipt: string; key: string; token: string; revision: number }[] }
+  await writeLeaseReceipt(receipt, { ...manifest, state: "intent" })
+  const resources = [] as Awaited<ReturnType<typeof acquireResourceLease>>[]
+  try {
+    for (const entry of inventory) {
+      const resource = await recoverResourceLease({ key: entry.current.key, lockRoot, journal: receipt, commandId, identity },
+        { token: entry.current.token, revision: entry.current.revision, incidentToken: String(entry.source.token) })
+      resources.push(resource)
+      manifest.resources.push({ receipt: resource.receipt, key: resource.reservation.key, token: resource.reservation.token, revision: resource.reservation.revision })
+      await writeLeaseReceipt(receipt, { ...manifest, state: "recovery-only" })
+    }
+    return slotLease(receipt, manifest, resources)
+  } catch (error) {
+    await Promise.all(resources.map(resource => resource.close()))
+    throw error
+  }
+}
+
+function slotLease(receipt: string, manifest: { version: number; token: string; slot: SlotDefinition; identity: ServerIdentity; commandId: string;
+  resources: { receipt: string; key: string; token: string; revision: number }[]; incident?: string }, resources: Awaited<ReturnType<typeof acquireResourceLease>>[]): SlotLease {
+  return { slot: manifest.slot, identity: manifest.identity, receipt, token: manifest.token, recoveryOnly: Boolean(manifest.incident),
+    async assertHeld() { await Promise.all(resources.map(resource => resource.assertHeld())) },
+    async close() { await Promise.all(resources.map(resource => resource.close())) }, async release(cleanupReceipt: string) {
+    const evidence = record(await readLeaseReceipt(cleanupReceipt))
+    if (evidence.status !== "confirmed" || evidence.slotId !== manifest.slot.id || evidence.leaseToken !== manifest.token || evidence.serverEpoch !== manifest.identity.serverEpoch ||
+      evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || evidence.archive !== "committed" ||
+      evidence.storageDeletionAllowed !== true || evidence.nextAdmissionAllowed !== true) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+    for (const resource of resources) {
+      const proof = `${receipt}.${new Bun.CryptoHasher("sha256").update(resource.reservation.key).digest("hex")}.released.json`
+      await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: resource.reservation.key, token: resource.reservation.token,
+        revision: resource.reservation.revision, cleanupReceipt, serverEpoch: manifest.identity.serverEpoch })
+      await resource.release(proof)
+    }
+    await writeLeaseReceipt(receipt, { ...manifest, state: "released", cleanupReceipt })
+  } }
 }
 
 async function requirePrivatePath(value: string, file: boolean): Promise<void> {
