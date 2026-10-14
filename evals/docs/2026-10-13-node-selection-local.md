@@ -34,6 +34,11 @@ Candidate: девять отдельных policy-v2 PASS; все шесть с�
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
+Отдельный descriptive baseline-v2 summary `43ca1ffe…`: policy2PASS/1violated/
+1insufficient, аналитика3correct/1notobtained, normalcompletion3/technicalfailure1.
+ABC использовал два JS-узла при верном расчёте; его нарушение в старом skill
+не является нарушением candidate и не задаёт порог приёмки. Новые sidecars
+ссылаются на исходные proofs, не переписывая audit/attempt/verdict.
 
 Собственная user:209 автоматически закрыта15:03:04.387Z; два свежих снимка
 диспетчера подтвердили отсутствие user-сессий. Admin210 вышел, браузер закрыт,
