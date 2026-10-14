@@ -1,5 +1,32 @@
 # Блокеры parallel evals
 
+## Положительная SessionBackup policy остаётся неквалифицированной
+
+2026-10-15 research: native PackageAutoSavePeriod=5000 read-back + named package
+с реальным изменением создали ненулевой `UserStorage/eval-a/backup-probe.lgp.autosave`.
+SessionBackupManager.GetSessionsList остался пуст, физический SessionBackup пуст
+до и после штатного stop собственной disposable pair. Другие проверенные recipes:
+несохранённый module, own pagehide fault, short SessionKeepAlive/read-back и новый
+user context. Они также не дали положительного session backup; это не доказывает
+отсутствие поддержки платформой. Native roots: UserStorage/SessionBackup, relative
+к рабочему каталогу. Drafts не autosave по официальной документации.
+
+Startup race подтверждён fixed BACKUP_DRIFT telemetry: MainForm поздно применяет
+сохранённый user autosave period. Published end-of-initialization callback wait
+сохранил исходный deadline и убрал этот drift. Named autosave теперь имеет
+private bytes/SHA + current identity/user/session/period evidence; safe A/B cleanup
+и SessionBackup mapping/delete/enforced-disabled всё ещё не квалифицированы.
+
+Следующая нужная информация — фактический server-side trigger создания session
+backup для закреплённого 7.4.2, либо положительно квалифицируемый enforced-disabled
+режим. Нужны ненулевой control и user/session attribution; empty root не снимает
+admission gate. Production ledger не принимает experimental backup phase,
+main/live/model admission остаются закрыты. Независимые задачи продолжаются.
+
+Источники: https://help.loginom.ru/userguide/interface/packages.html и
+https://help.loginom.ru/adminguide/linux/server/config.html; первичный
+MainForm.js:1133–1140/PackagesAutoSavePanel.js:50–58 закреплённого Studio.
+
 ## Draft admission fixture: retained unused slot reservation
 
 2026-10-14: /tmp/evals-admin-user-e3H9B4, own research nonce

@@ -182,3 +182,37 @@ API shape; actual calls ещё не проверены. MainForm.js:1133–1135 
 PackagesAutoSavePanel.js:50–58 переводят минуты в milliseconds и используют -1
 для disabled. Период должен быть прочитан обратно; источник сам по себе не
 доказывает ненулевой backup, его user isolation, GUID mapping или safe deletion.
+
+2026-10-15 autosave/SessionBackup distinction: named package + material change
+and read-back PackageAutoSavePeriod5000 produced a nonzero `.lgp.autosave` in
+its actual eval-a user directory. An unnamed empty module was not a positive
+backup control. Official documentation states drafts are excluded from autosave:
+https://help.loginom.ru/userguide/interface/packages.html .
+
+First experiment timed out; fixed telemetry + per-sample period read-back then
+caught BACKUP_DRIFT. MainForm.DoServerPrepare applies browser storage period
+late, after publishing Session. Waiting for its published
+Markdown.OnLoadAllowedLinkURLs assignment (MainForm.js:1133–1140) before setting
+period retained the original deadline and removed this race in the controlled
+probe. Cadence is period/4 and observation spans2 read-back periods. No tight
+RPC poll to fill a timer window.
+
+SessionBackupManager list and actual SessionBackup stayed empty through named
+and unnamed recipes, suppressed pagehide, short keepalive/new context and a
+controlled graceful stop of only the disposable Server. These are negative
+controls of those recipes; no unsupported-platform conclusion or disabled-policy
+proof follows. Native storage roots are relative UserStorage/SessionBackup;
+configuration resolves them from the working directory per official server docs:
+https://help.loginom.ru/adminguide/linux/server/config.html .
+
+Separate native backup research test copies actual autosave bytes/SHA, preserves
+native reply/process/source/physical directory observations, and records
+sessionBackupQualified:false. Its successful autosave/control assertions do not
+replace the still missing positive SessionBackup/enforced-disabled gate. See
+root eval_parallel_blockers.md. Own pair is destroyed after local process proof;
+no shared/development server stop, files or credentials are involved.
+
+Final current native/admin/slots/lease/user/preflight107 PASS/504 (135.67s),
+typecheck/diff PASS. Latest successful autosave/empty-backup evidence:
+`research/evidence/native-user-4e84ecb4-b1ee-4197-85d6-d2fdae1d7512` (actual bytes/SHA,
+current identity/user/session/period, shutdown backup copy, process proof).
