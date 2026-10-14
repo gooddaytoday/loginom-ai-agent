@@ -234,25 +234,36 @@
       "name": "input.csv",
       "bytes": 124,
       "sha256": "0e0151318f8307267dc1ed61b396c869303331dc8f1831cac8b7b5a73d2e2e4b",
+      "csv_format": {
+        "delimiter": ";",
+        "decimal_separator": ".",
+        "null_marker": "NULL",
+        "text_qualifier": "\""
+      },
       "columns": [
         {
           "name": "Id",
+          "label": "Id",
           "type": "integer"
         },
         {
           "name": "Category",
+          "label": "Category",
           "type": "string"
         },
         {
           "name": "Code",
+          "label": "Code",
           "type": "integer"
         },
         {
           "name": "Amount",
+          "label": "Amount",
           "type": "real"
         },
         {
           "name": "Keep",
+          "label": "Keep",
           "type": "string"
         }
       ]
@@ -261,21 +272,31 @@
       "name": "partial-input.csv",
       "bytes": 67,
       "sha256": "e195cdcbcc187601a822f31e26fc7d55f9507c66c51cb9e9d799d785649a1123",
+      "csv_format": {
+        "delimiter": ";",
+        "decimal_separator": ".",
+        "null_marker": "NULL",
+        "text_qualifier": "\""
+      },
       "columns": [
         {
           "name": "A",
+          "label": "A",
           "type": "string"
         },
         {
           "name": "A_Replace",
+          "label": "A_Replace",
           "type": "string"
         },
         {
           "name": "B",
+          "label": "B",
           "type": "string"
         },
         {
           "name": "C",
+          "label": "C",
           "type": "string"
         }
       ]

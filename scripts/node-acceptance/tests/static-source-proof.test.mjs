@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {verifyGeneratedCollapseMapping} from '../static-source-proof.mjs';
+import {verifyGeneratedCollapseMapping,verifyStaticImportFormat} from '../static-source-proof.mjs';
 test('generated Collapse definition requires complete native canonical schema without mapping or exclusion',()=>{
  const schema=[{name:'Key',label:'Key',type:'string'},{name:'Values',label:'Значения',type:'variant'}];
  const mapping={verified:true,inventory_complete:true,source_fields:[],target_fields:schema.map(f=>({...f,source:null,inherited:false,excluded:false}))};
@@ -11,4 +11,20 @@ test('generated Collapse definition requires complete native canonical schema wi
   m=>m.target_fields[1].inherited=true,m=>m.target_fields[1].source={record_id:'other'}]){
   const bad=structuredClone(mapping);mutate(bad);assert.throws(()=>verifyGeneratedCollapseMapping(bad,schema));
  }
+});
+
+test('cold CSV format is bound to the downloaded fixture; legacy default stays strict',()=>{
+ const legacy={delimiter:',',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
+ const replacement={...legacy,delimiter:';',null_marker:'NULL'};
+ assert.equal(verifyStaticImportFormat(legacy),true);
+ assert.equal(verifyStaticImportFormat(replacement,replacement),true);
+ assert.throws(()=>verifyStaticImportFormat(replacement));
+ assert.throws(()=>verifyStaticImportFormat(legacy,replacement));
+ for(const key of Object.keys(replacement)){
+  assert.throws(()=>verifyStaticImportFormat({...replacement,[key]:'foreign'},replacement));
+  const missing={...replacement};delete missing[key];
+  assert.throws(()=>verifyStaticImportFormat(missing,replacement));
+  assert.throws(()=>verifyStaticImportFormat(replacement,missing));
+ }
+ assert.throws(()=>verifyStaticImportFormat({...replacement,unknown:true},replacement));
 });

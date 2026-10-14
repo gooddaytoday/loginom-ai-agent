@@ -13,9 +13,17 @@ export function verifyGeneratedCollapseMapping(mapping,schema){
  return true;
 }
 
+const legacyCsvFormat={delimiter:',',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
+export function verifyStaticImportFormat(format,assigned=legacyCsvFormat){
+ const keys=['delimiter','decimal_separator','null_marker','text_qualifier'];
+ need(format&&assigned&&Object.keys(format).length===keys.length&&Object.keys(assigned).length===keys.length
+  &&keys.every(k=>typeof assigned[k]==='string'&&format[k]===assigned[k]),'CSV parser differs');
+ return true;
+}
+
 // Read settings and cancel each wizard. No CrossTable configure handler, private
 // model receipts, supplied subtype declarations or aggregate results are used.
-export async function observeStaticSources({load,graph,channelFor,account,revealSource}){
+export async function observeStaticSources({load,graph,channelFor,account,revealSource,expectedSources}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {isTextImportSourceReady}=await load('client/lib/text-import-procedure.mjs');
@@ -72,11 +80,12 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
    const observed=Object.fromEntries(['delimiter','decimal_separator','null_marker','text_qualifier'].map(k=>[k,s.wizard.settings.fields[k].value]));
    // The pinned format editors expose localized option labels, as in the
    // existing import procedure. Accept only the exact assigned CSV options.
-   const format={delimiter:observed.delimiter==='Запятая'?',':observed.delimiter,
+   const format={delimiter:observed.delimiter==='Запятая'?',':observed.delimiter==='Точка с запятой'?';':observed.delimiter,
     decimal_separator:observed.decimal_separator==='Точка (.)'?'.':observed.decimal_separator,
     text_qualifier:observed.text_qualifier==='Двойная кавычка (")'?'"':observed.text_qualifier,
     null_marker:observed.null_marker};
-   need(format.delimiter===','&&format.decimal_separator==='.'&&format.null_marker==='?'&&format.text_qualifier==='"','CSV parser differs');
+   const formats=expectedSources?.map(f=>f.csv_format??legacyCsvFormat)??[legacyCsvFormat];
+   need(formats.some(f=>['delimiter','decimal_separator','null_marker','text_qualifier'].every(k=>format[k]===f[k])),'CSV parser differs');
    const closed=await closePreparedWizard(channel);need(closed.verified&&!closed.settings_applied,'import cancel');
    const output=await mapping(channel,'output');
    need(output.fields.every(f=>!f.excluded&&f.name===f.source_name),'renamed or excluded import source');
@@ -173,6 +182,7 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
    proofs.set(path,{destination:path,bytes:bytes.length,sha256,bytes_verified:true,download_completion_verified:true,provenance:'independent_server_file_download',fixture});
   }
   source.source=proofs.get(path);
+  verifyStaticImportFormat(source.configuration.format,source.source.fixture.csv_format);
   const observed=JSON.stringify(source.configuration.output_mapping.fields.map(f=>pick(f,['name','label','type'])));
   need([source.source.fixture.columns,...(source.source.fixture.output_orders??[])].some(cols=>observed===JSON.stringify(cols)),'source fixture schema differs');
  }
