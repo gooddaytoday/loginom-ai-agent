@@ -584,18 +584,31 @@ export async function createBridge(config, session, { browserTransport: managedB
         if(primary)throw primary.value;
         if(!file.closeComplete)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
       };
+      assertCaptureEvidenceBinding();
+      const original=captureEvidenceBinding;
       const bound=capturePublications.get(name);
-      if(bound&&(bound.bytes!==bytes||bound.directory!==session.directory||bound.sessionId!==session.metadata.sessionId))
+      if(!original)throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+      if(bound&&(bound.bytes!==bytes||bound.directory!==original.directory||bound.metadata!==original.metadata||bound.sessionId!==original.sessionId))
         throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
       if(bound?.pending){rememberCapturePersistence(Error('LOGINOM_CAPTURE_RENAME_UNKNOWN'),'rename');throw capturePersistencePrimary.value}
       if(!bound?.succeeded){
-        const temporary=join(session.directory,'.'+name+'-'+randomUUID()+'.tmp');
-        await persist(temporary,captureConstants.O_WRONLY|captureConstants.O_CREAT|captureConstants.O_EXCL|captureConstants.O_NOFOLLOW,true);
-        const publication={pending:true,succeeded:false,temporary,bytes,directory:session.directory,sessionId:session.metadata.sessionId};
-        capturePublications.set(name,publication);
+        // Retain the original temporary/destination before any IO await. A
+        // fulfilled close may expose drift; it cannot publish into a new tuple.
+        const publication=bound??{pending:false,succeeded:false,prepared:false,
+          temporary:join(original.directory,'.'+name+'-'+randomUUID()+'.tmp'),bytes,
+          directory:original.directory,metadata:original.metadata,sessionId:original.sessionId};
+        if(!bound){
+          capturePublications.set(name,publication);
+          await persist(publication.temporary,captureConstants.O_WRONLY|captureConstants.O_CREAT|captureConstants.O_EXCL|captureConstants.O_NOFOLLOW,true);
+          publication.prepared=true;
+        }
+        if(!publication.prepared)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
+        assertCaptureEvidenceBinding();
+        captureIOAssert?.();
+        publication.pending=true;
         let projection;
         const completion=new Promise((resolve,reject)=>{
-          try{projection=captureRename(temporary,join(session.directory,name),error=>{
+          try{projection=captureRename(publication.temporary,join(publication.directory,name),error=>{
             publication.pending=false;
             if(error===null||error===undefined){publication.succeeded=true;resolve()}
             else{publication.failure={value:error};reject(error)}
@@ -604,7 +617,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         try{await Promise.all([completion,projection])}
         catch(value){rememberCapturePersistence(value,'rename');throw capturePersistencePrimary.value}
       }
-      await persist(session.directory,captureConstants.O_RDONLY|captureConstants.O_DIRECTORY|captureConstants.O_NOFOLLOW,false);
+      assertCaptureEvidenceBinding();
+      await persist(original.directory,captureConstants.O_RDONLY|captureConstants.O_DIRECTORY|captureConstants.O_NOFOLLOW,false);
       if(captureWriters.size)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
     }
     function assertCaptureEvidenceBinding() {
