@@ -1,24 +1,32 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии20:20:09.003Z: first-last-touch/1 closed20:04:25.456Z.
-Policy-v2 PASS `01e41281…`, mandatory failure review `558b2433…`: полная
-история40messages/147parts/42tools/125events/3362runtime,7standard success,
-JS0/childrennone. Import→Calculator last-touch→две Group→Join→Reform→Sort
-выполнены стандартными узлами; технический отказ Export не подменён JavaScript.
-CSV/LGP не получены, CLI1/cleanupfalse; export-1/2 NOT_APPLIED без эффекта,
-export-3 AMBIGUOUS/effecttrue с OUTPUT_PORT_OPEN_UNCONFIRMED.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты три candidate,
+политика подтверждена в трёх; один итоговый расчёт правильный, два результата
+не получены. Одна сессия завершена штатно, две освобождены адресно после отказа.
+Сейчас monthly-demand/1 выполняется с20:25:31.229Z, CLI3071140;
+runner3040743/exec71139 продолжает последовательную серию. Ещё21candidate не начат.
+
+Sales-by-category/1 closed20:25:22.530Z: policy PASS, oracle/calculationtrue,
+CLI0/cleanuptrue/Host3041636ACKtrue. Sidecar `2172b404…`: полные16messages/
+62parts/18completedtools/52events/1846runtime; четыре стандартных SUCCEEDED
+Import→Group→Sort→Export, JS0/childrennone/historyAnomalyfalse.
+35protected/4copied hashes неизменны. Повторного oracle или live-запуска не было;
+runner автоматически перешёл к Monthly после gate, без ручной паузы.
+
+First-last-touch/1 closed20:04:25.456Z: policy PASS `01e41281…`, mandatory failure
+review `558b2433…`; полные40messages/147parts/42tools/125events/3362runtime,
+семь выполненных стандартных узлов, JS0/childrennone. Итоговые CSV/LGP не получены,
+CLI1/cleanupfalse; Export3 остался AMBIGUOUS с OUTPUT_PORT_OPEN_UNCONFIRMED.
 Own237 closed20:16:54.921Z, adminlogout20:16:56.536Z, wholebrowserclosed20:17:09.291Z;
-9PIDgone, guardino8014768/mtime1792007680957.482 сохранён при архивировании.
-18original/24recovery неизменны; descriptor `b5f74132…`/independent review `14754876…`/
-finalreadback `40deba3c…`. Actual publicgate20:19:39.569Z разрешил
-advance TECHNICAL_FAILURE_RECORDED; originalCLI1/cleanupfalse не повышены до PASS.
-Sales-by-category/1 выполняется с20:20:09.003Z, CLI3041328;
-runner3040743/exec71139 возобновлён20:19:56.762049Z. Новая серия:2closed/2policyPASS,
-0correct/2notobtained,0normal/2manualreleased/0releasepending,+1active/22unstarted.
-Baseline6references, frozen sources/protocol/criteria и исходные отказы неизменны.
-JS/gap/recovery ещё впереди; общая policy acceptance не завершена.
-Отдельный metadata erratum `4af5dab4…` сохраняет raw Export cause и верный Sales slot,
-не переписывая запечатанные descriptor/command metadata.
+9PIDgone, точный guard архивирован,18original/24recovery неизменны.
+Descriptor `b5f74132…`/independent review `14754876…`/finalreadback `40deba3c…`;
+public gate20:19:39.569Z разрешил TECHNICAL_FAILURE_RECORDED. Original FAIL сохранён.
+Отдельный metadata erratum `4af5dab4…`/review `370231fb…` уточняет две описательные
+метки; запечатанные descriptor/command и действительная команда не изменены.
+
+Baseline6references, frozen sources/protocol/criteria и runtime неизменны.
+Проверки JS-исключений, recovery и seeded3 стандартных успехов ещё впереди;
+общая приёмка политики и достаточность полного покрытия пока не подтверждены.
 
 Исторический checkpoint ABC/1: closed19:32:25.838Z. Отдельный
 policy-v2 PASS `d46e66c0…`, mandatory failure review `a9d05ad9…`:full32messages/
