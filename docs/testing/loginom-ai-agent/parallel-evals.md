@@ -724,3 +724,17 @@ globalLockRoot в protected paths. Profile root, совпадающий с guard
 validation используют общую проверку. 94 slots/config/sandbox/environment tests/
 308 assertions PASS (19.21s), typecheck/diff PASS. Unit CI не создаёт/меняет fixed
 /var/lib root; legacy/dev/чужие guards не затронуты.
+
+
+Offline recovery operator CLI: `recover --config --incident --out` читает
+актуальную reservation/lineage и использует original command incident; token и
+revision не передаются в argv. Fixed global lock root не меняется через env.
+Actual private mount/network namespace связывает только собственный lock root
+с /var/lib/loginom-evals/locks; host PID namespace сохранён для birth comparison.
+Отдельный /dev обязателен в fixture: без него Bun startup panic стабилен 3/3,
+с --dev /dev минимальные startup controls и recovery проходят. Host guards и
+чужие процессы не изменены. CLI releases после recovery-only retry, сохраняет
+calibration/calls; terminal resolver replay после нового run оставляет current
+reservation bytes без изменений. 41 tests/216 assertions PASS (32.78s),
+typecheck/diff PASS. Это nonmodel closed-proof offline recovery; slot/admin и
+active-child recovery, полная prepare/verify/status и live auth не квалифицированы.
