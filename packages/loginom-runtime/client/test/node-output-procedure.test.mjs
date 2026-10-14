@@ -98,7 +98,7 @@ test('wide precision readback visits stored fields once without returning to col
    selected_numeric:selected===null?null:{source_index:selected,name_key:'F'+selected,...Object.fromEntries(Object.entries(draft).map(([k,value])=>[k,{status:'observed',value,input_ref:k}]))}}},
    ui:{dialogs:open?['format']:[],elements:[...fields().map(f=>control('f'+f.index,{table_field:f})),control('format_string'),control('table;ModalWindow_BrowseFormat;btnApply')]},
    node_outputs:{tables:[{active:true,view_guid:'view'}]}});
-  const channel={observe:async o=>{offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
+  const channel={observe:async o=>{if(o.condition==='Table numeric mask draft matches'||o.condition==='Table numeric mask applied to draft')assert.equal(o.timeoutMs,60000);offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
    const s=state();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);
    if(/^f\d+$/.test(a.ref)){
     if(selected!==null)stored[selected]={...draft, ...(corrupt&&selected===12?{format_string:'0.00'}:{})};

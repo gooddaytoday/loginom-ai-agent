@@ -722,3 +722,9 @@ test('ordinary observation keeps the fifteen second ceiling',async()=>{
  const f=fixture();await assert.rejects(f.channel.observe({condition:'ordinary',ready:()=>true,timeoutMs:60000}),/bounded readiness/);
  assert.equal(f.records.length,0);assert.ok(!f.events.includes('mutated'));
 });
+
+test('format window refuses an unbound or foreign dialog before recording',async()=>{
+ for(const extra of [{tableFormatPage:{offset:0,limit:8}},{tableFormatPage:{offset:0,limit:8},tableDialog:{kind:'filter'}}]){
+  const f=fixture();await assert.rejects(f.channel.observe({condition:'format',ready:()=>true,timeoutMs:60000,...extra}),/bounded readiness/);assert.equal(f.records.length,0);assert.ok(!f.events.includes('mutated'));
+ }
+});

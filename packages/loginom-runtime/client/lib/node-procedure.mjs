@@ -218,7 +218,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
-        || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > (readProcesses ? 60000 : 15000)) {
+        || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > (readProcesses || tableFormatPage && tableDialog?.kind==='format' ? 60000 : 15000)) {
         throw new Error('A named, bounded readiness condition is required');
       }
       readOutputs ||= !!tablePage || !!tableDialog;

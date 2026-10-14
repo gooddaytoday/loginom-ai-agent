@@ -108,7 +108,7 @@ export function verifyTableDateTimeFormat(observed,target) {
 
 export async function configureTablePrecision(channel,table,{alreadyOpen=false,restore=null}={}) {
   const dialog={table,kind:'format'};let offset=0,definition;
-  const read=(condition,ready=()=>true)=>channel.observe({condition,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.status==='observed'
+  const read=(condition,ready=()=>true)=>channel.observe({condition,timeoutMs:60000,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.status==='observed'
     &&s.table_settings.kind==='format'&&!!s.table_settings.format?.page?.schema_id&&(!definition||s.table_settings.format.page.schema_id===definition.schema_id)&&ready(s)});
   const field=s=>s.table_settings.format.selected_numeric??s.table_settings.format.selected_datetime;
   const action=(s,condition,resolve,identity)=>channel.perform({condition,initialObservation:s,ready:s=>s.table_settings?.format?.page?.schema_id===definition.schema_id,
@@ -215,7 +215,7 @@ export async function restoreEmptyDateTimeFormats(channel,table,targets,original
       return Math.floor(native.index/8)*8;
     };
     let offset=await open();
-    const read=condition=>channel.observe({condition,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.format?.selected_datetime?.source_index===target.index&&s.table_settings.format.selected_datetime.name_key===target.key});
+    const read=condition=>channel.observe({condition,timeoutMs:60000,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.format?.selected_datetime?.source_index===target.index&&s.table_settings.format.selected_datetime.name_key===target.key});
     const act=async(s,condition,resolve)=>channel.perform({condition,initialObservation:s,
       ready:s=>s.table_settings?.format?.selected_datetime?.source_index===target.index&&s.table_settings.format.selected_datetime.name_key===target.key,
       identity:()=>({table,target}),resolve});
