@@ -266,7 +266,9 @@ export async function createBridge(config, session, { browserTransport: managedB
           finally { queue.close(); }
         }
         session.metadata.archiveActive = archive?.active === true;
-        const connection = request.params.arguments?.checkConnections === false ? null : await diagnoseConnection(config);
+        const connection = request.params.arguments?.checkConnections === false ? null : await diagnoseConnection(config, {
+          headless: session.metadata.browserWindowMode === 'headless',
+        });
         return { content: [{ type: 'text', text: JSON.stringify({
         ...session.metadata, endpoint: config.endpoint, loginomUrl: config.loginomUrl, toolCatalogSha256: catalog.sha256,
         remoteTools: remoteTools.length, browserTools: browserTools.length,
