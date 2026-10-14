@@ -54,7 +54,7 @@ export function retainTerminalSourceStartup(message,state){
   parentSignalSameReference:false,loadPurpose:'sorting-terminal-source-v1',sourceBytesVerified:false,
   nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
  const token=Object.freeze({facts,
-  guard(){if(primary)throw primary.value;original.guard();if(Date.now()>=captureExpires)throw Error('LOGINOM_ORIGINAL_LOAD_EXPIRED');if(startups.get(state)!==token)fail();for(const check of checks)check();sourceRoutes.get(owner)?.check()},
+  guard(){if(primary)throw primary.value;original.guard();if(Date.now()>=captureExpires)throw Error('LOGINOM_ORIGINAL_LOAD_EXPIRED');if(startups.get(state)!==token)fail();for(const check of checks)check();sourceRoutes.get(owner)?.check();sourceWitnesses.get(owner)?.check()},
   reject(error){return remember(error)},
   async observed(work){let value;try{value=await work}catch(error){throw remember(error)}if(work===initTask)initSettled=true;token.guard();return value},
   bindOwner(value,originalProfile){token.guard();if(typeof originalProfile!=='string'||owner||loadData(state,'startupOwner')!==value||owners.has(value))fail();profile=originalProfile;owner=value;
@@ -70,7 +70,7 @@ export function retainTerminalSourceStartup(message,state){
   init(content){token.guard();if(initStarted||!page||typeof content!=='string'||(sourceRoutes.has(owner)&&!sourceRoutes.get(owner).ready()))fail();initStarted=true;
    try{initTask=Reflect.apply(methods.addInitScript,context,[{content}]);return initTask}catch(error){throw remember(error)}},
   admitPage(value,candidate){token.guard();if(value!==page||candidate!==loadData(input,'connection')||!initStarted||!initTask||!initSettled||navigationStarted)fail();navigationStarted=true},
-  inspect(){return Object.freeze({owner,profile,context,page,initTask,initStarted,initSettled,browserAdmitted,navigationStarted,facts,sourceResponses:sourceRoutes.get(owner)?.inspect()})},
+  inspect(){return Object.freeze({owner,profile,context,page,initTask,initStarted,initSettled,browserAdmitted,navigationStarted,facts,sourceResponses:sourceRoutes.get(owner)?.inspect(),scriptWitness:sourceWitnesses.get(owner)?.inspect()})},
  });
  startups.set(state,token);token.guard();return token;
 }
@@ -212,8 +212,10 @@ export async function prepareTerminalSourceResponses(owner){
    guard();if(!installed)fail();
    const request=hold(routeObject,'request')(),fetch=hold(routeObject,'fetch'),fulfill=hold(routeObject,'fulfill');abort=hold(routeObject,'abort');
    const urlReader=hold(request,'url'),method=hold(request,'method'),type=hold(request,'resourceType'),requestFrame=hold(request,'frame');
-   const url=urlReader(),pin=expected.get(url);
-   if(!pin||method()!=='GET'||type()!=='script'||requestFrame()!==frame||mainFrame()!==frame||seen.has(url))fail();seen.add(url);
+   const url=urlReader(),parsed=new URL(url);
+   if(parsed.hash||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search)))fail();
+   const pinUrl=parsed.origin+parsed.pathname,pin=expected.get(pinUrl);
+   if(!pin||method()!=='GET'||type()!=='script'||requestFrame()!==frame||mainFrame()!==frame||seen.has(pinUrl))fail();seen.add(pinUrl);
    checks.push(()=>{if(urlReader()!==url||method()!=='GET'||type()!=='script'||requestFrame()!==frame||mainFrame()!==frame)fail()});guard();
    const record={phase:'fetch',receipt:undefined};retained.push(record);
    const fetchTask=fetch({maxRedirects:0,maxRetries:0,timeout:Math.min(60000,load.facts.deadline-Date.now())});
@@ -233,7 +235,7 @@ export async function prepareTerminalSourceResponses(owner){
    record.phase='fulfill';
    const fulfillTask=fulfill({response,body:delivered,headers:copiedHeaders});await load.observed(fulfillTask);
    const finalDigest=await load.observed(crypto.subtle.digest('SHA-256',delivered));if(Buffer.from(finalDigest).toString('hex')!==pin.sha256)fail();
-   record.receipt=Object.freeze({url,bytes:pin.bytes,sha256:pin.sha256,request,response,fetchTask,bodyTask,digestTask,fulfillTask,frame,sourceExecutionQualified:false});record.phase='fulfilled';
+   record.receipt=Object.freeze({url,pinUrl,bytes:pin.bytes,sha256:pin.sha256,request,response,fetchTask,bodyTask,digestTask,fulfillTask,frame,sourceExecutionQualified:false});record.phase='fulfilled';
   }catch(error){
    const first=load.reject(error);
    // Abort this exact intercepted resource only. Never complete a task or replay a reader.
@@ -243,4 +245,43 @@ export async function prepareTerminalSourceResponses(owner){
  }
  try{guard();routeTask=route(pattern,handle);await load.observed(routeTask);installed=true;guard();return receipt.inspect()}
  catch(error){throw load.reject(error)}
+}
+
+const sourceWitnesses=new WeakMap();
+export async function bindTerminalScriptWitness(owner){
+ const load=terminalSourceForOwner(owner);if(!load)throw Error('LOGINOM_ORIGINAL_LOAD_UNAVAILABLE');load.guard();
+ if(sourceWitnesses.has(owner))fail();
+ const original=load.inspect(),responses=original.sourceResponses;
+ if(!responses?.responseBytesComplete){
+  const partial=Object.freeze({complete:false,reason:'SELECTED_RESPONSES_INCOMPLETE',projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false});
+  sourceWitnesses.set(owner,Object.freeze({check(){},inspect:()=>partial}));return partial;
+ }
+ const page=original.page;if(!original.navigationStarted||!original.initSettled||!page)fail();
+ let evaluate,definer,d;const chain=[];
+ for(let p=page;p;p=Object.getPrototypeOf(p)){chain.push([p,Object.getPrototypeOf(p)]);d=Object.getOwnPropertyDescriptor(p,'evaluate');if(d){definer=p;break}}
+ if(!d||!('value'in d)||typeof d.value!=='function')fail();evaluate=d.value;
+ let summaryCheck=()=>{},bound;
+ const check=()=>{let p=page;for(const[value,parent]of chain){if(p!==value||Object.getPrototypeOf(p)!==parent)fail();if(Object.hasOwn(p,'evaluate'))break;p=Object.getPrototypeOf(p)}
+  const now=Object.getOwnPropertyDescriptor(p,'evaluate');if(p!==definer||!now||Reflect.ownKeys(d).some(k=>!Object.is(now[k],d[k])))fail();summaryCheck()};
+ const phases={phase:'import',importTask:undefined,evaluateTask:undefined};
+ sourceWitnesses.set(owner,Object.freeze({check,inspect:()=>bound??Object.freeze({complete:false,reason:'WITNESS_PENDING',...phases,projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false})}));
+ try{
+  phases.importTask=import('../client/lib/terminal-script-witness.mjs');const module=await load.observed(phases.importTask);
+  const id=loadData(owner,'id'),account=loadData(owner,'account');phases.phase='evaluate';
+  phases.evaluateTask=Reflect.apply(evaluate,page,[module.collectTerminalScriptWitness,module.terminalScriptWitnessArguments(id,account)]);
+  const summary=await load.observed(phases.evaluateTask);summaryCheck=snapshot(summary);
+  if(loadData(summary,'id')!==id||loadData(summary,'account')!==account||loadData(summary,'projectionOnly')!==true
+    ||loadData(summary,'sourceExecutionQualified')!==false||loadData(summary,'closureIdentityQualified')!==false)fail();
+  const rows=loadData(summary,'rows');if(loadData(rows,'length')!==5)fail();
+  const kinds=['initial','modifier','ObjectProxy','FileStorage','StreamPersist'],paths=['bg/js/mscorlib.js','bg/js/bg.mscorlib.js','bg/js/rpc.js','bg/js/bg.rtl.rpc.js','bg/js/bg.rtl.rpc.js'],matches=[];
+  for(let i=0;i<5;i++){
+   const row=loadData(rows,String(i)),url=loadData(row,'url'),pinUrl='https://app.loginom.ai/app/'+paths[i];if(loadData(row,'kind')!==kinds[i])fail();
+   const matching=responses.records.filter(record=>record.url===url&&record.pinUrl===pinUrl);if(matching.length!==1)fail();
+   matches.push(Object.freeze({kind:kinds[i],url,pinUrl,responseReceipt:matching[0]}));
+  }
+  load.guard();phases.phase='compared';
+  bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
+   originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
+   sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
+ }catch(error){throw load.reject(error)}
 }

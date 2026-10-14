@@ -1,4 +1,4 @@
-import {terminalSourceForOwner,prepareTerminalSourceResponses} from './terminal-root-association.mjs'
+import {terminalSourceForOwner,prepareTerminalSourceResponses,bindTerminalScriptWitness} from './terminal-root-association.mjs'
 import { createRequire } from "node:module"
 import { mkdir, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
@@ -231,6 +231,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     const content=browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)
     await observed(sourceLoad?sourceLoad.init(content):owner.context.addInitScript({content}))
     const result=await observed(loginPage(owner.page,candidate,owner))
+    if(sourceLoad) await observed(bindTerminalScriptWitness(owner))
     if(!keepOpen) {await owner.close();return result}
     return {...result,context:owner.context}
   } catch(error) {
