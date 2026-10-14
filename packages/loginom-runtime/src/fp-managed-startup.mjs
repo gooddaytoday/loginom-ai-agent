@@ -77,5 +77,5 @@ export function assertAmountManagedStartup(retained,state) {
   const tuple=record.tuple;
   if(record.input.amountStartup!==tuple || !tuple.binding || tuple.purpose!=='amount-import-type-v1')
     throw Error('LOGINOM_AMOUNT_MANAGED_PROVIDER_UNAVAILABLE');
-  return {signal:record.controller.signal,deadline:tuple.deadline,operation:tuple.operation,request:tuple.request,binding:tuple.binding};
+  return {controller:record.controller,signal:record.controller.signal,deadline:tuple.deadline,operation:tuple.operation,request:tuple.request,binding:tuple.binding};
 }

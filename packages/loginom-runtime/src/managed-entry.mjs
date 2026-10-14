@@ -1,5 +1,5 @@
 import {retainAmountCaptureProxy} from './amount-capture-proxy.mjs'
-import {retainAmountManagedStartup} from "./fp-managed-startup.mjs"
+import {retainAmountManagedStartup,assertAmountManagedStartup} from "./fp-managed-startup.mjs"
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
@@ -462,7 +462,8 @@ async function handle(message) {
     if (message.operation === "acceptance.capture") {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
-      const controller = new AbortController()
+      const amount=!!state.amountCaptureProxy
+      const controller = amount ? assertAmountManagedStartup(state.controlledStartup,state).controller : new AbortController()
       state.controller = controller
       try {
         const result = await state.bridge.captureAcceptance({signal:controller.signal})
@@ -473,6 +474,7 @@ async function handle(message) {
           assertCaptureOwner(state.captureRetained)
           controller.signal.throwIfAborted()
         }
+        if(amount)state.bridge.assertAmountCompletion(result)
         send({id:message.id,result})
       } catch (rejected) {
         send({id:message.id,result:{cleanupComplete:false,refused:true,

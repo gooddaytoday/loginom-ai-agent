@@ -1,3 +1,4 @@
+import {retainAmountPreparation,assertAmountPreparation,beginAmountCompletion,retainAmountConsumerResult,sealAmountCompletion,assertAmountCompletion} from '../../src/amount-capture-lifecycle.mjs';
 import {assertAmountCaptureProxy,beginAmountCaptureProxy,rejectAmountCaptureAwait} from '../../src/amount-capture-proxy.mjs';
 import {captureControlledAmount,captureAmount} from '../../src/acceptance/amount-import-type-v1.mjs';
 import { assertCaptureOwner, capturePublication, assertCapturePublication, freezeCaptureResult } from '../../src/retained-capture.mjs';
@@ -184,7 +185,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   // Managed model runs derive teardown authority from guarded preparation and a
   // settled save on this bridge, never from a caller-supplied cleanup path.
   const managedCleanup = userProfile && config.mode === 'executor-replay';
-  let managedSave, cleanupRefused = false;
+  let managedSave, amountSaveOutcome, amountSavePreparation, amountSavePreparationBytes, amountPreparation, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
   const cleanupWriters = new Set();
   let cleanupEvidenceBinding, cleanupPersistencePrimary, cleanupPublication;
@@ -405,6 +406,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               validateActionParameters(definition.inputSchema,args);
             }
             if (!(request.params.name === 'dock_workspace_observe' && args.scope === 'bootstrap')) requirePreparedWorkspace(session.metadata);
+            const originalAmountSavePreparation=amountAdmission && request.params.name==='dock_action_run'
+              && ['package.save_as','package.save_checkpoint'].includes(args.action_key) ? session.metadata.workspacePreparation : undefined;
+            const originalAmountSaveBytes=originalAmountSavePreparation ? JSON.stringify(originalAmountSavePreparation) : undefined;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -422,6 +426,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             if ((managedCleanup || acceptanceCapture) && outcome.status === 'SUCCEEDED' && outcome.cleanup_complete === true
                 && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key) && outcome.output?.package_ref?.path) {
               const prepared=session.metadata.workspacePreparation?.state;
+              if(amountAdmission){amountSaveOutcome=outcome;amountSavePreparation=originalAmountSavePreparation;amountSavePreparationBytes=originalAmountSaveBytes;}
               managedSave={operationId:outcome.operation_id, sessionId:session.metadata.sessionId,
                 documentId:prepared?.document_id, tabTid:prepared?.workflow_ref?.tab_tid,
                 account:prepared?.loginom_account, packagePath:outcome.output.package_ref.path,
@@ -772,7 +777,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       const preparedAtCapture=session.metadata.workspacePreparation;
       const preparedBytes=registration?JSON.stringify(preparedAtCapture):undefined;
       const assertBound = () => {
-        if(amount)assertAmountCaptureProxy(amount,binding,signal);
+        if(amount){assertAmountCaptureProxy(amount,binding,signal);
+          if(amountPreparation)assertAmountPreparation(amountPreparation,preparedAtCapture,amountSaveOutcome);
+        }
         if (registration) {
           signal?.throwIfAborted();
           if(!signal || registration.mode!=='readonly' || typeof registration.validate!=='function'
@@ -798,6 +805,12 @@ export async function createBridge(config, session, { browserTransport: managedB
           throw Error('LOGINOM_CAPTURE_IDENTITY_REFUSED');
       };
       assertBound();
+      if(amount){
+        if(preparedAtCapture!==amountSavePreparation || JSON.stringify(preparedAtCapture)!==amountSavePreparationBytes)
+          throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_CHANGED');
+        amountPreparation=retainAmountPreparation(retained,preparedAtCapture,amountSaveOutcome);
+        beginAmountCompletion(amountPreparation,preparedAtCapture,amountSaveOutcome);
+      }
       captureConsumed=true;
       captureInFlight=browserGate(async () => {
         assertBound();
@@ -832,6 +845,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         if (!receipt || receipt.settings_applied !== false || receipt.cancel_verified !== true
             || Object.keys(identity).some(key => receipt[key] !== identity[key]))
           throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
+        if(amount)retainAmountConsumerResult(amountPreparation,receipt,preparedAtCapture,amountSaveOutcome);
         captureEvidence={binding,identity,receipt};
         captureUnknown=false;
         if(amount)captureIOAssert=assertBound;
@@ -848,11 +862,18 @@ export async function createBridge(config, session, { browserTransport: managedB
           return {receipt,diagnosticRead:true,cleanupComplete:false};
         }
         const closed=await closeBridge();
-        const cleanup=JSON.parse(await readFile(join(session.directory,'package-cleanup.json'),'utf8'));
+        const cleanupBytes=await readFile(join(capturePersistenceOrigin.directory,'package-cleanup.json'),'utf8');
+        const cleanup=JSON.parse(cleanupBytes);
         if (closed.cleanup_complete !== true || closed.browser_transport_closed !== true || cleanup.status !== 'SUCCEEDED'
             || cleanup.package_closed !== true || cleanup.logged_out !== true)
           throw Error('LOGINOM_CAPTURE_CLEANUP_UNCONFIRMED');
-        return {receipt,cleanup,cleanupComplete:true};
+        const result={receipt,cleanup,cleanupComplete:true};
+        if(amount){
+          const evidenceBytes=await readFile(join(capturePersistenceOrigin.directory,'acceptance-capture.json'),'utf8');
+          sealAmountCompletion(amountPreparation,result,{preparation:preparedAtCapture,save:amountSaveOutcome,
+            evidence:captureEvidence,evidenceBytes,receiptWritten:captureReceiptWritten,journalWritten:captureJournalWritten,closed,cleanupBytes});
+        }
+        return result;
       } catch (error) {
         cleanupRefused=true; captureRejected=true; captureRejection=error;
         try {
@@ -1122,6 +1143,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       return closing;
     }
     return {server,catalog,captureAcceptance,
+      assertAmountCompletion:result=>assertAmountCompletion(amountPreparation,result,session.metadata.workspacePreparation,amountSaveOutcome),
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};
