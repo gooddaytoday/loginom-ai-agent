@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readlink, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
-import { assessResourceCoverage } from "../src/parallel-acceptance"
+import { assessProcessResourceTimeline, assessResourceCoverage } from "../src/parallel-acceptance"
 import { superviseProcess } from "../src/process-supervisor"
 
 test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
@@ -44,11 +44,22 @@ test("resource sampling observes two admitted supervisors and retains B after dr
     expect((await sampleSupervisedResources()).scopes.find(scope => scope.owner.id === owners[0]!.id)?.processes?.every(item => item.verified)).toBe(true)
     const out = path.join(root, "resources.jsonl")
     const abortCollector = new AbortController()
-    const collecting = collectHostResources({ paths: [root], out, intervalMs: 20, runId: "owned-process-smoke", phase: "run",
+    const collecting = collectHostResources({ paths: [root], out, intervalMs: 1000, runId: "owned-process-smoke", phase: "run",
       signal: abortCollector.signal, processes: sampleSupervisedResources })
     try {
-      while (!await Bun.file(out).exists() || (await Bun.file(out).text()).split("\n").filter(Boolean).length < 2) {
-        if (Date.now() > deadline) throw Error("Owned process frames did not arrive")
+      const collectorDeadline = Date.now() + 8000
+      while (!await Bun.file(out).exists() || !(await Bun.file(out).text()).includes("\n")) {
+        if (Date.now() > collectorDeadline) throw Error("Owned process frames did not arrive")
+        await Bun.sleep(10)
+      }
+      const startedAt = new Date().toISOString()
+      while ((await Bun.file(out).text()).split("\n").filter(Boolean).length < 2) {
+        if (Date.now() > collectorDeadline) throw Error("Owned process frames did not arrive")
+        await Bun.sleep(10)
+      }
+      const finishedAt = new Date().toISOString()
+      while ((await Bun.file(out).text()).trim().split("\n").map(line => JSON.parse(line)).at(-1).host.observed_at < finishedAt) {
+        if (Date.now() > collectorDeadline) throw Error("Owned process bracket frame did not arrive")
         await Bun.sleep(10)
       }
       abortCollector.abort()
@@ -57,6 +68,9 @@ test("resource sampling observes two admitted supervisors and retains B after dr
       expect(rows[0].processes.producer_pid).toBe(process.pid)
       expect(owners.every(owner => rows.every(row => row.processes.scopes.some((scope: { owner: { id: string }; processes: { verified: boolean; rss_bytes: number }[] | null }) =>
         scope.owner.id === owner.id && scope.processes?.every(item => item.verified && item.rss_bytes > 0))))).toBe(true)
+      // This measured active subwindow does not claim a durable launch-to-exit receipt.
+      expect(assessProcessResourceTimeline({ samples: rows, intervalMs: 1000,
+        owners: expected.map(owner => ({ ...owner, startedAt, finishedAt })) })).toEqual({ status: "passed", codes: [] })
     } finally { abortCollector.abort(); await collecting }
     aborts[0]!.abort()
     while (!(await readers[0]!.read()).done) {}

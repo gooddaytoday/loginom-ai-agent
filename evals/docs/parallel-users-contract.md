@@ -29,6 +29,11 @@ Temporal policy требует ordered samples с неизменным interval 
 подтверждённого cleanup. Неизвестные clocks или неполное окно дают incomplete.
 Actual one-second owned-command smoke проверен; frozen manifest/coordinator
 и coverage всех actor lifetimes ещё требуют реализации.
+assessProcessResourceTimeline требует наблюдение exact owner/launcher birth с
+verified RSS/CPU в каждом frame внутри указанного окна, а также bracket/cadence.
+Missing scope или окно без наблюдений дают incomplete. Проверены два настоящих
+supervisor owner в измеренном active subwindow; durable launch-to-exit producer
+и подключение этого gate к coordinator ещё требуются.
 checkResourceEvidence читает единый verified bundle и возвращает поимённые
 timeline/coverage/cgroups/budget/incidents checks с source SHA. Known failed check имеет
 приоритет над incomplete; source-integrity errors запрещают результат.
