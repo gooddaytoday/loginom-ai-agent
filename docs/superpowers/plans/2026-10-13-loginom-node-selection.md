@@ -2957,7 +2957,7 @@ Design receipt `calculator-open-design-review.json` SHA
   проверяются ровно по фактическим диагностическим boundaries.
   Owner author — private entry/rewrite/tests/proof.ts/bindings/fixtures; Product,
   payload, profile, audit/runner и original evidence16/source closure74 не менять.
-- [ ] Выполнить package-level targeted private tests на pinned Node24.19,
+- [x] Выполнить package-level targeted private tests на pinned Node24.19,
   entry syntax и `bun typecheck` из evals для private driver. Независимо проверить
   semantic diff, canonical frame/source/anchor pins, bounded same-frame inputs,
   собственный fresh artifact/source GUID remap и сохранность originals. Root
@@ -2983,3 +2983,12 @@ counts сохраняются. Ранний отказ и latecatch раздел
 source/frame/anchor drift, bounds/unknown и success-no-fake-refusal проверены.
 Это evidence-preservation, не Product correction и не доказанный actualmask.
 Authorverification SHA `dd7cd896979d90a516be13435642c9c977ca5e21ac908f1aa9b0dcd9bd22508c`.
+
+
+Private capture проверки и independent source review завершены: 8focusedPASS,
+typecheck0/syntax0. Peerвыявленный late-catch empty-snapshot reader дефект исправлен
+RED→GREEN, повторен только regression1PASS. Source4454/fixture3/protected116,
+original16/effective source74/runtime288×2 unchanged. Peer review SHA
+`dcc68ae1479246a4195cc37e87a3776ac50bd5217d7a9a94dc24faf4710f96ac`;
+readyfalse0400 binding SHA `28dbed938ced99d118e3a5ada76e85a2a9eccf3902ceac7597abeca882740fcd`.
+Fresh live ещё не начинался; Rootactivation отдельна, acceptanceEligibilityfalse.
