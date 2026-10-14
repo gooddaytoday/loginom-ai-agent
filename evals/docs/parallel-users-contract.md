@@ -32,8 +32,13 @@ Actual one-second owned-command smoke проверен; frozen manifest/coordina
 assessProcessResourceTimeline требует наблюдение exact owner/launcher birth с
 verified RSS/CPU в каждом frame внутри указанного окна, а также bracket/cadence.
 Missing scope или окно без наблюдений дают incomplete. Проверены два настоящих
-supervisor owner в измеренном active subwindow; durable launch-to-exit producer
-ещё требуется. Coordinator принимает processWindows и требует ровно одно окно
+supervisor owner в измеренном active subwindow. ProcessCleanup.lifetime сохраняет
+producer PID, owner и exact launcher identity, timestamp перед spawn и timestamp
+actual launcher exit; отсутствие dispatch не создаёт lifetime, unknown exit=null.
+Новый process-cleanup.json создаётся0600 и file fsync, interrupted lifetime также
+сохраняется. Actual complete dispatch-to-exit window проверен через collector1000ms,
+summary и coordinator; receipt alone не выдаёт cleanup/recovery authority.
+Coordinator принимает processWindows и требует ровно одно окно
 для каждого уникального owner/birth из coverage; пропуск, подмена или дубль дают
 incomplete. Пустой declared owner inventory допустим только для component smoke;
 обязательный production inventory определяется отдельным manifest.

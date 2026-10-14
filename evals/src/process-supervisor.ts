@@ -32,6 +32,7 @@ export type ProcessCleanup = {
   admissions?: { pid: number; starttime: string; status: ProcessEntry["admission"] }[]
   selectedCli?: { executable: string; device: number; inode: number }
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
+  lifetime?: { producer_pid: number; owner: ProcessOwner; launcher: ProcessIdentity; started_at: string; finished_at: string | null }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
   peerProcesses?: { process: ProcessIdentity; launcher: ProcessIdentity; owner: ProcessOwner }[]
@@ -390,6 +391,7 @@ export async function superviseProcess(input: {
   const nonce = crypto.randomUUID()
   await writeFile(path.join(capsule, "command.json"), JSON.stringify({ cmd: input.sandbox ?? input.cmd, cwd: input.cwd, nonce,
     sandbox: Boolean(input.sandbox) }), { mode: 0o600 })
+  const dispatchedAt = new Date().toISOString()
   const proc = spawn(process.execPath, [path.join(import.meta.dir, "process-launcher.ts"), capsule], { cwd: input.cwd, env: input.env,
     detached: true, stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
   let cliExitCode: number | undefined, cliPid: number | undefined, reaperReady = false
@@ -399,6 +401,7 @@ export async function superviseProcess(input: {
   const exited = new Promise<void>((resolve) => {
     finish = resolve
     proc.once("exit", () => {
+      if (cleanup.lifetime) cleanup.lifetime.finished_at = new Date().toISOString()
       if (cliExitCode === undefined) cleanup.error ??= "Launcher ended without CLI exit receipt"
       resolve()
     })
@@ -479,6 +482,8 @@ export async function superviseProcess(input: {
   let lastOwn: ProcessIdentity[] = []
   if (root) {
     track(root, "launcher")
+    cleanup.lifetime = { producer_pid: process.pid, owner: { ...(input.owner ?? { kind: "command", id: profile ?? input.cwd }) },
+      launcher: identity(root), started_at: dispatchedAt, finished_at: null }
     liveSupervisors.set(key(root), { launcher: identity(root), entries: ledger, cleanup,
       owner: input.owner ?? { kind: "command", id: profile ?? input.cwd }, live: () => lastOwn })
   }
@@ -821,7 +826,10 @@ export async function superviseProcess(input: {
       !(sandboxTerminated && (timedOut || interrupted) && cliExitCode !== undefined && cliExitCode >= 128)
       ? "SANDBOX_EXECUTION_FAILED" : null) : null }
   if (input.outDir) {
-    await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2)).catch(() => {
+    await open(path.join(input.outDir, "process-cleanup.json"), "w", 0o600).then(async file => {
+      try { await file.writeFile(JSON.stringify(cleanup, null, 2)); await file.sync() }
+      finally { await file.close() }
+    }).catch(() => {
       cleanup.status = "failed"; cleanup.error ??= "Process evidence persistence failed"
     })
   }

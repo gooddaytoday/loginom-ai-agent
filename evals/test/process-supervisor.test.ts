@@ -8,6 +8,47 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
+test("supervisor persists its actual launcher lifetime bound to the admitted owner and birth", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-lifetime-"))
+  const owner = { kind: "command" as const, id: crypto.randomUUID() }
+  let confirmed = false
+  try {
+    const before = Date.now()
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(confirmed).toBe(true)
+    const lifetime = run.processCleanup.lifetime
+    expect(lifetime).toMatchObject({ producer_pid: process.pid, owner })
+    expect(lifetime?.launcher).toEqual(run.processCleanup.processes.find(item => item.pid === run.processCleanup.launcher?.pid))
+    expect(Date.parse(lifetime!.started_at)).toBeGreaterThanOrEqual(before)
+    expect(Date.parse(lifetime!.finished_at!)).toBeGreaterThan(Date.parse(lifetime!.started_at))
+    expect(Date.parse(lifetime!.finished_at!)).toBeLessThanOrEqual(Date.parse(run.processCleanup.verification![0]!.observed_at))
+    expect((await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime).toEqual(lifetime)
+    expect((await stat(path.join(root, "process-cleanup.json"))).mode & 0o777).toBe(0o600)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
+test("supervisor retains an interrupted launcher lifetime and publishes none before dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-interrupted-lifetime-"))
+  const owner = { kind: "judge" as const, id: crypto.randomUUID() }
+  let confirmed = false
+  try {
+    const skipped = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(120000)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 300, owner, signal: AbortSignal.abort() })
+    expect(skipped.interrupted).toBe(true)
+    expect(skipped.processCleanup.lifetime).toBeUndefined()
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(120000)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 300, outDir: root, owner })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(confirmed).toBe(true)
+    expect(run.timedOut).toBe(true)
+    expect(run.processCleanup.lifetime?.owner).toEqual(owner)
+    expect(Number.isFinite(Date.parse(run.processCleanup.lifetime!.finished_at!))).toBe(true)
+    expect((await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime).toEqual(run.processCleanup.lifetime)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
 test("supervisor releases its interrupt grace timer when the owned command exits", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-interrupt-timer-"))
   let cleanupConfirmed = true
