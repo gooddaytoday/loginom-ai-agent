@@ -1,10 +1,10 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты три candidate,
-политика подтверждена в трёх; один итоговый расчёт правильный, два результата
-не получены. Одна сессия завершена штатно, две освобождены адресно после отказа.
-Сейчас monthly-demand/1 выполняется с20:25:31.229Z, CLI3071140;
-runner3040743/exec71139 продолжает последовательную серию. Ещё21candidate не начат.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты четыре candidate,
+политика подтверждена в четырёх; один итоговый расчёт правильный, три результата
+не получены. Одна сессия завершена штатно, три освобождены адресно после отказа.
+Сейчас risky-approved-claims/1 выполняется с20:42:40.864Z, CLI3128627;
+runner3127557/exec7799 продолжает последовательную серию. Ещё20candidate не начаты.
 
 Sales-by-category/1 closed20:25:22.530Z: policy PASS, oracle/calculationtrue,
 CLI0/cleanuptrue/Host3041636ACKtrue. Sidecar `2172b404…`: полные16messages/
@@ -12,6 +12,17 @@ CLI0/cleanuptrue/Host3041636ACKtrue. Sidecar `2172b404…`: полные16messag
 Import→Group→Sort→Export, JS0/childrennone/historyAnomalyfalse.
 35protected/4copied hashes неизменны. Повторного oracle или live-запуска не было;
 runner автоматически перешёл к Monthly после gate, без ручной паузы.
+
+Monthly-demand/1 closed20:33:36.674Z: policy PASS `210051d9…`, mandatory failure
+review `f65a7d9b…`; полные30messages/114parts/32tools/95events/2647runtime,
+JS0/childrennone. Import→DateTime→Group→Reform→Sort выполнены стандартными узлами;
+Export native execution завершён, но read остался AMBIGUOUS:
+Export file search scroll budget exhausted. OriginalCLI1/cleanupfalse/нет полученных
+CSV/LGP/oracle сохраняются; отсутствие физического CSV не утверждается.
+Own242 closed20:38:50.316Z/admin243logout20:38:51.933Z/wholebrowser20:38:53.555Z,
+9PIDgone/точный guard архивирован/18original+21recovery неизменны.
+Descriptor `8fa019ce…`/independent review `a9d0790b…`/finalreadback `01a513a0…`;
+public gate20:42:17.318Z разрешил TECHNICAL_FAILURE_RECORDED без повышения FAIL.
 
 First-last-touch/1 closed20:04:25.456Z: policy PASS `01e41281…`, mandatory failure
 review `558b2433…`; полные40messages/147parts/42tools/125events/3362runtime,
