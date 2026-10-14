@@ -487,6 +487,14 @@ export async function superviseProcess(input: {
       .filter(entry => entry.origin && entry.admission === "allowed" && live.some(current => sameIdentity(current, entry.process)))
       .map(entry => ({ process: entry.process, launcher: supervisor.launcher, owner: supervisor.owner })))
     const peerIds = new Set(cleanup.peerProcesses.map(entry => key(entry.process)))
+    // Fresh kernel ancestry marks peer descendants as foreign even when the
+    // peer has not admitted a short-lived intermediate process. It grants no signal authority.
+    for (let pass = 0; pass < live.length; pass++) {
+      const descendants = live.filter(entry => !peerIds.has(key(entry)) && !ledger.get(key(entry))?.origin &&
+        live.some(parent => parent.pid === entry.parent && peerIds.has(key(parent))))
+      if (!descendants.length) break
+      descendants.forEach(entry => peerIds.add(key(entry)))
+    }
     for (const [id, entry] of ledger) if (!entry.origin && peerIds.has(id)) ledger.delete(id)
     for (const entry of ledger.values()) {
       if (!entry.origin) continue

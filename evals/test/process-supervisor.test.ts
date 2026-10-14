@@ -303,6 +303,68 @@ test("supervisor: собственный detached browser закрыт, неиз
   } finally { unknown.kill("SIGKILL"); await exited }
 }, 20_000)
 
+test("a refused child of a proven peer quarantines its owner without blocking A cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-refused-child-"))
+  const bundle = path.join(root, "bundle"), a = path.join(root, "a"), b = path.join(root, "b")
+  await Promise.all([mkdir(bundle), mkdir(a), mkdir(b)])
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const script = path.join(root, "browser.mjs"), trigger = path.join(root, "trigger"), pidFile = path.join(root, "bad.pid")
+  await Bun.write(script, `import {spawn} from "node:child_process";import {access,writeFile} from "node:fs/promises";
+setInterval(()=>{},1000);
+if(process.argv.some(arg=>arg.startsWith(${JSON.stringify("--user-data-dir=" + b + path.sep)}))){
+  while(!await access(${JSON.stringify(trigger)}).then(()=>true,()=>false)) await new Promise(resolve=>setTimeout(resolve,10));
+  const child=spawn(process.execPath,[${JSON.stringify(script)},"--type=helper",${JSON.stringify("--user-data-dir=" + path.join(root, "outside"))}],{stdio:"ignore",env:process.env});
+  await writeFile(${JSON.stringify(pidFile)},String(child.pid));
+}`)
+  const abort = new AbortController()
+  const commandA = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: a })
+  const commandB = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: b })
+  const pendingA = runAgent({ command: { ...commandA, env: { ...commandA.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(a, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "1500" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: a, outDir: a, profileDir: a, timeoutMs: 30_000 })
+  const pendingB = runAgent({ command: { ...commandB, env: { ...commandB.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(b, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "20000" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: b, outDir: b, profileDir: b, timeoutMs: 30_000, signal: abort.signal })
+  let child: ProcessIdentity | undefined
+  let settled = false
+  try {
+    const deadline = Date.now() + 5000
+    while (!await Bun.file(path.join(a, "browser.pid")).exists() || !await Bun.file(path.join(b, "browser.pid")).exists()) {
+      if (Date.now() > deadline) throw Error("Peer browsers did not start")
+      await Bun.sleep(10)
+    }
+    await Bun.write(trigger, "create refused peer child")
+    while (!await Bun.file(pidFile).exists()) {
+      if (Date.now() > deadline) throw Error("Refused child did not start")
+      await Bun.sleep(10)
+    }
+    const pid = Number(await Bun.file(pidFile).text())
+    const fields = (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ").at(-1)!.split(" ")
+    const executable = await stat(`/proc/${pid}/exe`)
+    child = { pid, starttime: fields[19]!, uid: (await stat(`/proc/${pid}`)).uid, parent: Number(fields[1]), group: Number(fields[2]), session: Number(fields[3]),
+      executable: await readlink(`/proc/${pid}/exe`), device: executable.dev, inode: executable.ino }
+    const finishedA = await pendingA
+    expect(finishedA.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedA.processCleanup.processes.some(process => process.pid === pid)).toBe(false)
+    expect((await readFile(`/proc/${pid}/stat`, "utf8")).split(") ").at(-1)!.split(" ")[19]).toBe(child.starttime)
+    await signalProcess(child, "SIGKILL")
+    abort.abort()
+    const finishedB = await pendingB
+    expect(finishedB.processCleanup.status).toBe("failed")
+    expect(finishedB.processCleanup.error).toContain("Browser binding differs")
+    settled = finishedA.processCleanup.capture_complete && finishedB.processCleanup.capture_complete &&
+      finishedB.processCleanup.verification?.every(pass => pass.owned_remaining === 0) === true
+  } finally {
+    try { if (child) await signalProcess(child, "SIGKILL") }
+    finally {
+      abort.abort()
+      await Promise.all([pendingA, pendingB])
+      if (settled) await rm(root, { recursive: true, force: true })
+    }
+  }
+}, 40_000)
+
 for (const delay of [0, 2800]) test(`parallel supervisors preserve a sibling's reparented browser heartbeat (helper delay ${delay})`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-browser-"))
   const bundle = path.join(root, "bundle")
