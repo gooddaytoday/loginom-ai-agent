@@ -45,8 +45,17 @@ Baseline описательный: один замер каждой задачи
 
 - [x] Исправить две инструкции skill по подтверждённому JS scope violation и проверить новый asset-only комплект без пересборки runtime.
 - [x] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
-- [ ] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
+- [x] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
+
+Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
+с19:23:31.436Z. Independent admission `e7ba5561…`, final execution lock
+`a48cfaf7…` заморожены до dispatch. Профиль был свободен,8previous ownPIDgone,
+oldseries leaseabsent; ownrelease-only `5a92054f…` не повышает старый violation.
+Сейчас первая попытка выполняется; принятие новогоskill пока не утверждается.
+Дальше C9→проверка6Brefs→C16, модели последовательны. Successful standard
+advance автоматически; JS/recovery/failure/anomaly и sampled successes review
+сохраняются. Подтверждённый candidateviolation останавливает новую серию.
 
 Controller commit `ffbbac4220`:28tests/429assertions, typecheck0, семь RED→GREEN
 циклов. Independent source review `0bf150db…`, Root actual6existingOnly gates

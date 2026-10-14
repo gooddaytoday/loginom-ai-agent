@@ -2,8 +2,10 @@
 
 Новая проверяемая версия подготовлена в `20261014T185528Z-ad0f2b`:
 skill commit `d99389dd2a`, digest `0ca88b2d…`, runtime659588 без пересборки.
-Проверка установленного skill и manifest прошла. Запуски ещё не начаты:
-до них завершаются TDD и admission контроллера baseline references.
+Проверка установленного skill и manifest прошла. Controller28PASS/429assertions,
+typecheck0, independent source review и actual6existingOnly gates прошли.
+Prospective admission e7ba5561/executiona48cfaf7 до старта; новая ABC/1
+выполняется с19:23:31.436Z. Результата новой версии и policy acceptance пока нет.
 Матрица —6 неизменённых baseline observations плюс25 новых candidate;
 сохранение baseline экономит32.87минуты фактического CLI-времени.
 Baseline имеет4 правильных результата и2 отсутствующих; один запуск каждой
