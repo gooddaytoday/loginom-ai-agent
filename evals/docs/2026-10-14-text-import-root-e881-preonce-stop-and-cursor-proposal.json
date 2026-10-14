@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "readAt": "2026-10-14T12:42:27.687385+00:00",
+  "scope": "LAB57 only/dedicated eval-tests; MAS foreign project/NO INTERVENTION",
+  "rootOperator": true,
+  "independentE881SourceAccepted": {
+    "source": "e8815ae0ea8ea30506a5f4e2e13daeed5a16702b",
+    "comment": "01a13a4f-ff71-78ea-9cb0-041d4da0c6cc",
+    "archive": "759e4e13e2044150f30b45e442c27ce55c50ff9384f5446c407f68f055042956",
+    "verifiedPayloads": 24
+  },
+  "actualE881SourceSetup": {
+    "installedFiles": 853,
+    "noReplace": true,
+    "helperScriptSha256": "302c261b0a07752cf9af81baa6efe211e64cb77e91676c53a46f5e70228a6733",
+    "bindingSha256": "403c7d576c15b8eeded0fa22a29d4eb212661ed82eac3227edf2d523cdbbcded",
+    "singleReadOnlyCommandPolicySha256": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4",
+    "rootHelperProvisionOnceSha256": "bdb9010b27642242f069304b5f8bef4131255e801b6e6bb935a9daf93e0dc6f0",
+    "otherPoliciesUnchanged": true,
+    "privateKeyMaterialDisclosed": false
+  },
+  "actualRootE881Execution": {
+    "exit": 2,
+    "pid": 2224436,
+    "birth": "103926302",
+    "startedAt": "2026-10-14T12:12:25.840071+00:00",
+    "finishedAt": "2026-10-14T12:12:35.192001+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "originalOverallOncePresent": false,
+    "operationPresent": false,
+    "diagnosticPresent": false,
+    "controllerStillPresent": false
+  },
+  "refusal": {
+    "stage": "fresh-guard/FRESH_GUARD_REFUSED",
+    "sha256": "51f4f7813492e3121a648e06b65a0385393a090a58c6860d3604781c706664d8",
+    "signedFDProof": "2x273 processes/allUID/allFD/complete/denied0/profileFD0/native0/originalPID0",
+    "actualProfiles": 6,
+    "container": "exact original/running/no bind mounts",
+    "blocking": "4 foreign Cursor490 tasks in central metadata; old guard addressed only MAS24",
+    "lowerOriginalWriterCause": "UNKNOWN retained"
+  },
+  "freshOriginalState": {
+    "readAt": "2026-10-14T12:42:27.687385+00:00",
+    "owner": {
+      "device": 64512,
+      "inode": 17837097,
+      "mode": "0o600",
+      "bytes": 500,
+      "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64"
+    },
+    "stand": {
+      "device": 64512,
+      "inode": 17837096,
+      "mode": "0o700",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "overallOncePresent": false,
+    "operationPresent": false,
+    "diagnosticPresent": false,
+    "priorRootControllerPresent": false,
+    "registration": {
+      "device": 64512,
+      "inode": 3710822,
+      "mode": "0o600",
+      "bytes": 7,
+      "sha256": "f03f26330addd250ebebfc615ffb52350ba77aba21b95bc94ce93344dc27a0a9"
+    },
+    "legacyGuard": {
+      "device": 64512,
+      "inode": 3840913,
+      "mode": "0o600",
+      "bytes": 96,
+      "sha256": "f3d323b799d38e4a1ebe1ad901bf69a08e572479674cc94d6f1751642ea87106"
+    }
+  },
+  "newSourceProposal": {
+    "source": "49a8a1c0421c1b36c8313e7fedc0a037442ca1d2",
+    "base": "e8815ae0ea8ea30506a5f4e2e13daeed5a16702b",
+    "sourceManifestSha256": "66fda949ab194c4192110899b0bcb33d4401cab4262acdcdf4c89430e609bce9",
+    "executableSha256": "056e412d5b36ff723eb091bb04da627db1b04b9b3a4a9a3b45d6fb15c6a1ed13",
+    "sourceEntries": 855,
+    "archiveSha256": "1a326219ba73cfd7614b516d3f12153d4f7f4bbe8578d907aa1c651eb3e3a239",
+    "deliveryManifestSha256": "6b5cd2ce0eb02221b4eca2af7738cc2f3dabfdb979862f6b7d63fb41d438be9d",
+    "payloads": 907,
+    "changedPaths": [
+      "evals/docs/evaler/lab57-root-operator-plan.md",
+      "evals/script/lab57-queue-pages.py",
+      "evals/script/lab57-route-inspect.py",
+      "evals/src/lab57-mas-runtime-extension.json",
+      "evals/src/lab57-queue-scope.ts",
+      "evals/test/lab57-cursor-mas.test.ts"
+    ],
+    "tests": {
+      "addressed": "153 PASS /0 FAIL /386expects /4 files",
+      "newCursor": "21 PASS /0 FAIL /47 expects; concrete Python->Node positives and5 negatives",
+      "typecheck": "PASS exactNode24.19/package",
+      "build": "two exact clean Git export builds byte-equal",
+      "genuineSourceCapture": {
+        "processes": 34,
+        "captureComplete": true,
+        "status": "confirmed",
+        "error": null
+      },
+      "retainedLocalErrors": "initial namespace omitted /opt/node; capture output dir absent before dispatch; fakeCLI execute mode600 from proof privacy chmod. All diagnosed/fixed fixture orchestration only; source checks unchanged. Initial local draft index expect-count72 corrected to actual47 before post; first ZIP retained NOT_POSTED."
+    },
+    "ownerDecisionSha256": "bfc38c4263a99d1f99aa3475a10e3d7ea2dec740af6a011d94b7d5706a39f5bf",
+    "installed": false,
+    "RootSelfAdmission": false,
+    "effects": 0,
+    "next": "Independent exact Evaler source admission then Root personally installs/provisions/one foreground owned cleanup; Ben final independent acceptance only"
+  },
+  "accounting": "Ben6/6 consumed/originalERROR/allqualityEXCLUDED; Rich4PASS2qualityFAIL; refs1/1/2/1/1/3; coldRich11/10/8/Ben9/9/8+ERROR1; repeats3/10remaining7; admission3/3/wrapper1/1/recovery0/1. No reset/precharge/newmodel/ref/product/cold.",
+  "originalOutcome": "Ben whole ERROR/code2/all6 quality EXCLUDED unchanged; no synthetic completion/release/PASS; recovery0/1 by preserved absent exact incident record, never infer consumption from SOURCE",
+  "cleanup": "UNCONFIRMED; original owner BUSY; no actual completion/RELEASED/FREE/ACCEPT yet",
+  "automation": "OFF/do not restore",
+  "humanTimeGate": false
+}
