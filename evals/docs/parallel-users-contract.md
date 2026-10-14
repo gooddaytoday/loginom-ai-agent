@@ -197,6 +197,13 @@ continuous capture с observations, valid launcher/process births и две orde
 empty verification после actual exit. Unknown/planned/changed proof отвергается;
 это readonly закрытых snapshots, не release authority. Текущая liveness,
 active-crash lineage/полнота inventory и explicit recovery ещё требуются.
+recoverOfflineJudge для offline home получает recovery-only CAS по captured
+token/revision/incident lineage, квалифицирует closed inventory исходного owner
+и проверяет current PID/birth при том же boot. Unknown/planned/live запрещают
+release; функция не посылает signals и не удаляет files. Confirmed private proof
+освобождает reservation, results сохраняются. Terminal marker позволяет readonly
+replay после нового run без stale CAS. Recovery CLI, active-child reconciliation
+и crash между reservation release и terminal marker ещё требуют проверки.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy
