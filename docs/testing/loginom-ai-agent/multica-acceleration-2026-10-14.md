@@ -53,7 +53,7 @@ Core receiving `5858ffb3dee774ed3c3acc239e8cf07ecaaa7e28`, clean `202610140842`,
 
 Проверены API CAS/readback, сохранность настроек и назначений, адресная доставка и содержательные действия исполнителей. Тесты runtime/model/native не запускались: этот проход меняет документы/назначения, а не реализацию узлов. Полная приёмка, merge и выпуск не заявлены.
 
-## Продолжение по команде владельца, 13:09–13:30 МСК
+## Продолжение по команде владельца, после13:09 МСК
 
 Эта секция обновляет прежние ограничения доступа и ревью; исходные отказы остаются историей. Владелец изменил конфигурацию Ловца и явно поручил возобновить ревью. API подтвердил прежнего агента `027d102c-5d25-402c-a8fb-58a3e810013c`, модель `grok-4.7-xhigh`, online runtime Cursor(mas) `490365fb-afb2-4cf3-a694-23459da7a6d1`. Оператор эти настройки не изменял.
 
@@ -70,6 +70,10 @@ Core receiving `5858ffb3dee774ed3c3acc239e8cf07ecaaa7e28`, clean `202610140842`,
 
 Доставка исправления проверена: этот комментарий стал trigger для running Worker67 `01a139f5-eb99-7a5f-88c2-bf1bd888d7e6`; в13:31 видна содержательная подготовка исходного кандидата и защищённых артефактов. Второго автора/повтора оператор не назначал; wakeups67/72/73 отсутствуют. Review73 продолжает адресные SOURCE/compiled проверки, включая исходный array reproducer; промежуточные PASS не заменяют итоговый verdict.
 
+Связь FAIL67→Worker дополнительно принята read-only `handoff.py --existing-comment`: `assigned/durable_assignment`, без POST нового задания. В13:34 завершён промежуточный stock host/factory/caller73:25 PASS/0 FAIL, actual compiled host с SOURCE factory/caller и Page/auth doubles; native acceptance не заявлена.
+
+В13:30 появился независимый bounded PASS68 (`01a139f6-56b8-7596-9a59-28cd0eb8a193`) для `24fe538050e4dc65133af41feb41df62a778d6dc`: SOURCE reader→SDK callback fixture и отдельный ACTUAL_INSTALLED embedded bootstrap. Регистратура в13:35 подтвердила доставку первого отсутствующего production seam в `session/tools.ts` прежнему carrier67: `01a139f9-fd29`→queued `01a139f9-fd3f`, за текущим cleanup correction. Binder/mint/relay — один кандидат, другого автора нет. Checkpoints68/67 обновлены самой Регистратурой1066→1067/996→997. Очередь не объявляется уже выполненной интеграцией; после адресного review результат должен перейти готовым70/71/66 по применимости.
+
 ### LAB-72: исправление диагностики и фактический root read
 
 Действующий Worker в retained run `01a13545-d71b-7b39-9d4d-490dbfead7c8` исправил локальный observer отдельной копией: ранее ошибка чтения namespace уничтожала уже собранные phase payloads. Теперь completed и partial данные сохраняются, ошибка оставляет qualification=false, preparation descriptors закрываются. Результат `01a139ef-ea81-780b-bc57-bf787a3a948f`, SHA256 v2 `435149c88966a5a19a1679a0253073897cd459845190cffb20bb73e6b832c42d`. Оператор повторил четыре fault controls (EACCES/vanished/EIO/after-scan) — PASS. Это проверка диагностической обвязки, не восстановления модели.
@@ -83,6 +87,8 @@ Core receiving `5858ffb3dee774ed3c3acc239e8cf07ecaaa7e28`, clean `202610140842`,
 Все девять адресных checks=true, но итоговый `localVisibleScopeReadQualified=false`: Chrome sandbox children имеют отдельные net/PID/user namespaces. Равенство network namespaces нельзя объявлять истинным. Initial-PID `/proc` видит nested targets, их NSpid соответствует observed PID; оценка достаточности этого evidence для inherited socket scope передана действующему Генератору, без повторения R1/R2 и без снятия gates.
 
 Приватные observer/capture размещены отдельными файлами в исходном workdir, mode0600, с точным readback. Сырые данные не включены в git. Уточнение `9696b426-fa46-4811-85b1-b8794ba1cda9` адресовано существующему Generator run `01a139ef-ea9d-7983-90d1-b034615a2d27`: оценить только недостающий scope факт, подготовить конкретный bounded план и доставить его на адресное независимое ревью. Комментарий прочитан через API; содержательная обработка этого последнего evidence ещё требует проверки.
+
+Повторная reconciliation по исходному `client_request_id` подтвердила тот же comment/run и `supplement_status=delivered`, delivered_at13:28:13 МСК, failure_reason отсутствует. По прочитанному API контракту этот exact request возвращает прежнюю квитанцию; новый комментарий или запуск не создавался. Доставка ещё не является техническим verdict по снимку.
 
 Checkpoint72 обновлён description-only CAS655→656 с точным readback: снято устаревшее ожидание административного доступа, сохранены false scope verdict и отдельное решение о draft loss. Статус, исполнитель, retained и queued назначения не изменены.
 
