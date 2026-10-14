@@ -1078,20 +1078,14 @@ export async function createBridge(config, session, { browserTransport: managedB
           }));
           assertBinding();
           if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,bytes,done));assertBinding()}
-          phase=claiming?'claim_sync':write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));assertBinding();
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));assertBinding();
         }catch(value){remember(value,phase)}
         if(file.fd!==undefined){
           const closePhase=write?'file_close':'directory_close';
           try{await closeWriter(file);assertBinding();if(!file.ownsTemporary)cleanupWriters.delete(file)}
           catch(value){file.closeFailure??={value};remember(value,closePhase)}
         }
-        if(primary){
-          if(claiming && file.openRejected && file.fd===undefined && file.io?.pending===false){
-            (publication.claimFailures??=[]).push(file);publication.claim=undefined;
-          }
-          throw primary.value;
-        }
-        if(claiming)return file;
+        if(primary)throw primary.value;
         if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
         return file;
       };
