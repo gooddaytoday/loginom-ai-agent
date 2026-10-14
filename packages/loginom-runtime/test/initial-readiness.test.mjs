@@ -12,7 +12,7 @@ const code=source.slice(source.indexOf('export function browserEnvironment')).re
 const managed=await readFile(process.env.STARTUP_MANAGED??new URL('../src/managed-entry.mjs',import.meta.url),'utf8');
 const managedCode=managed.slice(managed.indexOf('function closeRejection('),managed.indexOf('const stop ='));
 const values=[Error('original startup refusal'),undefined,null,false,0,''];
-function fixture(directory,phase,rejected){
+function fixture(directory,phase,rejected,clock=Date){
  const events=[],document={querySelectorAll:()=>[]},connection={Connected:false,UserName:'user'};
  const pageState=vm.createContext({document,location:{href:'about:blank',origin:'null'},getComputedStyle:()=>({visibility:'visible'}),Error});
  const native=()=>{pageState.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection,PackageNodes:{Count:phase==='packages'?1:0},HasRunningNodes:()=>false}}}}}}};
@@ -46,7 +46,7 @@ function fixture(directory,phase,rejected){
  class Client {async connect(){events.push('knowledge');if(phase==='knowledge')throw rejected}async close(){events.push('knowledge-close');if(phase==='knowledge-close')throw rejected}}
  const require=name=>{if(phase==='require'||phase==='knowledge-require')throw rejected;return name==='playwright-core'?{chromium:{async launchPersistentContext(){events.push('launch');if(phase==='launch')throw rejected;return context}}}:
   name.includes('streamableHttp')?{StreamableHTTPClientTransport:class{}}:{Client}};
- const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection,startupReadiness})',{require,mkdir,open,rename,unlink,constants,writeFile,readFile,createHash,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,
+ const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection,startupReadiness})',{require,mkdir,open:async(...args)=>{const h=await open(...args);try{await page.onEvidenceOpen?.(String(args[0]));return h}catch(error){await h.close();throw error}},rename,unlink,constants,writeFile,readFile,createHash,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,Date:clock,
   setTimeout,clearTimeout,AbortController,browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>''});
  const options={profile:directory,browserPath:'/fixture',candidate:{url:'https://loginom.invalid/app',username:'user',password:'',apiKey:'fixture'},endpoint:'https://knowledge.invalid',owner};
  return {owner,options,functions,events,context,page,pageState,connection,logout:()=>logout,contextClose:()=>contextClose};
@@ -140,5 +140,46 @@ for(const [kind,value] of Object.entries({error:Error('joint running',{cause:0})
   if(kind==='error')assert.equal(f.owner.evidence.guard_rejection.cause.value,0);
   if(persistence)assert.ok(f.owner.evidence.guard_persistence_failure);
   assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+ }finally{await rm(root,{recursive:true,force:true})}
+});
+
+// The whole actual gate, labelled Page/native doubles and real FS. A virtual
+// clock models receipt latency without a long sleep or a renewed deadline.
+for(const scenario of ['pending-ready','ready','late-read','parent-expiry','parent-cancel','parent-renewal','unknown-parent','known-busy','first-rejection'])test('qualified readiness receipt '+scenario,async()=>{
+ const root=await mkdtemp(join(tmpdir(),'ready-publication-'));let offset=0;
+ class Clock extends Date{static now(){return Date.now()+offset}}
+ const f=fixture(root,undefined,undefined,Clock),controller=new AbortController();
+ f.owner.signal=controller.signal;f.owner.deadline=scenario==='unknown-parent'?null:Date.now()+30000;f.owner.deadlineSource=scenario==='unknown-parent'?'NOT_SUPPLIED':'fixture_original_parent';
+ let reads=0,firstPublicationReads=null,publication=0;const reason=Error('original running',{cause:0});
+ f.page.onGuard=()=>{
+  reads++;const m=f.pageState.bg.app.Application.FInstance.FMainForm.FMapTree;
+  m.HasRunningNodes=()=>scenario==='pending-ready'&&reads===1?undefined:scenario==='known-busy'?true:false;
+  if(scenario==='first-rejection')m.HasRunningNodes=()=>{throw reason};
+  if(scenario==='late-read')offset=6000;
+ };
+ f.page.onEvidenceOpen=async name=>{
+  if(!name.includes('.startup-cleanup-')||!f.owner.evidence.guard_observations?.length)return;
+  if(firstPublicationReads===null)firstPublicationReads=reads;
+  if(publication++===0){assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);offset=scenario==='parent-expiry'?31000:6000;
+   if(scenario==='parent-cancel')controller.abort(false);
+   if(scenario==='parent-renewal')f.owner.deadline+=100000;
+  }
+ };
+ let failure;
+ try{
+  try{await f.functions.checkConnection(f.options)}catch(error){failure=error}
+  if(['pending-ready','ready'].includes(scenario)){
+   assert.equal(failure,undefined);assert.equal(f.logout(),1);assert.equal(f.contextClose(),1);
+   assert.equal(firstPublicationReads,scenario==='pending-ready'?2:1);
+   assert.equal(f.owner.evidence.initial_readiness.budget_ms,5000);
+   assert.equal(f.owner.evidence.guard_observations[0].result.authenticated,scenario==='ready');
+   await f.owner.close();assert.equal(f.logout(),1);assert.equal(f.contextClose(),1);
+  }else{
+   assert.ok(failure);assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+   if(scenario==='parent-cancel')assert.equal(failure.cause,false);
+   if(scenario==='first-rejection')assert.equal(failure.cause,reason);
+   if(scenario==='parent-renewal')assert.equal(f.owner.readinessBinding.deadline,f.owner.deadline-100000);
+   assert.equal(reads,1);
+  }
  }finally{await rm(root,{recursive:true,force:true})}
 });

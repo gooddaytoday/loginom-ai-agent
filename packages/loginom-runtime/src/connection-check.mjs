@@ -146,13 +146,13 @@ async function startupReadiness(owner, initial=true, persist=true) {
     effective_deadline:Math.min(start+5000,owner.deadline??Infinity),parent_policy:'diagnostic_only'};
   const budget=initial?owner.initialReadiness:null;
   owner.evidence.initial_readiness ??= budget?{...budget,status:'observing'}:{parent_policy:'diagnostic_only',status:'strict_cleanup'};
-  const guard=()=>{
+  const guard=(sampling=true)=>{
     if(owner.id!==binding.id||owner.account!==binding.account||owner.origin!==binding.origin
         ||owner.context!==binding.context||owner.page!==binding.page||owner.deadline!==binding.deadline||owner.signal!==binding.signal
         ||owner.context.pages().length!==1||owner.context.pages()[0]!==binding.page)
       throw Error('LOGINOM_INITIAL_READINESS_OWNER_CHANGED');
     if(owner.signal?.aborted)throw owner.signal.reason;
-    if(Date.now()>=(budget?.effective_deadline??owner.deadline??Infinity))
+    if(Date.now()>=(sampling?(budget?.effective_deadline??owner.deadline??Infinity):(owner.deadline??budget?.effective_deadline??Infinity)))
       throw Error('LOGINOM_INITIAL_READINESS_DEADLINE');
   };
   let iteration=0;
@@ -235,19 +235,9 @@ async function startupReadiness(owner, initial=true, persist=true) {
     }
     if(initial)owner.evidence.initial_readiness={...budget,status:observed.guardFailure?'rejected':observed.authenticated?'ready':observed.unauthenticated?'unauthenticated':'not_ready'};
     if(!observed.authenticated&&!observed.unauthenticated)owner.evidence.initial_refusal ??= {snapshot:observed.snapshot,reason:observed.reason??null};
-    try {if(persist)await startupEvidence(owner)}
-      catch(error) {
-        owner.evidence.guard_persistence_failure=startupRejection(error)
-        if(observed.guardFailure) throw owner.guardFailure.value
-        if(!observed.authenticated&&!observed.unauthenticated) throw new Error('LOGINOM_STARTUP_CLEANUP_BLOCKED',{cause:observed})
-        throw error // no native gesture without durable first evidence
-    }
-    if(observed.guardFailure) throw owner.guardFailure.value
-    
-    if(!observed.authenticated&&!observed.unauthenticated)owner.evidence.initial_refusal ??= {snapshot:observed.snapshot,reason:observed.reason??null};
-    guard();
-    if(observed.authenticated||observed.unauthenticated){if(initial)owner.initialReadinessCompleted=true;return observed}
-    owner.evidence.initial_refusal ??= {snapshot:observed.snapshot,reason:observed.reason??null};
+    // Read-only pending samples share the original sampling cap. Retain every
+    // tuple in the original owner; publish them together before any native
+    // gesture, rather than spending the read budget on intermediate FS IO.
     const x=observed.snapshot,unknown=v=>v?.is_undefined===true||v?.value===null;
     const pending=initial&&observed.reason==='STARTUP_NOT_OWN_EMPTY_IDLE'
       &&x.document_matches&&x.origin_matches&&x.identity_matches&&x.build.value==='7.4.2'
@@ -256,9 +246,24 @@ async function startupReadiness(owner, initial=true, persist=true) {
       &&(unknown(x.count)||x.count.value===0)
       &&(unknown(x.running)||x.running.value===false)
       &&(unknown(x.count)||unknown(x.running));
-    if(!pending)return observed;
-    owner.evidence.initial_readiness={...budget,status:'pending',observations:++iteration};
-    await startupEvidence(owner);
+    if(!observed.guardFailure)guard(); // no late read may qualify
+    if(pending)owner.evidence.initial_readiness={...budget,status:'pending',observations:++iteration};
+    else {
+      try {if(persist)await startupEvidence(owner)}
+      catch(error) {
+        owner.evidence.guard_persistence_failure=startupRejection(error)
+        if(observed.guardFailure) throw owner.guardFailure.value
+        if(!observed.authenticated&&!observed.unauthenticated) throw new Error('LOGINOM_STARTUP_CLEANUP_BLOCKED',{cause:observed})
+        throw error // no native gesture without durable first evidence
+      }
+      if(observed.guardFailure) throw owner.guardFailure.value
+      // A read already qualified within the sampling cap. Awaited durable
+      // publication cannot renew that cap or allow another read; it remains
+      // bounded by the captured parent deadline, signal and owner binding.
+      guard(false);
+      if(observed.authenticated||observed.unauthenticated){if(initial)owner.initialReadinessCompleted=true;return observed}
+      return observed;
+    }
     guard();
     const delay=Math.min(10*2**Math.min(iteration-1,4),budget.effective_deadline-Date.now());
     await new Promise((resolve,reject)=>{
