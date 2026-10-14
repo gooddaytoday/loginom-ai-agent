@@ -191,8 +191,12 @@ probes и evaluation judge публикуют planned owner с commandId до di
 assertHeld, затем confirmed/unconfirmed с отдельным fsynced proof snapshot.
 Hash proof вычисляется от JSON.stringify(parsed proof); сам inventory ещё не
 выдаёт recovery authority. Snapshot предыдущей команды сохраняется после rejudge.
-Runtime processEvidence исключён из saved config. Active-crash lineage/полнота
-inventory и readonly proof qualification для explicit recovery ещё требуются.
+Runtime processEvidence исключён из saved config. readJudgeProcessInventory
+проверяет private root/source, exact command/producer/owner, snapshot path/hash,
+continuous capture с observations, valid launcher/process births и две ordered
+empty verification после actual exit. Unknown/planned/changed proof отвергается;
+это readonly закрытых snapshots, не release authority. Текущая liveness,
+active-crash lineage/полнота inventory и explicit recovery ещё требуются.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy
