@@ -862,7 +862,7 @@ Original attempt не переписан и не повышен до PASS. Фи�
 проверка сохранности recovery boundary ожидается; Product/tests ещё неизменны.
 
 Решение: непосредственно перед input0 mapping стандартного exports.text,
-после Link, при доказанном обрезании порта выполнить максимум одну bounded
+после Link, при доказанном выходе порта за нижний край viewport выполнить одну bounded
 прокрутку собственной canvas через существующий guarded scroll.
 Использовать свежий видимый non-script graph anchor с тем же container_ref,
 не obscured port. Затем fresh observe должен подтвердить прежние document,
@@ -908,3 +908,29 @@ skill-файлов, затем clean candidate build/verify, новые факт
 `2dce56a9a7fe0f80179399be3aa9615067dfccc8ab6fb3813a74da25e9a921d7`
 независимо сверена:24original attempt hashes/24unique Sessions,18baseline+
 6candidate,4candidate selection-audit complete PASS,2incomplete,19unstarted.
+
+
+На 2026-10-14 04:59 UTC для следующей matched пары уточнён prospective
+порядок: independent pair review + все ordinary native gates + immutable pins,
+затем candidate9; при чистом gate — baseline18, затем candidate16.
+Runtime/runner/audit менять для перестановки не требуется: audit каждого
+слота читает pinned task/attempt/mode и не зависит от baseline receipts.
+Это execution order; full acceptance по-прежнему требует все43freshslots,
+18standard policy PASS, oracle не хуже нового baseline, все исключения/
+recovery/manual reviews. Сравнительный PASS до завершения обеих фаз запрещён.
+
+Новый effective acceptance lock до первой модели обязан закрепить этот
+executionSchedule. При ранней остановке сохранить каждый started slot и
+явно отметить unstarted; старые outcomes0, никаких замещающих повторов.
+Один общий профиль, уникальные пути/новые Sessions, sequential processes
+сохраняются. Нагрузка/storage остаются факторами локальной серии при любом
+порядке. Исторический baseline-before-first9 серии233119 не переписывается;
+этот prospective порядок заменяет его только для следующих matched пар.
+
+Независимый Product WIP review выявил привязку fresh retry к прежним canvas/
+anchor до scroll. Actual UI_EPOCH_CHANGED RED подтвердил ненужную scroll,
+когда порт стал visible; минимальный GREEN связывает fresh context/owner/
+viewport/port/anchor в существующем perform identity. Shared perform,
+native port ownership/hit guards unchanged; final freeze/negative suite/
+approval ещё ожидаются. Trigger ограничен наблюдавшимся выходом порта
+за нижнюю границу viewport (804>800), не всеми видами clipping canvas.
