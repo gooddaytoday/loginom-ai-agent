@@ -186,7 +186,13 @@ Offline controller сохраняет selected/allocated run directory в privat
 до evaluation judge; calibrate/rejudge ждут эту запись. При result/release-proof
 persistence exception карантин сохраняет locator, reservation остаётся retained
 и следующий запуск запрещён. Preflight/version probes могут предшествовать
-allocation; полный command-bound process inventory и explicit recovery ещё нужны.
+allocation. Offline command journal содержит private processInventory: version
+probes и evaluation judge публикуют planned owner с commandId до dispatch под
+assertHeld, затем confirmed/unconfirmed с отдельным fsynced proof snapshot.
+Hash proof вычисляется от JSON.stringify(parsed proof); сам inventory ещё не
+выдаёт recovery authority. Snapshot предыдущей команды сохраняется после rejudge.
+Runtime processEvidence исключён из saved config. Active-crash lineage/полнота
+inventory и readonly proof qualification для explicit recovery ещё требуются.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy

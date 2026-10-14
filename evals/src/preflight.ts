@@ -223,9 +223,9 @@ export async function gitInfo() {
   return { sha: sha.text().trim(), dirty: status.text().trim().length > 0 }
 }
 
-async function codexInfo(judge: Pick<JudgeSettings, "command" | "env">, signal?: AbortSignal) {
+async function codexInfo(judge: Pick<JudgeSettings, "command" | "env" | "processEvidence">, signal?: AbortSignal) {
   const env = judgeEnvironment(judge.env)
-  const version = await judgeVersion({ command: judge.command, env }, signal)
+  const version = await judgeVersion({ command: judge.command, env, processEvidence: judge.processEvidence }, signal)
   if (version.exitCode !== 0)
     throw new EvalFailure(`Судья недоступен: ${judge.command.join(" ")} --version → код ${version.exitCode}`, 2)
   const home = env.CODEX_HOME ?? path.join(os.homedir(), ".codex")
