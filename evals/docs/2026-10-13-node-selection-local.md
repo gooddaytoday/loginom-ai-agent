@@ -812,3 +812,19 @@ Frozen следующий `campaign-roi-by-channel/1` запущен Root32921; 
 пока нет. Source/build/skill/pins неизменны, инструментация private diagnostics
 в этот model run не добавляется. Candidate completed4/25; первая волна4/9
 остаётся нечистой, повторы закрыты, полная приёмка не завершена.
+
+
+На 2026-10-14 04:22 UTC `campaign-roi-by-channel/1` завершён полным PASS:
+Session `ses_ec7615900ffeSpJbGwjzNPDotz`, CLI/wrapper0, cleanuptrue,
+oracle/policy/calculation PASS, JS nodes/calls0. SHA attempt
+`1e37171e0efe0098f234b900f200df544cc4fdc169cbee0631f8ad15c20d637d`,
+audit `4dd8c7e07a3896e4f8fabe557c0326feec01f11e0b943b6b6e9d3acc5e0e1488`.
+History completeness, settlement, export identity и graph completeness PASS;
+Root32921 exit0, CLI около378секунд. Обычный model run не содержит private
+инструментацию. Product/skill/build/pins unchanged.
+
+Следующий frozen standard `first-last-touch/1` запущен Root4970.
+Candidate completed5/25 (four full PASS и original ABC/1 incomplete),
+firstwave5/9 нечистая. Baseline18/18,17oracle/расчёт PASS,11policy PASS.
+JS-вызовов в candidate standard пока не наблюдалось; это не policyPASS
+несохранённого ABC/1. Повторы закрыты, полная приёмка не завершена.
