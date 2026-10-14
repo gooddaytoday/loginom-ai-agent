@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { claimUserOwnership, readServerSession, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readServerSession, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -89,6 +89,26 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     await writeLeaseReceipt(lease.receipt, { ...leaseManifest, token: "foreign-lease" })
     await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_ADMISSION_UNCONFIRMED")
     await writeLeaseReceipt(lease.receipt, leaseManifest)
+    const closeReply = { v: 1 as const, id: "close-a", outcome: "confirmed" as const, data: { closed: true, disposition: "rpc_closed" } }
+    const closePayload = { proofId: observed.id, session: binding }
+    const closeSource = path.join(fixture.slots.controller.stateDir, "close-a.json")
+    await writeLeaseReceipt(closeSource, { version: 1, kind: "loginom-admin-command", id: closeReply.id, op: "close-session", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(closePayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(closeReply)).digest("hex"), settledAt: new Date().toISOString() })
+    expect(await recordServerSessionClosed(fixture.slots, lease, prepared.secretFile, observed.id, closeSource, closeReply)).toMatchObject({ state: "closed", binding })
+    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toMatchObject({ state: "closed", binding })
+    const closureFile = path.join(fixture.slots.controller.stateDir, "session-probe-a.closed.json")
+    const originalClosure = await Bun.file(closureFile).json()
+    await Bun.write(closureFile, "null")
+    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
+    expect(await Bun.file(closureFile).text()).toBe("null")
+    await writeLeaseReceipt(closureFile, { valueOf: false })
+    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow()
+    await writeLeaseReceipt(closureFile, originalClosure)
+    const originalCloseSource = await Bun.file(closeSource).json()
+    await writeLeaseReceipt(closeSource, { ...originalCloseSource, settledAt: new Date(Date.parse(originalCloseSource.settledAt) + 1).toISOString() })
+    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
+    await writeLeaseReceipt(closeSource, originalCloseSource)
     const originalSource = await Bun.file(source).json()
     await writeLeaseReceipt(source, { ...originalSource, settledAt: new Date(Date.parse(originalSource.settledAt) + 1).toISOString() })
     await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")

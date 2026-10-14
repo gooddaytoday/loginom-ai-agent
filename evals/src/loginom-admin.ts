@@ -27,7 +27,7 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
-import { claimUserOwnership, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession } from "./user-environment"
+import { claimUserOwnership, readServerSession, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
@@ -39,6 +39,7 @@ export type AdminConnection = {
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
   createBlockedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof readUserOwnership>>>
   observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown): Promise<Awaited<ReturnType<typeof recordServerSession>>>
+  closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
@@ -181,6 +182,20 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       })
       requireAdminReply(reply)
       return recordServerSession(file, lease, secretFile, path.join(directory, "commands", `${reply.id}.json`), payload, reply)
+    },
+    async closeOwnedSession(lease, secretFile, proofId) {
+      const entry = await readServerSession(file, lease, secretFile, proofId)
+      if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
+        throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      if (entry.state === "closed") return
+      if (path.dirname(entry.source.path) !== path.join(directory, "commands")) throw new EvalFailure("SESSION_OWNERSHIP_UNCONFIRMED", 2)
+      const reply = await request("close-session", { proofId: entry.source.id, session: entry.binding }, async () => {
+        if (JSON.stringify(await readServerSession(file, lease, secretFile, proofId)) !== JSON.stringify(entry))
+          throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+        await verifyParallelPair(file, identity)
+      })
+      requireAdminReply(reply)
+      await recordServerSessionClosed(file, lease, secretFile, proofId, path.join(directory, "commands", `${reply.id}.json`), reply)
     },
     async closeSession(session) {
       const data = requireAdminReply(await request("close-session", { session }))
