@@ -1,0 +1,116 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "static_sources": [
+    {
+      "bytes": 167,
+      "sha256": "5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3",
+      "format": {
+        "delimiter": ";",
+        "decimal_separator": ".",
+        "null_marker": "NULL",
+        "text_qualifier": "\""
+      },
+      "fixture_path": "fixtures/preservation/rowid-ab-c.csv",
+      "fixture_commit": "738ae7b8c622b696245bda6473e64d9e77a19eac",
+      "encoding": "UTF-8",
+      "provenance": "authored_fixture_bytes_contract",
+      "source_path": "{{SOURCE_PATH}}",
+      "required_receipt_provenance": "independent_server_file_download",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "A",
+          "label": "Same",
+          "type": "string"
+        },
+        {
+          "name": "B",
+          "label": "Same",
+          "type": "integer"
+        },
+        {
+          "name": "C",
+          "label": "Unused",
+          "type": "boolean"
+        },
+        {
+          "name": "Extra",
+          "label": "Unrequested",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.reform_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.reform_columns",
+      "output_node_label": "Preservation",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "A",
+          "label": "Only A",
+          "type": "string"
+        },
+        {
+          "name": "RenamedB",
+          "label": "Same",
+          "type": "integer"
+        },
+        {
+          "name": "Extra",
+          "label": "Unrequested",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 101,
+          "A": "alpha",
+          "RenamedB": 17,
+          "Extra": "keep"
+        },
+        {
+          "RowID": 102,
+          "A": "",
+          "RenamedB": 0,
+          "Extra": ""
+        },
+        {
+          "RowID": 103,
+          "A": null,
+          "RenamedB": null,
+          "Extra": null
+        },
+        {
+          "RowID": 104,
+          "A": "semi;colon",
+          "RenamedB": -7,
+          "Extra": "Кириллица"
+        },
+        {
+          "RowID": 105,
+          "A": "say \"yes\"",
+          "RenamedB": 2147483647,
+          "Extra": "NULL-ish"
+        }
+      ]
+    }
+  ]
+}

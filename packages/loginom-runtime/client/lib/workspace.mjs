@@ -5,8 +5,9 @@ async function prepareWorkspace(page, options) {
   const trace = [];
   let authenticated = false;
   const remaining = () => {
-    if (Date.now() >= deadline) throw new Error('DEADLINE');
-    return deadline - Date.now();
+    const left = deadline - Date.now();
+    if (left <= 0) throw new Error('DEADLINE');
+    return left;
   };
   const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
   const wait = async (name, probe) => {
@@ -123,6 +124,7 @@ async function prepareWorkspace(page, options) {
       await page.goto(options.url,{waitUntil:'domcontentloaded',timeout:remaining()});
     }
     const build=await wait('ui_build',()=>page.evaluate(()=>globalThis.bg?.app?.Version??null));
+    remaining();
     target={profile_id:options.profileId,loginom_build:build,platform:options.platform,browser:'chromium'};
     if (build!==options.expectedBuild) return result('INCOMPATIBLE','UI_BUILD_MISMATCH');
     const avatar=tid('MF;cntMain;tlbMainToolbar;btnAvatar'), login=tid('LoginForm;Login;edtUsername');
@@ -308,12 +310,22 @@ export const workspaceObserveTool = {
 
 function bootstrapWorkspace(page, expected) {
   return (async () => {
-    let origin = null;
-    try { origin = new URL(page.url()).origin; } catch { /* No open application. */ }
-    let output = { bootstrap: true, target_state: 'not_open', origin, authenticated: null,
+    if (page.isClosed?.()) throw new Error('Bootstrap page is closed');
+    const url = page.url();
+    if (typeof url !== 'string' || !url) throw new Error('Bootstrap page URL is unavailable');
+    // URL belongs to the browser realm, not the unsafe VM executing this helper.
+    const origin = url === 'about:blank' ? null : await page.evaluate(url => {
+      try {
+        const parsed = new URL(url);
+        return ['http:', 'https:'].includes(parsed.protocol) ? parsed.origin : null;
+      } catch { return null; }
+    }, url);
+    let output = { bootstrap: true, target_state: url === 'about:blank' ? 'not_open' : 'indeterminate', origin, authenticated: null,
       login_required: null, compatible_build: null, observation_only: true };
     if (origin === expected.origin) {
-      output = await page.evaluate(({ expectedBuild }) => {
+      output = await page.evaluate(({ expectedBuild, expectedOrigin }) => {
+        if (location.origin !== expectedOrigin) return { bootstrap: true, target_state: 'indeterminate',
+          origin: location.origin, authenticated: null, login_required: null, compatible_build: null, observation_only: true };
         const started = Date.now(), walker = document.createTreeWalker(document.documentElement, 1);
         let visited = 0, element, exhausted = false, avatar = false, login = false, dialogs = 0, masks = 0;
         const visible = element => {
@@ -348,7 +360,7 @@ function bootstrapWorkspace(page, expected) {
           compatible_build: compatible, blockers: { visible_dialogs: dialogs, visible_masks: masks },
           scan: { visited_elements: visited, complete: exhausted, max_elements: 4000, max_ms: 75 },
           observation_only: true };
-      }, { expectedBuild: expected.build });
+      }, { expectedBuild: expected.build, expectedOrigin: expected.origin });
     }
     return { status: 'SUCCEEDED', action_key: 'workspace.observe', action_revision: '1', operation_id: null,
       phase: 'observed', effect_possible: false, cleanup_complete: true, error: null, trace: [], output };

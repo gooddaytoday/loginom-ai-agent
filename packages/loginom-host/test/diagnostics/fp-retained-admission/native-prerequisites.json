@@ -1,0 +1,51 @@
+{
+  "revision": 1,
+  "scope": "FP_NEXT_NATIVE_PREREQUISITES_CONTRACT_ONLY",
+  "native_authorized_now": false,
+  "fixed_harness": "field-parameters-preservation-v1",
+  "fixed_type": "transform.reform_columns",
+  "input_port": 0,
+  "current_route": "inventory-bound fixed launcher creates its own private grant; actual receiver creates original FPStartup; actual acquire creates HostPort run/lease/generation/chat binding; original-control-only readPreReady invokes retained managed qualification and real bridge. PRE_READY_CLOSED_READ is observation only and locks this run against mutation/release.",
+  "qualification_is_admission": false,
+  "read_projection": {"kind": "PRE_READY_CLOSED_READ", "ready": false, "cleanupComplete": false},
+  "admission_gap": {
+    "source": "bridge.mjs fieldParametersCapture.context / captureAcceptance and executor.mjs assertFieldParametersDraftAllowed",
+    "required": "same bridge private existing FP operation whose original configure channel already owns the serial Page/editor/store/inputMapping. No such operation is created by a qualification read. Session metadata/config/model booleans cannot create it.",
+    "observed_refusal": "LOGINOM_FP_DRAFT_UNKNOWN before the private collector or mutation",
+    "startup_seam": "host.runtime launches a distinct acquired-chat managed child without FPStart; start-input.mjs explicitly disallows fpStartup together with acceptanceCapture or chat other than readiness. Qualification read control is original-bound; acquired-chat startup itself is not yet the original controlled-startup ABI.",
+    "minimal_future_intersection": "Agree the existing fpStartup validation for the actual acquired-chat capture tuple, and matching supervisor/managed original-start cancellation binding. Do not simply forward readiness startup into a capture chat: current validator deliberately rejects it; do not mint a fresh timer/controller/grant from model JSON. Source68/Amount algorithms are outside this cut.",
+    "positive_draft_requires": "actual original FP configure admission and native context/resources/source proof, separately authorized; historical AMBIGUOUS configure is never replayed"
+  },
+  "fresh_original_facts": [
+    "exact own account/profile/stand, rights, server session/holder and observed cleanup status",
+    "original retained serial Page/context/owner, session/metadata/directory and current document/workflow/node/input-port0",
+    "saved package/account/path and original native preparation receipts, editor root, store and persistent field/record IDs",
+    "actual run/lease/generation/chat and private grant; original signal, outer and managed request IDs, absolute upstream deadline",
+    "known dirty/running/unsettled/pending/unknown_effect before and after each bounded read; unknown is a refusal",
+    "exact input path and 167-byte input SHA256/full format/schema read from supported original source authority",
+    "actual model input/cwd/instructions/attachments isolation from the independent oracle"
+  ],
+  "input_contract": {
+    "bytes": 167,
+    "sha256": "5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3",
+    "provenance": "authored fixture contract; native original source NOT_VERIFIED",
+    "format": {"delimiter": ";", "decimal_separator": ".", "null_marker": "NULL", "text_qualifier": "\""},
+    "schema": [
+      {"name": "RowID", "label": "RowID", "type": "integer"},
+      {"name": "A", "label": "Same", "type": "string"},
+      {"name": "B", "label": "Same", "type": "integer"},
+      {"name": "C", "label": "Unused", "type": "boolean"},
+      {"name": "Extra", "label": "Unrequested", "type": "string"}
+    ],
+    "path_pin": "must bind the actual own original user source path; no placeholder/model-supplied path can authorize bytes"
+  },
+  "retained_draft_contract": {
+    "stopped_before_done": true,
+    "settings_applied": false,
+    "execution_started": false,
+    "cleanupComplete": false,
+    "pending_lease_journal_retained": true,
+    "no_prepare_apply_done_save_replay_cleanup_release_ack_now": true
+  },
+  "NOT_VERIFIED": ["native original FP authority/current safety/resources/cleanup", "original input source proof", "model isolation", "values/persistence/cold/full writer union/full node"]
+}

@@ -1,3 +1,4 @@
+import {collectFieldParametersPreservation} from '../../src/acceptance/field-parameters-preservation-v1.mjs';
 import {outputMappingOrigin,outputMappingState,outputRecoveryCalculatorState,verifyOutputMappingFinish,outputRecoveryBoundary,sameOutputRecovery} from './node-output-mapping-recovery.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {inputMappingOrigin,inputMappingState,inputMappingGraph,verifyInputMappingFinish,inputRecoveryBoundary,sameInputRecovery} from './node-input-mapping-recovery.mjs';
@@ -116,6 +117,22 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    },
    async configureCalculator(ctx,p) {
     enter(ctx);
+    if(operation.fpCapture){
+     requireValue(operation.nodeApply.request.target.type==='transform.reform_columns','FP fixed type required');
+     requireValue(!operation.fpCaptureConsumed,'FP capture cannot replay');operation.fpCaptureConsumed=true;
+     try{
+     const inputMapping=operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping;
+     const args=await operation.fpCapture.context(operation);
+
+     const record=async event=>{await onRecord({...event,operation_id:operation.id});const fresh=await operation.fpCapture.context(operation);Object.assign(args.resources,fresh.resources);};
+     const refresh=async()=>{const fresh=await operation.fpCapture.context(operation);Object.assign(args.resources,fresh.resources);};
+     const guarded={...channel};for(const name of ['observe','perform']){const original=channel[name].bind(channel);guarded[name]=async(...values)=>{await refresh();const reply=await original(...values);await refresh();return reply;};}
+     const retained={binding:args.binding,identity:args.identity,channel:guarded};
+     operation.fpDraft=await collectFieldParametersPreservation({...args,retained,inputMapping,channel:guarded,record});
+     await onRecord({event:'fp_draft_retained',operation_id:operation.id,receipt:operation.fpDraft});
+     }catch(primary){operation.fpUncertain=true;operation.fpFailure={value:primary};throw primary;}
+     throw Error('LOGINOM_FP_DRAFT_RETAINED');
+    }
     if(implementation){
      if(implementation.inspectConfigure){configureProgress.signature??=operation.nodeApply.signature;configureProgress.node??=structuredClone(operation.nodeApply.node);}
      try{

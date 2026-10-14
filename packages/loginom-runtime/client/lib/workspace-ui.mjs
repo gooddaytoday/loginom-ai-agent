@@ -106,10 +106,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const readUi = async (rediscover = false) => {
     const nodeContext=await boundNode();
     const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
-    try {
+    // Retain failed-read measurements across the browser realm without exporting partial action refs.
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
-    let maxMs = 500;
-    let work = 0,scanStage='collect';
+    // Root discovery issues only region references with no allowed actions.
+    // Under renderer contention even this small bounded scan can take >500ms.
+    // Actionable observations retain 500ms; retries never extend the parent deadline.
+    let maxMs = discoverRoots ? 2000 : 500;
+    let work = 0,scanStage='collect',visitedElements=0,scanRootTid=null,documentEpoch=null;
+    try {
     const charge = () => {
       if (++work > maxWork || Date.now() - scanStarted > maxMs) {
         const error = new Error('Workspace scan budget exceeded; no complete observation or action references were issued');
@@ -122,6 +126,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       state = { document, ids: new WeakMap(), sequence: 0, epoch: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` };
       Object.defineProperty(globalThis, stateKey, { value: state, configurable: true });
     }
+    documentEpoch=state.epoch;
     if (!state.observer) {
       if (typeof MutationObserver !== 'function') {
         const error = new Error('DOM mutation tracking is unavailable'); error.code = 'UI_EPOCH_UNAVAILABLE'; throw error;
@@ -178,13 +183,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if (rootRef && !requestedRoot?.isConnected) {
       const error=new Error('Observed root is detached or its reference expired');error.code='UI_ROOT_STALE';throw error;
     }
+    scanRootTid=requestedRoot?.getAttribute('data-tid')??null;
     const dom = [], seenElements = new Set();
     const include = element => {
       charge(); if (seenElements.has(element)) return;
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
-      seenElements.add(element);dom.push(element);
+      seenElements.add(element);dom.push(element);visitedElements=dom.length;
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"],[data-tid$="NavigationBar;NavPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -265,7 +271,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid$=";NavigationBar;NavPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       ...Object.entries({ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
@@ -314,9 +320,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       charge();for (const element of guards)if(addressedImportField(element))include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
-      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
+      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"],[data-tid*=";ViewsForm;cntPorts;"],[data-tid*=";ViewsForm;ViewerCard"]');
       charge();for (const element of tableOwners) {
-        charge();if(/^MF;TF(?:-\d+)?;ViewsForm;BrowseView(?:-[1-9][0-9]*)?$/.test(element.getAttribute('data-tid')??''))include(element);
+        charge();if(/^MF;TF(?:-\d+)?;ViewsForm(?:;BrowseView(?:-[1-9][0-9]*)?|;cntPorts;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|;ViewerCard(?:-[0-9]+)?)?$/.test(element.getAttribute('data-tid')??''))include(element);
       }
     }
     if(!requestedRoot && !discoverRoots && omittedRegions.has('preview_data_cells')) {
@@ -529,7 +535,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
       // breadcrumb buttons, not document.title. This is observed context only;
       // proving which graph click opened the wizard requires an action receipt.
-      const panels=(tids.get(workflow.prefix+';NavigationBar;NavigationPanel')??[]).filter(e=>visible(e) && !sensitive(e));
+      // Native 7.4.2 shortnames uses NavPanel; keep the legacy exact name.
+      // Both candidates still belong to this tab and must resolve uniquely.
+      const panels=['NavPanel','NavigationPanel'].flatMap(name=>tids.get(workflow.prefix+';NavigationBar;'+name)??[])
+        .filter(e=>visible(e) && !sensitive(e));
       let ownerContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       let portContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       if(panels.length===1) {
@@ -561,7 +570,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             vendor_icon:e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const chain=items.every((item,index)=>item.tid.length<=2048 && item.label.length<240
-            && (!index || item.tid.startsWith(items[index-1].tid+'>')));
+            && (!index || item.tid.startsWith(items[index-1].tid+'>')
+              && !item.tid.slice(items[index-1].tid.length+1).includes('>')));
           if(unique&&chain&&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
             &&items.length>=preparedWorkflowPath.length&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096
             &&preparedWorkflowPath.every((c,i)=>c.tid===items[i].tid&&c.label===items[i].label)
@@ -2505,6 +2515,8 @@ function readRenderedInputMapping(observation) {
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
       .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||preparedNodeId&&['NavigationPanel','NavPanel'].some(name=>getTid(selectedRoot)===definitionPrefix+';NavigationBar;'+name)
+          &&['NavigationPanel','NavPanel'].flatMap(name=>tids.get(definitionPrefix+';NavigationBar;'+name)??[]).filter(e=>visible(e)&&!sensitive(e)).length===1&&viewerControls.has(state.ids.get(element))
         ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
@@ -3226,13 +3238,20 @@ function readRenderedInputMapping(observation) {
       const code=['UI_SCAN_LIMIT','UI_ROOT_STALE','UI_EPOCH_UNAVAILABLE'].includes(error?.code)
         ? error.code : 'UI_OBSERVATION_FAILED';
       return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
-        ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
+        ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{}),...(code==='UI_SCAN_LIMIT'?{diagnostics:{
+          root_ref:rootRef??null,root_tid:scanRootTid,document_epoch:documentEpoch,
+          global_scan:!rootRef&&!discoverRoots,discover_roots:discoverRoots,
+          elapsed_ms:Math.max(0,Date.now()-scanStarted),work,visited_elements:visitedElements,
+          max_ms:maxMs,max_work:maxWork,max_elements:maxElements}}:{})}};
     }
   },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
     mappingPage:task.output_column_page??(task.snapshot?.wizard?.output_columns?.page?{offset:task.snapshot.wizard.output_columns.page.offset,limit:task.snapshot.wizard.output_columns.page.limit}:null),
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
-    preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
+    // Save As can rebuild breadcrumb TIDs while retaining this native node.
+    // Only boundNode's verified rebind supplies the current path; the same
+    // complete native context is checked again after the UI read below.
+    preparedWorkflowPath:nodeContext?.navigation_rebinding?.observed_path??task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
@@ -3240,7 +3259,7 @@ function readRenderedInputMapping(observation) {
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
-      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
+      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown',...observed.ui_read_failure.diagnostics});
       const messages={UI_SCAN_LIMIT:'Workspace scan budget exceeded; use root discovery and a narrower observation',
         UI_ROOT_STALE:'Observed root is detached, hidden, inactive or expired',
         UI_EPOCH_UNAVAILABLE:'DOM mutation tracking is unavailable',UI_OBSERVATION_FAILED:'Browser observation failed'};
@@ -3780,9 +3799,15 @@ function readRenderedInputMapping(observation) {
                 &&beforeNode.pending_wizard_node.label===owner?.node?.label
               :labels.length===1&&normalizeLabel(labels[0].label)!==''
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
+          // Only the prepared native binding can authorize a saved-package
+          // rekey; the raw owner path or displayed label cannot do so.
+          const rebound=afterNode?.navigation_rebinding;
+          const ownerPath=owner?.path?.slice(0,-2).map(({tid,label})=>({tid,label}));
+          const openingPathMatches=same(ownerPath,opening.workflow_path)
+            ||guidOwnerMatches&&same(rebound?.prepared_path,opening.workflow_path)&&same(rebound?.observed_path,ownerPath);
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingPathMatches))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
@@ -3892,6 +3917,13 @@ function readRenderedInputMapping(observation) {
             const discrete=['Строковый','Логический'].includes(choice.label);
             kind.enabled=!discrete;
             if(discrete){kind.value='Дискретный';kind.value_length_utf16=kind.value.length;}
+            // Loginom 7.4.2 promotes an undefined kind when converting a
+            // string to real or datetime. Preserve explicit kinds and every other field.
+            if(['Вещественный','Дата/Время'].includes(choice.label)
+              &&current.wizard.reform_parameters.fields.type_label.value==='Строковый'
+              &&kind.value==='Неопределенное') {
+              kind.value='Непрерывный';kind.value_length_utf16=kind.value.length;
+            }
           }
           if(!observed.authenticated || observed.origin!==current.origin || observed.loginom_build!==current.loginom_build
             || !same(observed.workflow_ref,current.workflow_ref) || !same(observed.package_identity,current.package_identity)
@@ -4041,13 +4073,17 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  const tableFilterOpening=options.action?.verb==='click'&&options.snapshot?.node_outputs?.verified===true
+    &&options.snapshot.node_outputs.surface==='views'&&options.snapshot.prepared_node_context?.surface==='views'
+    &&options.snapshot.node_outputs.tables.filter(t=>t.active&&t.view_guid&&t.port_guid
+      &&options.snapshot.ui.elements.some(e=>e.ref===options.action.ref&&e.tid===t.table_tid+';btnDataGridFilter')).length===1;
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)&&!tableFilterOpening
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
     throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
@@ -4064,4 +4100,83 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
   return `async (page) => (${workspaceUiCapability.toString()})(page, ${JSON.stringify(task)}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
+}
+
+// Internal Calculator-only diagnostic capture; not a public observer option.
+export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
+ const fail=m=>{throw Error('LOGINOM_CAPTURE_'+m);};
+ if(!limits||limits.bytes!==524288||limits.dom!==4096||limits.records!==1000||limits.string!==512)fail('LIMITS');
+ const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+ if(p?.document!==document||p.id!==owner.document_id||app?.Version!==owner.loginom_build
+  ||app.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName!==owner.account)fail('RAW_IDENTITY');
+ const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+ const tabs=exact(owner.tab_tid);
+ if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active'))fail('RAW_TAB');
+ const roots=exact(root_tid);if(roots.length!==1)fail('RAW_ROOT');
+ const root=roots[0],ui=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+ if(ui?.document!==document||ui.refs?.get(root_ref)?.deref()!==root||!root.isConnected)fail('RAW_ROOT_REF');
+ const receipts=[...p.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===owner.workflow_id&&r.tab===tabs[0]);
+ if(!receipts.length||receipts.some(r=>r.packageNode!==receipts[0].packageNode))fail('RAW_WORKFLOW');
+ const ids=new WeakMap();let seq=0;
+ const id=o=>{if(!o||typeof o!=='object')return null;if(!ids.has(o))ids.set(o,++seq);return ids.get(o);};
+ const scalar=v=>{if(v===undefined)return {missing:true};if(v===null||typeof v==='boolean')return v;
+  if(typeof v==='number'){if(!Number.isFinite(v))fail('FINITE');return v;}
+  if(typeof v==='string'){if(new TextEncoder().encode(v).length>limits.string)fail('STRING_BOUND');return v;}return {object_id:id(v)};};
+ const own=(o,k)=>{const d=o&&Object.getOwnPropertyDescriptor(o,k);return !d?{missing:true}:!('value'in d)?{accessor_not_read:true}:scalar(d.value);};
+ const rect=e=>{const r=e.getBoundingClientRect();if(![r.x,r.y,r.width,r.height,e.clientWidth,e.clientHeight,e.scrollWidth,e.scrollHeight,e.scrollLeft,e.scrollTop].every(Number.isFinite))fail('GEOMETRY');return {x:r.x,y:r.y,width:r.width,height:r.height,
+  clientWidth:e.clientWidth,clientHeight:e.clientHeight,scrollWidth:e.scrollWidth,scrollHeight:e.scrollHeight,scrollLeft:e.scrollLeft,scrollTop:e.scrollTop};};
+ const dom=[],stack=[root];while(stack.length){
+  if(dom.length>=limits.dom)fail('DOM_BOUND');const e=stack.pop();
+  dom.push({id:id(e),parent_id:id(e.parentElement),tag:e.tagName,
+   attrs:Object.fromEntries(['id','data-tid','data-recordindex','data-recordid','data-boundview','class'].map(k=>[k,scalar(e.getAttribute(k))])),rect:rect(e)});
+  // Charge before allocating a child list; reject rather than truncate.
+  if(e.children.length+stack.length+dom.length>limits.dom)fail('DOM_BOUND');
+  for(let i=e.children.length-1;i>=0;i--)stack.push(e.children[i]);
+ }
+ const stores=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(suffix=>{
+  const candidates=root.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']');
+  if(candidates.length!==1)fail('GRID');const element=candidates[0],view=globalThis.Ext?.getCmp?.(element.id);
+  if(view?.el?.dom!==element)fail('GRID_BINDING');
+  // These are the same cached UI accessors used by the native mapping reader.
+  const store=view.getStore?.(),data=store?.getData?.(),source=data?.getSource?.(),proxy=store?.getProxy?.();
+  if(!Array.isArray(data?.items)||data.items.length>limits.records||source&&(!Array.isArray(source.items)||source.items.length>limits.records))fail('CACHE_BOUND');
+  const records=data.items.map(r=>({object_id:id(r),internalId:own(r,'internalId'),data_id:id(r.data),
+   data:Object.fromEntries(['ID','Index','Name','DisplayName','DataType','GroupField','DataKind','Required','Broken','IsDerived','SourceDisplayName','SourceName','ConnectedRecord'].map(k=>[k,own(r.data,k)]))}));
+  const rendered=[...element.querySelectorAll('table.x-grid-item')];
+  if(rendered.length>limits.records)fail('ROW_BOUND');
+  const rows=rendered.map(e=>({element_id:id(e),parent_id:id(e.parentElement),record_index:scalar(e.getAttribute('data-recordindex')),record_id:scalar(e.getAttribute('data-recordid')),bound_view:scalar(e.getAttribute('data-boundview')),rect:rect(e)}));
+  const pending=proxy&&Object.getOwnPropertyDescriptor(proxy,'pendingOperations');
+  const pendingKeys=pending&&'value'in pending&&pending.value?Object.keys(pending.value):null;
+  if(pendingKeys&&pendingKeys.length>limits.records)fail('PENDING_BOUND');
+  return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
+   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,own(store,k)])),
+   cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
+    remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
+   proxy_class:own(proxy,'$className'),pendingKeys:pendingKeys?.map(scalar)??null,
+   source_membership:source?.items.map(id)??null,cache_membership:data.items.map(id),records,rows,geometry:rect(element)};
+ });
+ // These are diagnostic cache/row predicates, not the observer's ordinary
+ // coverage or addressed-definition decision. Missing facts stay unevaluated.
+ const window=stores.map(s=>{
+  const f=s.flags,c=s.cached_reads;
+  const available=typeof c.count==='number'&&typeof c.loading==='boolean'
+   &&typeof c.remoteFilter==='boolean'&&typeof c.remoteSort==='boolean'&&Array.isArray(s.source_membership)
+   &&Array.isArray(s.pendingKeys)&&typeof f.isBufferedStore==='boolean';
+  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable'};
+  const cache=f.$className==='Ext.data.Store'&&f.isBufferedStore===false&&c.loading===false
+   &&f.currentPage===1&&c.remoteFilter===false&&c.remoteSort===false&&s.pendingKeys.length===0
+   &&s.proxy_class==='bg.ext.CollectionProxy'&&c.count===s.records.length
+   &&s.source_membership.length===s.cache_membership.length
+   &&new Set(s.source_membership).size===s.source_membership.length
+   &&s.source_membership.every(id=>s.cache_membership.includes(id));
+  const rows=s.rows.length===s.records.length&&s.rows.every((r,i)=>
+   r.record_index===String(i)&&r.record_id===String(s.records[i].internalId)
+   &&r.bound_view===dom.find(e=>e.id===s.element_id)?.attrs.id);
+  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows};
+ });
+ const result={owner,root_tid,root_ref,dom,stores,collector_revision:1,
+  predicates:{status:'partial',evaluated:false,cached_windows:window,
+   missing:['ordinary_coverage','addressed_complete','native_window','full_geometry_trace']}};
+ if(new TextEncoder().encode(JSON.stringify(result)).length>limits.bytes)fail('BYTE_BOUND');
+ return result;
 }

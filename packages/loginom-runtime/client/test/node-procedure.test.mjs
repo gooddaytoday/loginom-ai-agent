@@ -679,6 +679,31 @@ test('bound completion gives mask settlement only the remaining parent deadline'
   }
 });
 
+test('bound Table filter opening uses its parent deadline without changing unrelated clicks',async()=>{
+  for(const mode of ['filter','format','foreign','expired']) {
+    const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+    const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+    const table='MF;TF-1;ViewsForm;BrowseView';
+    const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
+      prepared_node_context:{...binding.node,verified:true,surface:'views',tid:table},scan:{complete:true},wizard:{status:'absent'},
+      node_outputs:{verified:true,surface:'views',tables:[{active:true,table_tid:table,view_guid:'view',port_guid:'port'}]},
+      ui:{elements:[{ref:'ui-button',tid:(mode==='foreign'?table+'-2':table)+(mode==='format'?';btnDataGridFormat':';btnDataGridFilter'),allowed_actions:['click']}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+    const operation={id:'parent',deadline:mode==='expired'?11000:65000,action:{action_key:'node.apply',revision:'1'}};
+    let clicks=0;
+    const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+      now:()=>1000,wait:async()=>{},record:async e=>structuredClone(e),wrapMutation:(code,receipt)=>({code,receipt}),
+      execute:async(code,options)=>{
+        if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+        clicks++;
+        if(['foreign','format'].includes(mode))assert.doesNotMatch(code.code,/"opening_timeout_ms":/);
+        else {assert.match(code.code,new RegExp('"opening_timeout_ms":'+(mode==='expired'?10000:45000)));assert.equal(options.timeout,mode==='expired'?15000:50000);}
+        return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};
+      }});
+    await channel.observe({condition:'bound Table',ready:()=>true});await channel.act({verb:'click',ref:'ui-button'});
+    assert.equal(clicks,1);assert.equal(operation.deadline,mode==='expired'?11000:65000);
+  }
+});
+
 test('readiness expiry retains last geometry without a diagnostic browser round trip',async()=>{
   let time=1,reads=0;
   const f=fixture({now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms},onRead:()=>{time+=250;reads++}});

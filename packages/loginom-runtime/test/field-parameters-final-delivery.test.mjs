@@ -1,0 +1,94 @@
+import test,{mock} from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {mkdtemp,rm,readFile,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';
+import {nativeEditorDouble} from './support/fp-native-editor-double.mjs';
+const root=process.env.FP_RUNTIME??new URL('..',import.meta.url).pathname,lib=p=>pathToFileURL(root+'/client/lib/'+p).href;
+const require=createRequire(root+'/client/package.json');const {Client:AgentClient}=require('@modelcontextprotocol/sdk/client/index.js'),{InMemoryTransport}=require('@modelcontextprotocol/sdk/inMemory.js');const sdk=p=>pathToFileURL(require.resolve('@modelcontextprotocol/sdk/'+p).replace('/cjs/','/esm/')).href;
+const executor=await import(lib('executor.mjs')),catalog=await import(lib('action-catalog.mjs')),skill=await import(lib('skill.mjs')),workspace=await import(lib('workspace.mjs')),nodeContext=await import(lib('node-context.mjs'));
+const {actions:pinnedSourceActions}=await import(new URL('../client/test/support/executor-fixture.mjs',import.meta.url));
+let current;const target={profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'};
+const ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'flow',node_id:'node'};
+const encode=s=>'ui-'+Buffer.from(s).toString('hex');const transform=(v,k='')=>Array.isArray(v)?v.map(x=>transform(x)):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([key,x])=>[key,transform(x,key)])):typeof v==='string'&&(k==='ref'||k.endsWith('_ref'))?encode(v):v;
+function options(code,marker){const start=code.indexOf(marker);let depth=0,quoted=false,escape=false;for(let i=start;i<code.length;i++){const c=code[i];if(quoted){if(escape)escape=false;else if(c==='\\')escape=true;else if(c==='"')quoted=false}else if(c==='"')quoted=true;else if(c==='{')depth++;else if(c==='}'&&--depth===0)return JSON.parse(code.slice(start,i+1));}throw Error('missing serialized body')}
+async function snapshot(){const f=current,s=transform(await f.editor.channel.observe({ready:()=>true}));Object.assign(s,{origin:'https://worker.invalid',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'doc',revision:1},scan:{complete:true}});Object.assign(s.ui,{masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false}});if(f.scenario==='late-root'&&f.editor.events.some(e=>e.verb==='apply_reform_column'))s.wizard.root_tid='foreign';s.node_reform.node_context={...s.prepared_node_context};for(const [name,field]of Object.entries(s.wizard.reform_parameters?.fields??{}))s.ui.elements.push({ref:field.input_ref,allowed_actions:[name==='excluded'?'set_checked':'set_wizard_field']});for(const e of s.ui.elements)e.wizard_field={max_length_utf16:256};return s}
+class ExternalClient{
+ constructor(identity){this.browser=identity.name==='loginom-dock-browser';this.f=current}
+ async connect(t){this.transport=t}async close(){this.f.events.push('transport-close');this.transport?.onclose?.()}
+ async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]}}
+ async callTool({arguments:{code}}){const f=this.f;let value;
+ if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,target,loginom_account:'worker',document_id:'doc',created_draft:true,effect_possible:true,workflow_ref:ref,package_ref:{path:null}};
+ else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'doc'}};
+ else if(code.includes('function readSavedPackageState'))value={version:1,session_id:'session',document_id:'doc',account:'worker',package_path:'/worker/fp.lgp',modified:false,observation:'after_confirmed_save',read_only:false,persisted_content_verified:false};
+ else if(code.includes('async function readFieldParametersNativeContext'))value=await vm.runInNewContext('('+code+')')(f.page);
+ else if(code.includes('"mode":"act"')){const o=options(code,'{"mode":"act"'),a={...o.action};a.ref=Buffer.from(a.ref.slice(3),'hex').toString();await f.editor.channel.perform({resolve:()=>a});value={status:'SUCCEEDED',cleanup_complete:true,action_key:'ui.act',operation_id:o.operation_id,effect_possible:true,output:await snapshot()};value={status:'SUCCEEDED',action_key:'node.apply.transport',action_revision:'1',operation_id:'owned-fp',phase:'transport',effect_possible:true,cleanup_complete:true,output:{value},error:null,trace:[]};}
+ else if(code.includes('async function readReformContext'))value={status:'SUCCEEDED',action_key:'node.apply.transport',action_revision:'1',operation_id:'owned-fp',phase:'transport',effect_possible:false,cleanup_complete:true,output:{value:(await snapshot()).node_reform},error:null,trace:[]};
+ else if(code.includes('workspaceUiCapability'))value={status:'SUCCEEDED',action_key:'node.apply.transport',action_revision:'1',operation_id:'owned-fp',phase:'transport',effect_possible:false,cleanup_complete:true,output:{value:{status:'SUCCEEDED',output:await snapshot()}},error:null,trace:[]};
+ else throw Error('Unexpected private browser body');
+ return {content:[{type:'text',text:JSON.stringify(value)}]};
+ }
+}
+class ExternalTransport{}
+mock.module(sdk('client/index.js'),{namedExports:{Client:ExternalClient}});mock.module(sdk('client/stdio.js'),{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});mock.module(sdk('client/streamableHttp.js'),{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
+mock.module(lib('node-context.mjs'),{namedExports:{...nodeContext,readPreparedNodeContext:async page=>({...page.nativeContext})}});
+mock.module(lib('action-catalog.mjs'),{namedExports:{...catalog,pinActionCatalog:async()=>({pins:{},compatibility:target,manifest:{compatibility:target},actions:new Map([['package.save_checkpoint',pinnedSourceActions.get('package.save_checkpoint')]]),selectors:new Map()})}});
+mock.module(lib('skill.mjs'),{namedExports:{...skill,skillTransport:()=>({}),createSkillLoader:()=>({prepare:async()=>({main:'/fixture',directory:'/fixture',detail:{revision:'fixture',source:'fixture',content:'fixture'}})})}});
+mock.module(lib('workspace.mjs'),{namedExports:{...workspace,makeWorkspacePrepareCode:o=>workspace.makeWorkspacePrepareCode({...o,platform:'darwin'})}});
+mock.module(lib('executor.mjs'),{namedExports:{...executor,createActionRuntime:opts=>{
+ const f=current;const graph={complete:true,document_id:'doc',workflow_ref:ref,nodes:[{ref:node,type:'transform.reform_columns',label:'FP',position:{x:100,y:100},inputs:[0],outputs:[0]}],links:[],foreign_links:[]};const ok=extra=>async()=>({verified:true,cleanup_complete:true,effect_possible:false,...extra});
+ const support=f.support;
+ const runtime=executor.createActionRuntime({...opts,nodeApplyHandlers:new Map([['transform.reform_columns',{parameter_schema:{type:'object',properties:{}},revision:'fp-fixed',modes:['scalar'],output_wizard:'separate',validate:()=>{},configure:(ctx,p,d)=>d.configureCalculator(ctx,p)}]]),nodeTargetAdapterFactory:()=>({verifyWorkflow:async request=>({status:'SUCCEEDED',verified:request.document_id===graph.document_id&&JSON.stringify(request.workflow_ref)===JSON.stringify(graph.workflow_ref),cleanup_complete:true,effect_possible:false,document_id:graph.document_id,workflow_ref:graph.workflow_ref}),observe:async()=>structuredClone(graph),preflight:async()=>{},reconcile:async()=>({verified:true,cleanup_complete:true})}),nodeApplyDriverFactory:context=>({...support.nodeApplyDriverFactory(context),beforeTarget:undefined,afterTarget:undefined,verifySource:ok({}),mapPorts:async()=>({verified:true,cleanup_complete:true,effect_possible:false,native_mapping:f.editor.inputMapping}),openWizard:ok({}),finish:async()=>{throw Error('Done forbidden')},finishGraph:async()=>{throw Error('Done forbidden')}})});
+ f.runtime=runtime;return {...runtime,run:async(key,p,{operationId})=>{assert.equal(key,'package.save_checkpoint');return {status:'SUCCEEDED',cleanup_complete:true,action_key:key,operation_id:operationId,output:{package_ref:{path:p.path},save_completed:true}}}};
+}}});
+const {verifyFieldParametersPreservation}=await import(pathToFileURL(root+'/src/acceptance/field-parameters-preservation-consumer.mjs'));
+const oracle=JSON.parse(await readFile(new URL('../../../docs/node-development/nodes/field-parameters/acceptance/fixtures/preservation/rowid-ab-c.json',import.meta.url),'utf8'));
+// Independent late-boundary control. Keep the real journal write/fsync;
+// mutate only labelled Page/resource doubles after its final awaited record.
+const originalJournal=await import(lib('execution-journal.mjs'));
+mock.module(lib('execution-journal.mjs'),{namedExports:{...originalJournal,createExecutionJournal:opts=>{
+ const record=originalJournal.createExecutionJournal(opts);return async row=>{
+  const result=await record(row);
+  if(row.event==='fp_capture_draft'){
+   if(current.scenario==='after-journal-node')current.page.nativeContext.node_id='foreign';
+   if(current.scenario==='after-journal-dirty')current.page.dirty=true;
+   if(current.scenario==='after-journal-unknown')current.page.dirty=undefined;
+  }
+  return result;
+ };
+}}});
+const {createBridge}=await import(lib('bridge.mjs'));const {createReformNodeSupport}=await import(lib('reform-node.mjs'));
+for(const scenario of ['positive','after-journal-node','after-journal-dirty','after-journal-unknown'])test('whole private bridge/executor/tabular/component composition '+scenario,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'fp-bridge-')),document={},pkg={};const nativePackage={Package:pkg,PackageFileName:'/worker/fp.lgp',ReadOnly:false,HasRunningNodes:()=>false};const prep={document,id:'doc',receipts:new Map([['own',{phase:'verified',workflowId:'flow',packageNode:nativePackage,tab:{}}]])};const ctx=vm.createContext({document,location:{origin:'https://worker.invalid'},__loginomDockPreparationV1:prep,bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{HasRunningNodes:()=>false,FServerConnection:{Connected:true,UserName:scenario==='foreign-account'?'foreign':'worker',Session:{IsPackageModified:async()=>{if(scenario==='late-node'&&current.editor.events.some(e=>e.verb==='apply_reform_column'))current.page.nativeContext.node_id='foreign';return 'dirty' in current.page?current.page.dirty:scenario==='dirty'?true:scenario==='unknown-dirty'?undefined:false}}}}}}}}}});
+ const page={nativeContext:{...node,verified:true,surface:'wizard'},evaluate:async(fn,o)=>vm.runInContext('('+fn.toString()+')',ctx)(o)};
+ const binding=Object.freeze({revision:1,harness:'field-parameters-preservation-v1',owner:'owner',run:'run',lease:'owner:run',generation:1,chat:'chat',account:'worker',session:'session',packagePath:'/worker/fp.lgp',admission:'admission',expires:Date.now()+60000});
+ if(scenario==='foreign-page')prep.document={};
+ const f=current={scenario,page,editor:nativeEditorDouble(),events:[],support:createReformNodeSupport({targetOrigin:'https://worker.invalid',targetBuild:'7.4.2'})};
+ if(scenario==='partial')f.editor.inputMapping.inventory_complete=false;if(scenario==='duplicate-id')f.editor.inputMapping.target_fields[1].field_id='0';
+ const session={directory,browserCli:'/fixture',browserRoot:'/fixture',browserConfig:'/fixture',metadata:{client:'fixture',sessionId:'session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release')}}};let bridge,client;
+ try{bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'fixture',endpoint:'https://dock.invalid/mcp',stateDir:directory,loginomUrl:'https://worker.invalid/app',ownedPackageCleanupAccount:'worker',replayBootstrap:false,replayLoginUser:null},session,{acceptanceCapture:{binding,harness:()=>{throw Error('browser-oriented harness forbidden')}}});client=new AgentClient({name:'fixture',version:'1'});const[a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+ const preparation=await client.callTool({name:'dock_prepare',arguments:{}});assert.notEqual(preparation.isError,true,JSON.stringify(preparation));await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path:'/worker/fp.lgp'},operation_id:'save'}});
+ const request={operation_id:'owned-fp',contract_revision:'1.0.0',document_id:'doc',workflow_ref:ref,target:{kind:'existing',type:'transform.reform_columns',ref:node},inputs:[],mode:'scalar',parameters:{},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:30000,execute_ms:10000,total_ms:40000}};
+ const outcome=await f.runtime.runNodeApply(request);assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
+ if(scenario.startsWith('after-journal-')){
+  assert.equal(outcome.error?.message,'LOGINOM_FP_DRAFT_RETAINED');
+  let rejected=false,delivered;
+  try{delivered=await bridge.captureAcceptance()}catch{rejected=true}
+  const effects=f.editor.events.filter(e=>e.verb==='apply_reform_column').length;
+  if(process.env.REVIEW_RESULTS){
+   const journal=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).split('\n').filter(Boolean).map(row=>JSON.parse(row));
+   await writeFile(join(process.env.REVIEW_RESULTS,scenario+'.json'),JSON.stringify({scenario,rejected,delivered,
+    originalOutcome:outcome,currentNode:page.nativeContext.node_id,currentDirty:page.dirty===true,applyCount:effects,
+    originalPending:f.runtime.fieldParametersState('owned-fp'),finalJournal:journal.findLast(row=>row.event==='fp_capture_draft'),
+    fixtures:true,native_verified:false,real_execution_journal:true},null,2)+'\n');
+  }
+
+  console.log(JSON.stringify({scenario,rejected,returnedDraft:delivered?.draftRetained===true,applyCount:effects,
+    currentNode:page.nativeContext.node_id,currentDirty:page.dirty===true,originalPending:f.runtime.fieldParametersState('owned-fp').owned}));
+  assert.equal(f.runtime.fieldParametersState('owned-fp').owned,true);
+  assert.equal(f.runtime.fieldParametersState('owned-fp').pending_phase,'configure');
+  assert.equal(effects,3);await assert.rejects(bridge.close(),/FP_DRAFT_RETAINED/);
+  assert.equal(f.events.includes('release'),false);assert.equal(f.events.includes('transport-close'),false);
+  assert.equal(rejected,true,'FP authority/resources must remain valid after awaited final fp_capture_draft journal and before delivery');
+ }else if(scenario==='positive'){assert.equal(outcome.error?.message,'LOGINOM_FP_DRAFT_RETAINED',JSON.stringify(outcome));const result=await bridge.captureAcceptance();assert.equal(result.draftRetained,true);assert.equal(result.cleanupComplete,false);assert.equal(result.draft.configured.applied_editors,3);const table=(columns,rows)=>({status:'SUCCEEDED',cleanup_complete:true,effect_possible:false,output:{complete:true,port:0,binding:result.draft.owner,columns,rows}});const closed=verifyFieldParametersPreservation({draft:result.draft,inputTable:table(oracle.input_columns.map(({name,label,type})=>({name,label,type})),oracle.input_rows),outputTable:table(oracle.expected.columns,oracle.expected.rows)});assert.equal(closed.closed_contract_verified,true);assert.equal(closed.native_verified,false);assert.equal(f.runtime.fieldParametersState('owned-fp').owned,true);await assert.rejects(bridge.close(),/FP_DRAFT_RETAINED/);assert.equal(f.events.includes('release'),false);assert.equal(f.events.includes('transport-close'),false);}
+ else{await assert.rejects(bridge.captureAcceptance());if(scenario.startsWith('late-'))assert.equal(f.editor.events.filter(e=>e.verb==='apply_reform_column').length,1);else assert.equal(f.editor.events.length,0)}
+ assert.equal(f.editor.events.some(e=>['wizard_step','finish_wizard','cancel_wizard'].includes(e.verb)),false);
+ }finally{await client?.close();await bridge?.server.close();await rm(directory,{recursive:true,force:true})}
+});

@@ -29,20 +29,39 @@ export function reformOutputSources(configuration,native){
  // Native output source links establish correspondence here; never reuse input IDs.
  return fields.map(f=>({...f,used:true}));
 }
+export function resolveReformOutputMapping(mapping,sources,native){
+ const requested={direction:'output',port:0,...mapping};
+ const resolved=resolveConfiguredOutputMapping(requested,sources,native);
+ // Auto-sync rebuilds the output in source order on cold materialization.
+ // A complete manual layout therefore needs a manual output socket. Changes
+ // to names/labels alone retain the existing synchronization setting.
+ if(requested.fields){
+  const active=resolved.fields.filter(f=>!f.excluded).map(f=>f.source.name);
+  const natural=native.source_fields.filter(f=>active.includes(f.name)).map(f=>f.name);
+  if(JSON.stringify(active)!==JSON.stringify(natural)){
+   need(requested.autosync!==true,'custom output order conflicts with autosync');
+   return {...requested,autosync:false};
+  }
+ }
+ return requested;
+}
 export async function configureReformOutput(channel,configuration,parameters,mapping={}){
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  let s=await channel.observe({condition:'reform output inventory',readMappings:true,ready});
  s=await ensureDerivedOutputSources(channel,s);
- const sources=reformOutputSources(configuration,s.node_mapping),requested={direction:'output',port:0,...mapping},changes=[];
- resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
+ const sources=reformOutputSources(configuration,s.node_mapping),requested=resolveReformOutputMapping(mapping,sources,s.node_mapping),changes=[];
+ const autosync=requested.autosync??s.node_mapping.autosync;
+ // Disable rebuilding before applying the manual order; the native toggle
+ // independently verifies that no field definition changed.
+ if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
  if(requested.fields||requested.changes){
   changes.push(await configureOutputFields(channel,requested,sources));
   s=await channel.observe({condition:'reform output fields configured',readMappings:true,ready});
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
   changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
  }
- if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
  s=await channel.observe({condition:'reform complete output mapping readback',readMappings:true,ready});
  reformOutputSources(configuration,s.node_mapping);
+ need(s.node_mapping.autosync===autosync,'output synchronization changed before finish');
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};
 }

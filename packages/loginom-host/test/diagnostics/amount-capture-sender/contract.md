@@ -1,0 +1,7 @@
+Amount capture sender boundary (PARTIAL)
+
+Original fixed StageA factory and original acquired run retain the same signal/deadline/operation/request/auth. The factory has one private capture sender, retained in a WeakMap; it is not supplied through a handle/member/JSON. Capture can be claimed once only after successful acquisition, for the same run. Before dispatch the request registry creates the outer capture ID and carries it in the request and exact cancellation. Controlled cancellation retains pending until original reply or physical channel loss; boxed first cause and genuine equal late secondary use the existing Amount receipt. No caller object is frozen or mutated.
+
+HostPort amountHeld remains closed. This component does not open managed capture, prove same-child currentness at capture, execute successful consumer, or acknowledge evidence/cleanup. Next common67 seam: HostPort must retain original service.captureBinding/run.lease/runtime and outer request ID, forward a managed ID-bound private capture channel via supervisor, then validate original physical receipt before settlement. Source69 authorize5/captureLeases and algorithm are separate receiving.
+
+Production-route run: compiled fixed sender -> actual installed host/service/lease/managed -> preserved HostPort refusal. Named SDK/Page/session/catalog/native doubles; FS/IPC/child targets genuine. Protocol controls separately use real MessageChannel with a labelled reply/cancel peer. They cannot prove installed native/provider settlement.

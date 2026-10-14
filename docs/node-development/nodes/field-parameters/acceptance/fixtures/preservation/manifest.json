@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "scope": "independent offline preservation expectations",
+  "files": [
+    {
+      "path": "empty-typed.csv",
+      "bytes": 20,
+      "sha256": "04141a8709645de157b104c36f234833ebfbdb6e4fb6788f50f8f6931f42d130"
+    },
+    {
+      "path": "rowid-ab-c.csv",
+      "bytes": 167,
+      "sha256": "5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3"
+    },
+    {
+      "path": "wide-130.csv",
+      "bytes": 1601,
+      "sha256": "94cfc0aba74b6659f14880e0972de29bf3cd5db6ff68858d093c97dfed9fbc6f"
+    },
+    {
+      "path": "empty-typed.json",
+      "bytes": 3254,
+      "sha256": "313c1f57c7ef8e209974e09e83bcd01b895035331b9925d417d5dcfabe574ce7"
+    },
+    {
+      "path": "rowid-ab-c.json",
+      "bytes": 4307,
+      "sha256": "fba29e59d69a4554c3b4d9915d43a377e0d0cd683c8befc09b5da04a8d97eb62"
+    },
+    {
+      "path": "wide-130.json",
+      "bytes": 77724,
+      "sha256": "d4cd428022b0e578e113c693216a8d4ebb940fb4db89728c10e107a1ee5c57bb"
+    }
+  ]
+}

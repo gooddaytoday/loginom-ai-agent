@@ -5,6 +5,32 @@ import {observeColdCrossTable} from './cold-crosstable-settings.mjs';
 const need=(v,m)=>{if(!v)throw Error('COLD_SOURCE:'+m);};
 const one=(xs,m)=>{need(xs.length===1,m);return xs[0];};
 const pick=(f,ks)=>Object.fromEntries(ks.map(k=>[k,f[k]]));
+const formatKeys=['delimiter','decimal_separator','null_marker','text_qualifier'];
+export function normalizeStaticCsvFormat(observed){
+ const labels={delimiter:{'Запятая':',','Точка с запятой':';'},
+  decimal_separator:{'Точка (.)':'.'},text_qualifier:{'Двойная кавычка (")':'"'}};
+ const format=Object.fromEntries(formatKeys.map(k=>[k,labels[k]?.[observed?.[k]]??observed?.[k]]));
+ need([',',';'].includes(format.delimiter)&&format.decimal_separator==='.'&&format.text_qualifier==='"'
+  &&typeof format.null_marker==='string'&&format.null_marker.length>0&&format.null_marker.length<=64
+  &&!/[\x00-\x1f]/.test(format.null_marker),'unknown or unsupported CSV format');
+ return format;
+}
+export function verifyPinnedStaticCsvFormat(format,fixture){
+ const expected=fixture?.format;
+ need(expected&&formatKeys.every(k=>typeof expected[k]==='string'),'complete fixture CSV format required');
+ const canonical=normalizeStaticCsvFormat(expected);
+ need(formatKeys.every(k=>expected[k]===canonical[k]),'fixture CSV format must be canonical');
+ need(formatKeys.every(k=>format[k]===expected[k]),'CSV parser differs');
+ return true;
+}
+export function verifyStaticSourceFixture({bytes,allowed,format}){
+ need(Array.isArray(allowed)&&allowed.length>0,'source fixtures required');
+ const sha256=createHash('sha256').update(bytes).digest('hex');
+ const fixture=one(allowed.filter(f=>Number.isSafeInteger(f?.bytes)&&f.bytes===bytes.length
+  &&typeof f.sha256==='string'&&/^[a-f0-9]{64}$/.test(f.sha256)&&f.sha256===sha256),'source fixture mismatch');
+ verifyPinnedStaticCsvFormat(format,fixture);
+ return {fixture,sha256};
+}
 export function verifyGeneratedCollapseMapping(mapping,schema){
  need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_fields?.length===0
   &&Array.isArray(schema)&&schema.length>0&&schema.length<=128
@@ -15,7 +41,7 @@ export function verifyGeneratedCollapseMapping(mapping,schema){
 
 // Read settings and cancel each wizard. No CrossTable configure handler, private
 // model receipts, supplied subtype declarations or aggregate results are used.
-export async function observeStaticSources({load,graph,channelFor,account,revealSource}){
+export async function observeStaticSources({load,graph,channelFor,account,revealSource,verifiedSources}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {isTextImportSourceReady}=await load('client/lib/text-import-procedure.mjs');
@@ -72,11 +98,15 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
    const observed=Object.fromEntries(['delimiter','decimal_separator','null_marker','text_qualifier'].map(k=>[k,s.wizard.settings.fields[k].value]));
    // The pinned format editors expose localized option labels, as in the
    // existing import procedure. Accept only the exact assigned CSV options.
-   const format={delimiter:observed.delimiter==='Запятая'?',':observed.delimiter,
-    decimal_separator:observed.decimal_separator==='Точка (.)'?'.':observed.decimal_separator,
-    text_qualifier:observed.text_qualifier==='Двойная кавычка (")'?'"':observed.text_qualifier,
-    null_marker:observed.null_marker};
-   need(format.delimiter===','&&format.decimal_separator==='.'&&format.null_marker==='?'&&format.text_qualifier==='"','CSV parser differs');
+   const format=normalizeStaticCsvFormat(observed);
+   // The first readonly pass discovers settings; only independently downloaded
+   // bytes can bind them to a pinned fixture. The second pass rechecks that pin.
+   if(verifiedSources){
+    const proof=verifiedSources.get(source.source_path);
+    need(proof?.bytes_verified===true&&proof.download_completion_verified===true
+     &&proof.provenance==='independent_server_file_download','source provenance missing');
+    verifyPinnedStaticCsvFormat(format,proof.fixture);
+   }
    const closed=await closePreparedWizard(channel);need(closed.verified&&!closed.settings_applied,'import cancel');
    const output=await mapping(channel,'output');
    need(output.fields.every(f=>!f.excluded&&f.name===f.source_name),'renamed or excluded import source');
@@ -168,11 +198,12 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
    const downloadPath=join(output,'source-'+proofs.size+'.csv'),artifact={artifact_id:'cold-source-'+proofs.size,name,upload:{directory:own,destination:path,grant_id:'cold-source-readonly'}};
    const result=await execute(makeArtifactDownloadCode({artifact,snapshot:r,file_ref:e.ref,operation_id:artifact.artifact_id,expected_origin:origin,expected_build:'7.4.2',download_path:downloadPath}));
    need(result.status==='SUCCEEDED'&&result.cleanup_complete&&result.output.download_completed,'source download unconfirmed');
-   const bytes=await readFile(downloadPath);need(bytes.length<=16777216,'source byte bound');const sha256=createHash('sha256').update(bytes).digest('hex');
-   const fixture=one(allowed.filter(f=>f.sha256===sha256&&f.bytes===bytes.length),'source fixture mismatch');
+   const bytes=await readFile(downloadPath);need(bytes.length<=16777216,'source byte bound');
+   const {fixture,sha256}=verifyStaticSourceFixture({bytes,allowed,format:source.configuration.format});
    proofs.set(path,{destination:path,bytes:bytes.length,sha256,bytes_verified:true,download_completion_verified:true,provenance:'independent_server_file_download',fixture});
   }
   source.source=proofs.get(path);
+  verifyPinnedStaticCsvFormat(source.configuration.format,source.source.fixture);
   const observed=JSON.stringify(source.configuration.output_mapping.fields.map(f=>pick(f,['name','label','type'])));
   need([source.source.fixture.columns,...(source.source.fixture.output_orders??[])].some(cols=>observed===JSON.stringify(cols)),'source fixture schema differs');
  }

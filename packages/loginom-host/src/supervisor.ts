@@ -20,6 +20,8 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  acceptanceCapture?: { revision: 1; harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1" | "field-parameters-preservation-v1"; owner: string; run: string;
+    lease: string; generation: number; chat: string; account: string; packagePath: string; admission: string; expires: number }
 }
 
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
@@ -81,11 +83,38 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
   return env
 }
 
+export type FPStartupControl = {
+  signal:AbortSignal; deadline:number; requestId:string; authorization:string; harness:"field-parameters-preservation-v1"
+  guard():void; reject(value:unknown):unknown; receive(value:unknown,origin:unknown,secondary?:{value:unknown}):unknown
+  retain(runtime: Awaited<ReturnType<typeof supervise>>):void
+  phase?: 'capture'
+  binding?: NonNullable<Launch['acceptanceCapture']>
+}
+export type AmountStartupControl = Omit<FPStartupControl, 'harness'> & {
+  harness:'amount-import-type-v1'; operation:string; request:string
+}
+type ClosedStartupControl = FPStartupControl | AmountStartupControl
+type AmountCaptureFrame={revision:1;purpose:'amount-import-type-v1';outerRequestId:string;captureRequestId:string;managedRequestId:string;
+ startupRequestId:string;authorization:string;operation:string;request:string;deadline:number;binding:NonNullable<Launch['acceptanceCapture']>}
+
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
-export async function supervise(input: Launch) {
+export async function supervise(input: Launch, startup?:ClosedStartupControl) {
+  startup?.guard()
+  const originalStartup=startup
+  if(startup)startup=Object.freeze({...startup})
+  const original=input, originalConnection=input.connection
+  const snapshot={...input,connection:{...input.connection},environment:runtimeEnvironment(input.environment??process.env)}
+  const guard=()=>{
+    startup?.guard()
+    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","receive","retain","phase","binding","operation","request"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    if(startup && (Object.keys(snapshot).some(key=>key!=="connection" && key!=="environment" && (original as any)[key] !== (snapshot as any)[key])
+        || original.connection!==originalConnection || Object.keys(snapshot.connection).some(key=>(originalConnection as any)[key] !== (snapshot.connection as any)[key]))) throw Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  if(startup) input=snapshot
   if (![input.node, input.entry, input.resources, input.stateDir].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
+  guard()
   const child = fork(input.entry, [], {
     execPath: input.node,
     execArgv: ["--use-system-ca"],
@@ -95,18 +124,29 @@ export async function supervise(input: Launch) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; amount?:AmountCaptureFrame; cancelled?:boolean; primary?:{value:unknown}; shutdownSave?: boolean; closing?: { expired: boolean; acknowledged: boolean } }
   >()
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
-    child.once("exit", (code, signal) => resolve({ code, signal }))
+    child.once("exit", (code, signal) => {
+      pending.forEach((request, id) => {
+        if (!request.closing) return
+        pending.delete(id)
+        request.dispose?.()
+        if (!request.closing.acknowledged)
+          request.reject(new Error(request.closing.expired ? "LOGINOM_RUNTIME_TIMEOUT" : "LOGINOM_RUNTIME_DISCONNECTED"))
+      })
+      resolve({ code, signal })
+    })
     child.once("error", () => resolve({ code: 1, signal: null }))
   })
   function fail() {
-    pending.forEach((request) => {
+    pending.forEach((request, id) => {
+      if (request.closing) return // Disconnect alone does not prove child exit.
+      pending.delete(id)
       clearTimeout(request.timer)
-      request.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
+    request.dispose?.()
+      request.reject(request.primary?request.primary.value:new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     })
-    pending.clear()
   }
   child.on("disconnect", fail)
   child.on("exit", fail)
@@ -115,70 +155,185 @@ export async function supervise(input: Launch) {
     if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
+    if (request.closing) {
+      if (request.closing.acknowledged) return
+      request.closing.acknowledged = true
+      request.dispose?.()
+      if ("error" in message && "closeSaveRequired" in message && message.closeSaveRequired===true) closing.saveRequired=true;
+      if ("error" in message) request.reject(new Error(
+        typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
+          ? message.error : "LOGINOM_RUNTIME_FAILED", { cause: message.error }))
+      else request.resolve("result" in message ? message.result : undefined)
+      // Keep this same id until exit. Expiry cannot mint a second close.
+      return
+    }
+    if(request.amount){
+      const receipt='amountCaptureReceipt' in message?message.amountCaptureReceipt as any:undefined;
+      if(!receipt || Object.keys(receipt).sort().join(',')!=='acknowledged,cleanupSettled,evidenceSettled,frame,settled'
+        || receipt.settled!==true || receipt.evidenceSettled!==false || receipt.cleanupSettled!==false || receipt.acknowledged!==false
+        || JSON.stringify(receipt.frame)!==JSON.stringify(request.amount)){
+        request.primary??={value:startup!.reject(Error('LOGINOM_AMOUNT_CAPTURE_RECEIPT_UNKNOWN'))};return;
+      }
+    }
     pending.delete(message.id)
     clearTimeout(request.timer)
+    request.dispose?.()
+    if((request.fp || request.amount) && "rejection" in message) {
+      try {request.reject(startup!.receive(rejection(message.rejection),"rejectionOrigin" in message?message.rejectionOrigin:undefined,
+        "secondaryRejection" in message?{value:rejection(message.secondaryRejection)}:undefined))}
+      catch(error){request.reject(startup!.reject(error))}
+      return
+    }
+    if (request.primary) {request.reject(request.primary.value);return}
     if ("error" in message) {
       request.reject(
         new Error(
           typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
             ? message.error
             : "LOGINOM_RUNTIME_FAILED",
+          { cause: message.error },
         ),
       )
       return
     }
+    if(request.shutdownSave && closing.saveRequired && child.connected
+        && "closeRecoveryReady" in message && message.closeRecoveryReady===true) {
+      // Only this original child's save completion retires the known pre-effect
+      // refusal. Silence, timeout, peer loss and caller labels cannot remint close.
+      pending.forEach((held,id)=>{if(held.closing?.acknowledged){clearTimeout(held.timer);pending.delete(id)}})
+      closing.promise=undefined;closing.saveRequired=false;
+    }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function encodeReadRejection(value: unknown): unknown {
+    if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
+    return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+  }
+  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}, amountOuterId?:string) {
+    if(operation==='acceptance.capture' && startup?.harness==='amount-import-type-v1' && !amountOuterId)throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
+    if(control) {
+      control.signal.throwIfAborted()
+      if(!Number.isSafeInteger(control.deadline) || Date.now()>=control.deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+      timeout=control.deadline-Date.now()
+    }
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
+    const amountFrame:AmountCaptureFrame|undefined=amountOuterId && startup?.harness==='amount-import-type-v1' && startup.phase==='capture' && startup.binding
+      ? Object.freeze({revision:1,purpose:'amount-import-type-v1',outerRequestId:amountOuterId,captureRequestId:amountOuterId,managedRequestId:id,
+        startupRequestId:startup.requestId,authorization:startup.authorization,operation:startup.operation,request:startup.request,
+        deadline:startup.deadline,binding:startup.binding}):undefined;
+    if(amountOuterId && !amountFrame)throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
     return new Promise<unknown>((resolve, reject) => {
+      const deadline=control?.deadline??Date.now()+timeout
+      const cancel = (reason: unknown) => {
+        if(!pending.has(id)) return
+        if(amountFrame){
+          const current=pending.get(id)!;if(current.cancelled)return;current.cancelled=true;
+          current.primary??={value:startup!.receive(reason,'control')};
+          if(child.connected)child.send({id:randomUUID(),operation:'readonly.preReady.cancel',input:{phase:'amount-capture',requestId:id,amountCapture:amountFrame,rejection:encodeReadRejection(current.primary.value)}});
+          return;
+        }
+        if(startup && operation==="start") {
+          const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason}
+          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:"startup",requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
+            ...(startup.harness==='amount-import-type-v1'?{operation:startup.operation,request:startup.request}:{}),
+            ...(startup.phase?{bindingPhase:startup.phase,captureBinding:startup.binding}:{}),rejection:encodeReadRejection(current.primary.value)}})
+          return
+        }
+        pending.delete(id);clearTimeout(timer);control?.signal.removeEventListener("abort",abort)
+        // Cancellation belongs to this original request, never the next call.
+        if(control && child.connected)child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{requestId:id,rejection:encodeReadRejection(reason)}})
+        reject(reason)
+      }
+      const abort = () => cancel(control!.signal.reason)
+      const closeState = operation === "close" ? { expired: false, acknowledged: false } : undefined
       const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
+        if (closeState) { closeState.expired = true; return }
+        cancel(new Error(control ? "LOGINOM_PRE_READY_READ_EXPIRED" : "LOGINOM_RUNTIME_TIMEOUT"))
       }, timeout)
-      pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value }, (error) => {
-        if (error) fail()
+      const saveInput=value as {name?:string;arguments?:{action_key?:string}}|undefined;
+      const shutdownSave=operation==='call' && closing.saveRequired===true && saveInput?.name==='dock_action_run'
+        && ['package.save_as','package.save_checkpoint'].includes(saveInput.arguments?.action_key??'');
+      pending.set(id, { resolve, reject, timer, ...(shutdownSave?{shutdownSave:true}:{}), ...(closeState ? { closing: closeState } : {}), ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      control?.signal.addEventListener("abort",abort,{once:true})
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),...(amountFrame?{amountCapture:amountFrame}:{}) }, (error) => {
+        if(!error)return;
+        const original=pending.get(id);
+        if(original?.amount && startup){
+          // Register this new owned send failure before terminal loss drains the
+          // request. An already boxed cancel remains first, with a real secondary.
+          const reason=startup.reject(error);
+          original.primary??={value:reason};
+        }
+        fail();
       })
+      if(control?.signal.aborted)abort()
     })
   }
-  const closing: { promise?: Promise<void> } = {}
+  const closing: { promise?: Promise<void>; saveRequired?: boolean } = {}
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
-      const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
-      try {
-        const outcome = await exited
-        if (
-          !reply ||
-          typeof reply !== "object" ||
-          !("closed" in reply) ||
-          reply.closed !== true ||
-          outcome.code !== 0 ||
-          outcome.signal
-        )
-          throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      } finally {
-        clearTimeout(timer)
-      }
+      const reply = await request("close", undefined, 5000)
+      if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
+      const outcome = await exited
+      if (outcome.code !== 0 || outcome.signal)
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     })()
+    // Terminal refusal is cached too: reconnect/stop must not replay close.
     return closing.promise
   }
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
   // documented budget with the ordinary 120-second runtime handshake.
+  function rejection(value: any): unknown {
+    if(value?.kind==="Error") {const e=new Error(value.message,"cause" in value?{cause:rejection(value.cause)}:undefined);e.name=value.name;return e}
+    return value?.is_undefined?undefined:value?.value
+  }
+  async function readPreReady({signal,deadline}: {signal:AbortSignal;deadline:number}) {
+    const reply=await request("readonly.preReady",{deadline},0,{signal,deadline}) as any
+    signal.throwIfAborted()
+    if(Date.now()>=deadline)throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+    if(reply?.readonlyPreReady!==true)throw rejection(reply?.rejection)
+    return reply.result
+  }
+  let amountCaptureClaimed=false;
+  async function captureAmount(outerRequestId:string){
+    guard();
+    if(!startup || startup.harness!=='amount-import-type-v1' || startup.phase!=='capture' || !startup.binding
+      || !/^[a-f0-9-]{36}$/.test(outerRequestId))throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
+    if(amountCaptureClaimed)throw Error('LOGINOM_RECOVERY_REQUIRED');amountCaptureClaimed=true;
+    return request('acceptance.capture',undefined,0,{signal:startup.signal,deadline:startup.deadline},outerRequestId);
+  }
+  const runtime = {
+    canSaveAfterCloseRefusal:()=>child.connected && closing.saveRequired===true, ready: undefined as unknown, request, readPreReady, close, exited, captureAmount }
+  startup?.retain(runtime)
+  async function failedStart(error: unknown): Promise<never> {
+    if(startup) throw startup.reject(error)
+    try { await close() }
+    catch (cleanupFailure) {
+      const failure = new Error("LOGINOM_RUNTIME_START_FAILED", { cause: error })
+      // Private foreground ownership handoff, never serialized into IPC.
+      Object.defineProperties(failure, {
+        runtime: { value: runtime },
+        cleanupFailure: { value: cleanupFailure },
+      })
+      throw failure
+    }
+    throw error
+  }
   const ready = await request(
     "start",
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, environment: undefined, protocol: 1, ...(startup? startup.harness==='amount-import-type-v1'
+      ? {amountStartup:{requestId:startup.requestId,authorization:startup.authorization,purpose:startup.harness,deadline:startup.deadline,
+          operation:startup.operation,request:startup.request,...(startup.phase?{phase:startup.phase,binding:startup.binding}:{})}}
+      : {fpStartup:{requestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
+          ...(startup.phase?{phase:startup.phase,binding:startup.binding}:{})}} : {}) },
     input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
+    startup,
+  ).catch(failedStart)
+  guard()
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -190,8 +345,8 @@ export async function supervise(input: Launch) {
       ? !("checked" in ready) || ready.checked !== true
       : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
   ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    return failedStart(new Error("LOGINOM_HANDSHAKE_INVALID", { cause: ready }))
   }
-  return { ready, request, close, exited }
+  runtime.ready = ready
+  return runtime
 }

@@ -1,3 +1,4 @@
+import type { HostStartup } from "../fp-startup-control"
 import { randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
@@ -8,7 +9,8 @@ import type { recoveryStore } from "./recovery-store"
 export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void> }
 export type ConnectionRuntime = {
   check(candidate: ActiveConnection): Promise<void>
-  prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
+  prepare(candidate: ActiveConnection, startup?:HostStartup): Promise<RuntimeHandle>
+  close?(): Promise<void>
 }
 const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
 
@@ -16,6 +18,7 @@ export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
+  startup?: HostStartup,
 ) {
   const state: {
     active?: ActiveConnection
@@ -25,26 +28,33 @@ export async function connectionService(
     pending?: ActiveConnection
     phase: Loginom.View["state"]
     applying?: Promise<void>
+    checking?: Promise<void>
     failure?: string
     writing?: boolean
     closing?: boolean
     recovering?: Promise<void>
   } = { revision: 0, generation: 0, phase: "unconfigured" }
+  startup?.guard()
+  let startupFailure: {value:unknown} | undefined
+  let startupChecked=false
   const validations = new Map<
     string,
     { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
+  const leaseHandles = new WeakMap<object, {run:string; current():void; snapshot:Record<string,unknown>}>()
   state.active = await store.read().catch(() => {
     state.phase = "recoverable-error"
     return undefined
   })
+  startup?.guard()
   state.revision = state.active?.revision ?? 0
   const pending = await store.pending().catch(() => {
     state.phase = "recoverable-error"
     state.failure = "LOGINOM_STORE_READ_FAILED"
     return undefined
   })
+  startup?.guard()
   if (pending && pending.generation > (state.active?.generation ?? 0)) {
     state.pending = pending
     state.revision = pending.revision
@@ -57,25 +67,32 @@ export async function connectionService(
       return 0
     }),
   )
+  startup?.guard()
   if (state.active) {
     state.phase = "starting"
     state.applying = runtime
-      .prepare(state.active)
+      .prepare(state.active,startup)
       .then(
         (handle) => {
+          startup?.guard()
           state.handle = handle
           state.phase = state.pending ? "pending" : "ready"
         },
-        () => {
+        (error) => {
+          if (startup) startupFailure={value:startup.propagate(error)}
           state.phase = "recoverable-error"
         },
       )
+      .catch(error=>{if(startup)startupFailure={value:startup.propagate(error)};else throw error})
       .finally(() => {
         state.applying = undefined
-        progress()
+        if (!startupFailure) progress()
       })
   }
 
+  function validationRunning() {
+    return state.checking !== undefined
+  }
   function clearValidations() {
     validations.forEach((entry) => clearTimeout(entry.timer))
     validations.clear()
@@ -97,7 +114,7 @@ export async function connectionService(
     }
   }
   function progress() {
-    if (state.closing || !state.pending || leases.size || state.applying || state.writing || recovery?.pending().length)
+    if (startupFailure || state.closing || !state.pending || leases.size || state.applying || state.checking || state.checking || state.writing || recovery?.pending().length)
       return
     const candidate = state.pending
     state.phase = "starting"
@@ -173,7 +190,7 @@ export async function connectionService(
     async acknowledgeRecovery(input) {
       if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
       if (input.revision !== state.revision) throw Error("LOGINOM_REVISION_CONFLICT")
-      if (state.applying || state.writing) throw Error("LOGINOM_APPLICATION_PENDING")
+      if (state.applying || state.checking || state.writing) throw Error("LOGINOM_APPLICATION_PENDING")
       if ([...leases.values()].some((lease) => lease.active)) throw Error("LOGINOM_RECOVERY_BUSY")
       if (!recovery) throw Error("LOGINOM_RECOVERY_UNAVAILABLE")
       const ids = recovery.pending()
@@ -212,7 +229,7 @@ export async function connectionService(
       if (Option.isNone(decoded)) throw new Error("LOGINOM_CANDIDATE_INVALID")
       const candidate = decoded.value
       if (candidate.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
-      if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
+      if (state.applying || state.checking || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       validateAddress(candidate.url, candidate.username)
       const apiKey =
         candidate.apiKey.operation === "preserve" ? (state.pending ?? state.active)?.apiKey : candidate.apiKey.value
@@ -231,7 +248,9 @@ export async function connectionService(
         apiKey,
         password,
       }
-      await runtime.check(record).catch((error: unknown) => {
+      const checking = runtime.check(record)
+      state.checking = checking
+      await checking.catch((error: unknown) => {
         const code =
           error instanceof Error &&
           [
@@ -241,13 +260,18 @@ export async function connectionService(
             "LOGINOM_ACCOUNT_MISMATCH",
             "LOGINOM_LOGIN_UNAVAILABLE",
             "LOGINOM_BROWSER_START_FAILED",
+            "LOGINOM_RUNTIME_TIMEOUT",
+            "LOGINOM_RUNTIME_CLEANUP_FAILED",
           ].includes(error.message)
             ? error.message
             : "LOGINOM_CONNECTION_CHECK_FAILED"
-        throw new Error(code)
+        throw new Error(code, { cause: error })
+      }).finally(() => {
+        if (state.checking === checking) state.checking = undefined
+        progress()
       })
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
-      if (candidate.revision !== state.revision || state.applying || state.writing)
+      if (candidate.revision !== state.revision || state.applying || validationRunning() || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
       const validationId = randomUUID()
       const expiresAt = Date.now() + 5 * 60_000
@@ -262,7 +286,7 @@ export async function connectionService(
     async save(input) {
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (input.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
-      if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
+      if (state.applying || state.checking || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       const validation = validations.get(input.validationId)
       if (!validation || validation.expiresAt <= Date.now()) throw new Error("LOGINOM_VALIDATION_EXPIRED")
       clearValidations()
@@ -285,7 +309,7 @@ export async function connectionService(
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (input.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       // Once a filesystem commit begins, cancellation cannot race the active pointer.
-      if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_COMMITTING")
+      if (state.applying || state.checking || state.writing) throw new Error("LOGINOM_APPLICATION_COMMITTING")
       if (!state.pending) return view()
       state.writing = true
       try {
@@ -303,11 +327,19 @@ export async function connectionService(
   progress()
   return {
     api,
+    assertLease(value: object, run: string) {
+      const original=leaseHandles.get(value)
+      if(!original || original.run!==run
+          || Object.keys(original.snapshot).some(key=>(value as Record<string,unknown>)[key]!==original.snapshot[key]))
+        throw Error('LOGINOM_GENERATION_UNAVAILABLE')
+      original.current()
+    },
     acquire(run: string) {
       if (
         state.closing ||
         state.pending ||
         state.writing ||
+        state.checking ||
         recovery?.pending().length ||
         state.failure === "LOGINOM_STORE_READ_FAILED" ||
         state.phase !== "ready" ||
@@ -317,8 +349,16 @@ export async function connectionService(
         return
       const lease = { generation: state.active.generation, recovery: false, active: true }
       leases.set(run, lease)
-      return {
+      const handle = {
         generation: lease.generation,
+        // Private capability held by the acquiring host, never an IPC tuple.
+        // A matching generation number alone cannot prove this lease is live.
+        assertCurrent() {
+          if (leases.get(run) !== lease || !lease.active || lease.recovery
+              || state.closing || state.pending || state.writing || state.checking
+              || state.phase !== 'ready' || state.active?.generation !== lease.generation)
+            throw Error('LOGINOM_GENERATION_UNAVAILABLE')
+        },
         // Uncertain effects outlive the model drain. Only reconciliation releases recovery.
         holdRecovery() {
           if (leases.get(run) === lease) lease.recovery = true
@@ -338,19 +378,38 @@ export async function connectionService(
           progress()
         },
       }
+      leaseHandles.set(handle,{run,current:handle.assertCurrent,snapshot:{...handle}})
+      return handle
     },
     async settled() {
-      while (state.applying) await state.applying
+      try {
+        while (state.applying) await state.applying
+        if (startupFailure) throw startupFailure.value
+        if(!startupChecked){startup?.guard();startupChecked=true}
+      } catch(error) {throw startup?startup.forward(error):error}
     },
-    async close() {
+    close() {
+      const lifecycle = state as typeof state & { closingAttempt?: Promise<void> }
+      if (lifecycle.closingAttempt) return lifecycle.closingAttempt
       state.closing = true
-      state.pending = undefined
-      clearValidations()
-      await state.recovering?.catch(() => undefined)
-      await state.applying
-      await state.handle?.close()
-      state.handle = undefined
-      state.phase = state.active ? "recoverable-error" : "unconfigured"
+      const attempt = (async () => {
+        await state.recovering
+        await state.applying
+        if (state.checking) await state.checking.catch(() => undefined)
+        if (runtime.close) await runtime.close()
+        await state.handle?.close()
+        state.pending = undefined
+        clearValidations()
+        state.handle = undefined
+        state.phase = state.active ? "recoverable-error" : "unconfigured"
+      })()
+      lifecycle.closingAttempt = attempt
+      void attempt.catch(() => {
+        if (lifecycle.closingAttempt !== attempt) return
+        lifecycle.closingAttempt = undefined
+        state.closing = false
+      })
+      return attempt
     },
   }
 }

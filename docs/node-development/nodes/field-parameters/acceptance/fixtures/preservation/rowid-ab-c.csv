@@ -1,0 +1,6 @@
+RowID;A;B;C;Extra
+101;alpha;17;true;keep
+102;;0;false;
+103;NULL;NULL;NULL;NULL
+104;"semi;colon";-7;true;Кириллица
+105;"say ""yes""";2147483647;false;NULL-ish

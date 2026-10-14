@@ -1,0 +1,5 @@
+This component retains a private acquired-service capability in the actual host realm. It uses the service's original lease WeakMap and generation/connection/readiness references, rejects copied capabilities and changed tuples, and refuses active journal/recovery/lost/stale state. HostPort retains it only on ordinary acquisition, after the actual lease exists. It is not transmitted in JSON; ordinary acquire still returns generation only.
+
+This phase does not qualify a Union operation or register/mint its fifth packet. Missing seams: a trusted parent receiver for this host-realm capability; current same-child chat bridge/client/Page binding; original SDK request/operation/signature/purpose/creation correlation and raw signal/absolute deadline. No startup/FP/Amount/readiness value substitutes for those inputs. The existing adapter continues to refuse ORIGINAL_UNION_ACQUIRED_PROVIDER_UNAVAILABLE.
+
+The diagnostic uses production host/service/lease/HostPort, real filesystem and Node IPC, with a named managed-readiness protocol double. It performs no native login, operation, capture or cleanup. Fixture close is not native cleanup.
