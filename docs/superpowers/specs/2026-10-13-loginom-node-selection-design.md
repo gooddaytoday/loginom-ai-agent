@@ -3,8 +3,11 @@
 Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты десять candidate,
 policy PASS во всех десяти. Один итоговый расчёт правильный, девять результатов
 не получены. Одна сессия завершена штатно, девять адресно освобождены после отказа.
-Сейчас активных собственных процессов нет, профиль свободен;15candidate ещё не начаты.
-Sales/2 final release review и actual gate ожидаются до ABC/Pareto/2.
+Перед продолжением все процессы Sales/2 завершены и профиль освобождён;
+finalrelease review `eb7016dd…`/readback `ee9c94eb…` и actual gate22:49:28.650Z
+разрешили technical-failed при неизменном originalattempt8bbe250b….
+ABC/Pareto/2 начат следующим последовательным runner;15candidate остаются,
+включая текущую попытку. Criteria/runtime/model/input прежние, без пересборки.
 
 Sales-by-category/2 closed22:40:57.751Z: policy PASS `03a4a477…`, mandatory
 failure review `4a252108…`;30messages/119parts/32tools/95events/2042runtime,
@@ -16,7 +19,10 @@ recover/resume/blocker, новыхapply/JS нет. RuntimeMismatch и unsettled 
 остаются. Own260closed22:46:09.112Z/admin261logout22:46:10.745Z/browserclosed22:46:11.950Z;
 9PIDgone/точный guard архивирован;256и259сохраненывдвухUIreadbacks.
 Root publicreader независимо подтвердил native scope доclose.17original неизменны,
-review даёт18casefiles;26recovery; descriptor `c1c55b97…`, finalreview/gate ещёpending.
+review даёт18casefiles;26recovery; descriptor `c1c55b97…`, finalrelease review
+`eb7016dd…`/readback `ee9c94eb…` и actualgate22:49:28.650Z завершены.
+Verbal GUID-label typo в сообщении preparer исправлен; immutable bindings изначально
+содержали верные labels, Rootownership проверял весь exactGUID set; proof не переписан.
 
 Первая девятка завершена по политике и strict own release. Independent
 recovery release review `38048716…`/readback `91d8a205…` одобрены; actual public
