@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
-import { chmod, link, mkdtemp, rm, stat, symlink, unlink, writeFile } from "node:fs/promises"
+import { appendFile, chmod, link, mkdtemp, rm, stat, symlink, unlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources } from "../src/parallel-resources"
-import { writeResourceSummary } from "../src/parallel-resource-evidence"
+import { readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { readLeaseReceipt } from "../src/lease"
 
 test("resource evidence persists the actual sampler summary privately and binds the unchanged JSONL bytes", async () => {
@@ -75,5 +75,62 @@ test("resource evidence preserves existing summaries and refuses public or alias
     await unlink(path.join(root, "source-alias.jsonl"))
     expect(await Bun.file(out).text()).toBe(before)
     expect((await stat(out)).ino).toBe(inode)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("resource receipt read-back recomputes the actual private source and refuses changed JSONL bytes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-readback-"))
+  const samplesFile = path.join(root, "samples.jsonl"), out = path.join(root, "summary.json")
+  try {
+    await writeFile(samplesFile, JSON.stringify({ version: 1, sequence: 1, elapsed_ms: 0, missed_intervals: 0, duration_ms: 1,
+      interval_ms: 1000, run_id: "readback-smoke", phase: "before", host: await sampleHostResources([root]), containers: null, processes: null }) + "\n", { mode: 0o600 })
+    const written = await writeResourceSummary({ samplesFile, out })
+    const request = { file: out, samplesFile, runId: "readback-smoke", phase: "before" as const }
+    expect(await readResourceSummary(request)).toEqual(written)
+    const before = await Bun.file(out).text()
+    await appendFile(samplesFile, "\n")
+    await expect(readResourceSummary(request)).rejects.toThrow("RESOURCE_SOURCE_HASH_MISMATCH")
+    expect(await Bun.file(out).text()).toBe(before)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("resource receipt read-back refuses a changed source path before opening the declared replacement", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-source-binding-"))
+  const samplesFile = path.join(root, "samples.jsonl"), out = path.join(root, "summary.json")
+  try {
+    await writeFile(samplesFile, JSON.stringify({ version: 1, sequence: 1, elapsed_ms: 0, missed_intervals: 0, duration_ms: 1,
+      interval_ms: 1000, run_id: "source-binding", phase: "before", host: await sampleHostResources([root]), containers: null, processes: null }) + "\n", { mode: 0o600 })
+    const receipt = await writeResourceSummary({ samplesFile, out })
+    const request = { file: out, samplesFile, runId: "source-binding", phase: "before" as const }
+    expect(await readResourceSummary(request)).toEqual(receipt)
+    await writeFile(out, JSON.stringify({ ...receipt, source: { ...receipt.source, file: path.join(root, "not-a-measured-source.json") } }))
+    await expect(readResourceSummary(request)).rejects.toThrow("RESOURCE_SOURCE_PATH_MISMATCH")
+    expect(await Bun.file(path.join(root, "not-a-measured-source.json")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("resource receipt read-back refuses another run, phase or modified summary without rewriting evidence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-context-"))
+  const samplesFile = path.join(root, "samples.jsonl"), out = path.join(root, "summary.json")
+  try {
+    await writeFile(samplesFile, JSON.stringify({ version: 1, sequence: 1, elapsed_ms: 0, missed_intervals: 0, duration_ms: 1,
+      interval_ms: 1000, run_id: "context-smoke", phase: "before", host: await sampleHostResources([root]), containers: null, processes: null }) + "\n", { mode: 0o600 })
+    const receipt = await writeResourceSummary({ samplesFile, out })
+    const request = { file: out, samplesFile, runId: "context-smoke", phase: "before" as const }
+    const sourceBefore = await Bun.file(samplesFile).text(), receiptBefore = await Bun.file(out).text()
+    await expect(readResourceSummary({ ...request, runId: "another-run" })).rejects.toThrow("RESOURCE_RECEIPT_CONTEXT_MISMATCH")
+    await expect(readResourceSummary({ ...request, phase: "after" })).rejects.toThrow("RESOURCE_RECEIPT_CONTEXT_MISMATCH")
+    expect(await Bun.file(out).text()).toBe(receiptBefore)
+    await writeFile(out, JSON.stringify({ ...receipt, summary: { ...receipt.summary, missed_intervals: 99 } }))
+    const changed = await Bun.file(out).text()
+    await expect(readResourceSummary(request)).rejects.toThrow("RESOURCE_SUMMARY_MISMATCH")
+    expect(await Bun.file(out).text()).toBe(changed)
+    expect(await Bun.file(samplesFile).text()).toBe(sourceBefore)
+    // A forged header cannot relabel the measured raw source as another run.
+    await writeFile(out, JSON.stringify({ ...receipt, run_id: "another-run" }))
+    await expect(readResourceSummary({ ...request, runId: "another-run" })).rejects.toThrow("RESOURCE_RECEIPT_CONTEXT_MISMATCH")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
