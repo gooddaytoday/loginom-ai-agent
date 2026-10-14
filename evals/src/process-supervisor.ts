@@ -15,6 +15,7 @@ type ProcessEntry = {
   process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
   binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean; foreign?: boolean
 }
+export type ProcessOwner = { kind: "slot" | "admin" | "judge" | "command"; id: string }
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type RegistrationIdentity = { device: number; inode: number; uid: number; mode: number; bytes: string; mtimeNs: string; ctimeNs: string }
 export type OwnedRegistration = { profile: string; acquiredAt: string; original: ProcessCleanup; marker: RegistrationIdentity }
@@ -33,7 +34,13 @@ export type ProcessCleanup = {
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
+  peerProcesses?: { process: ProcessIdentity; launcher: ProcessIdentity; owner: ProcessOwner }[]
 }
+
+// Only this module can publish a spawned launcher and its admitted ancestry.
+const liveSupervisors = new Map<string, {
+  launcher: ProcessIdentity; entries: Map<string, ProcessEntry>; cleanup: ProcessCleanup; owner: ProcessOwner
+}>()
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")
@@ -337,6 +344,7 @@ export async function superviseProcess(input: {
   cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number | null
   profileDir?: string; outDir?: string; stdin?: string | ReadableStream<Uint8Array>; stdout?: WritableStream<Uint8Array>; signal?: AbortSignal; sandbox?: string[]
   observationMode?: "continuous" | "unit_after_exit"
+  owner?: ProcessOwner
 }) {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
   if (input.observationMode !== undefined && input.observationMode !== "continuous" && input.observationMode !== "unit_after_exit")
@@ -462,7 +470,11 @@ export async function superviseProcess(input: {
     tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
     ledger.set(key(entry), tracked)
   }
-  if (root) track(root, "launcher")
+  if (root) {
+    track(root, "launcher")
+    liveSupervisors.set(key(root), { launcher: identity(root), entries: ledger, cleanup,
+      owner: input.owner ?? { kind: "command", id: profile ?? input.cwd } })
+  }
   if (registration) {
     await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
     await registration.close().catch(() => { cleanup.error ??= "Process registration close failed" })
@@ -470,7 +482,16 @@ export async function superviseProcess(input: {
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
-    const live = await snapshot([...ledger.values()].filter((entry) => entry.origin).map((entry) => entry.process))
+    const registered = [...liveSupervisors.values()]
+    const live = await snapshot(registered.flatMap(supervisor => [...supervisor.entries.values()]
+      .filter(entry => entry.origin).map(entry => entry.process)))
+    const peers = registered.filter(supervisor => supervisor.entries !== ledger && supervisor.cleanup.launcher?.ready &&
+      live.some(current => sameIdentity(current, supervisor.launcher)))
+    cleanup.peerProcesses = peers.flatMap(supervisor => [...supervisor.entries.values()]
+      .filter(entry => entry.origin && entry.admission === "allowed" && live.some(current => sameIdentity(current, entry.process)))
+      .map(entry => ({ process: entry.process, launcher: supervisor.launcher, owner: supervisor.owner })))
+    const peerIds = new Set(cleanup.peerProcesses.map(entry => key(entry.process)))
+    for (const [id, entry] of ledger) if (!entry.origin && peerIds.has(id)) ledger.delete(id)
     for (const entry of ledger.values()) {
       if (!entry.origin) continue
       const current = live.find((candidate) => candidate.pid === entry.process.pid)
@@ -558,7 +579,7 @@ export async function superviseProcess(input: {
       }
       // An adopted process with a lost chain may be a browser helper outside the
       // bundle. Adoption cannot bypass executable admission, including its children.
-      const native = live.filter((entry) => !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
+      const native = live.filter((entry) => !peerIds.has(key(entry)) && !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
         inside(entry.executable, browser.directory) || ledger.has(key(entry)) &&
           (browserAncestor(ledger.get(key(entry))!, false) || cliPid !== undefined && entry.pid !== cliPid && ledger.get(key(entry))!.origin?.via === "subreaper")))
       // Establish exact root bindings first. Helpers cannot supply a missing
@@ -784,5 +805,6 @@ export async function superviseProcess(input: {
   if (marker && cleanup.status === "confirmed") await rm(marker, { force: true }).catch(() => {
     cleanup.status = "failed"; cleanup.error ??= "Process registration release failed"
   })
+  if (root && cleanup.status === "confirmed") liveSupervisors.delete(key(root))
   return result
 }
