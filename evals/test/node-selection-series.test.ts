@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -233,6 +233,91 @@ test("a frozen ready:false lock refuses before dispatch or profile access", asyn
     expect(await readdir(root)).toEqual(["lock.json"])
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("an explicit acceptance lock must be admitted before the original series can run", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-v2-admission-"))
+  try {
+    const seal = async (name: string, value: unknown) => {
+      const file = path.join(root, name), text = JSON.stringify(value)
+      await Bun.write(file, text)
+      await chmod(file, 0o400)
+      return { path: file, sha256: createHash("sha256").update(text).digest("hex") }
+    }
+    const original = await seal("original.json", { ready: false })
+    const acceptance = await seal("acceptance.json", { version: 2, ready: false })
+    await expect(runSelectionSeries(original.path, original.sha256, 1, acceptance))
+      .rejects.toThrow("SERIES_ACCEPTANCE_NOT_ADMITTED")
+    expect((await readdir(root)).sort()).toEqual(["acceptance.json", "original.json"])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("v2 admission verifies every archived original before accepting source overrides", async () => {
+  const fixture = await acceptanceFixture()
+  try {
+    await chmod(fixture.archived, 0o600)
+    await Bun.write(fixture.archived, "substituted old evaluator")
+    await chmod(fixture.archived, 0o400)
+    await expect(runSelectionSeries(fixture.original.path, fixture.original.sha256, 1, fixture.acceptance))
+      .rejects.toThrow("SERIES_SEAL_MISMATCH")
+    expect(await Bun.file(path.join(fixture.root, "series/.active")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("v2 permits exactly the four evaluator overrides while preserving the original admission", async () => {
+  const fixture = await acceptanceFixture()
+  try {
+    await expect(runSelectionSeries(fixture.original.path, fixture.original.sha256, 1, fixture.acceptance))
+      .rejects.toThrow("SERIES_NOT_ADMITTED")
+    const value = await Bun.file(fixture.acceptance.path).json() as Record<string, unknown>
+    for (const change of [
+      { sourceOverrides: { ...(value.sourceOverrides as Record<string, string>), "packages/loginom-runtime/client/lib/workspace-ui.mjs": "b".repeat(64) } },
+      { sourceOverrides: { ...(value.sourceOverrides as Record<string, string>), "evals/fixtures/node-selection/tags/data/dataset.csv": "b".repeat(64) } },
+    ]) {
+      const file = path.join(fixture.root, `invalid-${Object.keys(change.sourceOverrides).at(-1)!.includes("packages/") ? "product" : "fixture"}.json`)
+      const text = JSON.stringify({ ...value, ...change })
+      await Bun.write(file, text)
+      await chmod(file, 0o400)
+      await expect(runSelectionSeries(fixture.original.path, fixture.original.sha256, 1,
+        { path: file, sha256: createHash("sha256").update(text).digest("hex") })).rejects.toThrow("SERIES_SOURCE_OVERRIDE_FORBIDDEN")
+    }
+    expect(await Bun.file(path.join(fixture.root, "series/.active")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("the CLI requires both acceptance flags before reading a protocol or dispatching", async () => {
+  for (const flag of ["--acceptance-lock", "--acceptance-sha"]) {
+    const child = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/run-node-selection-series.ts"),
+      "--lock", "/nonexistent-protocol", "--sha", "a".repeat(64), flag, flag.endsWith("lock") ? "/nonexistent-acceptance" : "b".repeat(64)],
+      { stdout: "pipe", stderr: "pipe" })
+    const stderr = await new Response(child.stderr).text()
+    expect(await child.exited).not.toBe(0)
+    expect(stderr).toContain("SERIES_ARGUMENTS_INVALID")
+    expect(stderr).not.toContain("ENOENT")
+  }
+})
+
+async function acceptanceFixture(overrides: Record<string, string> = {}) {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-v2-seal-"))
+  const seal = async (name: string, value: unknown) => {
+    const file = path.join(root, name), text = JSON.stringify(value)
+    await Bun.write(file, text)
+    await chmod(file, 0o400)
+    return { path: file, sha256: createHash("sha256").update(text).digest("hex") }
+  }
+  const names = ["evals/script/run-node-selection-series.ts", "evals/test/node-selection-series.test.ts",
+    "evals/src/node-selection-continuation.ts", "evals/test/node-selection-continuation.test.ts"]
+  const archived = await Promise.all(names.map((name) => seal("original-source-v1/" + name, "original " + name)))
+  const files = Object.fromEntries(names.map((name, index) => [name, archived[index]!.sha256]))
+  const original = await seal("original.json", { ready: false, files, fileCount: names.length })
+  const index = await seal("original-source-v1-index.json", { version: 1, originalProtocolSha256: original.sha256,
+    sourceFiles: Object.fromEntries(names.map((name, i) => [name, archived[i]!])) })
+  const criteria = await seal("criteria.json", { criteriaVersion: "node-selection-policy-v2" })
+  const acceptance = await seal("acceptance.json", { version: 2, ready: true, criteriaVersion: "node-selection-policy-v2",
+    criteriaPath: criteria.path, criteriaSha256: criteria.sha256, originalProtocolPath: original.path,
+    originalProtocolSha256: original.sha256, originalSourceArchiveIndexPath: index.path, originalSourceArchiveIndexSha256: index.sha256,
+    sourceOverrides: { ...Object.fromEntries(names.map((name) => [name, "a".repeat(64)])), ...overrides } })
+  return { root, original, acceptance, archived: archived[0]!.path }
+}
 
 test("the interslot seal refuses a changed auditor source before the next slot can be admitted", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "selection-source-seal-"))

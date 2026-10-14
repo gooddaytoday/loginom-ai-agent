@@ -12,23 +12,62 @@ export async function verifySeriesInputs(inputs: ReadonlyMap<string, string>) {
   for (const [file, expected] of inputs) if (await hash(file) !== expected) throw Error("SERIES_INPUT_CHANGED")
 }
 
-export async function runSelectionSeries(lockFile: string, expectedHash: string, limit = 31) {
+type SeriesAcceptance = { criteriaVersion: "node-selection-policy-v2"; criteriaSha256: string }
+
+async function sealedSeriesFile(file: string, expected: unknown) {
+  if (!path.isAbsolute(file) || !digest(expected) || !(await lstat(file)).isFile() || (await lstat(file)).mode & 0o222
+    || await hash(file) !== expected) throw Error("SERIES_SEAL_MISMATCH")
+  return await Bun.file(file).json() as unknown
+}
+
+async function readSeriesAcceptance(lockFile: string, expectedHash: string, acceptance?: { path: string; sha256: string }) {
+  const lock = await sealedSeriesFile(lockFile, expectedHash)
+  const inputs = new Map<string, string>([[lockFile, expectedHash]])
+  const sourceOverrides: Record<string, string> = {}
+  if (!acceptance) return { lock, inputs, sourceOverrides, context: undefined }
+  const value = await sealedSeriesFile(acceptance.path, acceptance.sha256)
+  if (!record(value) || value.version !== 2 || value.ready !== true) throw Error("SERIES_ACCEPTANCE_NOT_ADMITTED")
+  if (value.criteriaVersion !== "node-selection-policy-v2" || !digest(value.criteriaSha256) || !nonempty(value.criteriaPath)
+    || !path.isAbsolute(value.criteriaPath) || value.originalProtocolPath !== lockFile || value.originalProtocolSha256 !== expectedHash
+    || !nonempty(value.originalSourceArchiveIndexPath) || !digest(value.originalSourceArchiveIndexSha256)
+    || !record(value.sourceOverrides) || !record(lock) || !record(lock.files)) throw Error("SERIES_ACCEPTANCE_BINDING_INVALID")
+  const allowed = ["evals/script/run-node-selection-series.ts", "evals/test/node-selection-series.test.ts",
+    "evals/src/node-selection-continuation.ts", "evals/test/node-selection-continuation.test.ts"]
+  const overrides = value.sourceOverrides, files = lock.files
+  if (Object.keys(overrides).length !== allowed.length || allowed.some((name) => !digest(overrides[name])
+    || !digest(files[name]))) throw Error("SERIES_SOURCE_OVERRIDE_FORBIDDEN")
+  const index = await sealedSeriesFile(value.originalSourceArchiveIndexPath, value.originalSourceArchiveIndexSha256)
+  if (!record(index) || index.version !== 1 || index.originalProtocolSha256 !== expectedHash || !record(index.sourceFiles)
+    || Object.keys(index.sourceFiles).length !== Object.keys(files).length) throw Error("SERIES_SOURCE_ARCHIVE_INVALID")
+  for (const [relative, expected] of Object.entries(files)) {
+    const archived = index.sourceFiles[relative]
+    if (!record(archived) || !nonempty(archived.path) || !path.isAbsolute(archived.path) || archived.sha256 !== expected || !digest(expected))
+      throw Error("SERIES_SOURCE_ARCHIVE_INVALID")
+    if (!(await lstat(archived.path)).isFile() || (await lstat(archived.path)).mode & 0o222 || await hash(archived.path) !== expected)
+      throw Error("SERIES_SEAL_MISMATCH")
+    inputs.set(archived.path, expected)
+  }
+  if (!(await lstat(value.criteriaPath)).isFile() || await hash(value.criteriaPath) !== value.criteriaSha256)
+    throw Error("SERIES_ACCEPTANCE_BINDING_INVALID")
+  inputs.set(acceptance.path, acceptance.sha256)
+  inputs.set(value.criteriaPath, value.criteriaSha256)
+  inputs.set(value.originalSourceArchiveIndexPath, value.originalSourceArchiveIndexSha256)
+  for (const name of allowed) sourceOverrides[name] = String(overrides[name])
+  const context: SeriesAcceptance = { criteriaVersion: "node-selection-policy-v2", criteriaSha256: value.criteriaSha256 }
+  return { lock, inputs, sourceOverrides, context }
+}
+
+export async function runSelectionSeries(lockFile: string, expectedHash: string, limit = 31, acceptance?: { path: string; sha256: string }) {
   if (!path.isAbsolute(lockFile) || !digest(expectedHash) || !Number.isSafeInteger(limit) || limit < 1 || limit > 31)
     throw Error("SERIES_ARGUMENTS_INVALID")
-  const sealed = async (file: string, expected: unknown) => {
-    if (!digest(expected) || !(await lstat(file)).isFile() || (await lstat(file)).mode & 0o222 || await hash(file) !== expected)
-      throw Error("SERIES_SEAL_MISMATCH")
-    return await Bun.file(file).json() as unknown
-  }
-  const lock = await sealed(lockFile, expectedHash)
+  const { lock, inputs, sourceOverrides, context } = await readSeriesAcceptance(lockFile, expectedHash, acceptance)
   if (!record(lock) || lock.ready !== true || !record(lock.files) || !record(lock.pinsSha256)
     || !digest(lock.auditVersion) || !nonempty(lock.matrixInterfaceCheckPath) || !record(lock.runtimeSourcePins)
     || !nonempty(lock.runtimeSourcePins.path)) throw Error("SERIES_NOT_ADMITTED")
   const slots = selectionSeriesSlots(lock)
-  const inputs = new Map<string, string>([[lockFile, expectedHash]])
-  const runtime = await sealed(lock.runtimeSourcePins.path, lock.runtimeSourcePins.sha256)
+  const runtime = await sealedSeriesFile(lock.runtimeSourcePins.path, lock.runtimeSourcePins.sha256)
   inputs.set(lock.runtimeSourcePins.path, String(lock.runtimeSourcePins.sha256))
-  const matrix = await sealed(lock.matrixInterfaceCheckPath, lock.matrixInterfaceCheckSha256)
+  const matrix = await sealedSeriesFile(lock.matrixInterfaceCheckPath, lock.matrixInterfaceCheckSha256)
   inputs.set(lock.matrixInterfaceCheckPath, String(lock.matrixInterfaceCheckSha256))
   if (!record(matrix) || !Array.isArray(matrix.slots) || matrix.slots.length !== 31 || matrix.promptArgumentCount !== 3 || !record(runtime))
     throw Error("SERIES_MATRIX_INVALID")
@@ -38,7 +77,7 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
     const names = Object.keys(pinHashes).filter((name) => name.startsWith(slot.phase + "-pins") && name.endsWith(".json"))
     if (names.length !== 1 || path.basename(names[0]!) !== names[0]) throw Error("SERIES_PINS_AMBIGUOUS")
     const file = path.join(path.dirname(lockFile), names[0]!)
-    const raw = await sealed(file, pinHashes[names[0]!])
+    const raw = await sealedSeriesFile(file, pinHashes[names[0]!])
     inputs.set(file, String(pinHashes[names[0]!]))
     const plan = selectionAttempt(raw, slot.task, slot.attempt)
     if (plan.pins.phase !== slot.phase || plan.pins.resultsRoot !== path.dirname(lockFile) || plan.pins.runID !== lock.runID
@@ -66,7 +105,8 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
     if (!digest(lock.files[required])) throw Error("SERIES_SOURCE_NOT_SEALED")
   // Recheck this small evaluator closure before every slot: the auditor is a
   // fresh subprocess. The thousands of immutable payload files are not rehashed.
-  for (const [relative, expected] of Object.entries(lock.files)) {
+  for (const [relative, original] of Object.entries(lock.files)) {
+    const expected = sourceOverrides[relative] ?? original
     const file = await ownFile(path.resolve(import.meta.dir, "../.."), relative)
     if (!digest(expected) || await hash(file) !== expected) throw Error("SERIES_SOURCE_CHANGED")
     inputs.set(file, expected)
@@ -82,13 +122,14 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
       const existing = await exists(path.join(directory, `${item.plan.pins.phase}-${item.plan.taskID}-${item.plan.number}`, "dispatch.json"))
       if (!existing && dispatched >= limit) return { status: "paused-limit", next: slots[index], dispatched }
       if (!existing) dispatched++
-      const result = await runSeriesSlot(item.file, item.plan.taskID, item.plan.number, lock.auditVersion, item.revision, true)
+      const result = await runSeriesSlot(item.file, item.plan.taskID, item.plan.number, lock.auditVersion, item.revision, true, context)
       const auditFile = path.join(item.plan.directory, "selection-audit.json")
       await appendFile(path.join(directory, "ledger.jsonl"), JSON.stringify({ recordedAt: new Date().toISOString(), lockSha256: expectedHash,
+        ...(context ? { version: 2, ...context, acceptanceLockSha256: acceptance!.sha256 } : {}),
         slot: slots[index], rechecked: existing, ...result, auditSha256: await exists(auditFile) ? await hash(auditFile) : null }) + "\n", { mode: 0o600 })
       if (result.decision !== "advance") return { status: result.decision, slot: slots[index], reason: result.reason, dispatched }
     }
-    // Seeded semantic review and comparison remain a separate final gate.
+    // Final policy/review acceptance and comparison reporting remain separate.
     return { status: "machine-complete-review-required", dispatched }
   } finally { await unlink(lease) }
 }
@@ -115,13 +156,14 @@ export function selectionSeriesSlots(lock: unknown): { phase: string; task: stri
   return slots
 }
 
-export async function runSeriesSlot(pinsFile: string, taskID: string, number: number, auditVersion: string, runtimeRevision?: string, technicalContinuation = false) {
+export async function runSeriesSlot(pinsFile: string, taskID: string, number: number, auditVersion: string, runtimeRevision?: string, technicalContinuation = false,
+  acceptance?: SeriesAcceptance) {
   const plan = selectionAttempt(await Bun.file(pinsFile).json() as unknown, taskID, number)
   const directory = path.join(plan.pins.resultsRoot, "series", `${plan.pins.phase}-${taskID}-${number}`)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   if (await exists(path.join(directory, "dispatch.json"))) {
     if (technicalContinuation && await exists(path.join(directory, "technical-continuation.json")))
-      return assessTechnicalContinuation(plan, directory, pinsFile, auditVersion, runtimeRevision)
+      return assessTechnicalContinuation(plan, directory, pinsFile, auditVersion, runtimeRevision, acceptance)
     if (!await exists(path.join(directory, "closure.json"))) return { decision: "halt", reason: "SLOT_ALREADY_DISPATCHED" }
     return assessCollected(plan, directory, auditVersion, runtimeRevision)
   }
@@ -129,6 +171,7 @@ export async function runSeriesSlot(pinsFile: string, taskID: string, number: nu
   if (await exists(path.join(plan.pins.profile, ".writer"))) return { decision: "halt", reason: "PROFILE_BUSY" }
   const before = await hostFiles(plan.pins.profile)
   await writeJson(path.join(directory, "dispatch.json"), { pinsFile, pinsSha256: await hash(pinsFile), taskID, number,
+    ...(acceptance ? { version: 2, ...acceptance } : {}),
     auditVersion, startedAt: new Date().toISOString(), hostFilesBefore: before })
   const state: { running: boolean; interruptReason: string | null; reading: boolean } = { running: true, interruptReason: null, reading: false }
   const timer = setInterval(() => {
@@ -417,9 +460,11 @@ function orderedTimes(...values: unknown[]) {
 }
 
 if (import.meta.main) {
-  const args = parseArgs({ options: { lock: { type: "string" }, sha: { type: "string" }, limit: { type: "string" } } }).values
-  if (!args.lock || !args.sha) throw Error("SERIES_ARGUMENTS_INVALID")
-  const result = await runSelectionSeries(path.resolve(args.lock), args.sha, args.limit ? Number(args.limit) : 31)
+  const args = parseArgs({ options: { lock: { type: "string" }, sha: { type: "string" }, limit: { type: "string" },
+    "acceptance-lock": { type: "string" }, "acceptance-sha": { type: "string" } } }).values
+  if (!args.lock || !args.sha || Boolean(args["acceptance-lock"]) !== Boolean(args["acceptance-sha"])) throw Error("SERIES_ARGUMENTS_INVALID")
+  const result = await runSelectionSeries(path.resolve(args.lock), args.sha, args.limit ? Number(args.limit) : 31,
+    args["acceptance-lock"] ? { path: path.resolve(args["acceptance-lock"]), sha256: args["acceptance-sha"]! } : undefined)
   console.log(JSON.stringify(result))
   process.exitCode = result.status === "halt" ? 1 : result.status === "review" ? 2 : 0
 }
