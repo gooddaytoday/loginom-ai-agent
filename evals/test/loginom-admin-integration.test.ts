@@ -99,7 +99,7 @@ liveIntegration("native user capability: creates one blocked account and refuses
       const configured = await request("reconcile-user", { ...payload, phase: "configure", owned })
       expect(configured).toMatchObject({ outcome: "confirmed", data: { passwordChanged: true, authModeChanged: true, secretHash: payload.secretHash,
         user: { objectId: user.objectId, name: credentials.username, userKind: 0, blocked: true, authMode: 1,
-          isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false } } })
+          isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false, allowPublish: false } } })
       const reused = await request("reconcile-user", { ...payload, phase: "configure", owned: { ...owned, secretHash: payload.secretHash } })
       expect(reused).toMatchObject({ outcome: "confirmed", data: { passwordChanged: false, authModeChanged: false, secretHash: payload.secretHash,
         user: (configured.data as { user: unknown }).user } })
