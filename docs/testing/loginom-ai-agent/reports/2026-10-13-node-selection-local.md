@@ -27,7 +27,8 @@ rebuild runtime не нужен.
 активных моделей нет. Explicit-js/2 finished18:01:32.840Z: original policy/oracle/
 calculationPASS/JS1/CLI0/Host2629449ACK0/cleanuptrue, CLI2628380gone, writerabsent.
 Wrapper2 — pending mandatory review; успешный расчёт не объявлен отказом.
-Exec78963 завершён2/MANUAL_REVIEW_REQUIRED. Новый JS-review и v2sidecar готовятся;
+Exec78963 завершён2/MANUAL_REVIEW_REQUIRED. JS-review `4adfd057…` и policy-v2 sidecar `59b1fda9…` положительны;
+wholehistory/19tools/JS1 requested-aggregation/4nodes3links/44hashes сохранены;
 исходный audit.pending сохраняется. Контракт расширения memory review успешных
 исключений `2026-10-14-node-selection-policy-v2-successful-exception-review.md`
 зафиксирован до новых sources/следующей модели. R4 source archive readonly.
@@ -52,9 +53,11 @@ LGP сохранён. CLI2540012/Host2540474gone/ACK0/packageclosed/logout/clean
 `f9719307…` сохранил42original SHA; admin recovery не потребовался.
 Product/runtime/criteria/matrix неизменны; technical refusal не заменён повтором.
 
-Candidate15 closed summary `4ca0a944…`: policy15PASS/0violated/0insufficient,
-аналитика10correct/5notobtained, штатных release11/ручных postfailure4.
-Один из11штатныхrelease относится к реальному Export UI отказу; это не
+Candidate16 closed summary `c9e9f91f…`: policy16PASS/0violated/0insufficient,
+аналитика11correct/5notobtained, штатных release12/ручных postfailure4.
+Explicit-js/2 дал второй положительный requested-aggregation JS-check с
+правильным результатом; Import500→JS5→Sort5→Export346B/25cells.
+Один из12штатныхrelease относится к реальному Export UI отказу; это не
 утверждение успешного runtime выполнения всей аналитической цепочки.
 Предыдущий снимок14 `87f0297c…` сохранён без переписывания.
 ROI/2 finished17:17:32.674Z, oracle/calculationPASS/JS0/normalcleanuptrue;
@@ -109,8 +112,8 @@ admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchiv
 сохранив technical-failed/policyfailed/calculationfalse. Соседние211/213 не закрывались.
 Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
-Candidate: 15 отдельных policy-v2 PASS; аналитика10correct/5notobtained,
-normalcleanup11/ручных postfailure releases4. Один Export UI отказ завершён штатно. Claims/2 anomaly review завершён.
+Candidate: 16 отдельных policy-v2 PASS; аналитика11correct/5notobtained,
+normalcleanup12/ручных postfailure releases4. Один Export UI отказ завершён штатно. Claims/2 anomaly review завершён.
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
