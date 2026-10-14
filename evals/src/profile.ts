@@ -333,6 +333,25 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
 
 export async function assertAuth(config: EvalConfig, command: AgentCommand) {
   const providerId = config.agent.model.split("/")[0] ?? ""
+  if (config.auth) {
+    if (command.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR !== config.auth.sharedDir ||
+      command.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== "false")
+      throw new EvalFailure("SHARED_AUTH_ENV_MISMATCH", 2)
+    const result = await management(command, ["providers", "status", "--provider", providerId, "--format", "json"])
+    const value = await new Response(result.stdout).json().catch(() => null) as {
+      format?: unknown; provider?: unknown; status?: unknown; code?: unknown
+      generation?: unknown; principal_sha256?: unknown; refresh_required?: unknown
+    } | null
+    if (value?.format !== "shared-oauth-status-v1" || value.provider !== providerId)
+      throw new EvalFailure("SHARED_AUTH_STATUS_INVALID", 2)
+    if (result.exitCode === 2 && value.status === "not_ready" && typeof value.code === "string" && /^SHARED_AUTH_[A-Z_]+$/.test(value.code))
+      throw new EvalFailure(value.code, 2)
+    if (result.exitCode !== 0 || value.status !== "ready" || typeof value.generation !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.generation) ||
+      typeof value.principal_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.principal_sha256) || typeof value.refresh_required !== "boolean")
+      throw new EvalFailure("SHARED_AUTH_STATUS_INVALID", 2)
+    return { generation: value.generation, principal_sha256: value.principal_sha256, refresh_required: value.refresh_required }
+  }
   if (config.agent.provider?.id === providerId) return
   const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
   const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
