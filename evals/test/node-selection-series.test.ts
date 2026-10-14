@@ -192,6 +192,49 @@ test.each(["package-cleanup.json", "saved-package-cleanup.json"])("copyout binds
     expect(await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime"))
       .toEqual({ decision: "advance", reason: null })
     await expect(readdir(path.join(plan.pins.resultsRoot, "incidents"))).rejects.toMatchObject({ code: "ENOENT" })
+    // Actual claims2 shape: completed machine audit, corrected-history anomaly,
+    // and a later independent review must not rewrite the sealed audit.
+    await write(path.join(closed, "closure.json"), { ...closure, historyAnomaly: true })
+    const auditFile = path.join(plan.directory, "selection-audit.json")
+    const auditBytes = await Bun.file(auditFile).text()
+    await chmod(auditFile, 0o400)
+    const reviewFile = path.join(plan.directory, "graph-review.json")
+    const review = { verdict: "passed", reviewer: "independent",
+      notes: "Reviewed the corrected anomaly against the bound saved package.", sessionID: value.sessionID,
+      packageSha256: createHash("sha256").update("closed fixture bytes").digest("hex"), evidence: ["artifact/package.lgp"] }
+    await write(reviewFile, review)
+    const assessV2 = () => runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime", false,
+      { criteriaVersion: "node-selection-policy-v2", criteriaSha256: "5b5053d14aecf7462e317b75fa3a14fa3bff6717080128edf0da582171a015fa" })
+    expect(await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime"))
+      .toEqual({ decision: "review", reason: "AUDIT_REVIEW_REFRESH_REQUIRED" })
+    expect(await assessV2()).toEqual({ decision: "advance", reason: null })
+    expect((await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime", false,
+      { criteriaVersion: "node-selection-policy-v2", criteriaSha256: "unbound" })).decision).toBe("review")
+    await rm(reviewFile)
+    expect(await assessV2()).toEqual({ decision: "review", reason: "MANUAL_REVIEW_REQUIRED" })
+    for (const change of [{ sessionID: "foreign" }, { packageSha256: "b".repeat(64) }, { evidence: [] }, { verdict: "failed" }]) {
+      await write(reviewFile, { ...review, ...change })
+      expect((await assessV2()).decision).not.toBe("advance")
+    }
+    await write(reviewFile, { ...review, evidence: ["artifact/missing.lgp"] })
+    await expect(assessV2()).rejects.toMatchObject({ code: "ENOENT" })
+    await write(reviewFile, review)
+    expect(await Bun.file(auditFile).text()).toBe(auditBytes)
+    const audit: Record<string, unknown> = await Bun.file(auditFile).json()
+    for (const change of [{ jsCalls: 1 }, { jsNodes: 1 }, { policyStatus: "failed" },
+      { calculationPassed: false }, { oraclePassed: false }, { reviewStatus: "failed" }]) {
+      await chmod(auditFile, 0o600)
+      await write(auditFile, { ...audit, ...change })
+      await chmod(auditFile, 0o400)
+      const before = await Bun.file(auditFile).text()
+      expect((await assessV2()).decision).not.toBe("advance")
+      expect(await Bun.file(auditFile).text()).toBe(before)
+    }
+    await chmod(auditFile, 0o600)
+    await Bun.write(auditFile, auditBytes)
+    await chmod(auditFile, 0o400)
+    expect(await assessV2()).toEqual({ decision: "advance", reason: null })
+    expect(await Bun.file(auditFile).text()).toBe(auditBytes)
     await Bun.write(path.join(plan.directory, "parts.json"), "changed history")
     expect((await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime")).reason).toBe("ATTEMPT_CHANGED")
   } finally { await rm(root, { recursive: true, force: true }) }

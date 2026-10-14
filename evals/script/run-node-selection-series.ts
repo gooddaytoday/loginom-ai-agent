@@ -165,7 +165,7 @@ export async function runSeriesSlot(pinsFile: string, taskID: string, number: nu
     if (technicalContinuation && await exists(path.join(directory, "technical-continuation.json")))
       return assessTechnicalContinuation(plan, directory, pinsFile, auditVersion, runtimeRevision, acceptance)
     if (!await exists(path.join(directory, "closure.json"))) return { decision: "halt", reason: "SLOT_ALREADY_DISPATCHED" }
-    return assessCollected(plan, directory, auditVersion, runtimeRevision)
+    return assessCollected(plan, directory, auditVersion, runtimeRevision, acceptance)
   }
   if (await exists(plan.directory)) return { decision: "halt", reason: "SLOT_ALREADY_EXISTS" }
   if (await exists(path.join(plan.pins.profile, ".writer"))) return { decision: "halt", reason: "PROFILE_BUSY" }
@@ -206,7 +206,7 @@ export async function runSeriesSlot(pinsFile: string, taskID: string, number: nu
     return { decision: "halt", reason: state.interruptReason ?? attempt.blocker ?? "ATTEMPT_NOT_COMPLETE" }
   try {
     await collectSeriesSlot(plan, directory, before, auditVersion, runtimeRevision)
-    return await assessCollected(plan, directory, auditVersion, runtimeRevision)
+    return await assessCollected(plan, directory, auditVersion, runtimeRevision, acceptance)
   } catch (error) {
     await writeJson(path.join(directory, "collection-failure.json"), { reason: error instanceof Error ? error.message : "CLOSE_COLLECTION_FAILED" })
     return { decision: "halt", reason: "CLOSE_COLLECTION_FAILED" }
@@ -297,7 +297,7 @@ export async function collectSeriesSlot(plan: ReturnType<typeof selectionAttempt
   return result
 }
 
-async function assessCollected(plan: ReturnType<typeof selectionAttempt>, directory: string, auditVersion: string, runtimeRevision?: string) {
+async function assessCollected(plan: ReturnType<typeof selectionAttempt>, directory: string, auditVersion: string, runtimeRevision?: string, acceptance?: SeriesAcceptance) {
   const closure: unknown = await Bun.file(path.join(directory, "closure.json")).json()
   const dispatch: unknown = await Bun.file(path.join(directory, "dispatch.json")).json()
   const returned: unknown = await Bun.file(path.join(directory, "returned.json")).json()
@@ -318,7 +318,11 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
   const reviewFile = path.join(plan.directory, "graph-review.json")
   const review: unknown = await exists(reviewFile) ? await Bun.file(reviewFile).json() : null
   const reviewed = inspectSelectionReview({ review, mode: plan.task.mode, sessionID: closure.sessionID, packageSha256: audit.packageSha256 })
-  if (reviewed.reviewStatus !== audit.reviewStatus) return { decision: "review", reason: "AUDIT_REVIEW_REFRESH_REQUIRED" }
+  // V2 preserves the sealed machine audit; a later bound review is effective only in memory.
+  const effectiveAudit = acceptance?.criteriaVersion === "node-selection-policy-v2" && digest(acceptance.criteriaSha256)
+    && plan.task.mode === "standard" && audit.policyStatus === "passed" && audit.calculationPassed === true && audit.oraclePassed === true
+    && audit.reviewStatus === "not-required" && reviewed.reviewStatus === "passed" ? { ...audit, reviewStatus: "passed" } : audit
+  if (reviewed.reviewStatus !== effectiveAudit.reviewStatus) return { decision: "review", reason: "AUDIT_REVIEW_REFRESH_REQUIRED" }
   if (reviewed.reviewStatus === "passed" && (!record(review) || !Array.isArray(review.evidence)
     || !review.evidence.length)) return { decision: "review", reason: "REVIEW_EVIDENCE_MISSING" }
   if (record(review) && Array.isArray(review.evidence)) for (const file of review.evidence) {
@@ -333,7 +337,7 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
   if (!digest(closure.copied[cleanup.name])) return { decision: "halt", reason: "CLOSE_COPY_CHANGED" }
   return inspectSeriesTransition({ ...closure,
     attempt: await Bun.file(path.join(plan.directory, "attempt.json")).json(),
-    audit,
+    audit: effectiveAudit,
     packageCleanup: cleanup.cleanup,
     resourceClose: await jsonLines(path.join(directory, "resource-close.jsonl")), terminalClose: await jsonLines(path.join(directory, "terminal-close.jsonl")),
     hostClose: [host], deadPids, writerAbsent: !await exists(path.join(plan.pins.profile, ".writer")),
