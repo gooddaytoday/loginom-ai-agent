@@ -2406,8 +2406,8 @@ function readRenderedInputMapping(observation) {
       const boundSources=new Set(pairs.map(([,pair])=>pair?.[0])),boundTargets=new Set(pairs.map(([,pair])=>pair?.[1]));
       const unboundSources=sources.filter(record=>!boundSources.has(record)),unboundTargets=targets.filter(record=>!boundTargets.has(record));
       // A null endpoint is not a relation. Reconnect stages only one completely
-      // observed vacant pair, beside five unchanged reciprocal native pairs.
-      const reconnect=sources.length===6&&pairs.length===5&&unboundSources.length===1&&unboundTargets.length===1
+      // observed vacant pair, beside the remaining reciprocal native pairs.
+      const reconnect=sources.length>=1&&sources.length<=80&&pairs.length===sources.length-1&&unboundSources.length===1&&unboundTargets.length===1
         &&unboundSources[0].data.ConnectedRecord===null&&unboundTargets[0].data.ConnectedRecord===null;
       requireLink((pairs.length===targets.length||reconnect)&&pairs.every(([key,pair])=>Array.isArray(pair)&&pair.length===2&&sources.includes(pair[0])&&targets.includes(pair[1])
         &&key===String(pair[0].internalId)+'_'+String(pair[1].internalId)&&pair[0].data.ConnectedRecord===pair[1]&&pair[1].data.ConnectedRecord===pair[0])
