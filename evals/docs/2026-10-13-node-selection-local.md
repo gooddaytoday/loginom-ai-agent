@@ -22,36 +22,36 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 15:31 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыты 13 из 31
-попытки, новых моделей сейчас нет. Candidate: девять отдельных policy-v2 PASS;
-все шесть стандартных задач и три исключения содержательно покрыты. Исходные
-аналитические результаты: пять успешных, четыре технических отказа без результата;
-normal cleanup успешен в пяти, четыре потребовали адресного восстановления.
-Baseline: sales/ABC/monthly дали правильный результат, claims завершился отказом
-на import configure/UI_SCAN_LIMIT до содержательных аналитических решений.
-Для политики claims — недостаточно доказательств, а не PASS из-за отсутствия JS.
-Runner96749 завершён; оригинальные failed attempt/audit/verdict сохранены.
+Текущий checkpoint 2026-10-14 15:46 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены14 из31,
+закрыты13; baseline ROI/1 безопасно выполняется. Dispatch15:45:58.739Z,
+CLI2347693, runnerPID2346840/exec45610; baseline first-last-touch/1 и16candidate
+ещё впереди. Модельные процессы текущего профиля последовательны.
 
-Собственная user:209 автоматически закрыта сервером в15:03:04.387Z; два свежих
-снимка диспетчера подтвердили отсутствие всех user-сессий. Admin:210 вышел,
-его браузер закрыт, все восемь собственных PID завершены. Точный собственный
-.writer архивирован в15:22:20.697Z с сохранением nonce/SHA/inode/mtime; активного
-.writer нет. Следующий model dispatch ещё не разрешён. Execution-v2 изменения прошли
-63 теста/189assertions и typecheck0; finalrelease review approved `f154e353…`.
-Однако фактический readonly gate на реальном полном журнале вернул
-`TECHNICAL_NATIVE_LEDGER_INCOMPLETE`; этот отказ сохранён отдельно `5d94fc72…`.
-Первый execution lock `093e2f85…` не использован для модели и сохранён;
-независимый execution review фиксирует blocked. Исправляется только чтение
-подтверждённой native записи по TDD, затем будет новый prospective lock.
-Прямая GUID-привязка не заявляется; используются два точных native RPC и полный
-серверный журнал. После допуска next — baseline ROI/1, затем first-last-touch/1
-и оставшиеся16candidate; исходные слоты не повторяются.
+Candidate: девять отдельных policy-v2 PASS; все шесть стандартных задач и три
+исключения содержательно покрыты. Исходная аналитика: пять успешных результатов,
+четыре технических отказа без результата; normalcleanup5, ручных recovery4.
+Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
+import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
+insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
 
-Критерииv2 записаны14:33:36.064Z до следующего dispatch. Матрица31, модель
-medium fast, inputs, oracle и runtime прежние. 76 исходных sealed files сохранены
-в отдельном readonly архиве; разрешены изменения только четырёх evaluator
-source/test файлов в новом execution lock. Product и обработчики узлов не меняются.
+Собственная user:209 автоматически закрыта15:03:04.387Z; два свежих снимка
+диспетчера подтвердили отсутствие user-сессий. Admin210 вышел, браузер закрыт,
+все8ownPIDgone; точный guard архивирован15:22:20.697Z. Finalrelease review
+`f154e353…` и actualreadonly gate-r2 `85b4b131…` разрешили безопасное продолжение.
+Прямая GUID-привязка остаётсяfalse; доказаны два узких native RPC и полный ledger.
+Первый actualgate отказ `5d94fc72…` и неиспользованный lock `093e2f85…` сохранены.
+Реальный U+2028 formatter record исправлен только в evaluator parser по TDD.
+Итоговые64tests/190assertions/typecheck0; source commits118f1dce1b/c0ccb0150a/6345ca6abf.
+
+Проспективный execution lock-r2 `495b3214…`, independent review `2794a055…`
+и критерии `5b5053d1…` зафиксированы до нового model dispatch. 76 исходных sealed
+files сохранены в readonly архиве;72currentsources unchanged, изменены ровно4
+разрешённых evaluator source/test файла. Product и runtime не менялись и не
+пересобирались. Matrix31/model/inputs/oracle прежние, старые слоты не повторяются.
+Успешные стандартные слоты автоматически продолжаются после всех immediate gates;
+исключения/отказы/аномалии и финальная seeded выборка сохраняют обязательное review.
+
 
 
 Источник требований — согласованные spec и plan в `docs/superpowers/`.
