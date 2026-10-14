@@ -1,0 +1,6 @@
+const source = await Bun.file(new URL("../../../src/transport.ts", import.meta.url)).text()
+const output = new Bun.Transpiler({loader:"ts",target:"node"}).transformSync(source)
+const start = output.indexOf("export function transport(")
+if (start < 0) throw Error("TRANSPORT_EXPORT_MISSING")
+const factory = output.slice(start).replace("export function transport(","function transport(")
+await Bun.write(process.argv[2], JSON.stringify({factory,dependencies:["randomUUID","hostError"],sourceExports:[...source.matchAll(/export function (\w+)/g)].map(x=>x[1]),bodyUnchanged:true}))

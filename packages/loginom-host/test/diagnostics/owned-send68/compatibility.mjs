@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import{readFile,writeFile}from'node:fs/promises';import{randomUUID}from'node:crypto';import{MessageChannel}from'node:worker_threads';
+const [proofPath,realm,output]=process.argv.slice(2),proof=JSON.parse(await readFile(proofPath,'utf8'));
+const unused=value=>{throw Error('UNEXERCISED_HOST_ERROR_DEPENDENCY')};
+const create=realm==='SOURCE_COMPILED'?Function(...proof.dependencies,proof.factory+';return transport')(randomUUID,unused):Function(...proof.dependencies,proof.factory+';return D')(randomUUID,unused);
+let sends=0,off=0,removed=0,closeHook;
+const channel=new MessageChannel(),port={postMessage(v){sends++;channel.port1.postMessage(v)},on(e,fn){channel.port1.on(e,data=>fn({data}))},off(){off++},start(){channel.port1.start()},onClose(fn){closeHook=fn;return()=>{removed++;closeHook=undefined}}};
+const client=create(port);assert.equal(typeof client.request,'function');assert.equal(typeof client.close,'function');assert.equal(client.requestOwnedAcquire,undefined);assert.deepEqual(Object.keys(client).sort(),['close','request']);assert.equal(sends,0);
+client.close();client.close();assert.equal(off,0);assert.equal(removed,0);assert.equal(typeof closeHook,'function');assert.equal(sends,0);
+channel.port1.removeAllListeners();channel.port2.removeAllListeners();channel.port1.close();channel.port2.close();
+await writeFile(output,JSON.stringify({realm,checks:2,ownedABI:'GAP',factoryKeys:Object.keys(client),ownedEntry:false,messageOff:off,closeHookRemoved:removed,requestsSent:sends,frozen4:'NOT_RUN_MISSING_PRIVATE_ENTRY',ErrorCompanion:'NOT_RUN_MISSING_PRIVATE_ENTRY',native:false,scope:'Source-transpiled or byte-exact installed embedded ordinary function on bundled Node. Real MessageChannel, unused hostError dependency double. No actual CLI/owned factory/service/host session/native proof; idle fixture closure is not native cleanup.'},null,2));console.log(JSON.stringify({realm,checks:2,ownedABI:'GAP',sends}));
