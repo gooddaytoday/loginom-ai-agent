@@ -1,5 +1,7 @@
 # Multica v3: checkpoint, допуск и распределение работ
 
+> Исторический документ: результаты и ограничения сохранены. Правила оркестрации заменены 14.10.2026 на [независимую обработку узлов](multica-mas.md); старые команды не являются действующей инструкцией.
+
 Внедрение 13.10.2026. Ветка `multica-workflow`, отдельный worktree; основной `txt-delivery`, незавершённые правки `node-orchestration` и `artifact-cleanup` сохранены. Клиент/сервер Multica, модели, роли, лимиты и критерии приёмки не изменялись. Канонический процесс — [multica-mas.md](multica-mas.md); инструкции четырёх ролей — [multica-roles](multica-roles).
 
 ## Обвязка и установка
@@ -8,9 +10,9 @@
 
 Итоговая обвязка: `ed6ce02cbf21bb94b01df916af3985813f5785af`, опубликована в `multica-workflow`, установлена отдельно в `/home/user/.local/share/loginom-multica/orchestration/ed6ce02cbf21bb94b01df916af3985813f5785af`. Все 14 Python/Markdown файлов сверены побайтно через SFTP, CLI help проверен. Предыдущие каталоги сохранены. Squad URLs/SHA256 и четыре role instructions записаны через API и точно перечитаны; остальные конфигурационные поля сохранены. Daemon PID212379 при установке прежний, перезапуска не было.
 
-- [checkpoint.py](../../../scripts/multica/checkpoint.py): GET → `PUT description+expected_revision` → exact GET. 20 строк, приватная receipt до записи, конфликт/потерянный ответ без слепого повтора. Только описание.
-- [admit.py](../../../scripts/multica/admit.py): task/input hashes, полный clean candidate manifest, model/variant, profile/config/shared OAuth, требования и применимость исправлений, свежий resource/cleanup evidence. Один вызов штатного CLI; существующая receipt не разрешает второй запуск.
-- [admission.md](../../../scripts/multica/admission.md): точный формат и ограничения. Для LAB-72 проверяются оба этапа enabled prefixes, `Joined_` и метка `Присоединённое: `; исходный strict сценарий отдельный. Oracle/evidence не передаются как prompt, attachments или служебное окружение.
+- [checkpoint.py](https://github.com/gooddaytoday/loginom-ai-agent/blob/48b5a0c867f71d06a8c50d7136ac3cd7d863490d/scripts/multica/checkpoint.py): GET → `PUT description+expected_revision` → exact GET. 20 строк, приватная receipt до записи, конфликт/потерянный ответ без слепого повтора. Только описание.
+- [admit.py](https://github.com/gooddaytoday/loginom-ai-agent/blob/48b5a0c867f71d06a8c50d7136ac3cd7d863490d/scripts/multica/admit.py): task/input hashes, полный clean candidate manifest, model/variant, profile/config/shared OAuth, требования и применимость исправлений, свежий resource/cleanup evidence. Один вызов штатного CLI; существующая receipt не разрешает второй запуск.
+- [admission.md](https://github.com/gooddaytoday/loginom-ai-agent/blob/48b5a0c867f71d06a8c50d7136ac3cd7d863490d/scripts/multica/admission.md): точный формат и ограничения. Для LAB-72 проверяются оба этапа enabled prefixes, `Joined_` и метка `Присоединённое: `; исходный strict сценарий отдельный. Oracle/evidence не передаются как prompt, attachments или служебное окружение.
 
 В процессе дополнительной сверки первоначальный71494 был заменён447dd (явный общий OAuth и idle initialized profile), затем85097 (оба этапа Union и точная метка), затемed6ce02c (равенство cwd/PWD/--dir). Новые вызовы admit направлены наed6ce02c; предыдущие receipts/каталоги не удалялись. Реальных модельных запусков для проверки обвязки не выполнялось. Это не sandbox, доказательство истинности reviewer evidence или защита от ручного обхода.
 
