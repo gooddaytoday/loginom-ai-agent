@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdir, mkdtemp, readlink, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readlink, rm, writeFile } from "node:fs/promises"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { verifyAdminRuntime } from "../src/preflight"
-import { superviseProcess, type ProcessOwner } from "../src/process-supervisor"
+import { signalProcess, superviseProcess, type ProcessOwner } from "../src/process-supervisor"
 
 test.skipIf(!process.env.EVAL_PROCESS_CANDIDATE_RECEIPT)("installed browser: trusted Node-owned Chromium exits with confirmed ownership without auth", async () => {
   const receipt = await readLeaseReceipt(process.env.EVAL_PROCESS_CANDIDATE_RECEIPT!) as { binary: string; manifestSha256: string }
@@ -96,6 +96,50 @@ test.skipIf(!process.env.EVAL_PROCESS_CANDIDATE_RECEIPT)("installed parallel bro
     await rm(root, { recursive: true })
   } finally { await Promise.all(contexts.map(context => context.stop())) }
 }, 120_000)
+
+test.skipIf(!process.env.EVAL_PROCESS_PID_REUSE)("kernel PID reuse cannot adopt or signal a new launcher through a retained failed owner", async () => {
+  const pidNamespace = await readlink("/proc/self/ns/pid")
+  const userNamespace = await readlink("/proc/self/ns/user")
+  if (!process.env.EVAL_PROCESS_HOST_PID_NAMESPACE || !process.env.EVAL_PROCESS_HOST_USER_NAMESPACE ||
+    pidNamespace === process.env.EVAL_PROCESS_HOST_PID_NAMESPACE || userNamespace === process.env.EVAL_PROCESS_HOST_USER_NAMESPACE)
+    throw Error("PID reuse test requires separate PID and user namespaces")
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-kernel-pid-reuse-"))
+  const first = path.join(root, "first"), second = path.join(root, "second")
+  await Promise.all([mkdir(first), mkdir(second)])
+  await mkdir(path.join(first, "process-cleanup.json"))
+  const original = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(50)"], cwd: first,
+    env: { PATH: "/usr/bin:/bin" }, outDir: first, timeoutMs: 2_000, owner: { kind: "slot", id: "a" } })
+  expect(original.processCleanup).toMatchObject({ status: "failed", error: "Process evidence persistence failed", unknownProcesses: [] })
+  const saved = original.processCleanup.processes.find(entry => entry.pid === original.processCleanup.launcher?.pid)!
+  expect(await Bun.file(`/proc/${saved.pid}/stat`).exists()).toBe(false)
+  const ready = Promise.withResolvers<number>()
+  await writeFile("/proc/sys/kernel/ns_last_pid", String(saved.pid - 1))
+  const pending = superviseProcess({ cmd: [process.execPath, "-e", "console.log(process.ppid); await Bun.sleep(1000)"], cwd: second,
+    env: { PATH: "/usr/bin:/bin" }, outDir: second, timeoutMs: 3_000, owner: { kind: "slot", id: "b" },
+    stdout: new WritableStream<Uint8Array>({ write(chunk) { ready.resolve(Number(new TextDecoder().decode(chunk).trim())) } }) })
+  try {
+    expect(await ready.promise).toBe(saved.pid)
+    const current = (await readFile(`/proc/${saved.pid}/stat`, "utf8")).split(") ")[1]!.split(" ")
+    expect(current[19]).not.toBe(saved.starttime)
+    await expect(signalProcess(saved, "SIGKILL")).rejects.toThrow("Process identity changed")
+    const run = await pending
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(run.processCleanup.peerProcesses?.some(entry => entry.process.starttime === saved.starttime && entry.process.pid === saved.pid)).toBe(false)
+    const replacement = run.processCleanup.processes.find(entry => entry.pid === saved.pid)!
+    expect(replacement.starttime).not.toBe(saved.starttime)
+    expect([replacement.uid, replacement.device, replacement.inode, replacement.group, replacement.session])
+      .toEqual([saved.uid, saved.device, saved.inode, saved.group, saved.session])
+    if (process.env.EVAL_PROCESS_PROOF_FILE) {
+      const file = path.join(path.dirname(process.env.EVAL_PROCESS_PROOF_FILE), "pid-reuse.json")
+      const proof = { version: 1, kind: "kernel-pid-reuse-proof", pidNamespace, userNamespace,
+        uidMap: await readFile("/proc/self/uid_map", "utf8"), liveQualified: false, original: saved, replacement, processes: run.processCleanup }
+      await writeLeaseReceipt(file, proof)
+      expect(await readLeaseReceipt(file)).toEqual(proof)
+    }
+    await rm(root, { recursive: true })
+  } finally { await pending }
+}, 10_000)
 
 async function nativeBrowser(root: string, name: string, owner: ProcessOwner, runtime: Awaited<ReturnType<typeof verifyAdminRuntime>>) {
   const directory = path.join(root, name)
