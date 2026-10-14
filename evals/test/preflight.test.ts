@@ -111,6 +111,19 @@ test("admin runtime: executable and manifest modes are verified before launch", 
   } finally { await rm(item.root, { recursive: true, force: true }) }
 })
 
+test("admin runtime: full POSIX permission bits must match the manifest", async () => {
+  const item = await runtimeFixture()
+  try {
+    // Bun's chmod masks special bits; the fixture must establish the real mode.
+    expect(await Bun.spawn(["/bin/chmod", "4755", item.binary], { stdout: "ignore", stderr: "ignore" }).exited).toBe(0)
+    await writeFile(path.join(item.root, "cli-manifest.json"), JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file.path === "bin/loginom-ai-agent-cli" ? { ...file, mode: 0o4755 } : file) }))
+    expect((await verifyAdminRuntime(item.binary)).installation).toBe(item.root)
+    await chmod(item.binary, 0o755)
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_MODE")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
 test("admin runtime: malformed or mismatched manifest targets fail with safe codes", async () => {
   const item = await runtimeFixture()
   try {
