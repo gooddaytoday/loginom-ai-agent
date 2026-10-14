@@ -92,6 +92,11 @@ function validCgroupResources(value: unknown): boolean {
   if (value === null || value === undefined) return true
   if (typeof value !== "object" || Array.isArray(value)) return false
   const group = resourceObject(value), quota = resourceObject(group.cpu_max)
+  if (group.view !== null && group.view !== undefined) {
+    const view = resourceObject(group.view), root = resourceObject(view.root)
+    if (typeof view.namespace !== "string" || !/^cgroup:\[\d+\]$/.test(view.namespace) ||
+      !Number.isSafeInteger(root.device) || Number(root.device) < 0 || !Number.isSafeInteger(root.inode) || Number(root.inode) < 1) return false
+  }
   if (group.controllers !== null && group.controllers !== undefined && (!Array.isArray(group.controllers) ||
     group.controllers.some(value => typeof value !== "string" || !value.trim()))) return false
   if (group.path !== null && group.path !== undefined && (typeof group.path !== "string" || !path.posix.isAbsolute(group.path) || path.posix.normalize(group.path) !== group.path)) return false
