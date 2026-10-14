@@ -66,7 +66,7 @@ function requests(port:Port){
     if(!pending.has(id)||cancelled&&!state.closed)return
     // Box the original cancellation before its owned send can reject.
     if(owned)owned.primary??={value}
-    if(control&&dispatched&&!cancelled){try{port.postMessage({id:randomUUID(),method:'readonly.preReady.cancel',input:{...(input as object),requestId:id,rejection:encode(value)}})}catch(error){if(owned)owned.secondary??={value:error}}}
+    if(control&&dispatched&&!cancelled&&!state.closed){try{port.postMessage({id:randomUUID(),method:'readonly.preReady.cancel',input:{...(input as object),requestId:id,rejection:encode(value)}})}catch(error){if(owned)owned.secondary??={value:error}}}
     if(owned&&dispatched&&!state.closed){owned.primary??={value};cancelled=true;return}
     if(owned){owned.primary??={value};settle(id,true,owned.primary.value);return}
     settle(id,true,value)
