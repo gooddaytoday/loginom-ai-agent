@@ -2221,7 +2221,7 @@ Design receipt `calculator-open-design-review.json` SHA
   собственный fresh artifact/source GUID remap и сохранность originals. Root
   закрепляет ready bindings отдельно; уже прошедший Product full/focused не
   повторять при неизменном Product.
-- [ ] Root выполнить один private native `--run` в текущем локальном Loginom:
+- [x] Root выполнить один private native `--run` в текущем локальном Loginom:
   full originalCSV →5original successful standard requests →one targetopening.
   Нет LLM/нового modelslot/earlySave/retry. Сохранить raw RPC/journals/инструментацию
   exact prethrow и late frames, one-gesture semantics и strict own closure/PID
@@ -2250,3 +2250,23 @@ original16/effective source74/runtime288×2 unchanged. Peer review SHA
 `dcc68ae1479246a4195cc37e87a3776ac50bd5217d7a9a94dc24faf4710f96ac`;
 readyfalse0400 binding SHA `28dbed938ced99d118e3a5ada76e85a2a9eccf3902ceac7597abeca882740fcd`.
 Fresh live ещё не начинался; Rootactivation отдельна, acceptanceEligibilityfalse.
+
+Checkpoint 2026-10-14 09:00 UTC — один private Calculator replay завершён без воспроизведения.
+В текущем локальном Loginom, без LLM, выполнены шесть исходных standard requests
+на полном CSV16735bytes. Целевой abc-class-01 применён ровно один раз и SUCCEEDED.
+Единственный begin_wizard frame инструментирован; отказа нет, prethrow captures0.
+Нового Product исправления и нового acceptance/model PASS это не доказывает.
+Original failed ABC/1, stopped31 protocol и его 30 незапущенных слотов сохранены.
+
+Save выполнен только после target success. Собственный package
+/user/CalcOpen-79afafd3c14845ea88cec9ca240116fd.lgp закрыт без discard, logouttrue;
+session17ea0dc4…/docda5c9daf… связаны с cleanup receipt. Host1423892 ACKtrue/exit0,
+noSignal/noError; result cleanupConfirmedtrue. Результат
+native-calculator-open-diagnostic/run/result.json SHA
+`1c2960985ac890360762adab344cc434b084012d4cc64e06f44cc5bc3640337a`.
+Независимый readback2290rows/48receipts/6requests/onegesture/Save/strictclose:
+`native-calculator-open-diagnostic/independent-closed-live-readback.json` SHA
+`6d627d3b8bff72a6d2b89a6b04584e9a677728123da1127729e3ffc0536b9bcc`.
+PID действительно отсутствует, .writer отсутствует; originals16/source74/4454
+и stopped/effective locks неизменны. Live-диагностика не входит в31модельный слот;
+завершённые runtime checks и Export/JS regression gates не повторялись.

@@ -2310,3 +2310,23 @@ own wizard, masks/dialogs0, поэтому конкретный false conjunct/f
 относится к плановым12процессам, не включает непредвиденную диагностику/отказы.
 Если подтверждённая правка меняет final runtime, нужна новая prospectively frozen
 matched пара и31fresh slots; этот started failure остаётся историческим.
+
+Checkpoint 2026-10-14 09:00 UTC — один private Calculator replay завершён без воспроизведения.
+В текущем локальном Loginom, без LLM, выполнены шесть исходных standard requests
+на полном CSV16735bytes. Целевой abc-class-01 применён ровно один раз и SUCCEEDED.
+Единственный begin_wizard frame инструментирован; отказа нет, prethrow captures0.
+Нового Product исправления и нового acceptance/model PASS это не доказывает.
+Original failed ABC/1, stopped31 protocol и его 30 незапущенных слотов сохранены.
+
+Save выполнен только после target success. Собственный package
+/user/CalcOpen-79afafd3c14845ea88cec9ca240116fd.lgp закрыт без discard, logouttrue;
+session17ea0dc4…/docda5c9daf… связаны с cleanup receipt. Host1423892 ACKtrue/exit0,
+noSignal/noError; result cleanupConfirmedtrue. Результат
+native-calculator-open-diagnostic/run/result.json SHA
+`1c2960985ac890360762adab344cc434b084012d4cc64e06f44cc5bc3640337a`.
+Независимый readback2290rows/48receipts/6requests/onegesture/Save/strictclose:
+`native-calculator-open-diagnostic/independent-closed-live-readback.json` SHA
+`6d627d3b8bff72a6d2b89a6b04584e9a677728123da1127729e3ffc0536b9bcc`.
+PID действительно отсутствует, .writer отсутствует; originals16/source74/4454
+и stopped/effective locks неизменны. Live-диагностика не входит в31модельный слот;
+завершённые runtime checks и Export/JS regression gates не повторялись.
