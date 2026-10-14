@@ -14,7 +14,8 @@ import {streamText,tool,jsonSchema} from 'ai'
 import {MockLanguageModelV3} from 'ai/test'
 const out=process.argv[2]
 await receivePrivateAdmission()
-let callbackCount=0,modelDoubleCount=0,realRequestCount=0,scopeDeadline:bigint|undefined,handlerRefusal
+let callbackCount=0,modelDoubleCount=0,realRequestCount=0,scopeDeadline:bigint|undefined
+let handlerRefusal:unknown
 await withStandaloneCancellation(async runSignal=>{
  const runArgs={message:['harmless business fixture'],format:'json',command:undefined,model:undefined,agent:undefined}
  // Real RunCommand generator executes its original retention before first await.
@@ -22,9 +23,9 @@ await withStandaloneCancellation(async runSignal=>{
  try{await Effect.runPromise(RunCommand.handler!(runArgs as never) as never)}catch(e){handlerRefusal=e}
  assert(handlerRefusal)
  const root=retainRunCommandCreation(runArgs,runSignal);assert(root)
- const sessionID='ses_original_source_fixture',input={sessionID,parts:[{type:'text',text:'harmless business fixture'}]}
+ const sessionID='ses_original_source_fixture',input={sessionID,parts:[{type:'text' as const,text:'harmless business fixture'}]}
  retainPromptSender(root,input,'prompt')
- const sdk=createOpencodeClient({baseUrl:'http://opencode.internal',fetch:async(raw,init)=>{
+ const sdk=createOpencodeClient({baseUrl:'http://opencode.internal',fetch:Object.assign(async(raw:RequestInfo|URL,init?:RequestInit)=>{
   const original=associatePromptRequest(root,new Request(raw,init))
   const request=relayPromptRequest(original,new Request(original,{headers:new Headers(original.headers)}))
   const web=HttpServerRequest.fromWeb(request);assert.equal(web.source,request);realRequestCount++
@@ -51,7 +52,7 @@ await withStandaloneCancellation(async runSignal=>{
   }})}})
   for await(const chunk of result.fullStream){if(chunk.type==='error')throw chunk.error}
   return Response.json({info:{id:'fixture'},parts:[]})
- }})
+ },{preconnect:fetch.preconnect})})
  const response=await sdk.session.prompt(input);assert(!response.error)
  assert.equal(callbackCount,1);assert.equal(realRequestCount,1);assert.equal(modelDoubleCount,1);assert.equal(typeof scopeDeadline,'bigint')
 })

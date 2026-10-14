@@ -944,7 +944,7 @@ const OriginalRunCommand = effectCmd({
               agent,
               model,
               variant: args.variant,
-              parts: [...files, { type: "text", text: message }],
+              parts: [...files, { type: "text" as const, text: message }],
             }
             retainPromptSender(originalCreation, originalInput, "prompt")
             const result = await client.session.prompt(originalInput)
