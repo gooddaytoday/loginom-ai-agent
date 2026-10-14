@@ -2,9 +2,37 @@ import { constants } from "node:fs"
 import { lstat, open, readFile, realpath, statfs } from "node:fs/promises"
 import path from "node:path"
 import { EvalFailure } from "./fail"
+import type { SlotFile } from "./slots"
+
+export async function loadResourceContainers(file: SlotFile) {
+  const { readLeaseReceipt } = await import("./lease")
+  const { pairImages } = await import("./parallel-pair")
+  const saved = await readLeaseReceipt(path.join(file.controller.stateDir, "pair.json")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("RESOURCE_PAIR_UNVERIFIED", 2)
+  })
+  if (saved === undefined) return null
+  const journal = resourceObject(saved)
+  const server = resourceObject(journal.server)
+  const images = resourceObject(journal.images)
+  const resources = resourceObject(journal.resources)
+  const nonce = journal.nonce
+  const purpose = journal.purpose
+  if (journal.version !== 2 || journal.kind !== "pair-provision" || journal.phase !== "ready" || journal.intent !== undefined ||
+    typeof nonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(nonce) ||
+    purpose !== "acceptance" && purpose !== "research" || resources.server === resources.studio ||
+    !Object.entries(file.server).every(([key, value]) => server[key] === value) || images.server !== pairImages.server || images.studio !== pairImages.studio)
+    throw new EvalFailure("RESOURCE_PAIR_UNVERIFIED", 2)
+  return (["server", "studio"] as const).map(role => {
+    const id = resources[role]
+    if (typeof id !== "string" || !/^[0-9a-f]{64}$/.test(id)) throw new EvalFailure("RESOURCE_PAIR_UNVERIFIED", 2)
+    return { role, id, name: role === "server" ? file.server.container : file.server.studioContainer, image: pairImages[role], nonce, purpose }
+  })
+}
 
 export async function collectHostResources(input: {
   paths: string[]; out: string; intervalMs: number; runId: string | null; phase: "before" | "run" | "after" | null; signal: AbortSignal
+  containers?: NonNullable<Awaited<ReturnType<typeof loadResourceContainers>>> | null
 }) {
   if (!Number.isSafeInteger(input.intervalMs) || input.intervalMs <= 0) throw new EvalFailure("RESOURCE_INTERVAL", 2)
   const directory = path.dirname(input.out)
@@ -22,10 +50,11 @@ export async function collectHostResources(input: {
     while (!input.signal.aborted) {
       const observed = performance.now()
       const missed = Math.max(0, Math.floor((observed - next) / input.intervalMs))
-      const host = await sampleHostResources(input.paths)
+      const [host, containers] = await Promise.all([sampleHostResources(input.paths), input.containers
+        ? Promise.all(input.containers.map(sampleBoundContainerResources)) : null])
       await handle.writeFile(JSON.stringify({ version: 1, sequence: ++samples, run_id: input.runId, phase: input.phase,
         interval_ms: input.intervalMs, elapsed_ms: observed - started, missed_intervals: missed,
-        duration_ms: performance.now() - observed, host }) + "\n")
+        duration_ms: performance.now() - observed, host, containers }) + "\n")
       await handle.sync()
       next += (missed + 1) * input.intervalMs
       await new Promise<void>(resolve => {
@@ -37,6 +66,15 @@ export async function collectHostResources(input: {
     }
     return { samples }
   } finally { await handle.close() }
+}
+
+async function sampleBoundContainerResources(target: NonNullable<Awaited<ReturnType<typeof loadResourceContainers>>>[number]) {
+  const sample = await sampleContainerResources(target.id)
+  if (sample.inspect?.name === `/${target.name}` && sample.inspect.image === target.image &&
+    sample.inspect.owner_kind === "users" && sample.inspect.owner_nonce === target.nonce && sample.inspect.purpose === target.purpose)
+    return { ...sample, role: target.role }
+  return { ...sample, role: target.role, cpu: null, memory: null, pids: null, io: null, raw_stats: null,
+    errors: [...sample.errors, "CONTAINER_IDENTITY_UNVERIFIED"] }
 }
 
 export async function sampleHostResources(paths: string[]) {
@@ -105,6 +143,7 @@ function cgroupNumber(value?: string) {
 
 export async function sampleContainerResources(id: string) {
   if (!/^[0-9a-f]{64}$/.test(id)) throw new EvalFailure("RESOURCE_CONTAINER_ID", 2)
+  const inspect = await containerInspection(id).catch(() => null)
   const version = await fetch("http://localhost/version", { unix: "/var/run/docker.sock", signal: AbortSignal.timeout(2000) })
     .then(async response => response.ok ? resourceObject(await response.json()).ApiVersion : undefined).catch(() => undefined)
   const payload = typeof version === "string" && /^1\.\d+$/.test(version)
@@ -123,6 +162,7 @@ export async function sampleContainerResources(id: string) {
   const io = resourceObject(matched?.data.blkio_stats).io_service_bytes_recursive
   const sample = {
     container_id: id, observed_at: new Date().toISOString(),
+    inspect,
     cpu: resourceCounter(usage.total_usage) !== null ? { total_usage_ns: resourceCounter(usage.total_usage),
       system_cpu_usage_ns: resourceCounter(cpu.system_cpu_usage), online_cpus: resourceCounter(cpu.online_cpus) } : null,
     memory: resourceCounter(memory.usage) !== null && resourceCounter(memory.limit) !== null
@@ -135,8 +175,32 @@ export async function sampleContainerResources(id: string) {
     // Preserve API bytes as well as the projection; large nanosecond counters exceed JS safe integers.
     raw_stats: matched?.raw ?? null,
   }
-  return { ...sample, errors: [...(matched ? [] : ["CONTAINER_STATS_UNAVAILABLE"]),
+  return { ...sample, errors: [...(matched ? [] : ["CONTAINER_STATS_UNAVAILABLE"]), ...(inspect ? [] : ["CONTAINER_INSPECT_UNAVAILABLE"]),
     ...["cpu", "memory", "pids", "io"].flatMap(key => sample[key as "cpu" | "memory" | "pids" | "io"] === null ? [`CONTAINER_${key.toUpperCase()}_UNAVAILABLE`] : [])] }
+}
+
+async function containerInspection(id: string) {
+  // Select metadata in Docker itself so Config.Env never enters collector output or memory.
+  const format = `{"id":{{json .Id}},"image":{{json .Image}},"name":{{json .Name}},"started_at":{{json .State.StartedAt}},"running":{{json .State.Running}},"oom_killed":{{json .State.OOMKilled}},"pid":{{json .State.Pid}},"memory_bytes":{{json .HostConfig.Memory}},"memory_swap_bytes":{{json .HostConfig.MemorySwap}},"nano_cpus":{{json .HostConfig.NanoCpus}},"cpu_quota":{{json .HostConfig.CpuQuota}},"cpu_period":{{json .HostConfig.CpuPeriod}},"pids_limit":{{json .HostConfig.PidsLimit}},"owner_kind":{{json (index .Config.Labels "loginom.evals.kind")}},"owner_nonce":{{json (index .Config.Labels "loginom.evals.nonce")}},"purpose":{{json (index .Config.Labels "loginom.evals.purpose")}}}`
+  const child = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "inspect", "--format", format, id],
+    { env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, stdin: "ignore", stdout: "pipe", stderr: "ignore" })
+  const timer = setTimeout(() => child.kill("SIGKILL"), 2000)
+  try {
+    const [stdout, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+    if (code !== 0) return null
+    const item = resourceObject(JSON.parse(stdout))
+    if (item.id !== id || typeof item.image !== "string" || typeof item.name !== "string" || typeof item.started_at !== "string" ||
+      typeof item.running !== "boolean" || typeof item.oom_killed !== "boolean") return null
+    return { id, image: item.image, name: item.name, started_at: item.started_at, running: item.running, oom_killed: item.oom_killed,
+      pid: resourceCounter(item.pid), memory_bytes: resourceCounter(item.memory_bytes), nano_cpus: resourceCounter(item.nano_cpus),
+      cpu_period: resourceCounter(item.cpu_period),
+      memory_swap_bytes: Number.isSafeInteger(item.memory_swap_bytes) && Number(item.memory_swap_bytes) >= -1 ? Number(item.memory_swap_bytes) : null,
+      cpu_quota: Number.isSafeInteger(item.cpu_quota) && Number(item.cpu_quota) >= -1 ? Number(item.cpu_quota) : null,
+      pids_limit: Number.isSafeInteger(item.pids_limit) && Number(item.pids_limit) >= -1 ? Number(item.pids_limit) : null,
+      owner_kind: typeof item.owner_kind === "string" ? item.owner_kind : null,
+      owner_nonce: typeof item.owner_nonce === "string" ? item.owner_nonce : null,
+      purpose: typeof item.purpose === "string" ? item.purpose : null }
+  } finally { clearTimeout(timer) }
 }
 
 function resourceObject(value: unknown): Record<string, unknown> {
