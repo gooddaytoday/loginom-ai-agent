@@ -40,6 +40,8 @@ continuous process absence proof. Это позволяет продолжать
 
 После успешной установки shared-oauth candidate metadata-only проверка обнаружила отсутствие `parallel/model-oauth/auth.json`, `parallel/judge-codex/auth.json` и `parallel/onboarding/profile`. Путь установленного candidate и hashes закреплены в private `/home/kiselev/.local/state/loginom-evals/parallel/candidate-receipt.json`. Source/manifest/capability qualification PASS; это не действующая авторизация.
 
+Подготовка directories завершена 2026-10-14: model-oauth, judge-codex, onboarding и onboarding/profile — canonical owner1001/mode0700 (read-back). Отсутствие onboarding/profile устранено; оба auth.json по metadata-only проверке всё ещё отсутствуют. Installed candidate eb85403ce4 квалифицирован только для synthetic-schema public status и bwrap status consumers; live OAuth/forced refresh не квалифицированы.
+
 План задачи 7 требует свежий вход владельца с внешним подтверждением аккаунта: shared модельный вход в private onboarding profile с `LOGINOM_AI_AGENT_SHARED_AUTH_DIR` и HTTP-only false, затем отдельный `CODEX_HOME=.../parallel/judge-codex codex login --device-auth` для судьи. Desktop/prod auth не копируются и существующие OAuth stores других задач не заимствуются. Harness может подготовить directories и проверить статус, но согласие аккаунта выполняет владелец.
 
 Этот blocker относится к model/refresh и judge live gates. `--skip-judge` не требует judge auth; немодельные и fake CLI/judge проверки могут продолжаться. Команды входа и неизменяемые пути остаются в задаче 7 плана; токены в этот файл не записывать. Вопрос пользователю отложен до завершения независимых задач.
