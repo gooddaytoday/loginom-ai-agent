@@ -407,3 +407,13 @@ grants сохраняются. На disposable pair фактически сня�
 shortened policy refused и второй вызов removed0. Это native capability:
 parent global configuration guard/ownership и effective negative access proof
 ещё обязательны; account остаётся blocked, ACL phase его не активирует.
+
+claimUserOwnership публикует exclusive private user-<slot>.json под held lease.
+Источник — confirmed reconcile-user creation journal внутри controller state:
+id/filename, exact identity, desired payload SHA и reply SHA должны совпасть.
+Claim связывает staged generation, exact Name/UserKind, controller userKey и
+наблюдённый native objectId; objectId не объявляется immutable account ID.
+Повтор сохраняет inode; иной claim не перезаписывается. readUserOwnership
+перепроверяет source semantic SHA и reconstruction исходного creation reply,
+staged credential binding и held lease. Эти fs/evidence codec проверки ещё
+не являются full native parent integration или подтверждением current idle.
