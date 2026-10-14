@@ -37,17 +37,27 @@ Criteria v2 `5b5053d1…`, lock `2c36d0cd…`, user authorization `aeff1714…`
 блокирующих расхождений. Исходный protocol834620b9… и его76source копий сохранены; новый runtime
 или model process ради переоценки не создавался.
 
-Текущий checkpoint 2026-10-14 16:32 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены18 из31,
-закрыты17; candidate Monthly/2 безопасно выполняется, CLI2428280,
-dispatch16:26:29.225Z. RunnerPID2392222/exec59059 активен; прежнийexec45610terminal.
-Впереди13candidate и текущийMonthly/2, модельные процессы последовательны.
-ABC/2 finished16:26:29.021Z/CLI0/Host2403507ACK0/cleanuptrue/oraclePASS/JS0;
-егоaudit `74f0f0da…`, новыйpolicy-v2sidecar `ea0fbc89…` иautoadvance `34f012b7…`.
-СтандартныйCalculator CumulativeSum/Stat/IF иGroup выполнилиABC; первыйотказABC1
-сохранён. ПодробныйpolicyverdictготовилсяпараллельноMonthly безповтораoracle/graph.
-Candidate11closed summary `8a5cb539…`: policy11PASS/0violated/0insufficient,
-analytics7correct/4notobtained, normalcompletion7/manualpostfailure4.
+Текущий checkpoint 2026-10-14 16:47 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены19 из31,
+закрыты19; моделей сейчас нет, profile свободен. Runner2392222/exec59059 завершён
+сreview/MANUAL_REVIEW_REQUIRED послеуспешногоClaims/2. CLI2441196/Host2441390gone,
+ACK/exit0/normalcleanuptrue/oracle-calculationPASS/JS0. Историяаномальная;
+обязательноеотдельноеревьювыполняется, исходныйaudit `3b392b57…` неизменен.
+Впереди12candidate; nextROI/2толькопослеревьюипроспективногоexecution-r3gate.
+
+Monthly/2 finished16:33:42.344Z/CLI0/Host2428511ACK0/cleanuptrue/oraclePASS/JS0;
+новыйpolicy-v2sidecar `bac2cd7f…`, autoadvanceproof `5ea4a696…`.
+Candidate12closed summary `ca7e5b83…`: policy12PASS/0violated/0insufficient,
+analytics8correct/4notobtained, normalcompletion8/manualpostfailure4.
+Claims/2MathPASS уже отдельный13-йрезультатcandidate, егоmanualpolicyreviewещёготовится.
+Инвентаризация18closed reviews `4eedc511…` подтвердилаимеющиесяобязательныеproofs;
+дальнейшиеJS-исключения, новыеаномалиииseeded3остаютсявприёмке.
+
+МинимальноеTDDдополнениеrunnerпозволитучитыватьотдельныйstandard-success review
+впамяти, не изменяяoriginalaudit. Исходные policy/oracle/calculation true обязательны;
+negative/foreign/incomplete review либоoriginalFAILнеразрешаютэтотузкийпуть.
+ПредыдущиеR2sources сохраненыreadonly, index `47b10529…`; новыйR3lockещёнеadmit.
+Product/runtime/criteria/matrixнеизменны, новых моделей доGREEN/review/gateнет.
 Sales/2 finished16:16:31.961Z/CLI0/Host2393038ACK0/cleanuptrue,
 oracle/calculationPASS/JS0/connectedgraph. Audit `6db41087…`,
 отдельныйpolicy-v2 verdict `e6b1c79b…` подтверждаетполнуюисториюиstandardlineage.
@@ -67,9 +77,10 @@ admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchiv
 сохранив technical-failed/policyfailed/calculationfalse. Соседние211/213 не закрывались.
 Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
-Candidate: одиннадцать отдельных policy-v2 PASS; все шесть стандартных задач и три
-исключения содержательно покрыты. Исходная аналитика: семь успешных результатов,
-четыре технических отказа без результата; normalcleanup7, ручных recovery4.
+Candidate: двенадцать отдельных policy-v2 PASS; все шесть стандартных задач и три
+исключения содержательно покрыты. Исходная аналитика: восемь успешных результатов в оценённых12,
+четыре технических отказа без результата; normalcleanup8, ручных recovery4.
+Claims/2 добавляет ещёодинMath/normalPASS, ноегообязательныйreviewпокаоткрыт.
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
