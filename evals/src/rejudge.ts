@@ -105,6 +105,6 @@ export async function rejudge(config: EvalConfig, runId: string) {
     }
     await writeSummary(runDir, summary)
     console.log(renderReport(summary))
-    return { code: 0, runDir }
+    return { code: 0, runDir, judgeCleanupConfirmed: !attempts.some(attempt => attempt.judge_cleanup_unconfirmed) }
   } finally { removeSigint() }
 }
