@@ -338,6 +338,8 @@ Ordinary source/build/native prerequisite закрыт отдельно; пол�
 Fresh baseline233119 sales-by-category/1 completed CLI0/wrapper0/cleanuptrue:
 policy/oracle/calculation/history/identity/graph/export PASS, JS0; attempta01a1c0e…/
 audit8a6ea80e…/Session ses_ec847ba38ffeWd3bMWkvwHlctf,327s. Model responses
-получены, прежнийOAuth401 не повторился. Baseline completed1/18/candidate0/25;
-sales/2 сейчасactive root98489, следующийплановыйcase ABC/Pareto1. Все18baseline
-обязательны доcandidatefirst9; baseline semanticmanualreview не добавляется.
+получены, прежнийOAuth401 не повторился. Sales/2 также completed CLI0/wrapper0/
+cleanuptrue: policy/oracle/calculation/history/identity/graph/export PASS, JS0;
+Session ses_ec841c075ffe63Lv3f42lwlzZ3. Baseline completed2/18/candidate0/25;
+ABC/Pareto1 сейчасactive root85644. Все18baseline обязательны доcandidatefirst9;
+baseline semanticmanualreview не добавляется.
