@@ -8,6 +8,7 @@ import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { runOfflineJudge } from "../src/judge-environment"
 import { main } from "../src/run"
 import { superviseProcess } from "../src/process-supervisor"
+import { readJudgeProcessInventory } from "../src/judge-process-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 test("offline calibration releases its home after SIGINT only with confirmed judge cleanup", async () => {
@@ -225,6 +226,8 @@ test("offline calibration releases its private home after confirmed cleanup and 
     expect(inventory).toMatchObject({ version: 2, kind: "offline-judge-processes", commandId: before.commandId })
     expect((await lstat(journal.processInventory)).mode & 0o777).toBe(0o600)
     expect(inventory.processes).toHaveLength(3)
+    const qualified = await readJudgeProcessInventory({ file: journal.processInventory, commandId: before.commandId, producerPid: before.owner.pid })
+    expect(qualified.processes).toHaveLength(3)
     for (const entry of inventory.processes) {
       expect(entry.owner.kind).toBe("judge")
       expect(entry.owner.id.startsWith(before.commandId + ":")).toBe(true)
