@@ -41,6 +41,13 @@ Docker boolean дают incomplete. Applicability/полностью unknown cou
 предметом cgroup coverage. Historical summary без этого optional derived field
 проверяется по прежним полям; новый результат пересчитывается из raw source,
 старые файлы сохраняются. Подменённое присутствующее поле отвергается.
+freezeResourceBudget фиксирует declared bounds в новом private/fsynced файле
+с run_id/automatic fixed_at и возвращает SHA. Контроллер сохраняет этот SHA до
+dispatch; readFrozenResourceBudget после run сверяет исходные bytes, private
+metadata, run и fixed_at строго до startedAt. checkResourceEvidence принимает
+budget file+captured SHA либо null (incomplete), сохраняя budget_source в result.
+Файл не перезаписывается; изменение caller bounds не меняет frozen snapshot.
+Этот механизм ещё не выбирает live thresholds и не заменяет mandatory manifest.
 
 ## Конфигурация и граница режимов
 
