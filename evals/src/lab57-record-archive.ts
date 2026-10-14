@@ -5,6 +5,7 @@ import { lstat, open, readdir, realpath } from "node:fs/promises"
 export type PrivateRecordEntry = { name: string; kind: "file" | "directory"; device: number; inode: number; uid: number;
   mode: number; size: number; mtimeNs: string; ctimeNs: string; sha256: string | null }
 export type RecordArchivePlan = { root: string; source: string; destination: string; once: string; expected: PrivateRecordEntry[] }
+type RecordArchiveReservation = RecordArchivePlan & {onceSha256:string;onceDevice:number;onceInode:number;onceMtimeNs:string;onceCtimeNs:string}
 const hash = (bytes: Uint8Array | string) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -54,15 +55,27 @@ export async function reserveRecordArchive(plan: RecordArchivePlan) {
   const file=await open(plan.once,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600)
   try {await file.writeFile(bytes);await file.sync()} finally {await file.close()}
   await syncDirectory(plan.root)
-  return {...plan,onceSha256:hash(bytes)}
+  const identity=await lstat(plan.once,{bigint:true})
+  return {...plan,onceSha256:hash(bytes),onceDevice:Number(identity.dev),onceInode:Number(identity.ino),
+    onceMtimeNs:String(identity.mtimeNs),onceCtimeNs:String(identity.ctimeNs)}
 }
 
 /** Linux RENAME_NOREPLACE preserves the entire object. No unlink, delete, rollback or retry. */
-export async function archiveReservedRecord(reservation: RecordArchivePlan & {onceSha256:string}) {
-  const once=await lstat(reservation.once)
-  if (!once.isFile() || once.isSymbolicLink() || once.uid!==process.getuid!() || (once.mode&0o777)!==0o600 || once.nlink!==1)
-    throw Error("Once identity changed")
-  if (hash(await Bun.file(reservation.once).bytes())!==reservation.onceSha256) throw Error("Once bytes changed")
+export async function archiveReservedRecord(reservation: RecordArchiveReservation) {
+  const once=await lstat(reservation.once,{bigint:true})
+  const handle=await open(reservation.once,constants.O_RDONLY|constants.O_NOFOLLOW)
+  try {
+    const bytes=await handle.readFile()
+    for (const observed of [once,await handle.stat({bigint:true}),await lstat(reservation.once,{bigint:true})]) {
+      if (!observed.isFile() || observed.isSymbolicLink() || observed.uid!==BigInt(process.getuid!()) || (observed.mode&0o777n)!==0o600n ||
+        observed.nlink!==1n || Number(observed.dev)!==reservation.onceDevice || Number(observed.ino)!==reservation.onceInode ||
+        String(observed.mtimeNs)!==reservation.onceMtimeNs || String(observed.ctimeNs)!==reservation.onceCtimeNs) throw Error("Once identity changed")
+    }
+    if (hash(bytes)!==reservation.onceSha256) throw Error("Once bytes changed")
+    const recorded=JSON.parse(bytes.toString()) as {status:string;plan:RecordArchivePlan}
+    if (recorded.status!=="CONSUMED_BEFORE_MUTATION" || !same(recorded.plan,{root:reservation.root,source:reservation.source,
+      destination:reservation.destination,once:reservation.once,expected:reservation.expected})) throw Error("Once plan changed")
+  } finally {await handle.close()}
   const snapshot=await snapshotPrivateRecord(reservation.root,reservation.source)
   if (!same(snapshot,reservation.expected)) throw Error("Record identity changed after reservation")
   const original=snapshot.find(r=>r.name===".")!
