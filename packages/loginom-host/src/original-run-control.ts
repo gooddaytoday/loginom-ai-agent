@@ -1,11 +1,13 @@
+import { randomUUID } from "node:crypto"
 // Private fixed standalone producer/SDK consumer binding. Never serialized authority.
-const originals = new WeakMap<object, { signal: AbortSignal; deadline: number; owner?: object; port?: object }>()
+const originals = new WeakMap<object, { signal: AbortSignal; deadline: number; owner?: object; port?: object; origin: Readonly<{id:string;control:object;signal:AbortSignal;deadline:number}> }>()
 const throwIfAborted = AbortSignal.prototype.throwIfAborted
 export function mintOriginalRunControl(signal: AbortSignal, deadline: number) {
   throwIfAborted.call(signal)
   if (!Number.isSafeInteger(deadline) || Date.now() >= deadline) throw Error("LOGINOM_ORIGINAL_RUN_EXPIRED")
   const control = Object.freeze({ signal, deadline })
-  originals.set(control, { signal, deadline })
+  const origin = Object.freeze({id:randomUUID(),control,signal,deadline})
+  originals.set(control, { signal, deadline, origin })
   return control
 }
 export function retainOriginalRunControl(control: object, owner?: object, port?: object) {
@@ -23,6 +25,16 @@ export function retainOriginalRunControl(control: object, owner?: object, port?:
     original.port = port
   }
   return { signal: original.signal, deadline: original.deadline, guard }
+}
+
+// Original parent origin born once with the root control, never reconstructed from DTO.
+export function retainOriginalRunOrigin(control: object) {
+  const original = originals.get(control)
+  if (!original) throw Error("LOGINOM_ORIGINAL_RUN_UNAVAILABLE")
+  return {origin:original.origin,guard(){
+    throwIfAborted.call(original.signal)
+    if(Date.now()>=original.deadline)throw Error("LOGINOM_ORIGINAL_RUN_EXPIRED")
+  }}
 }
 
 // Retain the actual SDK argument tree before queueing. No reader/getter or DTO copy.

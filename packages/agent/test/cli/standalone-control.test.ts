@@ -1,3 +1,4 @@
+import {randomUUID} from 'node:crypto'
 import {test,expect} from 'bun:test'
 import {standaloneRunControl,standaloneCancellation,withStandaloneCancellation} from '../../src/cli/standalone-cancellation'
 import {readFile} from 'node:fs/promises'
@@ -6,8 +7,8 @@ const source=await readFile(new URL('../../src/cli/standalone-cancellation.ts',i
 const compiled=await Bun.build({entrypoints:[new URL('../../src/cli/standalone-cancellation.ts',import.meta.url).pathname],target:'node'})
 const text=await compiled.outputs[0]!.text()
 function driver(code:string){let clock=1000,fire:()=>void=()=>{},cleared=false;const listeners=new Set<()=>void>()
- const c=vm.createContext({AbortController,AbortSignal,Error,Object,Math,Date:{now:()=>clock},setTimeout(fn:()=>void,delay:number){fire=fn;expect(delay).toBe(7200_000);return 7},clearTimeout(id:number){expect(id).toBe(7);cleared=true},process:{on(_:string,fn:()=>void){listeners.add(fn)},off(_:string,fn:()=>void){listeners.delete(fn)}}})
- vm.runInContext(code.slice(0,code.lastIndexOf('export {'))+';globalThis.api={standaloneRunControl,standaloneCancellation,withStandaloneCancellation}',c)
+ const c=vm.createContext({randomUUID,AbortController,AbortSignal,Error,Object,Math,Date:{now:()=>clock},setTimeout(fn:()=>void,delay:number){fire=fn;expect(delay).toBe(7200_000);return 7},clearTimeout(id:number){expect(id).toBe(7);cleared=true},process:{on(_:string,fn:()=>void){listeners.add(fn)},off(_:string,fn:()=>void){listeners.delete(fn)}}})
+ vm.runInContext(code.replace(/^import\s+\{\s*randomUUID\s*\}\s+from\s+["']node:crypto["'];?\s*$/m,'').slice(0,code.replace(/^import\s+\{\s*randomUUID\s*\}\s+from\s+["']node:crypto["'];?\s*$/m,'').lastIndexOf('export {'))+';globalThis.api={standaloneRunControl,standaloneCancellation,withStandaloneCancellation}',c)
  return{api:c.api,tick(){clock+=99},expire(){clock+=7200_000;fire()},cleared:()=>cleared,listeners}
 }
 test('actual compiled root producer owns same signal/absolute deadline before and through awaits',async()=>{

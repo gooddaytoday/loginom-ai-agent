@@ -10,6 +10,7 @@ import { standaloneBundle } from "./standalone-bundle"
 declare const LOGINOM_AI_AGENT_SORTING_ACCEPTANCE: string | undefined
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run", acceptanceCleanupPackage?: string) {
+  const originalControl = mode === "run" ? standaloneRunControl() : undefined
   const signal = mode === "run" ? standaloneCancellation() : undefined
   const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
   const flags = args.slice(0, boundary)
@@ -62,7 +63,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     acceptanceCleanupPackage,
     ...(sorting ? {packagePath: acceptanceCleanupPackage!} : {}),
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
-  })
+  }, originalControl)
   const owner = { deferRelease: true, leases: new Set<{ release(): Promise<void> }>(),
     ...(sorting ? {audit: {authorization: (host as Awaited<ReturnType<typeof launchSortingDiagnostic>>).auditAuthorization, phase: "ordinary" as "ordinary" | "capture"}} : {}) }
   let auditRefused = false, auditRejection: unknown

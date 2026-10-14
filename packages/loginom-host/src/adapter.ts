@@ -1,3 +1,4 @@
+import { originalRootPort } from "./original-root-port"
 import type { InputFile } from "./inputs"
 export * as LoginomHost from "./adapter"
 
@@ -7,13 +8,17 @@ import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
 
 type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }>; audit?: { authorization: string; phase: "ordinary" | "capture" } }
-const state: { connection?: ReturnType<typeof transport>; owner?: Owner; control?: ReturnType<typeof retainOriginalRunControl> } = {}
+const state: { connection?: ReturnType<typeof transport>; owner?: Owner; originalPort?: Port; control?: ReturnType<typeof retainOriginalRunControl> } = {}
 export function connect(port: Port, owner?: Owner, originalControl?: object) {
+  const origin = originalRootPort(port)
+  origin?.guard()
+  if(origin && origin.facts.control!==originalControl) throw Error("LOGINOM_ORIGINAL_OWNER_CHANGED")
   const control = originalControl ? retainOriginalRunControl(originalControl, owner, port) : undefined
   if (control && !owner) throw Error("LOGINOM_ORIGINAL_OWNER_UNAVAILABLE")
   state.connection?.close()
   state.connection = transport(port)
   state.control = control
+  state.originalPort = port
   state.owner = owner
 }
 export function disconnect() {
@@ -21,17 +26,19 @@ export function disconnect() {
   state.connection = undefined
   state.owner = undefined
   state.control = undefined
+  state.originalPort = undefined
 }
 export async function acquire(session: string) {
   const connection = state.connection
   if (!connection) return
-  const owner = state.owner, control = state.control
+  const owner = state.owner, control = state.control, origin = state.originalPort ? originalRootPort(state.originalPort) : undefined
   const leasesDescriptor = control && owner ? Object.getOwnPropertyDescriptor(owner, "leases") : undefined
   if (control && (!leasesDescriptor || !("value" in leasesDescriptor) || !(leasesDescriptor.value instanceof Set)))
     throw Error("LOGINOM_ORIGINAL_OWNER_UNAVAILABLE")
   const originalLeases = leasesDescriptor?.value
   const guard = () => {
     control?.guard()
+    origin?.guard()
     if (control && (state.connection !== connection || state.owner !== owner || state.control !== control))
       throw Error("LOGINOM_ORIGINAL_OWNER_CHANGED")
     if (control) {

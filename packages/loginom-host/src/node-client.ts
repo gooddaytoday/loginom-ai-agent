@@ -1,3 +1,5 @@
+import {retainOriginalRunOrigin} from "./original-run-control"
+import {bindOriginalRootPort} from "./original-root-port"
 import { fork } from "node:child_process"
 import { isAbsolute, join, resolve } from "node:path"
 import { readFile, realpath } from "node:fs/promises"
@@ -28,6 +30,7 @@ type FPStart = {
 const fpStarts = new WeakMap<object, FPStart>()
 const fpRetained = new WeakMap<object, Awaited<ReturnType<typeof launchNodeHost>>>()
 const fpAttempts = new WeakSet<object>()
+const rootAttempts = new WeakSet<object>()
 export const launchFieldParametersDiagnostic = Object.assign(async (input: NodeHostInput & {packagePath:string}, control: {signal:AbortSignal;deadline:number}) => {
   if (fpAttempts.has(input)) throw Error("LOGINOM_RECOVERY_REQUIRED")
   const signal = control.signal, deadline = control.deadline
@@ -106,7 +109,9 @@ async function launchFPDiagnostic(input: NodeHostInput & { packagePath: string }
 
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
-export async function launchSortingDiagnostic(input: NodeHostInput & { packagePath?: string }) {
+export async function launchSortingDiagnostic(input: NodeHostInput & { packagePath?: string }, originalControl?: object) {
+  const root = originalControl ? retainOriginalRunOrigin(originalControl) : undefined
+  root?.guard()
   if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
@@ -134,11 +139,15 @@ export async function launchSortingDiagnostic(input: NodeHostInput & { packagePa
   const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath, harness: "sorting-before-close-v1" as const }
   const options = { ...input }
   diagnostics.set(options, grant)
-  const host = await launchNodeHost(options)
+  root?.guard()
+  const host = await launchNodeHost(options, originalControl)
   return { ...host, auditAuthorization: grant.authorization, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
 }
 
-export async function launchNodeHost(input: NodeHostInput) {
+export async function launchNodeHost(input: NodeHostInput, originalControl?: object) {
+  const root = originalControl ? retainOriginalRunOrigin(originalControl) : undefined
+  root?.guard()
+  if ("rootOrigin" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
   // Ordinary product callers cannot turn structural fields into authority.
   if ("acceptanceCapture" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
   const diagnostic = diagnostics.get(input)
@@ -147,6 +156,10 @@ export async function launchNodeHost(input: NodeHostInput) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const environment = runtimeEnvironment(input.environment ?? process.env)
+  if (originalControl) {
+    if(rootAttempts.has(originalControl))throw Error("LOGINOM_RECOVERY_REQUIRED")
+    rootAttempts.add(originalControl)
+  }
   const child = fork(input.entry, [], {
     execPath: input.node,
     execArgv: ["--use-system-ca"],
@@ -193,6 +206,7 @@ export async function launchNodeHost(input: NodeHostInput) {
     },
     start() {},
   }
+  if (originalControl) bindOriginalRootPort(port, originalControl, child)
   const fpClient = diagnostic?.harness === "field-parameters-preservation-v1" ? privateFPTransport(port) : undefined
   const client = fpClient ?? transport(port)
   const startupInput = {
