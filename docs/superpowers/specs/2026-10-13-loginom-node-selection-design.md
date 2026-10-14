@@ -1,10 +1,10 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты четыре candidate,
-политика подтверждена в четырёх; один итоговый расчёт правильный, три результата
-не получены. Одна сессия завершена штатно, три освобождены адресно после отказа.
-Сейчас risky-approved-claims/1 выполняется с20:42:40.864Z, CLI3128627;
-runner3127557/exec7799 продолжает последовательную серию. Ещё20candidate не начаты.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты пять candidate,
+политика подтверждена в пяти; один итоговый расчёт правильный, четыре результата
+не получены. Одна сессия завершена штатно, четыре освобождены адресно после отказа.
+Сейчас campaign-roi-by-channel/1 выполняется с20:58:05.501Z, CLI3172809;
+runner3172265/exec39639 продолжает последовательную серию. Ещё19candidate не начаты.
 
 Sales-by-category/1 closed20:25:22.530Z: policy PASS, oracle/calculationtrue,
 CLI0/cleanuptrue/Host3041636ACKtrue. Sidecar `2172b404…`: полные16messages/
@@ -12,6 +12,16 @@ CLI0/cleanuptrue/Host3041636ACKtrue. Sidecar `2172b404…`: полные16messag
 Import→Group→Sort→Export, JS0/childrennone/historyAnomalyfalse.
 35protected/4copied hashes неизменны. Повторного oracle или live-запуска не было;
 runner автоматически перешёл к Monthly после gate, без ручной паузы.
+
+Risky-approved-claims/1 closed20:51:19.039Z: policy PASS `9caf0717…`, mandatory
+failure/anomaly review `c8d04d33…`;27messages/106parts/29tools/86events/2973runtime,
+JS0/childrennone. Отклонённая метка Filter исправлена без изменения предикатов;
+стандартные Import→Filter→Group→Sort выполнены. Export native execution completed,
+но read остался AMBIGUOUS с тем же исчерпанием поиска файла. Полученных CSV/LGP/
+oracle нет; физическое отсутствие CSV не утверждается. Own245closed20:55:02.894Z,
+admin246logout20:55:04.496Z/wholebrowser20:55:06.183Z/9PIDgone/точный guard архивирован.
+18original/22recovery сохранены; descriptor `28f74ca6…`/review `662cbd40…`/
+finalreadback `0e52df72…`; publicgate20:57:40.541Z разрешил учёт technical-failed.
 
 Monthly-demand/1 closed20:33:36.674Z: policy PASS `210051d9…`, mandatory failure
 review `f65a7d9b…`; полные30messages/114parts/32tools/95events/2647runtime,
@@ -60,6 +70,33 @@ runner2945739/exec13648 с19:54:30.413Z, sources/criteria/protocol прежни�
 0correct/1notobtained,0normal/1manualreleased и1active; policy acceptance пока нет.
 24candidate slots оставались до стартаfirst-last. Baseline6references неизменны;
 новая серия не заменяет originalFAIL и не запускает ABC retry.
+
+### Перспективная коррекция gate для настоящего аналитического FAIL
+
+Readonly-разбор выявил остаточный блокер evaluator: policy PASS с полностью
+полученным неверным CSV (oraclefalse/calculationfalse/wrapper1) не допускается
+старой веткой R4, рассчитанной только на missing-receipt. JS-исключения также
+упираются в функциональный порог. Это безопасная остановка, но противоречие
+разделению трёх оценок. Criteria-v2 `5b5053d1…` и исходные попытки не изменяются.
+
+Перед следующей новой попыткой после естественной остановки текущего runner
+подготовить отдельную execution revision: opt-in candidate/v2 продолжает только
+полностью собранный аналитический FAIL с положительной политикой, полным trusted
+history/graph/export, связанными LGP/CSV, без collection failures, strict normal
+release и immutable version-bound mandatory failure review. JS допускается лишь
+с положительным ревью своей конкретной разрешённой роли. Результат перехода —
+analytical-failed; исходные oraclefalse/calculationfalse/wrapper1 сохраняются.
+Отказы до получения результата и legacy/v1 не расширяются; oraclefalse не
+классифицируется как technical. Технические continuation guards не меняются.
+
+TDD в изолированной копии: standard и две JS-role положительные проверки через
+public API; отрицательные проверки чужого/отсутствующего review, нарушенной роли,
+неполной истории и release blockers, legacy-v1 и неизменности original bytes.
+Готовую минимальную правку перенести только при отсутствии активного model CLI,
+проверить, сохранить прежний execution lock/source archive и заморозить новую
+execution revision до очередного dispatch. Не пересобирать runtime и не менять
+обработчики узлов. Активные ROI либо следующий автоматически начатый explicit-JS
+завершаются на прежних источниках; изменение gate их не прерывает.
 
 ## Действующая приёмка: политика выбора узлов, версия 2
 
