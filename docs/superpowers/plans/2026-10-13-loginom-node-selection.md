@@ -1,12 +1,30 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты шесть candidate,
-политика подтверждена во всех шести стандартных сценариях. Один итоговый расчёт
-правильный, пять результатов не получены. Одна сессия завершена штатно, пять
-освобождены адресно после отказа. Explicit-js/1 начат после strict release:
-runner3247203 с21:44:57.378Z, dispatch21:45:03.066Z, CLI3247970. Execution R2
-97cad99c… заморожена до этого dispatch. Один candidate активен,18ещё не начаты;
-профиль занят только этой последовательной попыткой.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты семь candidate,
+policy PASS во всех семи: шесть стандартных сценариев и явный запрос JS.
+Один итоговый расчёт правильный, шесть результатов не получены. Одна сессия
+завершена штатно, шесть адресно освобождены после отказа. Собственных активных
+процессов нет, профиль свободен;18candidate ещё не начаты. Для explicit-js/1
+ожидается независимый final release review и actual gate до старта tags/1.
+
+Explicit-js/1 closed21:52:03.471Z, CLI1/cleanupfalse/Host3248443ACKfalse:
+policy PASS sidecar `3d6688ad…`, mandatory JS+failure review `0c89212f…`.
+Полные28messages/109parts/30tools/89events/2544runtime, nochildren.
+Два SUCCEEDED JSapply к одному GUID: actual category/count/sums/means из
+InputTable, затем существующий source обновлён для точности денежных сумм;
+нет захардкоженных результатов или JS-сортировки. Стандартные Import500→JS→
+SortDESC→Export; JS→Sort native preflight/settings/cleanup подтверждены, SortSUCCEEDED.
+Native Export completed, но поиск файла остался AMBIGUOUS; тот же operation
+reconciled, новых apply после ошибки нет, честный блокер без JS fallback.
+CSV/LGP/oracle не получены, savedGraph не выдуман; original incomplete/FAIL сохранён.
+
+Own251closed22:00:20.369Z/admin252logout22:00:38.790Z/wholebrowserclosed22:00:51.011Z;
+9PIDgone,250сохранилась в двух UI readbacks, точный guard архивирован с inode/rawNS.
+Root независимо сверил подготовленный другим агентом binding до close
+(`de95c79a…`); additional binding review `1c040256…` честно retrospective.
+17original неизменны; добавлены только2точные JS source copies и mandatory review,
+финальная conservation20casefiles/29recovery. Descriptor `3dcf6d46…`/R2execution97cad99c;
+final release review и actual public gate пока не заявлены как завершённые.
 
 Campaign-roi-by-channel/1 closed21:06:16.711Z: policy PASS `dc921fb2…`, mandatory
 failure review `4f990c9e…`;26messages/101parts/28tools/82events/2827runtime,
@@ -188,6 +206,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
 - [x] Подтвердить содержательное policy coverage всех шести стандартных сценариев по полным журналам, сохранив пять отказов и независимые оценки результата и release.
 - [x] Завершить минимальную analytical-failure коррекцию runner по TDD, независимое ревью и заморозить отдельную execution R2 после strict release, до следующей новой попытки.
+- [x] Положительно проверить явный запрос JavaScript по полному журналу и реальному динамическому коду, сохранив неуспешные analytics/runtime отдельно.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
