@@ -20,6 +20,19 @@ Matrix31, mandatory reviews, candidate violation stop и strict own release
 Новые policy-v2 sidecars ссылаются на criteria/protocol/evidence SHA и не меняют
 original attempt/audit. Runtime и76locked source files неизменны; rebuild не нужен.
 
+### Выполнение приёмки v2
+
+- [x] Зафиксировать отдельную версию критериев до следующего model dispatch, сохранить исходный протокол и получить независимое сравнение с прямым указанием пользователя.
+- [ ] Добавить отдельные policy-v2 verdicts для первых девяти закрытых candidate без изменения старых аналитических/runtime результатов.
+- [ ] Закончить неизменную матрицу31 и оценить оставшиеся16candidate поv2.
+- [ ] Завершить обязательные reviews всех исключений/отказов/аномалий и трёх seeded standard successes.
+- [ ] Подготовить итог с тремя независимыми оценками и решить приёмку политики по достаточности доказательств.
+
+Criteria v2 `5b5053d1…`, lock `2c36d0cd…`, user authorization `aeff1714…`
+сохранены. Независимое сравнение с дословным user request не выявило
+блокирующих расхождений. Исходный protocol834620b9… и76sealedsources не менялись;
+новый runtime или model process ради переоценки не создавался.
+
 Текущий checkpoint 2026-10-14 14:40 UTC: matched `20261014T112452Z-5e223f`,
 runtime659588…/sourcefdc4ac455e/76frozenfiles unchanged. Candidate9 закрыты:
 original5accepted+4technicalfailed; идут отдельные policy-v2 reviews на старых
