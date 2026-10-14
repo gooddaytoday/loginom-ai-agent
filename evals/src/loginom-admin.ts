@@ -143,6 +143,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
       })
       const owned = info ? await readUserOwnership(file, lease, secretFile) : null
+      if (owned?.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
       const reply = await request("reconcile-user", { phase: "blocked", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
         desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: owned ? { objectId: owned.objectId, name: owned.username,
           userKind: owned.userKind, preparationNonce: owned.preparationNonce } : null }, async () => {
