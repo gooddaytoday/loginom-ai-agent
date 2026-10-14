@@ -2503,13 +2503,15 @@ function readRenderedInputMapping(observation) {
       return priority[scopeOf(element)];
     };
     scanStage='controls';
-    const controls = candidates.filter(interesting)
+    // Keep global metadata/guards intact; classify controls only after the
+    // existing root admission, so unrelated controls cannot consume its budget.
+    const controls = candidates.filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent').filter(interesting)
       // Loginom draws anonymous canvas geometry with repeated Graph;Vertex
       // tids even in an empty draft. It is not a node or an actionable target.
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
-      .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
-        ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
+      .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element)))
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
       const type=element.getAttribute('type'),role=element.getAttribute('role');
@@ -3607,7 +3609,7 @@ function readRenderedInputMapping(observation) {
         } else fail('UI_ACTION_INVALID', 'Unsupported UI gesture');
         if (effectPossible) record('ui_gesture_applied', { verb: task.action.verb });
         phase = 'observing'; timeout();
-        if(['wizard_step','apply_expression_parameters','cancel_expression_parameters','select_wizard_option','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb))postActionRoot=current.wizard.root_ref;
+        if(['apply_expression_parameters','cancel_expression_parameters','select_wizard_option','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb))postActionRoot=current.wizard.root_ref;
         const exactDeactivation=fresh=>fresh.prepared_node_context?.verified===true
           &&fresh.prepared_node_context.surface==='graph'&&fresh.wizard?.status==='absent'
           &&fresh.ui.dialogs.length===1&&fresh.ui.elements.filter(e=>e.wizard_deactivation_confirmation
@@ -3652,15 +3654,8 @@ function readRenderedInputMapping(observation) {
             }
           }
         };
-        const readWizardStepUi=async()=>{
-          try{return await readUi();}
-          catch(error){
-            if(error?.code==='UI_ROOT_STALE')fail('WIZARD_STEP_NOT_CONFIRMED','The original wizard was detached or replaced after one click; inspect before retry');
-            throw error;
-          }
-        };
         let observed;
-        try { observed = await (task.action.verb==='wizard_step'?readWizardStepUi():['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action.verb)?readOpeningUi():readUi()); }
+        try { observed = await (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action.verb)?readOpeningUi():readUi()); }
         catch(error) {
           // A generic click can legitimately close its popup/tree. Rediscover
           // regions only after the completed gesture, never for preconditions
@@ -3941,14 +3936,14 @@ function readRenderedInputMapping(observation) {
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
               && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
               // Confirm the owned error once more without issuing another gesture.
-              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readWizardStepUi();
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
                 && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
                 observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
                 fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
-            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readWizardStepUi(); }
+            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi(); }
           }
           if(!unchangedContext(observed) || observed.ui.masks.length || !destination(observed.wizard.stage))
             fail('WIZARD_STEP_NOT_CONFIRMED','The requested destination stage was not confirmed after one click; inspect before retry');
@@ -3958,7 +3953,7 @@ function readRenderedInputMapping(observation) {
           let quietSamples=0;
           for(let attempt=0;attempt<12 && quietSamples<3;attempt++) {
             timeout();await page.waitForTimeout(Math.min(200,timeout()));
-            const fresh=await readWizardStepUi();
+            const fresh=await readUi();
             if(!unchangedContext(fresh) || fresh.ui.masks.length || !destination(fresh.wizard.stage))
               fail('WIZARD_STEP_NOT_CONFIRMED','The destination changed while settling after one click; inspect before retry');
             quietSamples=same(fresh.dom_epoch,observed.dom_epoch)?quietSamples+1:0;

@@ -1497,47 +1497,31 @@ function wizardStepFixture(page,direction='next') {
   return {base,form,marker,button,advance};
 }
 
-test('wizard step scopes every post-gesture read to its original form without a second gesture',async()=>{
- for(const fullScanRefuses of [false,true]){
-  const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe();
-  const button=snapshot.ui.elements.find(e=>e.wizard_step),roots=[];
-  page.add('button','MF;global-background-control','Outside wizard',{x:900,y:400,width:50,height:20});
-  const evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>{
-   if(page.events.includes('click')&&Object.hasOwn(arg??{},'rootRef')){
-    roots.push(arg.rootRef);
-    if(fullScanRefuses&&!arg.rootRef)return{ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'controls'}};
-   }
-   return evaluate(fn,arg);
-  };
-  page.waitForTimeout=async()=>{};const click=page.mouse.click;
-  page.mouse.click=async(...args)=>{await click(...args);c.advance();};
-  const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
-  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));
-  assert.equal(page.events.filter(e=>e==='click').length,1);
-  assert.ok(roots.length>=4);assert.ok(roots.every(r=>r===snapshot.wizard.root_ref));
-  assert.ok(!outcome.output.ui.elements.some(e=>e.tid==='MF;global-background-control'));
+for(const slowInside of [false,true])test('rooted wizard step control scan: slow '+(slowInside?'owned':'foreign')+' control',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
+ // Avatar is retained by the fixed global guard queries even in a rooted read.
+ const outside=page.avatar;
+ const initial=await page.observe(),snapshot=(await page.execute({mode:'observe',root_ref:initial.wizard.root_ref})).output;
+ assert.equal(snapshot.observation_root.ref,snapshot.wizard.root_ref);
+ const button=snapshot.ui.elements.find(e=>e.wizard_step),costly=slowInside?c.button:outside;let classificationReads=0;
+ const original=costly.matches.bind(costly);costly.matches=selector=>{
+  if(page.events.includes('click')&&selector.startsWith('button,input,textarea,select,')&&!selector.includes('[data-tid]')){
+   classificationReads++;clock.advance(600);
+  }
+  return original(selector);
+ };
+ page.waitForTimeout=async()=>{};const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();};
+ const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ if(slowInside){
+  assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.error.code,'UI_SCAN_LIMIT');
+  assert.ok(classificationReads>0);assert.ok(outcome.trace.some(e=>e.event==='ui_scan_limit'&&e.scan_stage==='controls'));
+  assert.ok(!outcome.trace.some(e=>e.event==='wizard_step_verified'));
+ }else{
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));assert.equal(classificationReads,0);
   assert.ok(outcome.trace.some(e=>e.event==='wizard_step_settled'&&e.quiet_samples===3));
+  assert.ok(!outcome.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnAvatar'));
  }
-});
-
-test('wizard step refuses a scan limit inside its original root after one gesture',async()=>{
- const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
- const evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>page.events.includes('click')&&Object.hasOwn(arg??{},'rootRef')
-  ?{ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'controls'}}:evaluate(fn,arg);
- const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();};
- page.waitForTimeout=async()=>{};
- const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
- assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.error.code,'UI_SCAN_LIMIT');
- assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(!outcome.trace.some(e=>e.event==='wizard_step_verified'));
-});
-
-test('wizard step scoped read still refuses a foreign global dialog after its gesture',async()=>{
- const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
- const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();const dialog=page.add('div','foreign-dialog','Foreign',{x:500,y:400,width:100,height:100});dialog.attrs.role='dialog';};
- page.waitForTimeout=async()=>{};
- const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
- assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.error.code,'WIZARD_STEP_NOT_CONFIRMED');
- assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(!outcome.trace.some(e=>e.event==='wizard_step_verified'));
 });
 
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
