@@ -55,6 +55,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   }
   async function handle(data: unknown) {
     if (state.closed) return
+    if(state.stopping){if(data&&typeof data==='object'&&'id'in data&&typeof data.id==='string')reply({id:data.id,error:'LOGINOM_HOST_CLOSED'});return}
     if (
       !data ||
       typeof data !== "object" ||
@@ -359,8 +360,20 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.stopping) return state.stopping
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
-      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.preReadyHeld || run.amountHeld))
+      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.preReadyHeld))
         throw new Error("LOGINOM_RECOVERY_REQUIRED")
+      for (const [id, run] of runs) if(run.amountHeld) {
+        const runtime=run.captureRuntime,lease=run.lease,generation=lease.generation;
+        if(!runtime || run.calls || run.dispatching)throw Error('LOGINOM_RECOVERY_REQUIRED');
+        // Only the original supervised runtime can settle this held owner.
+        // close() resolves after its native cleanup/IO acknowledgement and exit;
+        // a storage/refusal/lost reply remains a held lease, never a new runtime.
+        await runtime.close();
+        if(runs.get(id)!==run || run.captureRuntime!==runtime || run.lease!==lease
+          || lease.generation!==generation || run.active.size || run.calls || run.dispatching
+          || run.captureRefused || service.journal.pending().length)throw Error('LOGINOM_RECOVERY_REQUIRED');
+        run.amountHeld=false;
+      }
       for (const [id, run] of runs) await release(id, run)
       state.closed = true
     })
