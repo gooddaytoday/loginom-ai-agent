@@ -40,6 +40,23 @@ export async function readAmountOwnPage(o) {
  const running=await runningGetter.call(map);reason=authority();if(reason)return finish(reason);
  result.running={observed:true,type:typeof running,value:running??null};
  if(running!==false)return finish('NATIVE_IDLE_NOT_OBSERVED');
+ // Fixed read-only discovery for the next owned file-byte read. Inspect names
+ // and descriptors only: do not invoke an unknown getter, RPC, or file opener.
+ const providers=[];
+ for(const [source,object] of [['main',main],['map',map],['connection',connection],['session',session]]){
+  const members=[];let current=object;
+  for(let depth=0;current&&depth<4;depth++,current=Object.getPrototypeOf(current)){
+   for(const name of Object.getOwnPropertyNames(current).filter(x=>/file|storage|directory/i.test(x)).slice(0,32)){
+    if(members.some(x=>x.name===name))continue;
+    const d=Object.getOwnPropertyDescriptor(current,name);
+    members.push({name,depth,kind:d.get?'getter':typeof d.value});
+   }
+  }
+  providers.push({source,members});
+ }
+ reason=authority();if(reason)return finish(reason);
+ result.file_provider={status:'BYTE_READ_PROVIDER_NOT_VERIFIED',providers,
+  getters_invoked:0,file_rpc_calls:0,package_bytes_available:false,source_bytes_available:false};
  return {...finish(null),status:'OWN_EMPTY_IDLE_PAGE',packages:[],own_reference_chain_verified:true};
 }
 export async function inspectAmountOwnPage(retained,{guard,record,signal}) {
