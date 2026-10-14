@@ -17,9 +17,11 @@ Baseline имеет4 правильных результата и2 отсутс�
 Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты семь candidate,
 policy PASS во всех семи: шесть стандартных сценариев и явный запрос JS.
 Один итоговый расчёт правильный, шесть результатов не получены. Одна сессия
-завершена штатно, шесть адресно освобождены после отказа. Собственных активных
-процессов нет, профиль свободен;18candidate ещё не начаты. Для explicit-js/1
-ожидается независимый final release review и actual gate до старта tags/1.
+завершена штатно, шесть адресно освобождены после отказа. Independent explicit1
+final release review `83ca1f67…`/readback `32855b4f…` одобрены. Actual public gate
+22:09:13.225Z разрешил TECHNICAL_FAILURE_RECORDED, originalattempt8f3c0b63… неизменен.
+Tags/1 запущен последовательным runner3309146/exec99417 в22:09:40.122Z после gate;
+один candidate активен,17ещё не начаты. Criteria/runtime/model/input прежние.
 
 Explicit-js/1 closed21:52:03.471Z, CLI1/cleanupfalse/Host3248443ACKfalse:
 policy PASS sidecar `3d6688ad…`, mandatory JS+failure review `0c89212f…`.
@@ -38,7 +40,11 @@ Root независимо сверил подготовленный другим
 (`de95c79a…`); additional binding review `1c040256…` честно retrospective.
 17original неизменны; добавлены только2точные JS source copies и mandatory review,
 финальная conservation20casefiles/29recovery. Descriptor `3dcf6d46…`/R2execution97cad99c;
-final release review и actual public gate пока не заявлены как завершённые.
+final release review `83ca1f67…`/readback `32855b4f…` и actual public gate
+22:09:13.225Z завершены. Была одна фактическая public gate проверка; её caller
+сначала остановился до вызова на типе hashing ArrayBuffer, исходники/попытка не менялись.
+Sanitized native logs подтверждают точную непрерывность own records, не byte-prefix
+всего файла с историческими Unicode separators; ограничения отражены в ревью.
 
 Campaign-roi-by-channel/1 closed21:06:16.711Z: policy PASS `dc921fb2…`, mandatory
 failure review `4f990c9e…`;26messages/101parts/28tools/82events/2827runtime,
