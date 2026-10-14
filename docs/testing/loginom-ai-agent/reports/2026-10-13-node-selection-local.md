@@ -2239,3 +2239,34 @@ Host receipt не содержит chatID: attribution требует экскл
 единственной новой квитанции и её времени внутри собственной попытки.
 Модельная серия пока не начиналась; activation — только через новый immutable
 ready:true lock, не изменяющий исходные ready:false optimized/43-slot файлы.
+
+
+Checkpoint 2026-10-14 07:54 UTC — matched runtime gates завершены,31-slot admission frozen.
+Fresh ordinary JS→Group/Sort→Export прошёл на `21fcca85…`: Group A17/B21,
+Sort B21/A11/A6, exactCSV27bytes, сохранены5nodes/4links. Исходный JS component,
+code/declaredschema/socket равны до/после; native managed previews для двух
+ветвей подтверждены. Публичные generic UI/raw browser tools отсутствуют;
+pure validator на actual own captured port отказал, live UI receipt не заявляется.
+Root43066terminalexit0; exact own package закрыт, logouttrue/noDiscard,
+HostACKexit0/nosignal/noerror/PIDgone/.writerabsent. Result SHA
+`61c80c0bafbc18e89db5ce04d73acf5bfa418b116333c6e00ae2aa2766b207a6`;
+Root independent2195journal rows/full LGP parser/CSV/receipts/close review
+`native-js-downstream-proof/independent-live-review.json` SHA
+`be5e5edf1b856b4ae345fbad3404205f83a3332ab6ed4686a94dfa200ef85090`.
+Два fresh prepare имеют текущие16cards/build7.4.2/digest; их knowledge совпадает
+с историческим. Durable Join/schema dependency review SHA
+`7528b629ab4bea52686204df7fff7e649f7ff4a856b9f5d09f163f0089303c33`:
+из4397runtime files изменён только text-export;23конкретные shared/Join/schema
+зависимости byte-equal. Исторические15fullschemas/Join outcomes не переносятся;
+probe explicitLogoutfalse не повышается доtrue.
+
+Новый `acceptance-lock-effective.json` mode0400/readytrue, SHA
+`0770362667497e888718e996ed74a0d5c580ddca3dc4f230823f51749d921d06`,
+создан до моделей0. Он связывает исходный optimized lock, immutable pins/matrix,
+общий runtime source pin,74evaluator/task source files (включая новый script/test),
+11gate/review receipts. Product sourcec593 и evaluator commit6c7cdb0bea разделены;
+никакого payload rebuild из-за нового evaluator. Первые9 идут ABC/firstlast
+первыми, baseline6 только после clean9, затем candidate16. Все исходные43/optimized
+readyfalse artifacts сохранены; новое правило не применяется к старым попыткам.
+На момент seal live acceptance model slots ещё0; итоговая приёмка31 и manual
+reviews остаются открытыми. Первый planned ABC проверит actual auto-next lifecycle.
