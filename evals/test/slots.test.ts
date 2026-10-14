@@ -240,10 +240,52 @@ test("SlotLease: release I/O failure preserves a partial reservation and finaliz
     expect((await readResourceReservation({ key: original.resources[0]!.key, lockRoot }))?.state).toBe("released")
     expect((await readResourceReservation({ key: original.resources[1]!.key, lockRoot }))?.state).toBe("retained")
     const before = await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))
+    await expect(recoverSlotLease(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("BUSY")
     await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
     expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
     expect(await readLeaseReceipt(lease.receipt)).toMatchObject({ state: "retained" })
   } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("SlotLease: dead-controller partial release is adopted only as recovery ownership", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireSlotLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+      const {mkdir}=await import("node:fs/promises");const file=${JSON.stringify(file)};
+      const lease=await acquireSlotLease(file,file.slots[0],${JSON.stringify(identity)},${JSON.stringify(lockRoot)});
+      const manifest=await Bun.file(lease.receipt).json();const cleanup=${JSON.stringify(path.join(item.root, "cleanup.json"))};
+      await Bun.write(cleanup,JSON.stringify({status:"confirmed",slotId:lease.slot.id,leaseToken:lease.token,serverEpoch:lease.identity.serverEpoch,
+        processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true}));
+      const {chmod}=await import("node:fs/promises");await chmod(cleanup,0o600);
+      await mkdir(lease.receipt+"."+new Bun.CryptoHasher("sha256").update(manifest.resources[1].key).digest("hex")+".released.json",{mode:0o700});
+      const failed=await lease.release(cleanup).then(()=>false,()=>true);if(!failed)throw Error("fault not reached");
+      console.log(lease.receipt);await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    const incident = (await new Response(child.stdout).text()).trim()
+    const original = await readLeaseReceipt(incident) as { resources: { key: string; token: string; revision: number }[] }
+    expect((await readResourceReservation({ key: original.resources[0]!.key, lockRoot }))?.state).toBe("released")
+    expect((await readResourceReservation({ key: original.resources[1]!.key, lockRoot }))?.state).toBe("retained")
+    const before = await Promise.all(original.resources.map(resource => readResourceReservation({ key: resource.key, lockRoot })))
+    const cleanup = path.join(item.root, "cleanup.json")
+    const cleanupBytes = await Bun.file(cleanup).text()
+    await writeFile(cleanup, JSON.stringify({ ...JSON.parse(cleanupBytes), changed: true }), { mode: 0o600 })
+    await expect(recoverSlotLease(file, file.slots[0]!, identity, incident, lockRoot)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
+    expect(await Promise.all(original.resources.map(resource => readResourceReservation({ key: resource.key, lockRoot })))).toEqual(before)
+    await writeFile(cleanup, cleanupBytes, { mode: 0o600 })
+    const recovered = await recoverSlotLease(file, file.slots[0]!, identity, incident, lockRoot)
+    try {
+      expect(recovered.recoveryOnly).toBe(true)
+      await recovered.assertHeld()
+      for (const resource of original.resources) {
+        const current = await readResourceReservation({ key: resource.key, lockRoot })
+        expect(current).toMatchObject({ state: "recovery-only", revision: resource.revision + 1,
+          lineage: [{ token: resource.token, revision: resource.revision, identity }] })
+      }
+      await expect(stageUserPreparation(file, recovered, "e".repeat(64))).rejects.toThrow("SLOT_RECOVERY_ONLY")
+    } finally { await recovered.close() }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
 })
 
 test("SlotLease: recovery adopts a dead owner's complete slot inventory without admitting a new run", async () => {

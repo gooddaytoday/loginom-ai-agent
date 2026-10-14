@@ -582,3 +582,10 @@ missing tombstone даёт RECOVERY_FINALIZATION_REQUIRED. finalizeReleasedSlot
 только composite tombstone без ownership CAS или нового permission на cleanup.
 Source drift/foreign run/partial released+retained state сохраняются и запрещают
 finalization. Полная partial recovery и native cleanup producer ещё открыты.
+
+Partial slot release допускает новый recovery-only epoch ранее released
+resource только при private slot proof, незавершённом composite incident,
+неизменном cleanup SHA и точном generation/inventory. Эта проверка повторяется
+под resource guard перед CAS; generic recovery released resources не принимает
+без slot-specific callback. Live owner/source drift сохраняют прежнее владение.
+Это admission восстановления, не повторное model admission или delete grant.
