@@ -125,3 +125,32 @@ typecheck/diff PASS. Whitelist successful evidence:
 `research/evidence/native-user-172fece6-5dc0-464e-aaa3-94a60211241a/session-probe.json`.
 Durable session ledger, reconnect/retained session/backup и production admission
 остаются открыты. Context exit без server read-back authority не получает.
+
+Проверка следующего slice выявила ещё один реальный исход обычного disconnect:
+row осталась pendingDisconnect=true/Count0 (native-user-0b6a57d2...). Поэтому
+немедленное исчезновение не является invariant; прежняя успешная серия
+подтверждала только observed_absent path. Тест теперь требует итогового
+подтверждённого закрытия и сохраняет disposition, без фиксированного sleep.
+
+Для retained row fresh proxy выбирается по causal binding + exact
+Name/CreateTime/current epoch/account ID; неоднозначность/подмена отказали.
+Только после подтверждённого закрытия writer context и при Count0 и
+PendingDisconnect=true выполняется штатный manager.CloseSession(proxy,5000).
+После ack fresh manager перечитывается до отсутствия ID и Name/CreateTime в
+прежнем request deadline. Post-write uncertainty остаётся unknown.
+
+Fixed session-crash-probe прерывает только onpagehide logout callback своего
+renderer перед закрытием context; backend, login, package и RPC настоящие.
+Это client-finalization fault injection, не SIGKILL CLI/process-tree crash.
+Он воспроизводимо сохранил native pending/Count0 row; CloseSession дал
+rpc_closed. Foreign name/time на retained row отказали, следующая валидная
+команда действительно выполнила RPC, repeat подтвердил observed_absent.
+
+Target1 PASS/71 assertions (30.17s); final native/admin/codec/preflight60
+PASS/271 (77.49s), typecheck/diff PASS. Actual RPC evidence:
+`research/evidence/native-user-d3ec9d6a-33fa-483d-85e1-f1356d1f9364/session-crash-close.json`,
+paired session-crash-probe.json и command/process proofs. Own disposable pair
+удалена после confirmed native disposal. Qualification остаётся false для
+общего режима: active/nonempty packages, real CLI crash, reconnect, durable
+ledger/recovery и SessionBackup требуют следующих проверок. Bootstrap rights
+не менялись; generic parent close без probe proof по-прежнему unsupported.

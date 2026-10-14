@@ -138,15 +138,28 @@ liveIntegration("native user capability: creates one blocked account and refuses
       expect(candidate[0]!.packageCount).toBe(0)
       expect(observed.withPackage.find(row => row.objectId === candidate[0]!.objectId)).toMatchObject({ ...candidate[0]!, packageCount: 1 })
       expect(observed.afterPackage.find(row => row.objectId === candidate[0]!.objectId)).toMatchObject(candidate[0]!)
-      expect(observed.afterDisconnect.some(row => row.objectId === candidate[0]!.objectId ||
-        row.name === candidate[0]!.name && row.createdAt === candidate[0]!.createdAt)).toBe(false)
       expect(await request("close-session", { proofId: crypto.randomUUID(), session: observed.binding })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_OWNERSHIP_UNCONFIRMED" } })
       expect(await request("close-session", { proofId: probe.id, session: { ...observed.binding, name: "eval-b:1" } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
       expect(await request("close-session", { proofId: probe.id, session: { ...observed.binding, createdAt: "2026-10-13T00:00:00.000Z" } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
-      expect(await request("close-session", { proofId: probe.id, session: observed.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
+      const close = await request("close-session", { proofId: probe.id, session: observed.binding })
+      await writeLeaseReceipt(path.join(evidence, "session-close.json"), { version: 1, identity: pair.identity, ...close })
+      expect(close).toMatchObject({ outcome: "confirmed", data: { closed: true } })
+      expect(["observed_absent", "rpc_closed"]).toContain((close.data as { disposition: string }).disposition)
       expect(await request("close-session", { proofId: probe.id, session: observed.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
       const closed = await request("inspect", {})
       expect((closed.data as { rawSessions: { objectId: string }[] }).rawSessions.some(row => row.objectId === candidate[0]!.objectId)).toBe(false)
+      const disconnected = await request("reconcile-user", { ...activation, phase: "session-crash-probe" })
+      expect(disconnected.outcome).toBe("confirmed")
+      const disconnectedData = disconnected.data as typeof observed
+      await writeLeaseReceipt(path.join(evidence, "session-crash-probe.json"), { version: 1, identity: pair.identity, ...disconnectedData })
+      expect(disconnectedData.afterDisconnect.find(row => row.name === disconnectedData.binding.name &&
+        row.createdAt === disconnectedData.binding.createdAt)).toBeDefined()
+      expect(await request("close-session", { proofId: disconnected.id, session: { ...disconnectedData.binding, name: "eval-b:1" } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
+      expect(await request("close-session", { proofId: disconnected.id, session: { ...disconnectedData.binding, createdAt: "2026-10-13T00:00:00.000Z" } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
+      const terminated = await request("close-session", { proofId: disconnected.id, session: disconnectedData.binding })
+      await writeLeaseReceipt(path.join(evidence, "session-crash-close.json"), { version: 1, identity: pair.identity, ...terminated })
+      expect(terminated).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+      expect(await request("close-session", { proofId: disconnected.id, session: disconnectedData.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)
