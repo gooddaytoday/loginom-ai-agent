@@ -1,13 +1,14 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint 2026-10-14 13:31 UTC: matched112452/runtime659588….
-Приняты4standard(firstlast/sales/monthly/claims/1)+explicit-js/1; ABC/ROI technical-failed
-сохранены сapprovedownrelease. ExplicitJSроль requested-aggregation/все25ячеек/
-realinputalgorithm подтвержденынезависимо; actualhelperJS→Sort preflightPASS.
-Samefrozen31resume5/exec89372 реальноначал tags/1: CLI2050385start13:30:27.066Z,
-Session ses_ec56485e0ffeSm4LTnr9DvULJz. Вход150tags+variablelengths frozenзаранее.
-Started8/closed7/accepted5/technicalfailed2/notstarted23/baseline0.
-Полнаяприёмкаopen; admittedslotsнеповторяются, старыеoutcomesисторические.
+Текущий checkpoint 2026-10-14 13:49 UTC: matched112452/runtime659588….
+Приняты4standard(firstlast/sales/monthly/claims/1)+explicit-js/1; ABC/ROI/tags technical-failed
+сохранены. Tags завершён13:33:48.514Z: Import+JSunpack157rawrows SUCCEEDED,
+standardCalculatortrim targetAMBIGUOUS/upstreamportnotinteractable/noLGP/CSV.
+Own197/admin198/8actualPIDclosed, exactguard архивирован13:47:40/.writerabsent;
+descriptor4f2b12f7…400/17original+14recovery ожидает finalindependentrelease review.
+ConfirmedJSselectionviolationневыявлен, ноfulltagsrole/policy/calculationPASSнет.
+Exec89372 terminalexit1. Started8/closed8/accepted5/technicalfailed3/notstarted23/baseline0.
+Полнаяприёмкаopen; admittedslotsнеповторяются. Nextrecovery/1 толькоapprovedreview+puregate.
 
 
 Историческое состояние на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
@@ -2751,3 +2752,26 @@ reviewпослеmachineclose проверитvariable-unpack-only/безhardcode
 Started8/closed7/accepted5(4standard+1explicit)/technicalfailed2/notstarted23/baseline0.
 Full31/compare/fullacceptanceopen; всеисходники/model/runtime/source/pins/lock прежние.
 Reportamendment009/45f13218… сохраняетinitialpendingreview, новыйoutcomeотдельно.
+
+Checkpoint 2026-10-14 13:49 UTC — tags/1 failed; ownrecoverycompleted/reviewpending.
+Attempt13:33:48.514Z CLI2050385exit1/normalcleanupfalse/Host2050655ACKfalseexit1/
+LOGINOM_RUNTIME_CLEANUP_FAILED/sourcepreserved. Exec89372 terminalexit1,
+SELECTION_CLEANUP_UNCONFIRMED. Snapshot93parts/23messages; Import14a3a51f…/
+JS0616e0ac… SUCCEEDED,157rawnonemptyelements, JS1callsuccess1/no savedXML/CSV/oracle.
+Tags-trim-1 standardCalculator targetAMBIGUOUS, node=null, executionnotrequested,
+'Upstream port is not interactable'; readonlyinspect/resume/cancel/save неразрешилиpending.
+StandardTrim/Group/Sort/Export незавершены; JS→Group coverage этимкейсомнеподтверждено.
+Pre-review6ffb3927… approvedownbinding: latestuser197init13:30:40.942/actualImportJS
+GUIDs/doc1ddc71aa…/Dock5986328d…/exactguard; noConfirmedJSselectionviolation.
+StdSchemas→gaprationale→JSschema→JSapply, rawsplit/NullEmptySkip, безaggregation/sorting/
+constants; trimпыталисьстандартно, послеerrorновогоJSfallbackнет. FulltagsrolePASSнет.
+Ownuser197closed13:45:25.692, двареальныхrefreshsnapshots ownabsent/194+196unchanged;
+admin198created13:41:29.784/logout13:45:28.993/loginUI. ActualexclusiveCDP6IDs
+2064998/2065067/2065068/2065032/2065034/2065038 закрытыBrowser.close, direct/proc
+all6+CLI+Host absent13:46:04.046. ExactguardnonceSHAf2fed…/dir7752490/owner7752491/
+Node.mtimeMs1791984627086.7102 preservedrename13:47:40.369 archiveuser197/.writerabsent.
+History/evidence/pkgs сохранены, original17 hashes unchanged. Descriptor
+4f2b12f7a853ceebf6084181adb57c826a7106285f2c261f9090aafeacc75163400 binds14sealed
+recovery; finalindependentrelease reviewpending. Rootnextpuregate→recovery/1 ifapproved,
+безtagsrerun/noPASSupgrade. Started8/closed8/accepted5/technicalfailed3/notstarted23/
+baseline0. Main31/compare/fullacceptanceopen; source/runtime/skill/model/pins/inputs/lockпрежние.
