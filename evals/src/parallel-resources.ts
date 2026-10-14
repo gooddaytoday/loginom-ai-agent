@@ -140,14 +140,24 @@ export async function sampleHostResources(paths: string[]) {
 
 export async function sampleCgroupResources(pid = process.pid) {
   if (!Number.isSafeInteger(pid) || pid < 1) throw new EvalFailure("RESOURCE_PROCESS_IDENTITY", 2)
-  const group = (await readFile(`/proc/${pid}/cgroup`, "utf8").catch(() => undefined))
+  const raw = (await readFile(`/proc/${pid}/cgroup`, "utf8").catch(() => undefined))
     ?.split("\n").find(line => line.startsWith("0::"))?.slice(3)
-  const files = group ? await Promise.all(["cpu.stat", "memory.events", "memory.current", "memory.max", "memory.swap.current", "memory.swap.max"]
+  const group = raw && path.posix.isAbsolute(raw) && path.posix.normalize(raw) === raw ? raw : undefined
+  const [current, ancestors] = await Promise.all([readCgroupResources(group), group
+    ? Promise.all(group.split("/").filter(Boolean).map((_, index, parts) => readCgroupResources("/" + parts.slice(0, -index - 1).join("/")))) : null])
+  return { ...current, ancestors }
+}
+
+async function readCgroupResources(group?: string) {
+  const files = group ? await Promise.all(["cpu.stat", "memory.events", "memory.current", "memory.max", "memory.swap.current", "memory.swap.max", "cpu.max"]
     .map(name => readFile(path.join("/sys/fs/cgroup", group, name), "utf8").catch(() => undefined))) : []
   const cpu = cgroupCounters(files[0])
   const events = cgroupCounters(files[1])
+  const quota = files[6]?.trim().split(/\s+/)
   const sample = {
     path: group ?? null,
+    cpu_max: quota?.length === 2 && (quota[0] === "max" || (cgroupNumber(quota[0]) ?? 0) > 0) && (cgroupNumber(quota[1]) ?? 0) > 0
+      ? { quota_usec: quota[0] === "max" ? "max" as const : cgroupNumber(quota[0])!, period_usec: cgroupNumber(quota[1])! } : null,
     cpu_usage: ["usage_usec", "user_usec", "system_usec"].every(key => Number.isSafeInteger(cpu.get(key)))
       ? { usage_usec: cpu.get("usage_usec")!, user_usec: cpu.get("user_usec")!, system_usec: cpu.get("system_usec")! } : null,
     cpu_throttling: ["nr_periods", "nr_throttled", "throttled_usec"].every(key => Number.isSafeInteger(cpu.get(key)))
