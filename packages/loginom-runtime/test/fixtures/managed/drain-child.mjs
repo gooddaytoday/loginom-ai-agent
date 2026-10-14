@@ -6,7 +6,8 @@ const file=process.env.MANAGED_DRAIN_ENTRY,scenario=process.env.MANAGED_DRAIN_SC
 const context=vm.createContext({process,URL,AbortController,setImmediate,console,Error,Promise,Map,Set});
 const builtin={'node:module':module,'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os,'node:fs/promises':{...fs,writeFile:async(...args)=>{if(scenario==='receipt-failure' && String(args[1]).includes('\"status\": \"returned\"'))throw Error('fixture receipt write rejected');return fs.writeFile(...args)}}};
 const entry=new vm.SourceTextModule(await readFile(file,'utf8')+'\nexport {state,requests};',{context,identifier:url.pathToFileURL(file).href,initializeImportMeta(meta){meta.url=url.pathToFileURL(file).href}});
-await entry.link(specifier=>{
+await entry.link(async specifier=>{
+ if(specifier==='./terminal-managed-call.mjs')return new vm.SourceTextModule(await readFile(new URL(specifier,url.pathToFileURL(file)),'utf8'),{context,identifier:new URL(specifier,url.pathToFileURL(file)).href});
  const exports=builtin[specifier]??({
  './original-prepare-lender.mjs':{retainOriginalPrepareStartup(){throw Error('fixture forbids start')}},
  './fp-managed-startup.mjs':{retainFPManagedStartup(){throw Error('fixture forbids start')}},

@@ -1,3 +1,4 @@
+import {beginTerminalManagedCall,isTerminalManagedCall,terminalManagedPrepareMessage} from './terminal-managed-call.mjs'
 import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
 import {retainFPManagedStartup} from './fp-managed-startup.mjs'
 import { createRequire } from "node:module"
@@ -105,17 +106,23 @@ const stop = () => {
 process.on("disconnect", stop)
 process.on("SIGTERM", stop)
 process.on("message", (message) => {
-  const request = handle(message)
+  let invocation;
+  // Fixed actual IPC producer: retain the original message before handle enters.
+  try {if(terminalManagedPrepareMessage(message))invocation=beginTerminalManagedCall(message,state)}
+  catch(error){const id=message&&Object.getOwnPropertyDescriptor(message,'id');send({id:id&&'value'in id?id.value:undefined,error:error?.message??'LOGINOM_ORIGINAL_CALL_UNAVAILABLE'});return}
+  const request = handle(message,invocation)
+  invocation?.bindTask(request)
   // Close awaits the ordinary requests; tracking its own control handler would
   // make that drain wait for itself (and for every concurrent Close handler).
   if (message?.operation !== "close") requests.add(request)
   void request
-    .finally(() => requests.delete(request))
+    .finally(() => {requests.delete(request);if(invocation?.inspect().phase==='ready')invocation.finish()})
     .catch(() => {
       process.exitCode = 1
     })
 })
 async function handle(message) {
+  const invocation=arguments[1];
   if (!message || typeof message !== "object" || typeof message.id !== "string") return
   try {
     if (state.closing && message.operation !== "close") throw Error("LOGINOM_RUNTIME_CLOSING")
@@ -343,31 +350,37 @@ async function handle(message) {
       && !current.closed && !current.contextClosed && !state.bridgeCleanup;
     if (readonlyRequired && (!retainedOwner() || !qualified))
       throw Error("LOGINOM_RECOVERY_REQUIRED")
+    if(invocation || message.input.name==='dock_prepare') {
+      if(!isTerminalManagedCall(invocation,message,state))throw Error('LOGINOM_ORIGINAL_CALL_UNAVAILABLE');
+      await invocation.beforeDispatch();
+    }
     const controller = new AbortController()
     state.controller = controller
+    invocation?.bindController(controller)
     try {
       // dock_node_wait may legitimately wait 60 seconds. Leave room for its receipt
       // before the supervisor's 120-second deadline, instead of the SDK's 60-second default.
-      const result = await state.client.callTool(message.input, undefined, {
-        signal: controller.signal,
-        timeout: 105_000,
-      })
+      const options={signal:controller.signal,timeout:105_000};
+      let result;
+      try {result=await (invocation?invocation.invoke(options):state.client.callTool(message.input,undefined,options))}
+      catch(value){throw invocation?invocation.reject(value):value}
+      invocation?.guard()
       const readonlyContinuation=retainedOwner() && originalBridge?.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
       if (readonlyRequired && !readonlyContinuation) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (readonlyContinuation) state.readonlyRetained=true;
-      send({ id: message.id, result: {
+      send({ id: invocation?invocation.facts.requestId:message.id, result: {
         readonlyContinuation,
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
       } })
     } finally {
-      state.controller = undefined
+      if(invocation)invocation.finish();else state.controller = undefined
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    if(message.operation==='start' && state.controlledStartup)send({id:message.id,rejection:closeRejection(state.controlledStartup.propagate(error)),rejectionOrigin:state.controlledStartup.rejectionOrigin,
+    if((invocation?invocation.facts.operation:message.operation)==='start' && state.controlledStartup)send({id:message.id,rejection:closeRejection(state.controlledStartup.propagate(error)),rejectionOrigin:state.controlledStartup.rejectionOrigin,
       ...(state.controlledStartup.secondary?{secondaryRejection:closeRejection(state.controlledStartup.secondary.value)}:{})});
-    else send({ id: message.id, error: code })
-    if (message.operation === "start") {
+    else send({ id: invocation?invocation.facts.requestId:message.id, error: code })
+    if ((invocation?invocation.facts.operation:message.operation) === "start") {
       state.startupFailure=error
       if(state.startupOwner?.context) state.browser=state.startupOwner.context
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
@@ -376,5 +389,5 @@ async function handle(message) {
         void close().catch(() => undefined)
       })
     }
-  } finally {if(message.operation==='start')state.controlledStartup?.settle()}
+  } finally {if((invocation?invocation.facts.operation:message.operation)==='start')state.controlledStartup?.settle();if(invocation?.inspect().phase==='ready')invocation.finish()}
 }
