@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget } from "../src/parallel-acceptance"
+import { summarizeResourceSamples } from "../src/parallel-resource-summary"
 
 test("parallel acceptance fails on an intermediate rate limit even when the measured retry succeeds", () => {
   const receipt = {
@@ -147,4 +148,87 @@ test("parallel licence policy distinguishes an explicitly observed unlimited lim
     .toEqual({ status: "passed", codes: [] })
   for (const session_limit of [null, 0, "unknown"]) expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, session_limit } }))
     .toEqual({ status: "incomplete", codes: ["LICENCE_LIMIT_UNKNOWN"] })
+})
+
+
+test("resource budget policy requires a budget and samples before it can pass declared bounds", () => {
+  const fixture = budgetFixture()
+  expect(assessResourceBudget({ ...fixture, budget: null })).toEqual({ status: "incomplete", codes: ["RESOURCE_BUDGET_MISSING"] })
+  expect(assessResourceBudget({ ...fixture, summary: null })).toEqual({ status: "incomplete", codes: ["RESOURCE_SAMPLES_MISSING"] })
+  expect(assessResourceBudget(fixture)).toEqual({ status: "passed", codes: [] })
+})
+
+function budgetFixture() {
+  return { runId: "resource-policy-fixture", startedAt: "2026-10-14T10:00:01.000Z",
+    budget: { version: 1, kind: "parallel-resource-budget", run_id: "resource-policy-fixture", fixed_at: "2026-10-14T10:00:00.000Z",
+      bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 100, maximum: null },
+        { scope: "filesystem:/archives", metric: "available_bytes", minimum: 200, maximum: null }],
+    }, summary: summarizeResourceSamples([500, 300].map((available, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+      host: { cpu: null, memory: { available_bytes: available }, filesystems: [{ path: "/archives", capacity: { available_bytes: 400 } }] },
+    }))),
+  }
+}
+
+test("resource budget policy fails on observed minima or peaks beyond the fixed bounds", () => {
+  const fixture = budgetFixture()
+  expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget,
+    bounds: [{ ...fixture.budget.bounds[0], minimum: 301 }] } }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_BUDGET_EXCEEDED"] })
+  const summary = summarizeResourceSamples([150, 300].map((current, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: null }, containers: [{ container_id: "a".repeat(64), epoch_stable: true, inspect: { started_at: "fixture-start" },
+      memory: { current_bytes: current, limit_bytes: 1000 } }],
+  })))
+  const bound = { scope: `container:${"a".repeat(64)}:fixture-start`, metric: "memory.current_bytes", minimum: null, maximum: 250 }
+  expect(assessResourceBudget({ ...fixture, summary, budget: { ...fixture.budget, bounds: [bound] } }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_BUDGET_EXCEEDED"] })
+  expect(assessResourceBudget({ ...fixture, summary, budget: { ...fixture.budget, bounds: [{ ...bound, maximum: 300 }] } }))
+    .toEqual({ status: "passed", codes: [] })
+})
+
+test("resource budget policy cannot pass missing series, lost intervals or reset counters", () => {
+  const fixture = budgetFixture()
+  expect(assessResourceBudget({ ...fixture, summary: summarizeResourceSamples([]) }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_SAMPLES_MISSING"] })
+  expect(assessResourceBudget({ ...fixture, summary: { ...fixture.summary, missed_intervals: 1 } }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVATIONS_INCOMPLETE"] })
+  expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget, bounds: [{ ...fixture.budget.bounds[0], scope: "filesystem:/missing" }] } }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVATIONS_INCOMPLETE"] })
+  const summary = summarizeResourceSamples([500, null, 300].map((available, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: available === null ? null : { available_bytes: available } },
+  })))
+  expect(assessResourceBudget({ ...fixture, summary })).toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVATIONS_INCOMPLETE"] })
+  expect(assessResourceBudget({ ...fixture, summary, budget: { ...fixture.budget, bounds: [{ ...fixture.budget.bounds[0], minimum: 400 }] } }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_BUDGET_EXCEEDED"] })
+  const reset = summarizeResourceSamples([100, 5].map((ticks, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: { ticks: [ticks] }, memory: null },
+  })))
+  expect(assessResourceBudget({ ...fixture, summary: reset, budget: { ...fixture.budget,
+    bounds: [{ scope: "host", metric: "cpu.ticks.0", minimum: 0, maximum: null }] } }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVATIONS_INCOMPLETE"] })
+})
+
+test("resource budget policy binds the budget to the run and refuses thresholds fixed after execution starts", () => {
+  const fixture = budgetFixture()
+  expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget, run_id: "another-run" } }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_BUDGET_RUN_MISMATCH"] })
+  for (const fixed_at of [fixture.startedAt, "2026-10-14T10:00:02.000Z"]) expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget, fixed_at } }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_BUDGET_NOT_FIXED_BEFORE_RUN"] })
+  expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget, fixed_at: "unverified" } }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_BUDGET_TIME_UNVERIFIED"] })
+  expect(assessResourceBudget({ ...fixture, startedAt: "unverified" }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_BUDGET_TIME_UNVERIFIED"] })
+  expect(assessResourceBudget({ ...fixture, summary: null, budget: { ...fixture.budget, fixed_at: fixture.startedAt } }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_BUDGET_NOT_FIXED_BEFORE_RUN"] })
+})
+
+test("resource budget policy refuses malformed or empty bounds rather than silently skipping them", () => {
+  const fixture = budgetFixture()
+  for (const change of [{ version: 0 }, { kind: "unverified" }, { bounds: [] }, { bounds: null },
+    { bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: null, maximum: null }] },
+    { bounds: [{ scope: "", metric: "memory.available_bytes", minimum: 0, maximum: null }] },
+    { bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: "100", maximum: null }] },
+    { bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: -1, maximum: null }] },
+    { bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 500, maximum: 100 }] },
+  ]) expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget, ...change } }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_BUDGET_INVALID"] })
 })
