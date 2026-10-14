@@ -153,5 +153,47 @@ class OriginTest(unittest.TestCase):
         self.assertEqual((self.root/'receipt').read_bytes(), original)
 
 
+    def test_original_claim_refuses_inherited_process_before_write(self):
+        with admit.admission_decision(self.args) as decision:
+            original = (self.root/'receipt').read_bytes()
+            pid = os.fork()
+            if pid == 0:
+                try:
+                    try:
+                        decision._claim.write()
+                    except admit.DeliveryError:
+                        os._exit(0)
+                    os._exit(1)
+                except BaseException:
+                    os._exit(2)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(os.waitstatus_to_exitcode(status), 0)
+            self.assertEqual((self.root/'receipt').read_bytes(), original)
+            self.assertTrue(decision.consume_birth())
+
+    def test_secondary_diagnostic_refusal_keeps_first_exception_and_cause(self):
+        first = ValueError('original validation failure')
+        cause = RuntimeError('original cause')
+        first.__cause__ = cause
+        validate = admit.validate
+        held = []
+        def fail(spec):
+            validate(spec)
+            path = self.root/'receipt'
+            held.append(path.read_bytes())
+            path.rename(self.root/'original-receipt')
+            path.write_bytes(held[0])
+            path.chmod(0o600)
+            raise first
+        with patch.object(admit, 'validate', side_effect=fail):
+            with self.assertRaises(ValueError) as caught:
+                with admit.admission_decision(self.args): self.fail('admitted')
+        self.assertIs(caught.exception, first)
+        self.assertIs(first.__cause__, cause)
+        self.assertIsInstance(first._admission_diagnostic_failure, admit.DeliveryError)
+        self.assertEqual((self.root/'receipt').read_bytes(), held[0])
+        self.assertEqual((self.root/'original-receipt').read_bytes(), held[0])
+
+
 if __name__ == '__main__':
     unittest.main()

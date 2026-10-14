@@ -68,3 +68,10 @@ claim collision. Named elapsed-time/validation faults verify budget consumption,
 copy/foreign receipt/input refusals and original exception/UNKNOWN retention.
 No admit CLI, model process, SDK receiver or native operation runs. Candidate,
 resource evidence and business files are labelled fixture inputs, not native proof.
+
+The live claim retains its creator PID before the exclusive open. Every guard,
+consume and dispatch refuses inherited fork state before touching the claim;
+the durable provenance PID cannot reconstruct this live ownership. If rejected
+validation diagnostics fail their original claim guard, the same first exception
+and cause are re-raised; the exact diagnostic failure remains attached privately
+as `_admission_diagnostic_failure`. Foreign receipt bytes are never rewritten.

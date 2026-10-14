@@ -97,6 +97,7 @@ def validate(spec):
 class _Claim:
     """Original open claim, never authority reconstructed from receipt JSON."""
     def __init__(self, path, fingerprint):
+        self._creator_pid = os.getpid()
         self.path = path.absolute()
         self.fd = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         self.identity = os.fstat(self.fd)
@@ -109,6 +110,9 @@ class _Claim:
             raise
 
     def guard(self):
+        # Live claim ownership is process-local; receipt PID is only provenance.
+        if os.getpid() != self._creator_pid:
+            raise DeliveryError("Original admission creator process changed")
         current = os.stat(self.path, follow_symlinks=False)
         held = os.fstat(self.fd)
         if (current.st_dev, current.st_ino) != (self.identity.st_dev, self.identity.st_ino) or not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or held.st_uid != os.getuid() or stat.S_IMODE(current.st_mode) != 0o600:
@@ -226,7 +230,11 @@ def admission_decision(args):
     except (OSError, ValueError, KeyError) as error:
         if claim.record['state'] == 'checking':
             claim.record.update(state='rejected', reason=str(error) if isinstance(error, DeliveryError) else type(error).__name__)
-            claim.write()
+            try:
+                claim.write()
+            except (OSError, ValueError, KeyError) as diagnostic:
+                # The rejected validation remains primary even if custody is lost.
+                error._admission_diagnostic_failure = diagnostic
         # launching/UNKNOWN remains claimed. No rollback, remint or replay.
         raise
     finally:
