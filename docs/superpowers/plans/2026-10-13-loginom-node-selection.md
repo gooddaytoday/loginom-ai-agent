@@ -3199,8 +3199,10 @@ Clientgenerate без publicProtocol/HttpApi изменения.
   Независимо подтверждены15nonJSfamilies/127productionfiles exactbase;
   сохранены58JSfiles,18sharedJSdependencies и21Core/Host/runtime/CLIfiles.
   Group/Sort-only postJS helper/API удалены; новые standard fixes запрещены.
-- [ ] Независимо проверить итоговый scope diff и необходимые changed-code/JS
-  проверки; rollback сохранить обычным описательным commit.
+- [x] Независимо проверить итоговый scope diff и необходимые changed-code/JS
+  проверки:2154PASS/0FAIL/0SKIP,127standardproduction exactbase и JS dependencies
+  сохранены. Rollback сохранён обычным commit d445c8ea65; повторных неизменных
+  Host/runtime checks не было. Это source gate, а не live-приёмка.
 - [x] По TDD добавить отдельный technical continuation/recovery/history path
   в eval, без ослабления success path и без изменения failed outcomes. Проверено:
   44PASS/144assertions, typecheck0 и независимый source review revision2;
