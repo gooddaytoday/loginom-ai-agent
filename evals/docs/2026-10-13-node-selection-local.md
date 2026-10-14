@@ -1134,3 +1134,19 @@ login visible; browser closed/bridgeexit0. Guard отсутствовал, origi
 no acceptance credit. Join/schema static approved, fresh live ещё не выполнены.
 Runtime/payload/effective corrected pins unchanged; current-run historical233119.
 Stages fresh native/build acceptance и18+25 остаются открыты.
+
+
+На 2026-10-14 06:08 UTC independent recovery163 PASS:
+`f9f5b2ee23889b8ef38628dc24445a285726f75e789554f0c12294e72ad9d386`.
+Server closure16306:02:28.203Z/admin164Logout06:02:50.246Z/noReinit;
+raw22/source4453/fixtures15/protected68/effective10/runtime288×2 unchanged,
+own processes absent/.writer absent. Original failed4e90… не upgraded.
+
+Root79801 запустил approved ordinary Join. Reviewed binding6a0062fd…f3302
+preserved0400; only ready/status activation
+`5246b5963751898d04971e500ed2aa43411fe07e2a3d46d3adbb52e06ff1574c`,
+admission `18c5ae1a96fc9481cb6236bbc609b2a7b774a5f0ad696313cee481ad99c80538`.
+Fresh4452source/5fixtures/85protected и own idle проверены. Первоначальный
+read-only process filter оказался шире own scope и отказал до mutations;
+повторная проверка scoped к этой серии, чужие процессы не затрагивались.
+Join outcome pending; no other Host/CLI/admin/model. Model slots0/stages open.
