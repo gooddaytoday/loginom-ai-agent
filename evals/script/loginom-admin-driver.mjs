@@ -109,6 +109,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       }
       dispatched = true
       const result = await bounded(request, page.evaluate(async binding => {
+        let applied = false
         try {
           const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
           const scoped = await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)
@@ -129,26 +130,44 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           const rows = []
           for (let index = 0; index < await manager.Count; index++) {
             const row = await manager.SessionInfo(index)
-            rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
-              createdAt: (await row.CreateTime).toISOString() })
+            rows.push({ proxy: row, objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
+              createdAt: (await row.CreateTime).toISOString(), pendingDisconnect: await row.PendingDisconnect, packageCount: await row.Count })
           }
           const retained = rows.filter(row => row.objectId === binding.session.remoteKey ||
             row.name === binding.session.name && row.createdAt === binding.session.createdAt)
           if (retained.length > 1) return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_AMBIGUOUS" } }
           if (retained.some(row => row.name !== binding.session.name || row.createdAt !== binding.session.createdAt))
             return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } }
-          if (retained.length) return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_UNSUPPORTED" } }
+          if (retained.length) {
+            if (retained[0].packageCount !== 0 || retained[0].pendingDisconnect !== true)
+              return { outcome: "not_applied", data: { code: "SESSION_NOT_IDLE" } }
+            applied = true
+            if (!await manager.CloseSession(retained[0].proxy, 5000)) throw Error("close")
+            while (Date.now() < binding.deadline) {
+              await manager.UpdateSessionInfos()
+              const current = []
+              for (let index = 0; index < await manager.Count; index++) {
+                const row = await manager.SessionInfo(index)
+                current.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
+                  createdAt: (await row.CreateTime).toISOString() })
+              }
+              if (!current.some(row => row.objectId === binding.session.remoteKey ||
+                row.name === binding.session.name && row.createdAt === binding.session.createdAt))
+                return { outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } }
+            }
+            throw Error("deadline")
+          }
           // The fixed probe closed its only writer context; fresh server absence completes this bound observation.
           return { outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } }
-        } catch { return { outcome: "not_applied", data: { code: "SESSION_OBSERVATION_UNKNOWN" } } }
-      }, binding))
+        } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "SESSION_CLOSE_UNKNOWN" } } }
+      }, { ...binding, deadline: request.deadline }))
       respond(id, result.outcome, result.data)
       continue
     }
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure", "acl", "activate", "session-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== (["acl", "activate", "session-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== (["acl", "activate", "session-probe", "session-crash-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -157,7 +176,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
           payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (["acl", "activate", "session-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+      if (["acl", "activate", "session-probe", "session-crash-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
         Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
@@ -192,8 +211,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
           const flags = [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]
-          if (owned && !["activate", "session-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
-          if (["acl", "activate", "session-probe"].includes(phase)) {
+          if (owned && !["activate", "session-probe", "session-crash-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (["acl", "activate", "session-probe", "session-crash-probe"].includes(phase)) {
             stage = "ACL"
             console.info("ADMIN_USER_STAGE_ACL")
             const snapshot = async () => {
@@ -225,7 +244,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const before = await snapshot()
             if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
-            if (phase === "activate" || phase === "session-probe") {
+            if (["activate", "session-probe", "session-crash-probe"].includes(phase)) {
               const safePolicy = async () => owned.secretHash === secretHash && await user.AuthMode === bg.TBGDeductorUserAuthMode.uamLocal &&
                 (await Promise.all(flags.map(async ([name, value]) => await user[name] === value))).every(Boolean)
               if (before.some(directory => directory.permissions.length) || !await safePolicy())
@@ -234,7 +253,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               console.info("ADMIN_USER_STAGE_ACTIVATE")
               const blocked = await user.Blocked
               if (typeof blocked !== "boolean") throw Error("readback")
-              if (phase === "session-probe") return blocked ? { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_ACTIVE" } }
+              if (phase !== "activate") return blocked ? { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_ACTIVE" } }
                 : { outcome: "confirmed", data: { probeAllowed: true } }
               if (blocked) { applied = true; await user.set_Blocked(false) }
               const observed = { objectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), name: await user.Name,
@@ -288,7 +307,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
         password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null }))
-      if (payload.phase === "session-probe" && result.outcome === "confirmed") {
+      if (["session-probe", "session-crash-probe"].includes(payload.phase) && result.outcome === "confirmed") {
         const snapshot = () => bounded(request, page.evaluate(async () => {
           const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
           const manager = await (await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)).GetSessionsManager()
@@ -341,7 +360,10 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 await session.ClosePackage(new Ref(item), 5000)
               }, handle))
-              return { ownSession, baseline, opened, withPackage, afterPackage: await snapshot(), sessionIdentityQualified: false }
+              const afterPackage = await snapshot()
+              // Interrupt only this owned renderer's orderly logout; the native server/RPC remains real.
+              if (payload.phase === "session-crash-probe") await probePage.evaluate(() => { window.onpagehide = null })
+              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false }
             } finally { await handle.dispose() }
           } finally { await probeContext.close() }
         })()

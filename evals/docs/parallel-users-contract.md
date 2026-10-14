@@ -469,3 +469,14 @@ validation. Native symlink с тем же допустимым содержим�
 fixture восстановила исходный marker до own pair destroy.12 pair tests
 PASS/77 assertions (26.74s), typecheck/diff PASS. Это не публикация user root
 и не квалификация остальных POSIX metadata/links.
+
+Known fixed-probe retained session закрывается только через fresh matching
+proxy при unchanged account ID/epoch/Name/CreateTime, Count0 и
+PendingDisconnect=true после writer context closure. manager.CloseSession
+ack сопровождается fresh absence до прежнего deadline; uncertain write
+остаётся unknown. Disposition rpc_closed отличается от observed_absent.
+Fixed session-crash-probe suppresses только собственный client onpagehide
+logout для native fault injection; CLI SIGKILL этим не квалифицирован.
+Native retained-row name/time refusal и actual RPC+repeat verified:
+60 admin/native/codec/preflight PASS/271 (77.49s), typecheck/diff PASS.
+Volatile binding не даёт authority после нового admin context/recovery.
