@@ -22,11 +22,17 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 17:21 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущена 21 из 31 попытки,
-закрыты 20; candidate first-last-touch/2 выполняется с CLI PID2540012. Runner PID2508678,
-exec52487 работает последовательно; текущий guard принадлежит этой попытке.
-Профиль занят, до подтверждённого завершения этой сессии новый CLI запрещён.
+Текущий checkpoint 2026-10-14 17:34 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыта21 из31 попыток;
+активных моделей нет. Exec52487 завершён1/ATTEMPT_NOT_COMPLETE после first-last-touch/2.
+CLI2540012/Host2540474gone, ACKtrue/exit0/cleanuptrue, собственный guard отсутствует.
+Отказ Export UI / Canvas outline control unavailable не дал CSV; частичный LGP
+сохранён. Исходные wrapper2/analyticsfalse/policyincomplete не изменены.
+Отдельная оценка policy-v2 и обязательное ревью отказа выполняются.
+Перед следующим explicit-js/2 нужен execution-r4 допуск штатно освобождённой
+неуспешной попытки; контракт `2026-10-14-node-selection-policy-v2-normal-release-failure.md`
+закреплён до нового dispatch. Предыдущие R3 sources readonly, index `d949fb8d…`.
+Product/runtime/criteria/matrix неизменны. Моделей и browser recovery пока не требуется.
 
 Candidate14 closed summary `87f0297c…`: policy14PASS/0violated/0insufficient,
 аналитика10correct/4notobtained, normalcompletion10/manualpostfailure4.

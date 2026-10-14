@@ -29,7 +29,8 @@ rebuild runtime не нужен.
 - [x] Минимально изменить evaluator runner/release gate по TDD, сохранить исходные source seals и получить реальный strict-release допуск v2 до следующего нового model dispatch.
 - [x] Выполнить и описательно оценить все шесть baseline на итоговом matched runtime, сохранив четыре правильных результата и два технических отказа без повторов и без сравнительного порога приёмки.
 - [x] Сохранить исходный audit при обязательном ревью аномального стандартного успеха: отдельные review/verdict, минимальный runner R3 по TDD, независимый review и проспективный strict-release допуск.
-- [ ] Закончить неизменную матрицу31 и оценить все25candidate поv2 (14 закрыты, first-last-touch/2 выполняется, ещё10 не начаты).
+- [ ] Добавить узкий policy-only допуск стандартного отказа с штатным release, сохранив исходные результаты: TDD, независимое ревью и execution-r4 до следующей модели.
+- [ ] Закончить неизменную матрицу31 и оценить все25candidate поv2 (15 закрыты, отдельная policy-v2 оценка15-й ожидается, ещё10 не начаты).
 - [ ] Завершить обязательные reviews всех исключений/отказов/аномалий и трёх seeded standard successes.
 - [ ] Подготовить итог с тремя независимыми оценками и решить приёмку политики по достаточности доказательств.
 
@@ -38,11 +39,17 @@ Criteria v2 `5b5053d1…`, lock `2c36d0cd…`, user authorization `aeff1714…`
 блокирующих расхождений. Исходный protocol834620b9… и его76source копий сохранены; новый runtime
 или model process ради переоценки не создавался.
 
-Текущий checkpoint 2026-10-14 17:21 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущена 21 из 31 попытки,
-закрыты 20; candidate first-last-touch/2 выполняется с CLI PID2540012. Runner PID2508678,
-exec52487 работает последовательно; текущий guard принадлежит этой попытке.
-Профиль занят, до подтверждённого завершения этой сессии новый CLI запрещён.
+Текущий checkpoint 2026-10-14 17:34 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыта21 из31 попыток;
+активных моделей нет. Exec52487 завершён1/ATTEMPT_NOT_COMPLETE после first-last-touch/2.
+CLI2540012/Host2540474gone, ACKtrue/exit0/cleanuptrue, собственный guard отсутствует.
+Отказ Export UI / Canvas outline control unavailable не дал CSV; частичный LGP
+сохранён. Исходные wrapper2/analyticsfalse/policyincomplete не изменены.
+Отдельная оценка policy-v2 и обязательное ревью отказа выполняются.
+Перед следующим explicit-js/2 нужен execution-r4 допуск штатно освобождённой
+неуспешной попытки; контракт `2026-10-14-node-selection-policy-v2-normal-release-failure.md`
+закреплён до нового dispatch. Предыдущие R3 sources readonly, index `d949fb8d…`.
+Product/runtime/criteria/matrix неизменны. Моделей и browser recovery пока не требуется.
 
 Candidate14 closed summary `87f0297c…`: policy14PASS/0violated/0insufficient,
 аналитика10correct/4notobtained, normalcompletion10/manualpostfailure4.
