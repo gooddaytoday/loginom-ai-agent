@@ -4119,25 +4119,17 @@ test('Group blank summary may reuse the final data-cell tid without becoming act
 });
 
 
-test('scan time budget accepts 500 ms but rejects 501 ms before issuing references', async () => {
-  for (const elapsed of [500, 501]) {
-    const clock = fixtureClock(), page = new Page({ clock: clock.Date });
-    page.add('button', 'Safe;btnAction', 'Action');
-    const query = page.document.querySelectorAll.bind(page.document);
-    let first = true;
-    page.document.querySelectorAll = selector => {
-      if (first) { first = false; clock.advance(elapsed); }
-      return query(selector);
-    };
-    const outcome = await page.execute({ mode: 'observe', discover_roots: true });
-    assert.equal(outcome.status, elapsed === 500 ? 'SUCCEEDED' : 'NOT_APPLIED');
-    if (elapsed === 501) {
-      assert.equal(outcome.error.code, 'UI_SCAN_LIMIT');
-      assert.equal(outcome.output.scan.complete, false);
-      assert.equal(outcome.output.ui, undefined);
-      assert.equal(outcome.effect_possible, false);
-    }
-    assert.deepEqual(page.events, []);
+test('scan time bounds distinguish non-actionable roots and detailed observations', async () => {
+  for (const [discoverRoots,limit] of [[true,2000],[false,500]]) for (const elapsed of [limit,limit+1]) {
+    const clock=fixtureClock(),page=new Page({clock:clock.Date});
+    page.add('button','Safe;btnAction','Action');
+    const query=page.document.querySelectorAll.bind(page.document);let first=true;
+    page.document.querySelectorAll=selector=>{if(discoverRoots&&first){first=false;clock.advance(elapsed)}return query(selector)};
+    const walk=page.document.createTreeWalker.bind(page.document);page.document.createTreeWalker=(...args)=>{if(!discoverRoots&&first){first=false;clock.advance(elapsed)}return walk(...args)};
+    const outcome=await page.execute({mode:'observe',discover_roots:discoverRoots});
+    assert.equal(outcome.status,elapsed===limit?'SUCCEEDED':'NOT_APPLIED',JSON.stringify({discoverRoots,elapsed,outcome}));
+    if(elapsed>limit){assert.equal(outcome.error.code,'UI_SCAN_LIMIT');assert.equal(outcome.output.scan.complete,false);assert.equal(outcome.output.ui,undefined);assert.equal(outcome.effect_possible,false)}
+    assert.deepEqual(page.events,[]);
   }
 });
 
@@ -5182,5 +5174,20 @@ test('Amount type controls scan preserves one postgesture effect and reports the
   assert.equal(failed.max_work,250000);assert.equal(failed.max_elements,6000);
   assert.ok(failed.document_epoch);assert.ok(failed.work>0);assert.ok(failed.visited_elements>0);
   assert.equal(col.cells[2].ownText,'Строковый');
+ }
+});
+
+test('contended root discovery is bounded independently of actionable scans',async()=>{
+ for(const [discover,elapsed,success] of [[true,1200,true],[true,2000,true],[true,2001,false],[false,501,false]]){
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  const query=page.document.querySelectorAll.bind(page.document);let charged=false;
+  page.document.querySelectorAll=(selector)=>{if(discover&&!charged){charged=true;clock.advance(elapsed)}return query(selector)};
+  const walk=page.document.createTreeWalker.bind(page.document);page.document.createTreeWalker=(...args)=>{if(!discover&&!charged){charged=true;clock.advance(elapsed)}return walk(...args)};
+  const result=await page.execute({mode:'observe',discover_roots:discover});
+  if(success){
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.output.observation_kind,'roots');
+   assert.equal(result.output.scan.max_ms,2000);assert.ok(result.output.ui.elements.every(e=>e.allowed_actions.length===0));
+  }else{assert.equal(result.error?.code,'UI_SCAN_LIMIT',JSON.stringify({discover,elapsed,result}));assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true)}
+  assert.deepEqual(page.events,[]);
  }
 });

@@ -108,7 +108,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
     // Retain failed-read measurements across the browser realm without exporting partial action refs.
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
-    let maxMs = 500;
+    // Root discovery issues only region references with no allowed actions.
+    // Under renderer contention even this small bounded scan can take >500ms.
+    // Actionable observations retain 500ms; retries never extend the parent deadline.
+    let maxMs = discoverRoots ? 2000 : 500;
     let work = 0,scanStage='collect',visitedElements=0,scanRootTid=null,documentEpoch=null;
     try {
     const charge = () => {
