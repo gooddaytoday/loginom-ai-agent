@@ -343,3 +343,15 @@ cleanuptrue: policy/oracle/calculation/history/identity/graph/export PASS, JS0;
 Session ses_ec841c075ffe63Lv3f42lwlzZ3. Baseline completed2/18/candidate0/25;
 ABC/Pareto1 сейчасactive root85644. Все18baseline обязательны доcandidatefirst9;
 baseline semanticmanualreview не добавляется.
+
+
+На 2026-10-14 00:27 UTC в итоговой серии `20261013T233119Z-4699a5`
+завершены 3/18 baseline и 0/25 candidate. `abc-pareto-groups/1`
+(Session `ses_ec83bda4cffeSynVwFH3wCzQvZ`) завершился с CLI exit 0,
+wrapper exit 1, oracle и полным расчётом PASS, cleanup подтверждён.
+Два JS-узла дали policy failure `JAVASCRIPT_NOT_ALLOWED`: этот исход baseline
+сохранён как замер исходного skill, без повторного запуска или исключения
+из denominator. SHA attempt `793a8112…`, audit `371e128f…`.
+После завершения root85644 и проверки отсутствия `.writer` запущен
+`monthly-demand/1` (root2256). Следующий плановый слот —
+`risky-approved-claims/1`. Полная серия и приёмка ещё не завершены.
