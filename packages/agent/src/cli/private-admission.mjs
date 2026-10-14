@@ -72,7 +72,13 @@ export function receivePrivateAdmission(argv=process.argv){
  // Consume/close the inherited bootstrap BEFORE returning the first Promise.
  let b;try{b=bootstrap()}catch(e){originalPromise=Promise.reject(e);return originalPromise}
  if(!b){originalPromise=Promise.resolve();return originalPromise}
- const argvRef=argv,argvCheck=snapshot(argv),exec=process.execPath,argvHash=hash([exec,...argv.slice(1)])
+ const argvRef=argv,argvCheck=snapshot(argv),exec=process.execPath
+ const kernel=readFileSync('/proc/self/cmdline'),text=kernel.toString('utf8')
+ if(!kernel.equals(Buffer.from(text,'utf8'))||!text.endsWith('\0')){originalPromise=Promise.reject(error('ARGV'));return originalPromise}
+ // Bun compiled binaries project a synthetic argv[1]. Authenticate the actual
+ // OS/Popen vector, never a normalized/relabelled JS projection.
+ const argvHash=hash(text.slice(0,-1).split('\0'))
+ const kernelCheck=()=>{if(!kernel.equals(readFileSync('/proc/self/cmdline')))throw error('ARGV')}
  originalPromise=(async()=>{
   const socket=connect(b.endpoint),key=Buffer.from(b.key,'hex'),nonce=randomBytes(32).toString('hex');let pending,buffer=Buffer.alloc(0),first,secondary=[],finished=false,deadline,timer
   function remember(e){if(first)secondary.push({value:e});else first={value:e};if(pending){const p=pending;pending=undefined;p.reject(first.value)}}
@@ -80,7 +86,7 @@ export function receivePrivateAdmission(argv=process.argv){
   const eof=()=>{if(!finished)remember(error('EOF'))}
   socket.on('error',fail);socket.on('end',eof)
   socket.on('data',chunk=>{buffer=Buffer.concat([buffer,chunk]);if(buffer.length>LIMIT){remember(error('FRAME'));socket.destroy();return}pump()})
-  function guard(){if(first)throw first.value;if(argv!==argvRef||process.argv!==argvRef||process.execPath!==exec)throw error('ARGV');argvCheck();if(deadline!==undefined&&BigInt(Date.now())*1000000n>=deadline)throw error('EXPIRED')}
+  function guard(){if(first)throw first.value;if(argv!==argvRef||process.argv!==argvRef||process.execPath!==exec)throw error('ARGV');argvCheck();kernelCheck();if(deadline!==undefined&&BigInt(Date.now())*1000000n>=deadline)throw error('EXPIRED')}
   function pump(){if(!pending)return;const i=buffer.indexOf(10);if(i<0)return;const p=pending;pending=undefined;const data=buffer.subarray(0,i);buffer=buffer.subarray(i+1);try{const text=data.toString('utf8'),frame=parse(text);if(!Buffer.from(text,'utf8').equals(data)||canonical(frame)!==text)throw error('CANONICAL');p.resolve(frame)}catch(e){remember(e);p.reject(first.value)}}
   function read(){guard();return new Promise((resolve,reject)=>{pending={resolve,reject};pump()})}
   async function send(v){guard();await new Promise((resolve,reject)=>socket.write(canonical(v)+'\n',e=>e?reject(e):resolve()));guard()}
@@ -97,7 +103,7 @@ export function receivePrivateAdmission(argv=process.argv){
    await send({mac:mac('response',t)});const g=await read();guard();fields(g,['stage','mac']);if(g.stage!=='grant')throw error('STAGE');match(g.mac,'grant',t)
    await send({mac:mac('ack',t)});const a=await read();guard();fields(a,['stage','mac']);if(a.stage!=='accepted')throw error('STAGE');match(a.mac,'accepted',t)
    if(buffer.length)throw error('REPLAY');finished=true
-   admitted={deadline,argv:argvRef,argvCheck,exec};socket.end()
+   admitted={deadline,argv:argvRef,argvCheck:()=>{argvCheck();kernelCheck()},exec};socket.end()
   }catch(e){if(!first||!Object.is(first.value,e))remember(e);throw first.value}finally{clearTimeout(timer);key.fill(0);socket.destroy();socket.once('close',()=>{socket.removeListener('error',fail);socket.removeListener('end',eof)})}
  })()
  return originalPromise

@@ -7,7 +7,7 @@ inherited descriptor is closed, one bounded line is read, and both descriptors
 are closed before the first await. No FD/key/receipt alone is authority.
 
 Duplicate fields, noncanonical ASCII frames and incorrect staged HMAC/bindings
-refuse. Original argv digest and BigInt absolute deadline retain exact bytes;
+refuse. Original argv digest is the kernel/Popen cmdline (Bun JS argv adds a synthetic element), while original JS argv refs also stay guarded. BigInt absolute deadline retains exact bytes;
 producer birth/lifetime and pinned producer hash are checked. Grant alone is
 pending; only accepted completes. Same receiver returns original Promise, never
 remints. A receiver outcome is not child exit or native/SDK rights.
