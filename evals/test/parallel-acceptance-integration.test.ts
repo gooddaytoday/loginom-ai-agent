@@ -39,6 +39,38 @@ test("server filesystem sampling binds private container storage and preserves i
     const after = await Bun.$`docker --host unix:///var/run/docker.sock exec ${id} sha256sum /workdir/UserStorage/sentinel`.quiet().nothrow()
     expect(after.exitCode).toBe(0)
     expect(after.text()).toBe(before.text())
+    const root = await mkdtemp(path.join(os.tmpdir(), "evals-server-filesystem-frames-")), out = path.join(root, "samples.jsonl")
+    const abort = new AbortController()
+    const pending = collectHostResources({ paths: [root], out, intervalMs: 1000, runId: "storage-frames", phase: "run", signal: abort.signal,
+      containers: [{ role: "server", id, name, image, nonce, purpose: "research" }] })
+    try {
+      const framesDeadline = Date.now() + 5000
+      while (!await Bun.file(out).exists() || !(await Bun.file(out).text()).includes("\n")) {
+        if (Date.now() > framesDeadline) throw Error("Storage frame did not arrive")
+        await Bun.sleep(10)
+      }
+      abort.abort()
+      await pending
+      const rows = (await Bun.file(out).text()).trim().split("\n").map(line => JSON.parse(line))
+      expect(rows[0].containers[0].storage?.container_id).toBe(id)
+      expect(rows[0].containers[0].storage?.epoch_stable).toBe(true)
+      expect(rows[0].containers[0].storage?.filesystems[0].capacity.total_bytes).toBe(16 * 1024 * 1024)
+      expect(JSON.stringify(rows)).not.toContain("storage-private-env-canary")
+      expect((await writeResourceSummary({ samplesFile: out, out: path.join(root, "summary.json") })).summary.samples).toBe(rows.length)
+      const corrupted = path.join(root, "corrupted.jsonl"), rejected = path.join(root, "rejected-summary.json")
+      const storage = rows[0].containers[0].storage
+      await writeFile(corrupted, JSON.stringify({ ...rows[0], containers: [{ ...rows[0].containers[0], storage: { ...storage,
+        filesystems: storage.filesystems.map((file: typeof sample.filesystems[number]) => ({ ...file, capacity: { ...file.capacity, available_bytes: "malformed-counter-canary" } })) } }] }) + "\n", { mode: 0o600 })
+      await expect(writeResourceSummary({ samplesFile: corrupted, out: rejected })).rejects.toThrow("RESOURCE_SAMPLES_INVALID")
+      expect(await Bun.file(rejected).exists()).toBe(false)
+      for (const [index, change] of [{ epoch_stable: "true" }, { container_id: "short-id" },
+        { inspect: { ...storage.inspect, pid: "malformed-counter-canary" } }, { filesystems: "malformed-filesystem-canary" }].entries()) {
+        const source = path.join(root, `bad-storage-${index}.jsonl`), summary = path.join(root, `bad-storage-${index}.json`)
+        await writeFile(source, JSON.stringify({ ...rows[0], containers: [{ ...rows[0].containers[0], storage: { ...storage, ...change } }] }) + "\n", { mode: 0o600 })
+        await expect(writeResourceSummary({ samplesFile: source, out: summary })).rejects.toThrow("RESOURCE_SAMPLES_INVALID")
+        expect(await Bun.file(summary).exists()).toBe(false)
+      }
+    } finally { abort.abort(); await pending; await rm(root, { recursive: true, force: true }) }
     expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${id} rmdir /workdir/SessionBackup`.quiet().nothrow()).exitCode).toBe(0)
     const partial = await sampleServerFilesystems({ role: "server", id, name, image, nonce, purpose: "research" })
     expect(partial.epoch_stable).toBe(true)

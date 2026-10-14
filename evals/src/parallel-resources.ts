@@ -146,10 +146,10 @@ function matchesResourceContainer(inspect: Awaited<ReturnType<typeof containerIn
 }
 
 async function sampleBoundContainerResources(target: ResourceContainer) {
-  const sample = await sampleContainerResources(target.id)
+  const [sample, storage] = await Promise.all([sampleContainerResources(target.id), target.role === "server" ? sampleServerFilesystems(target) : null])
   if (matchesResourceContainer(sample.inspect, target))
-    return { ...sample, role: target.role }
-  return { ...sample, role: target.role, cpu: null, memory: null, pids: null, io: null, raw_stats: null, cgroup: null,
+    return { ...sample, role: target.role, storage }
+  return { ...sample, role: target.role, cpu: null, memory: null, pids: null, io: null, raw_stats: null, cgroup: null, storage: null,
     errors: [...sample.errors, "CONTAINER_IDENTITY_UNVERIFIED"] }
 }
 

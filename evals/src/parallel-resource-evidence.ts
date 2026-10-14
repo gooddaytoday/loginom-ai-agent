@@ -121,11 +121,13 @@ function validHostResources(value: unknown) {
     !cpu.ticks.every(value => Number.isSafeInteger(value) && Number(value) >= 0))) return false
   if (host.memory !== null && !["available_bytes", "total_bytes", "swap_free_bytes", "swap_total_bytes"]
     .every(key => Number.isSafeInteger(memory[key]) && Number(memory[key]) >= 0)) return false
-  return Array.isArray(host.filesystems) && host.filesystems.every(value => {
-    const file = resourceObject(value), capacity = resourceObject(file.capacity)
-    return typeof file.path === "string" && (file.capacity === null || ["available_bytes", "total_bytes", "available_inodes", "total_inodes"]
-      .every(key => Number.isSafeInteger(capacity[key]) && Number(capacity[key]) >= 0))
-  })
+  return Array.isArray(host.filesystems) && host.filesystems.every(validResourceFilesystem)
+}
+
+function validResourceFilesystem(value: unknown) {
+  const file = resourceObject(value), capacity = resourceObject(file.capacity)
+  return typeof file.path === "string" && (file.capacity === null || ["available_bytes", "total_bytes", "available_inodes", "total_inodes"]
+    .every(key => Number.isSafeInteger(capacity[key]) && Number(capacity[key]) >= 0))
 }
 
 function validCgroupResources(value: unknown): boolean {
@@ -185,14 +187,10 @@ function validContainerResources(value: unknown) {
   if (value === null || value === undefined) return true
   if (!Array.isArray(value)) return false
   return value.every(value => {
-    const container = resourceObject(value), inspect = resourceObject(container.inspect)
+    const container = resourceObject(value)
     if (typeof container.container_id !== "string" || !/^[0-9a-f]{64}$/.test(container.container_id) ||
       typeof container.epoch_stable !== "boolean" || container.role !== undefined && !["server", "studio"].includes(String(container.role))) return false
-    if (container.inspect !== null && container.inspect !== undefined && (inspect.id !== container.container_id || typeof inspect.image !== "string" ||
-      typeof inspect.name !== "string" || typeof inspect.started_at !== "string" || typeof inspect.running !== "boolean" || typeof inspect.oom_killed !== "boolean")) return false
-    if (container.inspect !== null && container.inspect !== undefined && (!validContainerCounters(inspect, ["pid", "memory_bytes", "nano_cpus", "cpu_period"]) ||
-      ["memory_swap_bytes", "cpu_quota", "pids_limit"].some(key => inspect[key] !== null && inspect[key] !== undefined &&
-        (!Number.isSafeInteger(inspect[key]) || Number(inspect[key]) < -1)))) return false
+    if (!validContainerInspection(container.container_id, container.inspect) || !validServerStorage(container.storage)) return false
     if (!validContainerCounters(container.cpu, ["total_usage_ns", "system_cpu_usage_ns", "online_cpus"]) ||
       !validContainerCounters(container.memory, ["current_bytes", "limit_bytes"]) || !validContainerCounters(container.pids, ["current"]) ||
       !validCgroupResources(container.cgroup)) return false
@@ -202,6 +200,21 @@ function validContainerResources(value: unknown) {
       return typeof entry.op === "string" && ["major", "minor", "bytes"].every(key => Number.isInteger(entry[key]) && Number(entry[key]) >= 0)
     })
   })
+}
+
+function validServerStorage(value: unknown) {
+  if (value === null || value === undefined) return true
+  const storage = resourceObject(value)
+  return typeof storage.container_id === "string" && /^[0-9a-f]{64}$/.test(storage.container_id) && typeof storage.epoch_stable === "boolean" &&
+    validContainerInspection(storage.container_id, storage.inspect) && Array.isArray(storage.filesystems) && storage.filesystems.every(validResourceFilesystem)
+}
+
+function validContainerInspection(id: unknown, value: unknown) {
+  if (value === null || value === undefined) return true
+  const inspect = resourceObject(value)
+  return inspect.id === id && typeof inspect.image === "string" && typeof inspect.name === "string" && typeof inspect.started_at === "string" &&
+    typeof inspect.running === "boolean" && typeof inspect.oom_killed === "boolean" && validContainerCounters(inspect, ["pid", "memory_bytes", "nano_cpus", "cpu_period"]) &&
+    ["memory_swap_bytes", "cpu_quota", "pids_limit"].every(key => inspect[key] === null || inspect[key] === undefined || Number.isSafeInteger(inspect[key]) && Number(inspect[key]) >= -1)
 }
 
 function validContainerCounters(value: unknown, keys: string[]) {

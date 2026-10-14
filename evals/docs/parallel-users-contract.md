@@ -53,7 +53,12 @@ sampleServerFilesystems читает только fixed UserStorage/SessionBacku
 PID/startedAt проверяются вокруг read-only stat probe. CLI environment PATH-only,
 stat environment очищен; неизвестный root даёт null, healthy root сохраняется.
 Host filesystem не подставляется. Primitive проверен на bounded pinned image
-с tmpfs/sentinel; periodic frame/schema/summary и live admission ещё не wired.
+с tmpfs/sentinel; summary/coverage и live admission ещё не wired.
+Periodic collector сохраняет independent storage snapshot в Server frame,
+Studio storage=null. Source schema проверяет metadata/capacity types и сохраняет
+nullable unknown; повреждённый storage не получает summary output. Sub-snapshot
+может наблюдать иной epoch, поэтому reducer/coverage обязаны сверять его identity
+с container frame до numeric credit. Этот semantic binding ещё требуется.
 
 ## Конфигурация и граница режимов
 
