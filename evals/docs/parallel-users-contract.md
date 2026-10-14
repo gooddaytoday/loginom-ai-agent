@@ -463,3 +463,9 @@ closure. Ответ observed_absent отличает этот путь от ис
 Foreign/missing proof и changed tuple отвергаются. Retained row остаётся
 unsupported до отдельной native mutation qualification. In-memory map не
 заменяет durable ledger/recovery и не выдаёт общей readiness.
+
+Physical pair marker проверяется как regular non-symlink file до cat/JSON
+validation. Native symlink с тем же допустимым содержимым отказал PAIR_MARKER;
+fixture восстановила исходный marker до own pair destroy.12 pair tests
+PASS/77 assertions (26.74s), typecheck/diff PASS. Это не публикация user root
+и не квалификация остальных POSIX metadata/links.

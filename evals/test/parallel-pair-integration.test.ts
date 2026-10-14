@@ -45,6 +45,12 @@ integration("research pair: real create qualifies private route and epoch withou
     } finally {
       await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/.loginom-evals-isolated.json'} sh ${marker}`.quiet()
     }
+    try {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'mv "$1" "$1.control" && ln -s "$1.control" "$1"'} sh /workdir/.loginom-evals-isolated.json`.quiet()
+      await expect(verifyParallelPair(file, created.identity)).rejects.toThrow("PAIR_MARKER")
+    } finally {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'rm "$1" && mv "$1.control" "$1"'} sh /workdir/.loginom-evals-isolated.json`.quiet()
+    }
     const components = (await Bun.$`docker exec ${created.identity.containerId} cat /workdir/Components.cfg`.quiet()).text()
     try {
       await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/Components.cfg'} sh ${components.replace('Disabled="true"', 'Disabled="false"')}`.quiet()

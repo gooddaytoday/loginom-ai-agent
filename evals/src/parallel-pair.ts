@@ -331,6 +331,8 @@ async function verifyPair(file: SlotFile, journal: PairJournal) {
   const server = await inspectContainer(journal.resources.server!)
   const studio = await inspectContainer(journal.resources.studio!)
   verifyTopology(file, journal, server, studio)
+  if ((await docker(["exec", server.Id, "sh", "-c", 'test -f "$1" && ! test -L "$1"', "sh", "/workdir/.loginom-evals-isolated.json"])).code !== 0)
+    throw new EvalFailure("PAIR_MARKER", 2)
   const marker = JSON.parse(await dockerText(["exec", server.Id, "cat", "/workdir/.loginom-evals-isolated.json"])) as ReturnType<typeof usersMarker>
   if (!marker || typeof marker !== "object" || Array.isArray(marker) || Object.keys(marker).length !== 6 ||
     marker.kind !== "loginom-evals-users" || marker.version !== 2 || marker.container_id !== server.Id || marker.owner_nonce !== journal.nonce ||
