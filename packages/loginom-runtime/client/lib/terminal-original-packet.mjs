@@ -86,7 +86,23 @@ export function captureTerminalLoadedExports(loaded) {
     checkGraph();};
   check();loads.set(token,{binding,definitions,source,exportRefs,check});return token;
 }
-export function captureTerminalInitialCustody({custody,native,loaded,preparation}) {
+function invocationCustody(invocation) {
+  if(invocation===undefined)return ()=>{};
+  const refs=take(invocation,['source','input','control']);
+  const objects=[invocation,...Object.values(refs),data(refs.input,'compatibility')];
+  const originals=objects.map(object=>({object,prototype:Object.getPrototypeOf(object),
+    descriptors:Reflect.ownKeys(object).map(key=>{const d=Object.getOwnPropertyDescriptor(object,key);
+      if(!('value' in d))fail('INVOCATION_ACCESSOR');return [key,d]})}));
+  return ()=>{for(const {object,prototype,descriptors} of originals){
+    const keys=Reflect.ownKeys(object);
+    if(Object.getPrototypeOf(object)!==prototype||keys.length!==descriptors.length)fail('INVOCATION_REPLACED');
+    descriptors.forEach(([key,original],index)=>{const d=Object.getOwnPropertyDescriptor(object,key);
+      if(keys[index]!==key||!d||!('value' in d)||!Object.is(d.value,original.value)
+        ||d.writable!==original.writable||d.enumerable!==original.enumerable||d.configurable!==original.configurable)
+        fail('INVOCATION_REPLACED');});
+  }};
+}
+export function captureTerminalInitialCustody({custody,native,loaded,preparation,invocation}) {
   const load=loads.get(loaded);if(!load)fail('LOAD_REQUIRED');load.check();
   const owner=take(custody,ownerKeys),nativeRefs=take(native,nativeKeys);
   if(Object.entries(owner).some(([key,value])=>!['refusal','path'].includes(key)&&(value===undefined||value===null))
@@ -111,10 +127,12 @@ export function captureTerminalInitialCustody({custody,native,loaded,preparation
     if(Object.values(values).some(value=>!Number.isInteger(value)||value<0))fail('DISCONNECTED');
     return {proxy,identity,values};
   });
+  const checkInvocation=invocationCustody(invocation);
   const check=()=>{
     AbortSignal.prototype.throwIfAborted.call(owner.signal);
     if(data(owner.signal,'throwIfAborted')!==AbortSignal.prototype.throwIfAborted)fail('SIGNAL_METHOD');
     if(Date.now()>=owner.deadline)fail('DEADLINE');
+    checkInvocation();
     same(custody,owner);same(native,nativeRefs);same(preparation,preparationRefs);receiptReader.check();load.check();same(nativeRefs.nativeSession,dependency);
     same(owner.page,pageMethods);if(pageMethods.url.call(owner.page)!==originalUrl)fail('PAGE_URL');
     if(data(dependency.$M,'GetDynamicData')!==messageMethod)fail('DEPENDENCY');

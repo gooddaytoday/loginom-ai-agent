@@ -31,7 +31,8 @@ async function setup(budget=60000,beforeInitial){
   documentId:preparation.id,account:'test-account',session:'own-session',operationId:'own-prepare',
   signal:controller.signal,deadline:Date.now()+budget,path:null,pending:false,running:false,unknown:false,writerPending:false,dirty:false,targetSelected:false};
  const receivers={currentUser:native.original.currentUser,fileStorage:native.storage,nativeSession:native.session};
- if(beforeInitial)beforeInitial({native,page,preparation,loaded,custody,receivers});
+ if(typeof beforeInitial==='function')beforeInitial({native,page,preparation,loaded,custody,receivers});
+ if(beforeInitial==='retain-only')return {native,page,preparation,loaded,custody,receivers,controller};
  const load=captureTerminalLoadedExports(loaded);
  const initial=captureTerminalInitialCustody({custody,native:receivers,loaded:load,preparation});
  const prepare=()=>runInNewContext(makeWorkspacePrepareCode({loginomUrl:'http://loginom.example/app?testable=true',
