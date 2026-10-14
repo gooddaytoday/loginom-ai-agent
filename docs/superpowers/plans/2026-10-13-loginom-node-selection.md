@@ -2600,7 +2600,7 @@ Product/payload unchanged, Root idle/model0. Any Product change requires a new
 matched pair and all native gates/full18+25; current050544 no model slots run.
 
 Следующие отдельные пункты завершать и коммитить по одному:
-- [ ] После independent design review реализовать scoped own Export LABEL click
+- [x] После independent design review реализовать scoped own Export LABEL click
   через TDD в text-export-node.mjs. Actual tooltip/label geometry, один click
   после own reveal, fresh native rebind, persistent cover/foreign/stale/locked/
   masked/no-label negatives; visible/no-reveal без click. 9hit guard не менять.
@@ -2649,3 +2649,27 @@ Next-pair подготовка `08c944c76e85cff7e22bec70e1e675f29c0d800552b27a9d
 existing build/verify pipeline, baseline verify до restore2skills; новая initial
 matrix сразу actual3arg, прежний schedule9→clean→18→16. Build checkout не менялся,
 сборки/новые payload не стартовали; требуется новый чистый source commit.
+
+
+LABEL TDD source завершён 2026-10-14 06:45 UTC: только16lines в
+text-export-node.mjs и actual factory/native-protocol tests. Product SHA
+`d6543f396964351173bdf38532cad5f9db33e449162d61a310beb56228d8dbfd`;
+test SHA `0e60290d16510a388c90fa8206e54af93048eb08b2598a06a46c23843315f076`.
+Author vertical RED exactno-point→GREEN one ownlabel→nativeinputwizard,
+34focusedPASS/0skip/syntax0/diffcheck0, verification
+`2b3187e16a7a3766bcbe2e6e3169d600acf3d8c5c09fa8082a871bec4f2ef320`.
+Covered/missing/duplicate/foreign/script/disabled label, persistent port cover,
+owner drift, target fingerprint, fresh DOMref replacement and both lock
+boundaries tested. Visible/no own reveal does not add label click.
+
+Independent source review Approved
+`4352deffe2020a845499cbe6286d2cccd457302b829f9763f9a1449121524465`:
+34independentPASS,5sharedguards/38originals/actualjournalrefs unchanged,
+no shared observer/channel/port/API/catalog/JSgrant changes. Root expanded
+focused395/395PASS/0skip, started06:41:53.598Z→06:44:35.874Z, receipt
+`3992aa1004a3aa01cb9917a13000cbac89e203683f5731a184dd961b409e298f`,
+command6a684653…/log6a93185f…, source hashes unchanged. Wrapper syntax error
+before first execution created no artifacts/tests; corrected command ran once.
+Full runtime suite pending; review/checks checkbox remains open. New build
+and actual ordinary tooltip disappearance/mapping/CSV/Save/cleanup remain
+required, all43models fresh on final pair. No live/acceptance upgrade yet.

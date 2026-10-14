@@ -71,6 +71,22 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
      const fresh=await channel.observe({condition:'export input after canvas scroll',ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
      need(['document_id','workflow_id','node_id','tid'].every(k=>fresh.prepared_node_context[k]===graph.prepared_node_context[k])
       &&['container_ref','container_tid','native_prefix'].every(k=>fresh.graph_identity?.[k]===owner[k]),'Export input graph changed during scroll');
+     const revealed=one(fresh.ui.elements.filter(e=>e.kind==='port'&&e.tid?.startsWith(fresh.prepared_node_context.tid+';Input_Data-')));
+     if(revealed.interaction?.state==='point_not_observed') {
+      // Select the owned label through ordinary UI guards; never dismiss or ignore a covering element.
+      const label=one(fresh.ui.elements.filter(e=>e.tid===fresh.prepared_node_context.tid+';Label;Label'));
+      need(label.scope==='graph'&&label.graph_node?.part==='label'&&label.signature?.native_graph?.status==='non_script'
+       &&label.scroll?.ref===owner.container_ref&&label.visible===true&&label.enabled===true
+       &&label.interaction?.state==='point_observed'&&label.allowed_actions.includes('click'),'Export input has no observed own label');
+      await channel.perform({condition:'select own export label after reveal',initialObservation:fresh,
+       ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent',
+       identity:s=>({node:s.prepared_node_context,owner:s.graph_identity,
+        port:s.ui.elements.filter(e=>e.ref===revealed.ref),label:s.ui.elements.filter(e=>e.ref===label.ref)}),
+       resolve:()=>({verb:'click',ref:label.ref})});
+      const selected=await channel.observe({condition:'export input after own label selection',ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+      need(['document_id','workflow_id','node_id','tid'].every(k=>selected.prepared_node_context[k]===fresh.prepared_node_context[k])
+       &&['container_ref','container_tid','native_prefix'].every(k=>selected.graph_identity?.[k]===owner[k]),'Export input graph changed during label selection');
+     }
     }
     await channel.openInputPort(0);
     const s=await channel.observe({condition:'complete native export input mapping',readMappings:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
