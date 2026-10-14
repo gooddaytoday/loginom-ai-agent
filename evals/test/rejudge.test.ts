@@ -8,8 +8,63 @@ import { main } from "../src/run"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { rejudge } from "../src/rejudge"
 import type { RunSummary } from "../src/report"
+import { parallelFixture } from "./helpers/parallel-fixture"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("judge-only reads a legacy summary without adding slot fields or changing quality denominators", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-legacy-slots-"))
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }
+  try {
+    const run = await main(["--dry-run"], env)
+    const file = Bun.file(path.join(run.runDir!, "summary.json"))
+    const legacy = await file.json() as RunSummary
+    delete legacy.slots
+    delete legacy.config.parallel
+    legacy.tasks.forEach(task => task.attempts.forEach(attempt => { delete attempt.slot_id }))
+    await Bun.write(file, JSON.stringify(legacy))
+    expect((await main(["--judge-only", legacy.run_id], env)).code).toBe(0)
+    const after = await file.json() as RunSummary
+    expect(after.slots).toBeUndefined()
+    expect(after.config.parallel).toBeUndefined()
+    expect(after.tasks.flatMap(task => task.attempts).every(attempt => attempt.slot_id === undefined)).toBe(true)
+    expect(after.metrics.total).toBe(3)
+    expect(after.metrics.completed).toBe(1)
+    expect(after.metrics.pass_evaluated_count).toBe(3)
+    expect(after.metrics.pass_rate).toBeCloseTo(1 / 3, 3)
+    expect(after.metrics.mean_score).toBe(33.3)
+    expect(await Bun.file(path.join(run.runDir!, "summary.prev.json")).json()).toEqual(legacy)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("judge-only preserves parallel slot metadata and counts an infra retry once", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-slots-"))
+  try {
+    const fixture = await parallelFixture(root, ["parallel-infra-retry", "parallel-fast"])
+    const env = { ...fixture.env, JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"], env,
+      { fixture: { slots: fixture.slots, lockRoot: fixture.lockRoot } })
+    expect(run.code).toBe(0)
+    const file = Bun.file(path.join(run.runDir!, "summary.json"))
+    const before = await file.json() as RunSummary
+    const attempts = before.tasks.flatMap(task => task.attempts)
+    expect(attempts).toHaveLength(2)
+    expect(attempts.filter(attempt => attempt.infra_retry)).toHaveLength(1)
+    expect(new Set(attempts.map(attempt => attempt.slot_id)).size).toBe(2)
+    expect((await main(["--judge-only", before.run_id], env)).code).toBe(0)
+    const after = await file.json() as RunSummary
+    expect(after.slots).toEqual(before.slots)
+    expect(after.config.parallel).toBe(2)
+    expect(after.tasks.flatMap(task => task.attempts).map(attempt => [attempt.task_id, attempt.attempt, attempt.slot_id, attempt.duration_ms, attempt.infra_retry]))
+      .toEqual(attempts.map(attempt => [attempt.task_id, attempt.attempt, attempt.slot_id, attempt.duration_ms, attempt.infra_retry]))
+    expect(after.metrics.total).toBe(2)
+    expect(after.metrics.pass_evaluated_count).toBe(2)
+    expect(after.metrics.infra_error_count).toBe(1)
+    expect(after.metrics.total_duration_ms).toBe(before.metrics.total_duration_ms)
+    expect(after.metrics.total_cost).toBe(before.metrics.total_cost)
+    expect(await Bun.file(path.join(run.runDir!, "summary.prev.json")).json()).toEqual(before)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 40_000)
 
 test("rejudge removes its SIGINT handler after success and failed result persistence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-signal-"))
