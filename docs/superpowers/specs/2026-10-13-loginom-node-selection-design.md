@@ -1673,3 +1673,43 @@ Calculator выполняется. Actual7standard prefix, Export3position900,64
 no early Save сохраняются. Clipping/scroll/CSV/graph/финальный cleanup ещё
 не подтверждены. Другие native/CLI/admin/модели не запускаются одновременно;
 model slots0, current-run ещё historical233119. Цель и stages live/18+25 открыты.
+
+
+На 2026-10-14 05:43 UTC original ordinary8node clipped proof Root25228
+завершён exit3 до Export: GroupLast group-last-1 AMBIGUOUS/open/
+WIZARD_OPEN_NOT_CONFIRMED/cleanupfalse; Import/Calc/GroupFirst SUCCEEDED.
+Result SHA `6c7f7f93dca97432393f9ff9c7ab18f4a776836d0433c658a24c0430371c8d7f`.
+NoSave/CSV/clipping, model0; runtime1029384 ACKfalse/exit1.
+Raw1367: один own begin_wizard click ACK133ms, native waits140/192/259ms,
+guard отказ564ms; before1365 exact own Group/unlocked/point observed/masks0.
+Error output уже grouping с ownGUID/masks0, но catch перечитывает UI:
+predicate-time cause неизвестна, secondmask не утверждается.
+Read-only diagnosis SHA `a32a6d6d2af19c34ad07dd732e74c5f6e2a17307578ba2e6172a19965ed2634b`;
+Product/общий runtime по этому неизвестному отказу не меняются.
+
+Strict3successfulGUID/6serverevents связали только user:160 latestinit05:27:39.471Z,
+binding `7a7c62478cf06abfab25e79e1f7621eadbfb5829ae853132f1b6ae3aba3c8895`.
+Root soleadmin закрыл160 в05:37:51.045Z после exactfreshrow/confirmation;
+двеrefresh подтвердили отсутствие160, admin161logout05:38:13.017Z.
+Bridge59539/browser closed/exit0, guard отсутствовал; профиль/история не менялись.
+Independent final recovery SHA
+`6db3bae9b1fcde4ee77566b2378c4f9171de98d8dc8e96db5bc985c12ebbc4ee`:
+raw35/source4452/fixtures9/protected15/effective10inputs0400/runtime288×2
+unchanged, own processes absent, new160init отсутствует. Original failed
+остался failed; recovery не подтверждает исправление Экспорта.
+
+Следующий diagnostic scope — новый private ordinary Import→Sort→Export,
+tiny27B/independent27B oracle, same Export position900,640,3nodes2links/noJS/
+noGroup/noearlySave. Сохраняются verifyRevealEvidence, ordinary entry и
+строгий cleanup; actual clipping обязателен, иначе NOT_REPRODUCED.
+Это изоляция Exportfix от неизвестного Group отказа, не упрощение модельных
+сценариев/18+25 acceptance. Новый private binder/graph проходит TDD и review;
+старый8node proof immutable, runtime/pair/pins unchanged.
+
+После recovery Root49772 запустил approved ordinary JS downstream отдельно.
+Reviewed binding6e668b33… preserved; ready/status active SHA
+`6c4c132dc9b2a1ef988629c476608225b4cebb2dc19cc145a5813c584ceb4296`,
+admission
+`aa1786cadade63c231efabe819476c9b8af0c70e87f8c49875df50618eb4246a`.
+Другой Host/CLI/admin не активен. Новые native результаты ещё ожидаются;
+model slots0, current-run historical233119, цель и live/model stages открыты.
