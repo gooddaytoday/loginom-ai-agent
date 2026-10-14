@@ -83,15 +83,14 @@ export async function createLoginomHost(options: {
     {
       async check(connection) {
         const chat = randomUUID()
-        try {
-          const child = await launch(connection, chat, true)
-          await child.close()
-        } finally {
-          await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
-            recursive: true,
-            force: true,
-          })
-        }
+        const child = await launch(connection, chat, true)
+        await child.close()
+        // Startup/cleanup failure can leave original owner evidence here.
+        // A terminal validation request is not proof of successful cleanup.
+        await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
+          recursive: true,
+          force: true,
+        })
       },
       async prepare(connection) {
         const child = await launch(connection, "readiness")
