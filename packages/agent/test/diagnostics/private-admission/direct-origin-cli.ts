@@ -1,5 +1,5 @@
 import {mkdir, copyFile, writeFile, readFile} from 'node:fs/promises'
-import {resolve,join} from 'node:path'
+import {resolve,join,dirname} from 'node:path'
 import {createHash} from 'node:crypto'
 import {connectionStore} from '../../../../loginom-host/src/connection/connection-store'
 import {cliCredentials} from '../../../../loginom-host/src/connection/cli-credentials'
@@ -9,7 +9,10 @@ let child:any
 const dir=resolve(process.argv[2]), resources=join(dir,'product/resources/loginom'),profile=join(dir,'profile')
 await mkdir(resources,{recursive:true});await mkdir(join(resources,'runtime/src'),{recursive:true});await mkdir(join(resources,'bin'),{recursive:true})
 await copyFile('/home/user/.cache/loginom-bootstrap/node/node-v24.19.0-linux-x64/bin/node',join(resources,'bin/node'))
-await buildNodeHost(join(resources,'host'))
+if(process.argv[3]){
+ await mkdir(join(resources,'host'),{recursive:true})
+ await copyFile(join(dirname(dirname(resolve(process.argv[3]))),'resources/loginom/host/node-host.mjs'),join(resources,'host/node-host.mjs'))
+}else await buildNodeHost(join(resources,'host'))
 const sha=async (p:string)=>createHash('sha256').update(await readFile(p)).digest('hex')
 const nodeHash=await sha(join(resources,'bin/node')),hostHash=await sha(join(resources,'host/node-host.mjs'))
 await writeFile(join(resources,'resource-manifest.json'),JSON.stringify({endpoint:'http://fixture.invalid',files:[{path:'bin/node',sha256:nodeHash}]}))
