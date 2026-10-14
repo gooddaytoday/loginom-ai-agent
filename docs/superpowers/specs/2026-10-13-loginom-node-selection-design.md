@@ -1,13 +1,29 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты12 candidate,
-policy PASS во всех12. Один итоговый расчёт правильный,11 результатов не получены.
-Одна сессия завершена штатно,11 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты13 candidate,
+policy PASS во всех13. Один итоговый расчёт правильный,12 результатов не получены.
+Одна сессия завершена штатно,12 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось13 candidate, включая текущую risky-approved-claims/2. Sequential
-runner3632025/exec40960 продолжил серию2026-10-14T23:33:43.966231+00:00;
+Осталось12 candidate, включая текущую campaign-roi-by-channel/2. Sequential
+runner3658207/exec58523 продолжил серию2026-10-14T23:45:28.591990+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
+
+Risky-approved-claims/2 closed23:41:16.639Z: policy PASS `17d64357…`, mandatory
+review `a6d5a715…`;26messages/98parts/28tools/82events/2582runtime, JS0/nochildren.
+Std Import400→Filter Approved AND fraud_score>0.8 (72rows)→Group Count/SumClaim/
+SumPayout/AvgScore→SortPayoutDESC (4rows) SUCCEEDED. Первый Filter unsupportedlabel
+отказал доnative UI: NOT_APPLIED/effectfalse/cleanuptrue/0nativeevents; label-only
+retry сохранилinput/predicates и успешно выполнен. Export nativeexecution completed,
+file-search AMBIGUOUS; только same-operation reconciliation и честный блокер,
+без новыхapply/JS. CSV/LGP/oracle не получены; originalCLI1/cleanupfalse/runtimeMismatch
+сохранены. Own269closed23:43:52.688Z/admin270logout23:43:54.343Z/browserclosed
+23:43:55.579Z;9actualPIDgone/exactguardarchive23:44:05.714201Z. Unknown265+268
+сохранены в двухreadbacks. Root независимо проверил scope доclose;
+17original bytes unchanged,18case/26recovery readonly; descriptor `38cc877b…`.
+Independent finalrelease review `e488afaf…`/readback `98f830d2…` approved;
+actualgate2026-10-14T23:45:24.961Z разрешил technical-failed.
+Originalattempt `8fde7203…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Monthly-demand/2 closed23:26:55.016Z: policy PASS `6b12f878…`, mandatory failure
 review `61ffcb75…`;24messages/92parts/26tools/76events/2314runtime, JS0/nochildren.
