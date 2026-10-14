@@ -2,6 +2,27 @@ import type { ServerIdentity } from "./slots"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 
+export function assessResourceTimeline(input: { samples: readonly unknown[]; intervalMs: number; startedAt: string; finishedAt: string }) {
+  if (!Number.isSafeInteger(input.intervalMs) || input.intervalMs < 1) return { status: "incomplete" as const, codes: ["RESOURCE_INTERVAL_INVALID"] }
+  if (input.samples.length < 2) return { status: "incomplete" as const, codes: ["RESOURCE_SAMPLES_MISSING"] }
+  const samples = input.samples.map(acceptanceObject)
+  const times = samples.map(sample => {
+    const time = acceptanceObject(sample.host).observed_at
+    return typeof time === "string" ? Date.parse(time) : NaN
+  })
+  const started = Date.parse(input.startedAt), finished = Date.parse(input.finishedAt)
+  if (![started, finished, ...times].every(Number.isFinite)) return { status: "incomplete" as const, codes: ["RESOURCE_TIME_UNVERIFIED"] }
+  if (finished < started) return { status: "failed" as const, codes: ["RESOURCE_EXECUTION_WINDOW_INVALID"] }
+  if (times[0]! > started || times.at(-1)! < finished)
+    return { status: "incomplete" as const, codes: ["RESOURCE_TIMELINE_UNBRACKETED"] }
+  if (samples.some((sample, index) => sample.sequence !== index + 1 || sample.interval_ms !== input.intervalMs || sample.missed_intervals !== 0 ||
+    typeof sample.elapsed_ms !== "number" || !Number.isFinite(sample.elapsed_ms) || sample.elapsed_ms < 0 || index > 0 && (
+      sample.elapsed_ms <= Number(samples[index - 1]!.elapsed_ms) || sample.elapsed_ms - Number(samples[index - 1]!.elapsed_ms) >= input.intervalMs * 2 ||
+      times[index]! < times[index - 1]! || times[index]! - times[index - 1]! >= input.intervalMs * 2)))
+    return { status: "incomplete" as const, codes: ["RESOURCE_CADENCE_INCOMPLETE"] }
+  return { status: "passed" as const, codes: [] }
+}
+
 // The expected view must be qualified outside actor namespaces and fixed in the manifest.
 export function assessCgroupCoverage(input: { groups: readonly unknown[]; view: { namespace: string; root: { device: number; inode: number } } }) {
   if (!input.groups.length)
