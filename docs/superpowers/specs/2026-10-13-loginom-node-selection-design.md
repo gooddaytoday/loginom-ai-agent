@@ -1,13 +1,29 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты восемь candidate,
-policy PASS во всех восьми: шесть стандартных, explicit-JS и gap tags.
-Один итоговый расчёт правильный, семь результатов не получены. Одна сессия
-завершена штатно, семь адресно освобождены после отказа. Перед новым запуском
-все процессы Tags завершились, профиль был свободен. Final release review `908f88b6…`/readback `e35c96cc…`
-одобрены; actual gate22:20:22.877Z разрешил technical-failed при неизменном attempt32c059e5….
-Recovery/1 запущен последовательно runner3345412/exec87739 в22:20:42.901Z;
-один candidate активен,16ещё не начаты. First9 и общая приёмка ещё не завершены.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты девять candidate,
+policy PASS во всех девяти: шесть стандартных, explicit-JS, gap и recovery.
+Один итоговый расчёт правильный, восемь результатов не получены. Одна сессия
+завершена штатно, восемь адресно освобождены после отказа. Сейчас собственных
+процессов нет, профиль свободен;16candidate ещё не начаты. Для recovery ожидаются
+независимый final release review и actual gate; first9 допуск ещё не заявлен.
+
+Recovery/1 closed22:24:30.652Z: policy PASS sidecar `1690878c…`, mandatory
+failure/anomaly review `db95a803…`;21messages/84parts/23tools/67events/949runtime,
+JS0/nochildren. Import и initial Calculator Profit=Revenue SUCCEEDED4rows.
+SameGUID invalid Revenue- настройка дала AMBIGUOUS/settingschanged during rejection
+verification, executionnotrequested. После inspect/cancel/recover/resume агент
+попросил standard sameGUID Revenue-Cost исправление; оно REFUSEDpending доnative
+admission,0runtimeevents. Честный блокер, новыхJS нет. recoveryObservedtrue означает
+actualerror+response поv2, successfulRecovery/restoredDraft/syntaxrefusal/
+correctedCalculationExecuted false. Новая операция приpending — runtime/anomaly;
+pure RUNTIME_APPLY_MISMATCH/TOOL_ADMISSION_MISSING сохранены, provenancePASS и
+settledpending не выдуманы. Нет CSV/LGP/oracle; CLI1/cleanupfalse остаются.
+
+Own257closed22:27:07.141Z/admin258logout22:27:09.590Z/wholebrowserclosed22:27:10.793Z;
+9PIDgone/точный guard архивирован с inode/rawNS.253и256сохранены вдвухUIreadbacks.
+Root независимо проверил подготовленную другим агентом nativeпривязку доclose.
+17original неизменны, mandatoryreview даёт18casefiles;26recovery.
+Descriptor `e866aed9…`; finalrelease review и actual gate пока не завершены.
 
 Tags/1 closed22:13:55.083Z: policy PASS sidecar `703d7a98…`, mandatory JS+failure
 review `e82a62ff…`;26messages/100parts/29tools/82events/1095runtime, nochildren.
