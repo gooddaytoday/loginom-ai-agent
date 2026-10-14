@@ -29,6 +29,11 @@ Temporal policy требует ordered samples с неизменным interval 
 подтверждённого cleanup. Неизвестные clocks или неполное окно дают incomplete.
 Actual one-second owned-command smoke проверен; frozen manifest/coordinator
 и coverage всех actor lifetimes ещё требуют реализации.
+checkResourceEvidence читает единый verified bundle и возвращает поимённые
+timeline/coverage/cgroups/budget checks с source SHA. Known failed check имеет
+приоритет над incomplete; source-integrity errors запрещают результат.
+Это проверка declared resource scopes, не полный live admission: mandatory
+frozen manifest и licence/limit/lifetime gates проверяются отдельно.
 
 ## Конфигурация и граница режимов
 
