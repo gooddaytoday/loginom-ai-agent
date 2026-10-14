@@ -1,4 +1,4 @@
-import {terminalSourceForOwner} from './terminal-root-association.mjs'
+import {terminalSourceForOwner,prepareTerminalSourceResponses} from './terminal-root-association.mjs'
 import { createRequire } from "node:module"
 import { mkdir, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
@@ -202,6 +202,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       executablePath: browserPath,
       headless,
       chromiumSandbox: true,
+      ...(sourceLoad?{serviceWorkers:'block'}:{}),
       // Chrome for Testing otherwise writes debug.log beside chrome.exe on
       // Windows, mutating the signed/manifested application payload. Keep all
       // browser state and diagnostics inside the disposable session profile.
@@ -226,6 +227,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     sourceLoad?.bindContext(owner.context)
     owner.page=(sourceLoad?sourceLoad.contextCall('pages'):owner.context.pages())[0]??await observed(sourceLoad?sourceLoad.contextCall('newPage'):owner.context.newPage())
     sourceLoad?.bindPage(owner.page)
+    if(sourceLoad) await observed(prepareTerminalSourceResponses(owner))
     const content=browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)
     await observed(sourceLoad?sourceLoad.init(content):owner.context.addInitScript({content}))
     const result=await observed(loginPage(owner.page,candidate,owner))
