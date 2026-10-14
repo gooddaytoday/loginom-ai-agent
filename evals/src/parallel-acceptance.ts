@@ -2,6 +2,34 @@ import type { ServerIdentity } from "./slots"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 
+// Checks the caller's declared resource scopes; full live admission also requires the frozen manifest and other gates.
+export async function checkResourceEvidence(input: {
+  file: string; samplesFile: string; runId: string; startedAt: string; finishedAt: string
+  coverage: Omit<Parameters<typeof assessResourceCoverage>[0], "samples">
+  view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: unknown
+}) {
+  const { readResourceEvidence } = await import("./parallel-resource-evidence")
+  const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
+  const groups = evidence.samples.flatMap(value => {
+    const sample = acceptanceObject(value), host = acceptanceObject(sample.host), processes = acceptanceObject(sample.processes)
+    return [host.collector_cgroup,
+      ...(Array.isArray(sample.containers) ? sample.containers.map(value => acceptanceObject(value).cgroup) : []),
+      ...(Array.isArray(processes.scopes) ? processes.scopes.flatMap(value => {
+        const scope = acceptanceObject(value)
+        return Array.isArray(scope.processes) ? scope.processes.map(value => acceptanceObject(value).cgroup) : []
+      }) : [])]
+  })
+  const checks = {
+    timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
+    coverage: assessResourceCoverage({ ...input.coverage, samples: evidence.samples }),
+    cgroups: assessCgroupCoverage({ groups, view: input.view }),
+    budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget: input.budget, summary: evidence.receipt.summary }),
+  }
+  const results = Object.values(checks)
+  return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
+    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source }
+}
+
 export function assessResourceTimeline(input: { samples: readonly unknown[]; intervalMs: number; startedAt: string; finishedAt: string }) {
   if (!Number.isSafeInteger(input.intervalMs) || input.intervalMs < 1) return { status: "incomplete" as const, codes: ["RESOURCE_INTERVAL_INVALID"] }
   if (input.samples.length < 2) return { status: "incomplete" as const, codes: ["RESOURCE_SAMPLES_MISSING"] }
