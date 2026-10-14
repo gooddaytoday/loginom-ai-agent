@@ -766,6 +766,33 @@ export async function createBridge(config, session, { browserTransport: managedB
         assertCaptureEvidenceBinding();
       }
     }
+    let amountResourceAttempted=false,amountResourceResult;
+    function amountResourceGuard(signal) {
+      const binding=amountAdmission?.binding,retained=acceptanceCapture?.retained;
+      if(!binding || !retained?.runtime?.client || amountAdmission.amountControl!==acceptanceCapture.amountControl
+          || shutdownStarted || cleanupRefused || captureConsumed || amountPrepareAttempted)
+        throw Error('LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE');
+      assertAmountCaptureProxy(amountAdmission.amountControl,binding,signal);
+      if(clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
+        throw Error('LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE');
+      return retained;
+    }
+    async function inspectAmountResources({signal}={}) {
+      const retained=amountResourceGuard(signal);
+      if(amountResourceAttempted)throw Error('LOGINOM_AMOUNT_RESOURCES_CONSUMED');
+      amountResourceAttempted=true;
+      let receipt;
+      try {receipt=await inspectAmountOwnPage(retained,{guard:()=>amountResourceGuard(signal),record:recordExecution,signal})}
+      catch(reason){try{amountResourceGuard(signal)}catch(primary){retained.state.controlledStartup.propagate(primary)}throw retained.state.controlledStartup.reject(reason)}
+      amountResourceGuard(signal);
+      amountResourceResult=freezeCaptureResult({resourceReadComplete:true,receipt});
+      return amountResourceResult;
+    }
+    function assertAmountResources(result,signal) {
+      amountResourceGuard(signal);
+      if(result!==amountResourceResult)throw Error('LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE');
+      return true;
+    }
     async function prepareAmount({signal}={}) {
       const binding=amountAdmission?.binding,retained=acceptanceCapture?.retained,client=retained?.runtime?.client;
       const guard=()=>{
@@ -1196,7 +1223,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       });
       return closing;
     }
-    return {server,catalog,captureAcceptance,prepareAmount,assertAmountPrepared,
+    return {server,catalog,captureAcceptance,prepareAmount,assertAmountPrepared,inspectAmountResources,assertAmountResources,
       assertAmountCompletion:result=>assertAmountCompletion(amountPreparation,result,session.metadata.workspacePreparation,amountSaveOutcome),
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,

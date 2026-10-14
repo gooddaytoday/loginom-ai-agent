@@ -168,7 +168,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
   }
   function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}) {
-    const amountCall=operation==="acceptance.prepare" || operation==="acceptance.capture";
+    const amountCall=operation==="acceptance.resources" || operation==="acceptance.prepare" || operation==="acceptance.capture";
     if(amountCall && startup?.harness==='amount-import-type-v1'){
       guard();if(!startup.binding || control?.signal!==startup.signal || control.deadline!==startup.deadline || value!==undefined)
         return Promise.reject(Error('LOGINOM_HANDSHAKE_INVALID'));
