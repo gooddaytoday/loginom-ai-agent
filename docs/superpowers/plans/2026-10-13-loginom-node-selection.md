@@ -30,7 +30,8 @@ rebuild runtime не нужен.
 - [x] Выполнить и описательно оценить все шесть baseline на итоговом matched runtime, сохранив четыре правильных результата и два технических отказа без повторов и без сравнительного порога приёмки.
 - [x] Сохранить исходный audit при обязательном ревью аномального стандартного успеха: отдельные review/verdict, минимальный runner R3 по TDD, независимый review и проспективный strict-release допуск.
 - [x] Добавить узкий policy-only допуск стандартного отказа с штатным release, сохранив исходные результаты: TDD, независимое ревью и execution-r4 до следующей модели.
-- [ ] Закончить неизменную матрицу31 и оценить все25candidate поv2 (15 закрыты и оценены; explicit-js/2 начинает оставшиеся10).
+- [ ] Расширить v2 memory review на успешные JS-исключения, сохранив исходный pending audit: TDD, обязательная роль JS, независимое ревью и execution-r5 до следующей модели.
+- [ ] Закончить неизменную матрицу31 и оценить все25candidate поv2 (16 закрыты;15оценены, обязательное review explicit-js/2 выполняется;9не начаты).
 - [ ] Завершить обязательные reviews всех исключений/отказов/аномалий и трёх seeded standard successes.
 - [ ] Подготовить итог с тремя независимыми оценками и решить приёмку политики по достаточности доказательств.
 
@@ -39,11 +40,16 @@ Criteria v2 `5b5053d1…`, lock `2c36d0cd…`, user authorization `aeff1714…`
 блокирующих расхождений. Исходный protocol834620b9… и его76source копий сохранены; новый runtime
 или model process ради переоценки не создавался.
 
-Текущий checkpoint 2026-10-14 17:56 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыта21 из31 попыток;
-запущены22. R4 runner PID2626846/exec78963 продолжен17:55:57.111Z;
-следующий слот explicit-js/2. Его guard и процессы принадлежат текущей попытке;
-при активном CLI никакой другой model process этого профиля не допускается.
+Текущий checkpoint 2026-10-14 18:03 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыты22 из31 попыток;
+активных моделей нет. Explicit-js/2 finished18:01:32.840Z: original policy/oracle/
+calculationPASS/JS1/CLI0/Host2629449ACK0/cleanuptrue, CLI2628380gone, writerabsent.
+Wrapper2 — pending mandatory review; успешный расчёт не объявлен отказом.
+Exec78963 завершён2/MANUAL_REVIEW_REQUIRED. Новый JS-review и v2sidecar готовятся;
+исходный audit.pending сохраняется. Контракт расширения memory review успешных
+исключений `2026-10-14-node-selection-policy-v2-successful-exception-review.md`
+зафиксирован до новых sources/следующей модели. R4 source archive readonly.
+Следующий tags/2 только после GREEN/independent-review/execution-r5 допуска.
 
 Узкий policy-only путь для first-last-touch/2 выполнен по TDD, commit355ba8d075,
 64 focused PASS/342assertions/typecheck0. Independent source review `ff97a114…`
