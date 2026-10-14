@@ -204,6 +204,12 @@ release; функция не посылает signals и не удаляет fil
 освобождает reservation, results сохраняются. Terminal marker позволяет readonly
 replay после нового run без stale CAS. Recovery CLI, active-child reconciliation
 и crash между reservation release и terminal marker ещё требуют проверки.
+Released reservation без terminal marker согласуется по validated reservation
+lineage и captured releaseEvidence SHA: обновляются только старые journals,
+повторный CAS не выполняется. Пока finalization не подтверждён, acquireJudgeLease
+под OS guard запрещает новый owner до probes и сохраняет tombstone. Изменённый
+release proof не обходит gate сменой reason. Fixture воспроизводит persisted
+release с прежними quarantine/intent journals; CLI и active-child recovery открыты.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy

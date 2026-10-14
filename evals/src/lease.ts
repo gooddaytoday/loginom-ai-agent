@@ -29,22 +29,41 @@ export function acquireResourceLease(input: ResourceRequest) {
   return acquireResource(input)
 }
 
+export async function readResourceReservation(input: { key: string; lockRoot?: string }) {
+  const root = input.lockRoot ?? globalLockRoot
+  await requireLockRoot(root)
+  return readReservation(path.join(root, `${new Bun.CryptoHasher("sha256").update(input.key).digest("hex")}.reservation.json`), input.key)
+}
+
 export async function acquireJudgeLease(input: { codexHome: string; journal: string; commandId: string; lockRoot?: string }) {
   const home = await realpath(input.codexHome).catch(() => { throw new EvalFailure("JUDGE_HOME_PRIVATE", 2) })
   const info = await lstat(home)
   if (!info.isDirectory() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700)
     throw new EvalFailure("JUDGE_HOME_PRIVATE", 2)
-  return acquireResourceLease({ key: `judge:${home}`, journal: input.journal, commandId: input.commandId, lockRoot: input.lockRoot ?? globalLockRoot })
+  return acquireResource({ key: `judge:${home}`, journal: input.journal, commandId: input.commandId, lockRoot: input.lockRoot ?? globalLockRoot }, undefined, async previous => {
+    if (previous?.state !== "released") return
+    const proof = await readLeaseReceipt(previous.releaseEvidence!.path).catch(() => { throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2) })
+    if (!jsonObject(proof) || new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== previous.releaseEvidence!.sha256)
+      throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+    if (proof.reason !== "qualified-closed-judge-proofs") return
+    const source = await readLeaseReceipt(previous.journal).catch(() => { throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2) })
+    if (!jsonObject(source) || source.kind !== "offline-judge-recovery" || typeof source.incidentJournal !== "string")
+      throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+    const original = await readLeaseReceipt(source.incidentJournal).catch(() => { throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2) })
+    const marker = jsonObject(original) && jsonObject(original.recovery) ? original.recovery : undefined
+    if (!marker || marker.status !== "released" || marker.key !== previous.key || marker.journal !== previous.journal ||
+      marker.incidentToken !== source.incidentToken || !jsonObject(marker.released) || marker.released.token !== previous.token || marker.released.revision !== previous.revision ||
+      !jsonObject(marker.proof) || marker.proof.path !== previous.releaseEvidence!.path || marker.proof.sha256 !== previous.releaseEvidence!.sha256)
+      throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+  })
 }
 
 export function recoverResourceLease(input: ResourceRequest, expected: { token: string; revision: number; incidentToken?: string }) {
   return acquireResource(input, expected)
 }
 
-async function acquireResource(input: ResourceRequest, expected?: { token: string; revision: number; incidentToken?: string }) {
-  const root = await lstat(input.lockRoot).catch(() => { throw new EvalFailure("LEASE_LOCK_ROOT", 2) })
-  if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
-    !path.isAbsolute(input.lockRoot) || await realpath(input.lockRoot) !== input.lockRoot) throw new EvalFailure("LEASE_LOCK_ROOT", 2)
+async function acquireResource(input: ResourceRequest, expected?: { token: string; revision: number; incidentToken?: string }, admit?: (previous: Reservation | undefined) => Promise<void>) {
+  await requireLockRoot(input.lockRoot)
   await readLeaseReceipt(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
   const key = new Bun.CryptoHasher("sha256").update(input.key).digest("hex")
   const guardFile = path.join(input.lockRoot, `${key}.guard`)
@@ -75,6 +94,7 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
   try {
     const receipt = path.join(input.lockRoot, `${key}.reservation.json`)
     const previous = await readReservation(receipt, input.key)
+    await admit?.(previous)
     if (expected && (!previous || previous.state === "released" || previous.token !== expected.token || previous.revision !== expected.revision))
       throw new EvalFailure("LEASE_CAS_STALE", 2)
     if (!expected && previous && previous.state !== "released") throw new EvalFailure("RECOVERY_REQUIRED", 2)
@@ -144,6 +164,12 @@ export async function readLeaseReceipt(file: string): Promise<unknown> {
       throw new EvalFailure("LEASE_FILE_PRIVATE", 2)
     return JSON.parse(await handle.readFile("utf8"))
   } finally { await handle.close() }
+}
+
+async function requireLockRoot(directory: string) {
+  const root = await lstat(directory).catch(() => { throw new EvalFailure("LEASE_LOCK_ROOT", 2) })
+  if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
+    !path.isAbsolute(directory) || await realpath(directory) !== directory) throw new EvalFailure("LEASE_LOCK_ROOT", 2)
 }
 
 async function readReservation(file: string, key: string): Promise<Reservation | undefined> {
