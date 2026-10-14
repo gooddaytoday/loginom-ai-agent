@@ -50,8 +50,13 @@ Runner96749 завершён; оригинальные failed attempt/audit/verd
 снимка диспетчера подтвердили отсутствие всех user-сессий. Admin:210 вышел,
 его браузер закрыт, все восемь собственных PID завершены. Точный собственный
 .writer архивирован в15:22:20.697Z с сохранением nonce/SHA/inode/mtime; активного
-.writer нет. Следующий model dispatch ещё не разрешён: завершаются TDD, review
-и отдельный execution-v2 seal для узкого release без успешного native узла.
+.writer нет. Следующий model dispatch ещё не разрешён. Execution-v2 изменения прошли
+63 теста/189assertions и typecheck0; finalrelease review approved `f154e353…`.
+Однако фактический readonly gate на реальном полном журнале вернул
+`TECHNICAL_NATIVE_LEDGER_INCOMPLETE`; этот отказ сохранён отдельно `5d94fc72…`.
+Первый execution lock `093e2f85…` не использован для модели и сохранён;
+независимый execution review фиксирует blocked. Исправляется только чтение
+подтверждённой native записи по TDD, затем будет новый prospective lock.
 Прямая GUID-привязка не заявляется; используются два точных native RPC и полный
 серверный журнал. После допуска next — baseline ROI/1, затем first-last-touch/1
 и оставшиеся16candidate; исходные слоты не повторяются.
