@@ -5,6 +5,7 @@ import {parseCapabilityResult,withBrowserReceipt} from '../../client/lib/executo
 import {readPreparedNodeContext} from '../../client/lib/node-context.mjs';
 import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
 import {closePreparedWizard} from '../../client/lib/node-wizard-close.mjs';
+import {prepareAmountEditor} from './amount-editor-preparation.mjs';
 import {assertAmountControl,beginAmountControl} from './amount-caller-control.mjs';
 function readCapturePreparation(identity) {
  const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
@@ -120,7 +121,7 @@ async function captureAmountInternal({binding,identity,browser,record,caller}) {
  const current=()=>{checkControl();need(Date.now()<deadline&&binding.owner===owner.owner&&binding.run===owner.run
   &&binding.lease===owner.lease&&binding.generation===owner.generation&&binding.chat===owner.chat
   &&identity.document_id===owner.document_id&&identity.account===owner.account&&identity.session_id===owner.session_id,'OWNER_CHANGED');};
- const observe=async()=>{
+ const observe=async({preparing=false}={})=>{
   current();
   // The ordinary bound definition scan intentionally omits this grid subtree.
   // Use the unchanged ordinary observer privately, between native context reads
@@ -133,7 +134,7 @@ async function captureAmountInternal({binding,identity,browser,record,caller}) {
    if(JSON.stringify(before)!==JSON.stringify(after)||receipt.status!=='SUCCEEDED')throw Error('LOGINOM_AMOUNT_CAPTURE_OBSERVATION');
    return {...receipt.output,prepared_node_context:before};
   }`);
-  checkAmountState(state,owner);return state;
+  if(!preparing)checkAmountState(state,owner);return state;
  };
  const snapshot=async state=>{
   const checked=checkAmountState(state,owner);
@@ -148,6 +149,7 @@ async function captureAmountInternal({binding,identity,browser,record,caller}) {
   }`);
   return result;
  };
+ await prepareAmountEditor({channel,observe:()=>observe({preparing:true}),owner,current,record});
  return {...identity,...await captureAmountDraft({owner,current,observe,snapshot,cancel:()=>closePreparedWizard(channel),record})};
 }
 
