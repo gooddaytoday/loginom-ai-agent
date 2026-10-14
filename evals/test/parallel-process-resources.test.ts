@@ -1,6 +1,86 @@
 import { expect, test } from "bun:test"
-import { readlink, stat } from "node:fs/promises"
-import { sampleProcessResources } from "../src/parallel-resources"
+import { mkdir, mkdtemp, readlink, rm, stat } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { collectHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
+import { superviseProcess } from "../src/process-supervisor"
+
+test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-owned-"))
+  const owners = [{ kind: "slot" as const, id: crypto.randomUUID() }, { kind: "judge" as const, id: crypto.randomUUID() }]
+  const streams = owners.map(() => new TransformStream())
+  const readers = streams.map(stream => stream.readable.getReader())
+  const aborts = owners.map(() => new AbortController())
+  const pending = owners.map((owner, index) => superviseProcess({ cmd: [process.execPath, "-e", "console.log('ready'); await Bun.sleep(120000)"],
+    cwd: root, env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, timeoutMs: 15_000,
+    stdout: streams[index]!.writable, signal: aborts[index]!.signal, owner }))
+  try {
+    await Promise.all(readers.map(reader => reader.read()))
+    const deadline = Date.now() + 5000
+    let sample = await sampleSupervisedResources()
+    while (!owners.every(owner => sample.scopes.some(scope => scope.owner.id === owner.id && scope.status === "observed" && (scope.processes?.length ?? 0) >= 2))) {
+      if (Date.now() > deadline) throw Error("Admitted resource scopes did not arrive")
+      await Bun.sleep(10)
+      sample = await sampleSupervisedResources()
+    }
+    expect(sample.producer_pid).toBe(process.pid)
+    for (const owner of owners) {
+      const scope = sample.scopes.find(scope => scope.owner.id === owner.id)!
+      expect(scope.owner).toEqual(owner)
+      expect(scope.processes?.every(item => item.verified && item.rss_bytes! > 0 && item.cpu !== null)).toBe(true)
+    }
+    // Public observations must not expose mutable identity records used by signaling.
+    sample.scopes.find(scope => scope.owner.id === owners[0]!.id)!.processes![0]!.identity.starttime = "changed"
+    expect((await sampleSupervisedResources()).scopes.find(scope => scope.owner.id === owners[0]!.id)?.processes?.every(item => item.verified)).toBe(true)
+    const out = path.join(root, "resources.jsonl")
+    const abortCollector = new AbortController()
+    const collecting = collectHostResources({ paths: [root], out, intervalMs: 20, runId: "owned-process-smoke", phase: "run",
+      signal: abortCollector.signal, processes: sampleSupervisedResources })
+    try {
+      while (!await Bun.file(out).exists() || (await Bun.file(out).text()).split("\n").filter(Boolean).length < 2) {
+        if (Date.now() > deadline) throw Error("Owned process frames did not arrive")
+        await Bun.sleep(10)
+      }
+      abortCollector.abort()
+      await collecting
+      const rows = (await Bun.file(out).text()).trim().split("\n").map(line => JSON.parse(line))
+      expect(rows[0].processes.producer_pid).toBe(process.pid)
+      expect(owners.every(owner => rows.every(row => row.processes.scopes.some((scope: { owner: { id: string }; processes: { verified: boolean; rss_bytes: number }[] | null }) =>
+        scope.owner.id === owner.id && scope.processes?.every(item => item.verified && item.rss_bytes > 0))))).toBe(true)
+    } finally { abortCollector.abort(); await collecting }
+    aborts[0]!.abort()
+    while (!(await readers[0]!.read()).done) {}
+    expect((await pending[0]!).processCleanup.status).toBe("confirmed")
+    const after = await sampleSupervisedResources()
+    expect(after.scopes.some(scope => scope.owner.id === owners[0]!.id)).toBe(false)
+    expect(after.scopes.find(scope => scope.owner.id === owners[1]!.id)?.processes?.every(item => item.verified && item.rss_bytes! > 0)).toBe(true)
+  } finally {
+    aborts.forEach(abort => abort.abort())
+    await Promise.all(readers.map(async reader => { while (!(await reader.read()).done) {} }))
+    const results = await Promise.all(pending)
+    readers.forEach(reader => reader.releaseLock())
+    if (results.every(result => result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete)) await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("a supervisor with failed evidence persistence publishes an unavailable resource scope", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-proof-failure-"))
+  const owner = { kind: "command" as const, id: crypto.randomUUID() }
+  let settled = false
+  try {
+    await mkdir(path.join(root, "process-cleanup.json"))
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, timeoutMs: 5000, outDir: root, owner })
+    settled = run.processCleanup.capture_complete && run.processCleanup.error === "Process evidence persistence failed" &&
+      run.processCleanup.verification?.length === 2 && run.processCleanup.verification.every(pass => pass.owned_remaining === 0) && !run.processCleanup.unknownProcesses?.length
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toBe("Process evidence persistence failed")
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+    const scope = (await sampleSupervisedResources()).scopes.find(scope => scope.owner.id === owner.id)
+    expect(scope?.status).toBe("unavailable")
+    expect(scope?.processes).toBeNull()
+  } finally { if (settled) await rm(root, { recursive: true, force: true }) }
+}, 15_000)
 
 test("process resource sampling binds actual RSS and CPU ticks to its trusted birth identity", async () => {
   const identity = await selfIdentity()

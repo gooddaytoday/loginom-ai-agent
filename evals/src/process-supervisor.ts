@@ -39,13 +39,23 @@ export type ProcessCleanup = {
 
 // Only this module can publish a spawned launcher and its admitted ancestry.
 const liveSupervisors = new Map<string, {
-  launcher: ProcessIdentity; entries: Map<string, ProcessEntry>; cleanup: ProcessCleanup; owner: ProcessOwner
+  launcher: ProcessIdentity; entries: Map<string, ProcessEntry>; cleanup: ProcessCleanup; owner: ProcessOwner; live(): ProcessIdentity[]
 }>()
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")
 const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
+
+// Resource observers receive copies, never the identity records used for signaling.
+export function supervisedProcesses() {
+  return { producer_pid: process.pid, observed_at: new Date().toISOString(), scopes: [...liveSupervisors.values()].map(scope => {
+    const observed = scope.cleanup.observation_mode === "continuous" && scope.cleanup.capture_complete && scope.cleanup.error === null &&
+      (scope.cleanup.observations?.count ?? 0) > 0 && !scope.cleanup.unknownProcesses?.length
+    return { owner: { ...scope.owner }, launcher: { ...scope.launcher }, status: observed ? "observed" as const : "unavailable" as const,
+      processes: observed ? scope.live().filter(process => scope.entries.get(key(process))?.admission === "allowed").map(process => ({ ...process })) : null }
+  }) }
+}
 
 export async function writerIdentity(profile: string): Promise<WriterIdentity | null> {
   const directory = path.join(profile, ".writer")
@@ -466,17 +476,17 @@ export async function superviseProcess(input: {
     tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
     ledger.set(key(entry), tracked)
   }
+  let lastOwn: ProcessIdentity[] = []
   if (root) {
     track(root, "launcher")
     liveSupervisors.set(key(root), { launcher: identity(root), entries: ledger, cleanup,
-      owner: input.owner ?? { kind: "command", id: profile ?? input.cwd } })
+      owner: input.owner ?? { kind: "command", id: profile ?? input.cwd }, live: () => lastOwn })
   }
   if (registration) {
     await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
     await registration.close().catch(() => { cleanup.error ??= "Process registration close failed" })
   }
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
-  let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
     const registered = [...liveSupervisors.values()]
     const live = await snapshot(registered.flatMap(supervisor => [...supervisor.entries.values()]

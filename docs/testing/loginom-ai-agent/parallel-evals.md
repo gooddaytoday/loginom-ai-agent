@@ -47,8 +47,8 @@ env -i PATH="$PATH" bun --no-env-file run script/sample-parallel-resources.ts --
 Output parent должен уже быть canonical private0700; existing evidence не
 перезаписывается. SIGINT/SIGTERM завершает запись и закрывает collector. Labels
 обозначают заявленный контекст, без flags остаются null и не доказывают связь с
-измеренным run. Owned-process counters, cgroups выбранных owners, controller binding и итоговая
-resource/licence acceptance ещё не реализованы; этот CLI не выдаёт readiness.
+измеренным run. Standalone CLI не подключён к реестру другого процесса: processes=null. Controller
+binding и итоговая resource/licence acceptance ещё открыты; этот CLI не выдаёт readiness.
 
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
@@ -79,9 +79,12 @@ sampleProcessResources({identity,owner}) читает только proc stat/sta
 metadata и cgroup. RSS хранится в bytes, CPU — в raw ticks. Birth, UID, executable
 device/inode/path, PGID/SID и cgroup path сверяются повторно; changed/exited process
 оставляет counters unknown. Owner label — вход trusted caller, этот primitive не
-доказывает admission/ancestry и не сигналит процесс. Его подключение к periodic
-runtime producer ещё требуется. С остальным sampling: 27 PASS/228 assertions
-(17.58s), typecheck/diff PASS; model/Loginom calls не выполнялись.
+доказывает admission/ancestry и не сигналит процесс. Process-local sampleSupervisedResources получает defensive copies admitted identities
+из supervisor registry, а collectHostResources сохраняет их через явный callback.
+Scope с ошибкой наблюдения/evidence остаётся unavailable/null. Actual A/B tests
+проверяют metrics, independent cleanup и неизменность signal identity; resource
+suite31 PASS/276 assertions, typecheck/diff PASS. Acceptance coordinator и normal
+main ещё не подключены; model/Loginom calls не выполнялись.
 
 Cgroup sample содержит ancestors (parent → /), CPU quota/period из cpu.max и
 memory/swap limits/counters каждого scope. Это чтение применимой иерархии,

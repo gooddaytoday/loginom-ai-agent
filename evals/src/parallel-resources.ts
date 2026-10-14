@@ -5,6 +5,14 @@ import { EvalFailure } from "./fail"
 import type { SlotFile } from "./slots"
 import type { ProcessIdentity, ProcessOwner } from "./process-supervisor"
 
+export async function sampleSupervisedResources() {
+  const { supervisedProcesses } = await import("./process-supervisor")
+  const snapshot = supervisedProcesses()
+  return { ...snapshot, scopes: await Promise.all(snapshot.scopes.map(async scope => ({ ...scope,
+    processes: scope.processes ? await Promise.all(scope.processes.map(identity => sampleProcessResources({ identity, owner: scope.owner }))) : null,
+  }))) }
+}
+
 export async function sampleProcessResources(input: { identity: ProcessIdentity; owner: ProcessOwner }) {
   if (!Number.isSafeInteger(input.identity.pid) || input.identity.pid < 1) throw new EvalFailure("RESOURCE_PROCESS_IDENTITY", 2)
   const before = await resourceProcessView(input.identity.pid).catch(() => undefined)
@@ -65,6 +73,7 @@ export async function loadResourceContainers(file: SlotFile) {
 export async function collectHostResources(input: {
   paths: string[]; out: string; intervalMs: number; runId: string | null; phase: "before" | "run" | "after" | null; signal: AbortSignal
   containers?: NonNullable<Awaited<ReturnType<typeof loadResourceContainers>>> | null
+  processes?: typeof sampleSupervisedResources
 }) {
   if (!Number.isSafeInteger(input.intervalMs) || input.intervalMs <= 0) throw new EvalFailure("RESOURCE_INTERVAL", 2)
   const directory = path.dirname(input.out)
@@ -82,11 +91,11 @@ export async function collectHostResources(input: {
     while (!input.signal.aborted) {
       const observed = performance.now()
       const missed = Math.max(0, Math.floor((observed - next) / input.intervalMs))
-      const [host, containers] = await Promise.all([sampleHostResources(input.paths), input.containers
-        ? Promise.all(input.containers.map(sampleBoundContainerResources)) : null])
+      const [host, containers, processes] = await Promise.all([sampleHostResources(input.paths), input.containers
+        ? Promise.all(input.containers.map(sampleBoundContainerResources)) : null, input.processes ? input.processes() : null])
       await handle.writeFile(JSON.stringify({ version: 1, sequence: ++samples, run_id: input.runId, phase: input.phase,
         interval_ms: input.intervalMs, elapsed_ms: observed - started, missed_intervals: missed,
-        duration_ms: performance.now() - observed, host, containers }) + "\n")
+        duration_ms: performance.now() - observed, host, containers, processes }) + "\n")
       await handle.sync()
       next += (missed + 1) * input.intervalMs
       await new Promise<void>(resolve => {
