@@ -3,7 +3,7 @@ import vm from 'node:vm';import {readFile} from 'node:fs/promises';
 import * as module from 'node:module';import * as crypto from 'node:crypto';import * as path from 'node:path';
 import * as url from 'node:url';import * as os from 'node:os';import * as fs from 'node:fs/promises';
 const file=process.env.MANAGED_DRAIN_ENTRY,scenario=process.env.MANAGED_DRAIN_SCENARIO;
-const context=vm.createContext({process,URL,AbortController,setImmediate,console,Error,Promise,Map,Set});
+const context=vm.createContext({process,URL,AbortController,AbortSignal,setImmediate,console,Error,Promise,Map,Set});
 const builtin={'node:module':module,'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os,'node:fs/promises':{...fs,writeFile:async(...args)=>{if(scenario==='receipt-failure' && String(args[1]).includes('\"status\": \"returned\"'))throw Error('fixture receipt write rejected');return fs.writeFile(...args)}}};
 const entry=new vm.SourceTextModule(await readFile(file,'utf8')+'\nexport {state,requests};',{context,identifier:url.pathToFileURL(file).href,initializeImportMeta(meta){meta.url=url.pathToFileURL(file).href}});
 await entry.link(async specifier=>{
