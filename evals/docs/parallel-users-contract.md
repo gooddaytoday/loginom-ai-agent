@@ -556,3 +556,8 @@ ownership разрешает cleanup close, но запрещает user provisi
 inspect не требует этого допуска. `reconcileOwnedAcl` получает свежий snapshot,
 проверяет сохранение сторонних grants и возвращает canonical hash/source proof;
 это staged ACL, ещё не effective-access или readiness gate.
+
+`reconcileUser` последовательно выполняет blocked creation/configuration/ACL
+в одном fenced admin context. Полученные user/ACL hashes описывают staged user;
+активация выполняется readiness controller после physical/effective-access gates.
+Чужое существующее имя отвергается до claim и настройки account.

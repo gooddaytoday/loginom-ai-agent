@@ -150,17 +150,11 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
     },
     async reconcileUser(lease, secretFile) {
-      await lease.assertHeld()
-      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
-      const prepared = await readUserPreparation(file, lease, secretFile)
-      if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      const data = requireAdminReply(await request("reconcile-user", { slot: lease.slot, secretFile,
-        preparationNonce: prepared.nonce, desiredHash: prepared.desiredHash, secretHash: prepared.secretHash }, async () => {
-        if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared))
-          throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
-      }))
-      if (!jsonObject(data) || typeof data.userKey !== "string" || typeof data.aclHash !== "string") throw new EvalFailure("ADMIN_PROTOCOL", 2)
-      return { userKey: data.userKey, aclHash: data.aclHash }
+      // Readiness activates the user only after storage and effective-access probes.
+      await connection.createBlockedUser(lease, secretFile)
+      await connection.configureOwnedUser(lease, secretFile)
+      const acl = await connection.reconcileOwnedAcl(lease, secretFile)
+      return { userKey: acl.userKey, aclHash: acl.aclHash }
     },
     async createBlockedUser(lease, secretFile) {
       await lease.assertHeld()

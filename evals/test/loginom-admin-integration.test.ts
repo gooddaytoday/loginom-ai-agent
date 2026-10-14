@@ -6,7 +6,7 @@ import { verifyAdminRuntime } from "../src/preflight"
 import { createJournaledAdminChannel, openLoginomAdmin, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
-import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
 import { stageUserPreparation } from "../src/user-environment"
@@ -40,6 +40,15 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
       expect((await Promise.all((await readdir(commands)).map(name => Bun.file(path.join(commands, name)).json())))
         .some(command => command.op === "reconcile-user")).toBe(false)
     } finally { await connection.dispose() }
+    const serverLease = await acquireResourceLease({ key: `server:${identity.containerId}`, identity,
+      journal: path.join(file.controller.stateDir, "run-journal.json"), commandId: "prepare", lockRoot: fixture.lockRoot })
+    try {
+      const fenced = await openLoginomAdmin(file, identity, { serverLease })
+      try {
+        await expect(fenced.reconcileUser(lease, prepared.secretFile)).rejects.toThrow("ADMIN_USER_OWNERSHIP_CONFLICT")
+        expect(await Bun.file(path.join(file.controller.stateDir, "user-a.json")).exists()).toBe(false)
+      } finally { await fenced.dispose() }
+    } finally { await serverLease.close() }
     expect(await readServerIdentity(file)).toEqual(identity)
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
 }, 90_000)
