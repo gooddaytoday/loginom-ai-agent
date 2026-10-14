@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -69,6 +69,37 @@ test("judgeInfo: версия судьи и sha256 промпта", async () => 
   expect(info.prompt_sha256).toMatch(/^[0-9a-f]{64}$/)
   expect(info.schema_sha256).toMatch(/^[0-9a-f]{64}$/)
 })
+
+test("judgeInfo: version probe drains its child before returning metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-version-child-"))
+  const pidFile = path.join(root, "child.pid")
+  const pending = judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --child-pid-file ${pidFile}` }))
+  const state = async () => {
+    if (!await Bun.file(pidFile).exists()) return undefined
+    const raw = await readFile(`/proc/${(await Bun.file(pidFile).text()).trim()}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw ? raw.slice(raw.lastIndexOf(")") + 2).split(" ") : undefined
+  }
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(pidFile).exists(); wait++) await Bun.sleep(10)
+    const birth = (await state())![19]
+    expect((await pending).codex_version).toBe("fake-codex 0.0.0")
+    const current = await state()
+    expect(!current || current[19] !== birth || ["Z", "X"].includes(current[0]!)).toBe(true)
+  } finally {
+    await pending
+    // The unqualified version path leaves this self-expiring fixture alive; never signal by PID alone.
+    for (let wait = 0; wait < 1200; wait++) {
+      const current = await state()
+      if (!current || ["Z", "X"].includes(current[0]!)) break
+      await Bun.sleep(10)
+    }
+    await rm(root, { recursive: true, force: true })
+  }
+}, 20_000)
 
 test("judgeInfo: --version не наследует секреты harness и сохраняет обычное окружение", async () => {
   const probe = await probeJudgeEnvironment("info")

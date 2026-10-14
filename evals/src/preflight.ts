@@ -8,7 +8,7 @@ import { assertIsolatedStorageEmpty, listStorage, type ArtifactSource } from "./
 import { agentCommand } from "./cli"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { superviseProcess } from "./process-supervisor"
-import { judgeEnvironment, type JudgeSettings } from "./judge"
+import { judgeEnvironment, judgeVersion, type JudgeSettings } from "./judge"
 
 export type Environment = {
   git: { sha: string; dirty: boolean } | null
@@ -225,13 +225,13 @@ export async function gitInfo() {
 
 async function codexInfo(judge: Pick<JudgeSettings, "command" | "env">) {
   const env = judgeEnvironment(judge.env)
-  const version = await Bun.$`${judge.command} --version`.env(env).quiet().nothrow()
+  const version = await judgeVersion({ command: judge.command, env })
   if (version.exitCode !== 0)
     throw new EvalFailure(`Судья недоступен: ${judge.command.join(" ")} --version → код ${version.exitCode}`, 2)
   const home = env.CODEX_HOME ?? path.join(os.homedir(), ".codex")
   if (path.basename(judge.command[0] ?? "") === "codex" && !(await Bun.file(path.join(home, "auth.json")).exists()))
     throw new EvalFailure(`Нет входа Codex: отсутствует ${path.join(home, "auth.json")}. Выполните: codex login`, 2)
-  return { version: version.text().trim() }
+  return { version: version.stdout.trim() }
 }
 
 async function containerDigest(container: string) {
