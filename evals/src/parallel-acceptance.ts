@@ -27,10 +27,14 @@ export async function checkResourceEvidence(input: {
   coverage: Omit<Parameters<typeof assessResourceCoverage>[0], "samples">
   processWindows: Parameters<typeof assessProcessResourceTimeline>[0]["owners"]
   view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: { file: string; sha256: string } | null
+  manifest?: { file: string; sha256: string }
 }) {
-  const { readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
+  const { readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
   const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
-  const budget = input.budget ? await readFrozenResourceBudget({ ...input.budget, runId: input.runId, startedAt: input.startedAt }) : null
+  const manifest = input.manifest ? await readFrozenResourceManifest({ ...input.manifest, runId: input.runId, startedAt: input.startedAt }) : null
+  const coverage = { ...input.coverage, ...(manifest?.coverage ?? {}) }
+  const budgetSource = manifest?.budget ?? input.budget
+  const budget = budgetSource ? await readFrozenResourceBudget({ ...budgetSource, runId: input.runId, startedAt: input.startedAt }) : null
   const groups = evidence.samples.flatMap(value => {
     const sample = acceptanceObject(value), host = acceptanceObject(sample.host), processes = acceptanceObject(sample.processes)
     return [host.collector_cgroup,
@@ -42,20 +46,20 @@ export async function checkResourceEvidence(input: {
   })
   const checks = {
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
-    coverage: assessResourceCoverage({ ...input.coverage, samples: evidence.samples }),
+    coverage: assessResourceCoverage({ ...coverage, samples: evidence.samples }),
     processTimeline: input.processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
       input.processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
         window.launcher.pid === owner.launcher.pid && window.launcher.starttime === owner.launcher.starttime).length === 1) &&
       new Set(input.coverage.owners.map(owner => JSON.stringify([owner.kind, owner.id, owner.launcher.pid, owner.launcher.starttime]))).size === input.coverage.owners.length
       ? assessProcessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, owners: input.processWindows })
       : { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] },
-    cgroups: assessCgroupCoverage({ groups, view: input.view }),
+    cgroups: assessCgroupCoverage({ groups, view: manifest?.view ?? input.view }),
     budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget, summary: evidence.receipt.summary }),
     incidents: assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
   }
   const results = Object.values(checks)
   return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
-    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: input.budget }
+    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: budgetSource, ...(input.manifest ? { manifest_source: input.manifest } : {}) }
 }
 
 export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {

@@ -80,6 +80,19 @@ Historical summary без новых derived filesystem series читается 
 файла; returned result пересчитывается из raw source. Подмена present series
 отвергается. Full manifest/lifetime/live gates этим не квалифицируются.
 
+Resource scope manifest фиксируется через freezeResourceManifest до dispatch:
+первые N canonical slots, все controller/profile/work/history paths, обе
+container role/ID/image/epoch/ownership identities, cgroup view, cadence1000ms и
+source SHA ранее сохранённого бюджета. Private exclusive/fsynced документ
+содержит только разрешённые metadata. readFrozenResourceManifest сверяет
+schema/run/time/hash и budget source. checkResourceEvidence с manifest берёт
+paths/containers/view/budget из него; inline caller не сокращает required scopes.
+Это frozen resource contract: input container metadata требуют независимой
+runtime qualification, полный actor inventory/thresholds/quotas и production
+binding ещё открыты. Полный immutable live manifest включает также pins и другие
+acceptance prerequisites, перечисленные в плане. Без manifest component API
+остаётся declared-only и не доказывает live admission.
+
 ## Конфигурация и граница режимов
 
 Без `EVAL_SLOTS_FILE` действует legacy singleton с marker v1 и эксклюзивным
