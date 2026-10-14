@@ -36,6 +36,7 @@ test("resource collector CLI observes private slots and drains on SIGINT under i
     expect(rows.length).toBeGreaterThanOrEqual(3)
     expect(JSON.parse(run.stdout).samples).toBe(rows.length)
     expect(rows.every(row => row.run_id === "run-1" && row.phase === "before")).toBe(true)
+    expect(rows.every(row => row.containers === null)).toBe(true)
     const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
     expect(rows[0].host.collector_cgroup?.path).toBe(group)
     expect(rows[0].host.collector_cgroup.cpu_usage.usage_usec).toBeGreaterThan(0)
@@ -52,6 +53,26 @@ test("resource collector CLI observes private slots and drains on SIGINT under i
     if (cleanupConfirmed) await rm(root, { recursive: true, force: true })
   }
 }, 30_000)
+
+test("resource collector CLI refuses an unverified pair journal before writing samples", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-foreign-pair-"))
+  let cleanupConfirmed = true
+  try {
+    const fixture = await parallelFixture(root)
+    const file = path.join(root, "slots.json")
+    const out = path.join(root, "samples.jsonl")
+    await writeLeaseReceipt(file, fixture.slots)
+    await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "pair.json"), { version: 2, phase: "ready", resources: { server: "a".repeat(64) } })
+    cleanupConfirmed = false
+    const run = await superviseProcess({ cmd: [process.execPath, path.join(evalsRoot, "script/sample-parallel-resources.ts"),
+      "--config", file, "--out", out], cwd: root, env: { PATH: process.env.PATH!, HOME: root }, timeoutMs: 500 })
+    cleanupConfirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.exitCode, run.stderr).toBe(2)
+    expect(run.stderr).toContain("RESOURCE_PAIR_UNVERIFIED")
+    expect(await Bun.file(out).exists()).toBe(false)
+  } finally { if (cleanupConfirmed) await rm(root, { recursive: true, force: true }) }
+}, 15_000)
 
 test("resource collector CLI supports the base interface and stops on SIGTERM without inventing run metadata", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-term-"))

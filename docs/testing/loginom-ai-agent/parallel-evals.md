@@ -33,7 +33,7 @@ fake-codex qualification: 117 tests/661 assertions PASS, typecheck/diff PASS.
 Это проверка version admission; live OAuth и другие Loginom probe owners остаются
 открытыми. Неопределённый offline outcome сохраняет durable reservation.
 
-Реализован host-only resource collector: raw CPU ticks, MemAvailable/swap,
+Реализован resource collector: raw CPU ticks, MemAvailable/swap,
 disk/inodes и пропуски измерений в private JSONL. Он не читает credentials или
 содержимое профилей и не требует готовых users. Запускать с очищенным env;
 в приёмке collector принадлежит trusted supervisor, отдельная команда пригодна
@@ -47,7 +47,7 @@ env -i PATH="$PATH" bun run script/sample-parallel-resources.ts --config /home/k
 Output parent должен уже быть canonical private0700; existing evidence не
 перезаписывается. SIGINT/SIGTERM завершает запись и закрывает collector. Labels
 обозначают заявленный контекст, без flags остаются null и не доказывают связь с
-измеренным run. Docker/owned-process counters, cgroups выбранных owners, controller binding и итоговая
+измеренным run. Owned-process counters, cgroups выбранных owners, controller binding и итоговая
 resource/licence acceptance ещё не реализованы; этот CLI не выдаёт readiness.
 
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
@@ -63,8 +63,17 @@ local Docker socket: CPU nanoseconds, RAM/limit, PIDs, доступный block 
 API body для сохранения точности больших counters. Unknown=null с диагностикой,
 names/short IDs отвергаются. Engine1.48 не возвращает id внутри one-shot response;
 binding задаёт полный ID в URL. Disposable bounded container и disappeared-ID
-smoke вместе с host/CLI: 20 PASS/131 assertions, typecheck/diff PASS. Этот primitive
-пока не подключён к CLI и не квалифицирует Loginom sessions или resource acceptance.
+smoke вместе с host/CLI квалифицированы; это не Loginom sessions/resource acceptance.
+
+CLI использует controller.stateDir/pair.json только как private ready ownership
+metadata. При отсутствии journal containers=null; invalid/incomplete journal
+отвергается до output. Каждая контейнерная запись проверяет full ID/image/name и
+owner labels; несовпадение сохраняет inspect diagnostic, counters/raw_stats=null.
+Selected Docker inspect хранит CPU/memory/swap/PID limits, started_at/running/OOM и
+host PID; Config.Env не читается. Actual CLI с bounded shells на обоих pinned
+images и synthetic private journal, healthy wrong-nonce control и env canary:
+24 PASS/185 assertions (16.24s), typecheck/diff PASS. Container limits и чужие
+ресурсы не менялись; все test containers удалены после exact ownership checks.
 
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
