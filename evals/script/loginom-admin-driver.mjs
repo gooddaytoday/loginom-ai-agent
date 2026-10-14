@@ -56,18 +56,32 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       await requireProfile(payload.profileDir)
       const { chromium } = require("playwright-core")
       dispatched = true
+      process.stderr.write("ADMIN_INIT_STAGE_BROWSER\n")
       context = await chromium.launchPersistentContext(payload.profileDir, { executablePath: browser, headless: true, timeout: remaining(request) })
       page = context.pages()[0] ?? await context.newPage()
       page.setDefaultTimeout(remaining(request))
+      process.stderr.write("ADMIN_INIT_STAGE_NAVIGATION\n")
       await page.goto(url.href, { timeout: remaining(request) })
+      process.stderr.write("ADMIN_INIT_STAGE_FORM\n")
       const login = page.locator('input[placeholder="Логин"]')
       const password = page.locator('input[placeholder="Пароль"]')
       if (await login.count() !== 1 || await password.count() !== 1 || await page.getByText("Войти", { exact: true }).count() !== 1) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      process.stderr.write("ADMIN_INIT_STAGE_USERNAME\n")
       await login.fill(credentials.username)
+      process.stderr.write("ADMIN_INIT_STAGE_PASSWORD\n")
+      const passwordState = await password.evaluate(element => element.disabled ? "DISABLED" : element.readOnly ? "READONLY"
+        : element.getClientRects().length ? "READY" : "HIDDEN")
+      process.stderr.write("ADMIN_INIT_PASSWORD_" + passwordState + "\n")
+      // Studio removes its password autofill guard on the native focus event.
+      await password.focus()
       await password.fill(credentials.password)
+      process.stderr.write("ADMIN_INIT_STAGE_BLUR\n")
       await password.blur()
+      process.stderr.write("ADMIN_INIT_STAGE_LOGIN\n")
       await page.getByText("Войти", { exact: true }).click()
+      process.stderr.write("ADMIN_INIT_STAGE_SESSION\n")
       await page.waitForFunction(() => typeof bg !== "undefined" && Boolean(bg.app?.Application?.FInstance?.FServerConnection?.ServerContainer?.Session), null, { timeout: remaining(request) })
+      process.stderr.write("ADMIN_INIT_STAGE_ROLE\n")
       const current = await bounded(request, page.evaluate(async () => {
         const user = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session.CurrentUser
         return { username: await user.Name, admin: await user.IsAdmin }

@@ -8,8 +8,18 @@
 regular current-UID0600, два непустых string-поля username/password без NUL.
 Содержимое не выводилось и не копировалось. Выбранные container names свободны,
 постоянный pair journal отсутствует; следующим шагом создаётся research pair.
-Отсутствие admin file больше не блокирует factory, но действующий Loginom login,
-роль администратора/лицензия и browser/RPC readiness ещё требуют проверки.
+Public create research 2026-10-14 завершился infrastructure-ready, persisted
+pair.json и resource/identity read-back PASS. Evidence:
+`/home/kiselev/.local/state/loginom-evals/research/evidence/pair-bootstrap-20261014`.
+Pinned-candidate native admin login/role read-back + browser/native dispose теперь
+PASS: target1/7 (6.22s), combined48/123 (36.33s), typecheck/diff PASS. Timeout
+root cause — Studio password readonly до focus — исправлен штатным focus;
+диагноз evals/docs/2026-10-14-admin-password-focus-diagnosis.md. Unknown старых
+probes сохранён; server sessions/ACL/backup/licence counts ещё не квалифицированы.
+Acceptance pair ещё не создана.
+Отсутствие admin file больше не блокирует factory; admin login и роль
+подтверждены на research. Лицензия, qualified session RPC/ownership и остальные
+readiness gates ещё требуют проверки.
 
 Историческое состояние на 2026-10-13:
 
