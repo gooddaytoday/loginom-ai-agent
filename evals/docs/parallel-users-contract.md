@@ -19,6 +19,9 @@ CLI закрывает raw JSONL перед exclusive private summary с source 
 min/peak/delta и missing/reset counts; исходные frames сохраняются. Summary
 разделяет container epochs/process births и не складывает shared ancestors;
 наличие summary не доказывает полноту наблюдений или успешную приёмку.
+Readonly receipt verification получает expected source path/run/phase от
+controller, сверяет private source bytes/SHA и пересчитывает summary;
+изменённый receipt не выбирает произвольный source и не изменяет raw evidence.
 
 ## Конфигурация и граница режимов
 

@@ -86,6 +86,15 @@ assertions, вместе с reducer/private evidence29 PASS/138, typecheck PASS.
 manifest проверяются отдельными gates; этот reducer policy сам не доказывает
 полноту бюджета или coverage всего run.
 
+Readonly readResourceSummary требует expected raw samplesFile/runId/phase от
+controller. Source path не берётся на доверие из receipt: mismatch запрещает
+открытие replacement. Проверяются private metadata, SHA actual bytes и
+пересчитанная summary; изменённый header не может переименовать raw run/phase.
+Evidence не переписывается. Общий writer/reader/parser regression с
+policy/Docker/namespace:63 PASS/429 assertions, typecheck/diff PASS.
+Component schema/mandatory scope coverage и frozen manifest/coordinator
+остаются следующими gates.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
