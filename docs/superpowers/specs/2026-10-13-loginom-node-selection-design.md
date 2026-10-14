@@ -2197,3 +2197,40 @@ Unsaved state до целевого opening сохраняется; early Save �
 она отложена. По actual frame — узкая доказанная TDD правка при необходимости,
 её focused/full checks и ordinary live regression; затем новая matched31 series
 с prospectively frozen protocol. Старый started failure в новую серию не входит.
+
+
+### План private capture, после independent design approval
+
+Design receipt `calculator-open-design-review.json` SHA
+`8d781ceacd4c0801ec35a233aaf072f9456ea4b280371d2331f6a6f61c641ca3`:
+обязательные boundaries совпадают с каноническим source; findings0. Пользовательская
+автономия блокеров/параллельного исполнения сохраняется; Root владеет только live.
+
+- [ ] Реализовать private evidence-preservation через TDD в новом diagnostic
+  каталоге. Первый behavioural RED выполняет canonical serialized workspace UI
+  fixture: refusal frame отличается от позднего catch frame; прежний код теряет
+  первый. GREEN сохраняет bounded первый frame отдельно при неизменных status,
+  originalcode, evaluate/gesture counts. Success, incoming foreign/non-target,
+  anchor/source drift, malformed/oversize/unknown и post-click foreign frame
+  проверяются ровно по фактическим диагностическим boundaries.
+  Owner author — private entry/rewrite/tests/proof.ts/bindings/fixtures; Product,
+  payload, profile, audit/runner и original evidence16/source closure74 не менять.
+- [ ] Выполнить package-level targeted private tests на pinned Node24.19,
+  entry syntax и `bun typecheck` из evals для private driver. Независимо проверить
+  semantic diff, canonical frame/source/anchor pins, bounded same-frame inputs,
+  собственный fresh artifact/source GUID remap и сохранность originals. Root
+  закрепляет ready bindings отдельно; уже прошедший Product full/focused не
+  повторять при неизменном Product.
+- [ ] Root выполнить один private native `--run` в текущем локальном Loginom:
+  full originalCSV →5original successful standard requests →one targetopening.
+  Нет LLM/нового modelslot/earlySave/retry. Сохранить raw RPC/journals/инструментацию
+  exact prethrow и late frames, one-gesture semantics и strict own closure/PID
+  evidence. Если закрытие не подтверждено — только адресное own admin recovery;
+  остальные сессии/пакеты/guards не трогать. Результат capture / no-repro / unknown
+  не является successful acceptance и не заменяет original ABC failure.
+- [ ] Прочитать actual frame независимо; установить exact false conjunct либо
+  честно зафиксировать отсутствие необходимого доказательства. Лишь доказанная
+  runtime correction идёт в TDD и ordinary gate; source/runtime change требует
+  новой matched baseline/candidate пары и prospectively sealed31fresh modelslots.
+
+Каждое `[ ]`→`[x]` — отдельный описательный commit с синхронными plan/spec updates.
