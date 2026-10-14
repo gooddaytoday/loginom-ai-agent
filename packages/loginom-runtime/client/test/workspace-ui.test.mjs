@@ -4330,15 +4330,17 @@ test('an empty native process console exposes only its bound context gesture and
 });
 
 test('Table add/enter controls are bound to native output panels, not repeated card labels',async()=>{
- for(const mode of ['valid','clipped_add','numbered','hidden_enter','foreign_panel','foreign_card','wrong_vendor','duplicate_add']) {
-  const page=new Page();page.context.innerWidth=1000;page.context.innerHeight=800;
+ for(const mode of ['valid','clipped_add','numbered','hidden_enter','foreign_panel','foreign_card','wrong_vendor','duplicate_add','scroll','offscreen_scroll']) {
+  const page=new Page();page.waitForTimeout=async()=>{};page.context.innerWidth=1000;page.context.innerHeight=800;
   class ViewsForm{};class BrowseViewVendor{};
   const root=page.add('div','MF;TF-1;ViewsForm','',{x:0,y:50,width:900,height:700});
+  if(mode==='scroll'||mode==='offscreen_scroll')Object.assign(root,{scrollTop:0,scrollHeight:922,clientHeight:700,style:{overflowY:'auto'}});
   const panel=page.add('div','MF;TF-1;ViewsForm;cntPorts;11111111-1111-1111-1111-111111111111','',{x:50,y:100,width:600,height:400},root);
   const add=page.add('div','MF;TF-1;ViewsForm;ViewerAddCard'+(mode==='numbered'?'-1':''),'Add',{x:70,y:120,width:150,height:120},panel);
   if(mode==='clipped_add')add.box.y=770;
   const cardTid='MF;TF-1;ViewsForm;ViewerCard'+(mode==='numbered'?'-1':'');
   const card=page.add('div',cardTid,'Table',{x:240,y:120,width:150,height:120},panel);
+  if(mode==='offscreen_scroll')card.box.y=900;
   const hoverEnter=page.add('button',cardTid+';btnEnter','Table',{x:250,y:130,width:100,height:30},card);
   if(mode==='hidden_enter')hoverEnter.box={x:250,y:130,width:0,height:0};
   const nativePanel={el:{dom:panel}},nativeCard={FView:{el:{dom:card}}};
@@ -4353,7 +4355,19 @@ test('Table add/enter controls are bound to native output panels, not repeated c
   assert.equal(adds.length,['foreign_panel','duplicate_add'].includes(mode)?0:1,mode);
   assert.equal(enters.length,['foreign_panel','foreign_card','wrong_vendor'].includes(mode)?0:1,mode);
   if(mode==='clipped_add'){let clicked;const click=page.mouse.click;page.mouse.click=async(x,y,...args)=>{clicked={x,y};return click(x,y,...args);};const result=await page.act({verb:'click',ref:adds[0].ref},s);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.ok(clicked.y<800);}
-  if(enters.length){assert.equal(enters[0].tid,cardTid);assert.deepEqual(enters[0].allowed_actions,['enter_table']);assert.equal(enters[0].viewer_card.view_guid,'22222222-2222-2222-2222-222222222222');}
+  if(enters.length){
+   assert.equal(enters[0].tid,cardTid);
+   assert.deepEqual(enters[0].allowed_actions,mode==='scroll'?['enter_table','scroll']:mode==='offscreen_scroll'?[]:['enter_table']);
+   assert.equal(enters[0].viewer_card.view_guid,'22222222-2222-2222-2222-222222222222');
+  }
+  if(mode==='scroll'){
+   assert.ok(adds[0].allowed_actions.includes('scroll'));
+   assert.equal(enters[0].scroll.ref,adds[0].scroll.ref);
+   const result=await page.act({verb:'scroll',ref:enters[0].ref,delta_y:200},s);
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(root.scrollTop,200);
+   const stale=await page.act({verb:'scroll',ref:enters[0].ref,delta_y:200},s);
+   assert.equal(stale.status,'NOT_APPLIED');assert.equal(root.scrollTop,200);
+  }
  }
 });
 
