@@ -185,6 +185,18 @@ symlink replacement и already observed replaced-owner release.
 Opt-in и nativeBusy SKIP не подтверждают native/live gates; production v2
 admission ещё не реализована, Admin/OAuth prerequisites остаются отсутствующими.
 
+Server storage capacity primitive проверен на собственном pinned-image container:
+tmpfs16MiB, intact sentinel hash, partial SessionBackup removal, wrong nonce и
+invalid role/short ID;31 assertions/typecheck/diff PASS. sampleServerFilesystems
+проверяет exact ID/image/name/labels и stable running PID/startedAt до/после probe,
+передаёт fixed root paths без shell и собирает только byte/inode counts.
+[GNU filesystem stat format](https://www.gnu.org/software/coreutils/manual/html_node/stat-invocation.html)
+используется для capacity; [Docker exec](https://docs.docker.com/reference/cli/docker/container/exec/)
+наследует container environment, поэтому сам stat выполняется через env-i.
+Unknown counters остаются null; отсутствующий root не скрывает healthy root
+и не подменяется host FS. Это bounded primitive, не real Loginom storage admission;
+periodic raw frames, schema, summary и required coverage пока не связаны с ним.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
