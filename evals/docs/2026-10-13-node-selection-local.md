@@ -22,14 +22,19 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 17:13 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены 20 из 31,
-закрыты 19; candidate ROI/2 выполняется с CLI PID2510269. Runner PID2508678,
+Текущий checkpoint 2026-10-14 17:21 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущена 21 из 31 попытки,
+закрыты 20; candidate first-last-touch/2 выполняется с CLI PID2540012. Runner PID2508678,
 exec52487 работает последовательно; текущий guard принадлежит этой попытке.
 Профиль занят, до подтверждённого завершения этой сессии новый CLI запрещён.
 
-Candidate13 closed summary `cb44bed5…`: policy13PASS/0violated/0insufficient,
-аналитика9correct/4notobtained, normalcompletion9/manualpostfailure4.
+Candidate14 closed summary `87f0297c…`: policy14PASS/0violated/0insufficient,
+аналитика10correct/4notobtained, normalcompletion10/manualpostfailure4.
+ROI/2 finished17:17:32.674Z, oracle/calculationPASS/JS0/normalcleanuptrue;
+sidecar `319ac1ec…`, autoadvanceproof `0c3c851c…` подтверждает переход к
+first-last-touch/2 в17:17:32.822Z после завершения собственных CLI/Host.
+Его аналитика: Group поchannel, Countcampaign/Sumbudget/Sumrevenue,
+Calculator взвешенногоROI, SortDESC и Export. Исходный ROI/1 отказ сохранён.
 Все шесть стандартных сценариев, explicit-JS, gap и recovery имеют содержательные
 доказательства. Полная матрица25candidate, следующие исключения и seeded3 остаются
 обязательными; общая приёмка пока не завершена.
@@ -54,8 +59,8 @@ Criteria v2, матрица31, model/inputs и продуктовый runtime н
 ABC/2 и Monthly/2 дали правильные результаты стандартными узлами, JS0;
 policy-v2 sidecars `ea0fbc89…` и `bac2cd7f…`. Monthly/2 finished16:33:42.344Z,
 его immediate gates разрешили автоматический Claims/2 без ручной паузы,
-autoadvanceproof `5ea4a696…`. Инвентаризация18closed reviews `4eedc511…`
-сохранена как предшествующий снимок; Claims/2 reviewed отдельно. Новые исключения,
+autoadvanceproof `5ea4a696…`. Инвентаризация19closed reviews `f8e9824b…`
+включает Claims/2 и R3, прежний снимок18 `4eedc511…` сохранён. Новые исключения,
 отказы, аномалии и финальная seeded выборка сохраняют обязательное review.
 
 Sales/2 finished16:16:31.961Z/CLI0/Host2393038ACK0/cleanuptrue,
@@ -77,8 +82,8 @@ admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchiv
 сохранив technical-failed/policyfailed/calculationfalse. Соседние211/213 не закрывались.
 Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
-Candidate: 13 отдельных policy-v2 PASS; аналитика9correct/4notobtained,
-normalcleanup9/ручных postfailure releases4. Claims/2 anomaly review завершён.
+Candidate: 14 отдельных policy-v2 PASS; аналитика10correct/4notobtained,
+normalcleanup10/ручных postfailure releases4. Claims/2 anomaly review завершён.
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
