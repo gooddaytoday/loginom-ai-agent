@@ -1,0 +1,9 @@
+Group;Segment;Amount;Other;Text
+A;X;1.25;10;alpha
+A;X;\N;20;\N
+A;Y;;-4;""
+A;Y;-2.5;3;beta
+B;X;0.123456789012345;1;""
+B;X;0;2;\N
+C;Z;\N;3;\N
+C;Z;;4;""

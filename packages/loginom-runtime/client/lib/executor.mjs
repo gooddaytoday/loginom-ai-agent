@@ -1030,6 +1030,48 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         path_matches: pathMatches, graph_matches: graphMatches, expected_graph: before.graph, actual_graph: signature,
         reason: 'reopened package path or graph differs' });
     }
+    const reopenedWorkflow={...workflow};
+    // Capture continuation at the successful producer verification, never in
+    // later cleanup. Original preparation records remain untouched.
+    const continuation=await page.evaluate(o=>{
+      const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+      if(!prep||prep.document!==document)return null;
+      const bound=prep.saveBindings?.get(o.operation);if(!bound)return null;
+      const {sourceOperation,source}=bound;
+      if(bound.consumed||bound.prep!==prep||bound.receipts!==prep.receipts||prep.receipts.get(sourceOperation)!==source
+       ||source.phase!=='verified'||source.tab!==bound.tab||source.packageNode!==bound.packageNode
+       ||source.request!==bound.sourceRequest||source.workflowId!==bound.workflowId||JSON.stringify(source.crumbs)!==bound.crumbs
+       ||source.tab.getAttribute('data-tid')!==o.previous.tab_tid)throw Error('Original Save As binding changed');
+      if(globalThis.bg!==bound.bg||app!==bound.app||app.Application!==bound.application
+       ||app.Application.FInstance!==bound.instance||app.Application.FInstance.FMainForm!==bound.main
+       ||bound.main.FMapTree!==bound.map||bound.map.FServerConnection!==bound.connection
+       ||bound.connection.Session!==bound.session||!bound.session||bound.connection.Connected!==true
+       ||bound.connection.UserName!==bound.account)throw Error('Original Save As owner chain changed');
+      const request=JSON.parse(source.request);
+      if(source.tab.isConnected||!source.workflowId||!request.session)throw Error('Original saved preparation changed');
+      const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
+      const tabs=exact(o.current.tab_tid),graphs=exact(o.current.prefix+';ModelForm;cmpDiagram');
+      const main=app.Application?.FInstance?.FMainForm,card=main?.Items?.Workspace?.getActiveTab();
+      if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||graphs.length!==1
+       ||!(card?.Controller?.FController instanceof app.ModelForm)
+       ||card.Controller.FController.FDiagram?.FmxGraph?.container!==graphs[0])throw Error('Reopened saved workflow changed');
+      let n=card.Controller.Node?.data?.node,pack,workflowNode;const seen=new Set();
+      for(let i=0;n&&i<32&&!seen.has(n);i++,n=n.ParentNode){seen.add(n);if(app.WorkFlowTreeNode&&n instanceof app.WorkFlowTreeNode)workflowNode=n;if(n instanceof app.PackageTreeNode){pack=n;break;}}
+      const path=typeof pack?.PackageFileName==='string'?'/'+pack.PackageFileName.replaceAll('\\','/').replace(/^\/+/, ''):null;
+      if(path!==o.path||pack.ReadOnly!==false||main.FMapTree.FServerConnection.Connected!==true
+       ||main.FMapTree.PackageNodes.Count!==1||main.FMapTree.PackageNodes.Items(0)!==pack||pack.HasRunningNodes()!==false)throw Error('Reopened saved package changed');
+      const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(o.current.prefix+';cnrNaviMode;b.s_')+']')].map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+      if(crumbs.length<3||crumbs.length>32)throw Error('Reopened navigation unavailable');
+      if(prep.receipts.has(o.operation))throw Error('Save continuation already exists');
+      const workflowId=source.workflowId+':save:'+o.operation;
+      bound.consumed=true;
+      prep.receipts.set(o.operation,{request:JSON.stringify({session:request.session,intent:'save_as_continuation',packagePath:o.path,sourceOperation}),phase:'verified',tab:tabs[0],packageNode:pack,nodeTargetWorkflowNode:workflowNode,crumbs,workflowId});
+      return {document_id:prep.id,session_id:request.session,account:main.FMapTree.FServerConnection.UserName,
+       source_operation_id:sourceOperation,operation_id:o.operation,package_path:path,
+       previous_workflow_ref:{...o.previous,workflow_id:source.workflowId},workflow_ref:{...o.current,workflow_id:workflowId,navigation_path:crumbs},graph:o.graph,previous_graph:o.previousGraph};
+    },{previous:before.workflow_ref,current:reopenedWorkflow,path:normalizedPath,operation:task.operation_id,graph:signature,previousGraph:before.graph});
+    await ensureReady();if(!same(workflow,reopenedWorkflow))throw Error('Saved continuation changed before projection');
+    if(continuation)record('save_continuation_observed',{continuation});
     phase = 'verified';
     record('postcondition_verified', { reopened: true, package_path: normalizedPath, tab_caption: identity, graph: signature });
     return result('SUCCEEDED', { package_ref: { kind: 'package', path: normalizedPath, active_identity: normalizedPath }, reopened: true });
@@ -1046,6 +1088,22 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const before = await packageCheckpoint();
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
+    if(!keepOpen)await page.evaluate(o=>{
+      const prep=globalThis.__loginomDockPreparationV1;if(!prep||prep.document!==document)return;
+      const records=[...prep.receipts.entries()].filter(([k,r])=>r.phase==='verified'&&r.tab?.getAttribute('data-tid')===o.previous.tab_tid);
+      if(records.length!==1)return;
+      const [sourceOperation,source]=records[0];
+      if(!source.tab.isConnected||!source.tab.classList.contains('x-tab-active'))throw Error('Original Save As tab changed');
+      prep.saveBindings??=new Map();if(prep.saveBindings.has(o.operation))throw Error('Save As binding consumed');
+      prep.saveBindings.set(o.operation,{prep,receipts:prep.receipts,sourceOperation,source,tab:source.tab,packageNode:source.packageNode,
+       sourceRequest:source.request,workflowId:source.workflowId,crumbs:JSON.stringify(source.crumbs),consumed:false,
+       bg:globalThis.bg,app:globalThis.bg?.app,application:globalThis.bg?.app?.Application,
+       instance:globalThis.bg?.app?.Application?.FInstance,main:globalThis.bg?.app?.Application?.FInstance?.FMainForm,
+       map:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree,
+       connection:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection,
+       session:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.Session,
+       account:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName});
+    },{previous:before.workflow_ref,operation:task.operation_id});
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
     await click('packages.menu');
@@ -2223,7 +2281,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(!operation){
           operation={id:operationId,signature,parameters:request,
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
-            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms,
+            captureSignal:signal,captureRequestBytes:JSON.stringify(request)};
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -2448,6 +2507,35 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
+    retainCaptureNode(operationId) {
+      const operation=operations.get(operationId),state=operation?.nodeApply;
+      const opening=state?.phases.find(p=>p.phase==='open');
+      const assert=()=>{
+        if (operations.get(operationId)!==operation || !state || operation.nodeApply!==state
+            || operation.captureNodeState!==state || operation.captureNode!==state.node
+            || operation.action.capability!=='node.apply' || !operation.captureSignal
+            || operation.captureSignal.aborted || running || pending || nodeJobs.unsettled || delivery.unsettled
+            || state.pending || operation.transportUncertain || operation.cleanupConfirmed!==true
+            || state.cleanup_complete!==true || !state.node || !opening || opening.status!=='verified'
+            || opening!==operation.captureOpening || JSON.stringify(opening)!==operation.captureOpeningBytes
+            || JSON.stringify(state.request)!==operation.captureRequestBytes || state.deadline!==operation.captureDeadline
+            || JSON.stringify(state.node)!==operation.captureTargetNodeBytes
+            || opening.value?.verified!==true || opening.value.cleanup_complete!==true
+            || state.phases.find(p=>p.phase==='open')!==opening || now()>=state.deadline)
+          throw Error('LOGINOM_CAPTURE_NODE_REFUSED');
+      };
+      assert();
+      const request=state.request,deadline=state.deadline;
+      const requestBytes=JSON.stringify(request),openingBytes=JSON.stringify(opening),nodeBytes=JSON.stringify(state.node);
+      return Object.freeze({request,state,opening,signal:operation.captureSignal,deadline,
+        requestSha256:createHash('sha256').update(requestBytes).digest('hex'),
+        openingSha256:createHash('sha256').update(openingBytes).digest('hex'),
+        assertCurrent() {
+          assert();
+          if(state.request!==request || state.deadline!==deadline || JSON.stringify(request)!==requestBytes
+              || JSON.stringify(opening)!==openingBytes || JSON.stringify(state.node)!==nodeBytes)throw Error('LOGINOM_CAPTURE_NODE_CHANGED');
+        }});
+    },
     hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),

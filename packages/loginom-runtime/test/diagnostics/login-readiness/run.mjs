@@ -1,0 +1,14 @@
+import assert from'node:assert/strict';import vm from'node:vm';import{pathToFileURL}from'node:url';import{resolve}from'node:path';
+const root=resolve(process.argv[2]);const{awaitOwnLoginReadiness}=await import(pathToFileURL(root+'/src/connection-check.mjs'));const rows=[];
+for(const mode of ['ready','late-cache','running-undefined','foreign-marker','foreign-account','postawait-drift','deadline-expired','read-false-dispose-Error','read-undefined-dispose-false']){
+ const document={},owner={id:'original',account:'own',origin:'https://app.loginom.ai',evidence:{},deadline:null};let reads=0,disposed=0,waits=0;
+ const map={FServerConnection:{Connected:true,UserName:'own'},FPackagesParentNode:{},PackageNodes:{Count:0},HasRunningNodes:()=>false};
+ const context={document,location:{origin:owner.origin},__loginomStartupV1:{document,id:owner.id,account:owner.account},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:map}}}}}};
+ if(mode==='late-cache')map.FPackagesParentNode=undefined;if(mode==='running-undefined')map.HasRunningNodes=()=>undefined;if(mode==='foreign-marker')context.__loginomStartupV1.id='foreign';if(mode==='foreign-account')map.FServerConnection.UserName='foreign';if(mode==='deadline-expired')owner.deadline=Date.now()-1;
+ const evaluate=(fn,args)=>{reads++;context.args=args;return vm.runInNewContext('('+fn.toString()+')(args)',context)};
+ const page={async waitForFunction(fn,args,options){waits++;assert(options.timeout>0&&options.timeout<=10000);let value=evaluate(fn,args);if(mode==='late-cache'){assert.equal(value,false);map.FPackagesParentNode={};value=evaluate(fn,args)}if(value!==true)throw Error('bounded readiness timeout');if(mode==='postawait-drift')context.__loginomStartupV1.id='late';return{async dispose(){disposed++;if(mode==='read-false-dispose-Error')throw Error('dispose',{cause:0});if(mode==='read-undefined-dispose-false')throw false}}},async evaluate(fn,args){if(mode.startsWith('read-'))throw mode.includes('undefined')?undefined:false;return evaluate(fn,args)}};
+ let error,present=false;try{await awaitOwnLoginReadiness(page,owner)}catch(value){error=value;present=true}
+ if(['ready','late-cache'].includes(mode)){assert.equal(present,false);assert(owner.evidence.login_readiness.completed_at);assert.equal(disposed,1)}else{assert(present);assert.equal(owner.evidence.login_readiness?.completed_at,undefined);if(mode==='running-undefined')assert.equal(disposed,0);if(mode==='postawait-drift')assert.equal(disposed,1);if(mode==='deadline-expired')assert.equal(waits,0);if(mode.startsWith('read-')){assert.equal(error,mode.includes('undefined')?undefined:false);assert(owner.evidence.login_readiness.secondary_rejection);assert.equal(disposed,1)}}
+ rows.push({mode,pass:true,reads,waits,disposed});
+}
+console.log(JSON.stringify({pass:rows.length,rows,limits:'Actual helper and serialized predicate in VM; Page/native/wait/dispose are named doubles. No Loginom or new deadline authority.'}));

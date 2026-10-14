@@ -1,0 +1,681 @@
+{
+  "before": {
+    "origin": "https://app.loginom.ai/",
+    "authenticated": true,
+    "loginom_build": "7.4.2",
+    "workflow_ref": {
+      "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+      "prefix": "MF;TF-1"
+    },
+    "graph_identity": {
+      "status": "unobserved"
+    },
+    "active_tab_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-106",
+    "active_identity": "Настройка",
+    "package_identity": {
+      "path": null,
+      "name": "Package1"
+    },
+    "geometry": {
+      "device_pixel_ratio": 1,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "screen": {
+        "width": 1280,
+        "height": 800,
+        "x": 10,
+        "y": 10
+      },
+      "visual_viewport": {
+        "width": 1280,
+        "height": 800,
+        "scale": 1,
+        "offset_left": 0,
+        "offset_top": 0
+      }
+    },
+    "file_storage": {
+      "status": "unobserved",
+      "directory": null,
+      "listing_complete": false,
+      "reason": "storage_container_not_observed"
+    },
+    "wizard": {
+      "status": "observed",
+      "root_tid": "MF;TF-1;WizrdMCF",
+      "root_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-242",
+      "title": "Настройка форматов импорта",
+      "title_status": "observed",
+      "stage": "text_import_format",
+      "stage_status": "observed",
+      "controls": {
+        "btnPrev": {
+          "status": "observed",
+          "enabled": true
+        },
+        "btnNext": {
+          "status": "observed",
+          "enabled": true
+        },
+        "btnDone": {
+          "status": "unobserved",
+          "enabled": null
+        },
+        "btnExecute": {
+          "status": "unobserved",
+          "enabled": null
+        },
+        "btnClose": {
+          "status": "observed",
+          "enabled": true
+        },
+        "btnError": {
+          "status": "unobserved",
+          "enabled": null
+        }
+      },
+      "owner_context": {
+        "status": "observed",
+        "opening_verified": false,
+        "panel_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-8",
+        "node": {
+          "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-248",
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий>Импорт_null-empty",
+          "label": "Импорт null-empty"
+        },
+        "path": [
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-243",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+            "label": ""
+          },
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-244",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+            "label": "Пакеты"
+          },
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-245",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+            "label": "Package1"
+          },
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-246",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+            "label": "Модуль1"
+          },
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-247",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+            "label": "Сценарий"
+          },
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-248",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий>Импорт_null-empty",
+            "label": "Импорт null-empty"
+          },
+          {
+            "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-249",
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий>Импорт_null-empty>Настройка",
+            "label": "Настройка"
+          }
+        ]
+      },
+      "settings": {
+        "status": "draft_ui_values",
+        "applied_verified": false,
+        "fields": {
+          "delimiter": {
+            "status": "observed",
+            "value": ";",
+            "value_length_utf16": 1,
+            "truncated": false,
+            "enabled": true,
+            "read_only": false,
+            "source_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtDelimiterChar;ValueControl",
+            "input_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-337",
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-336",
+            "value_kind": "displayed_input_text",
+            "native_max_length_utf16": 1
+          },
+          "text_qualifier": {
+            "status": "observed",
+            "value": "\"",
+            "value_length_utf16": 1,
+            "truncated": false,
+            "enabled": true,
+            "read_only": false,
+            "source_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtTextQualifier;ValueControl",
+            "input_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-339",
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-338",
+            "value_kind": "displayed_input_text",
+            "native_max_length_utf16": 1
+          },
+          "null_marker": {
+            "status": "observed",
+            "value": "\\N",
+            "value_length_utf16": 2,
+            "truncated": false,
+            "enabled": true,
+            "read_only": false,
+            "source_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtValueNull;ValueControl",
+            "input_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-341",
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-340",
+            "value_kind": "displayed_input_text",
+            "native_max_length_utf16": null
+          },
+          "decimal_separator": {
+            "status": "observed",
+            "value": ".",
+            "value_length_utf16": 1,
+            "truncated": false,
+            "enabled": true,
+            "read_only": false,
+            "source_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtDecimalSeparator;ValueControl",
+            "input_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-343",
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-342",
+            "value_kind": "displayed_input_text",
+            "native_max_length_utf16": 1
+          },
+          "date_format": {
+            "status": "observed",
+            "value": "Не задано (dd/mm/yyyy)",
+            "value_length_utf16": 22,
+            "truncated": false,
+            "enabled": true,
+            "read_only": false,
+            "source_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtDateFormat;ValueControl",
+            "input_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-345",
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-344",
+            "value_kind": "displayed_input_text",
+            "native_max_length_utf16": null
+          },
+          "date_separator": {
+            "status": "observed",
+            "value": "Не задано (.)",
+            "value_length_utf16": 13,
+            "truncated": false,
+            "enabled": true,
+            "read_only": false,
+            "source_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtDateSeparator;ValueControl",
+            "input_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-347",
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-346",
+            "value_kind": "displayed_input_text",
+            "native_max_length_utf16": 1
+          },
+          "multiple_delimiters": {
+            "status": "observed",
+            "value": false,
+            "owner_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-348",
+            "display_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-349",
+            "root_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-242",
+            "enabled": true,
+            "value_kind": "loginom_ext_checkbox"
+          }
+        }
+      },
+      "import_columns": {
+        "status": "rendered_draft_columns",
+        "fields": [
+          {
+            "index": 1,
+            "status": "observed",
+            "header_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-446",
+            "name": "Amount",
+            "label": "Amount",
+            "label_associated": true,
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true,
+            "cell_refs": {
+              "name": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-447",
+              "label": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-448",
+              "type": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-449",
+              "data_kind": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-450",
+              "used": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-451"
+            }
+          }
+        ],
+        "truncated": false,
+        "complete": false,
+        "settings_applied": false,
+        "definition_coverage": {
+          "status": "complete_configured_columns",
+          "count": 3,
+          "grid_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-407",
+          "container_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-408",
+          "body_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-409",
+          "first_header_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-440",
+          "last_header_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-452",
+          "source_schema_verified": false
+        },
+        "initial_layout": {
+          "status": "rendered_definition_layout",
+          "count": 3,
+          "source_schema_verified": false
+        },
+        "page": {
+          "status": "complete_definition_page",
+          "schema_id": "import-schema-eacb9069-694a-4e49-9e13-54b094ba29fe-1",
+          "offset": 0,
+          "limit": 8,
+          "returned": 3,
+          "total_columns": 3,
+          "next_offset": null,
+          "source_schema_verified": false
+        }
+      }
+    },
+    "wizard_pending_owner": {
+      "status": "unobserved"
+    },
+    "workflow_navigation": {
+      "status": "observed",
+      "control_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-247",
+      "control_tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+      "path": [
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+          "label": "Package1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ],
+      "current_path": [
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+          "label": "Package1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+          "label": "Сценарий"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий>Импорт_null-empty",
+          "label": "Импорт null-empty"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий>Импорт_null-empty>Настройка",
+          "label": "Настройка"
+        }
+      ]
+    },
+    "navigation_context": {
+      "status": "unobserved"
+    },
+    "node_context": {
+      "status": "unobserved",
+      "opening_verified": false
+    },
+    "table_settings": {
+      "status": "unobserved",
+      "settings_applied": false,
+      "result_complete": false,
+      "execution_verified": false
+    },
+    "table_coverage": {
+      "status": "unobserved",
+      "complete_result_verified": false
+    },
+    "process_console": {
+      "status": "unobserved",
+      "top_groups": [],
+      "rows": [],
+      "top_level_complete": false,
+      "details_complete": false,
+      "execution_verified": false,
+      "owner_verified": false
+    },
+    "dom_epoch": {
+      "document": "eacb9069-694a-4e49-9e13-54b094ba29fe",
+      "revision": 9513
+    },
+    "observation_root": {
+      "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-242",
+      "identity": {
+        "anchor_tid": "MF;TF-1;WizrdMCF",
+        "path": []
+      },
+      "detail_scope": "elements_and_cells",
+      "global_scan": false,
+      "global_guards": "fixed_native_queries"
+    },
+    "scan": {
+      "complete": true,
+      "mutation_counts": {
+        "cursor_style": 0,
+        "other_style": 1936,
+        "attributes": 1912,
+        "child_list": 800,
+        "text": 4,
+        "other": 0,
+        "unclassified": 4861,
+        "ignored_cursor_blink": 0
+      },
+      "visited_elements": 858,
+      "detail_elements": 770,
+      "max_elements": 6000,
+      "max_work": 250000,
+      "max_ms": 503,
+      "scope": "node_definition_controls",
+      "omitted_regions": [
+        "inactive_import_cards",
+        "unaddressed_import_definition_cells",
+        "import_data_preview",
+        "generic_table_cells"
+      ]
+    },
+    "nodes": [],
+    "links": [],
+    "workarea": null,
+    "ui": {
+      "elements": [
+        {
+          "ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-449",
+          "tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1;normalHeaderCt;1_2",
+          "identity": {
+            "anchor_tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1;normalHeaderCt;1_2",
+            "path": []
+          },
+          "kind": "control",
+          "role": null,
+          "label": "Строковый",
+          "scope": "workflow",
+          "import_definition_cell": {
+            "index": 1,
+            "name": "Amount",
+            "property": "type",
+            "header_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-446",
+            "wizard_root_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-242"
+          },
+          "signature": {
+            "tag": "td",
+            "tid": "MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1;normalHeaderCt;1_2",
+            "role": null,
+            "type": null,
+            "name": null,
+            "label": "Строковый",
+            "dialog_ref": null,
+            "scroll": null,
+            "check_state": null,
+            "import_definition_cell": {
+              "index": 1,
+              "name": "Amount",
+              "property": "type",
+              "header_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-446",
+              "wizard_root_ref": "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-242"
+            }
+          },
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 481.5,
+              "y": 527.5
+            }
+          },
+          "bounding_box": {
+            "x": 414,
+            "y": 516,
+            "width": 135,
+            "height": 23
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag"
+          ]
+        }
+      ],
+      "dialogs": [],
+      "messages": [],
+      "masks": [],
+      "table_cells": [],
+      "truncated": {
+        "elements": true,
+        "nodes": true,
+        "links": true,
+        "ports": true,
+        "dialogs": false,
+        "messages": true,
+        "masks": false,
+        "table_cells": true
+      }
+    },
+    "prepared_node_context": {
+      "verified": true,
+      "document_id": "403e0c36-f03f-437d-b7db-4de73b7754aa",
+      "workflow_id": "403e0c36-f03f-437d-b7db-4de73b7754aa-1",
+      "node_id": "7faf8d24-b976-4698-b0b9-b1f66a9d36ab",
+      "surface": "wizard",
+      "tid": "MF;TF-1;WizrdMCF"
+    }
+  },
+  "failure": {
+    "recorded_at": "2026-10-10T10:11:14.853Z",
+    "session_id": "fefe2bea-20a1-40a4-b98f-75ea8bf49523",
+    "runtime_revision": "327be723b8237898c25ba5c756a11c5332261e1b62af839e96ebbb4d246d7289",
+    "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+    "target": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "operation_id": "import-null-empty-001",
+    "action_key": "node.apply",
+    "action_revision": "1.0.0",
+    "phase": "node_step_completed",
+    "internal_provenance": "client_node_procedure_v1",
+    "step": 40,
+    "internal_operation_id": "import-null-empty-001:n40",
+    "outcome": {
+      "status": "AMBIGUOUS",
+      "action_key": "ui.act",
+      "action_revision": "1",
+      "operation_id": "import-null-empty-001:n40",
+      "phase": "observing",
+      "effect_possible": true,
+      "output": {
+        "observation_required": true,
+        "scan": {
+          "complete": false,
+          "limit_exceeded": true
+        }
+      },
+      "error": {
+        "code": "UI_SCAN_LIMIT",
+        "message": "Workspace scan budget exceeded; use root discovery and a narrower observation"
+      },
+      "trace": [
+        {
+          "at_ms": 0,
+          "event": "ui_observation_started"
+        },
+        {
+          "at_ms": 558,
+          "event": "ui_preconditions_verified",
+          "verb": "double_click",
+          "refs": [
+            "ui-eacb9069-694a-4e49-9e13-54b094ba29fe-449"
+          ]
+        },
+        {
+          "at_ms": 797,
+          "event": "ui_gesture_applied",
+          "verb": "double_click"
+        },
+        {
+          "at_ms": 1500,
+          "event": "ui_scan_limit",
+          "limit_kind": "time",
+          "scan_stage": "controls"
+        },
+        {
+          "at_ms": 1500,
+          "event": "ui_action_failed",
+          "code": "UI_SCAN_LIMIT"
+        }
+      ],
+      "cleanup_complete": true
+    }
+  },
+  "inspect": {
+    "status": "SUCCEEDED",
+    "action_key": "operation.inspect",
+    "action_revision": "1",
+    "operation_id": "import-null-empty-001",
+    "phase": "observed",
+    "effect_possible": false,
+    "error": null,
+    "trace": [],
+    "output": {
+      "operation_id": "import-null-empty-001",
+      "state": "pending",
+      "outcome": {
+        "status": "AMBIGUOUS",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "operation_id": "import-null-empty-001",
+        "phase": "configure",
+        "effect_possible": true,
+        "cleanup_complete": false,
+        "output": {
+          "operation_id": "import-null-empty-001",
+          "status": "AMBIGUOUS",
+          "effect_possible": true,
+          "phases": [
+            {
+              "phase": "source",
+              "receipt_id": "import-null-empty-001:source",
+              "status": "verified",
+              "effect_possible": false
+            },
+            {
+              "phase": "workflow",
+              "receipt_id": "import-null-empty-001:workflow",
+              "status": "verified",
+              "effect_possible": true
+            },
+            {
+              "phase": "target",
+              "receipt_id": "import-null-empty-001:target",
+              "status": "verified",
+              "effect_possible": true
+            },
+            {
+              "phase": "input_mapping",
+              "receipt_id": "import-null-empty-001:input_mapping",
+              "status": "verified",
+              "effect_possible": false
+            },
+            {
+              "phase": "open",
+              "receipt_id": "import-null-empty-001:open",
+              "status": "verified",
+              "effect_possible": true
+            }
+          ],
+          "node": {
+            "document_id": "403e0c36-f03f-437d-b7db-4de73b7754aa",
+            "workflow_id": "403e0c36-f03f-437d-b7db-4de73b7754aa-1",
+            "node_id": "7faf8d24-b976-4698-b0b9-b1f66a9d36ab"
+          },
+          "execution": {
+            "status": "not_requested",
+            "execution_id": null
+          },
+          "output": {
+            "status": "not_refreshed",
+            "evidence_ref": null,
+            "ports": []
+          },
+          "package_saved": false,
+          "cleanup_complete": false,
+          "warnings": [],
+          "pending_phase": "configure",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: Workspace scan budget exceeded; use root discovery and a narrower observation",
+            "cause": {
+              "code": "UI_SCAN_LIMIT",
+              "message": "Workspace scan budget exceeded; use root discovery and a narrower observation"
+            }
+          }
+        },
+        "error": {
+          "code": "NODE_APPLY_STOPPED",
+          "message": "Node procedure step did not confirm completion; inspect before retry: Workspace scan budget exceeded; use root discovery and a narrower observation",
+          "cause": {
+            "code": "UI_SCAN_LIMIT",
+            "message": "Workspace scan budget exceeded; use root discovery and a narrower observation"
+          }
+        },
+        "trace": []
+      },
+      "cleanup_confirmed": false,
+      "effect_state": "partial_or_unverified",
+      "recovery_options": [],
+      "next_steps": [
+        {
+          "tool": "dock_operation_inspect",
+          "arguments": {
+            "operation_id": "import-null-empty-001"
+          },
+          "required_fields": [],
+          "requires": [],
+          "provides": [
+            "completion_receipt",
+            "cleanup_state"
+          ]
+        },
+        {
+          "tool": "dock_workspace_observe",
+          "arguments": {},
+          "required_fields": [],
+          "requires": [],
+          "provides": [
+            "observation_id",
+            "fresh_ui_refs"
+          ]
+        }
+      ],
+      "internal_resume_available": false
+    }
+  },
+  "provenance": {
+    "attachment_sha256": "92809aa6fe6b102149e00e7e6e72466fa9f5800d78eb722bfa825f4907d4f8bc",
+    "selection": "before Amount index 1 and its type cell; failure and inspect unchanged"
+  }
+}

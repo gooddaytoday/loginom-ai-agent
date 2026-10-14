@@ -1,0 +1,65 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "columns": [
+        {
+          "name": "Group",
+          "label": "Group",
+          "type": "string"
+        },
+        {
+          "name": "OtherTotal",
+          "label": "Сумма",
+          "type": "real"
+        },
+        {
+          "name": "MeanAmount",
+          "label": "Сумма",
+          "type": "real"
+        },
+        {
+          "name": "TextRows",
+          "label": "Количество строк",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Group": "A",
+          "OtherTotal": 30.0,
+          "MeanAmount": 1.25,
+          "TextRows": 2
+        },
+        {
+          "Group": "A",
+          "OtherTotal": -1.0,
+          "MeanAmount": -2.5,
+          "TextRows": 2
+        },
+        {
+          "Group": "B",
+          "OtherTotal": 3.0,
+          "MeanAmount": 0.0617283945061725,
+          "TextRows": 2
+        },
+        {
+          "Group": "C",
+          "OtherTotal": 7.0,
+          "MeanAmount": null,
+          "TextRows": 2
+        }
+      ]
+    }
+  ]
+}

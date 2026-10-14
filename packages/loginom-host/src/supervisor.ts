@@ -20,6 +20,8 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  acceptanceCapture?: { revision: 1; harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1"; owner: string; run: string;
+    lease: string; generation: number; chat: string; account: string; packagePath: string; admission: string; expires: number }
 }
 
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
@@ -81,11 +83,33 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
   return env
 }
 
+type StartupControl = {
+  signal:AbortSignal; deadline:number; requestId:string; authorization:string; harness:"amount-import-type-v1";operation:string;request:string
+  guard():void; reject(value:unknown):unknown; receive(value:unknown,origin:unknown,secondary?:{value:unknown}):unknown
+  retain(runtime: Awaited<ReturnType<typeof supervise>>):void
+  phase?: 'capture'
+  binding?: NonNullable<Launch['acceptanceCapture']>
+}
+export type AmountStartupControl = StartupControl
+type ClosedStartupControl = AmountStartupControl
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
-export async function supervise(input: Launch) {
+export async function supervise(input: Launch, startup?:ClosedStartupControl) {
+  startup?.guard()
+  const originalStartup=startup
+  if(startup)startup=Object.freeze({...startup})
+  const original=input, originalConnection=input.connection
+  const snapshot={...input,connection:{...input.connection},environment:runtimeEnvironment(input.environment??process.env)}
+  const guard=()=>{
+    startup?.guard()
+    if(startup && ["signal","deadline","requestId","authorization","harness","guard","reject","receive","retain","phase","binding","operation","request"].some(k=>(originalStartup as any)[k] !== (startup as any)[k])) throw Error("LOGINOM_HANDSHAKE_INVALID")
+    if(startup && (Object.keys(snapshot).some(key=>key!=="connection" && key!=="environment" && (original as any)[key] !== (snapshot as any)[key])
+        || original.connection!==originalConnection || Object.keys(snapshot.connection).some(key=>(originalConnection as any)[key] !== (snapshot.connection as any)[key]))) throw Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  if(startup) input=snapshot
   if (![input.node, input.entry, input.resources, input.stateDir].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
+  guard()
   const child = fork(input.entry, [], {
     execPath: input.node,
     execArgv: ["--use-system-ca"],
@@ -95,8 +119,11 @@ export async function supervise(input: Launch) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; primary?:{value:unknown} }
   >()
+  // The physical Close request owns one callback. A diagnostic timeout may
+  // report failure, but must not discard that callback or dispatch Close again.
+  const originalClose: {reply?:Promise<unknown>;resolve?:(value:unknown)=>void;reject?:(reason:unknown)=>void;first?:{value:unknown}} = {}
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
     child.once("error", () => resolve({ code: 1, signal: null }))
@@ -104,9 +131,11 @@ export async function supervise(input: Launch) {
   function fail() {
     pending.forEach((request) => {
       clearTimeout(request.timer)
-      request.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
+    request.dispose?.()
+      request.reject(request.primary?request.primary.value:new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     })
     pending.clear()
+    originalClose.reject?.(originalClose.first ? originalClose.first.value : new Error("LOGINOM_RUNTIME_DISCONNECTED"))
   }
   child.on("disconnect", fail)
   child.on("exit", fail)
@@ -117,37 +146,92 @@ export async function supervise(input: Launch) {
     if (!request) return
     pending.delete(message.id)
     clearTimeout(request.timer)
+    request.dispose?.()
+    if(request.fp && "rejection" in message) {
+      try {const received=startup!.receive(rejection(message.rejection),"rejectionOrigin" in message?message.rejectionOrigin:undefined,
+        "secondaryRejection" in message?{value:rejection(message.secondaryRejection)}:undefined);request.reject(request.primary?request.primary.value:received)}
+      catch(error){const rejected=startup!.reject(error);request.reject(request.primary?request.primary.value:rejected)}
+      return
+    }
+    if (request.primary) {request.reject(request.primary.value);return}
     if ("error" in message) {
       request.reject(
         new Error(
           typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
             ? message.error
             : "LOGINOM_RUNTIME_FAILED",
+          { cause: message.error },
         ),
       )
       return
     }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function encodeReadRejection(value: unknown): unknown {
+    if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
+    return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+  }
+  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}) {
+    const amountCall=operation==="acceptance.files" || operation==="acceptance.resources" || operation==="acceptance.prepare" || operation==="acceptance.capture";
+    if(amountCall && startup?.harness==='amount-import-type-v1'){
+      guard();if(!startup.binding || control?.signal!==startup.signal || control.deadline!==startup.deadline || value!==undefined)
+        return Promise.reject(Error('LOGINOM_HANDSHAKE_INVALID'));
+    }
+
+    if(control) {
+      control.signal.throwIfAborted()
+      if(!Number.isSafeInteger(control.deadline) || Date.now()>=control.deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+      timeout=control.deadline-Date.now()
+    }
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
-      }, timeout)
-      pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value }, (error) => {
-        if (error) fail()
-      })
+      const deadline=control?.deadline??Date.now()+timeout
+      const cancel = (reason: unknown) => {
+        if(!pending.has(id)) return
+        if(startup && (operation==="start" || amountCall)) {
+          const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason};startup.receive(reason,"control")
+          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:amountCall?"amount":"startup",...(amountCall?{method:operation}:{}),requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
+            ...(startup.harness==='amount-import-type-v1'?{operation:startup.operation,request:startup.request}:{}),
+            ...(startup.phase?{bindingPhase:startup.phase,captureBinding:startup.binding}:{}),rejection:encodeReadRejection(current.primary.value)}})
+          return
+        }
+        if(operation==="close") {
+          originalClose.first ??= {value:reason}
+          reject(reason)
+          return // retain original pending id until reply/disconnect; never resend
+        }
+        pending.delete(id);clearTimeout(timer);control?.signal.removeEventListener("abort",abort)
+        // Cancellation belongs to this original request, never the next call.
+        if(control && child.connected)child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{requestId:id,rejection:encodeReadRejection(reason)}})
+        reject(reason)
+      }
+      const abort = () => cancel(control!.signal.reason)
+      const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
+      pending.set(id, { resolve:operation==="close"?value=>{originalClose.resolve?.(value);resolve(value)}:resolve,
+        reject:operation==="close"?reason=>{originalClose.first??={value:reason};originalClose.reject?.(originalClose.first.value);reject(reason)}:reject,
+        timer, ...(startup && (operation==="start" || amountCall)?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      control?.signal.addEventListener("abort",abort,{once:true})
+      child.send({ id, operation, input: value, ...(operation === "start" || amountCall ? { deadline:control?.deadline??deadline } : {}) }, (error) => { if (error) fail() })
+      if(control?.signal.aborted)abort()
     })
   }
   const closing: { promise?: Promise<void> } = {}
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      let reply:unknown
+      if(!originalClose.reply) {
+        originalClose.reply=new Promise((resolve,reject)=>{originalClose.resolve=resolve;originalClose.reject=reject})
+        void originalClose.reply.catch(()=>undefined)
+        reply=await request("close",undefined,5000).catch(reason=>{
+          if(!child.connected){originalClose.first??={value:reason};originalClose.reject?.(reason)}
+          throw reason
+        })
+      } else reply=await originalClose.reply // storage/management settlement only
+
+      if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
@@ -164,21 +248,42 @@ export async function supervise(input: Launch) {
         clearTimeout(timer)
       }
     })()
-    return closing.promise
+    const attempt = closing.promise
+    attempt.catch(() => { if (closing.promise === attempt) closing.promise = undefined })
+    return attempt
   }
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
   // documented budget with the ordinary 120-second runtime handshake.
+  function rejection(value: any): unknown {
+    if(value?.kind==="Error") {const e=new Error(value.message,"cause" in value?{cause:rejection(value.cause)}:undefined);e.name=value.name;return e}
+    return value?.is_undefined?undefined:value?.value
+  }
+  const runtime = { ready: undefined as unknown, request, close, exited }
+  startup?.retain(runtime)
+  async function failedStart(error: unknown): Promise<never> {
+    if(startup) throw startup.reject(error)
+    try { await close() }
+    catch (cleanupFailure) {
+      const failure = new Error("LOGINOM_RUNTIME_START_FAILED", { cause: error })
+      // Private foreground ownership handoff, never serialized into IPC.
+      Object.defineProperties(failure, {
+        runtime: { value: runtime },
+        cleanupFailure: { value: cleanupFailure },
+      })
+      throw failure
+    }
+    throw error
+  }
   const ready = await request(
     "start",
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, environment: undefined, protocol: 1, ...(startup? {amountStartup:{requestId:startup.requestId,authorization:startup.authorization,purpose:startup.harness,deadline:startup.deadline,
+          operation:startup.operation,request:startup.request,...(startup.phase?{phase:startup.phase,binding:startup.binding}:{})}}
+ : {}) },
     input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
+    startup,
+  ).catch(failedStart)
+  guard()
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -190,8 +295,8 @@ export async function supervise(input: Launch) {
       ? !("checked" in ready) || ready.checked !== true
       : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
   ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    return failedStart(new Error("LOGINOM_HANDSHAKE_INVALID", { cause: ready }))
   }
-  return { ready, request, close, exited }
+  runtime.ready = ready
+  return runtime
 }

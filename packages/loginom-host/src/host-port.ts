@@ -20,10 +20,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       dispatching: boolean
       released: boolean
       active: Set<string>
+      captured: boolean
+      captureRefused: boolean
+      captureRuntime?: Awaited<ReturnType<Awaited<ReturnType<typeof createLoginomHost>>["runtime"]>>
+      draftRetained?: boolean
+      preReadyHeld?: boolean
+      amountHeld?:boolean
+      fileAttempted?:boolean
+      resourcesAttempted?:boolean
+      prepareAttempted?:boolean
+      prepared?:boolean
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
+  let amountClaimed=false
+  const amountAcquires=new Map<string,{run:string;startup:NonNullable<ReturnType<typeof service.amountStartupControl>>}>()
+  const amountDispatches=new Map<string,{run:string;method:string;startup:NonNullable<ReturnType<typeof service.amountStartupControl>>}>()
+  const reads = new Map<string, {run: NonNullable<ReturnType<typeof runs.get>>; controller: AbortController; authorization: string}>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
@@ -43,6 +57,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   }
   async function handle(data: unknown) {
     if (state.closed) return
+    if(state.stopping){if(data&&typeof data==='object'&&'id'in data&&typeof data.id==='string')reply({id:data.id,error:'LOGINOM_HOST_CLOSED'});return}
     if (
       !data ||
       typeof data !== "object" ||
@@ -57,13 +72,31 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
     }
+    let amountRequest=false
     try {
+      if(data.method==="readonly.preReady.cancel" && "phase" in input && input.phase==="acquired") {
+        const active="requestId" in input && typeof input.requestId==="string" ? amountAcquires.get(input.requestId):undefined;
+        if(Object.keys(input).sort().join(",")!=="authorization,deadline,operation,phase,rejection,request,requestId,run" || !active || active.run!==input.run || !("authorization" in input) || input.authorization!==active.startup.tuple.authorization
+            || !("operation" in input) || input.operation!==active.startup.tuple.operation || !("request" in input) || input.request!==active.startup.tuple.request
+            || !("deadline" in input) || input.deadline!==active.startup.control.deadline || !("rejection" in input))throw Error("LOGINOM_METHOD_INVALID");
+        active.startup.abortAcquired(decodeReadRejection(input.rejection));reply({id:data.id,result:false});return;
+      }
+      if(data.method==="readonly.preReady.cancel" && "phase" in input && input.phase==="dispatch") {
+        const active="requestId" in input && typeof input.requestId==="string" ? amountDispatches.get(input.requestId):undefined;
+        if(Object.keys(input).sort().join(",")!=="authorization,deadline,method,operation,phase,rejection,request,requestId,run" || !active || active.run!==input.run
+          || !("method" in input) || input.method!==active.method || !("authorization" in input) || input.authorization!==active.startup.tuple.authorization
+          || !("operation" in input) || input.operation!==active.startup.tuple.operation || !("request" in input) || input.request!==active.startup.tuple.request
+          || !("deadline" in input) || input.deadline!==active.startup.control.deadline || !("rejection" in input))throw Error("LOGINOM_METHOD_INVALID");
+        active.startup.abortAcquired(decodeReadRejection(input.rejection));reply({id:data.id,result:false});return;
+      }
       if (data.method === "acquire") {
         if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
         if (service.recoveries.has(chat)) throw new Error("LOGINOM_RECOVERY_REQUIRED")
         if ([...runs.values()].some((run) => run.chat === chat)) throw new Error("LOGINOM_CALL_BUSY")
+        const amount=service.amountStartupControl?.();
+        if(!amount){
         const lease = service.acquire(`${owner}:${input.run}`)
         if (!lease) {
           reply({ id: data.id, result: null })
@@ -71,12 +104,130 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         await service.retireRuntime(chat)
         service.resetRestarts(chat)
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
+        try { service.bindCapture?.(owner, input.run, chat, lease) } catch (error) { lease.release(); throw error }
+        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false })
         reply({ id: data.id, result: { generation: lease.generation } })
+          return
+        }
+        if(amount) {
+          const c="amountControl" in input ? input.amountControl as Record<string,unknown> : undefined;
+          if(!c || Object.keys(c).sort().join(',')!=="authorization,operation,request" || c.authorization!==amount.tuple.authorization
+              || c.operation!==amount.tuple.operation || c.request!==amount.tuple.request || !("deadline" in data) || data.deadline!==amount.control.deadline)
+            throw Error("LOGINOM_HANDSHAKE_INVALID");
+          amount.guard();service.assertAmountAcquire(chat);if(amountClaimed)throw Error("LOGINOM_RECOVERY_REQUIRED");amountClaimed=true;amountRequest=true;amountAcquires.set(data.id,{run:input.run,startup:amount});
+        }
+        const lease = service.acquire(`${owner}:${input.run}`)
+        if (!lease) {
+          amountAcquires.delete(data.id);reply({ id: data.id, result: null });return
+        }
+        const acquired:NonNullable<ReturnType<typeof runs.get>>={chat,lease,calls:0,dispatching:false,released:false,active:new Set<string>(),captured:false,captureRefused:false,amountHeld:!!amount};
+        if(amount)runs.set(input.run,acquired);
+        try {
+          if(!amount)await service.retireRuntime(chat);amount?.guard();
+          service.resetRestarts(chat);service.bindCapture?.(owner,input.run,chat,lease);
+          if(amount){acquired.captureRuntime=await service.runtime(lease.generation,chat);amount.guard();service.assertCapture(owner,input.run,chat,lease)}
+          runs.set(input.run,acquired);reply({id:data.id,result:{generation:lease.generation}});
+        } catch(error) {
+          if(amount){acquired.captureRefused=true;lease.holdRecovery();service.recoveries.set(chat,lease);throw error}
+          lease.release();throw error;
+        } finally {amountAcquires.delete(data.id)}
         return
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
+      if(run.amountHeld && !["acceptance.resources","acceptance.files","acceptance.prepare","acceptance.capture"].includes(data.method))throw Error("LOGINOM_RECOVERY_REQUIRED")
+      if (run.captureRefused) {
+        if (data.method !== "call" || !("name" in input) || typeof input.name !== "string"
+            || !["dock_diagnostics", "dock_workspace_observe", "dock_operation_inspect", "dock_node_status"].includes(input.name)
+            || run.calls || run.dispatching) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        // Same retained runtime, read-only diagnosis. Never reconcile the capture
+        // journal or mint another mutation admission from this observation.
+        run.calls++
+        try {
+          const runtime = run.captureRuntime
+          if(!runtime) throw Error("LOGINOM_RECOVERY_REQUIRED")
+          const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined})
+          if (!observed || typeof observed !== "object" || !("result" in observed)) throw Error("LOGINOM_REPLY_INVALID")
+          reply({id:data.id,result:observed.result})
+        } finally { run.calls-- }
+        return
+      }
+      if (data.method === "acceptance.resources" || data.method === "acceptance.files" || data.method === "acceptance.capture" || data.method === "acceptance.prepare") {
+        const files=data.method==="acceptance.files",resources=data.method==="acceptance.resources",preparing=data.method==="acceptance.prepare";
+        const amount=run.amountHeld?service.amountStartupControl?.():undefined;
+        if(run.amountHeld){
+          if(!amount || Object.keys(input).sort().join(",")!=="authorization,operation,request,run"
+            || !("operation" in input) || input.operation!==amount.tuple.operation || !("request" in input) || input.request!==amount.tuple.request
+            || !("deadline" in data) || data.deadline!==amount.control.deadline)throw Error("LOGINOM_METHOD_INVALID");
+          amountRequest=true;amount.guard();
+          if(files ? !run.resourcesAttempted || run.fileAttempted || run.prepareAttempted : resources ? run.resourcesAttempted || run.prepareAttempted : preparing ? run.prepareAttempted : !run.prepared)throw Error("LOGINOM_RECOVERY_REQUIRED");
+        } else if(preparing || resources || files)throw Error("LOGINOM_METHOD_INVALID");
+        if ((!amount && Object.keys(input).sort().join(",") !== "authorization,run")
+            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization,owner,input.run,run.chat,run.lease) || run.captured)
+          throw Error("LOGINOM_METHOD_INVALID")
+        if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
+          throw Error("LOGINOM_CALL_BUSY")
+        service.assertCapture?.(owner,input.run,run.chat,run.lease)
+        if(files)run.fileAttempted=true;else if(resources)run.resourcesAttempted=true;else if(preparing)run.prepareAttempted=true;else run.captured = true
+        if(amount)amountDispatches.set(data.id,{run:input.run,method:data.method,startup:amount});
+        run.dispatching = true
+        run.calls++
+        let id: string | undefined
+        try {
+          const captureRun=input.run, authorization=input.authorization
+          const captureLease=run.lease, captureGeneration=captureLease.generation
+          const assertCaptureGeneration=()=>{
+            if(state.closed || run.released || runs.get(captureRun)!==run || run.lease!==captureLease
+                || !Number.isSafeInteger(captureGeneration) || captureGeneration<1
+                || captureLease.generation!==captureGeneration)
+              throw Error("LOGINOM_RECOVERY_REQUIRED")
+          }
+          const runtime = amount ? run.captureRuntime : await service.runtime(captureGeneration, run.chat)
+          if(!runtime)throw Error("LOGINOM_RECOVERY_REQUIRED")
+          run.captureRuntime=runtime
+          const assertCapture=()=>{
+            assertCaptureGeneration()
+            amount?.guard()
+            if(state.closed || run.released || runs.get(captureRun)!==run
+                || !service.authorizeCapture?.(authorization,owner,captureRun,run.chat,run.lease))
+              throw Error("LOGINOM_RECOVERY_REQUIRED")
+          }
+          assertCapture()
+          id = await service.journal.begin(run.chat, run.lease.generation)
+          run.active.add(id)
+          assertCapture()
+          const result = await runtime.request(files?"acceptance.files":resources?"acceptance.resources":preparing?"acceptance.prepare":"acceptance.capture",undefined,120_000,amount?.control)
+          assertCapture()
+          if (!result || typeof result !== "object" || (files ? !("fileReadComplete" in result) || result.fileReadComplete!==true : resources ? !("resourceReadComplete" in result) || result.resourceReadComplete!==true : preparing ? !("preparationComplete" in result) || result.preparationComplete!==true : !("cleanupComplete" in result) || result.cleanupComplete !== true)) {
+            run.captureRefused = true
+            run.lease.holdRecovery()
+            service.recoveries.set(run.chat, run.lease)
+            await service.journal.settle(id, false)
+            reply({id:data.id,result})
+            return
+          }
+          if(files || resources){await service.journal.settle(id,true);assertCapture();run.active.delete(id);reply({id:data.id,result});return}
+          if(preparing){await service.journal.settle(id,true);assertCapture();run.active.delete(id);run.prepared=true;reply({id:data.id,result});return}
+          await runtime.close()
+          if(amount){amount.control.signal.throwIfAborted();if(Date.now()>=amount.control.deadline)throw Error("LOGINOM_AMOUNT_EXPIRED")}
+          // Runtime exit legitimately updates lost/currentness; the original
+          // lease generation must still hold before settlement and reply.
+          assertCaptureGeneration()
+          await service.journal.settle(id, true)
+          assertCaptureGeneration()
+          run.active.delete(id)
+          reply({ id: data.id, result })
+        } catch (error) {
+          run.captureRefused = true
+          run.lease.holdRecovery()
+          service.recoveries.set(run.chat, run.lease)
+          if (id) await service.journal.settle(id, false)
+          throw error
+        } finally { amountDispatches.delete(data.id);run.calls--; run.dispatching = false }
+        return
+      }
+      if (run.captured && run.calls && data.method!=="interrupt") throw Error("LOGINOM_CALL_BUSY")
+      if (run.captured && ["call", "admit"].includes(data.method)) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (data.method === "release") {
         run.released = true
         if (!run.calls) {
@@ -193,7 +344,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
       }
     } catch (error) {
-      reply({ id: data.id, error: hostError(error) })
+      const amount=service.amountStartupControl?.();
+      if(amount && amountRequest && ["acquire","acceptance.resources","acceptance.files","acceptance.prepare","acceptance.capture"].includes(data.method))reply({id:data.id,rejection:encodeAmountRejection(amount.propagate(error)),rejectionOrigin:amount.rejectionOrigin,
+        ...(amount.secondary?{secondaryRejection:encodeAmountRejection(amount.secondary.value)}:{})});
+      else reply({ id: data.id, error: hostError(error) })
     }
   }
   port.on("message", ({ data }) => {
@@ -207,13 +361,28 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   })
   function stop() {
     if (state.stopping) return state.stopping
-    state.closed = true
-    runs.forEach((run) => {
-      run.released = true
-    })
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
+      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.preReadyHeld))
+        throw new Error("LOGINOM_RECOVERY_REQUIRED")
+      for (const [id, run] of runs) if(run.amountHeld) {
+        const runtime=run.captureRuntime,lease=run.lease,generation=lease.generation;
+        if(!runtime || run.calls || run.dispatching)throw Error('LOGINOM_RECOVERY_REQUIRED');
+        // Only the original supervised runtime can settle this held owner.
+        // close() resolves after its native cleanup/IO acknowledgement and exit;
+        // a storage/refusal/lost reply remains a held lease, never a new runtime.
+        await runtime.close();
+        if(runs.get(id)!==run || run.captureRuntime!==runtime || run.lease!==lease
+          || lease.generation!==generation || run.active.size || run.calls || run.dispatching
+          || run.captureRefused || service.journal.pending().length)throw Error('LOGINOM_RECOVERY_REQUIRED');
+        run.amountHeld=false;
+      }
       for (const [id, run] of runs) await release(id, run)
+      state.closed = true
+    })
+    const attempt = state.stopping
+    void attempt.catch(() => {
+      if (state.stopping === attempt) state.stopping = undefined
     })
     return state.stopping
   }
@@ -226,4 +395,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       await stop()
     },
   }
+}
+
+function encodeReadRejection(value: unknown): unknown {
+  if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
+  return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+}
+function decodeReadRejection(value: any): unknown {
+  if(value?.kind==="Error"){const error=new Error(value.message,"cause" in value?{cause:decodeReadRejection(value.cause)}:undefined);error.name=value.name;return error}
+  return value?.is_undefined?undefined:value?.value
+}
+
+function encodeAmountRejection(value:unknown):unknown {
+ if(value instanceof Error)return{kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeAmountRejection(value.cause)}:{})};
+ return{kind:"value",value:value===undefined?null:value,is_undefined:value===undefined};
 }

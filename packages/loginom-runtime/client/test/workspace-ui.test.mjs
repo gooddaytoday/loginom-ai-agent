@@ -5144,3 +5144,38 @@ test('fractional Reform rows retain complete definitions and native record bindi
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
 });
+
+test('Amount type controls scan preserves one postgesture effect and reports the actual failed scan',async()=>{
+ for(const boundary of ['pre','post']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=importFormatField(page);
+  const col=importColumnFixture(page,c.form,1,'Amount','Строковый');
+  const initial=await page.observe();
+  const roots=await page.execute({mode:'observe',discover_roots:true});
+  const root=roots.output.ui.elements.find(e=>e.tid==='MF;TF-1;WizrdMCF');
+  assert.ok(root);
+  const ref=initial.wizard.import_columns.fields.find(f=>f.name==='Amount').cell_refs.type;
+  let injected=false;
+  const sentinel=page.add('button','Safe;btnScanSentinel','',undefined,c.form);
+  const match=sentinel.closest.bind(sentinel);
+  sentinel.closest=selector=>{
+   if(!injected&&selector==='[data-tid="mnContextMenu"]'&&(boundary==='pre'||page.events.includes('double_click'))) {
+    injected=true;clock.advance(2000);
+   }
+   return match(selector);
+  };
+  const outcome=await page.execute({mode:'act',root_ref:root.ref,action:{verb:'double_click',ref},snapshot:initial});
+  assert.equal(outcome.error.code,'UI_SCAN_LIMIT',JSON.stringify(outcome));
+  assert.equal(outcome.status,boundary==='post'?'AMBIGUOUS':'NOT_APPLIED');
+  assert.equal(outcome.effect_possible,boundary==='post');
+  assert.equal(outcome.output.ui,undefined);assert.equal(outcome.output.scan.complete,false);
+  assert.equal(page.events.filter(e=>e==='double_click').length,boundary==='post'?1:0);
+  const failed=outcome.trace.find(e=>e.event==='ui_scan_limit');
+  assert.equal(failed.scan_stage,'controls');assert.equal(failed.limit_kind,'time');
+  assert.equal(failed.root_ref,root.ref);assert.equal(failed.root_tid,'MF;TF-1;WizrdMCF');
+  assert.equal(failed.global_scan,false);assert.equal(failed.discover_roots,false);
+  assert.equal(failed.elapsed_ms,2000);assert.ok(failed.max_ms>=500&&failed.max_ms<2000);
+  assert.equal(failed.max_work,250000);assert.equal(failed.max_elements,6000);
+  assert.ok(failed.document_epoch);assert.ok(failed.work>0);assert.ok(failed.visited_elements>0);
+  assert.equal(col.cells[2].ownText,'Строковый');
+ }
+});

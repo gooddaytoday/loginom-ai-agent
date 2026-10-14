@@ -1,0 +1,403 @@
+{
+  "five-aggregates.csv": {
+    "status": "not_checked",
+    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "keys": [
+      "Region"
+    ],
+    "measures": [
+      {
+        "field": "Amount",
+        "function": "sum",
+        "name": "Amount_sum",
+        "label": "Amount_sum"
+      },
+      {
+        "field": "Amount",
+        "function": "count",
+        "name": "Amount_count",
+        "label": "Amount_count"
+      },
+      {
+        "field": "Amount",
+        "function": "avg",
+        "name": "Amount_avg",
+        "label": "Amount_avg"
+      },
+      {
+        "field": "Amount",
+        "function": "min",
+        "name": "Amount_min",
+        "label": "Amount_min"
+      },
+      {
+        "field": "Amount",
+        "function": "max",
+        "name": "Amount_max",
+        "label": "Amount_max"
+      }
+    ],
+    "expected": {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Amount_sum",
+          "label": "Amount_sum",
+          "type": "real"
+        },
+        {
+          "name": "Amount_count",
+          "label": "Amount_count",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_avg",
+          "label": "Amount_avg",
+          "type": "real"
+        },
+        {
+          "name": "Amount_min",
+          "label": "Amount_min",
+          "type": "real"
+        },
+        {
+          "name": "Amount_max",
+          "label": "Amount_max",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "A",
+          "Amount_sum": 30.0,
+          "Amount_count": 3,
+          "Amount_avg": 15.0,
+          "Amount_min": 10.0,
+          "Amount_max": 20.0
+        },
+        {
+          "Region": "B",
+          "Amount_sum": -5.0,
+          "Amount_count": 2,
+          "Amount_avg": -2.5,
+          "Amount_min": -5.0,
+          "Amount_max": 0.0
+        }
+      ]
+    }
+  },
+  "multiple-keys.csv": {
+    "status": "not_checked",
+    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "keys": [
+      "Region",
+      "Product"
+    ],
+    "measures": [
+      {
+        "field": "Amount",
+        "function": "sum",
+        "name": "Amount_sum",
+        "label": "Amount_sum"
+      },
+      {
+        "field": "Amount",
+        "function": "count",
+        "name": "Amount_count",
+        "label": "Amount_count"
+      },
+      {
+        "field": "Amount",
+        "function": "avg",
+        "name": "Amount_avg",
+        "label": "Amount_avg"
+      },
+      {
+        "field": "Amount",
+        "function": "min",
+        "name": "Amount_min",
+        "label": "Amount_min"
+      },
+      {
+        "field": "Amount",
+        "function": "max",
+        "name": "Amount_max",
+        "label": "Amount_max"
+      },
+      {
+        "field": "Quantity",
+        "function": "sum",
+        "name": "Quantity_sum",
+        "label": "Quantity_sum"
+      }
+    ],
+    "expected": {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Product",
+          "label": "Product",
+          "type": "string"
+        },
+        {
+          "name": "Amount_sum",
+          "label": "Amount_sum",
+          "type": "real"
+        },
+        {
+          "name": "Amount_count",
+          "label": "Amount_count",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_avg",
+          "label": "Amount_avg",
+          "type": "real"
+        },
+        {
+          "name": "Amount_min",
+          "label": "Amount_min",
+          "type": "real"
+        },
+        {
+          "name": "Amount_max",
+          "label": "Amount_max",
+          "type": "real"
+        },
+        {
+          "name": "Quantity_sum",
+          "label": "Quantity_sum",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "A",
+          "Product": "X",
+          "Amount_sum": 30.0,
+          "Amount_count": 2,
+          "Amount_avg": 15.0,
+          "Amount_min": 10.0,
+          "Amount_max": 20.0,
+          "Quantity_sum": 3.0
+        },
+        {
+          "Region": "A",
+          "Product": "Y",
+          "Amount_sum": -5.0,
+          "Amount_count": 1,
+          "Amount_avg": -5.0,
+          "Amount_min": -5.0,
+          "Amount_max": -5.0,
+          "Quantity_sum": 3.0
+        },
+        {
+          "Region": "B",
+          "Product": "X",
+          "Amount_sum": 0.0,
+          "Amount_count": 1,
+          "Amount_avg": 0.0,
+          "Amount_min": 0.0,
+          "Amount_max": 0.0,
+          "Quantity_sum": 4.0
+        }
+      ]
+    }
+  },
+  "null-empty.csv": {
+    "status": "not_checked",
+    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "keys": [
+      "Region"
+    ],
+    "measures": [
+      {
+        "field": "Amount",
+        "function": "sum",
+        "name": "Amount_sum",
+        "label": "Amount_sum"
+      },
+      {
+        "field": "Amount",
+        "function": "count",
+        "name": "Amount_count",
+        "label": "Amount_count"
+      },
+      {
+        "field": "Amount",
+        "function": "avg",
+        "name": "Amount_avg",
+        "label": "Amount_avg"
+      },
+      {
+        "field": "Amount",
+        "function": "min",
+        "name": "Amount_min",
+        "label": "Amount_min"
+      },
+      {
+        "field": "Amount",
+        "function": "max",
+        "name": "Amount_max",
+        "label": "Amount_max"
+      },
+      {
+        "field": "Text",
+        "function": "count",
+        "name": "Text_count",
+        "label": "Text_count"
+      }
+    ],
+    "expected": {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Amount_sum",
+          "label": "Amount_sum",
+          "type": "real"
+        },
+        {
+          "name": "Amount_count",
+          "label": "Amount_count",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_avg",
+          "label": "Amount_avg",
+          "type": "real"
+        },
+        {
+          "name": "Amount_min",
+          "label": "Amount_min",
+          "type": "real"
+        },
+        {
+          "name": "Amount_max",
+          "label": "Amount_max",
+          "type": "real"
+        },
+        {
+          "name": "Text_count",
+          "label": "Text_count",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "A",
+          "Amount_sum": null,
+          "Amount_count": 2,
+          "Amount_avg": null,
+          "Amount_min": null,
+          "Amount_max": null,
+          "Text_count": 2
+        }
+      ]
+    }
+  },
+  "header-only.csv": {
+    "status": "not_checked",
+    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "keys": [
+      "Region"
+    ],
+    "measures": [
+      {
+        "field": "Amount",
+        "function": "sum",
+        "name": "Amount_sum",
+        "label": "Amount_sum"
+      },
+      {
+        "field": "Amount",
+        "function": "count",
+        "name": "Amount_count",
+        "label": "Amount_count"
+      },
+      {
+        "field": "Amount",
+        "function": "avg",
+        "name": "Amount_avg",
+        "label": "Amount_avg"
+      },
+      {
+        "field": "Amount",
+        "function": "min",
+        "name": "Amount_min",
+        "label": "Amount_min"
+      },
+      {
+        "field": "Amount",
+        "function": "max",
+        "name": "Amount_max",
+        "label": "Amount_max"
+      },
+      {
+        "field": "Text",
+        "function": "count",
+        "name": "Text_count",
+        "label": "Text_count"
+      }
+    ],
+    "expected": {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Amount_sum",
+          "label": "Amount_sum",
+          "type": "real"
+        },
+        {
+          "name": "Amount_count",
+          "label": "Amount_count",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_avg",
+          "label": "Amount_avg",
+          "type": "real"
+        },
+        {
+          "name": "Amount_min",
+          "label": "Amount_min",
+          "type": "real"
+        },
+        {
+          "name": "Amount_max",
+          "label": "Amount_max",
+          "type": "real"
+        },
+        {
+          "name": "Text_count",
+          "label": "Text_count",
+          "type": "integer"
+        }
+      ],
+      "rows": []
+    }
+  }
+}

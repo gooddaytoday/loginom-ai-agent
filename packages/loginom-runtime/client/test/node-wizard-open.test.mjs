@@ -13,6 +13,21 @@ const fixture=()=>{
  state.ui.elements=Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).map(([id,label])=>({tid:'msgbox;tlb;'+id,label,signature:{dialog_ref:'question'},allowed_actions:['click']}));
  return {state,binding};
 };
+
+for(const proof of ['navigation_rebinding','navigation_alias'])test('receiving deactivation consumes only verified matching '+proof,()=>{
+ const {state,binding}=fixture(),original=structuredClone(binding.opening.workflow_path),current=[{tid:'canonical',label:'Scenario'}];
+ state.wizard_pending_owner.path[0]=current[0];
+ state.prepared_node_context[proof]=proof==='navigation_rebinding'?{prepared_path:original,observed_path:current}:{original_path:original,path:current};
+ assert.equal(boundWizardDeactivationConfirmation(state,binding),true);
+ for(const fault of ['unverified','prepared','observed','identity']){
+  const bad=structuredClone(state);
+  if(fault==='unverified')bad.prepared_node_context.verified=false;
+  if(fault==='identity')bad.prepared_node_context.node_id='foreign';
+  if(fault==='prepared')bad.prepared_node_context[proof][proof==='navigation_rebinding'?'prepared_path':'original_path']=[{tid:'foreign'}];
+  if(fault==='observed')bad.prepared_node_context[proof][proof==='navigation_rebinding'?'observed_path':'path']=[{tid:'foreign'}];
+  assert.equal(boundWizardDeactivationConfirmation(bad,binding),false,fault);
+ }
+});
 test('deactivation requires the exact prepared graph, workflow, question and three button meanings',()=>{
  const {state,binding}=fixture();assert.equal(boundWizardDeactivationConfirmation(state,binding),true);
  for(const change of [s=>s.prepared_node_context.node_id='foreign',s=>s.prepared_node_context.surface='wizard',

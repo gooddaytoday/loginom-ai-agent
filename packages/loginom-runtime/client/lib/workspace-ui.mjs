@@ -106,10 +106,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const readUi = async (rediscover = false) => {
     const nodeContext=await boundNode();
     const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
-    try {
+    // Retain failed-read measurements across the browser realm without exporting partial action refs.
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
-    let work = 0,scanStage='collect';
+    let work = 0,scanStage='collect',visitedElements=0,scanRootTid=null,documentEpoch=null;
+    try {
     const charge = () => {
       if (++work > maxWork || Date.now() - scanStarted > maxMs) {
         const error = new Error('Workspace scan budget exceeded; no complete observation or action references were issued');
@@ -122,6 +123,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       state = { document, ids: new WeakMap(), sequence: 0, epoch: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` };
       Object.defineProperty(globalThis, stateKey, { value: state, configurable: true });
     }
+    documentEpoch=state.epoch;
     if (!state.observer) {
       if (typeof MutationObserver !== 'function') {
         const error = new Error('DOM mutation tracking is unavailable'); error.code = 'UI_EPOCH_UNAVAILABLE'; throw error;
@@ -178,11 +180,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if (rootRef && !requestedRoot?.isConnected) {
       const error=new Error('Observed root is detached or its reference expired');error.code='UI_ROOT_STALE';throw error;
     }
+    scanRootTid=requestedRoot?.getAttribute('data-tid')??null;
     const dom = [], seenElements = new Set();
     const include = element => {
       charge(); if (seenElements.has(element)) return;
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
-      seenElements.add(element);dom.push(element);
+      seenElements.add(element);dom.push(element);visitedElements=dom.length;
     };
     const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
@@ -3226,7 +3229,11 @@ function readRenderedInputMapping(observation) {
       const code=['UI_SCAN_LIMIT','UI_ROOT_STALE','UI_EPOCH_UNAVAILABLE'].includes(error?.code)
         ? error.code : 'UI_OBSERVATION_FAILED';
       return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
-        ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
+        ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{}),...(code==='UI_SCAN_LIMIT'?{diagnostics:{
+          root_ref:rootRef??null,root_tid:scanRootTid,document_epoch:documentEpoch,
+          global_scan:!rootRef&&!discoverRoots,discover_roots:discoverRoots,
+          elapsed_ms:Math.max(0,Date.now()-scanStarted),work,visited_elements:visitedElements,
+          max_ms:maxMs,max_work:maxWork,max_elements:maxElements}}:{})}};
     }
   },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
@@ -3240,7 +3247,7 @@ function readRenderedInputMapping(observation) {
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
-      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
+      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown',...observed.ui_read_failure.diagnostics});
       const messages={UI_SCAN_LIMIT:'Workspace scan budget exceeded; use root discovery and a narrower observation',
         UI_ROOT_STALE:'Observed root is detached, hidden, inactive or expired',
         UI_EPOCH_UNAVAILABLE:'DOM mutation tracking is unavailable',UI_OBSERVATION_FAILED:'Browser observation failed'};
@@ -3412,6 +3419,9 @@ function readRenderedInputMapping(observation) {
         if (!current.authenticated) fail('LOGIN_REQUIRED', 'Loginom authentication is required before changing the workspace');
         if (!same(task.snapshot.dom_epoch, current.dom_epoch)) fail('UI_EPOCH_CHANGED', 'The document changed since this observation; observe again even if its visible state looks unchanged');
         if (!same(current.ui.dialogs.map(item => item.ref), task.snapshot.ui.dialogs.map(item => item.ref))) fail('UI_CONTEXT_CHANGED', 'The visible dialog changed; observe the workspace again');
+        const openingWorkflowMatches=(node,path,opening)=>same(path,opening)
+          ||node?.verified===true&&same(node.navigation_rebinding?.prepared_path,opening)&&same(node.navigation_rebinding?.observed_path,path)
+          ||node?.verified===true&&same(node.navigation_alias?.original_path,opening)&&same(node.navigation_alias?.path,path);
         if(task.action.verb==='confirm_wizard_deactivation') {
           const binding=task.snapshot.node_wizard_confirmation,n=current.prepared_node_context;
           if(binding?.kind!=='deactivation'||n?.verified!==true||n.surface!=='graph'||n.tid!==binding.graph_tid
@@ -3420,7 +3430,7 @@ function readRenderedInputMapping(observation) {
             ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
               ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
                 &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
-            ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+            ||!openingWorkflowMatches(n,current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))
@@ -3780,9 +3790,12 @@ function readRenderedInputMapping(observation) {
                 &&beforeNode.pending_wizard_node.label===owner?.node?.label
               :labels.length===1&&normalizeLabel(labels[0].label)!==''
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
+          const ownerPath=owner?.path?.slice(0,-2).map(({tid,label})=>({tid,label}));
+          const openingPathMatches=same(ownerPath,opening.workflow_path)
+            ||guidOwnerMatches&&openingWorkflowMatches(afterNode,ownerPath,opening.workflow_path);
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingPathMatches))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});

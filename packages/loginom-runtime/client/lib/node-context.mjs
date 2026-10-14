@@ -21,6 +21,10 @@ export async function readPreparedNodeContext(page, binding) {
     if (!records.length || records.some(r=>r.tab!==records[0].tab || r.packageNode!==records[0].packageNode)) return reject('receipt');
     const r=records.find(r=>r.nodeTargetWorkflowNode);
     if (!r) return reject('workflow_unbound');
+    if(r.request!==undefined&&(typeof r.request!=='string'||!r.request))return reject('navigation_request');
+    const requestPin=Object.getOwnPropertyDescriptor(r,'nodePreparedRequest');
+    if(r.nodeNavigationBinding&&(!requestPin||typeof requestPin.value!=='string'||requestPin.writable||requestPin.configurable))return reject('navigation_request');
+    if(requestPin&&r.request!==requestPin.value)return reject('navigation_request');
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const tabs=exact(b.workflow_ref.tab_tid);
     if(tabs.length!==1 || tabs[0]!==r.tab || !tabs[0].classList.contains('x-tab-active')) return reject('tab');
@@ -41,7 +45,51 @@ export async function readPreparedNodeContext(page, binding) {
       if(crumbs.every((c,i)=>c.tid===b.workflow_ref.navigation_path[i].tid && c.label===b.workflow_ref.navigation_path[i].label))return pending();
       return reject('navigation');
     }
-    if(b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label))return reject('navigation');
+    const navigationChanged=b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label);
+    const hasReceiptAuthority = (wf, receipt) => {
+      const peers=[...p.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
+      return !peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
+        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode);
+    };
+    const verifyNavigation = (wf, receipt, observed, capture=false) => {
+      const expected=wf.navigation_path, samePath=(a,b)=>Array.isArray(a)&&a.length===b.length
+        &&a.every((c,i)=>c.tid===b[i].tid&&c.label===b[i].label);
+      if(!Array.isArray(expected)||!expected.length||expected.length>32||observed.length!==expected.length
+        ||new Set(observed.map(c=>c.tid)).size!==observed.length)return null;
+      if(!hasReceiptAuthority(wf,receipt)
+        ||receipt.crumbs&&!samePath(receipt.crumbs,expected))return null;
+      const native=observed.map(c=>{const es=exact(c.tid),e=es.length===1&&es[0],cmp=e&&globalThis.Ext?.getCmp?.(e.id);
+        return cmp?.el?.dom===e?cmp?._node?.data?.node:null;});
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      const account=main?.FMapTree?.FServerConnection?.UserName;
+      const packagePath=receipt.packageNode?.PackageFileName;
+      const baseline=receipt.nodeNavigationBinding;
+      if(baseline) {
+        if(!samePath(expected,baseline.path)||baseline.tab!==receipt.tab||baseline.packageNode!==receipt.packageNode
+          ||baseline.workflow!==receipt.nodeTargetWorkflowNode||baseline.account!==account||baseline.connection!==main?.FMapTree?.FServerConnection||baseline.packagePath!==packagePath
+          ||native.length!==baseline.native.length||native.some((n,i)=>!n||n!==baseline.native[i]||n.FGuid!==baseline.guids[i]||i>0&&n.ParentNode!==native[i-1]))return null;
+      }
+      if(samePath(expected,observed)) {
+        if(capture&&!baseline&&typeof receipt.request==='string'&&receipt.request&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
+          &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
+          &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
+          receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,
+            workflow:receipt.nodeTargetWorkflowNode,account,connection:main.FMapTree.FServerConnection,packagePath};
+        return {verified:true};
+      }
+      if(!baseline)return null;
+      const index=native.indexOf(receipt.packageNode),old=expected[index],current=observed[index];
+      if(index<1||!old||current.label!==old.label||receipt.packageNode.PackageName!==old.label
+        ||current.tid!==expected[index-1].tid+'>'+receipt.packageNode.PackageName)return null;
+      if(observed.some((c,i)=>c.label!==expected[i].label||c.tid!==(i<index?expected[i].tid:
+        i===index?current.tid:expected[i].tid.startsWith(old.tid+'>')?current.tid+expected[i].tid.slice(old.tid.length):null)))return null;
+      return {verified:true,rebinding:{prepared_path:expected.map(c=>({...c})),observed_path:observed.map(c=>({...c}))}};
+    };
+    // A canonical path transition cannot turn conflicting verified receipts
+    // into authority, even before the first navigation binding is captured.
+    if(!hasReceiptAuthority(b.workflow_ref,r))return reject('navigation');
+    let navigation=verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length));
+    if(!navigation&&r.nodeNavigationBinding)return reject('navigation');
     const model=card?.Controller?.FController;
     let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
     if(app.ModelForm && model instanceof app.ModelForm) {
@@ -100,7 +148,55 @@ export async function readPreparedNodeContext(page, binding) {
     if(elements.length!==1)return reject('surface_ambiguous');
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
+    // SaveCheckpoint can leave graph breadcrumb keys from the unsaved name;
+    // opening the wizard rerenders them. Rebind only after ALL surface/native
+    // checks above, using the verified preparation and exact tree-object chain.
+    // Never infer ancestry from pathname, labels, GUIDs or matching DOM keys.
+    if(r.nodeNavigationPath&&JSON.stringify(r.nodeNavigationPath)!==JSON.stringify(crumbs.slice(0,b.workflow_ref.navigation_path.length)))return reject('navigation');
+    let navigationAlias;
+    if(navigationChanged&&navigation?.rebinding) {
+      navigationAlias={original_path:b.workflow_ref.navigation_path,path:crumbs.slice(0,b.workflow_ref.navigation_path.length)};
+    } else if(navigationChanged) {
+      const original=b.workflow_ref.navigation_path, current=crumbs.slice(0,original.length);
+      let request;try{request=JSON.parse(r.request);}catch{return reject('navigation');}
+      const path=packageNode.PackageFileName;
+      if(request.intent!=='open_package'||typeof path!=='string'||!path
+        ||'/'+path.replaceAll('\\','/').replace(/^\/+/, '')!==request.packagePath
+        ||JSON.stringify(r.crumbs)!==JSON.stringify(original)
+        ||current.some((c,i)=>c.label!==original[i].label))return reject('navigation');
+      const lineage=[],visited=new Set();
+      for(let n=workflowNode;n&&lineage.length<32&&!visited.has(n);n=n.ParentNode){
+        visited.add(n);lineage.unshift(n);if(n===packageNode)break;
+      }
+      const start=current.length-lineage.length;
+      if(lineage[0]!==packageNode||lineage.at(-1)!==workflowNode||start<2
+        ||current.slice(0,start).some((c,i)=>c.tid!==original[i].tid))return reject('navigation');
+      for(let i=0;i<lineage.length;i++) {
+        const elements=exact(current[start+i].tid),e=elements[0];
+        const component=elements.length===1&&e?.isConnected&&globalThis.Ext?.getCmp(e.id);
+        if(!component||component.el?.dom!==e||component._node?.data?.node!==lineage[i])return reject('navigation');
+      }
+      navigationAlias={original_path:original,path:current}; // Fresh authority, never a cached caller claim.
+    }
+    if(navigation?.rebinding&&surface!=='graph') {
+      // The rebuilt owner suffix must belong to the current native node/wizard,
+      // including port/group ancestors. A duplicate label cannot bind it.
+      const tail=[],visited=new Set();let owner=card.Controller.Node?.data?.node;
+      while(owner&&owner!==workflowNode&&tail.length<32&&!visited.has(owner)) {
+        visited.add(owner);tail.unshift(owner);owner=owner.ParentNode;
+      }
+      const suffix=crumbs.slice(b.workflow_ref.navigation_path.length);
+      if(owner!==workflowNode||suffix.length!==tail.length||suffix.some((c,i)=>{
+        const es=exact(c.tid),e=es.length===1&&es[0],cmp=e&&globalThis.Ext?.getCmp?.(e.id);
+        return cmp?.el?.dom!==e||cmp?._node?.data?.node!==tail[i];
+      }))return reject('navigation_owner');
+    }
+    if(navigationAlias)r.nodeNavigationPath=navigationAlias.path; // Commit only verified transitions, including capture.
+    if(typeof r.request==='string'&&r.request&&!Object.hasOwn(r,'nodePreparedRequest'))Object.defineProperty(r,'nodePreparedRequest',{value:r.request});
+    verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length),true);
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
+      ...(navigation?.rebinding?{navigation_rebinding:navigation.rebinding}:{}),
+      ...(navigationAlias?{navigation_alias:navigationAlias}:{}),
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
