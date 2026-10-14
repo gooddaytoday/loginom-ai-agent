@@ -2,6 +2,10 @@ import { constants } from "node:fs"
 import { lstat, open, realpath } from "node:fs/promises"
 import path from "node:path"
 import { EvalFailure } from "./fail"
+import { globalLockRoot } from "./lease"
+import { loadResourceSlots } from "./slots"
+import type { SlotDefinition } from "./slots"
+import type { checkResourceEvidence } from "./parallel-acceptance"
 import { summarizeResourceSamples } from "./parallel-resource-summary"
 import { validResourceBound } from "./parallel-resource-budget"
 import type { ResourceBound } from "./parallel-resource-budget"
@@ -11,6 +15,75 @@ export async function writeResourceSummary(input: { samplesFile: string; out: st
   const receipt = resourceEvidence(input.samplesFile, await readResourceSource(input.samplesFile)).receipt
   await writeResourceDocument(input.out, receipt)
   return receipt
+}
+
+type ResourceManifest = {
+  version: 1; kind: "parallel-resource-manifest"; run_id: string; fixed_at: string; interval_ms: 1000
+  parallel: number; slots: SlotDefinition[]; state_dir: string
+  coverage: Pick<Parameters<typeof checkResourceEvidence>[0]["coverage"], "paths" | "containers">
+  view: Parameters<typeof checkResourceEvidence>[0]["view"]; budget: { file: string; sha256: string }
+}
+
+export async function freezeResourceManifest(input: {
+  out: string; slotsFile: string; parallel: number; runId: string; containers: ResourceManifest["coverage"]["containers"]
+  view: ResourceManifest["view"]; budget: ResourceManifest["budget"]
+}) {
+  await assertResourceDirectory(input.out)
+  const file = await loadResourceSlots(input.slotsFile)
+  if ([globalLockRoot, input.slotsFile, file.controller.adminCredentialsFile, file.judge.codexHome,
+    ...(file.auth ? [file.auth.sharedDir] : []), ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])]
+    .some(root => input.out === root || input.out.startsWith(root + path.sep) || root.startsWith(input.out + path.sep)))
+    throw new EvalFailure("RESOURCE_OUTPUT_EXPOSED", 2)
+  if (!Number.isSafeInteger(input.parallel) || input.parallel < 1 || input.parallel > file.slots.length ||
+    input.containers.some(container => container.name !== file.server[container.role === "server" ? "container" : "studioContainer"]))
+    throw new EvalFailure("RESOURCE_MANIFEST_INVALID", 2)
+  const slots = file.slots.slice(0, input.parallel)
+  const manifest = requireResourceManifest({ version: 1, kind: "parallel-resource-manifest", run_id: input.runId,
+    fixed_at: new Date().toISOString(), interval_ms: 1000, parallel: input.parallel, slots, state_dir: file.controller.stateDir,
+    coverage: { paths: [file.controller.stateDir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])], containers: input.containers.map(container => ({ role: container.role, id: container.id,
+      image: container.image, startedAt: container.startedAt, name: container.name, nonce: container.nonce, purpose: container.purpose })) },
+    view: { namespace: input.view.namespace, root: { device: input.view.root.device, inode: input.view.root.inode } },
+    budget: { file: input.budget.file, sha256: input.budget.sha256 } })
+  await readFrozenResourceBudget({ ...manifest.budget, runId: input.runId, startedAt: manifest.fixed_at })
+  await writeResourceDocument(input.out, manifest)
+  return { manifest, source: { file: input.out, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(manifest) + "\n").digest("hex") } }
+}
+
+export async function readFrozenResourceManifest(input: { file: string; sha256: string; runId: string; startedAt: string }) {
+  const bytes = await readResourceSource(input.file)
+  if (new Bun.CryptoHasher("sha256").update(bytes).digest("hex") !== input.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+  const manifest = requireResourceManifest(await new Response(bytes).json().catch(() => { throw new EvalFailure("RESOURCE_MANIFEST_INVALID", 2) }))
+  if (manifest.run_id !== input.runId) throw new EvalFailure("RESOURCE_MANIFEST_RUN_MISMATCH", 2)
+  const started = Date.parse(input.startedAt)
+  if (!Number.isFinite(started)) throw new EvalFailure("RESOURCE_MANIFEST_TIME_UNVERIFIED", 2)
+  if (Date.parse(manifest.fixed_at) >= started) throw new EvalFailure("RESOURCE_MANIFEST_NOT_FIXED_BEFORE_RUN", 2)
+  await readFrozenResourceBudget({ ...manifest.budget, runId: input.runId, startedAt: manifest.fixed_at })
+  return manifest
+}
+
+function requireResourceManifest(value: unknown): ResourceManifest {
+  const manifest = resourceObject(value), coverage = resourceObject(manifest.coverage), view = resourceObject(manifest.view)
+  const root = resourceObject(view.root), budget = resourceObject(manifest.budget)
+  const slots = Array.isArray(manifest.slots) ? manifest.slots.map(resourceObject) : []
+  const containers = Array.isArray(coverage.containers) ? coverage.containers.map(resourceObject) : []
+  const canonical = (value: unknown) => typeof value === "string" && path.isAbsolute(value) && path.resolve(value) === value
+  if (manifest.version !== 1 || manifest.kind !== "parallel-resource-manifest" || typeof manifest.run_id !== "string" || !manifest.run_id.trim() ||
+    typeof manifest.fixed_at !== "string" || !Number.isFinite(Date.parse(manifest.fixed_at)) || manifest.interval_ms !== 1000 ||
+    !Number.isSafeInteger(manifest.parallel) || Number(manifest.parallel) < 1 || slots.length !== manifest.parallel || !canonical(manifest.state_dir) ||
+    slots.some(slot => typeof slot.id !== "string" || !slot.id || typeof slot.username !== "string" || !slot.username ||
+      ![slot.profileDir, slot.workspaceRoot, slot.historyDir].every(canonical)) ||
+    new Set(slots.map(slot => slot.id)).size !== slots.length || new Set(slots.map(slot => slot.username)).size !== slots.length ||
+    JSON.stringify(coverage.paths) !== JSON.stringify([manifest.state_dir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])]) ||
+    containers.length !== 2 || ["server", "studio"].some(role => containers.filter(container => container.role === role).length !== 1) ||
+    new Set(containers.map(container => container.id)).size !== 2 || containers.some(container =>
+      typeof container.id !== "string" || !/^[0-9a-f]{64}$/.test(container.id) || typeof container.image !== "string" || !/^sha256:[0-9a-f]{64}$/.test(container.image) ||
+      typeof container.startedAt !== "string" || !Number.isFinite(Date.parse(container.startedAt)) || typeof container.name !== "string" || !container.name ||
+      typeof container.nonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(container.nonce) || !["research", "acceptance"].includes(String(container.purpose))) ||
+    typeof view.namespace !== "string" || !/^cgroup:\[\d+\]$/.test(view.namespace) || !Number.isSafeInteger(root.device) || Number(root.device) < 1 ||
+    !Number.isSafeInteger(root.inode) || Number(root.inode) < 1 || !canonical(budget.file) || typeof budget.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(budget.sha256))
+    throw new EvalFailure("RESOURCE_MANIFEST_INVALID", 2)
+  // Detach every field before publishing the immutable document.
+  return structuredClone(value) as ResourceManifest
 }
 
 export async function freezeResourceBudget(input: { out: string; runId: string; bounds: readonly ResourceBound[] }) {
