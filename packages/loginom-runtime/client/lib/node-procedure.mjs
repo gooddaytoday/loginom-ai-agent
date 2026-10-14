@@ -238,7 +238,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       const deadline = Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, lastOutputDefinition, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
       for (let sample = 0; sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -378,6 +378,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
+        if(outputColumnPage) {
+          // Only the already computed public sample, not a new native read or
+          // readiness proof. Missing facts remain unknown; do not copy UI text.
+          const wizard=result.output.wizard,page=wizard?.output_columns?.page;
+          const text=value=>typeof value==='string'&&value.length<=120?value:null;
+          const integer=value=>Number.isSafeInteger(value)?value:null;
+          lastOutputDefinition={stage:text(wizard?.stage),page:{status:text(page?.status),
+            offset:integer(page?.offset),limit:integer(page?.limit),
+            rendered_start:integer(page?.rendered_start),rendered_end:integer(page?.rendered_end),
+            total_columns:integer(page?.total_columns),schema_id:text(page?.schema_id)},
+            definition_scroll_ref_present:typeof wizard?.output_columns?.definition_scroll_ref==='string'
+              &&wizard.output_columns.definition_scroll_ref.length>0};
+        }
         if(readNavigation)result.output.node_navigation_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the
@@ -425,6 +438,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
+          ...(lastOutputDefinition?{last_output_definition:lastOutputDefinition}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
