@@ -670,7 +670,13 @@ export async function createBridge(config, session, { browserTransport: managedB
       }).catch(value=>{o.phase='refused';o.failure={value};throw value;});
       return o.promise;
     }
-    async function captureAcceptance({signal} = {}) {
+    async function captureAcceptance({signal,request} = {}) {
+      // The closed host grant supplies the original request. Opening and fixed
+      // capture share one controller/lease; a lost reply never reopens it.
+      if(request !== undefined) {
+        if(captureConsumed || captureInFlight)throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
+        await openImportPreconfig(request,{signal,retained:acceptanceCapture?.retained});
+      }
       const binding = acceptanceCapture?.binding;
       if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
         throw Error('LOGINOM_CAPTURE_UNAVAILABLE');

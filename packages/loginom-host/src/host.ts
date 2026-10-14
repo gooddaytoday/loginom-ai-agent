@@ -188,12 +188,13 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
-    authorizeCapture(authorization: unknown, owner?: string, run?: string, chat?: string, lease?: unknown) {
+    authorizeCapture(authorization: unknown, owner?: string, run?: string, chat?: string, lease?: unknown, harness?: string) {
       if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
       const bound=chat?captures.get(chat):undefined
       const leaseGeneration=lease && typeof lease==='object' && 'generation' in lease ? lease.generation : undefined
       return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
         && bound.harness===(options.acceptanceCapture.harness??"calculator-grouped-before-done-v1")
+        && (harness===undefined || bound.harness===harness)
         && bound.expires>Date.now() && captureLeases.get(chat!)===lease
         && Number.isSafeInteger(leaseGeneration) && leaseGeneration===bound.generation
         && generations.get(bound.generation)?.connection.username===bound.account

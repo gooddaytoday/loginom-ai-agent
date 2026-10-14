@@ -146,3 +146,25 @@ test('repair tuple refusal retains first storage error and performs no replay',a
   assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,1);
  }finally{if(moved)renameSync(f.state.session.directory+'-held',f.state.session.directory);await f.cleanup();}
 });
+
+// Atomic private capture must create the genuine original slot itself; callers
+// no longer need a ready handle or a separate open/controller lifetime.
+test('owner request -> bridge opening -> exact latch -> one fixed capture',async()=>{
+ const f=await setup();try {
+  const result=await f.bridge.captureAcceptance({signal:f.signal,request:f.original});
+  assert.equal(result.receipt.publication.operation_id,f.original.operation_id);
+  assert.equal(result.receipt.opening_effect,true);assert.equal(result.diagnosticRead,true);
+  assert.equal(result.cleanupComplete,false);assert.equal(result.receipt.close_authority,false);
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,1);
+  assert.equal(f.calls.filter(c=>c.mode==='read').length,1);
+  assert.equal(f.events.filter(e=>e.event==='fixed_import_preconfigure_observation').length,1);
+  await assert.rejects(f.bridge.captureAcceptance({signal:f.signal,request:f.original}));
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,1);
+  assert.deepEqual(f.dispatch,{configure:0,mapping:0,finish:0,execute:0});
+ }finally{await f.cleanup();}
+});
+for(const [label,change] of Object.entries({mapping:r=>r.mappings=[{direction:'output',port:0}],creation:r=>r.target.kind='new',execute:r=>r.finish='execute',foreign:r=>r.document_id='foreign'}))test('atomic opening refuses '+label+' before native opening',async()=>{
+ const f=await setup();try{change(f.original);await assert.rejects(f.bridge.captureAcceptance({signal:f.signal,request:f.original}));
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,0);assert.equal(f.calls.filter(c=>c.mode==='read').length,0);
+ }finally{await f.cleanup();}
+});

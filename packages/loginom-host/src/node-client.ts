@@ -58,7 +58,10 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
   const options = { ...input }
   diagnostics.set(options, grant)
   const host = await launchNodeHost(options)
-  return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
+  return { ...host, capture: (run: string, request?: unknown) => {
+    if (request !== undefined && harness !== "import-before-configure-v1") throw Error("LOGINOM_METHOD_INVALID")
+    return host.request("acceptance.capture", { run, authorization: grant.authorization, ...(request === undefined ? {} : {request}) })
+  } }
 }
 
 export async function launchNodeHost(input: NodeHostInput) {

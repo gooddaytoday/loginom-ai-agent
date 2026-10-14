@@ -98,8 +98,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (data.method === "acceptance.capture") {
-        if (Object.keys(input).sort().join(",") !== "authorization,run"
-            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, input.run, run.chat, run.lease) || run.captured)
+        const opening = "request" in input
+        const openingRequest = opening ? input.request : undefined
+        const openingRequestBytes = opening ? JSON.stringify(openingRequest) : undefined
+        if (Object.keys(input).sort().join(",") !== (opening ? "authorization,request,run" : "authorization,run")
+            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, input.run, run.chat, run.lease, opening ? "import-before-configure-v1" : undefined) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
         if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
           throw Error("LOGINOM_CALL_BUSY")
@@ -121,14 +124,15 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const assertCapture=()=>{
             assertCaptureGeneration()
             if(state.closed || run.released || runs.get(captureRun)!==run
-                || !service.authorizeCapture?.(authorization,owner,captureRun,run.chat,run.lease))
+                || opening && JSON.stringify(openingRequest)!==openingRequestBytes
+                || !service.authorizeCapture?.(authorization,owner,captureRun,run.chat,run.lease,opening ? "import-before-configure-v1" : undefined))
               throw Error("LOGINOM_RECOVERY_REQUIRED")
           }
           assertCapture()
           id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(id)
           assertCapture()
-          const result = await runtime.request("acceptance.capture")
+          const result = await runtime.request("acceptance.capture",opening ? {request:openingRequest} : undefined)
           assertCapture()
           if (!result || typeof result !== "object" || !("cleanupComplete" in result) || result.cleanupComplete !== true) {
             run.captureRefused = true

@@ -49,7 +49,7 @@ for(const scenario of ['original-import','startup-kind-drift','coupled-kind-drif
   }
   const allowed=bound&&host.authorizeCapture('a'.repeat(64),'owner','run','chat',lease)
   console.log(JSON.stringify({scenario,bound,allowed,originalKind:'import-before-configure-v1',forwardedKind:forwarded?.harness}))
-  if(scenario==='original-import')expect(allowed).toBe(true)
+  if(scenario==='original-import'){expect(allowed).toBe(true);expect(host.authorizeCapture('a'.repeat(64),'owner','run','chat',lease,'import-before-configure-v1')).toBe(true);expect(host.authorizeCapture('a'.repeat(64),'owner','run','chat',lease,'calculator-grouped-before-done-v1')).toBe(false)}
   // Safe implementations may ignore a late caller mutation and retain Import.
   // The required invariant is that a different kind cannot gain authorization.
   else expect(allowed&&forwarded?.harness!=='import-before-configure-v1').toBe(false)
@@ -68,6 +68,7 @@ test('original Calculator default and authorization/path survive outer options r
   expect(forwarded.harness).toBe('calculator-grouped-before-done-v1');expect(forwarded.packagePath).toBe('/own/result.lgp')
   expect(host.authorizeCapture('a'.repeat(64),'owner','run','chat',lease)).toBe(true)
   expect(host.authorizeCapture('b'.repeat(64),'owner','run','chat',lease)).toBe(false)
+  expect(host.authorizeCapture('a'.repeat(64),'owner','run','chat',lease,'import-before-configure-v1')).toBe(false)
  }finally{lease?.release();await host.close()}
 })
 

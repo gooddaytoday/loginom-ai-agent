@@ -16,7 +16,7 @@ for(const fault of ['canonical','missing','duplicate','hash','foreign-path','for
   await copyFile(node,join(root,'bin/node'))
   const resource="export const captureMode='readonly';export function captureImportPreconfig(){};export function validateCaptureResult(){}"
   await writeFile(join(root,fixed),resource)
-  await writeFile(entry,`process.on('message',m=>{if(m.method==='start'){if(m.input.acceptanceCapture?.harness!=='import-before-configure-v1')throw Error('kind lost');process.send({id:m.id,result:{ready:true,protocol:1,pid:process.pid}})}else if(m.method==='acceptance.capture'){process.send({id:m.id,result:{fixture:true,readonly:true,close_authority:false,native_proof:false}})}else if(m.method==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect())});`)
+  await writeFile(entry,`process.on('message',m=>{if(m.method==='start'){if(m.input.acceptanceCapture?.harness!=='import-before-configure-v1')throw Error('kind lost');process.send({id:m.id,result:{ready:true,protocol:1,pid:process.pid}})}else if(m.method==='acceptance.capture'){process.send({id:m.id,result:{fixture:true,readonly:true,close_authority:false,native_proof:false,...(m.input.request?{request:m.input.request}:{})}})}else if(m.method==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect())});`)
   const item={path:fixed,sha256:hash(resource)}
   const files=[{path:'bin/node',sha256:hash(await readFile(join(root,'bin/node')))},...(fault==='missing'?[]:[item])]
   if(fault==='duplicate')files.push({...item});if(fault==='hash')item.sha256='0'.repeat(64);if(fault==='foreign-path')item.path='runtime/src/acceptance/import-before-configure-v1.mjs'
@@ -24,7 +24,7 @@ for(const fault of ['canonical','missing','duplicate','hash','foreign-path','for
   await writeFile(join(product,'cli-manifest.json'),JSON.stringify({format:'loginom-cli-artifact-v1',files:[{path:'resources/loginom/host/node-host.mjs',sha256:hash(await readFile(entry))}]}))
   const input={node:join(root,'bin/node'),entry,root,resources:root,headless:true,environment:{},packagePath:'/own/result.lgp'}
   if(fault==='canonical'){
-   host=await launchImportPreconfigDiagnostic(input);expect(await host.capture('original-run')).toEqual({fixture:true,readonly:true,close_authority:false,native_proof:false})
+   host=await launchImportPreconfigDiagnostic(input);expect(await host.capture('original-run')).toEqual({fixture:true,readonly:true,close_authority:false,native_proof:false});const original={operation_id:'original-opening',target:{kind:'existing',type:'imports.text'}};expect((await host.capture('original-run',original)).request).toEqual(original)
   }else if(fault==='forged-grant')await expect(launchNodeHost({...input,acceptanceCapture:{harness:'import-before-configure-v1'}})).rejects.toThrow('LOGINOM_HANDSHAKE_INVALID')
   else await expect(launchImportPreconfigDiagnostic(input)).rejects.toThrow('LOGINOM_HANDSHAKE_INVALID')
  }finally{await host?.close();await rm(product,{recursive:true,force:true})}

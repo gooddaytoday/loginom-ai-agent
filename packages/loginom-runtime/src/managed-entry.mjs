@@ -317,12 +317,16 @@ async function handle(message) {
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "acceptance.capture") {
-      if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
+      const opening = message.input !== undefined
+      if (opening && (!state.captureRetained || state.captureRetained.binding.harness !== "import-before-configure-v1"
+          || !message.input || typeof message.input !== "object" || Array.isArray(message.input)
+          || Object.keys(message.input).join(",") !== "request" || message.input.request === undefined)
+          || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
       const controller = new AbortController()
       state.controller = controller
       try {
-        const result = await state.bridge.captureAcceptance({signal:controller.signal})
+        const result = await state.bridge.captureAcceptance({signal:controller.signal, ...(opening ? {request:message.input.request} : {})})
         if(result?.diagnosticRead===true) {
           if(!state.captureRetained || state.controller!==controller
               || Date.now()>=result.receipt.publication.deadline)
