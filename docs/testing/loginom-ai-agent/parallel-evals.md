@@ -808,3 +808,11 @@ research/controller/admin-x1eDkF/session-observations.json. Ordinary proxy ID н
 используется как managed identity. Target1 PASS/14 (6.49s); admin integration/
 unit/preflight48 PASS/130 (35.84s), typecheck/diff PASS. Qualification=false;
 обратная scope/CLI/reconnect/close связь требует дальнейшей проверки.
+
+
+Reverse managed row→Session scope control вернул null для всех12 rows, matches0
+с own GUID4caebf76-7323-47e0-91c9-bb383f6cbcb5. Private receipt research/controller/
+admin-QVtacx/session-observations.json сохранил row.sessionGuid:null. TDD missing
+field→GREEN target1 PASS/15 (7.36s), admin integration/unit/preflight48 PASS/131
+(35.95s), typecheck/diff PASS. Qualification=false, identity/close остаются открыты;
+два scope-null controls не объявляют всю платформу unsupported.
