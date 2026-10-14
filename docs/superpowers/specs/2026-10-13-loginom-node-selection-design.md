@@ -1814,3 +1814,54 @@ schema PID1103452 absent/ACKexit0. Explicit schema Logout остаётся false
 No simultaneous Host/admin/CLI/model. Instrumented diagnostic excluded from
 native/model acceptance; Product/payload/pins unchanged. Fresh result pending,
 model slots0, Export/fullnative/18+25 open.
+
+
+Checkpoint 2026-10-14 06:28 UTC — known tooltip cover, no acceptance upgrade.
+Schema independent live PASS
+`e74936500f1f2d006b5800441ffc523c873e286d975ff3da09c8dadb105cf5dc`:
+15public schemas/16freshJSprepare cards/31cachekeys independently reconstructed;
+source5/fixtures4/protected22/effective10/runtime288×2/raw22 unchanged.
+Distinct probe/prepare sessions, same build/runtime/skill; Logoutfalse preserved.
+Known bounds: Calculator/Collapse128 per node, Union14additional/15total,
+fields1000. General variable-unpack gap limited to known15 contracts;
+finite151 composition/universal impossibility not excluded or claimed.
+
+Private U diagnostic Root81562 exit3/result
+`2aac86b9bd1bd93fba14ebcb336290e668f1b2160160f59836d48b5bdde32814`.
+Raw760: nine inViewport points hit one U; fourth ancestor tooltip-2760/ttip/
+x-tip; port connected/sameModel/samePortDom/nativeGUID/input1 confirmed.
+Scroll0→82/780→698 succeeded, nativeopen NOT_APPLIED/effectfalse beforemenu;
+wholeExport AMBIGUOUS/cleanupfalse, noSave/CSV. Reportclippingfalse remains
+default before verifier. Tooltip owner/trigger/lifetime unknown, cachefoundfalse
+is not absent native ownership. Source scroll only sets guarded scrollTop;
+it does not move mouse, so hover on scroll-anchor is not established.
+Diagnosis `83fc9f9ad2014fd7b143b61ae76e6b4fec936de032c1a975b4a2145767b32c89`;
+independent live-stop
+`619dbead9daf11ae6683d511ffc25131db7a136a59a63d1385b5996cd95bb99e`.
+Raw/source/pins intact; instrumented result excluded from acceptance.
+
+Strict own167 binding `a0b179b8d63f4ca50d161b1525db3d6ececf74fbbb88885b3fbb8e7bb5dde030`
+confirmed latestinit06:17:02.249Z plus Import/Sort GUID4serverrows.
+Root soleadmin closed167; twoUIabsence checks06:22:26.359/27.123Z,
+neighbor166 untouched, admin168logout06:22:50.363Z/bridge81629exit0.
+Independent final recovery
+`988ae4d4d793487d642ed75c0719f480761711de6e7a629387bd6b25bcdc354b`:
+serverclose16706:22:25.537Z/admin168logout06:22:50.356Z/noReinit,
+raw23/source4456/fixtures20/protected70/effective10/runtime288×2 unchanged,
+ownPID1111256 absent/.writerabsent. Original failed remains failed.
+
+Prospective surgical design: only after successful own reveal and fresh
+same-owner read, if input0 still has no point, perform ONE existing guarded
+click of exact own Export LABEL, then fresh read/rebind and unchanged native
+openInputPort0/9hits. Actual label point1208,645/bbox1167,637,82,16 is visible
+outside tooltip y686..800, non_script/click allowed. BODY-first selection helper
+is unsuitable here: its computed center1208,710 is covered. No tooltip mutation,
+owner assertion, new hover API or guard waiver. Existing target/signature/
+pre-gesture epoch checks remain required; after valid selection fresh native
+GUID/doc/workflow/graph identity replaces obsolete DOM refs/epoch. If label
+or port remains covered, owner changes, wizard/mask/lock appears, or no exact
+label exists, refusal remains. Visible port/no own reveal means no label click.
+This is own selection with no link/mapping edit; actual disappearance and final
+Save/CSV/graph/cleanup still need proof. Independent design review pending;
+Product/payload unchanged, Root idle/model0. Any Product change requires a new
+matched pair and all native gates/full18+25; current050544 no model slots run.
