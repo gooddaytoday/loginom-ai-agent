@@ -201,6 +201,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
     try {
       await lease.close()
       await expect(connection.createBlockedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
+      await expect(connection.configureOwnedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.observeOwnedSession(lease, path.join(root, "never-read.json"), [])).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.closeOwnedSession(lease, path.join(root, "never-read.json"), "never-read")).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.reconcileUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
@@ -218,6 +219,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
       try {
         const secretFile = path.join(recoveryRoot, "never-read.json")
         await expect(connection.createBlockedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
+        await expect(connection.configureOwnedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.reconcileUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.observeOwnedSession(recovered, secretFile, [])).rejects.toThrow("SLOT_RECOVERY_ONLY")
       } finally { await recovered.close() }
