@@ -1,16 +1,17 @@
 # Локальная приёмка выбора узлов
 
-Текущий checkpoint 2026-10-14 14:17 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588af…`. Первые девять candidate закрыты: пять приняты
-(first-last-touch, sales, monthly, claims/1 и explicit-js/1), четыре technical-failed
-(ABC, ROI, tags, recovery/1). Чистый проход и полная приёмка не подтверждены.
-Baseline sales/1 принят автоматически: CLI0/normalcleanuptrue, oracle и graph
-PASS, JS0calls/nodes; actualHost2138065 ACKexit0, ownCLI/Host завершены.
-Runner автоматически начал baseline ABC/1: dispatch14:15:25.531Z,
-CLI2151728/Session `ses_ec53b2afaffeQZj5knUAPWS0kN`, exec96749 живой.
-Всего started11/closed10/accepted6/technicalfailed4/notstarted20;
-baseline started2/closed1/accepted1. Исходы candidate failures и их доказательства
-сохранены; recovery own release независимо подтверждён `607cd451…`.
+Текущий checkpoint 2026-10-14 14:24 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588af…`. Первые девять candidate закрыты: пять приняты,
+четыре technical-failed (ABC, ROI, tags, recovery/1). Полная приёмка открыта.
+Baseline sales/1 и ABC/1 прошли oracle/calculation/graph/export/normalcleanup.
+Sales использовал JS0; ABC — JS2calls/nodes, поэтому audit policyfailed,
+что допустимо только для baseline и не является candidate policyPASS.
+ABC граф: Import→JS pareto-rows→JS abc-groups→Export. JS→Group этим прогоном
+не подтверждён; JS→Sort ранее подтверждён candidate explicit-js/1.
+Runner автоматически начал baseline monthly/1: dispatch14:22:09.118Z,
+CLI2176513/Session `ses_ec5350c53ffeJWJrjpK3aNuwAs`, тот же exec96749 живой.
+Всего started12/closed11/machineAccepted7/technicalfailed4/notstarted19;
+baseline started3/closed2/calculationPassed2, candidate accepted5/closed9.
 Матрица31, runtime/модель/inputs/oracle/условия прежние; повторов слотов нет.
 
 Источник требований — согласованные spec и plan в `docs/superpowers/`.
@@ -1944,3 +1945,20 @@ Mini6 не равноценен ABC200 по объёму и автономнос
 накопленную/статистическую/условную проверку. Исходный ABC failed сохраняется.
 Альтернатива не запускалась, в31 не засчитывается и не разрешает новый parallel
 Loginom model/session; prospective условия отдельного запуска ещё нужно закрепить.
+
+### 2026-10-14 14:24 UTC — baseline ABC calculation PASS, JS2 и monthly admission
+
+ABC baseline CLI2151728 start14:15:36.979Z/end14:22:08.182Z (391.203с),
+attempt finish14:22:08.985Z (403.453с). Audit `06123cf9…` complete, oracle
+`dd4a3f21…` PASS, LGP `5f9be88c…`, history/runtime/identity/graph/export PASS,
+manual not-required/historyAnomalyfalse. JS2calls/nodes; единственная audit
+failure JAVASCRIPT_NOT_ALLOWED и wrapper1 сохраняются как baseline измерение.
+Frozen gate допускает такой baseline при успешном расчёте; правила candidate
+не ослаблены. ActualHost2152125 ACKtrue/exit0/noSignal, ownCLI/Hostgone.
+Ledgeradvance14:22:09.113Z и monthlydispatch14:22:09.118Z подтверждают auto-next
+без operatorresume. Monthly CLI2176513 start14:22:18.140Z/Session
+ses_ec5350c53ffeJWJrjpK3aNuwAs в том же exec96749. Observedreceipt wx0400 сохранён.
+Идентичность label «Итоги по классам» не означает Group: finalLGP содержит
+Import→JS→JS→Export, actual Group/Sort engines и preflight receipts отсутствуют.
+Независимый targeted readback общего restored helper фиксирует этот предел,
+без повторных oracle/live и без candidate-credit. JS→Group всё ещё не доказан.
