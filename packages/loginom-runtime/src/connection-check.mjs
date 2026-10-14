@@ -35,7 +35,7 @@ export async function loginPage(page, candidate, owner) {
   // Passive diagnostics only. These events never qualify login or cleanup,
   // read application data, renew deadlines, or issue an extra Page request.
   const trace=owner ? (owner.evidence??={}).login_ui={revision:1,source:'original_page_events',
-    owner_id:owner.id,phase:'navigation',events:[],dropped:0,authority:false} : undefined
+    owner_id:owner.id,phase:'navigation',events:[],dropped:0,script_failures:[],script_failures_dropped:0,authority:false} : undefined
   const context=owner?.context,ownerId=owner?.id
   const listeners=[]
   const append=event=>{
@@ -65,8 +65,18 @@ export async function loginPage(page, candidate, owner) {
       return {kind:'response',resource_type:type,same_origin:sameOrigin(response.url()),
         status:Number.isInteger(status)&&status>=100&&status<=599?status:null}
     })
-    listen('requestfailed',request=>({kind:'requestfailed',resource_type:resourceType(request),
-      same_origin:sameOrigin(request.url()),error_sha256:createHash('sha256').update(String(request.failure()?.errorText??'')).digest('hex')}))
+    listen('requestfailed',request=>{
+      const type=resourceType(request),url=request.url(),same=sameOrigin(url),errorText=String(request.failure()?.errorText??'')
+      if(type==='script'&&same&&trace&&!trace.observation_closed&&owner.page===page&&owner.context===context&&owner.id===ownerId) {
+        if(trace.script_failures.length>=30)trace.script_failures_dropped++
+        else {
+          let text=errorText
+          for(const secret of [candidate.password,candidate.apiKey].filter(v=>typeof v==='string'&&v.length))text=text.split(secret).join('[REDACTED]')
+          trace.script_failures.push({pathname:new URL(url).pathname,errorText:text,at:new Date().toISOString()})
+        }
+      }
+      return {kind:'requestfailed',resource_type:type,same_origin:same,error_sha256:createHash('sha256').update(errorText).digest('hex')}
+    })
   if(owner) owner.navigationStarted=true
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   if(owner) {

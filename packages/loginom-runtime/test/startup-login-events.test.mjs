@@ -46,3 +46,19 @@ test('success keeps normal identity read and stops diagnostic collection',async(
  assert.equal(f.owner.evidence.login_ui.phase,'verified');assert.deepEqual(f.events,['goto','evaluate','wait','evaluate']);
  f.page.emit('load');assert.equal(f.owner.evidence.login_ui.events.length,6);
 });
+
+test('script failures have an independent bounded path/error list without query or foreign origin',async()=>{
+ const primary=Error('entry timeout',{cause:0}),f=fixture(primary);
+ const go=f.page.goto;
+ f.page.goto=async()=>{await go();for(let i=0;i<40;i++)f.page.emit('load');
+  for(let i=0;i<35;i++)f.page.emit('requestfailed',{resourceType:()=> 'script',url:()=> 'https://own.invalid/app/js/'+i+'.js?token=secret-query#secret-password',failure:()=>({errorText:'net::ERR_UNKNOWN_URL_SCHEME'})});
+  f.page.emit('requestfailed',{resourceType:()=> 'script',url:()=> 'https://foreign.invalid/private.js',failure:()=>({errorText:'foreign-error'})});
+  f.page.emit('requestfailed',{resourceType:()=> 'image',url:()=> 'https://own.invalid/image.png',failure:()=>({errorText:'image-error'})});
+ };
+ await assert.rejects(loginPage(f.page,f.candidate,f.owner),e=>e===primary);
+ const t=f.owner.evidence.login_ui;assert.equal(t.events.length,32);assert.equal(t.script_failures.length,30);assert.equal(t.script_failures_dropped,6);
+ assert.deepEqual(t.script_failures[0].pathname,'/app/');assert.equal(t.script_failures[0].errorText,'net::ERR_ABORTED [REDACTED]');
+ assert.equal(t.script_failures[29].pathname,'/app/js/28.js');assert.equal(t.script_failures[29].errorText,'net::ERR_UNKNOWN_URL_SCHEME');
+ const raw=JSON.stringify(t.script_failures);for(const secret of ['secret-query','secret-password','secret-key','foreign.invalid','foreign-error','image-error'])assert.equal(raw.includes(secret),false);
+ f.page.emit('requestfailed',{resourceType:()=> 'script',url:()=>f.candidate.url,failure:()=>({errorText:'late'})});assert.equal(t.script_failures.length,30);assert.equal(t.script_failures_dropped,6);
+});
