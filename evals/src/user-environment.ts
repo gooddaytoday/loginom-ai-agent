@@ -4,6 +4,7 @@ import { lstat, open, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { parseSlots, type SlotFile, type SlotLease } from "./slots"
+import type { AdminReply } from "./loginom-admin"
 
 export async function stageUserPreparation(file: SlotFile, lease: SlotLease, desiredHash: string) {
   await lease.assertHeld()
@@ -84,6 +85,64 @@ export async function readUserPreparation(file: SlotFile, lease: SlotLease, secr
   await lease.assertHeld()
   return { version: 2, kind: "user-preparation", nonce: intent.nonce, slotId: lease.slot.id, username: lease.slot.username,
     endpoint: file.server.url, identity: lease.identity, desiredHash: intent.desiredHash, secretFile, secretHash: intent.secretHash, state: "staged" }
+}
+
+export async function claimUserOwnership(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, reply: AdminReply) {
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const owned = await ownershipFromCreation(file, lease, prepared, commandFile, reply)
+  const target = path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)
+  await lease.assertHeld()
+  const handle = await open(target, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "EEXIST") return undefined
+      throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
+    })
+  if (handle) {
+    try { await handle.writeFile(JSON.stringify(owned)); await handle.sync() }
+    finally { await handle.close() }
+    const parent = await open(file.controller.stateDir, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+    try { await parent.sync() } finally { await parent.close() }
+  }
+  const current = await readUserOwnership(file, lease, secretFile)
+  if (JSON.stringify(current) !== JSON.stringify(owned)) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+  return current
+}
+
+export async function readUserOwnership(file: SlotFile, lease: SlotLease, secretFile: string) {
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const value = record(await readLeaseReceipt(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`))
+    .catch(() => { throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2) }))
+  const source = record(value.source)
+  if (typeof source.path !== "string" || typeof source.id !== "string") throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+  const owned = await ownershipFromCreation(file, lease, prepared, source.path, { v: 1, id: source.id, outcome: "confirmed",
+    data: { created: true, user: { objectId: value.objectId, name: value.username, userKind: value.userKind, blocked: true } } })
+  if (JSON.stringify(value) !== JSON.stringify(owned)) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+  await lease.assertHeld()
+  return owned
+}
+
+async function ownershipFromCreation(file: SlotFile, lease: SlotLease, prepared: Awaited<ReturnType<typeof readUserPreparation>>, commandFile: string, reply: AdminReply) {
+  const data = record(reply.data)
+  const user = record(data.user)
+  if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    path.basename(commandFile) !== `${reply.id}.json` || data.created !== true || Object.keys(data).length !== 2 || Object.keys(user).length !== 4 ||
+    typeof user.objectId !== "string" || !user.objectId || user.name !== lease.slot.username || user.userKind !== 0 || user.blocked !== true ||
+    !path.isAbsolute(commandFile) || !commandFile.startsWith(file.controller.stateDir + path.sep) || path.resolve(commandFile) !== commandFile)
+    throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+  const source = record(await readLeaseReceipt(commandFile).catch(() => { throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2) }))
+  const payload = { phase: "blocked", slot: lease.slot, secretFile: prepared.secretFile, preparationNonce: prepared.nonce,
+    desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: null }
+  if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
+    source.op !== "reconcile-user" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(payload)).digest("hex") ||
+    source.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
+    typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
+    !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.settledAt) < Date.parse(source.at)) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+  return { version: 2, kind: "owned-loginom-user", slotId: lease.slot.id, username: lease.slot.username, userKind: 0,
+    preparationNonce: prepared.nonce, identity: lease.identity, userKey: new Bun.CryptoHasher("sha256")
+      .update(JSON.stringify({ generation: prepared.nonce, name: lease.slot.username, userKind: 0 })).digest("hex"),
+    objectId: user.objectId, everActivated: false, source: { path: commandFile, id: reply.id,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") } }
 }
 
 function record(value: unknown): Record<string, unknown> {
