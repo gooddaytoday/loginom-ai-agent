@@ -387,3 +387,13 @@ owner observation содержит exact name/UserKind/objectId/preparationNonce
 Перед Add enumerator освобождается немедленно через ReleaseObject(..., true):
 deferred disposal оставлял read lock и приводил к timeout. Ready phase и parent
 ownership manifest пока закрыты; native capability proof не является admission.
+
+Wire configure phase для supplied owner требует Blocked=true. Local AuthMode,
+password при смене режима/SHA и design flags меняются последовательно; getter
+read-back подтверждает IsAdmin/IsViewer/UseGlobalFileStorage/SchedulerFullAccess=false,
+IsDesigner=true и uamLocal=1. Blocked сохраняется. Unchanged local credential
+не вызывает AuthMode/password setters (native call-site telemetry). Все inspect
+enumerators освобождаются immediate: read-only inspect не оставляет read lock
+перед следующей mutation. Parent должен подтвердить protected ownership и idle
+closure до применения к ранее activated account; один Blocked getter этого
+не доказывает. ACL/unblock/admission пока не квалифицированы.

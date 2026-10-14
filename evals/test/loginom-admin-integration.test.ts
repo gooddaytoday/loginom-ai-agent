@@ -69,6 +69,14 @@ liveIntegration("native user capability: creates one blocked account and refuses
       const users = (observation.data as { users: { name: string }[] }).users.filter(user => user.name === credentials.username)
       expect(users).toHaveLength(1)
       expect(users[0]).toMatchObject({ userKind: 0, blocked: true })
+      const owned = { objectId: user.objectId, name: user.name, userKind: 0, preparationNonce: payload.preparationNonce, secretHash: null }
+      const configured = await request("reconcile-user", { ...payload, phase: "configure", owned })
+      expect(configured).toMatchObject({ outcome: "confirmed", data: { passwordChanged: true, authModeChanged: true, secretHash: payload.secretHash,
+        user: { objectId: user.objectId, name: credentials.username, userKind: 0, blocked: true, authMode: 1,
+          isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false } } })
+      const reused = await request("reconcile-user", { ...payload, phase: "configure", owned: { ...owned, secretHash: payload.secretHash } })
+      expect(reused).toMatchObject({ outcome: "confirmed", data: { passwordChanged: false, authModeChanged: false, secretHash: payload.secretHash,
+        user: (configured.data as { user: unknown }).user } })
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)
@@ -82,6 +90,8 @@ liveIntegration("native user capability: creates one blocked account and refuses
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(1)
       }
     }
   } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
