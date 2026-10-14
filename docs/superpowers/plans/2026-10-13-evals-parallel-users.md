@@ -520,6 +520,8 @@ expect(a.processCleanup.processes.some(item => item.pid === bRootPid)).toBe(fals
 
 - [ ] Отдельно измерить задержку **между запланированным и фактическим запуском** proc observations и разрыв между scans под нагрузкой двух слотов; `observations.max_duration_ms` измеряет время самого scan и не заменяет это измерение.
 - [ ] Проверить `bun test test/process-supervisor.test.ts`, `bun typecheck`, затем real Chromium немодельный smoke. Если узкие исправления не доказывают границу, фиксировать процессный blocker live; ACL Loginom не использовать как объяснение безопасности процессов.
+- [x] Подзадача 6/2: native installed gate воспроизвёл ADMIN_RUNTIME_INVALID до dispatch, так как manifest chrome-sandbox имеет полный mode04755 (observed root:root04755). Harness runtime validator принимает 0..07777 и сравнивает все permission bits, не отбрасывает SUID; потеря SUID даёт ADMIN_RUNTIME_MODE. Public real-FS RED→GREEN, 23 preflight tests/48 assertions и typecheck PASS. Fixture использует /bin/chmod: Bun chmod маскирует special bits. Chromium smoke следующий, live admin не квалифицирован.
+
 - [ ] Настоящие Bun/PID fixtures остаются в unit `process-supervisor.test.ts`; bundled Chromium, bwrap и trusted admin scenario — в `process-supervisor-integration.test.ts`. Запустить его отдельно на этом хосте с receipt и доступным установленным prod runtime; shared OAuth не требуется.
 - [x] Коммит `fix(evals): preserve process ownership across parallel supervisors`: первый registry tracer завершён; остальные gates задачи 6 выше сохраняют отдельные открытые checkbox.
 
