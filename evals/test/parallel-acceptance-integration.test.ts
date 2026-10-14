@@ -5,7 +5,7 @@ import { chmod, mkdtemp, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
-import { assessCgroupCoverage, assessResourceTimeline } from "../src/parallel-acceptance"
+import { assessCgroupCoverage, assessResourceTimeline, checkResourceEvidence } from "../src/parallel-acceptance"
 import { writeResourceSummary } from "../src/parallel-resource-evidence"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
@@ -322,6 +322,8 @@ console.log(JSON.stringify(await pending))
 test("resource timeline covers an actual owned command through confirmed cleanup at one-second cadence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-timeline-"))
   const samplesFile = path.join(root, "samples.jsonl"), abort = new AbortController()
+  const budget = { version: 1, kind: "parallel-resource-budget", run_id: "timeline-smoke", fixed_at: new Date().toISOString(),
+    bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] }
   const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "timeline-smoke", phase: "run", signal: abort.signal })
   try {
     const deadline = Date.now() + 5000
@@ -329,6 +331,7 @@ test("resource timeline covers an actual owned command through confirmed cleanup
       if (Date.now() > deadline) throw Error("Timeline collector did not start")
       await Bun.sleep(10)
     }
+    while (Date.now() <= Date.parse(budget.fixed_at)) await Bun.sleep(1)
     const startedAt = new Date().toISOString()
     const owned = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: root,
       env: { PATH: process.env.PATH! }, timeoutMs: 3000, owner: { kind: "command", id: "timeline-smoke" } })
@@ -344,5 +347,19 @@ test("resource timeline covers an actual owned command through confirmed cleanup
     expect(assessResourceTimeline({ samples, intervalMs: 1000, startedAt, finishedAt })).toEqual({ status: "passed", codes: [] })
     expect(samples.length).toBeGreaterThanOrEqual(2)
     expect(samples.every(sample => sample.missed_intervals === 0)).toBe(true)
+    const receipt = await writeResourceSummary({ samplesFile, out: path.join(root, "summary.json") })
+    const request = { file: path.join(root, "summary.json"), samplesFile, runId: "timeline-smoke",
+      startedAt, finishedAt, coverage: { paths: [root], containers: [], owners: [] }, view: samples[0].host.collector_cgroup.view, budget }
+    const result = await checkResourceEvidence(request)
+    expect(result).toMatchObject({ status: "passed", codes: [], source: receipt.source })
+    expect(Object.keys(result.checks)).toEqual(["timeline", "coverage", "cgroups", "budget"])
+    expect(await checkResourceEvidence({ ...request, budget: null })).toMatchObject({ status: "incomplete", codes: ["RESOURCE_BUDGET_MISSING"] })
+    expect(await checkResourceEvidence({ ...request, finishedAt: new Date(Date.parse(finishedAt) + 10000).toISOString(),
+      budget: { ...request.budget, bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: null, maximum: 0 }] } }))
+      .toMatchObject({ status: "failed", codes: ["RESOURCE_TIMELINE_UNBRACKETED", "RESOURCE_BUDGET_EXCEEDED"] })
+    await expect(checkResourceEvidence({ ...request, runId: "other-run" })).rejects.toThrow("RESOURCE_RECEIPT_CONTEXT_MISMATCH")
+    await writeFile(samplesFile, (await Bun.file(samplesFile).text()) + "\n")
+    await expect(checkResourceEvidence(request)).rejects.toThrow("RESOURCE_SOURCE_HASH_MISMATCH")
+    expect(await Bun.file(path.join(root, "summary.json")).json()).toEqual(receipt)
   } finally { abort.abort(); await collecting; await rm(root, { recursive: true, force: true }) }
 }, 10000)
