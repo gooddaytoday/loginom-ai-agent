@@ -106,7 +106,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name, createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect,
             packageCount: await row.Count, activeOperations: null })
         }
+        const ownManaged = await bg.ScopeFindObjectAsync(session, bg.IBGManagedSessionInfo)
         return { sessions: rows, ownSession: { guid: String(await session.Guid),
+          managedObjectId: ownManaged ? (await bg.ProxyObjectsHelper.GetObjectId(ownManaged)).toString() : null,
           objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() } }
       }))
       respond(id, "confirmed", { identity, rawSessions: observation.sessions, ownSession: observation.ownSession, sessionIdentityQualified: false })

@@ -89,11 +89,11 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (jsonObject(data) && data.sessionIdentityQualified === false && Array.isArray(data.rawSessions)) {
         const own = jsonObject(data.ownSession) ? data.ownSession : {}
         if (JSON.stringify(data.identity) !== JSON.stringify(identity) || typeof own.guid !== "string" || !own.guid ||
-          typeof own.objectId !== "string" || !own.objectId || data.rawSessions.some(row => !jsonObject(row) ||
+          typeof own.objectId !== "string" || !own.objectId || own.managedObjectId !== null && typeof own.managedObjectId !== "string" || data.rawSessions.some(row => !jsonObject(row) ||
             typeof row.objectId !== "string" || !row.objectId || typeof row.name !== "string" || typeof row.pendingDisconnect !== "boolean" ||
             !Number.isSafeInteger(row.packageCount) || Number(row.packageCount) < 0)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
         await writeLeaseReceipt(path.join(directory, "session-observations.json"), { version: 1, kind: "admin-session-observations", identity,
-          sessionIdentityQualified: false, ownSession: { guid: own.guid, objectId: own.objectId }, sessions: data.rawSessions.map(row => {
+          sessionIdentityQualified: false, ownSession: { guid: own.guid, objectId: own.objectId, managedObjectId: own.managedObjectId }, sessions: data.rawSessions.map(row => {
             const session = row as Record<string, unknown>
             return { objectId: session.objectId, name: session.name, createdAt: typeof session.createdAt === "string" ? session.createdAt : null,
               pendingDisconnect: session.pendingDisconnect, packageCount: session.packageCount, activeOperations: null }
