@@ -1,14 +1,13 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint 2026-10-14 12:47 UTC: разрешённые исправления восстановлены
-(d3cd4e46f9, 713 targeted PASS). Итоговая matched пара112452/runtime659588…;
-обычный живой Import→Sort→Export прошёл до модельной серии.
-ABC/1 technical-failed сохранён; own release независимо подтверждён.
-First-last-touch/1, sales-by-category/1 и monthly-demand/1 приняты: JS0,
-oracle/graph/export/identity/close PASS. Sales и monthly приняты автоматически.
-Same frozen31 sequential runner без ручной паузы начал risky-approved-claims/1,
-CLI1967137 started12:45:53.007Z, Session ses_ec58d52b0ffesM1zyvCNz7sATr.
-Started5/closed4/technicalfailed1/accepted3/notstarted26/baseline0.
+Текущий checkpoint 2026-10-14 12:55 UTC: итоговая matched пара112452/runtime659588…
+с разрешёнными восстановленными исправлениями (d3cd4e46f9,713targetedPASS).
+First-last-touch/1, sales-by-category/1 и monthly-demand/1 приняты;0JS, oracle/
+graph/export/close PASS. ABC/1 остаётся technical-failed с подтверждённымownrelease.
+Risky-approved-claims/1 завершён12:53:25.366Z: machinePASS/JS0/CLI0/cleanuptrue,
+HostACKexit0/ownPIDgone/.writerabsent; mandatorymanualreview аномалии filter1→2 pending.
+Same frozen31 runnerexec36709 terminalexit2; доreviewgate новый model не запускается.
+Started5/closed5/accepted3/technicalfailed1/pendingreview1/notstarted26/baseline0.
 Полная приёмка открыта; повторы admittedslots запрещены, старые outcomes исторические.
 
 
@@ -2638,3 +2637,17 @@ Started5/closed4/accepted3/technicalfailed1/notstarted26/baseline0; полный
 и6baseline всё ещё обязательны. Main31 task остаётся незавершённой.
 Закрытыеreport amendments готовятся параллельно без повторных oracle/live/model/tests.
 ТехническийABCотказ/denominator сохранён; полнаяприёмка и сравнение не утверждаются.
+
+Checkpoint 2026-10-14 12:55 UTC — claims/1 machine PASS, обязательное review pending.
+Attempt12:53:25.366Z CLI1967137exit0/normalcleanuptrue/0JS; audit0bb6b13f… complete
+policy/calculation/oracle/history/runtime/identity/graph/export=true/failures[]/
+reviewnotrequired. SavedLGPc30350d7…/oracleaaa80edf…;72filteredclaims/4policyrows.
+Closure.historyAnomalytrue: первичная настройкаfilter-approved-highfraud-1 и исправление
+filter-approved-highfraud-2 требуют независимого семантического/эффектного ревью.
+Runnerexec36709 terminalexit2, ledger12:53:25.530Z MANUAL_REVIEW_REQUIRED.
+Originalmachineaudit0400 сохранён вslot/selection-audit-before-manual-review.json;
+Rootreleaseobservation12:54:48: CLI1967137/Host1967501 absent/.writerabsent/.activeabsent.
+Host closed_acktrue/exit0/noSignal/noError. Branch_base ownsmanualreview толькоclosed
+artifacts; reportготовитсяпараллельно. Доgraph-review+auditrefresh+puregate accepted3.
+Started5/closed5/technicalfailed1/pendingreview1/notstarted26/baseline0.
+Истории/исходныеevidence/pins/lock/модель/runtime не менялись; повторовmodelsнет.

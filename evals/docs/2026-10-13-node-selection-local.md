@@ -1731,3 +1731,17 @@ Started5/closed4/accepted3/technicalfailed1/notstarted26/baseline0; полный
 и6baseline всё ещё обязательны. Main31 task остаётся незавершённой.
 Закрытыеreport amendments готовятся параллельно без повторных oracle/live/model/tests.
 ТехническийABCотказ/denominator сохранён; полнаяприёмка и сравнение не утверждаются.
+
+Checkpoint 2026-10-14 12:55 UTC — claims/1 machine PASS, обязательное review pending.
+Attempt12:53:25.366Z CLI1967137exit0/normalcleanuptrue/0JS; audit0bb6b13f… complete
+policy/calculation/oracle/history/runtime/identity/graph/export=true/failures[]/
+reviewnotrequired. SavedLGPc30350d7…/oracleaaa80edf…;72filteredclaims/4policyrows.
+Closure.historyAnomalytrue: первичная настройкаfilter-approved-highfraud-1 и исправление
+filter-approved-highfraud-2 требуют независимого семантического/эффектного ревью.
+Runnerexec36709 terminalexit2, ledger12:53:25.530Z MANUAL_REVIEW_REQUIRED.
+Originalmachineaudit0400 сохранён вslot/selection-audit-before-manual-review.json;
+Rootreleaseobservation12:54:48: CLI1967137/Host1967501 absent/.writerabsent/.activeabsent.
+Host closed_acktrue/exit0/noSignal/noError. Branch_base ownsmanualreview толькоclosed
+artifacts; reportготовитсяпараллельно. Доgraph-review+auditrefresh+puregate accepted3.
+Started5/closed5/technicalfailed1/pendingreview1/notstarted26/baseline0.
+Истории/исходныеevidence/pins/lock/модель/runtime не менялись; повторовmodelsнет.
