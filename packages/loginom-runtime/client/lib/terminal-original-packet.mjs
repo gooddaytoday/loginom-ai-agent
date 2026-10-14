@@ -184,6 +184,9 @@ export function checkTerminalInitialCustody(initial,page) {
 export function terminalInitialDeadline(initial,page) {
   checkTerminalInitialCustody(initial,page);return initials.get(initial).owner.deadline;
 }
+export function terminalInitialAccount(initial,page) {
+  checkTerminalInitialCustody(initial,page);return initials.get(initial).owner.account;
+}
 export async function prepareTerminalOriginalPacket(initial,input) {
   const entry=initials.get(initial);if(!entry)fail('INITIAL');
   try{entry.check()}catch(error){if(entry.preparationRejected)return entry.preparing;throw error}

@@ -1,4 +1,4 @@
-import {checkTerminalInitialCustody,terminalInitialDeadline} from './terminal-original-packet.mjs';
+import {checkTerminalInitialCustody,terminalInitialDeadline,terminalInitialAccount} from './terminal-original-packet.mjs';
 // Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
 export async function prepareWorkspace(page, options, terminal) {
   const assertOriginal=()=>{if(terminal!==undefined)checkTerminalInitialCustody(terminal,page)};
@@ -25,7 +25,7 @@ export async function prepareWorkspace(page, options, terminal) {
     authenticated, created_draft: createdDraft, effect_possible: effectPossible,
     operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
   // Only cached, read-only Loginom getters; never execute package or server methods.
-  const inspect = async mode => page.evaluate(({ mode, options, retainOriginalRealm }) => {
+  const inspect = async mode => page.evaluate(({ mode, options, retainOriginalRealm, expectedAccount }) => {
     const key = '__loginomDockPreparationV1';
     let state = globalThis[key];
     if (!state || state.document !== document) state = globalThis[key] = {
@@ -43,14 +43,16 @@ export async function prepareWorkspace(page, options, terminal) {
       };
       const root=globalThis,app=ref(ref(root,'bg'),'app'),main=ref(ref(ref(app,'Application'),'FInstance'),'FMainForm');
       const connection=ref(ref(main,'FMapTree'),'FServerConnection'),nativeSession=ref(connection,'Session');
+      const account=ref(connection,'UserName');if(account!==expectedAccount)throw Error('TERMINAL_REALM_ACCOUNT_CHANGED');
       const rpc=ref(root,'rpc'),bg=ref(root,'bg'),bgRpc=ref(bg,'rpc');
-      const bindings={document,preparation:state,receipts:ref(state,'receipts'),connection,nativeSession,
+      const bindings={document,preparation:state,receipts:ref(state,'receipts'),connection,nativeSession,account,
         ObjectProxy:ref(rpc,'TBGObjectProxy'),FileStorage:ref(bgRpc,'TIBGFileStorage_Proxy'),
         StreamPersistProxy:ref(bgRpc,'TIBGStreamPersist_Proxy'),StreamPersist:ref(bg,'IBGStreamPersist'),
         ss:ref(root,'ss'),GuidHelper:ref(rpc,'GuidHelper'),MessageDynamicData:ref(rpc,'TBGMessageDynamicData'),HResult:ref(rpc,'HResult')};
       Object.assign(bindings,{ObjectProxyPrototype:ref(bindings.ObjectProxy,'prototype'),
         FileStoragePrototype:ref(bindings.FileStorage,'prototype'),StreamPersistPrototype:ref(bindings.StreamPersistProxy,'prototype'),
         sessionMessages:ref(nativeSession,'$M'),sessionCompletion:ref(nativeSession,'$R'),sessionDispatch:ref(nativeSession,'DispatchMessageAsync')});
+      bindings.messageReader=ref(bindings.sessionMessages,'GetDynamicData');
       Object.assign(bindings,{query:ref(bindings.ObjectProxyPrototype,'QueryInterface'),
         connected:ref(bindings.FileStoragePrototype,'get_Connected'),currentDirectory:ref(bindings.FileStoragePrototype,'get_CurrentDirectory'),
         ownDirectory:ref(bindings.FileStoragePrototype,'get_IsOwnCurrentDirectory'),rootPath:ref(bindings.FileStoragePrototype,'get_RootPath'),
@@ -171,7 +173,7 @@ export async function prepareWorkspace(page, options, terminal) {
           available_width:screen.availWidth,available_height:screen.availHeight}};
     }
     return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid};
-  }, {mode, options, retainOriginalRealm:terminal!==undefined});
+  }, {mode, options, retainOriginalRealm:terminal!==undefined,expectedAccount:terminal===undefined?undefined:terminalInitialAccount(terminal,page)});
   try {
     const current = page.url() === 'about:blank' ? null : await checked(()=>(page.evaluate(() => ({origin:location.origin,pathname:location.pathname}))));
     if (page.url() !== 'about:blank' && (current.origin !== options.origin || current.pathname !== options.pathname)) {

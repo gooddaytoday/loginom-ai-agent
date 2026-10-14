@@ -18,9 +18,10 @@ test('browser capture is before UI effect and retains raw same-realm document/Ma
  }return result};
  await start();assert(captured);
 }));
-for(const variant of ['session','export','prototype','query'])test('realm '+variant+' replacement stops next UI/native dispatch',()=>control(async(f,start)=>{
+for(const variant of ['session','export','prototype','query','account'])test('realm '+variant+' replacement stops next UI/native dispatch',()=>control(async(f,start)=>{
  const evaluate=f.page.page.evaluate;let swapped=false;
  f.page.page.evaluate=async function(fn,args){const result=await evaluate.call(this,fn,args);if(args?.mode==='lookup'&&!swapped){swapped=true;
+  if(variant==='account')f.page.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName='foreign';
   if(variant==='session')f.page.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={};
   if(variant==='export')f.page.context.rpc.TBGObjectProxy={};
   if(variant==='prototype')f.page.context.rpc.TBGObjectProxy.prototype={};
