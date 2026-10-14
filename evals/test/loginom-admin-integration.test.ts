@@ -189,6 +189,10 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   const connection = await openLoginomAdmin(file, identity)
   try {
     expect(connection.identity).toEqual(identity)
+    const policy = await connection.inspectPolicy()
+    expect(policy.identity).toEqual(identity)
+    expect(policy.sharedDirectories).toHaveLength(2)
+    expect(policy.sharedDirectories.every(directory => directory.permissions.some(principal => principal.name === "Everyone" && principal.userKind === 2))).toBe(true)
     await expect(connection.inspect()).rejects.toThrow("SESSION_IDENTITY_UNSUPPORTED")
     const root = await mkdtemp(path.join(tmpdir(), "evals-admin-closed-lease-"))
     const fixture = await parallelFixture(root)
