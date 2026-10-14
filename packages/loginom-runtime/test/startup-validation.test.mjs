@@ -45,7 +45,7 @@ function fixture(directory,phase,rejected){
  const require=name=>{if(phase==='require'||phase==='knowledge-require')throw rejected;return name==='playwright-core'?{chromium:{async launchPersistentContext(){events.push('launch');if(phase==='launch')throw rejected;return context}}}:
   name.includes('streamableHttp')?{StreamableHTTPClientTransport:class{}}:{Client}};
  const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,writeFile,join,randomUUID,URL,process,Error,
-  browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>''});
+  browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>'',terminalUserPublisherScript:()=>''});
  const options={profile:directory,browserPath:'/fixture',candidate:{url:'https://loginom.invalid/app',username:'user',password:'',apiKey:'fixture'},endpoint:'https://knowledge.invalid',owner};
  return {owner,options,functions,events,context,page,logout:()=>logout,contextClose:()=>contextClose};
 }

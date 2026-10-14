@@ -1,3 +1,4 @@
+import {terminalUserPublisherInspectorSource} from './terminal-user-publisher.mjs';
 import {checkTerminalInitialCustody,terminalInitialDeadline,terminalInitialAccount} from './terminal-original-packet.mjs';
 // Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
 export async function prepareWorkspace(page, options, terminal) {
@@ -25,7 +26,7 @@ export async function prepareWorkspace(page, options, terminal) {
     authenticated, created_draft: createdDraft, effect_possible: effectPossible,
     operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
   // Only cached, read-only Loginom getters; never execute package or server methods.
-  const inspect = async mode => page.evaluate(({ mode, options, retainOriginalRealm, expectedAccount }) => {
+  const inspect = async mode => page.evaluate(({ mode, options, retainOriginalRealm, expectedAccount, expectedUserPublisherInspectorSource }) => {
     const key = '__loginomDockPreparationV1';
     let state = globalThis[key];
     if (!state || state.document !== document) state = globalThis[key] = {
@@ -70,6 +71,21 @@ export async function prepareWorkspace(page, options, terminal) {
         persist:ref(bindings.StreamPersistPrototype,'SaveToStream')});
       if(ref(fileStorage,'get_Connected')!==bindings.connected||ref(fileStorage,'QueryInterface')!==bindings.query)
         throw Error('TERMINAL_REALM_STORAGE_REPRESENTATION');
+      const userPublisherDescriptor=Object.getOwnPropertyDescriptor(root,'__loginomOriginalUserPublisherV1');
+      if(userPublisherDescriptor){
+        const userPublisher=ref(root,'__loginomOriginalUserPublisherV1'),userPublisherInspect=ref(userPublisher,'inspect');
+        if(!Object.isFrozen(userPublisher)||typeof userPublisherInspect!=='function'
+          ||Function.prototype.toString.call(userPublisherInspect)!==expectedUserPublisherInspectorSource)throw Error('TERMINAL_REALM_USER_PUBLISHER');
+        const userReceipt=Reflect.apply(userPublisherInspect,userPublisher,[]);
+        const receiptRef=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);
+          if(!d||!('value'in d))throw Error('TERMINAL_REALM_USER_PUBLISHER');return d.value;};
+        if(!Object.isFrozen(userReceipt)||receiptRef(userReceipt,'document')!==document
+          ||receiptRef(receiptRef(userReceipt,'bindings'),'transport')!==nativeSession)throw Error('TERMINAL_REALM_USER_PUBLISHER');
+        // Preserve references only, never serialize the receiver or its task.
+        Object.assign(bindings,{userPublisher,userPublisherInspect,user:receiptRef(userReceipt,'user'),
+          userTask:receiptRef(userReceipt,'task'),userReceiver:receiptRef(userReceipt,'receiver'),
+          originalUserSet:receiptRef(userReceipt,'originalSet'),originalUserInit:receiptRef(userReceipt,'originalInit')});
+      }
       const descriptor=Object.getOwnPropertyDescriptor(state,'terminalOriginalRealm');
       if(descriptor&&!('value' in descriptor))throw Error('TERMINAL_REALM_ACCESSOR');
       if(descriptor) {
@@ -89,7 +105,7 @@ export async function prepareWorkspace(page, options, terminal) {
         // cannot supply the original argument of CurrentUser.Set.
         Object.defineProperty(state,'terminalOriginalRealm',{value:Object.freeze({...bindings,
           slots:Object.freeze(slots.map(slot=>Object.freeze(slot))),
-          nativeReceiversQualified:false,reason:'ORIGINAL_USER_BEFORE_PROJECTION_NOT_RETAINED'})});
+          nativeReceiversQualified:false,reason:bindings.user?'LOADED_NATIVE_PROVIDER_NOT_BOUND':'ORIGINAL_USER_BEFORE_PROJECTION_NOT_RETAINED'})});
       }
     }
     const visible = e => !!e && !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height
@@ -196,7 +212,8 @@ export async function prepareWorkspace(page, options, terminal) {
           available_width:screen.availWidth,available_height:screen.availHeight}};
     }
     return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid};
-  }, {mode, options, retainOriginalRealm:terminal!==undefined,expectedAccount:terminal===undefined?undefined:terminalInitialAccount(terminal,page)});
+  }, {mode, options, retainOriginalRealm:terminal!==undefined,expectedAccount:terminal===undefined?undefined:terminalInitialAccount(terminal,page),
+    expectedUserPublisherInspectorSource:terminal===undefined?undefined:terminalUserPublisherInspectorSource});
   try {
     const current = page.url() === 'about:blank' ? null : await checked(()=>(page.evaluate(() => ({origin:location.origin,pathname:location.pathname}))));
     if (page.url() !== 'about:blank' && (current.origin !== options.origin || current.pathname !== options.pathname)) {

@@ -2,6 +2,7 @@ import { createRequire } from "node:module"
 import { mkdir, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
+import { terminalUserPublisherScript } from "../client/lib/terminal-user-publisher.mjs"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
 
@@ -215,7 +216,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       viewport: launch.viewport,
     })
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
-    await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
+    await owner.context.addInitScript({content:browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)})
     const result=await loginPage(owner.page,candidate,owner)
     if(!keepOpen) {await owner.close();return result}
     return {...result,context:owner.context}

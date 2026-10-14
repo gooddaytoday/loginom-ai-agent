@@ -167,6 +167,7 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
   const realm=realmDescriptor?.value;
   if(realm&&(data(realm,'connection')!==values.connection||data(realm,'nativeSession')!==values.nativeSession
     ||data(realm,'fileStorage')!==start.nativeRefs.fileStorage||data(realm,'account')!==values.account))fail('FOREIGN_CREATION');
+  if(realm&&Object.hasOwn(realm,'user')&&data(realm,'user')!==start.nativeRefs.currentUser)fail('FOREIGN_CREATION');
   const original=Object.freeze({...start.owner,...start.nativeRefs,tab:values.tab,
     packageNode:values.packageNode,packageProxy:proxy,path:values.path});
   const check=()=>{
@@ -182,6 +183,15 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
         ||data(data(realm,'applicationSession'),'$S')!==values.nativeSession
         ||data(values.connection,'FUsername')!==values.account
         ||data(data(realm,'urlUtils'),'FFileStorage')!==start.nativeRefs.fileStorage)fail('NATIVE_REPLACED');
+      if(Object.hasOwn(realm,'user')){
+        const publisher=data(realm,'userPublisher'),inspect=data(realm,'userPublisherInspect');
+        if(data(publisher,'inspect')!==inspect)fail('NATIVE_REPLACED');
+        const held=Reflect.apply(inspect,publisher,[]);
+        if(data(held,'document')!==values.document||data(held,'user')!==start.nativeRefs.currentUser
+          ||data(held,'task')!==data(realm,'userTask')||data(held,'receiver')!==data(realm,'userReceiver')
+          ||data(held,'originalSet')!==data(realm,'originalUserSet')
+          ||data(held,'originalInit')!==data(realm,'originalUserInit'))fail('NATIVE_REPLACED');
+      }
       for(const slot of data(realm,'slots')){
         let effective=slot.object;for(const member of slot.chain){
           if(effective!==member)fail('NATIVE_REPLACED');
