@@ -1,18 +1,37 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint 2026-10-14 14:24 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588af…`. Первые девять candidate закрыты: пять приняты,
-четыре technical-failed (ABC, ROI, tags, recovery/1). Полная приёмка открыта.
-Baseline sales/1 и ABC/1 прошли oracle/calculation/graph/export/normalcleanup.
-Sales использовал JS0; ABC — JS2calls/nodes, поэтому audit policyfailed,
-что допустимо только для baseline и не является candidate policyPASS.
-ABC граф: Import→JS pareto-rows→JS abc-groups→Export. JS→Group этим прогоном
-не подтверждён; JS→Sort ранее подтверждён candidate explicit-js/1.
-Runner автоматически начал baseline monthly/1: dispatch14:22:09.118Z,
-CLI2176513/Session `ses_ec5350c53ffeJWJrjpK3aNuwAs`, тот же exec96749 живой.
-Всего started12/closed11/machineAccepted7/technicalfailed4/notstarted19;
-baseline started3/closed2/calculationPassed2, candidate accepted5/closed9.
-Матрица31, runtime/модель/inputs/oracle/условия прежние; повторов слотов нет.
+## Действующая приёмка: политика выбора узлов, версия 2
+
+Прямое указание пользователя от2026-10-14 заменяет функциональные пороги
+приёмки цели. Канонические критерии: [acceptance-v2](../specs/2026-10-14-loginom-node-selection-acceptance-v2.md),
+version `node-selection-policy-v2`, SHA `5b5053d14aecf7462e317b75fa3a14fa3bff6717080128edf0da582171a015fa`.
+Для плана путь к файлу — `../specs/2026-10-14-loginom-node-selection-acceptance-v2.md`.
+Policy, аналитика и runtime/normalcleanup оцениваются независимо. Не требуются
+100% успешных расчётов, все functional PASS или превосходство над baseline.
+Отказы и original verdicts сохраняются. Технический отказ с достаточными
+содержательными решениями и полной историей может подтвердить policy;
+prepare/import-only отказ получает insufficient-evidence, а не PASS из-за JS0.
+Положительные explicit-JS/gap и error→standard-fix-or-blocker без JS обязательны.
+Whole construction history включает временные/failed JS и child sessions.
+Matrix31, mandatory reviews, candidate violation stop и strict own release
+не меняются. Baseline описательный; дополнительные альтернативы только при
+недостаточном policy coverage, а не ради functional100%. Original frozenprotocol
+и его gates ниже — история условий запуска, не действующие пороги приёмкиv2.
+Новые policy-v2 sidecars ссылаются на criteria/protocol/evidence SHA и не меняют
+original attempt/audit. Runtime и76locked source files неизменны; rebuild не нужен.
+
+Текущий checkpoint 2026-10-14 14:40 UTC: matched `20261014T112452Z-5e223f`,
+runtime659588…/sourcefdc4ac455e/76frozenfiles unchanged. Candidate9 закрыты:
+original5accepted+4technicalfailed; идут отдельные policy-v2 reviews на старых
+evidence без upgrade аналитики/runtime. Baseline4 закрыты: sales/ABC/monthly
+calculationPASS, claims technicalfailed на import configure/UI_SCAN_LIMIT
+до содержательной аналитики. Monthly finished14:30:58.106Z/JS0/normalcleanuptrue;
+claims finished14:33:03.911Z/CLI2196483exit1/normalcleanupfalse. Runner96749
+terminalexit1, own profile guard удержан; новых моделей нет. Started13/closed13/
+machineAccepted8/technicalfailed5/notstarted18. NextbaselineROI толькоstrictrelease.
+Критерииv2 записаны14:33:36.064Z до следующего dispatch; initialmetadata monthly
+livefalse сохранён, actualstate correction отдельным immutable receipt.
+Матрица31/model medium fast/inputs/oracle прежние, originalslotsнеповторяются.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
