@@ -25,6 +25,7 @@ export function assessProcessResourceTimeline(input: { samples: readonly unknown
 export async function checkResourceEvidence(input: {
   file: string; samplesFile: string; runId: string; startedAt: string; finishedAt: string
   coverage: Omit<Parameters<typeof assessResourceCoverage>[0], "samples">
+  processWindows: Parameters<typeof assessProcessResourceTimeline>[0]["owners"]
   view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: { file: string; sha256: string } | null
 }) {
   const { readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
@@ -42,6 +43,12 @@ export async function checkResourceEvidence(input: {
   const checks = {
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
     coverage: assessResourceCoverage({ ...input.coverage, samples: evidence.samples }),
+    processTimeline: input.processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
+      input.processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
+        window.launcher.pid === owner.launcher.pid && window.launcher.starttime === owner.launcher.starttime).length === 1) &&
+      new Set(input.coverage.owners.map(owner => JSON.stringify([owner.kind, owner.id, owner.launcher.pid, owner.launcher.starttime]))).size === input.coverage.owners.length
+      ? assessProcessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, owners: input.processWindows })
+      : { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] },
     cgroups: assessCgroupCoverage({ groups, view: input.view }),
     budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget, summary: evidence.receipt.summary }),
     incidents: assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),

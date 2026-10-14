@@ -33,9 +33,12 @@ assessProcessResourceTimeline требует наблюдение exact owner/la
 verified RSS/CPU в каждом frame внутри указанного окна, а также bracket/cadence.
 Missing scope или окно без наблюдений дают incomplete. Проверены два настоящих
 supervisor owner в измеренном active subwindow; durable launch-to-exit producer
-и подключение этого gate к coordinator ещё требуются.
+ещё требуется. Coordinator принимает processWindows и требует ровно одно окно
+для каждого уникального owner/birth из coverage; пропуск, подмена или дубль дают
+incomplete. Пустой declared owner inventory допустим только для component smoke;
+обязательный production inventory определяется отдельным manifest.
 checkResourceEvidence читает единый verified bundle и возвращает поимённые
-timeline/coverage/cgroups/budget/incidents checks с source SHA. Known failed check имеет
+timeline/coverage/processTimeline/cgroups/budget/incidents checks с source SHA. Known failed check имеет
 приоритет над incomplete; source-integrity errors запрещают результат.
 Это проверка declared resource scopes, не полный live admission: mandatory
 frozen manifest и licence/limit/lifetime gates проверяются отдельно.
