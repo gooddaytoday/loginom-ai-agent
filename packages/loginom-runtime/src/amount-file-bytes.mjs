@@ -34,7 +34,7 @@ export async function amountFilePhase(o) {
    ||location.origin!==e.origin||s.map.FPackagesParentNode!==s.root||s.map.PackageNodes!==s.inventory||s.connection.Connected!==true||s.connection.UserName!==e.account||s.app.Version!=='7.4.2'
    ||s.inventory?.Count!==0||s.session.get_FileStorage!==s.getStorage||s.getInfo&&s.storage.GetFileInfo!==s.getInfo||s.openFile&&s.storage.OpenFile!==s.openFile||s.transport&&(s.storage.$S!==s.transport||s.session.$S!==s.transport))fail('ORIGINAL_FILE_OWNER_CHANGED');
  };
- const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name])fail('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name)};
+ const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name]){const v=Error('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name,{cause:{name,expected:o.functions[name],observed:typeof fn==='function'?Function.prototype.toString.call(fn):typeof fn}});refusals.add(v);throw v}};
  const getter=(obj,name)=>{for(let d=0;obj&&d<8;d++,obj=Object.getPrototypeOf(obj)){const p=Object.getOwnPropertyDescriptor(obj,name);if(p)return p.get}};
  const construct=()=>{
   pin('constructor',s.bg.filestorage?.FileDownloader);const name=s.path.split('/').at(-1),dir=s.path.slice(0,-name.length);
@@ -59,7 +59,7 @@ export async function amountFilePhase(o) {
  if(o.phase!=='release'&&s.phase!==previous[o.phase])fail('ORIGINAL_FILE_PHASE_CHANGED');
  s.busy=true;let result;
  try{
-  if(o.phase==='storage'){authority();if(typeof s.session.get_FileStorage!=='function')fail('NATIVE_FILE_STORAGE_UNAVAILABLE');retain('storage',await s.session.get_FileStorage());authority();if(!s.storage)fail('NATIVE_FILE_STORAGE_UNAVAILABLE');if(!s.session.$S||s.storage.$S!==s.session.$S)fail('NATIVE_FILE_PROXY_OWNER_UNAVAILABLE');retain('transport',s.session.$S);pin('GetFileInfo',s.storage.GetFileInfo);pin('OpenFile',s.storage.OpenFile);retain('getInfo',s.storage.GetFileInfo);retain('openFile',s.storage.OpenFile);if(s.bg.TBGFileOpenMode.fomRead!==0)fail('NATIVE_FILE_MODE_UNAVAILABLE');s.phase='storage';}
+  if(o.phase==='storage'){authority();if(typeof s.session.get_FileStorage!=='function')fail('NATIVE_FILE_STORAGE_UNAVAILABLE');retain('storage',await s.session.get_FileStorage());authority();if(!s.storage)fail('NATIVE_FILE_STORAGE_UNAVAILABLE');if(!s.session.$S||s.storage.$S!==s.session.$S)fail('NATIVE_FILE_PROXY_OWNER_UNAVAILABLE');retain('transport',s.session.$S);pin('GetFileInfo',s.storage.GetFileInfo);pin('OpenFile',s.storage.OpenFile);retain('getInfo',s.storage.GetFileInfo);retain('openFile',s.storage.OpenFile);if(s.bg.TBGFileOpenMode.fomRead!==0)fail('NATIVE_FILE_MODE_UNAVAILABLE');const preflight=construct();await preflight.Dispose();authority();s.phase='storage';}
   if(o.phase==='info'){authority();retain('info',await s.getInfo.call(s.storage,s.path));if(!s.info)fail('NATIVE_FILE_INFO_UNAVAILABLE');if(s.info.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.infoOwned=true;if(typeof s.info.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('infoSize',s.info.get_Size);retain('infoRelease',construct());s.infoRelease.FFileStream=s.info;authority();s.phase='info';}
   if(o.phase==='size'){authority();retain('size',await s.infoSize.call(s.info));authority();if(!Number.isSafeInteger(s.size)||s.size<1||s.size>262144)fail('NATIVE_FILE_SIZE_UNAVAILABLE');s.phase='size';}
   if(o.phase==='info_release'){await release(s.infoRelease,s.info);authority();s.infoReleased=true;s.phase='info_released';}

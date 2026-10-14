@@ -6,7 +6,7 @@ const [root,out]=process.argv.slice(2),load=p=>import(pathToFileURL(resolve(root
 const {retainAmountManagedStartup,assertAmountManagedStartup}=await load('src/fp-managed-startup.mjs');
 const {retainCaptureOwner,bindCaptureRuntime,assertCaptureOwner}=await load('src/retained-capture.mjs');
 const {retainAmountCaptureProxy}=await load('src/amount-capture-proxy.mjs');
-const fixturePath=join(root,'test/diagnostics/amount-capture-proxy/run.mjs');
+const fixturePath=process.argv[4]??join(root,'test/diagnostics/amount-capture-proxy/run.mjs');
 const fixtures=await readFile(fixturePath,'utf8');
 const fixture=Function('retainAmountManagedStartup','retainCaptureOwner','bindCaptureRuntime','retainAmountCaptureProxy',fixtures.slice(fixtures.indexOf('function fixture('),fixtures.indexOf('const rows=[];'))+'return fixture;')(retainAmountManagedStartup,retainCaptureOwner,bindCaptureRuntime,retainAmountCaptureProxy);
 const text=await readFile(join(root,'src/managed-entry.mjs'),'utf8'),start=text.indexOf('    if (message.operation === "acceptance.files"'),end=text.indexOf('    if (message.operation === "admit")',start);
