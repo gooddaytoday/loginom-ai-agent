@@ -1163,3 +1163,26 @@ Postmove независимый review `6e1a3ae9…` подтвердил102targ
 его и ROI3 шести успешных/copied файлов в тот же own archive, с прежними
 pre/postconditions и restore map. Сопоставимая серия/skill/source не меняются.
 Полная приёмка ещё не завершена.
+
+
+На 2026-10-14 02:33 UTC baseline итоговой matched-серии завершён:18/18startedslots,
+17oracle/полных расчётов PASS,11policy PASS. Последний `first-last-touch/3`
+(Session `ses_ec7c5ee43ffe21njjqq6wmkAII`) дал oracle/расчёт PASS,
+CLI0/wrapper1/cleanuptrue, JS1 и `JAVASCRIPT_NOT_ALLOWED`;
+SHA attempt `63eb7bdf…`, audit `241cb302…`. Root23200 завершён exit0.
+В17полных baseline-аудитах JS-узлов9: ABC3×2 и first-last3×1;
+failedclaims3 остаётся CLI1/wrapper3/cleanupfalse/incomplete без замены.
+Фактическая baseline-хронология отличается от исходного рекомендуемого
+порядка Task3: sales/2 выполнен сразу после sales/1, sales/3 — перед остальными
+attempt2. Это отклонение сохраняется в ledger;18уникальных слотов/аналитические
+входы/model/pins/фазы и последовательное использование профиля не изменялись.
+Исходное правило candidate first9 и stop-on-first-policy-violation сохраняется.
+
+Обычный ROI3-журнал после archive подтвердил max_top11713 и успешное получение
+exactCSV286B/SHA1d8460f2… после10прокруток доtop10000, затем verified workflowreturn.
+Observation `1610d2a6…`; initial target DOM outside_viewport не выдаётся заhit-testPASS.
+Перед candidate подготовлен read-only incremental6plan `7be74b8a…`:
+ROI3+firstlast3 own inputs/savedLGP/CSV, existingarchive102→108,
+freshroot519→predicted513, fullinversemap. Независимый review ещё ожидается,
+перенос этих6файлов ещё не выполнен; candidate0/25, новыхпроцессовнет.
+Полная приёмка остаётся незавершённой.
