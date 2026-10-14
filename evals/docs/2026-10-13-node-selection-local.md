@@ -4,8 +4,8 @@
 skill commit `d99389dd2a`, digest `0ca88b2d…`, runtime659588 без пересборки.
 Проверка установленного skill и manifest прошла. Controller28PASS/429assertions,
 typecheck0, independent source review и actual6existingOnly gates прошли.
-Prospective admission e7ba5561/executiona48cfaf7 до старта; новая ABC/1
-выполняется с19:23:31.436Z. Результата новой версии и policy acceptance пока нет.
+Prospective admission e7ba5561/executiona48cfaf7 зафиксированы до старта
+ABC/1 в19:23:31.436Z. Итоговый policy acceptance новой версии ещё не завершён.
 Матрица —6 неизменённых baseline observations плюс25 новых candidate;
 сохранение baseline экономит32.87минуты фактического CLI-времени.
 Baseline имеет4 правильных результата и2 отсутствующих; один запуск каждой
@@ -14,7 +14,27 @@ Baseline имеет4 правильных результата и2 отсутс�
 12normal releases/5manual releases. Политика отвергнутой версии не принята;
 приёмка исправленной версии ещё не выполнена.
 
-Текущий checkpoint новой серии: ABC/1 closed19:32:25.838Z. Отдельный
+Текущий checkpoint новой серии20:20:09.003Z: first-last-touch/1 closed20:04:25.456Z.
+Policy-v2 PASS `01e41281…`, mandatory failure review `558b2433…`: полная
+история40messages/147parts/42tools/125events/3362runtime,7standard success,
+JS0/childrennone. Import→Calculator last-touch→две Group→Join→Reform→Sort
+выполнены стандартными узлами; технический отказ Export не подменён JavaScript.
+CSV/LGP не получены, CLI1/cleanupfalse; export-1/2 NOT_APPLIED без эффекта,
+export-3 AMBIGUOUS/effecttrue с OUTPUT_PORT_OPEN_UNCONFIRMED.
+Own237 closed20:16:54.921Z, adminlogout20:16:56.536Z, wholebrowserclosed20:17:09.291Z;
+9PIDgone, guardino8014768/mtime1792007680957.482 сохранён при архивировании.
+18original/24recovery неизменны; descriptor `b5f74132…`/independent review `14754876…`/
+finalreadback `40deba3c…`. Actual publicgate20:19:39.569Z разрешил
+advance TECHNICAL_FAILURE_RECORDED; originalCLI1/cleanupfalse не повышены до PASS.
+Sales-by-category/1 выполняется с20:20:09.003Z, CLI3041328;
+runner3040743/exec71139 возобновлён20:19:56.762049Z. Новая серия:2closed/2policyPASS,
+0correct/2notobtained,0normal/2manualreleased/0releasepending,+1active/22unstarted.
+Baseline6references, frozen sources/protocol/criteria и исходные отказы неизменны.
+JS/gap/recovery ещё впереди; общая policy acceptance не завершена.
+Отдельный metadata erratum `4af5dab4…` сохраняет raw Export cause и верный Sales slot,
+не переписывая запечатанные descriptor/command metadata.
+
+Исторический checkpoint ABC/1: closed19:32:25.838Z. Отдельный
 policy-v2 PASS `d46e66c0…`, mandatory failure review `a9d05ad9…`:full32messages/
 124parts/36tools/101events/2769runtime, JS0/childrennone. Стандартные CumulativeSum,
 Data(last running total), IF .8/.95 и Group count/sums содержательно покрыли ABC;
@@ -29,8 +49,9 @@ Own234 closed19:43:56.732Z, admin235logout19:45:31.881Z, wholeMCPbrowserclosed;
 actualpublicgate19:53:18.258Z разрешил advance TECHNICAL_FAILURE_RECORDED,
 originalpolicyincomplete/mathfalse остаются. ПолитикаPASS не означает functionalPASS.
 
-Next first-last-touch/1 начат19:54:40.938Z, CLI2946499; runner2945739/exec13648
-с19:54:30.413Z, sources/criteria/protocol прежние. Новая серия:1closedpolicyPASS,
+Исторический checkpoint19:54:40.938Z: first-last-touch/1 начат, CLI2946499;
+runner2945739/exec13648 с19:54:30.413Z, sources/criteria/protocol прежние.
+На этом checkpoint новая серия:1closedpolicyPASS,
 0correct/1notobtained,0normal/1manualreleased и1active; policy acceptance пока нет.
 24candidate slots оставались до стартаfirst-last. Baseline6references неизменны;
 новая серия не заменяет originalFAIL и не запускает ABC retry.

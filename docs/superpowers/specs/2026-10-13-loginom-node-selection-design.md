@@ -1,6 +1,26 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии: ABC/1 closed19:32:25.838Z. Отдельный
+Текущий checkpoint новой серии20:20:09.003Z: first-last-touch/1 closed20:04:25.456Z.
+Policy-v2 PASS `01e41281…`, mandatory failure review `558b2433…`: полная
+история40messages/147parts/42tools/125events/3362runtime,7standard success,
+JS0/childrennone. Import→Calculator last-touch→две Group→Join→Reform→Sort
+выполнены стандартными узлами; технический отказ Export не подменён JavaScript.
+CSV/LGP не получены, CLI1/cleanupfalse; export-1/2 NOT_APPLIED без эффекта,
+export-3 AMBIGUOUS/effecttrue с OUTPUT_PORT_OPEN_UNCONFIRMED.
+Own237 closed20:16:54.921Z, adminlogout20:16:56.536Z, wholebrowserclosed20:17:09.291Z;
+9PIDgone, guardino8014768/mtime1792007680957.482 сохранён при архивировании.
+18original/24recovery неизменны; descriptor `b5f74132…`/independent review `14754876…`/
+finalreadback `40deba3c…`. Actual publicgate20:19:39.569Z разрешил
+advance TECHNICAL_FAILURE_RECORDED; originalCLI1/cleanupfalse не повышены до PASS.
+Sales-by-category/1 выполняется с20:20:09.003Z, CLI3041328;
+runner3040743/exec71139 возобновлён20:19:56.762049Z. Новая серия:2closed/2policyPASS,
+0correct/2notobtained,0normal/2manualreleased/0releasepending,+1active/22unstarted.
+Baseline6references, frozen sources/protocol/criteria и исходные отказы неизменны.
+JS/gap/recovery ещё впереди; общая policy acceptance не завершена.
+Отдельный metadata erratum `4af5dab4…` сохраняет raw Export cause и верный Sales slot,
+не переписывая запечатанные descriptor/command metadata.
+
+Исторический checkpoint ABC/1: closed19:32:25.838Z. Отдельный
 policy-v2 PASS `d46e66c0…`, mandatory failure review `a9d05ad9…`:full32messages/
 124parts/36tools/101events/2769runtime, JS0/childrennone. Стандартные CumulativeSum,
 Data(last running total), IF .8/.95 и Group count/sums содержательно покрыли ABC;
@@ -15,8 +35,9 @@ Own234 closed19:43:56.732Z, admin235logout19:45:31.881Z, wholeMCPbrowserclosed;
 actualpublicgate19:53:18.258Z разрешил advance TECHNICAL_FAILURE_RECORDED,
 originalpolicyincomplete/mathfalse остаются. ПолитикаPASS не означает functionalPASS.
 
-Next first-last-touch/1 начат19:54:40.938Z, CLI2946499; runner2945739/exec13648
-с19:54:30.413Z, sources/criteria/protocol прежние. Новая серия:1closedpolicyPASS,
+Исторический checkpoint19:54:40.938Z: first-last-touch/1 начат, CLI2946499;
+runner2945739/exec13648 с19:54:30.413Z, sources/criteria/protocol прежние.
+На этом checkpoint новая серия:1closedpolicyPASS,
 0correct/1notobtained,0normal/1manualreleased и1active; policy acceptance пока нет.
 24candidate slots оставались до стартаfirst-last. Baseline6references неизменны;
 новая серия не заменяет originalFAIL и не запускает ABC retry.
@@ -53,7 +74,8 @@ Product md, без handler/runtime изменений. Новый asset-only can
 runtime остался659588. Изменены только два skill assets и два manifest-файла.
 Canonical quick_validate не поддерживает прежнее поле compatibility;
 проекция без этого поля прошла, реальное поле сохранено и accepted Host validator.
-Старая серия и её FAIL/violation не меняются. Новых моделей пока нет.
+Старая серия и её FAIL/violation не меняются. На checkpoint19:17 до первого
+dispatch новой серии моделей ещё не было.
 
 Проверка новой версии сохраняет31позицию:6 completed baseline references и25
 новых candidate. Контракт [baseline reuse](../../../evals/docs/2026-10-14-node-selection-baseline-reuse.md)
@@ -73,7 +95,8 @@ Baseline описательный: один замер каждой задачи
 с19:23:31.436Z. Independent admission `e7ba5561…`, final execution lock
 `a48cfaf7…` заморожены до dispatch. Профиль был свободен,8previous ownPIDgone,
 oldseries leaseabsent; ownrelease-only `5a92054f…` не повышает старый violation.
-Сейчас первая попытка выполняется; принятие новогоskill пока не утверждается.
+На checkpoint19:23 первая попытка выполнялась; принятие новогоskill
+на этом checkpoint не утверждалось.
 Дальше C9→проверка6Brefs→C16, модели последовательны. Successful standard
 advance автоматически; JS/recovery/failure/anomaly и sampled successes review
 сохраняются. Подтверждённый candidateviolation останавливает новую серию.
@@ -82,7 +105,8 @@ Controller commit `ffbbac4220`:28tests/429assertions, typecheck0, семь RED�
 циклов. Independent source review `0bf150db…`, Root actual6existingOnly gates
 `583efad7…`:4normal/2technical,267originalSHA неизменны,0models/0dispatch.
 Два исходных отказа не повышены до PASS. Новый frozen protocol `f71e0c50…`,
-source archive79/index `dad5e372…`; execution draft пока readyfalse.
+source archive79/index `dad5e372…`; draft был readyfalse до admission,
+final execution lock `a48cfaf7…` зафиксирован readytrue до первого dispatch.
 Criteria v2 прежние, сравнительный порог и100%math в новом протоколе отсутствуют.
 
 Дизайн следующей версии: [JS gap scope correction](2026-10-14-loginom-js-gap-scope-correction.md).
