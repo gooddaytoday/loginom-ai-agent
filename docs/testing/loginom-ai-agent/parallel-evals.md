@@ -426,3 +426,20 @@ process invocations; rejudge сохраняет judge_cleanup_unconfirmed без
 typecheck/diff PASS. Межпроцессный private CODEX_HOME lease/admission этих
 entrypoints и live authorisation этим не квалифицированы; bootstrap credentials,
 model OAuth и judge OAuth по прежним private paths всё ещё отсутствуют.
+
+Следующие немодельные изменения через14c9da7f99: loadJudgeEnvironment читает
+private slots metadata и возвращает canonical codexHome/stateDir без требования
+Loginom credentials; full loadSlots сохраняет прежние требования. Slots/loader21
+PASS/41 assertions. Gate разделяет подготовку и допуск invoke: pre-admit failure
+сохраняет тип/диагностику и освобождает очередь, post-admit exception сохраняет
+fence и запрещает следующую попытку. Physical EISDIR stdout test и прежние checks
+не ослаблены; два первоначальных regression failures воспроизведены3/3, устранены.
+
+judgeInfo и preflight теперь подтверждают version probe через superviseProcess
+с execution timeout10s и его штатной очисткой. Actual fake-codex child RED
+оставался жив после metadata; GREEN дожидается собственного child cleanup по
+точной birth. Missing executable снова даёт EvalFailure с safe diagnostics:
+collector3/3, исходное ожидание сохранено. Cold judge/preflight/rejudge/calibrate/
+run110 PASS/610 assertions (120.21s), typecheck/diff PASS. Native Codex auth и
+production/offline global judge lease/release пока не подключены; metadata loader
+и generic process probes не означают live readiness.
