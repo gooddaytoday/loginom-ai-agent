@@ -38,6 +38,20 @@
     "dist/esm/inMemory.js": {
       "sha256": "8eb57dc4b4c0993869273a5e01a35c71e8d84c3d5050e9871a8cf141360f883d",
       "sourceInstalledEqual": true
+    },
+    "dist/cjs/shared/protocol.js": {
+      "sha256": "cd1451d0a079cac3783e5259ab27fd547bb8aec75fbe04c57f7cf3961b1ca97e",
+      "sourceInstalledEqual": true
+    },
+    "dist/cjs/client/index.js": {
+      "sha256": "e2f909e827a6e08870b400f44f9e90f9545ef5655d6e10f9cc7d0a91a374af45",
+      "sourceInstalledEqual": true
+    },
+    "dist/cjs/inMemory.js": {
+      "sha256": "c4b20556354a84b7119afff069e5a5e81c5cd223a7dea284d4f52690b4ed8b90",
+      "sourceInstalledEqual": true
     }
-  }
+  },
+  "sdkVersion": "1.30.0",
+  "stockModuleMix": "managed CJS Client/InMemoryTransport; bridge ESM Server/schema"
 }
