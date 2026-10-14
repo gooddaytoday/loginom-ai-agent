@@ -53,6 +53,7 @@ print(json.dumps(q.collect_queues(a,sys.argv[2])))`
 }
 for(const [name,status]of malformed)for(const actor of ["mas","owner","followup"] as const)test(`unknown ${name} on ${actor} refuses collector before partition and bundled Node`,async()=>{
  const v=queueFixture(),row=actor==="followup"?v.agents[0]!.pages[0]!.rows[0]!:extra(v,actor==="owner")
+ if(name==="future_active"&&actor==="mas"){Reflect.set(row,"runtime_id",queueOriginal);resign(v)}
  // Start with a proven terminal control. Changing just status/hashes leaves a consistent old unsafe ledger.
  const witness=state(v)
  if(status===undefined)Reflect.deleteProperty(row,"status");else Reflect.set(row,"status",status)
