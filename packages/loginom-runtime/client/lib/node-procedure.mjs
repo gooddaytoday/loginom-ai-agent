@@ -236,7 +236,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      const deadline = Math.min(operation.deadline, started + timeoutMs);
+      const parentDeadline = operation.deadline;
+      const deadline = Math.min(parentDeadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
       let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
@@ -422,16 +423,27 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // without making that check stronger.
         if (satisfied && confirmations >= (confirmIdentity ? 2 : 1)) break;
       }
-      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
+      // The local bound qualifies native samples, which were checked above
+      // before their durable receipt. Slow publication cannot un-observe two
+      // already qualified samples or permit another read after that bound.
+      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1)) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
       }
+      const checkOriginalDeadline=()=>{
+        signal?.throwIfAborted();
+        if(operation.deadline!==parentDeadline)throw new Error('Node procedure original deadline changed');
+        if (now()>=parentDeadline || observationNow()>=parentDeadline)
+          throw new Error('Node procedure budget exhausted; inspect the partial result');
+      };
+      checkOriginalDeadline();
       const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
         readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: timeoutMs, elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
+      checkOriginalDeadline();
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;
