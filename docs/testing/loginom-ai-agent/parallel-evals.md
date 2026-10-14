@@ -176,6 +176,15 @@ observations дают incomplete. Historical summaries без optional field ч�
 Полный mandatory manifest, qualified runner anchor, lifetime coverage, server
 storage capacity, licence/limit producers и live dispatch ещё требуют реализации.
 
+Полный текущий regression на6068b57b65:911 PASS/16SKIP/0FAIL,4663 assertions,
+927 tests/74 files (1045.92s), exit0; bun typecheck/diff PASS.
+Два первоначальных writer initialization failures оказались outdated tests
+после intentional c183a97e38; test-only fix сохраняет refusal на directory/
+symlink replacement и already observed replaced-owner release.
+Диагноз и private log hash: [отчёт](../../../evals/docs/2026-10-14-writer-initialization-diagnosis.md).
+Opt-in и nativeBusy SKIP не подтверждают native/live gates; production v2
+admission ещё не реализована, Admin/OAuth prerequisites остаются отсутствующими.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
