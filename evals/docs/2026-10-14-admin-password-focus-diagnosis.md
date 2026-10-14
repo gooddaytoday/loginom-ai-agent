@@ -31,3 +31,17 @@ Old quarantined receipts и process proofs сохранены. Confirmed process
 не доказывает server session close; session correlation/ACL/backup/licence
 concurrency остаются отдельными gates. Generic inspect не выдаёт qualified session
 ownership по одному username.
+
+Позднее один запуск отказал на FORM (`admin-xpVeYw`), следующий прошёл
+(`admin-skCUv9`); оба dispose/process cleanup confirmed. Три дополнительных
+повтора: 3 PASS/78 assertions, 7.604/6.882/6.691s. FORM failure не воспроизведён;
+серия не доказывает его причину. Источники: private collector report
+`/tmp/evals-native-admin-form-signal-1vx9qlo0.json` и исходные receipts.
+
+Код проверял count сразу после navigation, без ожидания асинхронной формы.
+Добавлено ожидание visible для login/password/submit внутри прежнего request
+deadline; exact count guard сохранён. Новые retry/sleep/deadline не добавлены.
+Проверка после изменения: native admin/CRUD + codec/preflight 59 PASS/226
+assertions (59.25s), без изменения dev/legacy или постоянного research account.
+Это проверка текущего поведения; детерминированное воспроизведение FORM race
+и full harness regression не заявлены.
