@@ -171,6 +171,21 @@ liveIntegration("native user capability: creates one blocked account and refuses
       await writeLeaseReceipt(path.join(evidence, "session-crash-close.json"), { version: 1, identity: pair.identity, ...terminated })
       expect(terminated).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
       expect(await request("close-session", { proofId: disconnected.id, session: disconnectedData.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
+      const pendingPackage = await request("reconcile-user", { ...activation, phase: "session-package-crash-probe" })
+      expect(pendingPackage.outcome).toBe("confirmed")
+      const pendingPackageData = pendingPackage.data as typeof observed
+      await writeLeaseReceipt(path.join(evidence, "session-package-crash-probe.json"), { version: 1, identity: pair.identity, ...pendingPackageData })
+      expect(pendingPackageData.afterDisconnect.find(row => row.name === pendingPackageData.binding.name &&
+        row.createdAt === pendingPackageData.binding.createdAt)).toMatchObject({ packageCount: 1, pendingDisconnect: true })
+      expect(await request("close-session", { proofId: pendingPackage.id, session: { ...pendingPackageData.binding, name: "eval-b:1" } }))
+        .toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
+      expect(await request("close-session", { proofId: pendingPackage.id, session: { ...pendingPackageData.binding, createdAt: "2026-10-13T00:00:00.000Z" } }))
+        .toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
+      const closedPackage = await request("close-session", { proofId: pendingPackage.id, session: pendingPackageData.binding })
+      await writeLeaseReceipt(path.join(evidence, "session-package-crash-close.json"), { version: 1, identity: pair.identity, ...closedPackage })
+      expect(closedPackage).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+      expect(await request("close-session", { proofId: pendingPackage.id, session: pendingPackageData.binding }))
+        .toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)
