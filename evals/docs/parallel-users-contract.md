@@ -496,3 +496,21 @@ readUserActivation отдельно проверяет содержимое. Par
 по одному Blocked getter. Native parent activation ещё не подключена и обязана
 вызывать stage до mutation; это local FS lifecycle, не live activation proof.
 49 user/admin/slots PASS/151 assertions (1.69s), typecheck/diff PASS.
+
+Management session ledger (2026-10-15): record/readServerSession связывают held
+composite lease/token/slot/run command, preparation+activation generation,
+protected account key/observed ID и verified native probe reply с private
+command source (id/path/identity/payload+reply/semantic SHA). Проверяется ровно
+одна новая managed row и одинаковые ID/Name/CreateTime на Count0→1→0.
+Whitelist payload/reply сохраняются private/fsynced для повторной верификации;
+state=observed, actor=management, attemptId=null. Source drift и подмена lease
+manifest отказали. Это первоначальный management codec, не CLI/setup/check
+ledger и не durable recovery authority.
+
+Parent observeOwnedSession требует held preparation/ownership/activation,
+повторяет их validation внутри serialized dispatch и сохраняет ledger до
+возврата binding. Command intent уже fsynced до native producer. Native closed
+lease RED missing method→GREEN1 PASS/27 (6.59s), journal без mutation.
+Codec/slots/admin49 PASS/157 (1.73s), typecheck/diff PASS. Положительный native
+parent producer ещё не квалифицирован; wire probe evidence предыдущей стадии
+этого не заменяет. Parent close/confirmed close state и crash recovery далее.
