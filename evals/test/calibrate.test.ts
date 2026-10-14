@@ -5,8 +5,78 @@ import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { main, stamp } from "../src/run"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { calibrate } from "../src/calibrate"
+import { superviseProcess } from "../src/process-supervisor"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("calibrate removes its SIGINT handler after success and preparation failure", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-handler-"))
+  const listeners = process.listeners("SIGINT")
+  try {
+    const config = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
+      EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge,
+    })
+    const corpus = path.join(root, "corpus")
+    await mkdir(corpus)
+    const pending = calibrate(config, corpus)
+    expect(process.listeners("SIGINT")).toHaveLength(listeners.length + 1)
+    expect((await pending).code).toBe(0)
+    expect(process.listeners("SIGINT")).toEqual(listeners)
+    const blocked = path.join(root, "blocked-results")
+    await Bun.write(blocked, "preserve")
+    const failed = calibrate({ ...config, resultsDir: blocked }, corpus)
+    expect(process.listeners("SIGINT")).toHaveLength(listeners.length + 1)
+    await expect(failed).rejects.toThrow()
+    expect(process.listeners("SIGINT")).toEqual(listeners)
+    expect(await Bun.file(blocked).text()).toBe("preserve")
+  } finally {
+    process.listeners("SIGINT").filter(listener => !listeners.includes(listener)).forEach(listener => process.off("SIGINT", listener))
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("calibrate drains an active judge on SIGINT and saves an interrupted report without another invocation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-sigint-"))
+  const trace = path.join(root, "judge.jsonl")
+  const resultFile = path.join(root, "result.json")
+  let cleanupConfirmed = true
+  try {
+    await mkdir(path.join(root, "corpus"))
+    await mkdir(path.join(root, "supervision"))
+    const script = path.join(root, "interrupt.ts")
+    await Bun.write(script, `import { calibrate } from ${JSON.stringify(path.join(evalsRoot, "src/calibrate.ts"))}
+import { loadConfig } from ${JSON.stringify(path.join(evalsRoot, "src/config.ts"))}
+const config = loadConfig(["--calibrate", "--only", "group-sum-qty,calc-data-double"], ${JSON.stringify({
+      EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: `${fakeJudge} --gate-log ${trace} --delay-ms 1500`,
+    })})
+const pending = calibrate(config, ${JSON.stringify(path.join(root, "corpus"))})
+const deadline = Date.now() + 10000
+while (!await Bun.file(${JSON.stringify(trace)}).exists() && Date.now() < deadline) await Bun.sleep(10)
+if (!await Bun.file(${JSON.stringify(trace)}).exists()) throw Error("Judge did not start")
+process.kill(process.pid, "SIGINT")
+await Bun.write(${JSON.stringify(resultFile)}, JSON.stringify(await pending))
+`)
+    cleanupConfirmed = false
+    const run = await superviseProcess({ cmd: [process.execPath, script], cwd: evalsRoot,
+      env: { PATH: process.env.PATH!, HOME: root }, timeoutMs: 20_000, outDir: path.join(root, "supervision") })
+    cleanupConfirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.exitCode, JSON.stringify({ timedOut: run.timedOut, stdout: run.stdout, stderr: run.stderr })).toBe(0)
+    const result = await Bun.file(resultFile).json()
+    expect(result.code).toBe(1)
+    expect(result.judgeCleanupConfirmed).toBe(true)
+    const saved = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(saved.interrupted).toBe(true)
+    expect(saved.rows).toHaveLength(1)
+    expect(saved.rows[0].error).toContain("судья завершился кодом")
+    const calls = (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(calls.filter(call => call.kind === "start")).toHaveLength(1)
+    const proof = await Bun.file(path.join(result.runDir, saved.rows[0].task, saved.rows[0].kind, "judge-processes-1/process-cleanup.json")).json()
+    expect(proof.status).toBe("confirmed")
+    expect(proof.capture_complete).toBe(true)
+    expect(proof.verification.map((pass: { owned_remaining: number }) => pass.owned_remaining)).toEqual([0, 0])
+  } finally { if (cleanupConfirmed) await rm(root, { recursive: true, force: true }) }
+}, 45_000)
 
 test("calibrate stops spawning judges after unconfirmed process cleanup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-uncertain-"))
