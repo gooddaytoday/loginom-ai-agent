@@ -3027,3 +3027,52 @@ prethrow frame отсутствует, потому что private target SUCCEE
 исходного отказа. Верхнеуровневая задача получения actual refused frame остаётся
 открытой; Product fix, новая matched пара и model dispatch пока не допускаются.
 Ни тесты неизменного кода, ни модельная попытка повторно не запускались.
+
+## Ограниченная диагностика межоперационного интервала (2026-10-14 09:20 UTC)
+
+Закрытый private NO-REPRO не разрешает новую модельную серию. Фактическое
+различие original и private: Join completed → Calculator prepared5029ms и19ms;
+исходный public node_wait end → node_apply start4978ms. Обе операции до begin_wizard
+выполнили ту же последовательность steps1–30. Original отказ на656ms не содержит
+actual prethrow frame; успешный private дождался own wizard mask431ms и opening
+подтверждён на1044ms. Ни интервал, ни mask не объявляются причиной original failure.
+
+Независимый timing readback SHA
+`0867b8bc6f3bd8256b106a86f1762dbfb7b7a785e77a73326e9caa73de782ef0`.
+Все6 request projections/geometry/topology равны; Help/schema/read до импорта,
+других tools между Join/target нет. Join-01 отказал без browser effect.
+Предыдущие интервалы/длительности также различались; admission→begin_wizard
+14063/12999ms. Новый run проверяет только один фактор и не воспроизводит всю
+временную последовательность; NO-REPRO не исключает timing sensitivity.
+
+Выбран один дополнительный private запуск без LLM с единственным различающим
+фактором: внешний idle5029ms после собственного Join SUCCEEDED перед target apply.
+Это приближение observed interoperation timing; фактический новый gap измеряется
+по journal, а не заявляется точно равным исходному. Internal deadlines/readUi/
+masks waits/guards/one-gesture opening не меняются. Более широкое изменение
+Product diagnostic пока не обосновано; повтор модели не допускается протоколом.
+
+Новый отдельный каталог native-calculator-open-paced-diagnostic сохраняет
+original/private evidence, pins и frozen stop/lock. Input/case/entry/rewriter —
+byte-equal проверенным файлам. Меняются только private driver и внешний pacing gate;
+source bindings создаются заново, ready:false до checks/review, затем Root activation.
+Six requests/autoPlacement/fresh owner-GUID remap, один target/noearlySave,
+Save только после targetSUCCESS и strict own cleanup остаются прежними. Refusal
+сохраняет same-frame capture; неизвестное close требует только exact own recovery.
+Никаких parallel Loginom/CLI процессов текущего профиля и acceptance credit.
+
+TDD проверяет наблюдаемое поведение gate на реальном таймере: target callback не
+допущен до recorded delay и вызывается один раз; non-target не задерживается;
+ошибочный timing не вызывает apply. Не добавлять timer mocks/global substitutions
+или универсальную framework-конфигурацию. Повторяются только новые/затронутые
+private tests, syntax/typecheck; unchanged Product/full/focused и старый private
+rewriter suite не повторяются. Независимый design/source review обязателен.
+После одного run: capture → установление actual predicate; NO-REPRO → unknown,
+без автоматического третьего диагностического запуска или model retry.
+
+- [ ] После independent design review минимально реализовать и проверить внешний
+  pacing gate по TDD; новый immutable binding и independent source review.
+- [ ] Root выполнить один paced private native run, сохранить actual timing,
+  same-frame capture/no-repro/unknown и exact own close.
+- [ ] Независимо прочитать закрытый результат и определить следующий шаг только
+  по фактическим данным, сохранив исходный failed slot и условия приёмки31.
