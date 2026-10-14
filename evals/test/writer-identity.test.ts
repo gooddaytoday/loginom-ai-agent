@@ -30,22 +30,26 @@ test("writer identity refuses a persistently ownerless original directory", asyn
 })
 
 for (const replacement of ["directory", "owner", "owner-symlink"] as const)
-  test(`writer release observation refuses replaced ${replacement}`, async () => {
+  test(replacement === "owner" ? "writer initialization observes its first regular owner" : `writer initialization refuses replaced ${replacement}`, async () => {
     const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-replacement-"))
     const directory = path.join(profile, ".writer")
     try {
       await mkdir(directory, { mode: 0o700 })
+      const original = await stat(directory)
       const pending = writerIdentity(profile).then(value => value, error => error)
       await Bun.sleep(10)
       if (replacement === "directory") {
         await rename(directory, path.join(profile, "original-directory"))
         await mkdir(directory, { mode: 0o700 })
-      } else if (replacement === "owner") await Bun.write(path.join(directory, "owner"), "foreign-owner")
+      } else if (replacement === "owner") await Bun.write(path.join(directory, "owner"), "initial-owner")
       else {
         await Bun.write(path.join(profile, "foreign"), "foreign-owner")
         await symlink(path.join(profile, "foreign"), path.join(directory, "owner"))
       }
-      expect(String(await pending)).toContain("identity changed")
+      const observed = await pending
+      if (replacement === "owner") expect(observed).toEqual({ device: original.dev, inode: original.ino, owner: "initial-owner" })
+      if (replacement === "directory") expect(String(observed)).toContain("identity changed")
+      if (replacement === "owner-symlink") expect(String(observed)).toContain("Writer owner is not a private file")
       expect((await stat(directory)).isDirectory()).toBe(true)
     } finally { await rm(profile, { recursive: true, force: true }) }
   })
