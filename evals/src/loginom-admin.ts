@@ -27,7 +27,7 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
-import { readUserPreparation } from "./user-environment"
+import { claimUserOwnership, readUserOwnership, readUserPreparation } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
@@ -37,6 +37,7 @@ const frameLimit = 1024 * 1024
 export type AdminConnection = {
   identity: ServerIdentity
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
+  createBlockedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof readUserOwnership>>>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
@@ -132,6 +133,33 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       }))
       if (!jsonObject(data) || typeof data.userKey !== "string" || typeof data.aclHash !== "string") throw new EvalFailure("ADMIN_PROTOCOL", 2)
       return { userKey: data.userKey, aclHash: data.aclHash }
+    },
+    async createBlockedUser(lease, secretFile) {
+      const prepared = await readUserPreparation(file, lease, secretFile)
+      if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      const info = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined
+        throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
+      })
+      const owned = info ? await readUserOwnership(file, lease, secretFile) : null
+      const reply = await request("reconcile-user", { phase: "blocked", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
+        desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: owned ? { objectId: owned.objectId, name: owned.username,
+          userKind: owned.userKind, preparationNonce: owned.preparationNonce } : null }, async () => {
+        if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared))
+          throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
+        if (owned && JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned))
+          throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+        if (!owned && await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined
+          throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
+        })) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+      })
+      const data = requireAdminReply(reply)
+      if (!owned) return claimUserOwnership(file, lease, secretFile, path.join(directory, "commands", `${reply.id}.json`), reply)
+      if (!jsonObject(data) || data.created !== false || !jsonObject(data.user) || data.user.objectId !== owned.objectId ||
+        data.user.name !== owned.username || data.user.userKind !== 0 || data.user.blocked !== true)
+        throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+      return readUserOwnership(file, lease, secretFile)
     },
     async closeSession(session) {
       const data = requireAdminReply(await request("close-session", { session }))
