@@ -12,6 +12,10 @@ reservation, destroyPair отказал PAIR_RETAINED_INCIDENT. Pair/root/secret
 Нужны recovery-only CAS и доказанное unused/clean release (account absence,
 native process proof, committed archive) через lifecycle API. Native wire CRUD
 продолжен на других disposable pairs без slot admission; они штатно уничтожены.
+Обновление 2026-10-15: recovery-only slot CAS/lineage реализован и проверен
+реальными exited Bun controllers; native parent admission guards также PASS.
+Этот конкретный incident ещё не принят/освобождён: адресные process/archive/unused
+proofs и terminal cleanup producer остаются необходимыми.
 
 ## Незавершённый live admin dispose — причина пока не воспроизведена
 
