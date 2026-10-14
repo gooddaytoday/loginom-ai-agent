@@ -2891,3 +2891,51 @@ matched пара и31fresh slots; этот started failure остаётся ис
   и original operation IDs, отдельно от catch reread; без нового gesture/ослабления
   guard. Только по доказанной причине — narrow TDD fix и соответствующие checks/
   ordinary native gate. Failed ABC/1 не повторять и не переписывать его критерии.
+
+
+## Диагностика actual prethrow Calculator frame (2026-10-14 08:32 UTC)
+
+Новый scope — только сохранение недостающего доказательства. Остановленная
+серия064745/ABC1 и все immutable inputs остаются неизменными. Общая цель и
+условия31-slot приёмки не сокращаются. Пользователь делегировал самостоятельное
+решение блокеров; отдельного model retry/изменения Product сейчас нет.
+
+Выбран private instrumented native запуск без LLM: оригинальный16735bytes CSV,
+пять успешных standard requests (Import→Sort→Calculator и Group→Join), те же
+метки/параметры/автоматическое размещение. Runtime воспроизведения — pinned
+candidate21fcca85…; новые owner/doc/GUID берутся из собственных receipts, source
+references переназначаются явно. Затем ровно исходный abc-class-01 Calculator
+request; исходные runtime deadlines, clicks и guards сохраняются.
+
+Private managed entry сохраняет неизменный resource verifier, createSession,
+createBridge и close lifecycle. На существующем browser transport преобразует
+ТОЛЬКО канонический serialized workspace-ui act frame для begin_wizard этого
+целевого operation ID. Hash/точные unique anchors обязательны. Перед исходным
+throw сохраняет уже прочитанные значения contextMatches/intendedWizard/
+deactivationPending/ownedLoading, bounded masks/dialogs, intended owner/path,
+prepared/current native identity/TID и epoch. Никакого нового readUi, browser call,
+ожидания, жеста, DOM/CSS/native mutation или переопределения результата.
+Capture failure остаётся отдельным diagnostic unknown, не меняет исходный отказ.
+Поздний catch readUi хранится отдельно; маркер private и acceptanceEligiblefalse
+явны в bindings/result. Frozen Product/payload/source файлы не патчатся.
+
+Тест через реальный workspaceUiCapability/serialized browser fixture сначала
+показывает, что прежний код теряет refused frame при позднем чтении; затем private
+rewrite сохраняет его при том же AMBIGUOUS/code/click count. Отдельные negatives:
+foreign/non-target frame не переписывать, anchor/hash drift отказ, success не
+создаёт fake refusal, late snapshot не подменяет prethrow, bounded/unknown capture.
+Не угадывать Product correction до actual capture.
+
+Private artifacts: новый каталог `evals/results/node-selection-local/20261014T064745Z-367f4b/native-calculator-open-diagnostic`;
+entry/rewrite/test/driver/bindings и private fixture projection. Author использует
+TDD, source review независимый. Root один запускает `--run` после ready bindings,
+idle profile/process checks. Никаких parallel CLI/Loginom attempts текущего профиля.
+Отсутствие воспроизведения записывается как такой исход, не как fixed/PASS.
+Unsaved state до целевого opening сохраняется; early Save меняет исходную модель
+и не вводится. Если native close не подтверждён, Root адресно связывает и закрывает
+только собственную server session, сохраняя evidence; чужие сессии не трогает.
+
+Альтернатива Product diagnostic изменила бы final runtime/сборки ещё до причины;
+она отложена. По actual frame — узкая доказанная TDD правка при необходимости,
+её focused/full checks и ordinary live regression; затем новая matched31 series
+с prospectively frozen protocol. Старый started failure в новую серию не входит.
