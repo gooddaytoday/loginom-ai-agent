@@ -76,7 +76,7 @@ def inspect_pass(backend,request):
    for index,profile in enumerate(request['profiles']):
     if profile in target:refs.append({'pid':pid,'birth':identity['birth'],'fd':fd,'profile':index})
    if native and target.startswith('socket:[') and target.endswith(']'):native_sockets.add(target[8:-1])
-  inventory.append({k:identity[k] for k in ['pid','parent','birth','uid']}|{'fdCount':len(fds),'fdDigest':digest(fds)})
+  inventory.append({k:identity[k] for k in ['pid','parent','birth','uid']}|{'fdCount':len(fds),'fdDigest':digest(fds),'nativeComm':identity['comm'] if native else None})
  after=backend.snapshot()
  # comm is a mutable display label (including kernel worker labels), not a
  # process birth/owner identity. Every PID/FD remains observed; a native-name

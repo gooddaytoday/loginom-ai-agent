@@ -25,7 +25,7 @@ print(json.dumps({'fullInventory':True,'stableIdentity':True,'commandLabelOnly':
  expect(exit).toBe(0);expect(stderr).toBe("");expect(JSON.parse(stdout).fullInventory).toBe(true)
 })
 
-for(const mode of ["native-enter","native-leave","native-rename","birth","uid","parent"])test("observer still refuses changed "+mode,async()=>{
+for(const mode of ["native-enter","native-leave","native-rename","birth","uid","parent","between-enter","between-leave","between-rename"])test("observer still refuses changed "+mode,async()=>{
  const code=String.raw`
 import importlib.util,sys
 s=importlib.util.spec_from_file_location('observer',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
@@ -38,8 +38,7 @@ class Backend:
  def snapshot(self):
   self.calls+=1;mode=sys.argv[2]
   row={'pid':200,'parent':2,'birth':'30','uid':0,'comm':'node'}
-  if mode=='native-leave':row['comm']='chrome'
-  if mode=='native-rename':row['comm']='chrome'
+  if mode in ['native-leave','native-rename','between-leave','between-rename']:row['comm']='chrome'
   if self.calls>1:
    if mode=='native-enter':row['comm']='chrome'
    if mode=='native-leave':row['comm']='node'
@@ -47,6 +46,9 @@ class Backend:
    if mode=='birth':row['birth']='31'
    if mode=='uid':row['uid']=1000
    if mode=='parent':row['parent']=3
+  if self.calls>2 and mode=='between-enter':row['comm']='chrome'
+  if self.calls>2 and mode=='between-leave':row['comm']='node'
+  if self.calls>2 and mode=='between-rename':row['comm']='chromium'
   return {100:{'pid':100,'parent':1,'birth':'20','uid':1000,'comm':'node'},101:{'pid':101,'parent':100,'birth':'21','uid':1000,'comm':'python3'},200:row}
  def fds(self,pid):return Directory()
  def listeners(self):return set()
@@ -54,5 +56,5 @@ m.two_passes(Backend(),request)
 `
  const child=Bun.spawn(["/usr/bin/python3","-c",code,new URL("../script/lab57-fd-observer.py",import.meta.url).pathname,mode],{stdout:"pipe",stderr:"pipe"})
  const [exit,stdout,stderr]=await Promise.all([child.exited,new Response(child.stdout).text(),new Response(child.stderr).text()])
- expect(exit).not.toBe(0);expect(stdout).toBe("");expect(stderr).toContain("PROCESS_ROSTER_OR_IDENTITY_RACE")
+ expect(exit).not.toBe(0);expect(stdout).toBe("");expect(stderr).toContain(mode.startsWith("between-")?"TWO_PASS_COHERENCE_CHANGED":"PROCESS_ROSTER_OR_IDENTITY_RACE")
 })

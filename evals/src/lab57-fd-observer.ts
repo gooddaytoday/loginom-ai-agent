@@ -2,7 +2,7 @@ import {verify,createPublicKey} from "node:crypto"
 import {queueDigest} from "./lab57-queue-scope"
 export type FdRequest={version:1;nonce:string;sourceSha:string;ownerSha256:string;uid:1000;controller:{pid:number;birth:string};requester:{pid:number;birth:string};
  node:{path:string;device:number;inode:number;bytes:number;sha256:string};profiles:string[];originalPids:number[];namespaces:{pid:string;mnt:string;user:string}}
-type Identity={pid:number;birth:string;uid:number;parent:number;fdCount:number;fdDigest:string}
+type Identity={pid:number;birth:string;uid:number;parent:number;fdCount:number;fdDigest:string;nativeComm:string|null}
 export type FdPass={complete:boolean;startedAt:number;finishedAt:number;inventory:Identity[];originalPids:unknown[];foreignNative:unknown[];denied:unknown[];profileFds:unknown[]}
 export type FdProof={report:{version:1;request:FdRequest;producer:{uid:number;capSysPtrace:boolean};passes:FdPass[];observedAt:number};signature:string}
 function canonical(v:unknown):string {
@@ -25,7 +25,8 @@ export function verifyFdProof(proof:FdProof,request:FdRequest,publicKey:string):
    if(p.complete!==true||!Number.isFinite(p.startedAt)||!Number.isFinite(p.finishedAt)||p.startedAt>p.finishedAt||p.finishedAt>r.observedAt||now-p.startedAt>15000
     ||[p.originalPids,p.foreignNative,p.denied,p.profileFds].some(a=>!Array.isArray(a)||a.length)||!Array.isArray(p.inventory)||!p.inventory.length
     ||new Set(p.inventory.map(i=>i.pid)).size!==p.inventory.length||p.inventory.some(i=>!Number.isSafeInteger(i.pid)||i.pid<=0||!/^\d+$/.test(i.birth)
-      ||!Number.isSafeInteger(i.uid)||i.uid<0||!Number.isSafeInteger(i.parent)||i.parent<0||!Number.isSafeInteger(i.fdCount)||i.fdCount<0||!/^[0-9a-f]{64}$/.test(i.fdDigest)))fail()
+      ||!Number.isSafeInteger(i.uid)||i.uid<0||!Number.isSafeInteger(i.parent)||i.parent<0||!Number.isSafeInteger(i.fdCount)||i.fdCount<0||!/^[0-9a-f]{64}$/.test(i.fdDigest)
+      ||!(i.nativeComm===null||typeof i.nativeComm==="string"&&["chrome","chromium","loginom-ai-","bwrap"].some(prefix=>i.nativeComm!.startsWith(prefix)))))fail()
    for(const e of [request.controller,request.requester])if(!p.inventory.some(i=>i.pid===e.pid&&i.birth===e.birth&&i.uid===1000))fail()
    if(p.inventory.some(i=>request.originalPids.includes(i.pid)))fail()
    let pid=request.requester.pid;const seen=new Set<number>()
