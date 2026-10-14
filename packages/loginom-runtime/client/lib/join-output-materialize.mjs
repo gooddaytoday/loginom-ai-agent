@@ -12,9 +12,12 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
   &&s.node_mapping.source_identity_verified===true&&same(s.node_mapping.node_context,owner);
  const mappingSame=(a,b)=>['mapping_wizard','autosync','produce_mode','source_fields','target_fields'].every(k=>same(a[k],b[k]));
  const unchanged=s=>bound(s)&&mappingSame(s.node_mapping,baseline);
- need(bound(initial)&&baseline.autosync===true&&baseline.source_fields.length===6
-  &&baseline.target_fields.length===6&&orderedIds.length===6&&new Set(orderedIds).size===6
-  &&orderedIds.every(id=>baseline.target_fields.some(t=>t.record_id===id)), 'Join materializer requires complete six-pair autosync output');
+ const count=baseline.source_fields.length;
+ // The accepted wide case has40 fields on each input. Cardinality is native,
+ // never inferred from labels; every pair must still pass the same proof.
+ need(Number.isInteger(count)&&count>0&&count<=80&&bound(initial)&&baseline.autosync===true
+  &&baseline.target_fields.length===count&&orderedIds.length===count&&new Set(orderedIds).size===count
+  &&orderedIds.every(id=>baseline.target_fields.some(t=>t.record_id===id)), 'Join materializer requires complete bounded autosync output');
  let state=initial;
  if(!mappingLinksView(state)){
   await channel.perform({condition:'show owned Join Links for default materialization',initialObservation:state,ready:unchanged,identity:()=>baseline,
@@ -45,7 +48,7 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
   const p=proof(state,source[0].record_id,id);need([0,1].includes(p.link.target.OriginType),'Join output origin is not observed');
   planned.push({sourceId:source[0].record_id,targetId:id,original:p.link,implicit:p.link.target.OriginType===0});
  }
- need(new Set(planned.map(p=>p.sourceId)).size===6,'Join output sources are ambiguous');
+ need(new Set(planned.map(p=>p.sourceId)).size===count,'Join output sources are ambiguous');
  const receipts=[],completed=new Set();
  const definitions=s=>{for(const p of planned){const current=proof(s,p.sourceId,p.targetId);need(same(current.link.source,p.original.source)&&same(current.link.target,{...p.original.target,OriginType:completed.has(p.targetId)?1:p.original.target.OriginType}), 'Join retained native definition changed');}};
  for(const pair of planned.filter(p=>p.implicit)){
@@ -77,7 +80,7 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
   const restored=pairProof(state);need(same(restored.link.source,pair.original.source)&&same(restored.link.target,{...pair.original.target,OriginType:1}), 'Join reconnect changed definition or origin');completed.add(pair.targetId);definitions(state);
  }
  state=await ensureMappingTableView(channel,state);
- const definition=await readOutputDefinitionPages(channel,{expectedCount:6,ready:s=>s.wizard?.root_ref===root&&same(s.prepared_node_context,owner)});
+ const definition=await readOutputDefinitionPages(channel,{expectedCount:count,ready:s=>s.wizard?.root_ref===root&&same(s.prepared_node_context,owner)});
  need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===baseline.target_fields[i][k])), 'Join materialized rendered definition differs');
  state=await channel.observe({condition:'native Join mapping after complete rendered materialization',readMappings:true,ready:unchanged});
  return {state,receipt:{verified:true,effect_possible:receipts.length>0,cleanup_complete:true,persisted_content_verified:false,
