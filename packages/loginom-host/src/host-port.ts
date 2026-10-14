@@ -1,3 +1,4 @@
+import { retainTerminalCallAssociation } from "./terminal-call-association"
 import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
@@ -65,31 +66,33 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       typeof data.method !== "string"
     )
       return
+    const requestId = data.id
     const input = "input" in data ? data.input : undefined
     if (!input || typeof input !== "object" || !("run" in input) || typeof input.run !== "string") {
-      reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
+      reply({ id: requestId, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
     }
+    const originalRunId = input.run
     try {
       if (data.method === "acquire") {
-        if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
+        if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(originalRunId))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
         if (service.recoveries.has(chat)) throw new Error("LOGINOM_RECOVERY_REQUIRED")
         if ([...runs.values()].some((run) => run.chat === chat)) throw new Error("LOGINOM_CALL_BUSY")
-        const lease = service.acquire(`${owner}:${input.run}`)
+        const lease = service.acquire(`${owner}:${originalRunId}`)
         if (!lease) {
-          reply({ id: data.id, result: null })
+          reply({ id: requestId, result: null })
           return
         }
         await service.retireRuntime(chat)
         service.resetRestarts(chat)
-        try { service.bindCapture?.(owner, input.run, chat, lease) } catch (error) { lease.release(); throw error }
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false })
-        reply({ id: data.id, result: { generation: lease.generation } })
+        try { service.bindCapture?.(owner, originalRunId, chat, lease) } catch (error) { lease.release(); throw error }
+        runs.set(originalRunId, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false })
+        reply({ id: requestId, result: { generation: lease.generation } })
         return
       }
-      const run = runs.get(input.run)
+      const run = runs.get(originalRunId)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
       if (run.readonlyRuntime) {
         if (data.method!=='call' || !readonlyCall(input) || run.calls || run.dispatching
@@ -101,7 +104,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (!observed || typeof observed!=='object' || !("result" in observed)
               || !("readonlyContinuation" in observed) || observed.readonlyContinuation!==true || service.journal.pending().length)
             throw Error("LOGINOM_RECOVERY_REQUIRED")
-          reply({id:data.id,result:observed.result})
+          reply({id:requestId,result:observed.result})
         } finally {run.calls--}
         return
       }
@@ -116,13 +119,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const runtime = await service.runtime(run.lease.generation, run.chat)
           const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined})
           if (!observed || typeof observed !== "object" || !("result" in observed)) throw Error("LOGINOM_REPLY_INVALID")
-          reply({id:data.id,result:observed.result})
+          reply({id:requestId,result:observed.result})
         } finally { run.calls-- }
         return
       }
       if (data.method === "acceptance.capture") {
         if (Object.keys(input).sort().join(",") !== "authorization,run"
-            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, input.run, run.chat, run.lease) || run.captured)
+            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, originalRunId, run.chat, run.lease) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
         if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
           throw Error("LOGINOM_CALL_BUSY")
@@ -140,13 +143,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.lease.holdRecovery()
             service.recoveries.set(run.chat, run.lease)
             await service.journal.settle(id, false)
-            reply({id:data.id,result})
+            reply({id:requestId,result})
             return
           }
           await runtime.close()
           await service.journal.settle(id, true)
           run.active.delete(id)
-          reply({ id: data.id, result })
+          reply({ id: requestId, result })
         } catch (error) {
           run.captureRefused = true
           run.lease.holdRecovery()
@@ -161,9 +164,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       if (data.method === "release") {
         run.released = true
         if (!run.calls) {
-          await release(input.run, run)
+          await release(originalRunId, run)
         }
-        reply({ id: data.id, result: true })
+        reply({ id: requestId, result: true })
         return
       }
       if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
@@ -175,7 +178,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       try {
         if (data.method === "tools") {
           const runtime = await service.runtime(run.lease.generation, "readiness")
-          reply({ id: data.id, result: await runtime.request("list") })
+          reply({ id: requestId, result: await runtime.request("list") })
           return
         }
         if (data.method === "admit") {
@@ -194,7 +197,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const files = await service.inputs(run.lease.generation, run.chat, input.userMessage, input.files)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           reply({
-            id: data.id,
+            id: requestId,
             result: await runtime.request("admit", { files, userMessage: input.userMessage }),
           })
           return
@@ -202,7 +205,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         if (data.method === "interrupt") {
           const runtime = await service.runtime(run.lease.generation, run.chat)
           await runtime.request("interrupt")
-          reply({ id: data.id, result: true })
+          reply({ id: requestId, result: true })
           return
         }
         if (
@@ -213,13 +216,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           typeof input.userMessage !== "string"
         )
           throw new Error("LOGINOM_CALL_INVALID")
-        const recovery = { id: undefined as string | undefined }
+        const association = input.name === "dock_prepare"
+          ? retainTerminalCallAssociation(data, input, run, runs, state, owner) : undefined
+        const recovery = { id: undefined as string | undefined, dispatched: false }
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
+          association?.guard()
           await service.runtime(run.lease.generation, run.chat)
+          association?.guard()
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
+          association?.guard()
           const runtime = await service.runtime(run.lease.generation, run.chat).catch(async (error: unknown) => {
             // Exit can land during journal.begin. A relaunch-limit refusal from
             // this lookup precedes dispatch, so settle only this unused admission.
@@ -230,10 +238,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             throw error
           })
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+          association?.guard()
+          recovery.dispatched = true
           const result = await runtime.request("call", {
-            name: input.name,
-            arguments: "args" in input ? input.args : undefined,
+            name: association?.tuple.name ?? input.name,
+            arguments: association ? association.tuple.args : "args" in input ? input.args : undefined,
           })
+          association?.guard()
           if (
             !result ||
             typeof result !== "object" ||
@@ -265,8 +276,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               service.recoveries.delete(run.chat)
             }
           }
-          reply({ id: data.id, result: result.result })
+          reply({ id: requestId, result: result.result })
         } catch (error) {
+          if (association?.isRefusal(error) && !recovery.dispatched) {
+            // Only this admitted row is known not dispatched. Preserve older pending/UNKNOWN.
+            if (recovery.id) { await service.journal.settle(recovery.id, true); run.active.delete(recovery.id) }
+            throw error
+          }
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
@@ -279,11 +295,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         if (data.method === "call") run.dispatching = false
         run.calls--
         if (run.released && !run.calls) {
-          await release(input.run, run)
+          await release(originalRunId, run)
         }
       }
     } catch (error) {
-      reply({ id: data.id, error: hostError(error) })
+      reply({ id: requestId, error: hostError(error) })
     }
   }
   port.on("message", ({ data }) => {
