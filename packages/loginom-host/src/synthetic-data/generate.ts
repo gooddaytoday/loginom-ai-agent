@@ -1,11 +1,12 @@
 import { cellText, copyCell, type Cell, type TableData } from "./cells"
+import { checkConsistency, type EntityCheck, type LookupCheck } from "./consistency"
 import { dictionaryValue } from "./dictionaries"
 import { assignCounters, groupSizes, groupSpan, keysUnique, sortGroups } from "./groups"
 import { materializeLink, pickTuple, sharedValueCount } from "./links"
 import { adjustCompare, allowedCategories, allowedTuples, avoidNever, strictViolation } from "./rules"
 import { createRng, poisson, type Rng } from "./rng"
 import { addOffset, seriesGrid, walkStep } from "./series"
-import type { Column, Rule, Spec, Table } from "./spec"
+import { LIMITS, type Column, type Link, type Rule, type Spec, type Table } from "./spec"
 
 const letters = "абвгдежзийклмнопрстуфхцчшщыэюя"
 
@@ -17,6 +18,8 @@ export type Constraint = {
   rules: number
   violations: number
   rejected_defects: number
+  entities: EntityCheck[]
+  lookups: LookupCheck
 }
 
 type GenContext = {
@@ -28,32 +31,68 @@ type GenContext = {
   previous?: Cell[]
   sharedKey: string
   previousKey: string
+  rowIndex: number
+  enumerate?: string
+  entityNames: Set<string>
 }
 
 export function generateTables(spec: Spec) {
   const rng = createRng(spec.seed)
+  const entities = materializeEntities(spec.entities, rng)
+  assignEnumeratedRows(spec, entities)
   const built = new Map<string, TableData>()
   const constraints: Constraint[] = []
   const tables = spec.tables.map((table) => {
-    const generated = generateTable(rng, table, built)
+    const generated = generateTable(rng, table, built, entities, spec.entities)
     built.set(table.name, generated.data)
     constraints.push(generated.constraint)
     return { spec: table, data: generated.data }
   })
+  const consistency = checkConsistency(tables, entities, spec.entities)
+  if (consistency.broken) throw Error("SYNTHETIC_DATA_CONSISTENCY_BROKEN")
+  for (const constraint of constraints) {
+    constraint.entities = consistency.report.filter((item) => item.tables.includes(constraint.table))
+    constraint.lookups = consistency.lookups.get(constraint.table) ?? { checked: 0, mismatches: 0 }
+  }
   return { rng, tables, constraints }
 }
 
-function generateTable(rng: Rng, table: Table, built: Map<string, TableData>) {
+function materializeEntities(entities: Link[], rng: Rng) {
+  const rows = new Map<string, string[][]>()
+  if (!entities.length) return rows
+  for (const entity of entities) {
+    const tuples = materializeLink(entity, rng)
+    const keys = tuples.map((tuple) => tuple[0] ?? "")
+    if (new Set(keys).size !== keys.length) throw Error("SYNTHETIC_DATA_KEY_COLLISION")
+    rows.set(entity.name, tuples)
+  }
+  return rows
+}
+
+function assignEnumeratedRows(spec: Spec, entities: Map<string, string[][]>) {
+  if (!spec.entities.length) return
+  for (const table of spec.tables) {
+    if (!table.enumerate) continue
+    const count = entities.get(table.enumerate)?.length ?? 0
+    if (!count || count > LIMITS.rows) throw Error("SYNTHETIC_DATA_ENUMERATE_SIZE")
+    if (table.rows !== 0 && table.rows !== count) throw Error("SYNTHETIC_DATA_ENUMERATE_SIZE")
+    table.rows = count
+  }
+  const total = spec.tables.reduce((sum, table) => sum + table.rows, 0)
+  if (total > LIMITS.totalRows) throw Error("SYNTHETIC_DATA_LIMIT")
+}
+
+function generateTable(rng: Rng, table: Table, built: Map<string, TableData>, entities: Map<string, string[][]>, entitySpecs: Link[]) {
   const links = new Map(table.links.map((link) => [link.name, materializeLink(link, rng)]))
-  if (table.series) return generateSeries(rng, table, built, links)
-  if (table.groups) return generateGrouped(rng, table, built, links)
-  const data = plainTable(rng, table, built, links)
+  if (table.series) return generateSeries(rng, table, built, links, entities, entitySpecs)
+  if (table.groups) return generateGrouped(rng, table, built, links, entities, entitySpecs)
+  const data = plainTable(rng, table, built, links, entities, entitySpecs)
   if (table.columns.some((column) => column.type === "sequence" && column.per?.length))
     assignCounters(data.rows, data.rows.map((_, index) => index), table.columns, { keys: [], shared: [], size: { min: 1, max: 1 }, sortBy: [] })
   return { data, constraint: constraintFor(table, data, links, undefined) }
 }
 
-function plainTable(rng: Rng, table: Table, built: Map<string, TableData>, links: Map<string, string[][]>): TableData {
+function plainTable(rng: Rng, table: Table, built: Map<string, TableData>, links: Map<string, string[][]>, entities: Map<string, string[][]>, entitySpecs: Link[]): TableData {
   const plans = new Map<string, number[]>()
   for (const column of table.columns) {
     if (column.type !== "ref" || !column.unique) continue
@@ -71,7 +110,7 @@ function plainTable(rng: Rng, table: Table, built: Map<string, TableData>, links
   const rows = Array.from({ length: table.rows }, (_, index) => {
     const row: Cell[] = []
     const picks = new Map<string, number>()
-    const context = contextFor(table, links)
+    const context = contextFor(table, links, entities, entitySpecs)
     context.previous = previous
     for (const column of table.columns) row.push(generateCell(rng, column, table.columns, row, index, built, plans, picks, context))
     previous = row
@@ -81,7 +120,9 @@ function plainTable(rng: Rng, table: Table, built: Map<string, TableData>, links
 }
 
 function generateCell(rng: Rng, column: Column, columns: Column[], row: Cell[], index: number, built: Map<string, TableData>, plans: Map<string, number[]>, picks: Map<string, number>, context: GenContext): Cell {
+  context.rowIndex = index
   const cell = rawCell(rng, column, columns, row, index, built, plans, picks, context)
+  if (column.type === "linked" && context.entityNames.has(column.link)) return cell
   const fitted = context.rules.length ? avoidNever(context.rules, columns, row, columns.indexOf(column), cell) : cell
   const compared = context.rules.length ? adjustCompare(context.rules, columns, row, columns.indexOf(column), fitted) : fitted
   if (column.optional === undefined || compared.kind === "null") return compared
@@ -140,14 +181,14 @@ function rawCell(rng: Rng, column: Column, columns: Column[], row: Cell[], index
   return { kind: "number", value: column.scale === undefined ? value : round(value, scale), scale }
 }
 
-function generateGrouped(rng: Rng, table: Table, built: Map<string, TableData>, links: Map<string, string[][]>) {
+function generateGrouped(rng: Rng, table: Table, built: Map<string, TableData>, links: Map<string, string[][]>, entities: Map<string, string[][]>, entitySpecs: Link[]) {
   const groups = table.groups
   if (!groups) throw Error("SYNTHETIC_DATA_RULE_UNSATISFIABLE")
   const sizes = groupSizes(table.rows, groups.size.min, groups.size.max, (min, max) => rng.int(min, max))
   const plans = new Map<string, number[]>()
   const headers = sizes.map((size, groupIndex) => {
     const cells: Cell[] = []
-    const context = contextFor(table, links)
+    const context = contextFor(table, links, entities, entitySpecs)
     for (const column of table.columns) {
       const shared = groups.shared.includes(column.name) && !(column.type === "sequence" && column.per?.length)
       cells.push(shared ? generateCell(rng, column, table.columns, cells, groupIndex, built, plans, new Map(), context) : { kind: "null" })
@@ -160,7 +201,7 @@ function generateGrouped(rng: Rng, table: Table, built: Map<string, TableData>, 
   sortGroups(headers, table.columns, groups.sortBy).forEach((header, groupIndex) => {
     for (let offset = 0; offset < header.size; offset += 1) {
       const row = header.cells.map((cell) => copyCell(cell))
-      const context = contextFor(table, links)
+      const context = contextFor(table, links, entities, entitySpecs)
       context.previous = rows.at(-1)
       context.previousKey = lastKey
       context.sharedKey = groups.shared.map((name) => cellText(row[table.columns.findIndex((column) => column.name === name)] ?? { kind: "null" })).join("\u0000")
@@ -180,7 +221,7 @@ function generateGrouped(rng: Rng, table: Table, built: Map<string, TableData>, 
   return { data, constraint: constraintFor(table, data, links, groupSpan(sizes)) }
 }
 
-function generateSeries(rng: Rng, table: Table, built: Map<string, TableData>, links: Map<string, string[][]>) {
+function generateSeries(rng: Rng, table: Table, built: Map<string, TableData>, links: Map<string, string[][]>, entities: Map<string, string[][]>, entitySpecs: Link[]) {
   const spec = table.series
   const grid = spec ? seriesGrid(spec, table.columns) : undefined
   if (!spec || !grid) throw Error("SYNTHETIC_DATA_RULE_UNSATISFIABLE")
@@ -191,7 +232,7 @@ function generateSeries(rng: Rng, table: Table, built: Map<string, TableData>, l
     const state = new Map<string, number>()
     for (const date of grid.dates) {
       const row: Cell[] = []
-      const context = contextFor(table, links)
+      const context = contextFor(table, links, entities, entitySpecs)
       context.seriesState = state
       context.previous = rows.at(-1)
       context.previousKey = lastKey
@@ -219,7 +260,13 @@ function generateSeries(rng: Rng, table: Table, built: Map<string, TableData>, l
 function linkedCell(rng: Rng, column: Extract<Column, { type: "linked" }>, columns: Column[], row: Cell[], context: GenContext): Cell {
   const link = context.linkSpecs.find((item) => item.name === column.link)
   const names = link?.columns ?? []
+  const field = column.field ?? column.name
   let tuple = context.chosen.get(column.link)
+  if (!tuple && context.enumerate === column.link) {
+    tuple = (context.links.get(column.link) ?? [])[context.rowIndex] ?? []
+    if (!tuple.length) throw Error("SYNTHETIC_DATA_ENUMERATE_SIZE")
+    context.chosen.set(column.link, tuple)
+  }
   if (!tuple) {
     const rows = context.links.get(column.link) ?? []
     const allowed = context.rules.length ? allowedTuples(rows, names, context.rules, columns, row, columns.indexOf(column)) : rows
@@ -228,7 +275,7 @@ function linkedCell(rng: Rng, column: Extract<Column, { type: "linked" }>, colum
     tuple = allowed[pickTuple(rng, allowed, link?.distribution ?? "uniform", link?.zipf ?? 1, weights)] ?? []
     context.chosen.set(column.link, tuple)
   }
-  return { kind: "text", value: tuple[names.indexOf(column.name)] ?? "" }
+  return { kind: "text", value: tuple[names.indexOf(field)] ?? "" }
 }
 
 function offsetCell(rng: Rng, column: Extract<Column, { type: "offset" }>, columns: Column[], row: Cell[], context: GenContext): Cell {
@@ -254,8 +301,11 @@ function walkCell(rng: Rng, column: Extract<Column, { type: "walk" }>, context: 
   return { kind: "number", value, scale: column.scale }
 }
 
-function contextFor(table: Table, links: Map<string, string[][]>): GenContext {
-  return { rules: table.rules, links, linkSpecs: table.links, chosen: new Map(), seriesState: new Map(), sharedKey: "", previousKey: "" }
+function contextFor(table: Table, links: Map<string, string[][]>, entities: Map<string, string[][]>, entitySpecs: Link[]): GenContext {
+  const merged = new Map(links)
+  for (const [name, rows] of entities) merged.set(name, rows)
+  const linkSpecs = [...table.links, ...entitySpecs.filter((entity) => !table.links.some((link) => link.name === entity.name))]
+  return { rules: table.rules, links: merged, linkSpecs, chosen: new Map(), seriesState: new Map(), sharedKey: "", previousKey: "", rowIndex: 0, enumerate: table.enumerate, entityNames: new Set(entitySpecs.map((entity) => entity.name)) }
 }
 
 function tableData(table: Table, rows: Cell[][]): TableData {
@@ -274,6 +324,8 @@ function constraintFor(table: Table, data: TableData, links: Map<string, string[
     rules: table.rules.length,
     violations: table.rules.length ? data.rows.filter((row) => strictViolation(table.rules, table.columns, row)).length : 0,
     rejected_defects: 0,
+    entities: [],
+    lookups: { checked: 0, mismatches: 0 },
   }
 }
 

@@ -2,18 +2,18 @@ import { cellText, copyCell, type Cell, type DefectRecord, type TableData } from
 import { numberOf } from "./generate"
 import { forceViolation, strictViolation } from "./rules"
 import type { Rng } from "./rng"
-import type { Column, Defect, Realism, Table, When } from "./spec"
+import type { Column, Defect, Link, Realism, Table, When } from "./spec"
 
 const alphabet = "абвгдежзийклмнопрстуфхцчшщыэюяaeiou"
 
-export function applyDefects(rng: Rng, tables: Array<{ spec: Table; data: TableData }>, defects: Defect[], realism?: Realism) {
+export function applyDefects(rng: Rng, tables: Array<{ spec: Table; data: TableData }>, defects: Defect[], realism?: Realism, entities: Link[] = []) {
   const records: DefectRecord[] = []
   const rejected = new Map<string, number>()
-  const guard = realism || tables.some((table) => table.spec.rules.some((rule) => rule.severity === "strict")) ? createGuard(realism) : undefined
+  const guard = realism || entities.length || tables.some((table) => table.spec.rules.some((rule) => rule.severity === "strict")) ? createGuard(realism, entities) : undefined
   for (const defect of defects) {
     const table = tables.find((item) => item.spec.name === defect.table)
     if (!table) continue
-    if (defect.kind === "duplicate") duplicate(rng, table.data, defect, records)
+    if (defect.kind === "duplicate") duplicate(rng, table, defect, records, entities)
     else if (defect.kind === "broken_row") broken(rng, table.data, defect, records)
     else if (defect.kind === "rule_violation") violate(rng, table, defect, records, guard, rejected)
     else if (defect.kind === "drop") dropRows(rng, table.data, defect, records)
@@ -98,20 +98,26 @@ function noise(rng: Rng, defect: Extract<Defect, { kind: "noise" }>, cell: Cell)
   return { kind: "text", value: chars.join("") }
 }
 
-function duplicate(rng: Rng, data: TableData, defect: Extract<Defect, { kind: "duplicate" }>, records: DefectRecord[]) {
+function duplicate(rng: Rng, table: { spec: Table; data: TableData }, defect: Extract<Defect, { kind: "duplicate" }>, records: DefectRecord[], entities: Link[]) {
+  const data = table.data
   const length = data.rows.length
+  const skip = protectedIndexes(table.spec, entities)
   for (let row = 0; row < length; row += 1) {
     if (!rng.chance(defect.rate)) continue
     const copy = (data.rows[row] ?? []).map((cell) => copyCell(cell))
-    if (defect.mode === "fuzzy") fuzz(rng, copy)
+    if (defect.mode === "fuzzy") fuzz(rng, copy, skip)
     data.rows.push(copy)
     data.broken.push(null)
     records.push({ table: data.name, row: data.rows.length - 1, column: "", kind: "duplicate", original: String(row + 1), value: defect.mode })
   }
 }
 
-function fuzz(rng: Rng, row: Cell[]) {
-  const text = row.find((cell) => cell.kind === "text" && cell.value.length > 0)
+function protectedIndexes(table: Table, entities: Link[]) {
+  return new Set(table.columns.flatMap((column, index) => entities.some((entity) => column.type === "linked" && entity.name === column.link) ? [index] : []))
+}
+
+function fuzz(rng: Rng, row: Cell[], skip: Set<number>) {
+  const text = row.find((cell, index) => !skip.has(index) && cell.kind === "text" && cell.value.length > 0)
   if (text?.kind === "text") {
     text.value = `${text.value.slice(0, -1)}${rng.pick([...alphabet])}`
     return
@@ -132,7 +138,7 @@ function broken(rng: Rng, data: TableData, defect: Extract<Defect, { kind: "brok
 function write(table: { spec: Table; data: TableData }, row: number, index: number, column: string, kind: string, cell: Cell, records: DefectRecord[], guard: Guard | undefined, rejected: Map<string, number>) {
   const current = table.data.rows[row]?.[index]
   if (!current) return
-  const next = guard ? guard.prepare(table, row, index, cell) : cell
+  const next = guard ? guard.prepare(table, row, index, cell, kind) : cell
   if (!next) {
     rejected.set(table.spec.name, (rejected.get(table.spec.name) ?? 0) + 1)
     return
@@ -192,13 +198,18 @@ function dropRows(rng: Rng, data: TableData, defect: Extract<Defect, { kind: "dr
   data.broken = kept.map((index) => data.broken[index] ?? null)
 }
 
-type Guard = { prepare: (table: { spec: Table; data: TableData }, row: number, index: number, cell: Cell) => Cell | undefined; mark: (table: string, row: number, index: number) => void }
+type Guard = { prepare: (table: { spec: Table; data: TableData }, row: number, index: number, cell: Cell, kind: string) => Cell | undefined; mark: (table: string, row: number, index: number) => void }
 
-function createGuard(realism: Realism | undefined): Guard {
+function createGuard(realism: Realism | undefined, entities: Link[]): Guard {
   const touched = new Set<string>()
   const counts = new Map<string, number>()
   return {
-    prepare(table, row, index, cell) {
+    prepare(table, row, index, cell, kind) {
+      const column = table.spec.columns[index]
+      const entity = entities.find((item) => column?.type === "linked" && item.name === column.link)
+      const entityKey = entity?.columns[0] === (column?.type === "linked" ? column.field ?? column.name : "")
+      if (entity && !(kind === "orphan" && entityKey)) return
+      if (realism && column?.type === "lookup") return
       const key = `${table.spec.name}:${row}`
       if (realism?.oneDefectPerCell && touched.has(`${key}:${index}`)) return
       if (realism && (counts.get(key) ?? 0) >= realism.maxDefectsPerRow) return

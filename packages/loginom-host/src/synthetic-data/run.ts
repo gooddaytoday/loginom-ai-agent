@@ -43,7 +43,7 @@ async function generate(input: RunInput, directory: string) {
   if (generated instanceof Error) return failure(generated)
   const { rng, tables, constraints } = generated
   if (constraints.some((item) => item.violations > 0)) return { ok: false, errors: ["Строгие правила не выполняются на чистых данных."] }
-  const applied = applyDefects(rng, tables, loaded.spec.defects, loaded.spec.realism)
+  const applied = applyDefects(rng, tables, loaded.spec.defects, loaded.spec.realism, loaded.spec.entities)
   for (const item of constraints) item.rejected_defects = applied.rejected.get(item.table) ?? 0
   const defects = applied.records
   const rendered = await renderFiles(tables, defects).catch((error: unknown) => {
@@ -109,6 +109,9 @@ function generateSafely(spec: Parameters<typeof generateTables>[0]) {
 function failure(error: Error) {
   if (error.message === "SYNTHETIC_DATA_RULE_UNSATISFIABLE") return { ok: false as const, errors: ["Правила не оставляют допустимых значений."] }
   if (error.message === "SYNTHETIC_DATA_KEY_COLLISION") return { ok: false as const, errors: ["Составной ключ получился неуникальным."] }
+  if (error.message === "SYNTHETIC_DATA_CONSISTENCY_BROKEN") return { ok: false as const, errors: ["Один идентификатор получил разные атрибуты."] }
+  if (error.message === "SYNTHETIC_DATA_ENUMERATE_SIZE") return { ok: false as const, errors: ["Число строк не совпало с числом элементов справочника."] }
+  if (error.message === "SYNTHETIC_DATA_LIMIT") return { ok: false as const, errors: ["Слишком много строк."] }
   throw error
 }
 

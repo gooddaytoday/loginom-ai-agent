@@ -348,6 +348,168 @@ test("unsatisfiable rules fail before files are written", async () => {
   }
 })
 
+test("shared entities keep one type and title for an identifier", async () => {
+  const root = await mkdtemp(join(tmpdir(), "synthetic-entities-"))
+  try {
+    const generated = await writeAndGenerate(root, {
+      name: "shared",
+      seed: 6,
+      entities: [{ name: "items", columns: ["id", "kind", "title"], rows: [["a", "sensor", "north"], ["b", "meter", "south"], ["c", "sensor", "east"]] }],
+      tables: [
+        { name: "catalog", enumerate: "items", columns: [
+          { name: "id", type: "linked", link: "items" },
+          { name: "kind", type: "linked", link: "items" },
+          { name: "title", type: "linked", link: "items" },
+        ] },
+        { name: "log", rows: 10, columns: [
+          { name: "id", type: "linked", link: "items" },
+        ] },
+        { name: "north", rows: 8, columns: [
+          { name: "id", type: "linked", link: "items" },
+          { name: "kind", type: "linked", link: "items" },
+          { name: "title", type: "linked", link: "items" },
+        ] },
+        { name: "south", rows: 8, columns: [
+          { name: "id", type: "linked", link: "items" },
+          { name: "kind", type: "linked", link: "items" },
+          { name: "title", type: "linked", link: "items" },
+        ] },
+      ],
+    }, "shared")
+    const catalog = await readTable(join(generated.directory, "catalog.csv"))
+    expect(catalog).toEqual([
+      { id: "a", kind: "sensor", title: "north" },
+      { id: "b", kind: "meter", title: "south" },
+      { id: "c", kind: "sensor", title: "east" },
+    ])
+    const known = new Map(catalog.map((row) => [row.id, row]))
+    const log = await readTable(join(generated.directory, "log.csv"))
+    expect(Object.keys(log[0] ?? {})).toEqual(["id"])
+    expect(log.every((row) => known.has(row.id))).toBe(true)
+    for (const name of ["north.csv", "south.csv"]) {
+      const rows = await readTable(join(generated.directory, name))
+      expect(rows.every((row) => known.get(row.id)?.kind === row.kind && known.get(row.id)?.title === row.title)).toBe(true)
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("generated entity tuples are shared by every table", async () => {
+  const root = await mkdtemp(join(tmpdir(), "synthetic-entity-generate-"))
+  try {
+    const generated = await writeAndGenerate(root, {
+      name: "drawn",
+      seed: 2,
+      entities: [{ name: "items", columns: ["id", "kind"], generate: [{ values: ["a", "b", "c"] }, { values: ["sensor", "meter"], fanout: 1 }] }],
+      tables: [
+        { name: "left", rows: 12, columns: [{ name: "id", type: "linked", link: "items" }, { name: "kind", type: "linked", link: "items" }] },
+        { name: "right", rows: 12, columns: [{ name: "id", type: "linked", link: "items" }, { name: "kind", type: "linked", link: "items" }] },
+      ],
+    }, "drawn")
+    const left = await readTable(join(generated.directory, "left.csv"))
+    const right = await readTable(join(generated.directory, "right.csv"))
+    const kinds = new Map(left.map((row) => [row.id, row.kind]))
+    expect(new Set(kinds.keys()).size).toBe(3)
+    expect(right.every((row) => kinds.get(row.id) === row.kind)).toBe(true)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("entity conflicts fail before files are written", async () => {
+  const root = await mkdtemp(join(tmpdir(), "synthetic-entity-reject-"))
+  try {
+    const duplicate = await runSyntheticData({ operation: "generate", directory: root, spec: await specFile(root, "duplicate", {
+      name: "duplicate", seed: 1,
+      entities: [{ name: "items", columns: ["id", "kind"], rows: [["a", "sensor"], ["a", "meter"]] }],
+      tables: [{ name: "facts", rows: 2, columns: [{ name: "id", type: "linked", link: "items" }, { name: "kind", type: "linked", link: "items" }] }],
+    }), name: "duplicate" })
+    expect(duplicate.ok).toBe(false)
+    if (duplicate.ok || !("errors" in duplicate)) throw Error("expected errors")
+    expect(duplicate.errors.join(" ")).toContain("ключ")
+    const renamed = await runSyntheticData({ operation: "generate", directory: root, spec: await specFile(root, "renamed", {
+      name: "renamed", seed: 1,
+      tables: [
+        { name: "parent", rows: 2, columns: [{ name: "id", type: "sequence", start: 1 }, { name: "name", type: "category", values: ["north"] }] },
+        { name: "child", rows: 2, columns: [{ name: "id", type: "ref", table: "parent", column: "id" }, { name: "name", type: "category", values: ["south"] }] },
+      ],
+    }), name: "renamed" })
+    expect(renamed.ok).toBe(false)
+    if (renamed.ok || !("errors" in renamed)) throw Error("expected errors")
+    expect(renamed.errors.join(" ")).toContain("lookup")
+    expect(await readdir(root)).not.toContain("synthetic-data")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("strict rules do not split an entity and defects cannot rewrite it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "synthetic-entity-protect-"))
+  try {
+    const generated = await writeAndGenerate(root, {
+      name: "protect",
+      seed: 9,
+      entities: [{ name: "items", columns: ["id", "kind", "title"], rows: [["a", "sensor", "north"], ["b", "meter", "south"]] }],
+      rules: [],
+      tables: [{
+        name: "facts",
+        rows: 16,
+        rules: [{ name: "sensor_open", never: [{ column: "kind", in: ["sensor"] }, { column: "status", in: ["closed"] }] }],
+        columns: [
+          { name: "id", type: "linked", link: "items" },
+          { name: "kind", type: "linked", link: "items" },
+          { name: "title", type: "linked", link: "items" },
+          { name: "status", type: "category", values: ["open", "closed"] },
+          { name: "value", type: "int", min: 1, max: 5 },
+        ],
+      }],
+      defects: [
+        { table: "facts", column: "id", kind: "missing", rate: 1, as: "empty" },
+        { table: "facts", column: "kind", kind: "noise", rate: 1, noise: "typo" },
+        { table: "facts", column: "id", kind: "orphan", rate: 0.5 },
+        { table: "facts", kind: "duplicate", rate: 0.5, mode: "fuzzy" },
+      ],
+    }, "protect")
+    const rows = await readTable(join(generated.directory, "facts.csv"))
+    const known = new Map([["a", { kind: "sensor", title: "north" }], ["b", { kind: "meter", title: "south" }]])
+    expect(rows.every((row) => row.kind !== "sensor" || row.status !== "closed")).toBe(true)
+    expect(rows.filter((row) => known.has(row.id)).every((row) => known.get(row.id)?.kind === row.kind && known.get(row.id)?.title === row.title)).toBe(true)
+    const listed = await readFile(join(generated.directory, "defects.csv"), "utf8")
+    expect(listed).toContain("orphan")
+    expect(listed.split("\n").some((line) => line.includes(",id,missing,") || line.includes(",kind,typo,"))).toBe(false)
+    const manifest = await Bun.file(generated.manifest).json()
+    const facts = manifest.constraints.find((item: { table: string }) => item.table === "facts")
+    expect(facts.rejected_defects).toBeGreaterThan(0)
+    expect(facts.entities[0].mismatches).toBe(0)
+    const copies = rows.filter((row) => !known.has(row.id))
+    expect(copies.every((row) => [...known.values()].some((item) => item.kind === row.kind && item.title === row.title))).toBe(true)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("lookup of an ambiguous parent key stops generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "synthetic-lookup-"))
+  try {
+    const spec = await specFile(root, "ambiguous", {
+      name: "ambiguous",
+      seed: 1,
+      tables: [
+        { name: "parent", rows: 2, columns: [{ name: "id", type: "category", values: ["a"] }, { name: "label", type: "sequence", start: 1 }] },
+        { name: "child", rows: 2, columns: [{ name: "id", type: "ref", table: "parent", column: "id" }, { name: "label", type: "lookup", table: "parent", column: "label", match: "id" }] },
+      ],
+    })
+    const result = await runSyntheticData({ operation: "generate", directory: root, spec, name: "ambiguous" })
+    expect(result.ok).toBe(false)
+    if (result.ok || !("errors" in result)) throw Error("expected errors")
+    expect(result.errors.join(" ")).toContain("атрибуты")
+    expect(await readdir(root)).not.toContain("synthetic-data")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test("skill examples validate and generate", async () => {
   const root = await mkdtemp(join(tmpdir(), "synthetic-examples-"))
   const examples = join(import.meta.dir, "../../product/skills/synthetic-data/references/examples")
@@ -370,6 +532,12 @@ function requireGenerated(value: { ok: boolean; directory?: unknown; manifest?: 
 async function hashes(directory: string) {
   const names = (await readdir(directory)).filter((name) => name !== "manifest.json").toSorted()
   return Object.fromEntries(await Promise.all(names.map(async (name) => [name, createHash("sha256").update(await readFile(join(directory, name))).digest("hex")])))
+}
+
+async function specFile(root: string, name: string, spec: unknown) {
+  const file = join(root, `${name}.json`)
+  await Bun.write(file, JSON.stringify(spec))
+  return file
 }
 
 async function writeAndGenerate(root: string, spec: unknown, name: string) {

@@ -61,7 +61,7 @@ export type Column = ColumnFlags & (
   | { name: string; type: "ref"; table: string; column: string; distribution: "uniform" | "zipf"; zipf: number; unique: boolean }
   | { name: string; type: "lookup"; table: string; column: string; match: string }
   | { name: string; type: "expr"; expr: string; scale?: number }
-  | { name: string; type: "linked"; link: string }
+  | { name: string; type: "linked"; link: string; field?: string }
   | { name: string; type: "offset"; from: string; unit: "minutes" | "hours" | "days"; min: number; max: number; distribution: "uniform" | "lognormal"; cumulative: boolean }
   | { name: string; type: "walk"; model: "gbm" | "arithmetic" | "ar1"; start: number | { min: number; max: number }; drift: number; volatility: number; floor?: number; mean?: number; speed?: number; scale: number }
 )
@@ -91,9 +91,10 @@ export type Table = {
   rules: Rule[]
   groups?: Groups
   series?: SeriesSpec
+  enumerate?: string
 }
 
-export type Spec = { name: string; seed: number; tables: Table[]; defects: Defect[]; realism?: Realism }
+export type Spec = { name: string; seed: number; tables: Table[]; defects: Defect[]; realism?: Realism; entities: Link[] }
 
 export function folderName(value: string) {
   const cleaned = value.trim().replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 64)
@@ -135,14 +136,17 @@ export function parseSpec(value: unknown): { ok: true; spec: Spec } | { ok: fals
       errors.push(`Таблица ${table.name}: split.by указывает на неизвестную колонку.`)
     validateStructure(table, errors)
   }
+  const entities = parseEntities(root.entities, errors)
+  resolveEnumerate(tables, entities, errors)
+  validateEntities(tables, entities, errors)
   if (cycle(tables)) errors.push("Ссылки между таблицами образуют цикл.")
   const total = tables.reduce((sum, table) => sum + table.rows, 0)
   if (total > LIMITS.totalRows) errors.push(`Суммарное число строк ${total} больше ${LIMITS.totalRows}.`)
-  const defects = Array.isArray(root.defects) ? root.defects.flatMap((item, index) => parseDefect(item, index, tables, errors)) : []
+  const defects = Array.isArray(root.defects) ? root.defects.flatMap((item, index) => parseDefect(item, index, tables, entities, errors)) : []
   if (root.defects !== undefined && !Array.isArray(root.defects)) errors.push("Поле defects должно быть массивом.")
   const realism = parseRealism(root.realism, errors)
   if (errors.length || seed === undefined) return { ok: false, errors }
-  return { ok: true, spec: { name, seed, tables: order(tables), defects, realism } }
+  return { ok: true, spec: { name, seed, tables: order(tables), defects, realism, entities } }
 }
 
 function parseTable(value: unknown, index: number, errors: string[]) {
@@ -182,13 +186,16 @@ function parseTable(value: unknown, index: number, errors: string[]) {
   const groups = parseGroups(root.groups, name, columns, errors)
   const series = parseSeries(root.series, name, columns, errors)
   const rules = parseRules(root.rules, name, columns, errors)
+  const enumerate = typeof root.enumerate === "string" ? root.enumerate.trim() : undefined
+  if (root.enumerate !== undefined && !enumerate) errors.push(`Таблица ${name}: enumerate — имя сущности.`)
   const counted = series ? seriesRows(series, columns) : rowsValue
   if (series && rowsValue !== undefined && counted !== undefined && rowsValue !== counted)
     errors.push(`Таблица ${name}: rows должно совпасть с сеткой ряда (${counted}).`)
-  if (!series && rowsValue === undefined) errors.push(`Таблица ${name || index + 1}: rows — целое от 1 до ${LIMITS.rows}.`)
-  const rows = counted
-  if (!output || rows === undefined || !Number.isInteger(rows) || rows < 1 || rows > LIMITS.rows) return
-  return { name, rows, columns, output, split, links, rules, groups, series }
+  const pending = Boolean(enumerate) && rowsValue === undefined && !series
+  if (!series && rowsValue === undefined && !pending) errors.push(`Таблица ${name || index + 1}: rows — целое от 1 до ${LIMITS.rows}.`)
+  const rows = counted ?? (pending ? 0 : undefined)
+  if (!output || rows === undefined || !Number.isInteger(rows) || rows < 0 || rows > LIMITS.rows || (rows < 1 && !pending)) return
+  return { name, rows, columns, output, split, links, rules, groups, series, enumerate }
 }
 
 function parseColumn(value: unknown, table: string, index: number, errors: string[]): Column | undefined {
@@ -259,7 +266,8 @@ function parseColumn(value: unknown, table: string, index: number, errors: strin
   }
   if (type === "linked") {
     if (typeof root.link !== "string" || !root.link.trim()) errors.push(`${where}: linked требует link.`)
-    return applyFlags({ name, type, link: String(root.link ?? "") }, root, where, errors)
+    const field = typeof root.field === "string" && root.field.trim() ? root.field.trim() : undefined
+    return applyFlags({ name, type, link: String(root.link ?? ""), field }, root, where, errors)
   }
   if (type === "offset") {
     const unit = root.unit === "hours" || root.unit === "days" ? root.unit : "minutes"
@@ -312,7 +320,7 @@ function parseOutput(value: unknown, table: string, errors: string[]): Output | 
   return { format, file, delimiter, quote, encoding, bom: root.bom === true, decimal, dateFormat: typeof root.dateFormat === "string" ? root.dateFormat : "YYYY-MM-DD", newline, header: root.header !== false, sheet: typeof root.sheet === "string" && root.sheet.trim() ? root.sheet.trim() : table }
 }
 
-function parseDefect(value: unknown, index: number, tables: Table[], errors: string[]): Defect[] {
+function parseDefect(value: unknown, index: number, tables: Table[], entities: Link[], errors: string[]): Defect[] {
   const root = record(value)
   const where = `Дефект ${index + 1}`
   if (!root || typeof root.kind !== "string" || typeof root.table !== "string") {
@@ -366,8 +374,10 @@ function parseDefect(value: unknown, index: number, tables: Table[], errors: str
     return [{ table: root.table, column: column.name, kind: "out_of_range", rate: safeRate, direction: root.direction === "low" || root.direction === "both" ? root.direction : "high" }]
   }
   if (root.kind === "orphan") {
-    if (column.type !== "ref" && column.type !== "lookup") errors.push(`${where}: orphan применяется к ref или lookup.`)
-    return [{ table: root.table, column: column.name, kind: "orphan", rate: safeRate }]
+    const entity = entities.find((item) => column?.type === "linked" && item.name === column.link)
+    const key = entity?.columns[0] === (column?.type === "linked" ? column.field ?? column.name : "")
+    if (column?.type !== "ref" && column?.type !== "lookup" && !key) errors.push(`${where}: orphan применяется к ref, lookup или ключу сущности.`)
+    return [{ table: root.table, column: column?.name ?? "", kind: "orphan", rate: safeRate }]
   }
   if (root.kind === "inconsistent") {
     if (column.type !== "expr") errors.push(`${where}: inconsistent применяется к expr.`)
@@ -454,8 +464,11 @@ function validateStructure(table: Table, errors: string[]) {
       errors.push(`Таблица ${table.name}: связь ${link.name} требует колонки linked в том же порядке.`)
   }
   for (const column of table.columns) {
-    if (column.type === "linked" && !table.links.some((link) => link.name === column.link))
-      errors.push(`Таблица ${table.name}: колонка ${column.name} ссылается на неизвестную связь.`)
+    if (column.type === "linked") {
+      const link = table.links.find((item) => item.name === column.link)
+      const field = column.field ?? column.name
+      if (link && !link.columns.includes(field)) errors.push(`Таблица ${table.name}: поле ${field} отсутствует в связи ${link.name}.`)
+    }
     if (column.type === "sequence" && column.per?.some((name) => !table.columns.some((item) => item.name === name && !(item.type === "sequence" && item.per?.length))))
       errors.push(`Таблица ${table.name}: per колонки ${column.name} указывает на неизвестное поле.`)
     if (column.type === "offset") {
@@ -480,6 +493,67 @@ function validateStructure(table: Table, errors: string[]) {
   const anchor = table.groups?.shared ?? table.series?.by
   if (table.split && anchor && !anchor.includes(table.split.by))
     errors.push(`Таблица ${table.name}: split.by должен входить в общие поля группы или ключ ряда.`)
+  if (table.enumerate && (table.groups || table.series)) errors.push(`Таблица ${table.name}: enumerate не сочетается с groups и series.`)
+}
+
+function parseEntities(value: unknown, errors: string[]) {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    errors.push("Поле entities должно быть массивом.")
+    return []
+  }
+  return parseLinkList(value, "Сущность", errors)
+}
+
+function resolveEnumerate(tables: Table[], entities: Link[], errors: string[]) {
+  for (const table of tables) {
+    if (!table.enumerate) continue
+    const entity = entities.find((item) => item.name === table.enumerate)
+    if (!entity) {
+      errors.push(`Таблица ${table.name}: неизвестная сущность ${table.enumerate}.`)
+      continue
+    }
+    const known = entity.rows?.length
+    if (!known) continue
+    if (table.rows !== 0 && table.rows !== known) errors.push(`Таблица ${table.name}: rows должно совпасть с числом элементов (${known}).`)
+    table.rows = known
+  }
+}
+
+function validateEntities(tables: Table[], entities: Link[], errors: string[]) {
+  if (new Set(entities.map((entity) => entity.name)).size !== entities.length) errors.push("Имена сущностей должны быть уникальными.")
+  for (const entity of entities) {
+    const key = entity.columns[0] ?? ""
+    const keys = entity.rows?.map((row) => row[0] ?? "")
+    if (keys && new Set(keys).size !== keys.length) errors.push(`Сущность ${entity.name}: ключ ${key} повторяется.`)
+    for (const table of tables) {
+      if (table.links.some((link) => link.name === entity.name)) errors.push(`Сущность ${entity.name} совпадает со связью таблицы ${table.name}.`)
+      const used = table.columns.filter((column) => column.type === "linked" && column.link === entity.name)
+      if (!used.length) continue
+      if (!used.some((column) => column.type === "linked" && (column.field ?? column.name) === key))
+        errors.push(`Таблица ${table.name}: сущность ${entity.name} требует ключевое поле ${key}.`)
+      for (const column of used) {
+        if (column.type !== "linked") continue
+        const field = column.field ?? column.name
+        if (!entity.columns.includes(field)) errors.push(`Таблица ${table.name}: поле ${field} отсутствует в сущности ${entity.name}.`)
+      }
+    }
+  }
+  for (const table of tables) {
+    for (const column of table.columns) {
+      if (column.type === "linked" && !table.links.some((link) => link.name === column.link) && !entities.some((entity) => entity.name === column.link))
+        errors.push(`Таблица ${table.name}: колонка ${column.name} ссылается на неизвестную связь.`)
+      if (column.type !== "ref") continue
+      const parent = tables.find((item) => item.name === column.table)
+      if (!parent) continue
+      for (const attr of parent.columns) {
+        if (attr.name === column.column) continue
+        const local = table.columns.find((item) => item.name === attr.name)
+        if (!local || local.type === "lookup" || local.type === "linked" || local.type === "ref") continue
+        errors.push(`Таблица ${table.name}: колонка ${local.name} повторяет атрибут ${parent.name}.${attr.name}. Используйте lookup, linked или другое имя.`)
+      }
+    }
+  }
 }
 
 function parseLinks(value: unknown, table: string, columns: Column[], errors: string[]): Link[] {
@@ -488,9 +562,14 @@ function parseLinks(value: unknown, table: string, columns: Column[], errors: st
     errors.push(`Таблица ${table}: links должен быть массивом.`)
     return []
   }
+  void columns
+  return parseLinkList(value, `Таблица ${table}, связь`, errors)
+}
+
+function parseLinkList(value: unknown[], wherePrefix: string, errors: string[]): Link[] {
   return value.flatMap((item, index) => {
     const root = record(item)
-    const where = `Таблица ${table}, связь ${index + 1}`
+    const where = `${wherePrefix} ${index + 1}`
     if (!root || typeof root.name !== "string") {
       errors.push(`${where} требует name.`)
       return []
@@ -505,9 +584,9 @@ function parseLinks(value: unknown, table: string, columns: Column[], errors: st
     const weights = Array.isArray(root.weights) ? root.weights.map((weight) => finite(weight)) : undefined
     if (weights && (weights.some((weight) => weight === undefined || weight < 0) || weights.length !== rows?.length)) errors.push(`${where}: weights совпадают с rows.`)
     const distribution = root.distribution === "zipf" ? "zipf" : "uniform"
-    return [{ name: root.name, columns: names, rows, generate, distribution, zipf: numberOr(root.zipf, 1), weights: weights?.every((weight) => weight !== undefined) ? weights : undefined }]
+    const ready = weights?.every((weight) => weight !== undefined) ? weights.flatMap((weight) => weight === undefined ? [] : [weight]) : undefined
+    return [{ name: root.name, columns: names, rows, generate, distribution, zipf: numberOr(root.zipf, 1), weights: ready }]
   })
-  void columns
 }
 
 function parseLevel(value: unknown, where: string, errors: string[]): LinkLevel[] {

@@ -20,7 +20,7 @@ metadata:
 дефекты — в [каталоге](references/defects.md), файлы — в
 [форматах](references/formats.md), готовый розничный набор — в
 [пресетах](references/presets.md). Связи, группы и ряды — в
-[зависимостях](references/relations.md), ограничители грязных данных — в
+[зависимостях](references/relations.md). Элемент нескольких наборов описывай один раз через `entities` или `lookup`: один идентификатор не должен получать разные тип и название. Ограничители грязных данных — в
 [правдоподобии](references/realism.md). Заготовки спецификаций лежат в
 `references/examples/`. Уже написанный сценарий — в
 [режиме существующего сценария](references/existing-scenario.md).
