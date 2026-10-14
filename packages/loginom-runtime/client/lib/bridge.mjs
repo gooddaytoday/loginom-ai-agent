@@ -595,6 +595,10 @@ export async function createBridge(config, session, { browserTransport: managedB
         throw capturePersistencePrimary.value;
       }
       for(const file of captureWriters){
+        // A settled rejected exclusive open acquired no FD; it is not a close.
+        if(file.claim && file.openRejected && file.fd===undefined && file.io?.pending===false){
+          captureWriters.delete(file);continue;
+        }
         if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
           try{await closeCaptureWriter(file)}catch(value){file.closeFailure??={value};rememberCapturePersistence(value,'retained_close')}
         }
@@ -644,13 +648,19 @@ export async function createBridge(config, session, { browserTransport: managedB
         current();
         // An unowned existing receipt is never replaced. A directory can only
         // produce the kernel's file-to-directory refusal, without replacement.
-        if(existing && !existing.isDirectory())throw Error('LOGINOM_CAPTURE_PUBLICATION_EXISTS');
+        if(existing && !existing.isDirectory() && (!publication.claim?.identity
+            || existing.dev!==publication.claim.identity.dev || existing.ino!==publication.claim.identity.ino
+            || existing.uid!==publication.claim.identity.uid || existing.size!==0
+            || existing.nlink!==1 || (existing.mode&0o777)!==0o600))
+          throw Error('LOGINOM_CAPTURE_PUBLICATION_EXISTS');
       };
       if(!publication.file)await assertDestinationSlot();
       const persist=async(path,mode,write)=>{
+        const claiming=write==='claim';write=write===true;
         const file={fd:undefined,closeComplete:false};captureWriters.add(file);
         if(write)publication.file=file;
-        let phase=write?'file_open':'directory_open',primary;
+        if(claiming){file.claim=true;publication.claim=file;}
+        let phase=claiming?'claim_open':write?'file_open':'directory_open',primary;
         const failed=value=>{primary??={phase,value};rememberCapturePersistence(value,phase)};
         const callback=invoke=>{
           current();const operation={pending:true,phase};file.io=operation;let projection,callbackSettled=false;
@@ -672,29 +682,38 @@ export async function createBridge(config, session, { browserTransport: managedB
         };
         try{
           await callback(done=>captureOpen(path,mode,0o600,(error,fd)=>{
-            file.openComplete=true;if(error===null||error===undefined)file.fd=fd;done(error,fd);
+            file.openComplete=true;file.openRejected=error!==null&&error!==undefined;
+            if(!file.openRejected)file.fd=fd;done(error,fd);
           }));
           if(write){phase='file_write';await callback(done=>captureWrite(file.fd,bytes,done))}
-          else{
+          else if(!claiming){
             phase='directory_identity';const stat=await callback(done=>captureFstat(file.fd,done));
             if(!stat.isDirectory() || stat.dev!==publication.directoryIdentity.dev
                 || stat.ino!==publication.directoryIdentity.ino || stat.uid!==publication.directoryIdentity.uid)
               throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
           }
-          phase=write?'file_sync':'directory_sync';await callback(done=>captureSync(file.fd,done));
-          if(write){
-            phase='file_identity';const stat=await callback(done=>captureFstat(file.fd,done));
-            if(!stat.isFile() || stat.nlink!==1 || (stat.mode&0o777)!==0o600 || stat.size!==Buffer.byteLength(bytes))
+          phase=claiming?'claim_sync':write?'file_sync':'directory_sync';await callback(done=>captureSync(file.fd,done));
+          if(write||claiming){
+            phase=claiming?'claim_identity':'file_identity';const stat=await callback(done=>captureFstat(file.fd,done));
+            if(!stat.isFile() || stat.nlink!==1 || (stat.mode&0o777)!==0o600 || stat.size!==(claiming?0:Buffer.byteLength(bytes))
+                || claiming && stat.uid!==publication.identity.uid)
               throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
-            publication.identity=Object.freeze({dev:stat.dev,ino:stat.ino,size:stat.size,uid:stat.uid});
+            const identity=Object.freeze({dev:stat.dev,ino:stat.ino,size:stat.size,uid:stat.uid});
+            if(claiming)file.identity=identity;else publication.identity=identity;
           }
         }catch(value){if(!file.io)captureWriters.delete(file);failed(value)}
-        if(file.fd!==undefined){
-          phase=write?'file_close':'directory_close';
+        if(file.fd!==undefined && (!claiming || primary)){
+          phase=claiming?'claim_close':write?'file_close':'directory_close';
           try{await closeCaptureWriter(file);captureWriters.delete(file)}
           catch(value){file.closeFailure??={value};failed(value)}
-        }else if(file.openComplete && file.io?.pending===false){captureWriters.delete(file)}
-        if(primary)throw primary.value;
+        }else if(file.fd===undefined && file.openComplete && file.io?.pending===false){captureWriters.delete(file)}
+        if(primary){
+          if(claiming && file.openRejected && file.fd===undefined && file.io?.pending===false){
+            (publication.claimFailures??=[]).push(file);publication.claim=undefined;
+          }
+          throw primary.value;
+        }
+        if(claiming)return file;
         if(!file.closeComplete)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
       };
       if(!publication.prepared){
@@ -707,6 +726,15 @@ export async function createBridge(config, session, { browserTransport: managedB
         if(publication.pending || publication.renamed){rememberCapturePersistence(Error('LOGINOM_CAPTURE_RENAME_UNKNOWN'),'rename');throw capturePersistencePrimary.value}
         await pathIdentity(publication.temporary,publication.identity);
         await assertDestinationSlot();
+        // Physical exclusive claim: a competing wx receipt cannot be replaced.
+        // Hold its original FD/inode through the original rename settlement.
+        if(publication.claim?.openRejected && publication.claim.fd===undefined && publication.claim.io?.pending===false){
+          (publication.claimFailures??=[]).push(publication.claim);publication.claim=undefined;
+        }
+        if(!publication.claim)await persist(join(publication.directory,name),
+          captureConstants.O_WRONLY|captureConstants.O_CREAT|captureConstants.O_EXCL|captureConstants.O_NOFOLLOW,'claim');
+        if(!publication.claim?.identity)throw Error('LOGINOM_CAPTURE_PUBLICATION_CLAIM_UNKNOWN');
+        await pathIdentity(join(publication.directory,name),publication.claim.identity);
         current();publication.pending=true;let projection,callbackSettled=false;
         const completion=new Promise((resolve,reject)=>{
           try{projection=captureRename(publication.temporary,join(publication.directory,name),error=>{
@@ -729,6 +757,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         try{await Promise.all(owned)}catch(value){throw capturePersistencePrimary.value}
         await publication.settlement;
         if(!publication.succeeded)throw Error('LOGINOM_CAPTURE_RENAME_UNKNOWN');
+      }
+      if(publication.claim && !publication.claim.closeComplete){
+        await closeCaptureWriter(publication.claim);captureWriters.delete(publication.claim);
       }
       current();await pathIdentity(join(publication.directory,name),publication.identity);
       await pathIdentity(publication.directory,publication.directoryIdentity,true);
@@ -1047,14 +1078,20 @@ export async function createBridge(config, session, { browserTransport: managedB
           }));
           assertBinding();
           if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,bytes,done));assertBinding()}
-          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));assertBinding();
+          phase=claiming?'claim_sync':write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));assertBinding();
         }catch(value){remember(value,phase)}
         if(file.fd!==undefined){
           const closePhase=write?'file_close':'directory_close';
           try{await closeWriter(file);assertBinding();if(!file.ownsTemporary)cleanupWriters.delete(file)}
           catch(value){file.closeFailure??={value};remember(value,closePhase)}
         }
-        if(primary)throw primary.value;
+        if(primary){
+          if(claiming && file.openRejected && file.fd===undefined && file.io?.pending===false){
+            (publication.claimFailures??=[]).push(file);publication.claim=undefined;
+          }
+          throw primary.value;
+        }
+        if(claiming)return file;
         if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
         return file;
       };
