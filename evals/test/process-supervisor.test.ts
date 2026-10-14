@@ -338,6 +338,42 @@ test("parallel observation evidence records delayed starts separately from scan 
   } finally { await Promise.all(runs); await rm(root, { recursive: true }) }
 }, 10_000)
 
+test("parallel registry does not publish a fresh peer claim for an unreadable live process", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-unreadable-"))
+  const a = path.join(root, "a"), b = path.join(root, "b")
+  await Promise.all([mkdir(a), mkdir(b)])
+  const heartbeat = path.join(b, "heartbeat")
+  const ready = Promise.withResolvers<number>()
+  const pendingA = superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(1200)"], cwd: a,
+    env: { PATH: process.env.PATH ?? "" }, outDir: a, timeoutMs: 5_000, owner: { kind: "slot", id: "a" } })
+  const pendingB = superviseProcess({ cmd: [process.execPath, "-e", `
+    const {dlopen}=await import('bun:ffi');
+    const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
+    await Bun.write(${JSON.stringify(heartbeat)},String(Date.now()));
+    const timer=setInterval(()=>{void Bun.write(${JSON.stringify(heartbeat)},String(Date.now()))},50);
+    await Bun.sleep(500);
+    if(library.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);
+    console.log(process.pid);
+    await Bun.sleep(2500);
+    clearInterval(timer);
+  `], cwd: b, env: { PATH: process.env.PATH ?? "" }, outDir: b, timeoutMs: 5_000, owner: { kind: "slot", id: "b" },
+    stdout: new WritableStream<Uint8Array>({ write(chunk) { ready.resolve(Number(new TextDecoder().decode(chunk).trim())) } }) })
+  try {
+    const pid = await Promise.race([ready.promise, pendingB.then(() => { throw Error("Protected peer ended before readiness") })])
+    const before = await Bun.file(heartbeat).text()
+    const run = await pendingA
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(run.processCleanup.peerProcesses?.some(entry => entry.process.pid === pid)).toBe(false)
+    expect(run.processCleanup.processes.some(entry => entry.pid === pid)).toBe(false)
+    expect(await Bun.file(heartbeat).text()).not.toBe(before)
+    expect((await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")[0]).not.toBe("Z")
+    const finishedB = await pendingB
+    expect(finishedB.exitCode).toBe(0)
+    expect(finishedB.processCleanup.status).toBe("failed")
+  } finally { await Promise.all([pendingA, pendingB]); await rm(root, { recursive: true }) }
+}, 10_000)
+
 test("supervisor: происхождение без точного browser profile не разрешает сигнал браузеру", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-bundle-"))
