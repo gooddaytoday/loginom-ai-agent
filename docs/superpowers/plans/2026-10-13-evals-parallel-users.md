@@ -534,6 +534,8 @@ expect(a.processCleanup.processes.some(item => item.pid === bRootPid)).toBe(fals
 
 - [x] Подзадача cleanup/receipt (2026-10-14): после native2/25 и real PID reuse1/11 сохранены три private proofs, attached к current candidate receipt как processEvidence scope nonmodel-native-browser-and-kernel-pid-reuse-only/liveQualified=false, SHA каждого и read-back. Удалены5 собственных superseded native scopes +16 launcher capsules только после metadata/inode/UID/mode audit и terminal private PID namespaces; host PID signals0. superseded-scopes.json600 read-back PASS; proof JSON, logs и текущая candidate installation сохранены.
 
+- [x] Подзадача current-code process qualification: после fresh-peer guard повторены native2 PASS/25 (8.98s; PID case skip не засчитан), отдельный kernel PID reuse1 PASS/11 (1.69s). Current candidate processEvidence с SHA трёх proofs/read-back указывает process-proof-refresh-Iv7Was и tested harness31f8392608, liveQualified=false. Shared model status/public pins не изменены; authenticated admin bridge не квалифицирован. Старые statements времени описывают прошлые наблюдения; current proof set — эта директория.
+
 - [ ] Настоящие Bun/PID fixtures остаются в unit `process-supervisor.test.ts`; bundled Chromium, bwrap и trusted admin scenario — в `process-supervisor-integration.test.ts`. Запустить его отдельно на этом хосте с receipt и доступным установленным prod runtime; shared OAuth не требуется.
 - [x] Коммит `fix(evals): preserve process ownership across parallel supervisors`: первый registry tracer завершён; остальные gates задачи 6 выше сохраняют отдельные открытые checkbox.
 
