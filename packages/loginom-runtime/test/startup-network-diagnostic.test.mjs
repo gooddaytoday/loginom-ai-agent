@@ -21,3 +21,18 @@ for(const [i,primary]of [Error('original'),undefined,null,false,0,''].entries())
  assert.equal(failed,true);assert.equal(value,primary);assert.equal(owner.loginSubmitted,undefined);
  assert.equal(owner.evidence.startup_diagnostics.requests[0].state,'pending');assert.equal(owner.evidence.startup_diagnostics.stopped,true);assert.equal(page.eventNames().length,0);
 });
+
+test('static certificate failures remain bounded, sanitized and separate from RPC inventory',()=>{
+ const page=new EventEmitter(),d=module.startupPageDiagnostics(page,'https://own.invalid');
+ const request=(failure='net::ERR_CERT_VERIFIER_CHANGED SECRET')=>({resourceType:()=> 'script',url:()=> 'https://own.invalid/app/worker.js?token=SECRET',failure:()=>({errorText:failure}),postData(){throw Error('MUST_NOT_READ_BODY')}});
+ for(let i=0;i<70;i++){const r=request();page.emit('request',r);page.emit('requestfailed',r)}
+ assert.equal(d.evidence.static_requests,70);assert.equal(d.evidence.static_failures.length,64);assert.equal(d.evidence.dropped_static_failures,6);
+ assert.equal(d.evidence.requests.length,0);assert.equal(d.evidence.static_failures[0].error_name,'net::ERR_CERT_VERIFIER_CHANGED');assert.equal(d.evidence.static_failures[0].pathname,'/app/worker.js');
+ assert.equal(JSON.stringify(d.evidence).includes('SECRET'),false);
+ d.stop();page.emit('requestfailed',request());assert.equal(d.evidence.static_failures.length,64);assert.equal(page.eventNames().length,0);
+});
+test('unknown static failure text cannot enter the diagnostic receipt',()=>{
+ const page=new EventEmitter(),d=module.startupPageDiagnostics(page,'https://own.invalid');
+ page.emit('requestfailed',{resourceType:()=> 'stylesheet',url:()=> 'https://foreign.invalid/app/style.css?password=SECRET',failure:()=>({errorText:'SECRET arbitrary error'})});
+ assert.equal(d.evidence.static_failures[0].same_origin,false);assert.equal(d.evidence.static_failures[0].error_name,'UNKNOWN');assert.equal(JSON.stringify(d.evidence).includes('SECRET'),false);d.stop();
+});

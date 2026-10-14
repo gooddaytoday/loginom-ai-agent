@@ -31,7 +31,7 @@ export function loginomAddress(value) {
 // Pre-widget diagnostics only: no response bodies, headers, query, console text
 // or input values. The collector grants no readiness/cleanup authority.
 export function startupPageDiagnostics(page, origin) {
-  const evidence={version:1,started_at:new Date().toISOString(),requests:[],dropped_requests:0,static_requests:0,page_errors:[],console_counts:{},stopped:false};
+  const evidence={version:1,started_at:new Date().toISOString(),requests:[],dropped_requests:0,static_requests:0,static_failures:[],dropped_static_failures:0,page_errors:[],console_counts:{},stopped:false};
   const requests=new WeakMap();
   const request=r=>{try {
     // Hundreds of startup assets must not evict the later config/credential RPC.
@@ -41,7 +41,15 @@ export function startupPageDiagnostics(page, origin) {
     requests.set(r,item);evidence.requests.push(item);
   }catch{evidence.dropped_requests++}};
   const finish=r=>{const item=requests.get(r);if(item){item.state='finished';item.settled_at=new Date().toISOString()}};
-  const fail=r=>{const item=requests.get(r);if(item){item.state='failed';item.settled_at=new Date().toISOString()}};
+  const fail=r=>{const item=requests.get(r);if(item){item.state='failed';item.settled_at=new Date().toISOString();return}
+    try {
+      if(['document','xhr','fetch'].includes(r.resourceType()))return;
+      if(evidence.static_failures.length>=64){evidence.dropped_static_failures++;return}
+      const url=new URL(r.url()),failure=r.failure()?.errorText;
+      evidence.static_failures.push({same_origin:url.origin===origin,pathname:url.pathname.slice(0,256),
+        resource_type:r.resourceType(),error_name:typeof failure==='string'?(/net::[A-Z_]+/.exec(failure)?.[0]??'UNKNOWN'):'UNKNOWN',observed_at:new Date().toISOString()});
+    }catch{evidence.dropped_static_failures++}
+  };
   const error=e=>{if(evidence.page_errors.length<16)evidence.page_errors.push({name:typeof e?.name==='string'?e.name:'unknown',observed_at:new Date().toISOString()})};
   const consoleEvent=e=>{const type=e.type();if(['error','warning','log','info','debug'].includes(type))evidence.console_counts[type]=(evidence.console_counts[type]??0)+1};
   const listeners=[['request',request],['requestfinished',finish],['requestfailed',fail],['pageerror',error],['console',consoleEvent]];
