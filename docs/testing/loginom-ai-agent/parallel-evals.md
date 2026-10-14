@@ -443,3 +443,28 @@ collector3/3, исходное ожидание сохранено. Cold judge/p
 run110 PASS/610 assertions (120.21s), typecheck/diff PASS. Native Codex auth и
 production/offline global judge lease/release пока не подключены; metadata loader
 и generic process probes не означают live readiness.
+
+Через765c6683de production main подключает v2 judge-only/calibrate к private
+command journal и host-global canonical CODEX_HOME lease. Пробы проходят уже под
+lease; release требует judgeCleanupConfirmed и bound cleanup proof, quality code
+не заменяет process proof. Uncertain result сохраняет reservation и journal
+quarantined, повтор получает RECOVERY_REQUIRED до нового child. Legacy offline
+metadata сохраняется. Environment/lease/rejudge/calibrate/config106 PASS/482
+assertions (70.64s), typecheck/diff PASS. Default lock root фиксирован; temp root
+unit API не доступен через CLI/env/config.
+
+Auth guard4880a5740a проверяет lstat metadata native auth.json: regular current-UID
+file0600/nlink1; bytes не читает, symlink/hardlink/public file отвергает до lease
+и probe. Missing auth также не создаёт reservation. 12 environment tests/50
+assertions PASS (8.43s), typecheck/diff PASS; canaries инертны, OAuth не подменяется.
+
+Отдельный public main nonmodel proof: private PID/net/mount namespace, host root
+read-only, /var/lib внутри namespace и fixed /var/lib/loginom-evals/locks связан
+только с собственным private lock root. Настоящие Bun/flock/fake-codex процессы
+подтвердили default path, matched inode bind, ignored env override, одинаковый
+home version/exec, bound proof и released reservation/journal. Proof600
+/home/kiselev/.local/state/loginom-evals/parallel/offline-default-root-ljtcc5/proof.json,
+SHA11a9ad4c4f9b355d83a5a430cc644449312ea07d3b6699bd1a9d4ffe9b6151f8/read-back
+PASS, namespace separation проверена, liveQualified=false. Host guard paths,
+dev/legacy/другие контроллеры не изменены; native Codex auth/exception recovery
+остаются открытыми.
