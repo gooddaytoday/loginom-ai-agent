@@ -28,14 +28,22 @@ rebuild runtime не нужен.
 CLI2540012/Host2540474gone, ACKtrue/exit0/cleanuptrue, собственный guard отсутствует.
 Отказ Export UI / Canvas outline control unavailable не дал CSV; частичный LGP
 сохранён. Исходные wrapper2/analyticsfalse/policyincomplete не изменены.
-Отдельная оценка policy-v2 и обязательное ревью отказа выполняются.
+Отдельный policy-v2 verdict `979df7d7…` и обязательное failure/anomaly review
+`04bd0a4d…` подтвердили достаточную полную историю и правильный выбор узлов.
+Initial catalog и повторный cachedprepare связаны с тем же Session/skill;
+18 admitted native operations settled. Исходные identity/runtimeSettled false
+не переписаны. Результат не получен; неправильный расчёт не утверждается.
+Own normal-release readback `f9719307…`:42исходных файла/hash сохранены.
 Перед следующим explicit-js/2 нужен execution-r4 допуск штатно освобождённой
 неуспешной попытки; контракт `2026-10-14-node-selection-policy-v2-normal-release-failure.md`
 закреплён до нового dispatch. Предыдущие R3 sources readonly, index `d949fb8d…`.
 Product/runtime/criteria/matrix неизменны. Моделей и browser recovery пока не требуется.
 
-Candidate14 closed summary `87f0297c…`: policy14PASS/0violated/0insufficient,
-аналитика10correct/4notobtained, normalcompletion10/manualpostfailure4.
+Candidate15 closed summary `4ca0a944…`: policy15PASS/0violated/0insufficient,
+аналитика10correct/5notobtained, штатных release11/ручных postfailure4.
+Один из11штатныхrelease относится к реальному Export UI отказу; это не
+утверждение успешного runtime выполнения всей аналитической цепочки.
+Предыдущий снимок14 `87f0297c…` сохранён без переписывания.
 ROI/2 finished17:17:32.674Z, oracle/calculationPASS/JS0/normalcleanuptrue;
 sidecar `319ac1ec…`, autoadvanceproof `0c3c851c…` подтверждает переход к
 first-last-touch/2 в17:17:32.822Z после завершения собственных CLI/Host.
@@ -88,8 +96,8 @@ admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchiv
 сохранив technical-failed/policyfailed/calculationfalse. Соседние211/213 не закрывались.
 Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
-Candidate: 14 отдельных policy-v2 PASS; аналитика10correct/4notobtained,
-normalcleanup10/ручных postfailure releases4. Claims/2 anomaly review завершён.
+Candidate: 15 отдельных policy-v2 PASS; аналитика10correct/5notobtained,
+normalcleanup11/ручных postfailure releases4. Один Export UI отказ завершён штатно. Claims/2 anomaly review завершён.
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
