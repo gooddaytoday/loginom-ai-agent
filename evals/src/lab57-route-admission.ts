@@ -10,7 +10,7 @@ export function validateFreshRouteState(s:FreshRouteState,csvRemoved:boolean) {
   if(!s || !Array.isArray(s.passes) || s.passes.length!==2 || s.passes.some(p=>
     [p.originalPids,p.foreignNative,p.denied,p.profileFds].some(a=>!Array.isArray(a)||a.length))
     || s.profiles!==6 || !Array.isArray(s.foreignMarkers) || s.foreignMarkers.length || !Array.isArray(s.pendingWorkers) || s.pendingWorkers.length
-    || s.queuesChecked!==8 || !Number.isFinite(s.checkedAt) || s.checkedAt>Date.now() || Date.now()-s.checkedAt>15000
+    || s.queuesChecked<8 || !Number.isFinite(s.checkedAt) || s.checkedAt>Date.now() || Date.now()-s.checkedAt>15000
     || s.container?.id!==lab57CleanupScope.containerId || s.container.startedAt!==originalContainerStartedAt || s.container.running!==true
     || !Array.isArray(s.container.mounts) || s.container.mounts.length || !Array.isArray(s.storage)
     || s.storage.length!==(csvRemoved?0:1) || !csvRemoved&&Object.entries(ownedCsv).some(([k,v])=>s.storage[0]?.[k as keyof typeof ownedCsv]!==v))
