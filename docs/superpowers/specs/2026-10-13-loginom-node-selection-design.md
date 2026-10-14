@@ -1888,3 +1888,21 @@ Worker реализует approved LABEL branch через TDD, только tex
 и focused test; raw/oldfixtures/pins/docs не меняет. Root owns canonical docs,
 checks/commits; independent source review до commit/live. Stage TDD label
 и его review/checks пока открыты, model acceptance не начиналась.
+
+
+Уточнение LABEL guard scope 2026-10-14 06:38 UTC: наблюдавшийся lock в fresh
+read до label запрещает click. Если native FLocked изменится уже ПОСЛЕ
+node_step_prepared admission, прежний shared checkedHandle может допустить
+одну безопасную own-label selection; следующая fresh проверка обязана отказать
+ДО input/menu/mapping. Это та же temporal граница, что у разрешённого own scroll;
+selection не меняет данные/links. Zero selection после такой race не заявляется.
+Shared guard/API не изменяются ради расширения scope. Author tests фиксируют
+этот реальный инвариант и negatives; final source freeze/review пока pending.
+
+Skill_policy source review дважды не начался из-за selected-model capacity;
+Product independent review передан verify_audit_corrections (не автор правки).
+Это не model eval slots и не quota outcome попытки. Никакого live/LLM eval нет.
+Next-pair подготовка `08c944c76e85cff7e22bec70e1e675f29c0d800552b27a9d50ad9497d4dae563`:
+existing build/verify pipeline, baseline verify до restore2skills; новая initial
+matrix сразу actual3arg, прежний schedule9→clean→18→16. Build checkout не менялся,
+сборки/новые payload не стартовали; требуется новый чистый source commit.
