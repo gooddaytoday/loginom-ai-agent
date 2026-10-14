@@ -1466,3 +1466,27 @@ first-last → explicit-js → tags → recovery. Первая волна уже
 нарушении policy дальнейшие слоты этого digest останавливаются. Параллельно
 готовится отдельный deterministic native diagnostic без LLM для exact open
 predicate; до воспроизведения product/runtime/skill/pins не меняются.
+
+
+На 2026-10-14 03:18 UTC адресное recovery ABC/1 завершено: независимый
+postarchive review `bdfcd9ee…` подтвердил сохранённые inode/bytes guard,
+отсутствие исходного `.writer` и неизменность failed outcome, raw, pins,
+исходников, runtime и квитанций закрытия. Original ABC/1 не повторялся.
+
+`monthly-demand/1` завершён полным PASS: Session
+`ses_ec79d2db9ffe53yzDMRmbd2a4T`, CLI/wrapper 0, cleanup true, oracle/policy/
+calculation PASS, JS nodes/calls 0. Машинный аудит подтвердил полную историю,
+settlement, идентичность экспорта и связность сохранённого графа.
+SHA attempt `a781c5f7d45e6015b202589f880974544d3aca2bd1d8747183e4ca192610cf07`,
+selection-audit `3f5251f0966a645b6579cc829d004175547d3e67380860324974bc86eecfe9f4`.
+Root 59629 завершён exit 0; длительность CLI около 484 секунд.
+Candidate завершил 3/25 (firstwave 3/9): два полных PASS и один технический
+incomplete; JS-вызовов не наблюдалось. Baseline остаётся 18/18, 17 oracle/
+расчёт PASS, 11 policy PASS. Общий build/skill/pins не менялись.
+
+Перед следующим frozen модельным слотом claims/1 профиль временно выделен
+для отдельного deterministic native diagnostic ABC opening без LLM.
+Подготовка и TDD идут в ignored private run directory; независимый review
+проверяет trace без изменения guard/control flow. Live diagnostic ещё не
+запущен. Его результат не заменяет ABC/1 и не считается acceptance.
+Первая волна остаётся нечистой, повторы закрыты, полная приёмка не завершена.
