@@ -495,3 +495,39 @@ user132/134/136 и остальные сессии не трогались. Пр
 allowlist уже скопированных файлов идёт параллельно; source/runtime не менялись.
 До подтверждённого закрытия own-сессии и адресного guard recovery следующие
 модельные попытки запрещены. Исходный failed outcome не заменяется.
+
+
+На 2026-10-14 02:18 UTC адресное recovery собственной user137 завершено:
+strict binding `4924ba9d…`, server close02:05:01.287/.288Z,
+admin138 logout02:05:57.854Z, PlaywrightMCP84741 exit0.
+User132 исчез по штатному timeout1800s02:03:52.914Z; user134/136 не закрывались.
+Guard review `5a9a75c7…` подтвердил exclusive admission, deadCLI/runtime,
+неизменный nonce8140…; root атомарно архивировал intact `.writer` в
+`.writer-recovered-node-selection-20261013T233119Z-4699a5-user137`.
+Receipt `36b7203f…`, независимый final recovery `6f4b1c6e…`:
+inode/bytes сохранены, исходный failed attempt `596780a5…` остаётся прежним.
+
+После read-only плана `a0955691…` и независимого review `b1247c38…`
+root перепроверил102 exact receipt-owned files и перенёс их same-device68
+в `/workdir/UserStorage/user/node-selection-archive-20261014T0214Z-4699a5`.
+Receipt `82953398…` и полный inverse-path map сохранены отдельно:
+614→513 top-level entries фактически; target bytes/SHA/inode/mode/mtime
+сохранены, исходные пути отсутствуют, остальные имена не изменились.
+34 input +34 savedLGP +34 CSV уже имели проверенные локальные копии.
+Текущие failed CSV/input и неизвестные файлы вне allowlist. Файлы не удалены;
+перед будущим reopen/reproduction LGP и входы нужно вернуть по inverse map
+на точные прежние пути. XML и raw evidence не переписывались.
+Предварительный сбой служебной find-команды на embeddedNUL произошёл до
+intent/mkdir/move; исправлен только delimiter эфемерной команды.
+Оценка max_top11665 остаётся прогнозом до следующего ordinary наблюдения.
+
+Source/runtime/skill/закреплённые входы не менялись: matched233119 продолжается,
+пересборка18+25 не требуется. После exact recovery/absence.writer и root
+postmove-check запущен root23200: только оставшиеся ROI/3 и first-last/3,
+последовательно отдельными CLI с тем же gating. Независимая postmove-проверка
+идёт параллельно read-only. Baseline completed16/18,15oracle/полных расчётов PASS,
+10policy PASS; candidate0/25. Failed claims/3 не заменяется и не исключается.
+Для следующих live-слотов каталог нужно периодически поддерживать адресным
+архивированием только finished cleanup-confirmed receipt/copied artifacts;
+каждый перенос требует того же exact pre/post-check и inverse map.
+Итоговая приёмка ещё не завершена.
