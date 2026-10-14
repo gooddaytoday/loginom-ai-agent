@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { join, dirname } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
+import { createStartupStaticLoader } from "./startup-static-loader.mjs"
 
 const runtimeModulePath = fileURLToPath(import.meta.url)
 
@@ -77,8 +78,15 @@ export async function loginPage(page, candidate, owner) {
   }
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-  try {await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })}
+  let widgetFailed=false,widgetPrimary
+  try {
+    const ready=avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+    await (owner?.staticLoader?Promise.race([ready,owner.staticLoader.failure]):ready)
+  }catch(error){widgetFailed=true;widgetPrimary=error}
+  try {await owner?.staticLoader?.stop()}
+  catch(error){if(!widgetFailed){widgetFailed=true;widgetPrimary=error}else owner.evidence.static_loader_secondary=startupRejection(error)}
   finally {owner?.startupDiagnostics?.stop()}
+  if(widgetFailed)throw widgetPrimary
   let loginReadyDeadline=Date.now()+30_000
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
@@ -394,10 +402,14 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     })
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
     await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
+    owner.staticLoader=await createStartupStaticLoader(owner.page,owner.context,owner,
+      Math.min(Date.now()+60_000,Number.isSafeInteger(owner.deadline)?owner.deadline:Infinity))
+    owner.evidence.startup_static_loader=owner.staticLoader.evidence
     const result=await loginPage(owner.page,candidate,owner)
     if(!keepOpen) {await owner.close();return result}
     return {...result,context:owner.context}
   } catch(error) {
+    try {await owner.staticLoader?.stop()}catch(secondary){owner.evidence.static_loader_secondary=startupRejection(secondary)}
     owner.startupDiagnostics?.stop()
     owner.primaryFailure=error
     owner.evidence.primary_rejection=startupRejection(error)
