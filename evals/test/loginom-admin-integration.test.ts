@@ -120,6 +120,22 @@ liveIntegration("native user capability: creates one blocked account and refuses
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
       expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: false,
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
+      const probe = await request("reconcile-user", { ...activation, phase: "session-probe" })
+      expect(probe.outcome).toBe("confirmed")
+      const observed = probe.data as { ownSession: { guid: string; objectId: string; userObjectId: string; username: string; isAdmin: boolean; isDesigner: boolean };
+        baseline: { objectId: string }[]; opened: { objectId: string; name: string; createdAt: string; packageCount: number }[];
+        withPackage: { objectId: string; name: string; createdAt: string; packageCount: number }[];
+        afterPackage: { objectId: string; name: string; createdAt: string; packageCount: number }[]; sessionIdentityQualified: boolean }
+      await writeLeaseReceipt(path.join(evidence, "session-probe.json"), { version: 1, identity: pair.identity, ...observed })
+      expect(observed.ownSession).toMatchObject({ userObjectId: user.objectId, username: user.name, isAdmin: false, isDesigner: true })
+      expect(observed.ownSession.guid).toBeString()
+      expect(observed.sessionIdentityQualified).toBe(false)
+      const candidate = observed.opened.filter(row => !observed.baseline.some(previous => previous.objectId === row.objectId))
+      expect(candidate).toHaveLength(1)
+      expect(candidate[0]!.name).toMatch(new RegExp(`^${user.name}:\\d+$`))
+      expect(candidate[0]!.packageCount).toBe(0)
+      expect(observed.withPackage.find(row => row.objectId === candidate[0]!.objectId)).toMatchObject({ ...candidate[0]!, packageCount: 1 })
+      expect(observed.afterPackage.find(row => row.objectId === candidate[0]!.objectId)).toMatchObject(candidate[0]!)
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)
