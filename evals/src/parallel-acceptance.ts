@@ -1,6 +1,58 @@
 import type { ServerIdentity } from "./slots"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 
+export function assessResourceCoverage(input: {
+  samples: readonly unknown[]; paths: string[]
+  containers: { role: "server" | "studio"; id: string; image: string; startedAt: string; name: string; nonce: string; purpose: string }[]
+  owners: { kind: string; id: string; launcher: { pid: number; starttime: string } }[]
+}) {
+  if (!input.samples.length) return { status: "incomplete" as const, codes: ["RESOURCE_SAMPLES_MISSING"] }
+  if (input.samples.some(value => {
+    const host = acceptanceObject(acceptanceObject(value).host), cpu = acceptanceObject(host.cpu)
+    return !Array.isArray(cpu.ticks) || cpu.ticks.length < 8 || !cpu.ticks.every(value => Number.isSafeInteger(value) && Number(value) >= 0) ||
+      !resourceNumbersObserved(host.memory, ["available_bytes", "total_bytes", "swap_free_bytes", "swap_total_bytes"])
+  })) return { status: "incomplete" as const, codes: ["HOST_RESOURCE_COVERAGE_INCOMPLETE"] }
+  if (input.samples.some(value => input.paths.some(path => {
+    const files = acceptanceObject(acceptanceObject(value).host).filesystems
+    const file = Array.isArray(files) ? files.find(value => acceptanceObject(value).path === path) : undefined
+    return !resourceNumbersObserved(acceptanceObject(file).capacity, ["available_bytes", "total_bytes", "available_inodes", "total_inodes"])
+  }))) return { status: "incomplete" as const, codes: ["FILESYSTEM_RESOURCE_COVERAGE_INCOMPLETE"] }
+  const containers = input.samples.flatMap(value => input.containers.map(target => {
+    const values = acceptanceObject(value).containers
+    const matches = Array.isArray(values) ? values.filter(value => acceptanceObject(value).role === target.role) : []
+    const container = acceptanceObject(matches[0]), inspect = acceptanceObject(container.inspect)
+    if (matches.length !== 1 || container.epoch_stable !== true || inspect.running !== true) return { missing: true, mismatch: false }
+    const mismatch = container.container_id !== target.id || inspect.id !== target.id || inspect.image !== target.image ||
+      inspect.name !== `/${target.name}` || inspect.started_at !== target.startedAt || inspect.owner_kind !== "users" ||
+      inspect.owner_nonce !== target.nonce || inspect.purpose !== target.purpose
+    const io = container.io
+    const missing = !resourceNumbersObserved(container.cpu, ["total_usage_ns"]) || !resourceNumbersObserved(container.memory, ["current_bytes", "limit_bytes"]) ||
+      !resourceNumbersObserved(container.pids, ["current"]) || !Array.isArray(io) || !io.length || io.some(value => {
+        const entry = acceptanceObject(value)
+        return typeof entry.op !== "string" || !resourceNumbersObserved(entry, ["major", "minor", "bytes"])
+      })
+    return { missing, mismatch }
+  }))
+  if (containers.some(entry => entry.mismatch)) return { status: "failed" as const, codes: ["CONTAINER_RESOURCE_IDENTITY_MISMATCH"] }
+  if (containers.some(entry => entry.missing)) return { status: "incomplete" as const, codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] }
+  if (input.owners.some(owner => !input.samples.some(value => {
+    const producer = acceptanceObject(acceptanceObject(value).processes)
+    return Array.isArray(producer.scopes) && producer.scopes.some(value => {
+      const scope = acceptanceObject(value), observed = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
+      if (observed.kind !== owner.kind || observed.id !== owner.id || launcher.pid !== owner.launcher.pid || launcher.starttime !== owner.launcher.starttime ||
+        scope.status !== "observed" || !Array.isArray(scope.processes) || !scope.processes.length) return false
+      return scope.processes.every(value => {
+        const process = acceptanceObject(value)
+        return process.verified === true && resourceNumbersObserved(process, ["rss_bytes"]) && resourceNumbersObserved(process.cpu, ["user_ticks", "system_ticks"])
+      }) && scope.processes.some(value => {
+        const identity = acceptanceObject(acceptanceObject(value).identity)
+        return identity.pid === owner.launcher.pid && identity.starttime === owner.launcher.starttime
+      })
+    })
+  }))) return { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] }
+  return { status: "passed" as const, codes: [] }
+}
+
 // Declared bounds only; required scope coverage and source integrity are separate gates.
 export function assessResourceBudget(input: { runId: string; startedAt: string; budget: unknown; summary: ReturnType<typeof summarizeResourceSamples> | null }) {
   if (input.budget === null || input.budget === undefined) return { status: "incomplete" as const, codes: ["RESOURCE_BUDGET_MISSING"] }
@@ -80,6 +132,11 @@ function validResourceBound(value: unknown) {
   return typeof bound.scope === "string" && Boolean(bound.scope.trim()) && typeof bound.metric === "string" && Boolean(bound.metric.trim()) &&
     [bound.minimum, bound.maximum].every(value => value === null || typeof value === "number" && Number.isFinite(value) && value >= 0) &&
     (bound.minimum !== null || bound.maximum !== null) && (bound.minimum === null || bound.maximum === null || Number(bound.minimum) <= Number(bound.maximum))
+}
+
+function resourceNumbersObserved(value: unknown, keys: string[]) {
+  const counters = acceptanceObject(value)
+  return keys.every(key => Number.isSafeInteger(counters[key]) && Number(counters[key]) >= 0)
 }
 
 function validLimitEvent(value: unknown) {
