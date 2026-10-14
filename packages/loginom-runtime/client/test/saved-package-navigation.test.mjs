@@ -30,6 +30,38 @@ test('original Page receipt recovers an unknown activation response without a se
 import vm from 'node:vm';
 import {NavigationPage} from './fixtures/navigation/ui-page.mjs';
 import {makeWorkspaceUiCode} from '../lib/workspace-ui.mjs';
+test('UI workflow breadcrumb uses the same native rebind after package save',async()=>{
+ const f=nativePage(),page=new NavigationPage(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+ const crumbs=path=>path.forEach((c,i)=>{
+  const e=page.add('a',c.tid,c.label,{x:20+i*130,y:100,width:120,height:25},panel);e.id='rebound-crumb-'+i;
+  f.components.set(e.id,{el:{dom:e},_node:{data:{node:f.native[i]}}});
+  if(i===4)page.add('span',null,'',{x:20+i*130,y:100,width:10,height:10},e).attrs.class='maptree-icon-workflow';
+  if(i===5)page.add('span',null,'',undefined,e).attrs.class='bg-vendor-icon-importtext';
+  if(i===6)page.add('span',null,'',undefined,e).attrs.class='maptree-icon-wizard';
+ });
+ crumbs(f.binding.workflow_ref.navigation_path);
+ const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;NavigationDiagnostic','',undefined,graph);
+ f.prep.document=page.document;f.record.tab=page.tab;
+ f.graph.FDiagram.FmxGraph.container=graph;f.graph.FDiagram.FmxGraph.view.getState=()=>({shape:{node:body}});
+ page.context.bg=f.context.bg;page.context.Ext=f.context.Ext;page.context.__loginomDockPreparationV1=f.prep;
+ page.evaluate=(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',page.context);
+ const observe=()=>vm.runInContext('('+makeWorkspaceUiCode({expected_build:'7.4.2',expected_origin:'https://loginom.test',prepared_node_context:f.binding,mode:'observe'})+')',page.context)(page);
+ assert.equal((await readPreparedNodeContext(page,f.binding)).verified,true);
+ f.enterWizard();graph.remove();for(const e of [...panel.children])e.remove();
+ const path=f.crumbs().map(e=>({tid:e.getAttribute(),label:e.textContent}));crumbs(path);
+ const w=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;ImportTextFileParamsWizard;FileNameTuning;edtFileName','',undefined,w);
+ const result=await observe();assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(result.output.prepared_node_context.navigation_rebinding.observed_path[2].tid,path[2].tid);
+ assert.equal(result.output.workflow_navigation.status,'observed');
+ assert.equal(result.output.workflow_navigation.control_tid,path[4].tid);
+ assert.notEqual(path[2].tid,f.binding.workflow_ref.navigation_path[2].tid);
+ assert.deepEqual(page.events,[],'read-only rebinding performs no gesture');
+ f.node.FGuid='foreign';const refused=await observe();assert.notEqual(refused.status,'SUCCEEDED');assert.deepEqual(page.events,[]);
+ f.node.FGuid='node';const evaluate=page.evaluate;
+ page.evaluate=async(fn,arg)=>{const value=await evaluate(fn,arg);if(arg?.preparedWorkflowPath)f.node.FGuid='foreign';return value;};
+ const late=await observe();assert.notEqual(late.status,'SUCCEEDED','native drift after the UI read refuses the snapshot');
+ assert.deepEqual(page.events,[]);
+});
 for(const mode of ['saved_rekey','changed_label','changed_owner','lost_reply'])test('real UI opening '+mode+' keeps one settings gesture',async()=>{
  const f=nativePage(),page=new NavigationPage(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
  const makeCrumbs=path=>{for(const [i,c] of path.entries()){
