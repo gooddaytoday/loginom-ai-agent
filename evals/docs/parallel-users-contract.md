@@ -30,10 +30,17 @@ Temporal policy требует ordered samples с неизменным interval 
 Actual one-second owned-command smoke проверен; frozen manifest/coordinator
 и coverage всех actor lifetimes ещё требуют реализации.
 checkResourceEvidence читает единый verified bundle и возвращает поимённые
-timeline/coverage/cgroups/budget checks с source SHA. Known failed check имеет
+timeline/coverage/cgroups/budget/incidents checks с source SHA. Known failed check имеет
 приоритет над incomplete; source-integrity errors запрещают результат.
 Это проверка declared resource scopes, не полный live admission: mandatory
 frozen manifest и licence/limit/lifetime gates проверяются отдельно.
+OOM gate отвергает рост memory_events.oom/oom_kill или Docker oom_killed=true;
+memory_events series дополнительно сохраняют counter_increases, чтобы поздний
+reset не стирал известное событие. Reset/gap/single observation либо unknown
+Docker boolean дают incomplete. Applicability/полностью unknown counters остаются
+предметом cgroup coverage. Historical summary без этого optional derived field
+проверяется по прежним полям; новый результат пересчитывается из raw source,
+старые файлы сохраняются. Подменённое присутствующее поле отвергается.
 
 ## Конфигурация и граница режимов
 
