@@ -334,3 +334,8 @@ null. Whitelist исключает дополнительные поля. GetObj
 await Session; cached ID не считается обязательным prior state. Прямого
 GUID/proxy↔managed-ID соответствия пока нет; public inspect сохраняет отказ
 SESSION_IDENTITY_UNSUPPORTED. Observations не выдаёт close/delete authority.
+
+Поддержанный own Session→IBGManagedSessionInfo scope lookup возвращает null на
+research; observations сохраняет managedObjectId:null. Обычный Session proxy ID
+не подставляется вместо неизвестного managed ID. Это один отрицательный control,
+не доказательство отсутствия других supported способов linkage.
