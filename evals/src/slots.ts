@@ -2,6 +2,7 @@ import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, open, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
+import { globalLockRoot } from "./lease"
 
 export type SlotDefinition = {
   id: string
@@ -157,7 +158,7 @@ async function canonicalPath(value: string): Promise<string> {
 
 function validatePaths(file: SlotFile, protectedPaths: string[] = []) {
   const paths = [file.controller.stateDir, file.controller.adminCredentialsFile, file.judge.codexHome,
-    ...(file.auth ? [file.auth.sharedDir] : []), ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]), ...protectedPaths]
+    ...(file.auth ? [file.auth.sharedDir] : []), ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]), globalLockRoot, ...protectedPaths]
   if (paths.some(value => !path.isAbsolute(value))) throw new EvalFailure("SLOT_PATH_ABSOLUTE", 2)
   paths.map(value => path.resolve(value)).forEach((value, index, all) => {
     if (all.slice(index + 1).some(other => value === other || value.startsWith(other.endsWith(path.sep) ? other : other + path.sep) || other.startsWith(value.endsWith(path.sep) ? value : value + path.sep)))
