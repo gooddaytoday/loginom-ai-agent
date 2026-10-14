@@ -96,3 +96,14 @@ claim/birth contract and current unsupported RunCommand private reader seam.
 `test_admission_origin.OriginTest` checks real offline claim/FS/process boundaries
 without CLI/model spawn. New producer source does not install itself or qualify
 SDK/native origin; receiving requires separately reviewed authoritative pins.
+
+Original assignment sender lookup uses the authenticated original author task
+listing (`agents/{author}/tasks?limit=200`, bounded complete created_at|id pages),
+not target issue runs or a supplied caller row. Source issue is recorded separately
+from target issue. A scoped authenticated response may omit redundant workspace
+fields; explicit foreign workspace/author, missing IDs/issues, duplicates,
+incomplete pages and exhausted pagination refuse. The same resolver runs during
+selection and final readback, including exact canonical retry and explicit legacy
+adoption. Target receiver issue and trigger linkage remain mandatory. Completed
+original sender runs retain provenance. Source-only changes do not install a kit
+or authorize live receipt reconciliation before independently reviewed new pins.

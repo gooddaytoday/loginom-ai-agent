@@ -1,0 +1,16 @@
+{
+  "key": "45c5b2f2ac75c9eb7f76ac178751f9a8533fb486bae5f83afbddc8b3c7fba86d",
+  "fingerprint": "f611b40c799e44d1de225a2fc713202b00d212a57d8d5f4c68b42411a14297c2",
+  "issue": "01a124e5-2403-75b1-87f2-539d1942a242",
+  "agent": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+  "state": "admitted",
+  "comment": "01a13884-7985-718c-b4a8-90b274672dc9",
+  "outcomes": [
+    {
+      "target_type": "agent",
+      "target_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+      "status": "queued",
+      "reason_code": "queued"
+    }
+  ]
+}

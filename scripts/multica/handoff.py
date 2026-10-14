@@ -65,7 +65,8 @@ def deliver(args):
     else:
         existing = None
     runs = request(base, headers, f'issues/{issue}/task-runs')
-    found = select_assignment(comments, runs, existing, text, key, issue, agent, args.sha, args.scope)
+    resolve_sender = lambda comment: assignment_sender(comment, base, headers, issue)
+    found = select_assignment(comments, runs, existing, text, key, issue, agent, args.sha, args.scope, resolve_sender)
     if not found:
         if record['state'] != 'prepared':
             raise DeliveryError('Unknown POST outcome; never blindly repost')
@@ -95,13 +96,14 @@ def deliver(args):
         found = next((c for c in comments if c['id'] == record['comment'] and c.get('content') == text), None)
     if not found:
         raise DeliveryError('Read-back missing; preserve receipt')
-    sender = assignment_sender(found, request(base, headers, f'issues/{issue}/task-runs'), issue)
+    sender = resolve_sender(found)
     record['comment'] = found['id']
     record['comment_fingerprint'] = hashlib.sha256(found['content'].encode()).hexdigest()
     record['source_sha'] = args.sha
     record['scope'] = args.scope
     record['sender_task'] = sender['id']
     record['sender_agent'] = sender['agent_id']
+    record['source_issue'] = sender['issue_id']
     runs = request(base, headers, f'issues/{issue}/task-runs')
     # Deferred/planned and queued/coalesced obligations survive the active run's finish.
     linked = [r for r in runs if r.get('agent_id') == agent and r.get('issue_id') == issue and (
@@ -122,16 +124,65 @@ def deliver(args):
     print(json.dumps(record))
 
 
-def assignment_sender(comment, runs, issue):
-    senders = [r for r in runs if r.get('id') == comment.get('source_task_id')]
-    if (comment.get('issue_id') != issue or comment.get('author_type') != 'agent'
-            or len(senders) != 1 or senders[0].get('issue_id') != issue
-            or senders[0].get('agent_id') != comment.get('author_id')):
-        raise DeliveryError('Original assignment sender/issue metadata is not confirmed')
-    return senders[0]
+def assignment_sender(comment, base, headers, issue):
+    """Resolve server-stamped source lineage from its authenticated author scope."""
+    if comment.get('issue_id') != issue or comment.get('author_type') != 'agent':
+        raise DeliveryError('Original assignment target/author metadata is not confirmed')
+    author = str(uuid.UUID(comment['author_id']))
+    source_id = str(uuid.UUID(comment['source_task_id']))
+    workspace = headers.get('X-Workspace-ID')
+    if workspace:
+        workspace = str(uuid.UUID(workspace))
+    before = None
+    seen = set()
+    matches = []
+    # Author tasks use the existing limit/before(created_at|id) API. Do not stop
+    # at the first match: later pages must not hide duplicate/foreign lineage.
+    for page_number in range(50):
+        route = f'agents/{author}/tasks?limit=200'
+        if before:
+            route += '&before=' + urllib.parse.quote(before, safe='')
+        page = request(base, headers, route, require_complete=True)
+        if not isinstance(page, list) or len(page) > 200:
+            raise DeliveryError('Original author task lookup incomplete')
+        for row in page:
+            if not isinstance(row, dict) or row.get('agent_id') != author:
+                raise DeliveryError('Original author task provenance is not confirmed')
+            task_id = str(uuid.UUID(row['id']))
+            source_issue = str(uuid.UUID(row['issue_id']))
+            row_workspace = row.get('workspace_id')
+            if row_workspace is not None:
+                row_workspace = str(uuid.UUID(row_workspace))
+                if workspace and row_workspace != workspace:
+                    raise DeliveryError('Original author task workspace mismatch')
+                workspace = workspace or row_workspace
+            elif not workspace:
+                raise DeliveryError('Original author task workspace provenance missing')
+            # A scoped authenticated author response may omit redundant workspace
+            # fields; a supplied target-run row is never a lookup substitute.
+            if task_id in seen:
+                raise DeliveryError('Original author task lookup ambiguous')
+            seen.add(task_id)
+            if task_id == source_id:
+                matches.append(row)
+        if len(page) < 200:
+            break
+        last = page[-1]
+        created = last.get('created_at')
+        if not isinstance(created, str) or not created:
+            raise DeliveryError('Original author task pagination incomplete')
+        cursor = created + '|' + last['id']
+        if cursor == before:
+            raise DeliveryError('Original author task pagination incomplete')
+        before = cursor
+    else:
+        raise DeliveryError('Original author task pagination bound exceeded')
+    if len(matches) != 1:
+        raise DeliveryError('Original assignment source task is not confirmed')
+    return matches[0]
 
 
-def select_assignment(comments, runs, existing, text, key, issue, agent, sha, scope):
+def select_assignment(comments, runs, existing, text, key, issue, agent, sha, scope, resolve_sender):
     # Generated headers identify an action. A release result can quote the same
     # marker later in its body; the marker alone is never an assignment identity.
     assignments = []
@@ -187,7 +238,7 @@ def select_assignment(comments, runs, existing, text, key, issue, agent, sha, sc
         raise DeliveryError('Action identity conflicts; reconcile existing assignments')
     found = assignments[0] if assignments else None
     if found:
-        assignment_sender(found, runs, issue)
+        resolve_sender(found)
     for comment in comments:
         if comment in assignments:
             continue
