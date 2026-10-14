@@ -9,6 +9,32 @@ import { runOfflineJudge } from "../src/judge-environment"
 import { main } from "../src/run"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
+test("offline proof persistence exception quarantines the journal and preserves completed output", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-proof-error-"))
+  const fixture = await parallelFixture(root)
+  const file = path.join(root, "slots.json")
+  const trace = path.join(root, "judge.jsonl")
+  await writeLeaseReceipt(file, fixture.slots)
+  const config = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
+    EVAL_SLOTS_FILE: file, EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `bun ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --gate-log ${trace} --delay-ms 500`,
+  })
+  const pending = runOfflineJudge(config, fixture.lockRoot)
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(trace).exists(); wait++) await Bun.sleep(10)
+    const reservations = await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: fixture.lockRoot, absolute: true }))
+    const admitted = await Bun.file(reservations[0]!).json()
+    await mkdir(path.join(path.dirname(admitted.journal), "cleanup.json"))
+    await expect(pending).rejects.toThrow()
+    expect((await Bun.file(reservations[0]!).json()).state).toBe("retained")
+    expect((await Bun.file(admitted.journal).json()).state).toBe("quarantined")
+    expect(await Array.fromAsync(new Bun.Glob("*/calibration.json").scan(config.resultsDir))).toHaveLength(1)
+    const before = await Bun.file(trace).text()
+    await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
+    expect(await Bun.file(trace).text()).toBe(before)
+  } finally { await pending.catch(() => {}); await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 for (const kind of ["missing", "symlink", "hardlink", "public"]) test(`native judge refuses ${kind} auth before any probe or reservation`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-auth-private-"))
   try {
