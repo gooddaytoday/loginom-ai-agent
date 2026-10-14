@@ -1,6 +1,41 @@
 import { expect, test } from "bun:test"
 import { summarizeResourceSamples } from "../src/parallel-resource-summary"
 
+test("resource summary credits server filesystem counters only for the matching container epoch", () => {
+  const id = "a".repeat(64)
+  const inspect = { id, image: "observed-image", name: "/server", started_at: "first-epoch", pid: 100,
+    running: true, owner_kind: "users", owner_nonce: "observed-nonce", purpose: "research" }
+  const samples = [800, 9999, 600].map((available, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: null }, containers: [{ container_id: id, epoch_stable: true, inspect,
+      storage: { container_id: id, epoch_stable: true, inspect: { ...inspect, started_at: index === 1 ? "second-epoch" : inspect.started_at },
+        filesystems: [
+          { path: "/workdir/UserStorage", capacity: { total_bytes: 10000, available_bytes: available, total_inodes: 100, available_inodes: 50 - index * 10 } },
+          { path: "/workdir/SessionBackup", capacity: { total_bytes: 10000, available_bytes: 1000, total_inodes: 100, available_inodes: 80 } },
+        ] },
+    }] }))
+  const before = JSON.stringify(samples), summary = summarizeResourceSamples(samples)
+  expect(summary.metrics.find(series => series.scope === `container:${id}:first-epoch:filesystem:/workdir/UserStorage` && series.metric === "available_bytes"))
+    .toMatchObject({ observed: 2, missing: 1, min: 600, peak: 800, delta: -200 })
+  expect(summary.metrics.find(series => series.scope === `container:${id}:first-epoch:filesystem:/workdir/UserStorage` && series.metric === "available_inodes"))
+    .toMatchObject({ observed: 2, missing: 1, min: 30, peak: 50, delta: -20 })
+  expect(summary.metrics.find(series => series.scope === `container:${id}:first-epoch:filesystem:/workdir/SessionBackup` && series.metric === "available_inodes"))
+    .toMatchObject({ observed: 2, missing: 1, min: 80, peak: 80, delta: 0 })
+  expect(JSON.stringify(samples)).toBe(before)
+})
+
+test("resource summary cannot credit storage when its independent identity is incomplete", () => {
+  const id = "a".repeat(64)
+  const inspect = { id, image: "observed-image", name: "/server", started_at: "first-epoch", pid: 100,
+    running: true, owner_kind: "users", owner_nonce: "observed-nonce", purpose: "research" }
+  const samples = [0, 1].map(index => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: null }, containers: [{ container_id: id, epoch_stable: true, inspect,
+      storage: { container_id: id, epoch_stable: true, inspect: { ...inspect, pid: undefined },
+        filesystems: [{ path: "/workdir/UserStorage", capacity: { available_bytes: 1000, total_bytes: 2000, available_inodes: 10, total_inodes: 20 } }] },
+    }] }))
+  expect(summarizeResourceSamples(samples).metrics.find(series => series.scope === `container:${id}:first-epoch:filesystem:/workdir/UserStorage` && series.metric === "available_bytes"))
+    .toMatchObject({ observed: 0, missing: 2, min: null, peak: null, delta: null })
+})
+
 // Deliberately redacted observations exercise the receipt reducer, without OS mocks.
 test("resource summary preserves host peaks, minima, deltas and unavailable measurements", () => {
   const samples = [

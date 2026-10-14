@@ -306,15 +306,32 @@ test("resource coverage binds both container roles to the exact prepared epochs 
   const host = await sampleHostResources([os.tmpdir()])
   const targets = (["server", "studio"] as const).map((role, index) => ({ role, id: String(index + 1).repeat(64), image: `sha256:${String(index + 3).repeat(64)}`,
     startedAt: "2026-10-14T10:00:00.000Z", name: `fixture-${role}`, nonce: "fixture-nonce", purpose: "acceptance" }))
-  const containers = targets.map(target => ({ role: target.role, container_id: target.id, epoch_stable: true,
-    inspect: { id: target.id, image: target.image, name: `/${target.name}`, started_at: target.startedAt, running: true, oom_killed: false,
-      owner_kind: "users", owner_nonce: target.nonce, purpose: target.purpose },
-    cpu: { total_usage_ns: 10 }, memory: { current_bytes: 100, limit_bytes: 1000 }, pids: { current: 1 },
-    io: [{ major: 8, minor: 0, op: "Write", bytes: 0 }],
-  }))
+  const containers = targets.map((target, index) => {
+    const inspect = { id: target.id, image: target.image, name: `/${target.name}`, started_at: target.startedAt, pid: index + 100, running: true, oom_killed: false,
+      owner_kind: "users", owner_nonce: target.nonce, purpose: target.purpose }
+    return { role: target.role, container_id: target.id, epoch_stable: true, inspect,
+      storage: target.role === "server" ? { container_id: target.id, epoch_stable: true, inspect,
+        filesystems: ["/workdir/UserStorage", "/workdir/SessionBackup"].map(path => ({ path,
+          capacity: { total_bytes: 10000, available_bytes: 5000, total_inodes: 100, available_inodes: 50 } })) } : null,
+      cpu: { total_usage_ns: 10 }, memory: { current_bytes: 100, limit_bytes: 1000 }, pids: { current: 1 },
+      io: [{ major: 8, minor: 0, op: "Write", bytes: 0 }],
+    }
+  })
   const sample = { host, containers, processes: null }
   const request = { samples: [sample], paths: [os.tmpdir()], containers: targets, owners: [] }
   expect(assessResourceCoverage(request)).toEqual({ status: "passed", codes: [] })
+  expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: [{ ...containers[0], storage: null }, containers[1]] }] }))
+    .toEqual({ status: "incomplete", codes: ["SERVER_FILESYSTEM_COVERAGE_INCOMPLETE"] })
+  const storage = containers[0]!.storage!
+  for (const change of [{ epoch_stable: false }, { inspect: { ...storage.inspect, pid: undefined } },
+    { filesystems: storage.filesystems.slice(0, 1) }, { filesystems: [storage.filesystems[0], ...storage.filesystems] },
+    { filesystems: storage.filesystems.map(file => ({ ...file, capacity: null })) }])
+    expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: [{ ...containers[0], storage: { ...storage, ...change } }, containers[1]] }] }))
+      .toEqual({ status: "incomplete", codes: ["SERVER_FILESYSTEM_COVERAGE_INCOMPLETE"] })
+  for (const change of [{ container_id: "f".repeat(64) }, { inspect: { ...storage.inspect, started_at: "changed" } },
+    { inspect: { ...storage.inspect, owner_nonce: "changed" } }])
+    expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: [{ ...containers[0], memory: null, storage: { ...storage, ...change } }, containers[1]] }] }))
+      .toEqual({ status: "failed", codes: ["SERVER_STORAGE_IDENTITY_MISMATCH"] })
   expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: containers.slice(0, 1) }] }))
     .toEqual({ status: "incomplete", codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] })
   for (const change of [{ memory: null }, { cpu: null }, { io: null }, { epoch_stable: false }])

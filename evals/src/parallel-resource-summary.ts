@@ -1,3 +1,7 @@
+import { serverStorageBinding } from "./parallel-resource-storage"
+
+type SummaryFilesystem = { path: string; capacity: { available_bytes?: number; total_bytes?: number; available_inodes?: number; total_inodes?: number } | null }
+
 type SummaryCgroup = {
   path: string | null
   memory_current_bytes?: number | null
@@ -19,6 +23,7 @@ type ResourceSummarySample = {
   }[] } | null
   containers?: {
     container_id: string; epoch_stable: boolean; inspect: { started_at: string } | null; cgroup?: SummaryCgroup | null
+    storage?: { container_id: string; epoch_stable: boolean; inspect: Record<string, unknown> | null; filesystems: SummaryFilesystem[] } | null
     io?: { major: unknown; minor: unknown; op: unknown; bytes: unknown }[] | null
     cpu?: { total_usage_ns: number | null; system_cpu_usage_ns?: number | null; online_cpus?: number | null } | null
     memory?: { current_bytes: number | null; limit_bytes: number | null } | null
@@ -26,7 +31,7 @@ type ResourceSummarySample = {
   }[] | null
   host: {
     collector_cgroup?: SummaryCgroup | null
-    filesystems?: { path: string; capacity: { available_bytes?: number; total_bytes?: number; available_inodes?: number; total_inodes?: number } | null }[]
+    filesystems?: SummaryFilesystem[]
     cpu: { ticks: number[] } | null
     memory: { available_bytes?: number; total_bytes?: number; swap_free_bytes?: number; swap_total_bytes?: number } | null
   }
@@ -44,6 +49,11 @@ export function summarizeResourceSamples(samples: readonly ResourceSummarySample
     ...scopedMetrics(samples, sample => (sample.containers ?? []).flatMap(container => (container.io ?? []).map(entry => ({
       scope: `container:${container.container_id}:${container.inspect?.started_at ?? "unverified"}:io:${entry.major}:${entry.minor}:${entry.op}`,
       values: { bytes: container.epoch_stable && typeof entry.bytes === "number" ? entry.bytes : null },
+    })))),
+    ...scopedMetrics(samples, sample => (sample.containers ?? []).flatMap(container => (container.storage?.filesystems ?? []).map(file => ({
+      scope: `container:${container.container_id}:${container.inspect?.started_at ?? "unverified"}:filesystem:${file.path}`,
+      values: Object.fromEntries((["available_bytes", "total_bytes", "available_inodes", "total_inodes"] as const)
+        .map(metric => [metric, serverStorageBinding(container) === "matched" ? file.capacity?.[metric] ?? null : null])),
     })))),
     ...scopedMetrics(samples, sample => sample.processes?.scopes.flatMap(scope => (scope.processes ?? []).map(process => ({
       scope: processScope(sample.processes!.producer_pid, scope.owner, process.identity),
