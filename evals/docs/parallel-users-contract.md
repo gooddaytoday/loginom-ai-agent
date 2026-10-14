@@ -339,3 +339,8 @@ SESSION_IDENTITY_UNSUPPORTED. Observations не выдаёт close/delete author
 research; observations сохраняет managedObjectId:null. Обычный Session proxy ID
 не подставляется вместо неизвестного managed ID. Это один отрицательный control,
 не доказательство отсутствия других supported способов linkage.
+
+Обратный managed row→IBGCustomDeductorServerSession scope lookup также вернул
+null для всех observed rows на research. Row sessionGuid:null сохраняет
+недоступность linkage; username/proxy ID не используются вместо неизвестного
+GUID и не разрешают close/delete.

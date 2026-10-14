@@ -103,7 +103,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         const rows = []
         for (let index = 0; index < await manager.Count; index++) {
           const row = await manager.SessionInfo(index)
-          rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name, createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect,
+          const targetSession = await bg.ScopeFindObjectAsync(row, bg.IBGCustomDeductorServerSession)
+          rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(),
+            sessionGuid: targetSession ? String(await targetSession.Guid) : null, name: await row.Name, createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect,
             packageCount: await row.Count, activeOperations: null })
         }
         const ownManaged = await bg.ScopeFindObjectAsync(session, bg.IBGManagedSessionInfo)
