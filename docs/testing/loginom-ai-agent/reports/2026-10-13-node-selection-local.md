@@ -22,17 +22,28 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 18:03 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыты22 из31 попыток;
-активных моделей нет. Explicit-js/2 finished18:01:32.840Z: original policy/oracle/
-calculationPASS/JS1/CLI0/Host2629449ACK0/cleanuptrue, CLI2628380gone, writerabsent.
-Wrapper2 — pending mandatory review; успешный расчёт не объявлен отказом.
-Exec78963 завершён2/MANUAL_REVIEW_REQUIRED. JS-review `4adfd057…` и policy-v2 sidecar `59b1fda9…` положительны;
-wholehistory/19tools/JS1 requested-aggregation/4nodes3links/44hashes сохранены;
-исходный audit.pending сохраняется. Контракт расширения memory review успешных
-исключений `2026-10-14-node-selection-policy-v2-successful-exception-review.md`
-зафиксирован до новых sources/следующей модели. R4 source archive readonly.
-Следующий tags/2 только после GREEN/independent-review/execution-r5 допуска.
+Текущий checkpoint 2026-10-14 18:15 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыты22 из31 попыток,
+запущены23; tags/2 выполняется последовательно в runnerPID2682367/exec75475.
+Guard текущей попытки не трогать; next только после strict own release и review.
+
+R5 commit6a30af1c34 изменил две строки effectiveAudit для успешных исключений:
+66focusedPASS/416assertions/typecheck0. Independent source review `6bbc9b71…`,
+Root review `978e0f5b…`, prospective execution-lock-r5 `cb27b1ca…` и delta
+admission review `42ce9f85…` зафиксированы до старта18:15:23.177Z.
+Readonly gate explicit-js/2 `00f493e9…` разрешил advance;46original hashes сохранены,
+audit.reviewStatuspending и originalwrapper2 не переписаны. JS role inspector,
+strict release, defaultv1 и R4 failed path неизменны; runtime не пересобирался.
+R4 source archive `471ad6f0…` сохранён. Неизменные approved R4 proofs повторно
+не пересматривались; R5 admission проверил67delta/case references без gate rerun.
+
+Explicit-js/2 finished18:01:32.840Z: policy/oracle/calculationPASS/JS1/CLI0,
+Host2629449ACK0/cleanuptrue, CLI2628380gone, writerabsent перед nextdispatch.
+Mandatory graph-review `4adfd057…` и policy-v2 sidecar `59b1fda9…` положительны:
+requested-aggregation вычисляет входные count/sum/means без hardcoded output;
+4nodes3links, full19tools/55events/1932runtime,44original bindings неизменны.
+Exec78963 завершён review, а не ошибкой расчёта. Successful explicit2 не повторён.
+Текущие критерии, матрица31/model/inputs и продуктовый runtime прежние.
 
 Узкий policy-only путь для first-last-touch/2 выполнен по TDD, commit355ba8d075,
 64 focused PASS/342assertions/typecheck0. Independent source review `ff97a114…`
