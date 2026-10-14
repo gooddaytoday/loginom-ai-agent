@@ -98,6 +98,15 @@ export async function loadJudgeEnvironment(file: string) {
   return { codexHome: canonical.judge.codexHome, stateDir: canonical.controller.stateDir }
 }
 
+// Resource observation reads configuration metadata; it never admits users or reads their credentials.
+export async function loadResourceSlots(file: string) {
+  const input = await readSlotFile(file, 1)
+  const canonical = await canonicalSlots(input)
+  validatePaths(canonical, [await canonicalPath(path.resolve(file))])
+  await Promise.all([input.controller.stateDir, canonical.controller.stateDir].map(value => requirePrivatePath(value, false)))
+  return canonical
+}
+
 export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease> {
   if (!file.slots.some(candidate => candidate.id === slot.id && candidate.username === slot.username && candidate.profileDir === slot.profileDir &&
     candidate.workspaceRoot === slot.workspaceRoot && candidate.historyDir === slot.historyDir)) throw new EvalFailure("SLOT_NOT_CONFIGURED", 2)
