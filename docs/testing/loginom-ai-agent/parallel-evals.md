@@ -816,3 +816,15 @@ admin-QVtacx/session-observations.json сохранил row.sessionGuid:null. TD
 field→GREEN target1 PASS/15 (7.36s), admin integration/unit/preflight48 PASS/131
 (35.95s), typecheck/diff PASS. Qualification=false, identity/close остаются открыты;
 два scope-null controls не объявляют всю платформу unsupported.
+
+Readonly snapshot текущего окружения:
+
+```bash
+cd evals
+bun script/parallel-env.ts status --config /home/kiselev/.local/state/loginom-evals/research/slots.json
+```
+
+Команда печатает JSON с recorded pair/resources, отдельными user/profile
+reservations каждого configured slot, server/judge state и snapshotChanged.
+Status не захватывает ownership, не входит в Loginom и не выдаёт live admission;
+`admission:not_verified` — обязательное ограничение снимка. Credentials не читаются.

@@ -568,3 +568,9 @@ pending Count1 row; ordinary probes retain the Count0 requirement. Fresh account
 and tuple checks plus RPC absence remain mandatory. Production parent session
 ledger does not accept this phase; arbitrary operations/CLI crash/backup/recovery
 authority remain unqualified.
+
+`parallel-env status --config <slots.json>` выводит readonly snapshot metadata
+пары и server/judge/user/profile reservations без login или takeover. Двойное
+чтение сообщает `snapshotChanged`; `admission:not_verified` сохраняется даже
+при recorded pair phase ready. Status не читает credentials, не создаёт output
+и не принимает --out/--incident. Live readiness остаётся отдельным gate.
