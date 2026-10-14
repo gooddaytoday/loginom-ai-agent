@@ -1573,3 +1573,23 @@ context/shared fixture byteequalHEAD. Initial lock не допускает scrol
 завершиться, но fresh readiness запрещает даже начало открытия порта.
 Общий Node suite и связанные модули, ordinary new-payload proof и модели
 этим verdict не заменяются. Root related checks active; остальные stages открыты.
+
+
+На 2026-10-14 05:08 UTC appropriate checks исходного commit
+`a8db3e0f4cdde78399f6f81114e936fa16980920` завершены Root:
+related focused378/378PASS/0SKIP и pinned Node24.19 fullupstream3847tests/
+3837PASS/0FAIL/10SKIP/0cancelled/0todo, exit0. Cwd client; module/test hashes
+до/после совпали. Full TAP command/log/result сохранены; related spec reporter
+counts взяты из исходного полного log отдельной supplemental summary,
+original result не переписывался. Общая root-checks-verification SHA
+`a24d9902389d8e1d2adb370f4af89d2580f758eb10438b3422d532757c552f2a`.
+Source review и checks закрыты отдельно от ordinary native/model acceptance.
+
+Новая matched пара `20261014T050544Z-2085d7` собирается из того же commit
+в собственном clean detached checkout; baseline74/candidateff18 skill,
+модель/variant/tasks/seed/18+25 unchanged. Effective lock должен закрепить
+новый prospective schedule candidate9→clean gate→baseline18→candidate16.
+Пока нет активного Root model/native/admin процесса и current-run не переключён.
+Private clipped Export proof проходит отдельный static review: нужны точный
+saved XML noJS gate и canonical own scroll completed/trace; эти fixes не
+меняют Product/runtime. Новые immutable bindings и live ещё не допущены.
