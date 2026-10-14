@@ -24,10 +24,28 @@ export async function checkResourceEvidence(input: {
     coverage: assessResourceCoverage({ ...input.coverage, samples: evidence.samples }),
     cgroups: assessCgroupCoverage({ groups, view: input.view }),
     budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget: input.budget, summary: evidence.receipt.summary }),
+    incidents: assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
   }
   const results = Object.values(checks)
   return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
     codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source }
+}
+
+export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {
+  const counters = input.summary.metrics.filter(series => ["memory_events.oom", "memory_events.oom_kill"].includes(series.metric))
+  const containers = input.samples.flatMap(value => {
+    const containers = acceptanceObject(value).containers
+    return Array.isArray(containers) ? containers.map(value => acceptanceObject(acceptanceObject(value).inspect)) : []
+  })
+  const codes = [...(counters.some(series => (series.counter_increases ?? 0) > 0) ? ["CGROUP_OOM_OBSERVED"] : []),
+    ...(containers.some(inspect => inspect.oom_killed === true) ? ["CONTAINER_OOM_OBSERVED"] : [])]
+  if (codes.length) return { status: "failed" as const, codes }
+  if (containers.some(inspect => typeof inspect.oom_killed !== "boolean"))
+    return { status: "incomplete" as const, codes: ["CONTAINER_OOM_OBSERVATIONS_INCOMPLETE"] }
+  // Applicability and entirely unavailable counters are handled by the cgroup coverage gate.
+  if (counters.some(series => series.observed > 0 && (series.observed < 2 || series.missing > 0 || (series.counter_resets ?? 0) > 0)))
+    return { status: "incomplete" as const, codes: ["CGROUP_OOM_OBSERVATIONS_INCOMPLETE"] }
+  return { status: "passed" as const, codes: [] }
 }
 
 export function assessResourceTimeline(input: { samples: readonly unknown[]; intervalMs: number; startedAt: string; finishedAt: string }) {

@@ -30,6 +30,28 @@ test("resource evidence returns the validated raw observations with their verifi
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("resource evidence reads historical summaries without OOM increase counts and preserves their files", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-historical-summary-"))
+  const samplesFile = path.join(root, "samples.jsonl"), out = path.join(root, "summary.json")
+  try {
+    const source = JSON.stringify({ version: 1, sequence: 1, elapsed_ms: 0, missed_intervals: 0, duration_ms: 1,
+      interval_ms: 1000, run_id: "historical-summary", phase: "before", host: await sampleHostResources([root]), containers: null, processes: null }) + "\n"
+    await writeFile(samplesFile, source, { mode: 0o600 })
+    const expected = await writeResourceSummary({ samplesFile, out })
+    const historical = { ...expected, summary: { ...expected.summary, metrics: expected.summary.metrics.map(metric =>
+      Object.fromEntries(Object.entries(metric).filter(([key]) => key !== "counter_increases"))) } }
+    const bytes = JSON.stringify(historical)
+    await writeFile(out, bytes)
+    expect(await readResourceSummary({ file: out, samplesFile, runId: "historical-summary", phase: "before" })).toEqual(expected)
+    expect(await Bun.file(out).text()).toBe(bytes)
+    expect(await Bun.file(samplesFile).text()).toBe(source)
+    await writeFile(out, JSON.stringify({ ...expected, summary: { ...expected.summary, metrics: expected.summary.metrics.map(metric =>
+      metric.metric === "memory_events.oom" ? { ...metric, counter_increases: 123 } : metric) } }))
+    await expect(readResourceSummary({ file: out, samplesFile, runId: "historical-summary", phase: "before" })).rejects.toThrow("RESOURCE_SUMMARY_MISMATCH")
+    expect(await Bun.file(samplesFile).text()).toBe(source)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("resource evidence persists the actual sampler summary privately and binds the unchanged JSONL bytes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-summary-"))
   const samplesFile = path.join(root, "samples.jsonl"), out = path.join(root, "summary.json")
