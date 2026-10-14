@@ -262,7 +262,7 @@ async function verifyNativeActionRelease(directory: string, value: Record<string
   if (!raw[0]?.includes(" - Лог-файл создан ") || raw.filter((line) => line.includes(" - Лог-файл создан ")).length !== 1)
     throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
   const ledger = raw.reduce<{ time: string; at: number; thread: string; name: string; message: string }[]>((rows, line) => {
-    const match = /^(\S+) .* \((loginomd:[^>]+)>([^)]*)\) - (.*)$/.exec(line)
+    const match = /^(\S+) .* \((loginomd:[^>]+)>([^)]*)\) - (.*)$/s.exec(line)
     if (!match) {
       if (!rows.length || /^\d{4}-\d{2}-\d{2}T/.test(line)) throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
       rows[rows.length - 1]!.message += "\n" + line

@@ -17,6 +17,17 @@ test("v2 can release an import-before-execution failure using a complete native 
   } finally { await rm(fixture.root, { recursive: true, force: true }) }
 })
 
+test("a complete native ledger retains a real U+2028 separator inside an historical debug message", async () => {
+  const fixture = await nativeActionFixture()
+  try {
+    // Sanitized native server record 7031: U+2028 is message data, not a
+    // missing native header or a new session event.
+    await fixture.raw("ledger.log", fixture.ledger.replace("Multiline historical node warning", "Calculator expression first\u2028second"))
+    expect(await assessTechnicalContinuation(fixture.plan, fixture.directory, fixture.pinsFile, "audit", "runtime", fixture.acceptance))
+      .toMatchObject({ decision: "advance", outcome: "technical-failed", calculationPassed: false })
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
 test("a v2 context preserves the original executed-node v1 release contract", async () => {
   const fixture = await technicalFixture()
   try {
