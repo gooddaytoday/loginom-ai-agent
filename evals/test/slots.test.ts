@@ -230,6 +230,25 @@ test("SlotLease: recovery refuses a live controller without changing either rese
   } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
 })
 
+test("SlotLease: replacing the composite token revokes held ownership before provisioning", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lease = await acquireSlotLease(file, file.slots[0]!, identity, path.join(item.root, "locks"))
+  try {
+    const original = await readLeaseReceipt(lease.receipt) as object
+    await writeFile(lease.receipt, JSON.stringify({ ...original, token: "foreign-token" }), { mode: 0o600 })
+    await expect(lease.assertHeld()).rejects.toThrow("LEASE_NOT_HELD")
+    await expect(stageUserPreparation(file, lease, "e".repeat(64))).rejects.toThrow("LEASE_NOT_HELD")
+    expect(await Bun.file(path.join(file.controller.stateDir, "prepare-a.json")).exists()).toBe(false)
+    const proof = path.join(item.root, "cleanup.json")
+    await writeFile(proof, JSON.stringify({ status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
+      processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true, nextAdmissionAllowed: true }), { mode: 0o600 })
+    await expect(lease.release(proof)).rejects.toThrow("LEASE_NOT_HELD")
+    await writeFile(lease.receipt, JSON.stringify(original), { mode: 0o600 })
+    await lease.assertHeld()
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
 test("SlotLease: the original incident resumes recovery after the recovery controller exits", async () => {
   const item = await fixture()
   const file = parseSlots(item.value, 1)
