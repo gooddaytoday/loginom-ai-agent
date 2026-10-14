@@ -78,7 +78,14 @@ def inspect_pass(backend,request):
    if native and target.startswith('socket:[') and target.endswith(']'):native_sockets.add(target[8:-1])
   inventory.append({k:identity[k] for k in ['pid','parent','birth','uid']}|{'fdCount':len(fds),'fdDigest':digest(fds)})
  after=backend.snapshot()
- if before!=after:raise ObserverRefused('PROCESS_ROSTER_OR_IDENTITY_RACE')
+ # comm is a mutable display label (including kernel worker labels), not a
+ # process birth/owner identity. Every PID/FD remains observed; a native-name
+ # transition remains uncertain and must never disappear from classification.
+ fields=['pid','parent','birth','uid']
+ if {pid:{k:v[k] for k in fields} for pid,v in before.items()}!={pid:{k:v[k] for k in fields} for pid,v in after.items()} or any(
+  before[pid]['comm']!=after[pid]['comm'] and
+  (before[pid]['comm'].startswith(('chrome','chromium','loginom-ai-','bwrap')) or after[pid]['comm'].startswith(('chrome','chromium','loginom-ai-','bwrap')))
+  for pid in before):raise ObserverRefused('PROCESS_ROSTER_OR_IDENTITY_RACE')
  listeners=backend.listeners()&native_sockets
  return {'complete':True,'startedAt':started,'finishedAt':int(time.time()*1000),'inventory':inventory,
   'originalPids':sorted(set(request['originalPids'])&set(before)), 'foreignNative':foreign,
