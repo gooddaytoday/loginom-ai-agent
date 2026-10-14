@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdtemp, readdir, rm, stat, statfs } from "node:fs/promises"
+import { chmod, mkdtemp, readdir, readlink, rm, stat, statfs } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, loadResourceContainers, sampleCgroupResources, sampleContainerResources, sampleHostResources } from "../src/parallel-resources"
@@ -250,4 +250,11 @@ test("cgroup sampler records observed controller availability at the leaf and ea
     const source = await Bun.file(path.join("/sys/fs/cgroup", group.path!, "cgroup.controllers")).text().catch(() => null)
     expect(group.controllers).toEqual(source === null ? null : source.trim().split(/\s+/).filter(Boolean))
   }
+})
+
+
+test("cgroup sampler records the actual observer namespace and sysfs hierarchy root identity", async () => {
+  const sample = await sampleCgroupResources()
+  const root = await stat("/sys/fs/cgroup")
+  expect(sample.view).toEqual({ namespace: await readlink("/proc/self/ns/cgroup"), root: { device: root.dev, inode: root.ino } })
 })

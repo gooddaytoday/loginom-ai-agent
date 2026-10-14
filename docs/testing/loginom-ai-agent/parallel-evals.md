@@ -135,6 +135,14 @@ resource/policy/Docker/namespace71 PASS/507, typecheck/diff PASS.
 Global hierarchy/root applicability остаётся отдельным gate;
 controllers/limits/foreign processes не изменялись.
 
+Scope view fingerprint хранит observed cgroup namespace ID и sysfs hierarchy
+root device/inode; unavailable view=null с diagnostic. Actual CG namespace
+control отличает global и aligned virtual roots даже при proc path=/.
+72 resource/policy/Docker/namespace tests PASS/516 assertions, typecheck PASS.
+Fingerprint предназначен для immutable expected runner view в manifest,
+его значение само не доказывает global visibility и не подменяет quota null
+значением max. Namespace/inode constants не захардкожены.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
