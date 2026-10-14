@@ -195,7 +195,14 @@ invalid role/short ID;31 assertions/typecheck/diff PASS. sampleServerFilesystems
 наследует container environment, поэтому сам stat выполняется через env-i.
 Unknown counters остаются null; отсутствующий root не скрывает healthy root
 и не подменяется host FS. Это bounded primitive, не real Loginom storage admission;
-periodic raw frames, schema, summary и required coverage пока не связаны с ним.
+Periodic raw frames/schema и semantic summary/coverage теперь связаны с ним:
+ID/image/name/startedAt/PID/owner fields и оба stable running flags должны
+совпасть. Root metrics разделены по container/epoch/path; unknown не даёт0,
+known mismatch отвергает gate, missing/duplicate roots дают incomplete.
+Оба storage roots обязательны для Server coverage. Resource93 PASS/683,
+typecheck/diff PASS; actual16MiB pipeline и historical summary compatibility
+проверены без переписывания raw/old receipt. Mandatory manifest, lifetime,
+qualified runner anchor и production/live admission остаются отдельными gates.
 
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные

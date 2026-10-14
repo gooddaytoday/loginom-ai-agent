@@ -2,6 +2,7 @@ import type { ServerIdentity } from "./slots"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
+import { serverStorageBinding } from "./parallel-resource-storage"
 
 // Checks the caller's declared resource scopes; full live admission also requires the frozen manifest and other gates.
 export async function checkResourceEvidence(input: {
@@ -130,7 +131,7 @@ export function assessResourceCoverage(input: {
     const values = acceptanceObject(value).containers
     const matches = Array.isArray(values) ? values.filter(value => acceptanceObject(value).role === target.role) : []
     const container = acceptanceObject(matches[0]), inspect = acceptanceObject(container.inspect)
-    if (matches.length !== 1 || container.epoch_stable !== true || inspect.running !== true) return { missing: true, mismatch: false }
+    if (matches.length !== 1 || container.epoch_stable !== true || inspect.running !== true) return { missing: true, mismatch: false, storageMissing: false, storageMismatch: false }
     const mismatch = container.container_id !== target.id || inspect.id !== target.id || inspect.image !== target.image ||
       inspect.name !== `/${target.name}` || inspect.started_at !== target.startedAt || inspect.owner_kind !== "users" ||
       inspect.owner_nonce !== target.nonce || inspect.purpose !== target.purpose
@@ -140,10 +141,18 @@ export function assessResourceCoverage(input: {
         const entry = acceptanceObject(value)
         return typeof entry.op !== "string" || !resourceNumbersObserved(entry, ["major", "minor", "bytes"])
       })
-    return { missing, mismatch }
+    const storage = acceptanceObject(container.storage), files = storage.filesystems
+    const binding = target.role === "server" ? serverStorageBinding(container) : "unavailable"
+    const storageMissing = target.role === "server" && (binding !== "matched" || ["/workdir/UserStorage", "/workdir/SessionBackup"].some(path => {
+      const matches = Array.isArray(files) ? files.filter(value => acceptanceObject(value).path === path) : []
+      return matches.length !== 1 || !resourceNumbersObserved(acceptanceObject(matches[0]).capacity, ["available_bytes", "total_bytes", "available_inodes", "total_inodes"])
+    }))
+    return { missing, mismatch, storageMissing, storageMismatch: target.role === "server" && binding === "mismatched" }
   }))
   if (containers.some(entry => entry.mismatch)) return { status: "failed" as const, codes: ["CONTAINER_RESOURCE_IDENTITY_MISMATCH"] }
+  if (containers.some(entry => entry.storageMismatch)) return { status: "failed" as const, codes: ["SERVER_STORAGE_IDENTITY_MISMATCH"] }
   if (containers.some(entry => entry.missing)) return { status: "incomplete" as const, codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] }
+  if (containers.some(entry => entry.storageMissing)) return { status: "incomplete" as const, codes: ["SERVER_FILESYSTEM_COVERAGE_INCOMPLETE"] }
   if (input.owners.some(owner => !input.samples.some(value => {
     const producer = acceptanceObject(acceptanceObject(value).processes)
     return Array.isArray(producer.scopes) && producer.scopes.some(value => {

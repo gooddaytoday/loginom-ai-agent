@@ -65,10 +65,15 @@ export async function readResourceEvidence(input: { file: string; samplesFile: s
   if (saved.run_id !== input.runId || expected.receipt.run_id !== input.runId || saved.phase !== input.phase || expected.receipt.phase !== input.phase)
     throw new EvalFailure("RESOURCE_RECEIPT_CONTEXT_MISMATCH", 2)
   const savedMetrics = resourceObject(saved.summary).metrics
-  // Older receipts omit this derived field; raw bytes still determine its returned value.
-  const comparable = { ...expected.receipt.summary, metrics: expected.receipt.summary.metrics.map((metric, index) =>
-    Object.fromEntries(Object.entries(metric).filter(([key]) => key !== "counter_increases" ||
-      Array.isArray(savedMetrics) && resourceObject(savedMetrics[index]).counter_increases !== undefined))) }
+  // Older receipts omit new derived series/fields; returned values still come from raw bytes.
+  const comparable = { ...expected.receipt.summary, metrics: expected.receipt.summary.metrics.flatMap(metric => {
+    const savedMetric = Array.isArray(savedMetrics) ? savedMetrics.find(value => {
+      const series = resourceObject(value)
+      return series.scope === metric.scope && series.metric === metric.metric
+    }) : undefined
+    if (metric.scope.startsWith("container:") && metric.scope.includes(":filesystem:") && savedMetric === undefined) return []
+    return [Object.fromEntries(Object.entries(metric).filter(([key]) => key !== "counter_increases" || resourceObject(savedMetric).counter_increases !== undefined))]
+  }) }
   if (JSON.stringify(saved.summary) !== JSON.stringify(comparable)) throw new EvalFailure("RESOURCE_SUMMARY_MISMATCH", 2)
   return expected
 }
