@@ -251,7 +251,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
       };
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, lastSampleAcknowledgement, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
       for (let sample = 0; sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -422,9 +422,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const identity = satisfied && confirmIdentity ? digest(confirmIdentity(result.output)) : null;
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
+        const sampledAt=observationNow();
         await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: observationNow() - started },
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: sampledAt - started },
           outcome: structuredClone(result) });
+        const acknowledgedAt=observationNow();
+        lastSampleAcknowledgement={sample,satisfied,required_samples:confirmIdentity?2:1,
+          confirmations,sampled_elapsed_ms:sampledAt-started,
+          acknowledgement_elapsed_ms:acknowledgedAt-sampledAt,
+          acknowledged_elapsed_ms:acknowledgedAt-started};
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
@@ -433,6 +439,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
+          ...(lastSampleAcknowledgement?{last_sample_acknowledgement:lastSampleAcknowledgement}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
