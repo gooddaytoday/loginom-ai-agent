@@ -454,6 +454,10 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
     resourceClose: await jsonLines(path.join(directory, "resource-close.jsonl")), terminalClose: await jsonLines(path.join(directory, "terminal-close.jsonl")),
     hostClose: [host], deadPids, writerAbsent: !await exists(path.join(plan.pins.profile, ".writer")) }
   if (acceptance?.criteriaVersion === "node-selection-policy-v2" && digest(acceptance.criteriaSha256)
+    && plan.pins.phase === "candidate" && ["standard", "standard-recovery", "explicit-js", "capability-gap"].includes(plan.task.mode) && audit.policyStatus === "passed"
+    && audit.calculationPassed === false && audit.oraclePassed === false)
+    return assessNormalReleaseFailure(plan, directory, input, acceptance, true)
+  if (acceptance?.criteriaVersion === "node-selection-policy-v2" && digest(acceptance.criteriaSha256)
     && plan.pins.phase === "candidate" && plan.task.mode === "standard" && audit.calculationPassed === false && audit.oraclePassed === false)
     return assessNormalReleaseFailure(plan, directory, input, acceptance)
   const reviewFile = path.join(plan.directory, "graph-review.json")
@@ -474,21 +478,31 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
 }
 
 async function assessNormalReleaseFailure(plan: ReturnType<typeof selectionAttempt>, directory: string,
-  input: Record<string, unknown>, acceptance: SeriesAcceptance) {
+  input: Record<string, unknown>, acceptance: SeriesAcceptance, analytical = false) {
   const stop = (reason: string) => ({ decision: "halt" as const, reason })
   if (!record(input.attempt) || !record(input.audit)) return stop("SERIES_EVIDENCE_INCOMPLETE")
   const attempt = input.attempt, audit = input.audit
   const invalidAttempt = inspectClosedAttempt(input, attempt)
   if (invalidAttempt) return invalidAttempt
-  if (input.phase !== "candidate" || input.mode !== "standard" || input.taskID !== plan.taskID
+  const ineligible = analytical
+    ? input.phase !== "candidate" || input.mode !== plan.task.mode || !["standard", "standard-recovery", "explicit-js", "capability-gap"].includes(String(input.mode)) || input.taskID !== plan.taskID
+      || attempt.exitCode !== 1 || attempt.resultPath !== `${plan.pins.connection.folder}/${plan.resultName}` || !empty(attempt.collectionFailures)
+      || attempt.policyStatus !== "passed" || attempt.oraclePassed !== false || attempt.calculationPassed !== false
+      || audit.auditStage !== "complete" || audit.auditVersion !== input.auditVersion || audit.taskID !== input.taskID || audit.mode !== input.mode
+      || audit.policyStatus !== "passed" || !["pending", "not-required", "passed"].includes(String(audit.reviewStatus)) || !empty(audit.failures)
+      || audit.oraclePassed !== false || audit.calculationPassed !== false
+      || !["historyComplete", "runtimeSettled", "identityVerified", "graphComplete", "exportIdentityVerified"].every((key) => audit[key] === true)
+      || !["jsNodes", "jsCalls", "successfulJsCalls"].every((key) => Number.isSafeInteger(audit[key])
+        && (["standard", "standard-recovery"].includes(String(input.mode)) ? audit[key] === 0 : Number(audit[key]) > 0)) || Number(audit.successfulJsCalls) > Number(audit.jsCalls)
+    : input.phase !== "candidate" || input.mode !== "standard" || input.taskID !== plan.taskID
     || attempt.exitCode !== 2 || attempt.resultPath !== null || !Array.isArray(attempt.collectionFailures)
     || attempt.collectionFailures.length !== 1 || attempt.collectionFailures[0] !== "RESULT_RECEIPT_MISSING_OR_AMBIGUOUS"
     || audit.auditStage !== "complete" || audit.auditVersion !== input.auditVersion || audit.taskID !== input.taskID
     || audit.mode !== "standard" || audit.policyStatus !== "incomplete" || audit.reviewStatus !== "not-required" || audit.historyComplete !== true
     || !["jsNodes", "jsCalls", "successfulJsCalls"].every((key) => audit[key] === 0)
     || !Array.isArray(audit.failures) || !audit.failures.length || !audit.failures.every((reason) =>
-      ["RESULT_RECEIPT_UNVERIFIED", "RUNTIME_APPLY_MISMATCH", "TOOL_RECEIPT_INCOMPLETE", "CATALOG_UNVERIFIED", "GRAPH_IMPORT_EXPORT_REQUIRED"].includes(String(reason))))
-    return stop("POLICY_V2_FAILURE_NOT_ELIGIBLE")
+      ["RESULT_RECEIPT_UNVERIFIED", "RUNTIME_APPLY_MISMATCH", "TOOL_RECEIPT_INCOMPLETE", "CATALOG_UNVERIFIED", "GRAPH_IMPORT_EXPORT_REQUIRED"].includes(String(reason)))
+  if (ineligible) return stop("POLICY_V2_FAILURE_NOT_ELIGIBLE")
   const invalidRelease = inspectSeriesRelease(input, attempt)
   if (invalidRelease) return invalidRelease
   const sidecarPath = `policy-v2/${plan.pins.phase}/${plan.taskID}/${plan.number}.json`
@@ -503,10 +517,15 @@ async function assessNormalReleaseFailure(plan: ReturnType<typeof selectionAttem
       || !record(sidecar.policy) || !record(sidecar.runtime) || !record(sidecar.trustedHistory) || !record(sidecar.analytics)
       || !record(sidecar.analytics.originalAudit) || sidecar.analytics.originalAudit.packageSha256 !== audit.packageSha256)
       return stop("POLICY_V2_FAILURE_REVIEW_INVALID")
+    if (analytical && (sidecar.analytics.originalAudit.policyStatus !== audit.policyStatus
+      || sidecar.analytics.originalAudit.calculationPassed !== false || sidecar.analytics.originalAudit.oraclePassed !== false))
+      return stop("POLICY_V2_FAILURE_REVIEW_INVALID")
     const policy = sidecar.policy, history = sidecar.trustedHistory
     if (policy.verdict !== "passed" || !nonempty(policy.reason) || policy.historyComplete !== true || policy.substantiveSelectionSufficient !== true
       || policy.entireToolLedgerReviewed !== true || policy.temporaryAndFailedJsAttemptsIncluded !== true
-      || !["jsApplyAttempts", "successfulJsCalls", "savedJsNodes", "unjustifiedJsAttempts"].every((key) => policy[key] === 0)
+      || policy.unjustifiedJsAttempts !== 0
+      || (analytical ? policy.jsApplyAttempts !== audit.jsCalls || policy.successfulJsCalls !== audit.successfulJsCalls || policy.savedJsNodes !== audit.jsNodes
+        : !["jsApplyAttempts", "successfulJsCalls", "savedJsNodes"].every((key) => policy[key] === 0))
       || policy.standardFailureUsedAsJsJustification !== false || !Array.isArray(policy.substantiveSelections)
       || !policy.substantiveSelections.some((item) => record(item) && nonempty(item.type) && item.type.startsWith("transform.") && item.toolState === "completed")
       || history.parentID !== null || !empty(history.childSessionIDs) || history.allSessionAndMessageBindingsMatch !== true || history.allEventsOwnSession !== true
@@ -523,7 +542,7 @@ async function assessNormalReleaseFailure(plan: ReturnType<typeof selectionAttem
       || review.criteriaVersion !== acceptance.criteriaVersion || review.criteriaSha256 !== acceptance.criteriaSha256
       || review.phase !== plan.pins.phase || review.taskID !== plan.taskID || review.attempt !== plan.number
       || review.policyVerdict !== "passed" || review.functionalResultPassed !== false || review.historyComplete !== true
-      || review.substantiveSelectionSufficient !== true || review.jsApplyAttempts !== 0 || review.unjustifiedJsAttempts !== 0
+      || review.substantiveSelectionSufficient !== true || review.jsApplyAttempts !== (analytical ? audit.jsCalls : 0) || review.unjustifiedJsAttempts !== 0
       || review.publicOperationsSettled !== true || review.catalogIdentityVerified !== true) return stop("POLICY_V2_FAILURE_REVIEW_INVALID")
     const manifest: unknown = await Bun.file(path.join(plan.directory, "runtime-journals.json")).json()
     if (!Array.isArray(manifest) || !manifest.length || !Array.isArray(sidecar.evidence)) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
@@ -535,6 +554,7 @@ async function assessNormalReleaseFailure(plan: ReturnType<typeof selectionAttem
       expected.set(file, item.sha256)
     }
     const required = ["attempt.json", "selection-audit.json", "parts.json", "runtime-journals.json", "artifact/package.lgp", "independent-failed-attempt-review.json"]
+    if (analytical) required.push(`artifact/results/${plan.resultName}`)
     for (const item of manifest) {
       if (!record(item) || !nonempty(item.path) || !digest(item.sha256)
         || expected.get(await ownFile(plan.directory, item.path)) !== item.sha256) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
@@ -544,7 +564,8 @@ async function assessNormalReleaseFailure(plan: ReturnType<typeof selectionAttem
       if (!nonempty(relative) || !expected.has(await ownFile(plan.directory, relative))) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
     }
     if (!expected.has(await ownFile(directory, "closure.json"))) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
-    return { decision: "advance" as const, reason: "POLICY_V2_FAILURE_RECORDED", outcome: "failed" as const,
+    return { decision: "advance" as const, reason: analytical ? "POLICY_V2_ANALYTICAL_FAILURE_RECORDED" : "POLICY_V2_FAILURE_RECORDED",
+      outcome: analytical ? "analytical-failed" as const : "failed" as const,
       policyStatus: audit.policyStatus, policyVerdict: policy.verdict, calculationPassed: audit.calculationPassed,
       oraclePassed: audit.oraclePassed, jsCalls: audit.jsCalls, jsNodes: audit.jsNodes,
       sidecarSha256: await hash(sidecarFile), failureReviewSha256: sidecar.failureReview.sha256 }
