@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireHarnessLease, acquireJudgeLease, acquireResourceLease, recoverResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
+import { acquireHarnessLease, acquireJudgeLease, acquireResourceLease, readResourceReservation, recoverResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
 import type { Reservation } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -14,6 +14,22 @@ async function resourceFixture() {
   await writeFile(journal, "{}", { mode: 0o600 })
   return { root, request: { key: "server:container", lockRoot, journal, commandId: "run-one" } }
 }
+
+test("resource reservation readback validates the selected private root without changing ownership", async () => {
+  const item = await resourceFixture()
+  try {
+    expect(await readResourceReservation(item.request)).toBeUndefined()
+    const lease = await acquireResourceLease(item.request)
+    try {
+      const bytes = await Bun.file(lease.receipt).text()
+      expect(await readResourceReservation(item.request)).toEqual(lease.reservation)
+      expect(await Bun.file(lease.receipt).text()).toBe(bytes)
+      await chmod(item.request.lockRoot, 0o755)
+      await expect(readResourceReservation(item.request)).rejects.toThrow("LEASE_LOCK_ROOT")
+      await chmod(item.request.lockRoot, 0o700)
+    } finally { await lease.close() }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
 
 test("judge lease: different server controllers share the canonical CODEX_HOME OS guard", async () => {
   const item = await resourceFixture()
