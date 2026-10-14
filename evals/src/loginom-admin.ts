@@ -94,6 +94,10 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
           !Array.isArray(data.users) || data.users.some(user => !jsonObject(user) || typeof user.objectId !== "string" || !user.objectId ||
             typeof user.name !== "string" || !user.name || user.userKind !== 0 ||
             [user.isAdmin, user.isDesigner, user.isViewer, user.blocked, user.useGlobalFileStorage, user.schedulerFullAccess].some(value => typeof value !== "boolean")) ||
+          !Array.isArray(data.sharedDirectories) || data.sharedDirectories.some(directory => !jsonObject(directory) || typeof directory.objectId !== "string" ||
+            !directory.objectId || typeof directory.name !== "string" || !directory.name || !Array.isArray(directory.permissions) ||
+            directory.permissions.some(principal => !jsonObject(principal) || typeof principal.objectId !== "string" || !principal.objectId ||
+              typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(Number(principal.userKind)) || typeof principal.userKind !== "number")) ||
           typeof own.objectId !== "string" || !own.objectId || own.managedObjectId !== null && typeof own.managedObjectId !== "string" || data.rawSessions.some(row => !jsonObject(row) ||
             typeof row.objectId !== "string" || !row.objectId || row.sessionGuid !== null && typeof row.sessionGuid !== "string" || typeof row.name !== "string" || typeof row.pendingDisconnect !== "boolean" ||
             !Number.isSafeInteger(row.packageCount) || Number(row.packageCount) < 0)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
@@ -103,6 +107,10 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
             const user = value as Record<string, unknown>
             return { objectId: user.objectId, name: user.name, userKind: user.userKind, isAdmin: user.isAdmin, isDesigner: user.isDesigner,
               isViewer: user.isViewer, blocked: user.blocked, useGlobalFileStorage: user.useGlobalFileStorage, schedulerFullAccess: user.schedulerFullAccess }
+          }), sharedDirectories: data.sharedDirectories.map(value => {
+            const directory = value as Record<string, unknown>
+            return { objectId: directory.objectId, name: directory.name, permissions: (directory.permissions as Record<string, unknown>[]).map(principal =>
+              ({ objectId: principal.objectId, name: principal.name, userKind: principal.userKind })) }
           }), sessions: data.rawSessions.map(row => {
             const session = row as Record<string, unknown>
             return { objectId: session.objectId, sessionGuid: session.sessionGuid, name: session.name, createdAt: typeof session.createdAt === "string" ? session.createdAt : null,
