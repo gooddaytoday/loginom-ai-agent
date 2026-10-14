@@ -4,11 +4,55 @@ import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { readUserPreparation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readUserOwnership, readUserPreparation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("user ownership publishes a private generation-bound claim from a confirmed creation journal", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-claim-"))
+  const fixture = await parallelFixture(root)
+  await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  try {
+    const prepared = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
+    const reply = { v: 1 as const, id: "create-a", outcome: "confirmed" as const,
+      data: { created: true, user: { objectId: "native-user-41", name: "eval-a", userKind: 0, blocked: true } } }
+    const payload = { phase: "blocked", slot: lease.slot, secretFile: prepared.secretFile, preparationNonce: prepared.nonce,
+      desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: null }
+    const source = path.join(fixture.slots.controller.stateDir, "create-a.json")
+    // Data-only evidence codec fixture; no Loginom operation is simulated.
+    await writeLeaseReceipt(source, { version: 1, kind: "loginom-admin-command", id: reply.id, op: "reconcile-user", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(payload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex"), settledAt: new Date().toISOString() })
+    const renamed = path.join(fixture.slots.controller.stateDir, "renamed.json")
+    await writeLeaseReceipt(renamed, await Bun.file(source).json())
+    await expect(claimUserOwnership(fixture.slots, lease, prepared.secretFile, renamed, reply)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
+    expect(await Bun.file(path.join(fixture.slots.controller.stateDir, "user-a.json")).exists()).toBe(false)
+    const claimed = await claimUserOwnership(fixture.slots, lease, prepared.secretFile, source, reply)
+    expect(claimed).toMatchObject({ version: 2, kind: "owned-loginom-user", preparationNonce: prepared.nonce, slotId: "a",
+      username: "eval-a", userKind: 0, objectId: "native-user-41", identity, everActivated: false })
+    expect(claimed.userKey).toMatch(/^[0-9a-f]{64}$/)
+    expect(await readUserOwnership(fixture.slots, lease, prepared.secretFile)).toEqual(claimed)
+    expect((await stat(path.join(fixture.slots.controller.stateDir, "user-a.json"))).mode & 0o777).toBe(0o600)
+    expect(JSON.stringify(claimed)).not.toContain((await Bun.file(prepared.secretFile).json()).password)
+    const target = path.join(fixture.slots.controller.stateDir, "user-a.json")
+    const before = await stat(target)
+    expect(await claimUserOwnership(fixture.slots, lease, prepared.secretFile, source, reply)).toEqual(claimed)
+    expect((await stat(target)).ino).toBe(before.ino)
+    const originalSource = await Bun.file(source).json()
+    await writeLeaseReceipt(source, { ...originalSource, settledAt: new Date(Date.parse(originalSource.settledAt) + 1).toISOString() })
+    await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
+    await writeLeaseReceipt(source, originalSource)
+    await writeLeaseReceipt(target, { ...claimed, preparationNonce: crypto.randomUUID() })
+    const foreign = await Bun.file(target).text()
+    await expect(claimUserOwnership(fixture.slots, lease, prepared.secretFile, source, reply)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
+    expect(await Bun.file(target).text()).toBe(foreign)
+    await lease.close()
+    await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("LEASE_NOT_HELD")
+  } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+})
 
 test("user preparation reader rejects a malformed durable nonce without changing the files", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
