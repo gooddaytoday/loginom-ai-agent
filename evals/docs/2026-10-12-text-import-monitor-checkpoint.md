@@ -1,7 +1,7 @@
 # Мониторинг LAB-56–LAB-63
 
-- Full8 fresh01:41:03UTC14Oct: LAB56 done70/ownerACK/ACCEPT+cleanup; LAB57 blocked295/phaseblocked/frozeneb1/review2/reject1; LAB58–63 in_progress9/admission/no runs; all8 metadata unchanged.
-- One Rich SOURCE task01a13800-0e7e running04:22:02+03; safe progress140messages/seq140 at01:46:17UTC, no report/ACCEPT/cleanup inferred. Currenthandoff body/parent/attachment identical; no duplicate/newreview.
+- Full8 fresh02:10:57UTC14Oct: LAB56 done70/ownerACK/ACCEPT+cleanup; LAB57 blocked295/phaseblocked/frozeneb1/review2/reject1; LAB58–63 in_progress9/admission/no runs; all8 metadata unchanged.
+- One Rich SOURCE task01a13800-0e7e running04:22:02+03; safe progress136newmessages/seq276 at02:11:27UTC, no report/ACCEPT/cleanup inferred. Currenthandoff body/parent/attachment identical; no duplicate/newreview.
 - BenBLOCKED report01a137ef-d9d2 parent01a137da-8164: BLOCKED_SUPPORTED_ORIGINAL_SESSION_TRANSPORT/NOT_APPLIED, clean144e607a68bd603a1d67d228ebef990eeeff3b89; no livehandler/READY_SOURCE/operatoradoption.
 - Archive334289bytes/b03d6b14…add7/manifest807b0044…60760/92payload paths/types/hashes verified; sourcemanifest696794d3…39b1/bundle2fb317cd…675c/800Git blobs/795f3+785active unchanged/5added verified. Actual namedbundle ref inspected after HEAD-assumption failure, no runtime retry.
 - New closedguard provenance validates originalproducer/command/kernelbirth/rawrecord identities/sixparentedges/171sources; missing parentcapture/admission never fabricated. Offline CLI --apply refused beforeinputreads; static VERIFIED leaves cleanupUNCONFIRMED/servercessationUNPROVEN.
