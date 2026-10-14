@@ -104,6 +104,16 @@ Bun child и bounded Docker controls:65 tests PASS/456 assertions, typecheck
 PASS. Coverage, applicable ancestor/controller fields и manifest binding
 проверяются отдельно; malformed данные не считаются отсутствующими samples.
 
+Resource presence/binding policy требует host CPU/memory/swap и заданные
+filesystem capacities в каждом sample, exact prepared container epochs и
+CPU/RAM/PIDs/I/O. Expected owner задаётся kind/id/launcher PID/birth; нужен
+хотя бы один observed snapshot с verified RSS/CPU и живым launcher в members.
+Actual A/B supervisor controls показывают независимость B после A drain.
+33 policy/producer/evidence tests PASS/220 assertions, typecheck PASS.
+Это presence gate: весь active interval, cgroup applicability/counters/quotas
+и mandatory frozen requirements ещё должны быть проверены. Диагностические
+empty requirements не предоставляют live qualification.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный

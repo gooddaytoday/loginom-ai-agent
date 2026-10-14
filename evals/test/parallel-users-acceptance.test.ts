@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits, assessResourceBudget } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage } from "../src/parallel-acceptance"
+import { sampleHostResources } from "../src/parallel-resources"
+import os from "node:os"
 import { summarizeResourceSamples } from "../src/parallel-resource-summary"
 
 test("parallel acceptance fails on an intermediate rate limit even when the measured retry succeeds", () => {
@@ -231,4 +233,42 @@ test("resource budget policy refuses malformed or empty bounds rather than silen
     { bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 500, maximum: 100 }] },
   ]) expect(assessResourceBudget({ ...fixture, budget: { ...fixture.budget, ...change } }))
     .toEqual({ status: "incomplete", codes: ["RESOURCE_BUDGET_INVALID"] })
+})
+
+
+test("resource coverage requires real host counters and every selected filesystem", async () => {
+  const host = await sampleHostResources([os.tmpdir()])
+  const sample = { host, containers: null, processes: null }
+  const request = { samples: [sample], paths: [os.tmpdir()], containers: [], owners: [] }
+  expect(assessResourceCoverage(request)).toEqual({ status: "passed", codes: [] })
+  expect(assessResourceCoverage({ ...request, samples: [] })).toEqual({ status: "incomplete", codes: ["RESOURCE_SAMPLES_MISSING"] })
+  expect(assessResourceCoverage({ ...request, samples: [{ ...sample, host: { ...host, memory: null } }] }))
+    .toEqual({ status: "incomplete", codes: ["HOST_RESOURCE_COVERAGE_INCOMPLETE"] })
+  expect(assessResourceCoverage({ ...request, paths: [os.tmpdir(), "/unobserved-storage"] }))
+    .toEqual({ status: "incomplete", codes: ["FILESYSTEM_RESOURCE_COVERAGE_INCOMPLETE"] })
+  expect(assessResourceCoverage({ ...request, samples: [{ ...sample, host: { ...host, filesystems: [{ path: os.tmpdir(), capacity: null }] } }] }))
+    .toEqual({ status: "incomplete", codes: ["FILESYSTEM_RESOURCE_COVERAGE_INCOMPLETE"] })
+})
+
+test("resource coverage binds both container roles to the exact prepared epochs and requires their counters", async () => {
+  const host = await sampleHostResources([os.tmpdir()])
+  const targets = (["server", "studio"] as const).map((role, index) => ({ role, id: String(index + 1).repeat(64), image: `sha256:${String(index + 3).repeat(64)}`,
+    startedAt: "2026-10-14T10:00:00.000Z", name: `fixture-${role}`, nonce: "fixture-nonce", purpose: "acceptance" }))
+  const containers = targets.map(target => ({ role: target.role, container_id: target.id, epoch_stable: true,
+    inspect: { id: target.id, image: target.image, name: `/${target.name}`, started_at: target.startedAt, running: true, oom_killed: false,
+      owner_kind: "users", owner_nonce: target.nonce, purpose: target.purpose },
+    cpu: { total_usage_ns: 10 }, memory: { current_bytes: 100, limit_bytes: 1000 }, pids: { current: 1 },
+    io: [{ major: 8, minor: 0, op: "Write", bytes: 0 }],
+  }))
+  const sample = { host, containers, processes: null }
+  const request = { samples: [sample], paths: [os.tmpdir()], containers: targets, owners: [] }
+  expect(assessResourceCoverage(request)).toEqual({ status: "passed", codes: [] })
+  expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: containers.slice(0, 1) }] }))
+    .toEqual({ status: "incomplete", codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] })
+  for (const change of [{ memory: null }, { cpu: null }, { io: null }, { epoch_stable: false }])
+    expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: [{ ...containers[0], ...change }, containers[1]] }] }))
+      .toEqual({ status: "incomplete", codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] })
+  for (const change of [{ started_at: "changed" }, { image: "changed" }, { owner_nonce: "changed" }])
+    expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: [{ ...containers[0], inspect: { ...containers[0]!.inspect, ...change } }, containers[1]] }] }))
+      .toEqual({ status: "failed", codes: ["CONTAINER_RESOURCE_IDENTITY_MISMATCH"] })
 })
