@@ -32,6 +32,7 @@ function installOriginalUserPublisher(origin) {
   };
   const guard=()=>{
     if(acquisition?.failed)throw acquisition.error;
+    if(acquisition?.lower?.failed)throw acquisition.lower.error;
     if(sample?.failed)throw sample.error; // Raw first rejection wins secondary drift.
     if(failure)throw failure.value;
     const currentDocument=descriptor(root,'document');
@@ -42,12 +43,26 @@ function installOriginalUserPublisher(origin) {
   };
   const inspect=()=>{
     guard();if(!sample||!sample.settled||!sample.sourceVerified
-      ||(acquisition&&(!acquisition.settled||!acquisition.sourceVerified||acquisition.user!==sample.user)))unavailable();
+      ||(acquisition&&(!acquisition.settled||!acquisition.sourceVerified||acquisition.user!==sample.user
+        ||(acquisition.lower&&(!acquisition.lower.completed||!acquisition.lower.sourceVerified
+          ||acquisition.lower.user!==sample.user||!acquisition.lower.restored)))))unavailable();
+    if(acquisition?.lower){const lower=acquisition.lower;
+      if(data(sample.user,'$S')!==lower.transport||data(sample.bindings.identity,'$OW')!==lower.w
+        ||data(sample.bindings.identity,'$O')!==lower.o)unavailable();
+    }
     return Object.freeze({document:originalDocument,receiver:sample.receiver,user:sample.user,
       task:sample.task,originalSet:sample.originalSet,originalInit:sample.originalInit,
       bindings:sample.bindings,acquisition:acquisition?Object.freeze({receiver:acquisition.receiver,
         task:acquisition.task,user:acquisition.user,session:acquisition.session,originalGet:acquisition.originalGet,
-        rpcCompletionVerified:false}):undefined,nativeReceiversQualified:false});
+        rpcCompletionVerified:!!(acquisition.lower?.completed&&acquisition.lower.sourceVerified),
+        lower:acquisition.lower?.completed?Object.freeze({session:acquisition.lower.session,transport:acquisition.lower.transport,
+          method:acquisition.lower.originalMethod,task:acquisition.lower.task,dispatchTask:acquisition.lower.dispatchTask,
+          response:acquisition.lower.response,user:acquisition.lower.user,w:acquisition.lower.w,o:acquisition.lower.o,type:703,
+          originalResultReader:acquisition.lower.originalResultReader,continuation:acquisition.lower.continuation,
+          taskReader:acquisition.lower.taskReader,taskContinuation:acquisition.lower.taskContinuation,
+          originalContinuation:acquisition.lower.originalContinuation,request:acquisition.lower.request,
+          ss:acquisition.lower.ss,taskConstructor:acquisition.lower.taskConstructor,mkdel:acquisition.lower.mkdel,
+          exceptionWrap:acquisition.lower.exceptionWrap,baseConstructor:acquisition.lower.baseConstructor,baseMethod:acquisition.lower.baseMethod}):undefined}):undefined,nativeReceiversQualified:false});
   };
   define(root,key,{value:Object.freeze({inspect})});
   const hash=async fn=>{if(!digest||!Encoder)unavailable();return Array.from(new Uint8Array(await digest('SHA-256',new Encoder().encode(apply(toString,fn,[])))))
@@ -93,6 +108,93 @@ function installOriginalUserPublisher(origin) {
     define(current,'Set',{...d,value:retainedSet});
     hold(current,'Set');hold(root,'bg');hold(bg,'app');hold(app,'CurrentUser');
   };
+  const captureLower=(session)=>{
+    let methodDescriptor;for(let p=session;p;p=prototype(p)){methodDescriptor=descriptor(p,'get_CurrentUser');if(methodDescriptor)break}
+    if(!methodDescriptor)return;
+    if(!('value'in methodDescriptor)||typeof methodDescriptor.value!=='function')unavailable();
+    const transport=hold(session,'$S'),originalMethod=methodDescriptor.value;
+    const ss=hold(root,'ss'),taskConstructor=hold(ss,'TaskCompletionSource'),mkdel=hold(ss,'mkdel'),exceptionWrap=hold(hold(ss,'Exception'),'wrap');
+    const record={session,transport,originalMethod,ss,taskConstructor,mkdel,exceptionWrap,patches:[],restored:false,used:false,sourceVerified:false,completed:false};
+    const patch=(object,name,make)=>{
+      const own=descriptor(object,name),original=data(object,name);
+      if(typeof original!=='function'||(own&&(!own.configurable&&!own.writable)))unavailable();
+      const wrapped=make(original),temporary={value:wrapped,writable:true,enumerable:own?.enumerable??false,configurable:true};
+      if(own&&!own.configurable)temporary.configurable=false;
+      define(object,name,temporary);
+      const chain=[];let owner=object,originalDescriptor;for(;owner;owner=prototype(owner)){chain.push(owner);originalDescriptor=descriptor(owner,name);if(originalDescriptor)break}
+      // The effective original descriptor was replaced above for own fields.
+      if(own){originalDescriptor=own;owner=object;chain.length=1}
+      else {chain.length=0;owner=prototype(object);for(;owner;owner=prototype(owner)){chain.push(owner);originalDescriptor=descriptor(owner,name);if(originalDescriptor)break}}
+      const entry={object,name,own,original,temporary,chain,owner,originalDescriptor};record.patches.push(entry);
+      return entry;
+    };
+    const check=()=>{for(const entry of record.patches){const now=descriptor(entry.object,entry.name);
+      const expected=record.restored?entry.own:entry.temporary;
+      if(!expected){if(now)unavailable();let owner=prototype(entry.object);for(const expectedOwner of entry.chain){if(owner!==expectedOwner)unavailable();if(descriptor(owner,entry.name))break;owner=prototype(owner)}
+        const original=descriptor(owner,entry.name);if(owner!==entry.owner||!original||Reflect.ownKeys(entry.originalDescriptor).some(k=>original[k]!==entry.originalDescriptor[k]))unavailable();
+        if(data(entry.object,entry.name)!==entry.original)unavailable()}
+      else if(!now||Reflect.ownKeys(expected).some(k=>now[k]!==expected[k]))unavailable();
+    }};
+    checks.push(check);
+    record.restore=()=>{
+      check();for(const entry of record.patches.slice().reverse()){
+        if(entry.own)define(entry.object,entry.name,entry.own);else delete entry.object[entry.name];
+      }record.restored=true;check();
+    };
+    let invoking=false,completing=false;
+    try{
+      patch(transport,'$R',original=>function(w,o,type){
+        if(!completing)return apply(original,this,arguments);
+        guard();if(this!==transport||type!==703||w!==record.w||o!==record.o)unavailable();
+        const user=apply(original,this,arguments);guard();record.user=user;record.completed=true;completing=false;return user;
+      });
+      patch(transport,'DispatchMessageAsync',original=>function(request){
+        if(!invoking)return apply(original,this,arguments);
+        guard();if(this!==transport||record.dispatchTask)unavailable();record.request=request;
+        const task=apply(original,this,arguments);record.dispatchTask=task;
+        record.continuation=data(task,'continueWith');record.originalResultReader=data(task,'getAwaitedResult');
+        patch(task,'getAwaitedResult',reader=>function(){
+          if(this!==task||record.response)unavailable();
+          if(record.failed)throw record.error;
+          if(!record.observed)unavailable();
+          const response=record.outcome;guard();record.response=response;completing=true;
+          patch(response,'ReadParameterInt32',read=>function(offset){
+            guard();if(this!==response||(offset!==0&&offset!==4))unavailable();
+            const value=apply(read,this,arguments);guard();if(offset===0)record.w=value;else record.o=value;return value;
+          });return response;
+        });
+        patch(task,'continueWith',continueWith=>function(callback){
+          if(this!==task||record.originalContinuation)unavailable();record.originalContinuation=callback;
+          return apply(continueWith,this,[function(){
+            if(record.observed){remember(Error('TERMINAL_USER_RPC_CONTINUATION_REPLAY'));return}
+            record.observed=true;
+            try{record.outcome=apply(record.originalResultReader,task,[])}catch(error){record.failed=true;record.error=error}
+            if(!record.failed){try{guard()}catch(error){remember(error);record.callbackStopped=true;return}}
+            else {const reader=record.patches.find(p=>p.object===task&&p.name==='getAwaitedResult');
+              const now=descriptor(task,'getAwaitedResult');if(!now||Reflect.ownKeys(reader.temporary).some(k=>now[k]!==reader.temporary[k])){
+                record.callbackStopped=true;return}
+            }
+            return apply(callback,this,arguments);
+          }]);
+        });return task;
+      });
+      patch(session,'get_CurrentUser',original=>function(){
+        guard();if(this!==session||record.used)unavailable();record.used=true;invoking=true;
+        try{const task=apply(original,this,arguments);record.task=task;
+          record.taskContinuation=hold(task,'continueWith');record.taskReader=hold(task,'getAwaitedResult');return task;
+        }finally{invoking=false}
+      });
+      (async()=>{guard();const value=await hash(originalMethod);guard();
+        if(value!=='e7d959448a2b1a8030f3511caf44768b4ee4e1c918aa9b3791a897022026738a'){
+          if(value!=='07380ada53b9b8eba218bf876f7b30b40a9076a954b07755c68fc745f1f72a5c')unavailable();
+          record.baseConstructor=hold(hold(hold(root,'bg'),'rpc'),'TIBGBaseDeductorServerSession_Proxy');
+          record.baseMethod=hold(hold(record.baseConstructor,'prototype'),'get_CurrentUser');
+          const baseHash=await hash(record.baseMethod);guard();if(baseHash!=='e7d959448a2b1a8030f3511caf44768b4ee4e1c918aa9b3791a897022026738a')unavailable();
+        }record.sourceVerified=true;
+      })().catch(remember);
+      return record;
+    }catch(error){remember(error);throw error}
+  };
   const bindAcquisition=(app,Connection)=>{
     const proto=data(Connection,'prototype'),d=descriptor(proto,'GetCurrentUser');
     if(!d||!('value'in d)||typeof d.value!=='function'||!d.writable)unavailable();
@@ -115,6 +217,7 @@ function installOriginalUserPublisher(origin) {
             ||Reflect.ownKeys(reader).some(k=>now[k]!==reader[k]))unavailable();
         });
         acquisition={receiver:this,session,originalGet,settled:false,failed:false,sourceVerified:false};
+        if(!('value'in reader))acquisition.lower=captureLower(session);
         hold(app,'ServerConnection');hold(Connection,'prototype');hold(proto,'GetCurrentUser');
         hold(root,'__awaiter');guard();
       }catch(error){remember(error)}
@@ -123,8 +226,9 @@ function installOriginalUserPublisher(origin) {
       }
       if(acquisition&&!acquisition.started){
         acquisition.started=true;acquisition.task=task;
-        try{apply(then,task,[user=>{acquisition.user=user;acquisition.settled=true;try{guard()}catch(error){remember(error)}},
-          error=>{acquisition.failed=true;acquisition.error=error;acquisition.settled=true}]);
+        try{apply(then,task,[user=>{acquisition.user=user;acquisition.settled=true;try{guard();if(acquisition.lower)acquisition.lower.restore()}catch(error){remember(error)}},
+          error=>{acquisition.failed=true;acquisition.error=error;acquisition.settled=true;
+            try{acquisition.lower?.restore()}catch(error){remember(error)}}]);
           (async()=>{guard();const value=await hash(originalGet);guard();
             if(value!=='b2145693ef7b07b2542bb413a8ec4453334a159055a9b85456915f8d2268ebb0')unavailable();
             acquisition.sourceVerified=true;})().catch(remember);

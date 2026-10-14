@@ -92,6 +92,14 @@ export async function prepareWorkspace(page, options, terminal) {
           Object.assign(bindings,{userAcquisitionReceiver:receiptRef(acquisition,'receiver'),
             userAcquisitionTask:receiptRef(acquisition,'task'),userAcquisitionSession:receiptRef(acquisition,'session'),
             originalUserGet:receiptRef(acquisition,'originalGet')});
+          const lower=receiptRef(acquisition,'lower');
+          if(lower){
+            if(receiptRef(acquisition,'rpcCompletionVerified')!==true||receiptRef(lower,'user')!==bindings.user
+              ||receiptRef(lower,'transport')!==nativeSession||receiptRef(lower,'type')!==703)throw Error('TERMINAL_REALM_USER_RPC');
+            Object.assign(bindings,{userRpcTask:receiptRef(lower,'task'),userDispatchTask:receiptRef(lower,'dispatchTask'),
+              userResponse:receiptRef(lower,'response'),userRpcMethod:receiptRef(lower,'method'),
+              userRpcContinuation:receiptRef(lower,'originalContinuation')});
+          }
         }
       }
       const descriptor=Object.getOwnPropertyDescriptor(state,'terminalOriginalRealm');

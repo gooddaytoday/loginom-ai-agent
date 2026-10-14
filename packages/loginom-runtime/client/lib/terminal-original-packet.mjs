@@ -197,6 +197,13 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
             ||data(acquisition,'session')!==data(realm,'userAcquisitionSession')
             ||data(acquisition,'originalGet')!==data(realm,'originalUserGet')
             ||data(acquisition,'user')!==start.nativeRefs.currentUser)fail('NATIVE_REPLACED');
+          if(Object.hasOwn(realm,'userRpcTask')){const lower=data(acquisition,'lower');
+            if(data(acquisition,'rpcCompletionVerified')!==true||!lower
+              ||data(lower,'task')!==data(realm,'userRpcTask')||data(lower,'dispatchTask')!==data(realm,'userDispatchTask')
+              ||data(lower,'response')!==data(realm,'userResponse')||data(lower,'method')!==data(realm,'userRpcMethod')
+              ||data(lower,'originalContinuation')!==data(realm,'userRpcContinuation')
+              ||data(lower,'user')!==start.nativeRefs.currentUser||data(lower,'type')!==703)fail('NATIVE_REPLACED');
+          }
         }
       }
       for(const slot of data(realm,'slots')){
