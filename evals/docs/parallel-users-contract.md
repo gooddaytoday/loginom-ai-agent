@@ -142,6 +142,8 @@ OOM/ENOSPC, license denial, rate/quota/429, включая промежуточ�
 
 ### Временный candidate shared OAuth — 2026-10-14
 
+`providers list` не подходит для shared admission: credential view скрывает generation и не проверяет uncertain refresh. Минимальная отдельная product-адаптация `87c7d497d64f72f49a70e949f13712e5b383029d` в managed worktree `evals-oauth` добавляет публичный `providers status --provider openai --format json`. Ответ `shared-oauth-status-v1` содержит только status, generation, principal_sha256 и refresh_required; not_ready содержит безопасный code и exit 2. Проверка использует существующий locked snapshot/reconciliation; store/refresh не копируются в harness. Нет fallback на local auth; uncommitted pending marker и auth bytes сохраняются. Source command/store/plugin/profile tests: 26 PASS/124 assertions (113.13s), Agent typecheck PASS. Это отдельный commit после импортов и installer fix, для отдельной upstream поставки; основной checkout не изменён. Установленный ниже candidate 04ff82be4d ещё не содержит status: нужен fresh build/install/verifier и отдельное немодельное protocol/bwrap evidence, а live OAuth остаётся отдельным gate.
+
 Отдельная ветка `evals-oauth`, worktree `/home/kiselev/.codex/worktrees/evals-oauth/loginom-ai-agent`, база `loginom@38ee045e79720d363a35666484f17804162b55a1`. Общий checkout и ветки других агентов не изменялись. Импорт выполнен строго `cherry-pick -x` в указанном порядке; evals-код не добавлен в импортируемые коммиты.
 
 - `dfd2b0df2de6b60f529973f35fcccc59feceef5f` → `ede16ba7f91786a584608a97dac98e57341e33be`.

@@ -3,6 +3,15 @@ import { spawn } from "node:child_process"
 import { appendFile, chmod, mkdir, rm, rmdir } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
+if (command === "providers" && sub === "status" && process.env.EVAL_FAKE_SHARED_AUTH_RECEIPT) {
+  if (process.env.EVAL_FAKE_SHARED_AUTH_CALLS_FILE)
+    await appendFile(process.env.EVAL_FAKE_SHARED_AUTH_CALLS_FILE, JSON.stringify({ args: Bun.argv.slice(2),
+      sharedDir: process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR, httpOnly: process.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS }) + "\n", { mode: 0o600 })
+  const text = await Bun.file(process.env.EVAL_FAKE_SHARED_AUTH_RECEIPT).text()
+  process.stdout.write(text + "\n")
+  await Bun.sleep(400)
+  process.exit(Number(process.env.EVAL_FAKE_SHARED_AUTH_EXIT ?? "0"))
+}
 const fixtures = path.join(import.meta.dir, "fake")
 const packageFixture = command === "run" && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-package.json")
 const collision = command === "run" ? Bun.argv.find((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "node-output-collision.json") : undefined

@@ -48,6 +48,8 @@ gates, затем полный LLM N=2 → N=1 и node-evals с неизменн
 
 ## Контракт изоляции live eval
 
+- При настроенном v2 `auth.sharedDir` readiness проверяет публичный `providers status --provider <id> --format json` установленного CLI (`shared-oauth-status-v1`), а не local auth.json. Ответ допускается только при совпадающем provider, UUID generation, principal hash, boolean refresh requirement и успешном exit; ошибки не раскрывают raw provider output. Capability и успешный немодельный status не заменяют live OAuth/forced-refresh qualification.
+
 - Решение и последовательность: [план](docs/2026-10-07-analytic-evals-isolation-plan.md). Отклонение от внешней спеки фиксируется здесь, чтобы изменения оставались внутри `evals/`: default `EVAL_CLI_MODE=source` сохраняется для совместимости конфигурации, но live-вызовы `main()` допускают только установленный binary CLI в обязательной Linux bubblewrap-границе. Это касается и node-evals/LAB-16; fake/dry-run, judge-only и калибровка не запускают оцениваемого агента и сохраняют свой путь.
 - Агенту доступны только prompt, inputs текущей попытки, подготовленный writable-профиль и ресурсы продукта. Harness/судья, корпус, Git, исходный agent-validation, результаты и закрытый архив истории остаются вне mounts. Ошибка установки или исполнения границы — `harness_error`, остановка без судьи/retry/fallback.
 - OAuth и `cli-profile.json` сохраняются на запись. После подтверждённого завершения процессов/recovery история **каждой** попытки (включая retry), БД с WAL/SHM и inputs переносятся в закрытый архив вне mounts. Это изменяет прежнюю политику долговечности в `profile.test.ts`: история долговечна в архиве, а не в рабочем профиле. Pending recovery или ошибка переноса запрещают следующую попытку.

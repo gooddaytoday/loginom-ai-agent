@@ -10,6 +10,71 @@ import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
 
+test("assertAuth: shared mode refuses local auth and exposes only the provider status code", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    const local = path.join(input.config.profileDir, "data/auth.json")
+    await writeFile(local, '{"openai":{"type":"oauth","refresh":"local-canary"}}', { mode: 0o600 })
+    await Bun.write(input.receipt, JSON.stringify({ format: "shared-oauth-status-v1", provider: "openai", status: "not_ready", code: "SHARED_AUTH_OAUTH_REQUIRED" }))
+    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } })).rejects.toThrow("SHARED_AUTH_OAUTH_REQUIRED")
+    expect(JSON.parse((await Bun.file(input.calls).text()).trim())).toEqual({ args: ["providers", "status", "--provider", "openai", "--format", "json"],
+      sharedDir: input.config.auth.sharedDir, httpOnly: "false" })
+    expect(await Bun.file(local).text()).toContain("local-canary")
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+})
+
+test("assertAuth: shared mode admits only the public verified receipt without a local auth file", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
+      principal_sha256: "a".repeat(64), refresh_required: true }
+    await Bun.write(input.receipt, JSON.stringify(ready))
+    expect(await assertAuth(input.config, input.command)).toEqual({ generation: ready.generation,
+      principal_sha256: ready.principal_sha256, refresh_required: true })
+    expect(await Bun.file(path.join(input.config.profileDir, "data/auth.json")).exists()).toBe(false)
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+})
+
+test("assertAuth: shared receipt tampering cannot admit a slot or expose raw provider output", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
+      principal_sha256: "a".repeat(64), refresh_required: false }
+    for (const value of ["private-canary", { ...ready, provider: "other" }, { ...ready, generation: "private-canary" },
+      { ...ready, principal_sha256: "private-canary" }, { ...ready, refresh_required: "yes" },
+      { ...ready, status: "not_ready", code: "private-canary" }]) {
+      await Bun.write(input.receipt, JSON.stringify(value))
+      await expect(assertAuth(input.config, input.command)).rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
+    }
+    await Bun.write(input.receipt, JSON.stringify(ready))
+    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } }))
+      .rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+}, 20_000)
+
+test("assertAuth: shared grant and HTTP switch must match before any management process", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    for (const env of [{ ...input.command.env, LOGINOM_AI_AGENT_SHARED_AUTH_DIR: path.join(input.root, "ungranted") },
+      { ...input.command.env, LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" }])
+      await expect(assertAuth(input.config, { ...input.command, env })).rejects.toThrow("SHARED_AUTH_ENV_MISMATCH")
+    expect(await Bun.file(input.receipt).exists()).toBe(false)
+    expect(await Bun.file(input.calls).exists()).toBe(false)
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+})
+
+async function sharedAuthFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-shared-auth-admission-"))
+  const config = { ...loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "fake", EVAL_SLOTS_FILE: "fixture-programmatic-only",
+    EVAL_AGENT_MODEL: "openai/model", LOGINOM_DOCK_API_KEY: "fixture", EVAL_PROFILE_DIR: path.join(root, "profile") }),
+    auth: { sharedDir: path.join(root, "shared") } }
+  await Promise.all([path.join(config.profileDir, "data"), config.auth.sharedDir].map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
+  const receipt = path.join(root, "provider-status.json")
+  const calls = path.join(root, "provider-calls.jsonl")
+  const base = agentCommand(config, { PATH: process.env.PATH })
+  return { root, config, receipt, calls, command: { ...base, env: { ...base.env, EVAL_FAKE_SHARED_AUTH_RECEIPT: receipt, EVAL_FAKE_SHARED_AUTH_CALLS_FILE: calls } } }
+}
+
 test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
   const profile = path.join(dir, "profile")
