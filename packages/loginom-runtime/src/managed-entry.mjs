@@ -381,7 +381,8 @@ async function handle(message) {
       } catch (rejected) {
         send({id:message.id,result:{cleanupComplete:false,refused:true,
           rejectedIsUndefined:rejected === undefined,
-          rejected:rejected instanceof Error ? {name:rejected.name,message:rejected.message} : rejected}})
+          rejected:rejected instanceof Error ? {name:rejected.name,message:rejected.message,
+            ...(Object.hasOwn(rejected,"cause")?{cause:closeRejection(rejected.cause)}:{})} : rejected}})
       }
       return
     }

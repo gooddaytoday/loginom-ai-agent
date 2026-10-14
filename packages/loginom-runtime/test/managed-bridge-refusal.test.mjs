@@ -40,3 +40,17 @@ for(const [label,value]of Object.entries({...cases,missing:undefined}))test('ful
  const receipt={browser_transport_closed:true,...(label==='missing'?{}:{cleanup_complete:value})};const f=await fixture(()=>receipt);
  try{await f.handle({id:'close',operation:'close'});assert.deepEqual(f.events,['bridge']);assert.equal(f.state.bridgeCloseFailure.cause,receipt);assert.equal(f.state.bridgeCleanup,undefined);assert.equal(f.messages[0].error,'LOGINOM_RUNTIME_CLEANUP_FAILED');assert.equal(f.state.release.browser_profile,undefined)}finally{await f.dispose()}
 });
+for(const [label,cause]of Object.entries({...cases,member:'packages'}))test('capture diagnostic forwards first cause '+label,async()=>{
+ const f=await fixture(()=>{throw Error('close must not run')});let calls=0;
+ const primary=Error('LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED',{cause});
+ f.state.bridge.captureAcceptance=async()=>{calls++;throw primary};
+ try{
+  await f.handle({id:'capture',operation:'acceptance.capture'});
+  const result=f.messages[0].result;
+  assert.equal(result.refused,true);assert.equal(result.cleanupComplete,false);
+  assert.equal(result.rejected.message,primary.message);
+  if(cause instanceof Error){assert.equal(result.rejected.cause.message,cause.message);assert.equal(result.rejected.cause.cause.value,0);}
+  else {assert.equal(result.rejected.cause.value,cause===undefined?null:cause);assert.equal(result.rejected.cause.is_undefined,cause===undefined);}
+  assert.equal(calls,1);assert.deepEqual(f.events,[]);assert.equal(f.state.release,undefined);
+ }finally{await f.dispose()}
+});
