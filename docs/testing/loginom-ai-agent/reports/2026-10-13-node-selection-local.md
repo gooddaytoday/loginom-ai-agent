@@ -2431,3 +2431,11 @@ Ownrelease105540 независимо verifiedSHA87060dc1f255ada5fe4520338342dd4
 exactGUID→user177/latestinit→close/admin178logout/UI/Hostgone/nowriter, original
 nativefailure/normalcleanupfalse preserved. Новыйsource и31matched admission
 готовятся; modelslots0 на обоих новых подготовленныхruntime.
+
+Checkpoint — независимое review разрешённого восстановления завершено.
+Commitd3cd4e46f9; reviewSHA659917e995a47e82c51cdccd827e5c0fc1cec803515c19fa38c8b96cb988928f
+findings0:15restoredpaths exact15e,289clientlibphysicalfiles onlyVariant/base
+difference,59JSmodules/21CoreHostRuntimeAgent exact15e;581protected/32raw/
+usercorrections unchanged. Targeted713PASS. Эти условия заменяют прежнее
+требование127standardfiles exactbase; новый scope — явный whitelist владельца.
+Новая matched сборка и31freshmodel slots открыты, старые failures не переносятся.

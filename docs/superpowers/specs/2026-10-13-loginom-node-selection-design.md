@@ -1,5 +1,14 @@
 # Приоритет стандартных узлов в loginom-automation
 
+Текущий checkpoint 2026-10-14: по последним разрешениям владельца восстановлены
+ранее выполненные исправления Import, Join, Export, Calculator, Group и Sort,
+а также javascript-output-preview и его hook. Commitd3cd4e46f9;15paths exact15e,
+targeted713PASS/0FAIL/0SKIP и независимый scope reviewPASS. Общая JS инфраструктура
+сохранена. Пара105540 историческая доmodels0: её shortExportfailure и verified
+ownrelease сохранены. Следующий этап — новая matched пара, prospective31lock
+и локальная live-серия; полная приёмка пока не завершена.
+
+
 Историческое состояние на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
 к базе38ee (127productionfiles independentlychecked), а общие порты, мастера
 и таблицы, необходимые JavaScript, сохранены. Rollbackd445c8ea65 и sourcegate
@@ -2498,8 +2507,10 @@ lock до firstmodel. Старые failure, pins, drafts и review остают�
   JS→Group/Sort helper и его hook; Variant/base и чужие файлы сохранены.
   Existing Export regression RED→GREEN; targeted15suites713PASS/0FAIL/0SKIP,
   собственные процессы завершены. Полная live-приёмка этим не подтверждается.
-- [ ] Независимо проверить разрешённый diff и targeted restoration regressions;
-  сохранённый failure/ownrelease оформить в отчёте, восстановление — обычным commit.
+- [x] Независимо проверить разрешённый diff и targeted restoration regressions:
+  все15paths exact15e;289physical clientlibfiles — только Variant/base отличается;
+  713PASS/0FAIL/0SKIP, scope review659917e995… findings0. Failure/ownrelease
+  оформлены в отчёте; восстановление сохранено обычным commit d3cd4e46f9.
 
 Новые matched build/pins/live31 и итоговый трёхосевой отчёт остаются открытыми
 задачами основного протокола. При technical failures полная приёмка не заявляется.

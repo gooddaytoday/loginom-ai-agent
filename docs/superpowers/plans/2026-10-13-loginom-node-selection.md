@@ -1,5 +1,14 @@
 # Loginom Standard Node Selection Implementation Plan
 
+Текущий checkpoint 2026-10-14: по последним разрешениям владельца восстановлены
+ранее выполненные исправления Import, Join, Export, Calculator, Group и Sort,
+а также javascript-output-preview и его hook. Commitd3cd4e46f9;15paths exact15e,
+targeted713PASS/0FAIL/0SKIP и независимый scope reviewPASS. Общая JS инфраструктура
+сохранена. Пара105540 историческая доmodels0: её shortExportfailure и verified
+ownrelease сохранены. Следующий этап — новая matched пара, prospective31lock
+и локальная live-серия; полная приёмка пока не завершена.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Стандартные поддерживаемые узлы используются по умолчанию; JavaScript допускается по явному запросу или для подтверждённого функционального пробела.
@@ -3252,8 +3261,10 @@ lock до firstmodel. Старые failure, pins, drafts и review остают�
   JS→Group/Sort helper и его hook; Variant/base и чужие файлы сохранены.
   Existing Export regression RED→GREEN; targeted15suites713PASS/0FAIL/0SKIP,
   собственные процессы завершены. Полная live-приёмка этим не подтверждается.
-- [ ] Независимо проверить разрешённый diff и targeted restoration regressions;
-  сохранённый failure/ownrelease оформить в отчёте, восстановление — обычным commit.
+- [x] Независимо проверить разрешённый diff и targeted restoration regressions:
+  все15paths exact15e;289physical clientlibfiles — только Variant/base отличается;
+  713PASS/0FAIL/0SKIP, scope review659917e995… findings0. Failure/ownrelease
+  оформлены в отчёте; восстановление сохранено обычным commit d3cd4e46f9.
 
 Новые matched build/pins/live31 и итоговый трёхосевой отчёт остаются открытыми
 задачами основного протокола. При technical failures полная приёмка не заявляется.
