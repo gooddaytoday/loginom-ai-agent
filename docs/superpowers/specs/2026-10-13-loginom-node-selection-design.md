@@ -2367,3 +2367,87 @@ Independent closed paced readback SHA
 protected2181/effective74 unchanged. Causeunknown; no native/model acceptance.
 Новое ограничение владельца требует отменить branch standard-node production
 changes до исходной базы; дальнейшие standard fixes/diagnostic loops здесь запрещены.
+
+## Действующее ограничение области и новый протокол (владелец, 2026-10-14)
+
+Этот раздел имеет приоритет над прежними заданиями исправлять standard runtime
+и gate clean9. Новые правила применяются только к новой сборке/серии, до её
+первого model dispatch; старые frozen locks/outcomes не переписываются.
+Источник — полный запрос владельца в attachment80e0c1d9 от2026-10-14.
+
+Исходная база всей текущей rebased node-javascript —
+`38ee045e79720d363a35666484f17804162b55a1`: merge-base с loginom, parent первого
+коммита2f28591b69, reflog rebase onto38ee и programming-javascript/rebase-checkpoint.md.
+Историческая pre-rebase a8ad59766… не применяется: она откатила бы upstreamloginom.
+849cc844ea — checkpoint skill, а не база ветки. Карта40mixed/standard production
+libfiles и99changed inventory SHA
+`bb5c82be6d53e7bc19ca2a282e702ee0931e24b92e15cbdf4da01fea1dc49dad`.
+
+В этой ветке запрещено менять production Import, Group, Sort, Join, Calculator,
+Export и любые другие standard узлы. Вернуть их код к38ee, включая дату импорта,
+Group/Sort preflight после JS, распознавание/scroll/label Export, общий UI для
+Join/input/output/console/mapping и общую процедуру downstream после JS.
+Общая обвязка не исключение. JS-only registration/lifecycle могут сохраниться
+лишь без изменения standard path; необходимые зависимости изолировать в JS
+области либо явно признать ограничение. Не сохранять standard fixes ради eval.
+Host/bridge/budgets требуют проверки каждого mixed hunk, а не общего исключения.
+
+Сохраняются собственно JavaScript,2skill files и необходимая eval-инфраструктура.
+Откат — обычный обозримый commit, без reset/history/evidence/userfile deletion.
+Все собственные live процессы завершены; последний31151/Host1496283 закрыт,
+logout/ACK0/PIDgone/.writerabsent независимо подтверждены70f70d56….
+Чужие процессы/сессии/незавершённые изменения не трогать. Нового live пока нет.
+
+Новая основная матрица31=6baseline+25candidate неизменна:18standard/3explicitJS/
+3tags/1recovery; порядок первых9 ABC→firstlast→sales→monthly→claims→ROI→explicit→
+tags→recovery, затем baseline6 и remaining16. Первые9 должны быть исполнены,
+исходы сохранены/разобраны, все разрешённые continuation подтверждены; требование
+всех9functionalPASS отменено для новой серии. Плановые attempts2/3 сохраняются
+отдельными исходами; не перезапускать уже dispatch/admitted слот и не заменятьfailure.
+
+Технический отказ сохраняется в отчёте/знаменателе и не становится PASS.
+После strict own session close, dead CLI/Host и свободного профиля допускается
+следующий другой слот. Успешный standard идёт автоматически по прежним обязательным
+oracle/graph/policy/history/closure checks. Technical путь отдельный: complete
+own history, отсутствие подтверждённого policy violation, классификация/review,
+normal exactclose либо bound manual recovery; свежий idle gate перед dispatch.
+Manual recovery не меняет attempt.cleanupConfirmedfalse/CLIcode/oracle/policyincomplete
+и не подделывает нормальный closure, Save, graph или HostACK0. Недостоверная история,
+unknown close/PID/.writer запрещают автоматическое продолжение до проверки.
+Подтверждённый candidateJS-policy violation имеет приоритет и останавливает digest.
+Неверный аналитический результат нельзя автоматически назвать runtime technicalfailure.
+
+Ошибки standard nodes не разрешают JS fallback. В этой ветке их не исправлять:
+blocker с evidence, существующая диагностика плюс максимум1необходимый новый
+дополнительный прогон, затем доступные сценарии. Старые Calculator no-repro уже
+подготовлены; новых циклов diagnostics/fixes здесь нет.
+
+Альтернативы — только заранее записанные coverage mapping+independent oracle,
+отдельные IDs/attempts/знаменатель и независимый review. Исходный failed scenario
+остаётся failed. Для ABC нужны accumulatedsum/statisticalsum/conditionalclass;
+одна Group не заменяет это покрытие. Alternative не включать в основные31.
+
+После production rollback нужна новая matched baseline/candidate пара с одинаковыми
+итоговыми runtime/model/parameters/input и skill-only различиями. Old21fcca и все
+прежние results исторические; gates/checks на нём не выдаются за gate новогоruntime.
+Проверять только изменённое и необходимые JS/regression/scope boundaries. Код
+изменять по TDD, rollback подтверждать base-diff и независимым review. Никаких
+Clientgenerate без publicProtocol/HttpApi изменения.
+
+Отчёт разделяет policy compliance, analytical correctness и runtime reliability;
+при technical failures полную приёмку не объявлять. Отдельное подтверждение —
+все запрещённые production deltas отменены, новых standard changes нет.
+
+- [ ] Отменить standard/common production deltas относительно38ee, сохранив
+  JS-only разработку/skill/eval; проверить зависимости и зафиксировать ограничения.
+- [ ] Независимо проверить итоговый scope diff и необходимые changed-code/JS
+  проверки; rollback сохранить обычным описательным commit.
+- [ ] По TDD добавить отдельный technical continuation/recovery/history path
+  в eval, без ослабления success path и без изменения failed outcomes.
+- [ ] Собрать новую matched пару; до firstmodel freeze31/rules/source/ownership
+  pins и независимый readback. Старые results не переносятся.
+- [ ] Выполнить все31исходных слотов последовательно; success auto-next,
+  technical после verified release продолжает; policy violation останавливает.
+- [ ] При blockedcoverage заранее закрепить обоснованную alternative с oracle,
+  проверить отдельно и сохранить оригинальный failure; не объявлять удобную замену.
+- [ ] Подготовить итоговый трёхосевой отчёт с scope/base evidence и ограничениями.
