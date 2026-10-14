@@ -150,7 +150,9 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000)
+      // Native logout, MCP disposal and durable receipts share this one request.
+      // Use the existing management allowance; five seconds races confirmed cleanup.
+      const reply = await request("close", undefined, 120_000)
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
