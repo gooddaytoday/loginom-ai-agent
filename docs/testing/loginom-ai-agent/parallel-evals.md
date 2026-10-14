@@ -738,3 +738,16 @@ calibration/calls; terminal resolver replay после нового run оста
 reservation bytes без изменений. 41 tests/216 assertions PASS (32.78s),
 typecheck/diff PASS. Это nonmodel closed-proof offline recovery; slot/admin и
 active-child recovery, полная prepare/verify/status и live auth не квалифицированы.
+
+
+Frozen resource scope manifest сохраняет первые N canonical slots и все их
+пути, обе container identities/epochs, cgroup view, cadence1000ms и original
+budget source. Private source SHA/run/time/schema read-back; лишние поля не
+копируются. Coordinator потребляет эти required scopes вместо inline сокращений:
+actual host-only sampler с пустым caller containers ранее давал coverage PASS,
+теперь missing frozen Server/Studio → incomplete. N=2→N=1 selection, protected
+profile output, no-overwrite и изменённый source проверены. 63 resource evidence/
+summary/policy/process tests/405 assertions PASS (8.68s), typecheck/diff PASS.
+Container records в этом тесте — normalized input receipts; live generation
+qualification, все runtime actors/thresholds/quotas и ordinary v2 dispatch binding
+остаются открытыми. Manifest не выдаёт разрешение на model dispatch.
