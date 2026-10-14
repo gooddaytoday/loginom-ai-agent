@@ -660,7 +660,10 @@ export async function superviseProcess(input: {
         cleanup.observations.count++
         cleanup.observations.max_duration_ms = Math.max(cleanup.observations.max_duration_ms, Date.now() - started)
       }
-    }).catch((error) => { cleanup.error ??= message(error) })
+    }).catch((error) => {
+      cleanup.peerProcesses = []
+      cleanup.error ??= message(error)
+    })
     return scanning.then(() => confirmed)
   }
   await checkedScan()
