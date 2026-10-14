@@ -4,12 +4,34 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
 import { openLoginomAdmin } from "../src/loginom-admin"
-import { createPair, destroyPair } from "../src/parallel-pair"
-import { parseSlots } from "../src/slots"
+import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
+import { loadSlots, parseSlots } from "../src/slots"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+const liveIntegration = process.env.EVAL_ADMIN_LIVE_CONFIG ? test : test.skip
+
+liveIntegration("trusted bridge: configured research admin login reads the role and disposes its native browser", async () => {
+  const file = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const pair = await Bun.file(path.join(file.controller.stateDir, "pair.json")).json()
+  expect({ purpose: pair.purpose, phase: pair.phase }).toEqual({ purpose: "research", phase: "ready" })
+  const identity = await readServerIdentity(file)
+  const previous = new Set(await readdir(file.controller.stateDir))
+  const connection = await openLoginomAdmin(file, identity)
+  try {
+    expect(connection.identity).toEqual(identity)
+  } finally { await connection.dispose() }
+  const directories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-") && !previous.has(name))
+  expect(directories).toHaveLength(1)
+  const receipt = await Bun.file(path.join(file.controller.stateDir, directories[0]!, "connection.json")).json()
+  expect(receipt).toMatchObject({ kind: "loginom-admin-connection", status: "disposed", initialization: "confirmed", dispose: "confirmed",
+    identity, processes: { status: "confirmed", error: null, observation_mode: "continuous", capture_complete: true } })
+  expect(receipt.processes.browserBindings.length).toBeGreaterThan(0)
+  expect(receipt.processes.verification.map((pass: { owned_remaining: number }) => pass.owned_remaining)).toEqual([0, 0])
+  expect(await readServerIdentity(file)).toEqual(identity)
+}, 90_000)
 
 integration("trusted bridge: failed initialization disposes the actual Node child with durable process proof", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-bridge-"))
@@ -33,7 +55,7 @@ integration("trusted bridge: failed initialization disposes the actual Node chil
     expect(directory).toHaveLength(1)
     const receipt = await Bun.file(path.join(file.controller.stateDir, directory[0]!, "connection.json")).json()
     expect(receipt).toMatchObject({ version: 1, kind: "loginom-admin-connection", status: "disposed", identity: pair.identity,
-      initialization: "not_applied", dispose: "confirmed", processes: { status: "confirmed", error: null, observation_mode: "continuous", capture_complete: true } })
+      initialization: "not_applied", initializationCode: "ADMIN_CREDENTIAL_PRIVATE", initializationStage: null, dispose: "confirmed", disposeCode: null, processes: { status: "confirmed", error: null, observation_mode: "continuous", capture_complete: true } })
     expect(receipt.processes.verification.map((pass: { owned_remaining: number }) => pass.owned_remaining)).toEqual([0, 0])
     expect(receipt.processes.processes.some((entry: { executable: string }) => entry.executable.endsWith("/resources/loginom/bin/node"))).toBe(true)
     const journals = await Promise.all((await readdir(path.join(file.controller.stateDir, directory[0]!, "commands")))
