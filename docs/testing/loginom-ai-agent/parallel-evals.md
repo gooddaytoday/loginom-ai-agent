@@ -67,6 +67,16 @@ failure_kinds.provider. Шесть redacted receipt tests PASS; реальные
 ещё должны доказать coverage до объявления complete. Этот policy gate не
 наблюдает transport и не предоставляет live admission сам по себе.
 
+Licence receipt policy связывает normalized readback с exact Server/Studio
+identity и выбранными users; requires known limit (positive integer либо
+observed unlimited), all_sessions counting scope и фактическую concurrency
+users+admin. Missing/unknown/inconsistent metadata даёт incomplete; bound
+denial/epoch mismatch/limit exceeded — failed. 7 дополнительных redacted
+receipt tests PASS, полный policy набор13 PASS/68 assertions. Реальный
+licence producer ещё не квалифицирован: нет bootstrap admin. Другие counting
+scopes остаются incomplete до отдельного подтверждённого контракта; licence
+keys и успешная реальная выдача этими unit inputs не создаются.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
