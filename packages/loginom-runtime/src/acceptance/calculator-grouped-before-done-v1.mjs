@@ -6,7 +6,7 @@ import {NODE_TYPES} from '../../client/lib/node-contracts.mjs';
 import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
 import {selectPreparedGraphNode} from '../../client/lib/node-graph-selection.mjs';
 import {excludeOutputField} from '../../client/lib/port-mapping-procedure.mjs';
-import {closePreparedWizard} from '../../client/lib/node-wizard-close.mjs';
+import {closePreparedWizard,wizardCloseBinding} from '../../client/lib/node-wizard-close.mjs';
 import {readPreparedNodeContext} from '../../client/lib/node-context.mjs';
 
 const need=(ok,message)=>{if(!ok)throw Error('LOGINOM_CAPTURE_'+message);};
@@ -74,28 +74,34 @@ export async function captureCalculator({binding,identity,browser,record}) {
  current();await selectPreparedGraphNode(channel,selected,'fixed diagnostic Calculator selection');
  current();await channel.openOutputPort(0);
  const receipt=await captureDraft({owner,current,observe,snapshot,
-  exclude:source=>excludeOutputField(channel,source),cancel:()=>closePreparedWizard(channel),record});
+  observeCancellation:()=>channel.observe({condition:'same owned Calculator draft before cancellation',
+   ready:s=>s.prepared_node_context?.verified===true&&s.wizard?.status==='observed'}),
+  exclude:source=>excludeOutputField(channel,source),cancel:state=>closePreparedWizard(channel,wizardCloseBinding(state)),record});
  return {...identity,...receipt};
 }
 
 // Small orchestration unit tested with labelled drivers; captureCalculator above
 // always supplies the real guarded channel. These doubles are not native PASS.
-export async function captureDraft({owner,current,observe,snapshot,exclude,cancel,record}) {
- const checked=state=>{
-  current();const n=state.prepared_node_context,w=state.wizard,m=state.node_mapping;
+export async function captureDraft({owner,current,observe,observeCancellation=observe,snapshot,exclude,cancel,record}) {
+ const owned=state=>{
+  current();const n=state.prepared_node_context,w=state.wizard;
   need(n?.verified===true&&n.surface==='wizard'&&n.document_id===owner.document_id&&n.node_id===owner.node_id
    &&n.workflow_id===owner.workflow_id,'NODE_CHANGED');
   need(w?.status==='observed'&&w.stage==='output_mapping'&&typeof w.root_tid==='string'&&typeof w.root_ref==='string','ROOT');
+  need(!state.pending&&!state.running&&!state.unknown_effect,'UNSETTLED');
+  return {state,binding:wizardCloseBinding(state),root_tid:w.root_tid,root_ref:w.root_ref};
+ };
+ const checked=state=>{
+  const draft=owned(state),m=state.node_mapping;
   need(m?.verified===true&&m.inventory_complete===true&&m.source_identity_verified===true
    &&m.mapping_wizard==='DerivedDataSourceOutputSocketWizard','MAPPING');
-  need(!state.pending&&!state.running&&!state.unknown_effect,'UNSETTLED');
   const fields=m.target_fields;need(Array.isArray(fields)&&fields.length<=CAPTURE_LIMITS.records,'RECORD_BOUND');
   const matches=fields.filter(f=>f.name==='Region');need(matches.length===1,'REGION');
-  return {state,region:matches[0],root_tid:w.root_tid,root_ref:w.root_ref};
+  return {...draft,region:matches[0]};
  };
- let before,after,baseline,changed,failure,failed=false,mutationUnconfirmed=false;
+ let before,after,baseline,changed,originalDraft,failure,failed=false,mutationUnconfirmed=false;
  try {
-  baseline=checked(await observe());
+  const initial=await observe();originalDraft=owned(initial);baseline=checked(initial);
   need(baseline.region.excluded===false&&baseline.region.source?.record_id,'REGION_ALREADY_EXCLUDED');
   before=await snapshot(baseline.state);validateCapture(before,owner,baseline);
   await record({event:'calculator_capture_before',owner,capture:before});
@@ -113,15 +119,23 @@ export async function captureDraft({owner,current,observe,snapshot,exclude,cance
  }catch(error){failure=error;failed=true;}
  // Refuse cancellation after an uncertain mutation or identity loss. For a
  // pure capture error on a still-owned draft, cancellation remains authorized.
- if(mutationUnconfirmed)throw failure;
- const safe=checked(await observe());
- if(baseline)need(safe.root_tid===baseline.root_tid&&safe.root_ref===baseline.root_ref,'CANCEL_ROOT_CHANGED');
- current();const cancellation=await cancel();
+ if(mutationUnconfirmed||!originalDraft)throw failure;
+ let cancellation;
+ try {
+ const safe=owned(await observeCancellation());
+ need(equal(safe.binding,originalDraft.binding),'CANCEL_ROOT_CHANGED');
+ current();cancellation=await cancel(safe.state);
  need(cancellation?.verified===true&&cancellation.cleanup_complete===true&&cancellation.draft_discarded===true
   &&cancellation.settings_applied===false&&cancellation.execution_started===false
   &&cancellation.node_context?.document_id===owner.document_id&&cancellation.node_context?.node_id===owner.node_id
   &&cancellation.node_context?.workflow_id===owner.workflow_id,'CANCEL_UNCONFIRMED');
  await record({event:'calculator_capture_cancel',owner,cancellation});
+ }catch(error){
+  // A second refusal must not replace the original capture cause, including
+  // falsy values. No cancellation receipt is emitted for an unconfirmed close.
+  if(failed)throw failure;
+  throw error;
+ }
  if(failed)throw failure; // Preserve Error and all falsy rejection values exactly.
  return {settings_applied:false,cancel_verified:true,execution_started:false,paused_before_done:true,
   capture_complete:false,missing:['ordinary_coverage','addressed_complete','native_window','full_geometry_trace'],

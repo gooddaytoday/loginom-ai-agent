@@ -42,10 +42,11 @@ export function cancelledWizardReady(state,binding) {
   && state.ui?.dialogs?.length===0 && state.ui?.masks?.length===0;
 }
 
-export async function closePreparedWizard(channel) {
+export async function closePreparedWizard(channel,expectedBinding) {
  let s=await channel.observe({condition:'prepared wizard can be cancelled',ready:s=>s.wizard?.status==='observed'
   &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnClose'&&e.allowed_actions.includes('click')).length===1});
  const binding=wizardCloseBinding(s);
+ requireValue(expectedBinding===undefined||same(binding,expectedBinding),'Prepared wizard changed before cancellation');
  await channel.perform({condition:'close the prepared wizard draft',initialObservation:s,
   ready:s=>same(wizardCloseBinding(s),binding),identity:()=>binding,
   resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid===binding.root_tid+';btnClose').ref})});

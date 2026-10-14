@@ -9,6 +9,8 @@ import * as executor from '../../lib/executor.mjs';
 import * as catalog from '../../lib/action-catalog.mjs';
 import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import {captureDraft} from '../../../src/acceptance/calculator-grouped-before-done-v1.mjs';
+import {closePreparedWizard,wizardCloseBinding} from '../../lib/node-wizard-close.mjs';
 
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
@@ -73,6 +75,29 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
  const falsy={'falsy-false':false,'falsy-zero':0,'falsy-empty':'','falsy-null':null,'falsy-undefined':undefined};
  const harness=async({identity,browser,record})=>{
   assert.ok(browser);f.events.push('capture-before');f.events.push('capture-after');
+  if(scenario.startsWith('confirmed-refusal')||scenario.startsWith('foreign-cancel')){
+   const owner={...identity,...Object.fromEntries(['owner','lease','run','generation','chat'].map(k=>[k,binding[k]])),workflow_id:'own-workflow',node_id:'own-node'};
+   const primary={'confirmed-refusal-undefined':undefined,'confirmed-refusal-null':null,'confirmed-refusal-false':false,'confirmed-refusal-zero':0,'confirmed-refusal-empty':''};
+   const rejection=scenario==='confirmed-refusal-error'?Error('original mapping',{cause:0}):scenario in primary?primary[scenario]:false;
+   let closed=false;
+   const draft={prepared_node_context:{...owner,verified:true,surface:'wizard'},
+    wizard:{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref',owner_context:{status:'observed',node_id:owner.node_id}},
+    ui:{elements:[{tid:'root;btnClose',ref:'close',allowed_actions:['click']}],dialogs:[],masks:[]},
+    node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
+     target_fields:[{name:'Region',record_id:'target',excluded:false,source:{record_id:'source',field_id:'20'}}]}};
+   const graph={prepared_node_context:{...draft.prepared_node_context,surface:'graph',locked:false},wizard:{status:'absent'},ui:{dialogs:[],masks:[],elements:[]}};
+   const channel={observe:async({ready})=>{const s=closed?graph:draft;assert.equal(ready(s),true);return s;},
+    perform:async({ready,initialObservation})=>{assert.equal(ready(initialObservation),true);f.events.push('draft-close');closed=true;}};
+   return captureDraft({owner,current:()=>{},observe:async()=>draft,observeCancellation:async()=>draft,
+    snapshot:async()=>{throw rejection;},exclude:async()=>{throw Error('unexpected exclusion');},
+    cancel:s=>closePreparedWizard(channel,wizardCloseBinding(s)),record:async event=>{
+     if(scenario==='foreign-cancel-node')event.cancellation.node_context={...event.cancellation.node_context,node_id:'foreign'};
+     if(scenario==='foreign-cancel-owner')event.owner={...event.owner,lease:'foreign'};
+     if(scenario==='foreign-cancel-flag')event.cancellation={...event.cancellation,draft_discarded:false};
+     await record(event);
+     if(scenario==='confirmed-refusal-drift')session.metadata.workspacePreparation.state.document_id='foreign';
+    }});
+  }
   if(scenario in falsy)throw falsy[scenario];
   if(scenario==='identity-after')session.metadata.workspacePreparation.state.document_id='foreign';
   f.events.push('verified-cancel');await record({event:'fixture_cancel',identity});
@@ -104,6 +129,18 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
    assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
    assert.equal(JSON.parse(await readFile(join(directory,'acceptance-capture.json'),'utf8')).binding.lease,binding.lease);
    await assert.rejects(bridge.captureAcceptance());
+  }else if(scenario.startsWith('confirmed-refusal')||scenario.startsWith('foreign-cancel')){
+   assert.equal(result.ok,false);
+   if(scenario==='confirmed-refusal-error'){assert.equal(result.error.message,'original mapping');assert.equal(result.error.cause,0);}
+   else if(scenario.startsWith('confirmed-refusal'))assert.equal(result.error,{'confirmed-refusal-undefined':undefined,'confirmed-refusal-null':null,'confirmed-refusal-false':false,'confirmed-refusal-zero':0,'confirmed-refusal-empty':'','confirmed-refusal-drift':false}[scenario]);
+   await assert.rejects(bridge.captureAcceptance());
+   const close=await bridge.close().then(value=>({ok:true,value}),error=>({ok:false,error}));
+   const confirmed=scenario.startsWith('confirmed-refusal')&&scenario!=='confirmed-refusal-drift';
+   assert.equal(close.ok,confirmed,JSON.stringify(close));
+   assert.equal(f.events.includes('package-cleanup'),confirmed);
+   assert.equal(f.events.includes('release-uploads'),confirmed);
+   assert.equal(f.events.filter(e=>e==='capture-before').length,1);assert.equal(f.events.filter(e=>e==='draft-close').length,1);
+   if(confirmed){assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));}
   }else{
    assert.equal(result.ok,false);assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
    if(scenario in falsy){

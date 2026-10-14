@@ -39,7 +39,7 @@ function pageDouble(scenario){
   const items=records();return {$className:'Ext.data.Store',isBufferedStore:false,currentPage:1,loading:false,getCount:()=>items.length,getTotalCount:()=>items.length,isLoading:()=>false,getRemoteFilter:()=>scenario==='filter',getRemoteSort:()=>false,getData:()=>({items,getSource:()=>({items})}),getProxy:()=>({$className:'bg.ext.CollectionProxy',pendingOperations:{}})};
  }});
  state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:scenario==='node'?'foreign':'node',tid:scenario==='node-root'?'foreign':'root'},
-  wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref'}:{status:'absent'},
+  wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref',owner_context:{status:'observed',node_id:'node'}}:{status:'absent'},
   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
    target_fields:[{name:'Region',record_id:state.edited?'after':'before',excluded:state.edited,
     ...(state.edited?{exclusion_source:{record_id:'source',field_id:'20'}}:{source:{record_id:'source',field_id:'20'}})}]}})};

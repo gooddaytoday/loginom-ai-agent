@@ -9,7 +9,7 @@ function fixture(scenario){
  const region=()=>({name:'Region',record_id:edited?'replaced':'original',excluded:edited,
   ...(edited?{exclusion_source:{record_id:'source',field_id:'20'}}:{source:{record_id:'source',field_id:'20'}})});
  const observe=async()=>({prepared_node_context:{verified:true,surface:'wizard',...owner,
-  ...(scenario==='node'?{node_id:'foreign'}:{})},wizard:{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref'},
+  ...(scenario==='node'?{node_id:'foreign'}:{})},wizard:{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref',owner_context:{status:'observed',node_id:'node'}},
   ...(scenario==='pending'?{pending:true}:{}),...(scenario==='running'?{running:true}:{}),...(scenario==='unknown'?{unknown_effect:true}:{}),
   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',target_fields:[region()]}});
  const snapshot=async()=>{
@@ -50,4 +50,40 @@ test('fixed entry refuses binding before any browser invocation',async()=>{
 test('raw record and DOM bounds refuse without completeness claims',()=>{
  const capture={owner,root_tid:'root',root_ref:'ref',dom:Array(CAPTURE_LIMITS.dom+1),stores:[{records:[]},{records:[]}],collector_revision:1,predicates:{status:'partial',evaluated:false,cached_windows:[{evaluated:true,value:true},{evaluated:true,value:true}]}};
  assert.throws(()=>validateCapture(capture,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'x'}}));
+});
+
+for(const invalid of ['source','inventory','Region'])test('owned pure '+invalid+' refusal cancels without mapping qualification',async()=>{
+ const {drivers,events}=fixture();const read=drivers.observe;
+ drivers.observe=async()=>{const s=await read();
+  if(invalid==='source')s.node_mapping.source_identity_verified=false;
+  if(invalid==='inventory')s.node_mapping.inventory_complete=false;
+  if(invalid==='Region')s.node_mapping.target_fields=[];
+  return s;};
+ drivers.observeCancellation=async()=>{const s=await read();delete s.node_mapping;return s;};
+ await assert.rejects(captureDraft(drivers),{message:invalid==='Region'?'LOGINOM_CAPTURE_REGION':'LOGINOM_CAPTURE_MAPPING'});
+ assert.deepEqual(events,['cancel','calculator_capture_cancel']);
+});
+for(const drift of ['node','root','port','pending','running','unknown','owner'])test('pure refusal cannot cancel after '+drift+' custody loss',async()=>{
+ const {drivers,events}=fixture();const read=drivers.observe;let ownerLost=false;
+ drivers.current=()=>{if(ownerLost)throw Error('foreign-owner');};
+ drivers.observe=async()=>{const s=await read();s.node_mapping.source_identity_verified=false;return s;};
+ drivers.observeCancellation=async()=>{const s=await read();
+  if(drift==='node')s.prepared_node_context.node_id='foreign';
+  if(drift==='root')s.wizard.root_ref='replacement';
+  if(drift==='port')s.wizard.owner_context={status:'observed',node_id:'foreign'};
+  if(['pending','running'].includes(drift))s[drift]=true;
+  if(drift==='unknown')s.unknown_effect=true;
+  if(drift==='owner')ownerLost=true;
+  return s;};
+ await assert.rejects(captureDraft(drivers),{message:'LOGINOM_CAPTURE_MAPPING'});
+ assert.equal(events.includes('cancel'),false);
+});
+for(const primary of [undefined,null,false,0,'',Error('original',{cause:0})])test('capture primary remains exact after confirmed cancel or secondary refusal: '+String(primary),async()=>{
+ for(const secondary of [false,true]){
+  const {drivers,events}=fixture();drivers.snapshot=async()=>{throw primary;};
+  if(secondary)drivers.cancel=async()=>{events.push('cancel');throw Error('secondary');};
+  let caught=false;try{await captureDraft(drivers);}catch(e){caught=true;assert.equal(e,primary);}
+  assert.equal(caught,true);assert.equal(events.includes('cancel'),true);
+  assert.equal(events.includes('calculator_capture_cancel'),!secondary);
+ }
 });

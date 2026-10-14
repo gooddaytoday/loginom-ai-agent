@@ -39,8 +39,8 @@ function pageDouble(scenario){
   const items=records();return {$className:'Ext.data.Store',isBufferedStore:false,currentPage:1,loading:false,getCount:()=>items.length,getTotalCount:()=>items.length,isLoading:()=>false,getRemoteFilter:()=>false,getRemoteSort:()=>false,getData:()=>({items,getSource:()=>({items})}),getProxy:()=>({$className:'bg.ext.CollectionProxy',pendingOperations:{}})};
  }});
  state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:'node',tid:'root'},
-  wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref'}:{status:'absent'},
-  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
+  wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref',owner_context:{status:'observed',node_id:'node'}}:{status:'absent'},
+  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:scenario!=='missing-source',mapping_wizard:'DerivedDataSourceOutputSocketWizard',
    target_fields:[{name:'Region',record_id:state.edited?'after':'before',excluded:state.edited,
     ...(state.edited?{exclusion_source:{record_id:'source',field_id:'20'}}:{source:{record_id:'source',field_id:'20'}})}]}})};
  globalThis.document=document;globalThis.location={origin:'https://loginom.invalid'};
@@ -55,7 +55,7 @@ function pageDouble(scenario){
  }};
  return {events,browser};
 }
-for(const scenario of ['success','document','lease','run','session'])test('fixed resource entry with labelled Page/Ext/executor doubles: '+scenario,async()=>{
+for(const scenario of ['success','document','lease','run','session','missing-source'])test('fixed resource entry with labelled Page/Ext/executor doubles: '+scenario,async()=>{
  const {events,browser}=pageDouble(scenario),binding={revision:1,harness:'calculator-grouped-before-done-v1',owner:'owner',run:'run',lease:'owner:run',admission:'admission',chat:'chat',account:'account',session:'session',generation:1,expires:Date.now()+60000,packagePath:'/account/draft.lgp'};
  const identity={session_id:'session',document_id:'doc',account:'account',package_path:binding.packagePath,tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',loginom_build:'7.4.2'};
  if(scenario==='lease')binding.lease='foreign';if(scenario==='run')binding.run='foreign';if(scenario==='session')binding.session='foreign';
@@ -66,6 +66,9 @@ for(const scenario of ['success','document','lease','run','session'])test('fixed
    assert.equal(result.before.dom.length,5);assert.equal(result.before.stores[1].records[0].internalId,'before');
    assert.equal(result.after.stores[1].records[0].data.GroupField,'Исключенные');
    assert.deepEqual(events.filter(e=>e!=='browser'),['select','open-output','exclude','cancel']);
+  }else if(scenario==='missing-source'){
+   await assert.rejects(captureCalculator({binding,identity,browser,record:async()=>{}}),{message:'LOGINOM_CAPTURE_MAPPING'});
+   assert.deepEqual(events.filter(e=>e!=='browser'),['select','open-output','cancel']);
   }else {await assert.rejects(captureCalculator({binding,identity,browser,record:async()=>{}}));assert.equal(events.includes('exclude'),false);}
  }finally{for(const k of ['document','location','bg','Ext','__loginomDockPreparationV1'])delete globalThis[k];delete globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];}
 });

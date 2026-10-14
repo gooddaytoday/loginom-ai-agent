@@ -489,7 +489,33 @@ export async function createBridge(config, session, { browserTransport: managedB
         // Only the fixed verified resource receives this private Page transport.
         // It is never supplied by IPC, the tool catalogue or the model.
         captureUnknown=true;
-        const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution});
+        let cancelledDraft=false;
+        const recordCapture=async event=>{
+          if(event?.event==='calculator_capture_cancel') {
+            assertBound();
+            const owner=event.owner,c=event.cancellation;
+            if(!owner || Object.keys(identity).some(key=>owner[key]!==identity[key])
+                || ['owner','lease','run','generation','chat'].some(key=>owner[key]!==binding[key])
+                || owner.workflow_id!==session.metadata.workspacePreparation.state.workflow_ref.workflow_id
+                || typeof owner.node_id!=='string'||!owner.node_id
+                || c?.verified!==true||c.cleanup_complete!==true||c.draft_discarded!==true
+                || c.settings_applied!==false||c.execution_started!==false
+                || ['document_id','workflow_id','node_id'].some(key=>c.node_context?.[key]!==owner[key]))
+              throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
+            await recordExecution(event);
+            assertBound();
+            cancelledDraft=true;
+          } else await recordExecution(event);
+        };
+        let receipt;
+        try { receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordCapture}); }
+        catch(error) {
+          // The fixed harness may discard an owned draft and still reject its
+          // original capture. Only its durable, exact cancellation permits
+          // ordinary cleanup; it never promotes that rejection to capture PASS.
+          if(cancelledDraft) { try { assertBound();captureUnknown=false; }catch {} }
+          throw error;
+        }
         assertBound();
         if (!receipt || receipt.settings_applied !== false || receipt.cancel_verified !== true
             || Object.keys(identity).some(key => receipt[key] !== identity[key]))
