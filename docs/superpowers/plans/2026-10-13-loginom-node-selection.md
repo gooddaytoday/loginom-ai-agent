@@ -1,13 +1,14 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint 2026-10-14 11:42 UTC: разрешённые исправления восстановлены
-(d3cd4e46f9,713targetedPASS). Итоговая matched пара112452 собрана изfdc4ac455e,
-независимо проверена, runtime659588… одинаковый. Fresh ordinary clipped
-Import→Sort→Export прошёл: точныйCSV27B, сохранённыйLGP3nodes/2links/noJS,
-logout/HostACKexit0/PIDgone/.writerabsent. Effective31lock0400 закреплён
-до моделей0,76sourcefiles и4independent admission proofs. Следующий шаг —
-ABC/1 новой candidate9→reviewreleased→baseline6→candidate16 серии.
-Полная приёмка ещё открыта; старые outcomes исторические, не перенесены.
+Текущий checkpoint 2026-10-14 12:13 UTC: разрешённые исправления восстановлены
+(d3cd4e46f9, 713 targeted PASS). Итоговая matched пара112452 собрана изfdc4ac455e;
+обычный живой Import→Sort→Export прошёл на runtime659588… до модельной серии.
+ABC/1 закрыт как technical-failed: calculation=false, policy=incomplete, JS calls0,
+без CSV/LGP. Own release независимо подтверждён; pure gate разрешил следующий слот.
+First-last-touch/1 запущен12:12:02.040Z, CLI1857207/Session ses_ec5ac2d8fffe15FRObifENEobd.
+Та же frozen31 серия продолжается последовательно: начаты2, закрыт1, technical-failed1,
+accepted0, baseline0. Повтор ABC и замена отказа успешной попыткой запрещены.
+Полная приёмка остаётся открытой; старые outcomes исторические, не перенесены.
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -3299,3 +3300,21 @@ Own backenduser181 связан exact3successfulGUID/latestinit11:44:23.150;
 0400 связывает17original+14recovery; independent release review pending.
 Дальше — pure continuation gate и first-last-touch/1, еслиindepreviewapproved;
 ABC1неповторятьиfailureнеподменять. Initialplaceholderexitнеиспользуетсякакoutcome.
+
+Checkpoint 2026-10-14 12:13 UTC — own release ABC/1 подтверждён, серия продолжена.
+Independent review b6d76b1516bd409862c976965c6cc66933e3c961eeead4da336d66f32b19b793
+связывает descriptor584fb11e…; подробный read-back f204c447… подтвердил17original+
+14recovery, exactuser181close/admin182logout, neighbor180 untouched,8actualPIDgone,
+архив собственного guard с прежними nonce/inode/mtime и отсутствие .writer.
+Сохранены исходные normalcleanup=false/HostACKfalse/exit1 и неуспешный outcome.
+Root pure runSeriesSlot gate: advance/TECHNICAL_FAILURE_RECORDED, technical-failed,
+policy=incomplete/calculation=false/JS calls0/JS nodesunknown. Новый ledger record
+12:12:02.032Z rechecked=true; это read-only assessment, не повтор модели ABC.
+Existing sequential runner возобновлён с теми же lock834620…/pins/runtime/model/inputs;
+root-series-resume-1-command.json и отдельный журнал сохраняют точный запуск.
+First-last-touch/1 admitted12:12:02.040Z, CLI1857207 started12:12:10.959Z,
+Session ses_ec5ac2d8fffe15FRObifENEobd. Initial attempt exit3/modelStartednull —
+рабочий placeholder до terminal, не результат. Started2/closed1/technicalfailed1/
+accepted0/notstarted29/baseline0. Следующая попытка допускается только после
+обязательных machine gates; никаких параллельных профильных CLI/Loginom-сессий.
+Закрытые evidence и отчёт разбираются параллельно текущей модели.
