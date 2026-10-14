@@ -5,15 +5,20 @@ import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResou
 import { loadJudgeEnvironment } from "./slots"
 import { readJudgeProcessInventory } from "./judge-process-evidence"
 
+export async function recoverOfflineJudgeIncident(input: { slotsFile: string; journal: string }, lockRoot = globalLockRoot) {
+  const source = await readOfflineJudgeIncident(input)
+  const marker = recoveryObject(source.original.recovery), incident = recoveryObject(marker.incident)
+  if (marker.status === "released" && typeof incident.token === "string" && Number.isSafeInteger(incident.revision))
+    return recoverOfflineJudge({ ...input, token: incident.token, revision: Number(incident.revision) }, lockRoot)
+  const reservation = await readResourceReservation({ key: `judge:${source.environment.codexHome}`, lockRoot })
+  const original = reservation && [reservation, ...reservation.lineage]
+    .find(entry => entry.journal === input.journal && entry.commandId === source.original.commandId)
+  if (!reservation || !original) throw new EvalFailure("JUDGE_RECOVERY_LINEAGE_INVALID", 2)
+  return recoverOfflineJudge({ ...input, token: reservation.token, revision: reservation.revision, incidentToken: original.token }, lockRoot)
+}
+
 export async function recoverOfflineJudge(input: { slotsFile: string; journal: string; token: string; revision: number; incidentToken?: string }, lockRoot = globalLockRoot) {
-  const environment = await loadJudgeEnvironment(input.slotsFile)
-  const root = path.dirname(input.journal), info = await lstat(root)
-  if (input.journal !== path.join(root, "journal.json") || path.dirname(root) !== environment.stateDir || !path.basename(root).startsWith("judge-command-") ||
-    await realpath(root) !== root || !info.isDirectory() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700)
-    throw new EvalFailure("JUDGE_RECOVERY_JOURNAL_INVALID", 2)
-  const original = recoveryObject(await readLeaseReceipt(input.journal))
-  if (original.version !== 2 || original.kind !== "offline-judge-command" || typeof original.commandId !== "string" || !original.commandId ||
-    original.processInventory !== path.join(root, "processes.json")) throw new EvalFailure("JUDGE_RECOVERY_JOURNAL_INVALID", 2)
+  const source = await readOfflineJudgeIncident(input), environment = source.environment, original = source.original
   const key = `judge:${environment.codexHome}`, incidentToken = input.incidentToken ?? input.token
   const persisted = recoveryObject(original.recovery)
   const completed = persisted.status === "released" ? persisted : await releasedRecoveryMarker({ key, incidentToken, journal: input.journal,
@@ -86,6 +91,18 @@ export async function recoverOfflineJudge(input: { slotsFile: string; journal: s
 
 function recoveryObject(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+async function readOfflineJudgeIncident(input: { slotsFile: string; journal: string }) {
+  const environment = await loadJudgeEnvironment(input.slotsFile)
+  const root = path.dirname(input.journal), info = await lstat(root)
+  if (input.journal !== path.join(root, "journal.json") || path.dirname(root) !== environment.stateDir || !path.basename(root).startsWith("judge-command-") ||
+    await realpath(root) !== root || !info.isDirectory() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700)
+    throw new EvalFailure("JUDGE_RECOVERY_JOURNAL_INVALID", 2)
+  const original = recoveryObject(await readLeaseReceipt(input.journal))
+  if (original.version !== 2 || original.kind !== "offline-judge-command" || typeof original.commandId !== "string" || !original.commandId ||
+    original.processInventory !== path.join(root, "processes.json")) throw new EvalFailure("JUDGE_RECOVERY_JOURNAL_INVALID", 2)
+  return { environment, original: original as Record<string, unknown> & { commandId: string; processInventory: string } }
 }
 
 async function releasedRecoveryMarker(input: { key: string; incidentToken: string; journal: string; commandId: string; stateDir: string; token: string; revision: number }, lockRoot: string): Promise<Record<string, unknown>> {
