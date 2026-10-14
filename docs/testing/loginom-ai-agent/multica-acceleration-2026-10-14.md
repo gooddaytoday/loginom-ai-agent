@@ -52,3 +52,38 @@ Core receiving `5858ffb3dee774ed3c3acc239e8cf07ecaaa7e28`, clean `202610140842`,
 Текущий reader68 должен выдать один минимальный positive supported путь либо первый точный отсутствующий seam. Применимый проверенный результат передаётся carrier67 и готовым потребителям без ожидания несвязанных общих исправлений. Для LAB-72 сначала нужен проверяемый ограниченный план и отдельное решение о допустимости потери draft. Для фильтрованных ревью требуется штатное разрешение вопроса с провайдером.
 
 Проверены API CAS/readback, сохранность настроек и назначений, адресная доставка и содержательные действия исполнителей. Тесты runtime/model/native не запускались: этот проход меняет документы/назначения, а не реализацию узлов. Полная приёмка, merge и выпуск не заявлены.
+
+## Продолжение по команде владельца, 13:09–13:30 МСК
+
+Эта секция обновляет прежние ограничения доступа и ревью; исходные отказы остаются историей. Владелец изменил конфигурацию Ловца и явно поручил возобновить ревью. API подтвердил прежнего агента `027d102c-5d25-402c-a8fb-58a3e810013c`, модель `grok-4.7-xhigh`, online runtime Cursor(mas) `490365fb-afb2-4cf3-a694-23459da7a6d1`. Оператор эти настройки не изменял.
+
+После проверки отсутствия эквивалентных active/queued/retry/wakeups через `handoff.py` доставлены два самостоятельных продолжения с прежними критериями:
+
+| Карточка / точный кандидат | Комментарий → реально running run |
+|---|---|
+| LAB-67 / `a1383d78dde22d6596b9e72bf5ecd77bbb12c573` | `01a139e3-9abd-7181-ad97-e51fce3969c0` → `01a139e3-9ad7-708e-940a-c96dfe8552e4` |
+| LAB-73 / `44a4613e56bdbf57a98d40f8cd4a37408777d7ac` | `01a139e3-c4b6-703c-a84e-71ffa98e81a3` → `01a139e3-c4d1-7c17-8bad-4af58ee5140b` |
+
+Проверены receipt/readback и содержательные действия исполнителя. Это ещё не независимый verdict. Checkpoints обновлены description-only CAS:67 revision991→992,73 revision483→484. Новая ошибка провайдера не разрешает автоматический повтор; старые failed runs и pins сохранены.
+
+В13:29 Ловец опубликовал независимый **FAIL67** (`01a139f5-eb79-7ad3-b813-501c42e03036`). На exact a138/source и установленном bridge slot2/claim4/affected13 проходят, однако `writeCleanupReceipt` обращается к `claiming`, объявленному только в другом persist scope. Прямой вызов на actual installed bridge даёт `ReferenceError`, не вызывает fsync и оставляет temp вместо cleanup receipt; родитель1c56 на той же пробе проходит. Адрес исправления — только ошибочно перенесённые условия cleanup `persistHandle`; exclusive capture claim и прежние assertions сохранить. Receiving69 для a138 закрыт, автору передан конкретный reproducer. Полная приёмка из этого FAIL не выводится.
+
+Доставка исправления проверена: этот комментарий стал trigger для running Worker67 `01a139f5-eb99-7a5f-88c2-bf1bd888d7e6`; в13:31 видна содержательная подготовка исходного кандидата и защищённых артефактов. Второго автора/повтора оператор не назначал; wakeups67/72/73 отсутствуют. Review73 продолжает адресные SOURCE/compiled проверки, включая исходный array reproducer; промежуточные PASS не заменяют итоговый verdict.
+
+### LAB-72: исправление диагностики и фактический root read
+
+Действующий Worker в retained run `01a13545-d71b-7b39-9d4d-490dbfead7c8` исправил локальный observer отдельной копией: ранее ошибка чтения namespace уничтожала уже собранные phase payloads. Теперь completed и partial данные сохраняются, ошибка оставляет qualification=false, preparation descriptors закрываются. Результат `01a139ef-ea81-780b-bc57-bf787a3a948f`, SHA256 v2 `435149c88966a5a19a1679a0253073897cd459845190cffb20bb73e6b832c42d`. Оператор повторил четыре fault controls (EACCES/vanished/EIO/after-scan) — PASS. Это проверка диагностической обвязки, не восстановления модели.
+
+Доступ из корневого `.env` проверен: SSH user UID1000 и sudo reader UID0; namespace PID reader совпал с `/proc/1`. Secrets не передавались агентам; SSH/sudo policy, daemon и процессы не менялись. Ранее наблюдавшиеся pre-banner/channel ошибки сохранены; причина их исчезновения не установлена. Отдельный административный канал больше не требуется.
+
+После чтения полного v2 выполнена одна минимальная операторская адаптация: expected original UID1000 сохранён отдельно от reader UID0, входные metadata зафиксированы, `ss` задан абсолютным путём с timeout20, результат получен через stdout без root-записи в workdir. SHA256 observer `06d2cc29d98736dc3f452b4e8b34db84fef22495cd5e6865ba01fa7dc4a4523e`; capture `e4b9e15639d8f371f0b274754db9d03a0dbd15aea378a8d12eac36cb23669bda`.
+
+Снимок13:26:56 МСК: каждый из двух обходов269 PID /754 TID /754 FD tables /22920 FD links; ошибок и отказов доступа0, PID set stable. Все15 original identities стабильны; preparation process pidfds flags0 nonterminal, все15 закрыты после чтения. Четыре reciprocal UNIX_DIAG пары согласованы с449 raw task-FD наблюдениями каждого обхода; посторонних держателей этих сокетов не обнаружено. Это данные ограниченного снимка, не будущая гарантия неизменности.
+
+Все девять адресных checks=true, но итоговый `localVisibleScopeReadQualified=false`: Chrome sandbox children имеют отдельные net/PID/user namespaces. Равенство network namespaces нельзя объявлять истинным. Initial-PID `/proc` видит nested targets, их NSpid соответствует observed PID; оценка достаточности этого evidence для inherited socket scope передана действующему Генератору, без повторения R1/R2 и без снятия gates.
+
+Приватные observer/capture размещены отдельными файлами в исходном workdir, mode0600, с точным readback. Сырые данные не включены в git. Уточнение `9696b426-fa46-4811-85b1-b8794ba1cda9` адресовано существующему Generator run `01a139ef-ea9d-7983-90d1-b034615a2d27`: оценить только недостающий scope факт, подготовить конкретный bounded план и доставить его на адресное независимое ревью. Комментарий прочитан через API; содержательная обработка этого последнего evidence ещё требует проверки.
+
+Checkpoint72 обновлён description-only CAS655→656 с точным readback: снято устаревшее ожидание административного доступа, сохранены false scope verdict и отдельное решение о draft loss. Статус, исполнитель, retained и queued назначения не изменены.
+
+Retained owner, collector и queued receiving сохранены. Signals/Save/Close/replay/hotpatch/native cleanup не выполнялись. Разрешение владельца относится только к сохранительному recovery; потеря partial draft и аварийное завершение требуют отдельного решения после подготовки проверяемого плана. Native GUID→server disposition остаётся UNKNOWN; local process exit не является native cleanup/ACK.
