@@ -2,7 +2,7 @@ import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, open, readFile, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { acquireResourceLease, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, writeLeaseReceipt } from "./lease"
+import { acquireResourceLease, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, withResourceReservationGuards, writeLeaseReceipt } from "./lease"
 
 export type SlotDefinition = {
   id: string
@@ -116,7 +116,23 @@ export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, ide
   const resources = [] as Awaited<ReturnType<typeof acquireResourceLease>>[]
   try {
     for (const key of [`user:${identity.containerId}:${slot.username}:0`, `profile:${await canonicalPath(slot.profileDir)}`].sort())
-      resources.push(await acquireResourceLease({ key, lockRoot, journal, commandId, identity }))
+      resources.push(await acquireResourceLease({ key, lockRoot, journal, commandId, identity }, async previous => {
+        if (previous?.state !== "released") return
+        const proof = record(await readLeaseReceipt(previous.releaseEvidence!.path))
+        if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== previous.releaseEvidence!.sha256)
+          throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+        if (proof.kind !== "slot-resource-release") return
+        if (typeof proof.slotReceipt !== "string" || typeof proof.cleanupReceipt !== "string" || typeof proof.cleanupReceiptHash !== "string")
+          throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+        const composite = record(await readLeaseReceipt(proof.slotReceipt))
+        if (composite.version !== 2 || composite.state !== "released" || composite.cleanupReceipt !== proof.cleanupReceipt ||
+          composite.commandId !== previous.commandId || JSON.stringify(composite.identity) !== JSON.stringify(previous.identity) ||
+          !Array.isArray(composite.resources) || !composite.resources.some(value => {
+            const resource = record(value)
+            return resource.key === previous.key && resource.token === previous.token && resource.revision === previous.revision
+          }) || new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(proof.cleanupReceipt))).digest("hex") !== proof.cleanupReceiptHash)
+          throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+      }))
     const token = crypto.randomUUID()
     const receipt = path.join(file.controller.stateDir, `slot-${slot.id}-${token}.lease.json`)
     const manifest = { version: 2, token, slot, identity, commandId, resources: resources.map(resource => ({ receipt: resource.receipt,
@@ -198,6 +214,47 @@ export async function recoverSlotLease(file: SlotFile, slot: SlotDefinition, ide
   }
 }
 
+export async function finalizeReleasedSlot(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, incident: string, lockRoot: string) {
+  if (path.dirname(incident) !== file.controller.stateDir || path.resolve(incident) !== incident ||
+    !file.slots.some(candidate => JSON.stringify(candidate) === JSON.stringify(slot))) throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
+  const keys = [`user:${identity.containerId}:${slot.username}:0`, `profile:${await canonicalPath(slot.profileDir)}`].sort()
+  return withResourceReservationGuards(keys, lockRoot, async rows => {
+    const original = record(await readLeaseReceipt(incident))
+    if (original.version !== 2 || !["retained", "released"].includes(String(original.state)) || typeof original.token !== "string" ||
+      path.basename(incident) !== `slot-${slot.id}-${original.token}.lease.json` || JSON.stringify(original.slot) !== JSON.stringify(slot) ||
+      JSON.stringify(original.identity) !== JSON.stringify(identity) || !Array.isArray(original.resources) || original.resources.length !== keys.length ||
+      record(await readLeaseReceipt(path.join(file.controller.stateDir, "run-journal.json"))).commandId !== original.commandId)
+      throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
+    const proofs = await Promise.all(rows.map(async (row, index) => {
+      const source = record((original.resources as unknown[])[index])
+      const current = row.reservation
+      const proofFile = `${incident}.${new Bun.CryptoHasher("sha256").update(row.key).digest("hex")}.released.json`
+      if (source.key !== row.key || source.receipt !== path.join(lockRoot, `${new Bun.CryptoHasher("sha256").update(row.key).digest("hex")}.reservation.json`) ||
+        !current || current.state !== "released" || current.token !== source.token || current.revision !== source.revision ||
+        current.commandId !== original.commandId || current.journal !== path.join(file.controller.stateDir, "run-journal.json") ||
+        JSON.stringify(current.identity) !== JSON.stringify(identity) || current.releaseEvidence?.path !== proofFile)
+        throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+      const proof = record(await readLeaseReceipt(proofFile))
+      if (proof.version !== 2 || proof.kind !== "slot-resource-release" || proof.status !== "confirmed" || proof.key !== row.key ||
+        proof.token !== current.token || proof.revision !== current.revision || proof.slotReceipt !== incident || proof.serverEpoch !== identity.serverEpoch ||
+        typeof proof.cleanupReceipt !== "string" || typeof proof.cleanupReceiptHash !== "string" ||
+        new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== current.releaseEvidence.sha256)
+        throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+      const cleanup = record(await readLeaseReceipt(proof.cleanupReceipt))
+      if (new Bun.CryptoHasher("sha256").update(JSON.stringify(cleanup)).digest("hex") !== proof.cleanupReceiptHash ||
+        cleanup.status !== "confirmed" || cleanup.slotId !== slot.id || cleanup.leaseToken !== original.token || cleanup.serverEpoch !== identity.serverEpoch ||
+        cleanup.processes !== "confirmed" || cleanup.serverSessions !== "confirmed" || cleanup.archive !== "committed" ||
+        cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+      return proof.cleanupReceipt
+    }))
+    if (new Set(proofs).size !== 1 || original.state === "released" && original.cleanupReceipt !== proofs[0])
+      throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
+    if (original.state === "released") return { status: "already_released", cleanupReceipt: proofs[0] }
+    await writeLeaseReceipt(incident, { ...original, state: "released", cleanupReceipt: proofs[0] })
+    return { status: "released", cleanupReceipt: proofs[0] }
+  })
+}
+
 function slotLease(receipt: string, manifest: { version: number; token: string; slot: SlotDefinition; identity: ServerIdentity; commandId: string;
   resources: { receipt: string; key: string; token: string; revision: number }[]; incident?: string }, resources: Awaited<ReturnType<typeof acquireResourceLease>>[]): SlotLease {
   const assertHeld = async () => {
@@ -215,8 +272,9 @@ function slotLease(receipt: string, manifest: { version: number; token: string; 
       evidence.storageDeletionAllowed !== true || evidence.nextAdmissionAllowed !== true) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
     for (const resource of resources) {
       const proof = `${receipt}.${new Bun.CryptoHasher("sha256").update(resource.reservation.key).digest("hex")}.released.json`
-      await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: resource.reservation.key, token: resource.reservation.token,
-        revision: resource.reservation.revision, cleanupReceipt, serverEpoch: manifest.identity.serverEpoch })
+      await writeLeaseReceipt(proof, { version: 2, kind: "slot-resource-release", status: "confirmed", key: resource.reservation.key, token: resource.reservation.token,
+        revision: resource.reservation.revision, slotReceipt: receipt, cleanupReceipt,
+        cleanupReceiptHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(evidence)).digest("hex"), serverEpoch: manifest.identity.serverEpoch })
       await resource.release(proof)
     }
     await writeLeaseReceipt(receipt, { ...manifest, state: "released", cleanupReceipt })
