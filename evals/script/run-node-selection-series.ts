@@ -333,8 +333,8 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
   const reviewed = inspectSelectionReview({ review, mode: plan.task.mode, sessionID: closure.sessionID, packageSha256: audit.packageSha256 })
   // V2 preserves the sealed machine audit; a later bound review is effective only in memory.
   const effectiveAudit = acceptance?.criteriaVersion === "node-selection-policy-v2" && digest(acceptance.criteriaSha256)
-    && plan.task.mode === "standard" && audit.policyStatus === "passed" && audit.calculationPassed === true && audit.oraclePassed === true
-    && audit.reviewStatus === "not-required" && reviewed.reviewStatus === "passed" ? { ...audit, reviewStatus: "passed" } : audit
+    && audit.policyStatus === "passed" && audit.calculationPassed === true && audit.oraclePassed === true
+    && ["pending", "not-required"].includes(String(audit.reviewStatus)) && reviewed.reviewStatus === "passed" ? { ...audit, reviewStatus: "passed" } : audit
   if (reviewed.reviewStatus !== effectiveAudit.reviewStatus) return { decision: "review", reason: "AUDIT_REVIEW_REFRESH_REQUIRED" }
   if (reviewed.reviewStatus === "passed" && (!record(review) || !Array.isArray(review.evidence)
     || !review.evidence.length)) return { decision: "review", reason: "REVIEW_EVIDENCE_MISSING" }

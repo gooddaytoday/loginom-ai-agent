@@ -380,6 +380,105 @@ test.each(["package-cleanup.json", "saved-package-cleanup.json"])("copyout binds
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test.each([
+  { taskID: "explicit-js", mode: "explicit-js", javascriptRole: "requested-aggregation" },
+  { taskID: "tags", mode: "capability-gap", javascriptRole: "variable-unpack-only" },
+])("v2 successful $mode review advances without rewriting the original pending audit", async (scenario) => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-exception-review-"))
+  try {
+    const plan = selectionAttempt({ runID: "test-1", phase: "candidate", resultsRoot: path.join(root, "results"),
+      workspaceRoot: path.join(root, "workspaces"), payload: path.join(root, "payload"), profile: path.join(root, "profile"),
+      manifestSha256: "a".repeat(64), expectedSkillDigest: "b".repeat(64), model: "openai/gpt-6-sol-fast", variant: "medium",
+      frozenModelsPath: path.join(root, "models.json"), frozenModelsSha256: "c".repeat(64), deadlineSeconds: 1800, graceSeconds: 90,
+      connection: { url: "http://localhost/app/", username: "user", folder: "/user" },
+      container: { id: "d".repeat(64), name: "loginom-test" }, storageDir: "/workdir/UserStorage/user",
+      tasks: { [scenario.taskID]: { directory: path.join(root, "tasks", scenario.taskID), mode: scenario.mode, attempts: [2],
+        promptSha256: "e".repeat(64), inputHashes: { "data.csv": "f".repeat(64) }, oracleSha256: "a".repeat(64) } } }, scenario.taskID, 2)
+    const value = evidence()
+    const write = async (file: string, data: unknown) => { await Bun.write(file, JSON.stringify(data)) }
+    const cli = Bun.spawn([process.execPath, "-e", ""], { stdout: "ignore", stderr: "ignore" })
+    await cli.exited
+    const host = Bun.spawn([process.execPath, "-e", ""], { stdout: "ignore", stderr: "ignore" })
+    await host.exited
+    const closed = path.join(plan.pins.resultsRoot, "series", `candidate-${plan.taskID}-2`)
+    const copied: Record<string, string> = {}
+    for (const [name, data] of [
+      ["saved-package-cleanup.json", JSON.stringify({ ...value.packageCleanup, package_path: plan.packagePath })],
+      ["host-close.json", JSON.stringify({ ...value.hostClose[0], pid: host.pid })],
+      ["resource-close.jsonl", value.resourceClose.map((row) => JSON.stringify(row)).join("\n") + "\n"],
+      ["terminal-close.jsonl", value.terminalClose.map((row) => JSON.stringify(row)).join("\n") + "\n"],
+    ]) {
+      await Bun.write(path.join(closed, name!), data!)
+      copied[name!] = createHash("sha256").update(data!).digest("hex")
+    }
+    await Bun.write(path.join(plan.directory, "artifact/package.lgp"), "closed exception package")
+    // Actual explicit-js/2 projection: wrapper2, JS1/1/1, all machine axes pass,
+    // original review pending, and successful normal close. Identities sanitized;
+    // capability-gap also exercises its existing variable-unpack-only role contract.
+    const attempt = { ...value.attempt, taskID: plan.taskID, mode: plan.task.mode, exitCode: 2, packagePath: plan.packagePath }
+    const audit = { ...value.audit, taskID: plan.taskID, mode: plan.task.mode, jsNodes: 1, jsCalls: 1, successfulJsCalls: 1,
+      oracleSha256: plan.task.oracleSha256, packageSha256: createHash("sha256").update("closed exception package").digest("hex"), reviewStatus: "pending" }
+    const auditFile = path.join(plan.directory, "selection-audit.json")
+    await write(path.join(plan.directory, "attempt.json"), attempt)
+    await write(auditFile, audit)
+    await chmod(auditFile, 0o400)
+    await write(path.join(closed, "closure.json"), { ...value, mode: plan.task.mode, taskID: plan.taskID,
+      packagePath: plan.packagePath, runtimeRevision: "runtime", cliPid: cli.pid, copied,
+      protectedFiles: { "attempt.json": createHash("sha256").update(JSON.stringify(attempt)).digest("hex") },
+      pinsSha256: createHash("sha256").update(JSON.stringify(plan.pins)).digest("hex") })
+    await write(path.join(root, "pins.json"), plan.pins)
+    await write(path.join(closed, "dispatch.json"), { pinsFile: path.join(root, "pins.json") })
+    await write(path.join(closed, "returned.json"), { interruptReason: null })
+    const reviewFile = path.join(plan.directory, "graph-review.json")
+    const review = { verdict: "passed", reviewer: "independent",
+      notes: "The allowed role is bound to the saved JavaScript node and output.", sessionID: value.sessionID,
+      packageSha256: audit.packageSha256, javascriptRole: scenario.javascriptRole, evidence: ["artifact/package.lgp"] }
+    await write(reviewFile, review)
+    const auditBytes = await Bun.file(auditFile).text()
+    const assessV2 = () => runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 2, "audit", "runtime", false,
+      { criteriaVersion: "node-selection-policy-v2", criteriaSha256: "5b5053d14aecf7462e317b75fa3a14fa3bff6717080128edf0da582171a015fa" })
+    expect(await assessV2()).toEqual({ decision: "advance", reason: null })
+    expect(await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 2, "audit", "runtime"))
+      .toEqual({ decision: "review", reason: "AUDIT_REVIEW_REFRESH_REQUIRED" })
+    await rm(reviewFile)
+    expect(await assessV2()).toEqual({ decision: "review", reason: "MANUAL_REVIEW_REQUIRED" })
+    for (const change of [{ javascriptRole: undefined }, { javascriptRole: "arbitrary-script" },
+      { javascriptRole: scenario.mode === "explicit-js" ? "variable-unpack-only" : "requested-aggregation" },
+      { sessionID: "foreign" }, { packageSha256: "b".repeat(64) }, { evidence: [] }, { verdict: "failed" },
+      { reviewer: "" }, { notes: "" }]) {
+      await write(reviewFile, { ...review, ...change })
+      expect((await assessV2()).decision).not.toBe("advance")
+    }
+    await write(reviewFile, { ...review, evidence: ["artifact/missing.lgp"] })
+    await expect(assessV2()).rejects.toMatchObject({ code: "ENOENT" })
+    await write(reviewFile, review)
+    expect(await Bun.file(auditFile).text()).toBe(auditBytes)
+    for (const change of [{ policyStatus: "failed" }, { calculationPassed: false }, { oraclePassed: false },
+      { historyComplete: false }, { runtimeSettled: false }, { identityVerified: false }, { graphComplete: false },
+      { exportIdentityVerified: false }, { reviewStatus: "failed" }]) {
+      await chmod(auditFile, 0o600)
+      await write(auditFile, { ...audit, ...change })
+      await chmod(auditFile, 0o400)
+      const before = await Bun.file(auditFile).text()
+      expect((await assessV2()).decision).not.toBe("advance")
+      expect(await Bun.file(auditFile).text()).toBe(before)
+    }
+    await chmod(auditFile, 0o600)
+    await write(auditFile, { ...audit, reviewStatus: "not-required" })
+    await chmod(auditFile, 0o400)
+    const notRequiredBytes = await Bun.file(auditFile).text()
+    expect(await assessV2()).toEqual({ decision: "advance", reason: null })
+    expect(await Bun.file(auditFile).text()).toBe(notRequiredBytes)
+    await chmod(auditFile, 0o600)
+    await Bun.write(auditFile, auditBytes)
+    await chmod(auditFile, 0o400)
+    expect(await assessV2())
+      .toEqual({ decision: "advance", reason: null })
+    expect(await Bun.file(auditFile).text()).toBe(auditBytes)
+    expect(await Bun.file(path.join(plan.directory, "attempt.json")).text()).toBe(JSON.stringify(attempt))
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("the frozen 9 → 6 → 16 schedule preserves all slots and rejects duplicate/replacement admission", () => {
   const tasks = ["abc-pareto-groups", "first-last-touch", "sales-by-category", "monthly-demand", "risky-approved-claims", "campaign-roi-by-channel"]
   const schedule = {
