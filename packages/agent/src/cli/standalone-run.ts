@@ -4,7 +4,7 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { launchNodeHost, launchSortingDiagnostic } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
-import { standaloneCancellation } from "./standalone-cancellation"
+import { standaloneCancellation, standaloneRunControl } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
 
 declare const LOGINOM_AI_AGENT_SORTING_ACCEPTANCE: string | undefined
@@ -107,7 +107,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH = "1"
     const { applyCliSystemProxy, systemProxyNoticeLine } = await import("./standalone-proxy")
     const systemProxy = await applyCliSystemProxy()
-    LoginomHost.connect(host.port, owner)
+    LoginomHost.connect(host.port, owner, mode === "run" ? standaloneRunControl() : undefined)
     const { AppRuntime } = await import("../effect/app-runtime")
     cleanup.dispose = async () => {
       const { HttpApiApp } = await import("../server/routes/instance/httpapi/server")

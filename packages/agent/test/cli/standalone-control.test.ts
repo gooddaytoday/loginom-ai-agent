@@ -6,7 +6,7 @@ const source=await readFile(new URL('../../src/cli/standalone-cancellation.ts',i
 const compiled=await Bun.build({entrypoints:[new URL('../../src/cli/standalone-cancellation.ts',import.meta.url).pathname],target:'node'})
 const text=await compiled.outputs[0]!.text()
 function driver(code:string){let clock=1000,fire:()=>void=()=>{},cleared=false;const listeners=new Set<()=>void>()
- const c=vm.createContext({AbortController,Error,Object,Math,Date:{now:()=>clock},setTimeout(fn:()=>void,delay:number){fire=fn;expect(delay).toBe(7200_000);return 7},clearTimeout(id:number){expect(id).toBe(7);cleared=true},process:{on(_:string,fn:()=>void){listeners.add(fn)},off(_:string,fn:()=>void){listeners.delete(fn)}}})
+ const c=vm.createContext({AbortController,AbortSignal,Error,Object,Math,Date:{now:()=>clock},setTimeout(fn:()=>void,delay:number){fire=fn;expect(delay).toBe(7200_000);return 7},clearTimeout(id:number){expect(id).toBe(7);cleared=true},process:{on(_:string,fn:()=>void){listeners.add(fn)},off(_:string,fn:()=>void){listeners.delete(fn)}}})
  vm.runInContext(code.slice(0,code.lastIndexOf('export {'))+';globalThis.api={standaloneRunControl,standaloneCancellation,withStandaloneCancellation}',c)
  return{api:c.api,tick(){clock+=99},expire(){clock+=7200_000;fire()},cleared:()=>cleared,listeners}
 }

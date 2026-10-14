@@ -1,3 +1,4 @@
+import { mintOriginalRunControl } from "@loginom-ai-agent/loginom-host/original-run-control"
 const state: { signal?: AbortSignal; run?: Readonly<{signal: AbortSignal; deadline: number}> } = {}
 
 export function standaloneCancellation() {
@@ -16,7 +17,7 @@ export async function withStandaloneCancellation(run: (signal: AbortSignal) => P
   const controller = new AbortController()
   const interrupt = () => controller.abort()
   state.signal = controller.signal
-  const control = timedRun ? Object.freeze({signal: controller.signal, deadline: Date.now() + 7200_000}) : undefined
+  const control = timedRun ? mintOriginalRunControl(controller.signal, Date.now() + 7200_000) : undefined
   state.run = control
   const timer = control ? setTimeout(() => controller.abort(new Error("CLI_CANCELLED")), Math.max(0,control.deadline-Date.now())) : undefined
   process.on("SIGINT", interrupt)
