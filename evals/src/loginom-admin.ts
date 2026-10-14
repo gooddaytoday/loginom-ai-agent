@@ -55,6 +55,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   await mkdir(path.join(directory, "profile"), { mode: 0o700 })
   const driver = path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")
   const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "starting", initialization: "not_started", dispose: "not_started",
+    initializationCode: null as string | null, initializationStage: null as string | null, passwordState: null as string | null, disposeCode: null as string | null,
     runtimeManifestHash: runtime.manifestHash, driverHash: new Bun.CryptoHasher("sha256").update(await Bun.file(driver).bytes()).digest("hex"),
     processes: null as ProcessCleanup | null }
   await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
@@ -102,6 +103,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       disposal ??= (async () => {
         const ack = await request("dispose", {}).catch(() => undefined)
         receipt.dispose = ack?.outcome ?? "unknown"
+        receipt.disposeCode = ack?.outcome === "confirmed" ? null : ack ? adminReplyCode(ack) : "ADMIN_OPERATION_UNKNOWN"
         const disposed = ack?.outcome === "confirmed" && jsonObject(ack.data) && ack.data.disposed === true
         if (!disposed) stop()
         await channel.end().catch(stop)
@@ -109,6 +111,10 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         await channel.close().catch(stop)
         options.signal?.removeEventListener("abort", stop)
         receipt.processes = result?.processCleanup ?? null
+        receipt.initializationStage = result?.stderr.split("\n").filter(line =>
+          /^ADMIN_INIT_STAGE_(BROWSER|NAVIGATION|FORM|USERNAME|PASSWORD|BLUR|LOGIN|SESSION|ROLE)$/.test(line)).at(-1)?.slice("ADMIN_INIT_STAGE_".length) ?? null
+        receipt.passwordState = result?.stderr.split("\n").filter(line =>
+          /^ADMIN_INIT_PASSWORD_(READY|DISABLED|READONLY|HIDDEN)$/.test(line)).at(-1)?.slice("ADMIN_INIT_PASSWORD_".length) ?? null
         receipt.status = disposed && result?.exitCode === 0 && result.processCleanup.status === "confirmed" &&
           result.processCleanup.capture_complete && !result.interrupted && !result.timedOut ? "disposed" : "quarantined"
         await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
@@ -121,6 +127,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     const initialized = await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url: file.server.url,
       credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(directory, "profile/loginom/runtime/admin/attempts/context/browser-profile") })
     receipt.initialization = initialized.outcome
+    receipt.initializationCode = initialized.outcome === "confirmed" ? null : adminReplyCode(initialized)
     receipt.status = "initializing"
     await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
     const data = requireAdminReply(initialized)
@@ -134,8 +141,12 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
 
 function requireAdminReply(reply: AdminReply): unknown {
   if (reply.outcome === "confirmed") return reply.data
-  const code = jsonObject(reply.data) && typeof reply.data.code === "string" && /^(ADMIN|SESSION|SERVER)_[A-Z_]{1,64}$/.test(reply.data.code) ? reply.data.code : "ADMIN_OPERATION_UNKNOWN"
-  throw new EvalFailure(code, 2)
+  throw new EvalFailure(adminReplyCode(reply), 2)
+}
+
+function adminReplyCode(reply: AdminReply) {
+  return jsonObject(reply.data) && typeof reply.data.code === "string" && /^(ADMIN|SESSION|SERVER)_[A-Z_]{1,64}$/.test(reply.data.code)
+    ? reply.data.code : "ADMIN_OPERATION_UNKNOWN"
 }
 
 export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, output: WritableStream<Uint8Array>, journalDir: string) {

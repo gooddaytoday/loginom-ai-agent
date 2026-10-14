@@ -775,3 +775,16 @@ assertions; CLI/report/fixture parallel/policy118 tests/563 assertions PASS
 (223.25s), typecheck/diff PASS. Источник формы APIError проверен в текущем
 packages/core/src/v1/session.ts и JSON emitter packages/agent/src/cli/cmd/run.ts;
 native model transport и hidden limit absence не квалифицированы.
+
+
+Permanent research infrastructure create/read-back PASS: noncee6799bc1-0e0d-4b44-
+88f5-7213279df442, Server6ae20e683182/Studioff3ce5974e67 (полные IDs в private
+controller/pair.json и pair-bootstrap-20261014 receipt). Native pinned-candidate
+admin login проверил username/admin role и confirmed native/browser disposal.
+Missing focus раньше давал stable3/3 ADMIN_DISPOSE_UNKNOWN; safe diagnostics
+показали ADMIN_DEADLINE/PASSWORD/READONLY. Pinned Studio AutoCompleteOff снимает
+readonly на штатном focus, driver теперь делает password.focus перед fill.
+Target1 PASS/7 (6.22s); admin integration/unit/preflight48 PASS/123 (36.33s),
+typecheck/diff PASS. Full diagnosis в evals/docs/2026-10-14-admin-password-focus-diagnosis.md.
+Quarantined evidence сохранены; server session close/ACL/backup/licence counts,
+acceptance pair и native model/judge qualification остаются открытыми.
