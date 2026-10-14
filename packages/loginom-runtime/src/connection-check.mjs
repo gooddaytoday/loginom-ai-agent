@@ -43,6 +43,7 @@ export async function loginPage(page, candidate, owner) {
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
   await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+  let loginReadyDeadline=Date.now()+30_000
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
     const password = field("edtPassword").locator("input")
@@ -53,6 +54,7 @@ export async function loginPage(page, candidate, owner) {
     if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
     if(owner) owner.loginSubmitted=true
     await field("btnLogin").click()
+    loginReadyDeadline=Date.now()+30_000
     await avatar.waitFor({ state: "visible", timeout: 30_000 }).catch(cause => {
       throw new Error("LOGINOM_LOGIN_REJECTED",{cause})
     })
@@ -61,6 +63,23 @@ export async function loginPage(page, candidate, owner) {
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
   )
   if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+  if(owner) {
+    // A visible avatar precedes the asynchronous package-tree initialization.
+    // Stay read-only within the original login UI allowance; do not turn an
+    // unavailable running predicate into false or change the cleanup guard.
+    if(Number.isSafeInteger(owner.deadline))loginReadyDeadline=Math.min(loginReadyDeadline,owner.deadline)
+    const remaining=loginReadyDeadline-Date.now()
+    if(remaining<=0)throw Error("LOGINOM_STARTUP_READINESS_EXPIRED")
+    await page.waitForFunction(o=>{
+      const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree
+      if(own?.document!==document||own?.id!==o.id||own?.account!==o.account||location.origin!==o.origin)
+        throw Error("LOGINOM_STARTUP_IDENTITY_CHANGED")
+      if(m?.FServerConnection?.UserName!==o.account||m.FServerConnection.Connected!==true)
+        throw Error("LOGINOM_ACCOUNT_MISMATCH")
+      return !!m.FPackagesParentNode
+    },{id:owner.id,account:owner.account,origin:owner.origin},{timeout:remaining})
+    if(owner.page!==page||Date.now()>=loginReadyDeadline)throw Error("LOGINOM_STARTUP_IDENTITY_CHANGED")
+  }
   return { authenticated: true }
 }
 

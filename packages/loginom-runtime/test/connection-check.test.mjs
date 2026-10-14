@@ -93,3 +93,23 @@ for (const [initial, password, expected] of [
     },
   )
 }
+
+// Real login function and serialized readiness predicate; native/Page doubles.
+for(const scenario of ['ready-after-avatar','foreign-account','foreign-document','changed-page','expired'])test('managed login native initialization '+scenario,async()=>{
+ const {default:vm}=await import('node:vm');let clicks=0,waits=0;
+ const native=vm.createContext({document:{},location:{origin:'https://fixture.invalid'},bg:{app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'User',Connected:true}}}}}}}});
+ const owner={id:'original',account:'User',origin:'https://fixture.invalid',deadline:Date.now()+(scenario==='expired'?-1:6000)};
+ const locator={or(){return this},first(){return this},async waitFor(){},async isVisible(){return true},async click(){clicks++}};
+ const page={async goto(){},locator(){return locator},async evaluate(fn,arg){return vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',native)},
+  async waitForFunction(fn,arg,opts){waits++;assert.ok(opts.timeout>0&&opts.timeout<=6000);
+   const run=()=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',native);
+   assert.equal(run(),false);
+   vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree.FPackagesParentNode={};',native);
+   if(scenario==='foreign-account')vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName="foreign"',native);
+   if(scenario==='foreign-document')vm.runInContext('globalThis.document={}',native);
+   assert.equal(run(),true);if(scenario==='changed-page')owner.page={};
+  }};owner.page=page;
+ if(scenario==='ready-after-avatar')assert.deepEqual(await loginPage(page,{url:'https://fixture.invalid/app/',username:'User',password:''},owner),{authenticated:true});
+ else await assert.rejects(loginPage(page,{url:'https://fixture.invalid/app/',username:'User',password:''},owner));
+ assert.equal(clicks,0);assert.equal(waits,scenario==='expired'?0:1);
+});
