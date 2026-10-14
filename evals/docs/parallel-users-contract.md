@@ -7,6 +7,12 @@ Private CleanupReceipt включает leaseToken/serverEpoch: release свер
 текущим SlotLease; close только освобождает OS guards, сохраняя reservations.
 Фактические проверки и ограничения записываются в [runbook](../../docs/testing/loginom-ai-agent/parallel-evals.md).
 
+Resource sampler хранит неизвестные host/cgroup/container counters как null.
+Docker primitive использует immutable full ID и фиксированный local Unix socket;
+исходный stats body сохраняется вместе с проекцией counters. Его bounded-container
+smoke не подтверждает live Loginom/resource acceptance; Server/Studio binding и
+зафиксированный до run бюджет ещё требуют реализации.
+
 ## Конфигурация и граница режимов
 
 Без `EVAL_SLOTS_FILE` действует legacy singleton с marker v1 и эксклюзивным

@@ -58,6 +58,14 @@ unlimited limit. Текущий app cgroup общий с другими проц
 Host/CLI/private namespace qualification: 18 tests/111 assertions PASS,
 typecheck/diff PASS; чужие cgroups и настройки лимитов не изменялись.
 
+Программный sampleContainerResources(fullId) читает one-shot stats по фиксированному
+local Docker socket: CPU nanoseconds, RAM/limit, PIDs, доступный block I/O и исходный
+API body для сохранения точности больших counters. Unknown=null с диагностикой,
+names/short IDs отвергаются. Engine1.48 не возвращает id внутри one-shot response;
+binding задаёт полный ID в URL. Disposable bounded container и disappeared-ID
+smoke вместе с host/CLI: 20 PASS/131 assertions, typecheck/diff PASS. Этот primitive
+пока не подключён к CLI и не квалифицирует Loginom sessions или resource acceptance.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —

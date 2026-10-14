@@ -102,3 +102,47 @@ function cgroupNumber(value?: string) {
   if (!value || !/^\d+$/.test(value.trim()) || !Number.isSafeInteger(Number(value))) return null
   return Number(value)
 }
+
+export async function sampleContainerResources(id: string) {
+  if (!/^[0-9a-f]{64}$/.test(id)) throw new EvalFailure("RESOURCE_CONTAINER_ID", 2)
+  const version = await fetch("http://localhost/version", { unix: "/var/run/docker.sock", signal: AbortSignal.timeout(2000) })
+    .then(async response => response.ok ? resourceObject(await response.json()).ApiVersion : undefined).catch(() => undefined)
+  const payload = typeof version === "string" && /^1\.\d+$/.test(version)
+    ? await fetch(`http://localhost/v${version}/containers/${id}/stats?stream=false&one-shot=true`, { unix: "/var/run/docker.sock", signal: AbortSignal.timeout(2000) })
+      .then(async response => {
+        if (!response.ok) return undefined
+        const raw = await response.text()
+        return { raw, data: resourceObject(JSON.parse(raw)) }
+      }).catch(() => undefined) : undefined
+  // Engine 1.48 omits id in one-shot stats; the request uses the immutable full ID.
+  const matched = payload && (payload.data.id === undefined || payload.data.id === id) ? payload : undefined
+  const cpu = resourceObject(matched?.data.cpu_stats)
+  const usage = resourceObject(cpu.cpu_usage)
+  const memory = resourceObject(matched?.data.memory_stats)
+  const pids = resourceObject(matched?.data.pids_stats)
+  const io = resourceObject(matched?.data.blkio_stats).io_service_bytes_recursive
+  const sample = {
+    container_id: id, observed_at: new Date().toISOString(),
+    cpu: resourceCounter(usage.total_usage) !== null ? { total_usage_ns: resourceCounter(usage.total_usage),
+      system_cpu_usage_ns: resourceCounter(cpu.system_cpu_usage), online_cpus: resourceCounter(cpu.online_cpus) } : null,
+    memory: resourceCounter(memory.usage) !== null && resourceCounter(memory.limit) !== null
+      ? { current_bytes: resourceCounter(memory.usage), limit_bytes: resourceCounter(memory.limit) } : null,
+    pids: resourceCounter(pids.current) !== null ? { current: resourceCounter(pids.current) } : null,
+    io: Array.isArray(io) && io.length && io.every(entry => {
+      const item = resourceObject(entry)
+      return typeof item.op === "string" && resourceCounter(item.major) !== null && resourceCounter(item.minor) !== null && resourceCounter(item.value) !== null
+    }) ? io.map(entry => { const item = resourceObject(entry); return { major: item.major, minor: item.minor, op: item.op, bytes: item.value } }) : null,
+    // Preserve API bytes as well as the projection; large nanosecond counters exceed JS safe integers.
+    raw_stats: matched?.raw ?? null,
+  }
+  return { ...sample, errors: [...(matched ? [] : ["CONTAINER_STATS_UNAVAILABLE"]),
+    ...["cpu", "memory", "pids", "io"].flatMap(key => sample[key as "cpu" | "memory" | "pids" | "io"] === null ? [`CONTAINER_${key.toUpperCase()}_UNAVAILABLE`] : [])] }
+}
+
+function resourceObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function resourceCounter(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0 ? value : null
+}

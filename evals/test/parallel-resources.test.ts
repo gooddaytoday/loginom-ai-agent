@@ -2,10 +2,15 @@ import { expect, test } from "bun:test"
 import { chmod, mkdtemp, readdir, rm, stat, statfs } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { collectHostResources, sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
+import { collectHostResources, sampleCgroupResources, sampleContainerResources, sampleHostResources } from "../src/parallel-resources"
 import { loadResourceSlots } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("container sampling refuses names and shortened IDs before Docker observation", async () => {
+  await expect(sampleContainerResources("eval-server")).rejects.toThrow("RESOURCE_CONTAINER_ID")
+  await expect(sampleContainerResources("d138ce018adb")).rejects.toThrow("RESOURCE_CONTAINER_ID")
+})
 
 test("resource sampling observes its actual unified cgroup without inventing unavailable throttling counters", async () => {
   const sample = await sampleCgroupResources()
