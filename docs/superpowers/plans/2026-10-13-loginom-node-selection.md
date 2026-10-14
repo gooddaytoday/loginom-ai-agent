@@ -1,15 +1,15 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint 2026-10-14 12:25 UTC: разрешённые исправления восстановлены
-(d3cd4e46f9, 713 targeted PASS). Итоговая matched пара112452 собрана изfdc4ac455e;
-обычный живой Import→Sort→Export прошёл на runtime659588… до модельной серии.
-ABC/1 закрыт как technical-failed; own release независимо подтверждён.
-First-last-touch/1 завершён: machine policy/oracle/calculation/graph/export PASS,
-JS calls/nodes0, CLI0/cleanup=true/HostACKexit0/ownPIDgone/.writerabsent.
-Runner остановлен для обязательного ревью аномалий экспортных операций;
-accepted0 до этого ревью, started2/closed2/technicalfailed1/notstarted29/baseline0.
-Повтор ABC и замена отказа успешной попыткой запрещены. Frozen31 серия неизменна,
-полная приёмка открыта; старые outcomes исторические, не перенесены.
+Текущий checkpoint 2026-10-14 12:30 UTC: разрешённые исправления восстановлены
+(d3cd4e46f9, 713 targeted PASS). Итоговая matched пара112452/runtime659588…;
+обычный живой Import→Sort→Export прошёл до модельной серии.
+ABC/1 technical-failed сохранён; own release независимо подтверждён.
+First-last-touch/1 принят: machine+independent semantic PASS, JS calls/nodes0,
+правильные25ячеек/500входныхстрок, связныйLGP8nodes/8links, штатное закрытие.
+Same frozen31 sequential runner продолжен: sales-by-category/1 admitted12:29:58.383Z,
+CLI1931252 started12:30:09.794Z, Session ses_ec59bb705ffeER56yPWSw7JG1h.
+Started3/closed2/technicalfailed1/accepted1/notstarted28/baseline0.
+Полная приёмка открыта; повторы admittedslots запрещены, старые outcomes исторические.
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -3341,3 +3341,27 @@ Import→Sort→ONE Calculator(CumulativeSum+Stat+inlineIF)→Group→Sort→Exp
 Исходный200-row business oracle также независимо пересчитан. Драфт не запускается
 сейчас, не меняет31матрицу/denominator и не заменяет failedABC1; при отдельном запуске
 покрытие/ожидаемыйрезультат/параметры будут закреплены заранее.
+
+Checkpoint 2026-10-14 12:30 UTC — first-last-touch/1 принят; sales/1 реально запущен.
+Independent wx graph-review7a26ab3ffb9983faf129de32ec0ea78246b67795ab931207b1016511b18491b0
+passed, details92740b6f…, oracleb1506490…: независимый Decimal-пересчёт500строк,
+все25ячеек/5каналов и64случая touchpoint_2=None при заполненномtouchpoint_3.
+Импорт ValueNull=None и IsNull в Calculator согласованы; обе Count/Sum Group,
+Join, переименование, Sort и Export подтверждены XML/receipts. Все8businessnodes
+необходимы и связаны8links,0JS, только1Export. Export-1..3 terminalNOT_APPLIED
+лежит вstate.error при пустомoutput (truncatedparts0/tooloutputs=[]), node=null,
+executionnotrequested/effectfalse/cleanuptrue;9before/afterграфов структурноравны.
+Export-4 создал единственный CSV361B/d4a002e1…. Все11nodeoperations terminalcleanuptrue;
+ни orphan узлов, ни незавершённого reconciliation.35originalprotectedfiles unchanged.
+Root refresh толькоselection-audit: diff ровно reviewStatus not-required→passed,
+новыйaudit eb932217365c50472caa030421bb6ab022b142aac40d5f44c7122a7ec19dca22,
+original7f444…0400 сохранён. Pure gate advance/null, savedroot-post-review-gate.json0400.
+Runner resume2 с теми же lock834620…/pins/runtime/model/inputs; ledgerrecheck12:29:58
+сохраняет ABC technical-failed, firstlast advance. Sales-by-category/1 admitted
+12:29:58.383Z, CLI1931252 started12:30:09.794Z, Session ses_ec59bb705ffeER56yPWSw7JG1h;
+exec36709/runner1930475 active. Новых моделей дляfirstlast/ABC не было.
+Started3/closed2/technicalfailed1/accepted1/notstarted28/baseline0.
+Current coverage — успешный standalone exportgate и один автономный standard
+firstlastcase; ABC blocked. Сравнение skill ещё невозможно; полнаяприёмка открыта.
+Report amendments ae428436…/2dc1917b… подготовлены параллельно, старый skeleton сохранён.
+Новых правок производственных обработчиков стандартных узлов не внесено.
