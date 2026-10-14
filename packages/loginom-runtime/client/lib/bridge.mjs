@@ -512,14 +512,30 @@ export async function createBridge(config, session, { browserTransport: managedB
       if(file.closeComplete)return;
       if(file.io?.pending)throw Error('LOGINOM_CAPTURE_WRITER_IO_UNKNOWN');
       if(file.closeStarted)throw file.closeFailure?file.closeFailure.value:Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
-      file.closeStarted=true;let projection;
+      file.closeStarted=true;file.closePending=true;let projection,callbackSettled=false;
       const completion=new Promise((resolve,reject)=>{
         try{projection=captureClose(file.fd,error=>{
-          if(error===null||error===undefined){file.closeComplete=true;resolve()}
-          else{file.closeFailure={value:error};reject(error)}
-        })}catch(value){file.closeFailure??={value};reject(value)}
+          callbackSettled=true;
+          if(error===null||error===undefined)resolve();else reject(error);
+        })}catch(value){
+          if(callbackSettled)projection=Promise.reject(value);else reject(value);
+        }
       });
-      await Promise.all([completion,projection]);
+      const observe=promise=>Promise.resolve(promise).catch(value=>{
+        if(file.closeFailure)file.closeSecondary??={value};else file.closeFailure={value};
+        throw value;
+      });
+      const owned=[observe(completion),observe(projection)];
+      file.closeSettlement=Promise.allSettled(owned).then(results=>{
+        // A callback alone, or a throw without that callback, is not settlement.
+        if(callbackSettled){
+          file.closePending=false;
+          if(results.every(result=>result.status==='fulfilled'))file.closeComplete=true;
+        }
+      });
+      try{await Promise.all(owned)}catch(value){throw file.closeFailure.value}
+      await file.closeSettlement;
+      if(!file.closeComplete)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
     }
     function rememberCapturePersistence(value,phase) {
         capturePersistencePrimary??={phase,value};
