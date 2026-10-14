@@ -1,3 +1,4 @@
+import {inspectAmountOwnPage} from '../../src/amount-own-page.mjs';
 import {retainAmountPreparation,assertAmountPreparation,beginAmountCompletion,retainAmountConsumerResult,sealAmountCompletion,assertAmountCompletion} from '../../src/amount-capture-lifecycle.mjs';
 import {assertAmountCaptureProxy,beginAmountCaptureProxy,rejectAmountCaptureAwait} from '../../src/amount-capture-proxy.mjs';
 import {captureControlledAmount,captureAmount} from '../../src/acceptance/amount-import-type-v1.mjs';
@@ -786,6 +787,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         guard();return value;
       };
       const options=()=>({signal,timeout:Math.max(1,Math.min(binding.expires,retained.owner.deadline)-Date.now())});
+      // Fresh original same-Page empty-cache proof precedes every opening/Save.
+      await owned(()=>inspectAmountOwnPage(retained,{guard,record:recordExecution,signal}));
       await owned(()=>client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:binding.packagePath,
         operation_id:'amount-prepare:'+binding.admission}},undefined,options()));
       requirePreparedWorkspace(session.metadata);
