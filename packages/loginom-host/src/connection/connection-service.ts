@@ -260,6 +260,8 @@ export async function connectionService(
             "LOGINOM_ACCOUNT_MISMATCH",
             "LOGINOM_LOGIN_UNAVAILABLE",
             "LOGINOM_BROWSER_START_FAILED",
+            "LOGINOM_RUNTIME_TIMEOUT",
+            "LOGINOM_RUNTIME_CLEANUP_FAILED",
           ].includes(error.message)
             ? error.message
             : "LOGINOM_CONNECTION_CHECK_FAILED"

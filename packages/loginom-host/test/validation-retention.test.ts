@@ -1,3 +1,4 @@
+import {getFPHostStartup,getAmountHostStartup} from '../src/fp-startup-control'
 import assert from 'node:assert/strict'
 import {test} from 'bun:test'
 import vm from 'node:vm'
@@ -61,7 +62,7 @@ for(const kind of candidate?['compiled']:['source'])for(const scenario of ['vali
         } else throw Error('UNEXPECTED_FIXTURE_OPERATION')
       })().catch(error=>fakeChild.emit('error',error))
     }
-    const symbols:any={Error,AggregateError,Promise,Map,Set,JSON,process:{platform:'linux',env:{}},
+    const symbols:any={getFPHostStartup,getAmountHostStartup,Error,AggregateError,Promise,Map,Set,JSON,process:{platform:'linux',env:{}},
       randomUUID,randomUUID5:randomUUID,join,join5:join,isAbsolute,isAbsolute2:isAbsolute,
       mkdir,mkdir2:mkdir,readFile,readFile2:readFile,rm,rm3:rm,setTimeout,clearTimeout,
       fork:()=>fakeChild,inputStore:()=>({}),recoveryStore:async()=>({}),connectionStore:()=>({})}
@@ -112,7 +113,7 @@ for(const kind of candidate?['compiled']:['source'])for(const scenario of ['vali
       assert.deepEqual(await readFile(join(capturedDirectory,'startup-cleanup.json')),originalEvidence)
       const unwrap=(value:any):any=>value instanceof Error&&Object.hasOwn(value,'cause')?unwrap(value.cause):value
       assert.equal(unwrap(outerFailure),scenario==='checked-missing-receipt'?undefined:rejected)
-      assert.equal(closeCalls,2) // Same child; no fork/acquire or native replay.
+      assert.equal(closeCalls,1) // Original close refusal is retained; no new close id.
     }else{
       assert.equal(closeCalls,1)
       assert(stages.some((s:any)=>s.stage==='outer_acknowledgement'&&s.status==='prepared'))

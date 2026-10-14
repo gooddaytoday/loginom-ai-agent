@@ -124,19 +124,29 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; amount?:AmountCaptureFrame; cancelled?:boolean; primary?:{value:unknown} }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; amount?:AmountCaptureFrame; cancelled?:boolean; primary?:{value:unknown}; closing?: { expired: boolean; acknowledged: boolean } }
   >()
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
-    child.once("exit", (code, signal) => resolve({ code, signal }))
+    child.once("exit", (code, signal) => {
+      pending.forEach((request, id) => {
+        if (!request.closing) return
+        pending.delete(id)
+        request.dispose?.()
+        if (!request.closing.acknowledged)
+          request.reject(new Error(request.closing.expired ? "LOGINOM_RUNTIME_TIMEOUT" : "LOGINOM_RUNTIME_DISCONNECTED"))
+      })
+      resolve({ code, signal })
+    })
     child.once("error", () => resolve({ code: 1, signal: null }))
   })
   function fail() {
-    pending.forEach((request) => {
+    pending.forEach((request, id) => {
+      if (request.closing) return // Disconnect alone does not prove child exit.
+      pending.delete(id)
       clearTimeout(request.timer)
     request.dispose?.()
       request.reject(request.primary?request.primary.value:new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     })
-    pending.clear()
   }
   child.on("disconnect", fail)
   child.on("exit", fail)
@@ -145,6 +155,17 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
+    if (request.closing) {
+      if (request.closing.acknowledged) return
+      request.closing.acknowledged = true
+      request.dispose?.()
+      if ("error" in message) request.reject(new Error(
+        typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
+          ? message.error : "LOGINOM_RUNTIME_FAILED", { cause: message.error }))
+      else request.resolve("result" in message ? message.result : undefined)
+      // Keep this same id until exit. Expiry cannot mint a second close.
+      return
+    }
     if(request.amount){
       const receipt='amountCaptureReceipt' in message?message.amountCaptureReceipt as any:undefined;
       if(!receipt || Object.keys(receipt).sort().join(',')!=='acknowledged,cleanupSettled,evidenceSettled,frame,settled'
@@ -217,8 +238,12 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
         reject(reason)
       }
       const abort = () => cancel(control!.signal.reason)
-      const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
-      pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      const closeState = operation === "close" ? { expired: false, acknowledged: false } : undefined
+      const timer = setTimeout(() => {
+        if (closeState) { closeState.expired = true; return }
+        cancel(new Error(control ? "LOGINOM_PRE_READY_READ_EXPIRED" : "LOGINOM_RUNTIME_TIMEOUT"))
+      }, timeout)
+      pending.set(id, { resolve, reject, timer, ...(closeState ? { closing: closeState } : {}), ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
       child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),...(amountFrame?{amountCapture:amountFrame}:{}) }, (error) => {
         if(!error)return;
@@ -241,25 +266,12 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       const reply = await request("close", undefined, 5000)
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
-      const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
-      try {
-        const outcome = await exited
-        if (
-          !reply ||
-          typeof reply !== "object" ||
-          !("closed" in reply) ||
-          reply.closed !== true ||
-          outcome.code !== 0 ||
-          outcome.signal
-        )
-          throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      } finally {
-        clearTimeout(timer)
-      }
+      const outcome = await exited
+      if (outcome.code !== 0 || outcome.signal)
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     })()
-    const attempt = closing.promise
-    attempt.catch(() => { if (closing.promise === attempt) closing.promise = undefined })
-    return attempt
+    // Terminal refusal is cached too: reconnect/stop must not replay close.
+    return closing.promise
   }
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
