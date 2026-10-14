@@ -18,20 +18,36 @@ Matrix31, mandatory reviews, candidate violation stop и strict own release
 недостаточном policy coverage, а не ради functional100%. Original frozenprotocol
 и его gates ниже — история условий запуска, не действующие пороги приёмкиv2.
 Новые policy-v2 sidecars ссылаются на criteria/protocol/evidence SHA и не меняют
-original attempt/audit. Runtime и76locked source files неизменны; rebuild не нужен.
+original attempt/audit. Runtime неизменен; исходные76source files сохранены в readonly
+архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
+rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 14:40 UTC: matched `20261014T112452Z-5e223f`,
-runtime659588…/sourcefdc4ac455e/76frozenfiles unchanged. Candidate9 закрыты:
-original5accepted+4technicalfailed; идут отдельные policy-v2 reviews на старых
-evidence без upgrade аналитики/runtime. Baseline4 закрыты: sales/ABC/monthly
-calculationPASS, claims technicalfailed на import configure/UI_SCAN_LIMIT
-до содержательной аналитики. Monthly finished14:30:58.106Z/JS0/normalcleanuptrue;
-claims finished14:33:03.911Z/CLI2196483exit1/normalcleanupfalse. Runner96749
-terminalexit1, own profile guard удержан; новых моделей нет. Started13/closed13/
-machineAccepted8/technicalfailed5/notstarted18. NextbaselineROI толькоstrictrelease.
-Критерииv2 записаны14:33:36.064Z до следующего dispatch; initialmetadata monthly
-livefalse сохранён, actualstate correction отдельным immutable receipt.
-Матрица31/model medium fast/inputs/oracle прежние, originalslotsнеповторяются.
+Текущий checkpoint 2026-10-14 15:31 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыты 13 из 31
+попытки, новых моделей сейчас нет. Candidate: девять отдельных policy-v2 PASS;
+все шесть стандартных задач и три исключения содержательно покрыты. Исходные
+аналитические результаты: пять успешных, четыре технических отказа без результата;
+normal cleanup успешен в пяти, четыре потребовали адресного восстановления.
+Baseline: sales/ABC/monthly дали правильный результат, claims завершился отказом
+на import configure/UI_SCAN_LIMIT до содержательных аналитических решений.
+Для политики claims — недостаточно доказательств, а не PASS из-за отсутствия JS.
+Runner96749 завершён; оригинальные failed attempt/audit/verdict сохранены.
+
+Собственная user:209 автоматически закрыта сервером в15:03:04.387Z; два свежих
+снимка диспетчера подтвердили отсутствие всех user-сессий. Admin:210 вышел,
+его браузер закрыт, все восемь собственных PID завершены. Точный собственный
+.writer архивирован в15:22:20.697Z с сохранением nonce/SHA/inode/mtime; активного
+.writer нет. Следующий model dispatch ещё не разрешён: завершаются TDD, review
+и отдельный execution-v2 seal для узкого release без успешного native узла.
+Прямая GUID-привязка не заявляется; используются два точных native RPC и полный
+серверный журнал. После допуска next — baseline ROI/1, затем first-last-touch/1
+и оставшиеся16candidate; исходные слоты не повторяются.
+
+Критерииv2 записаны14:33:36.064Z до следующего dispatch. Матрица31, модель
+medium fast, inputs, oracle и runtime прежние. 76 исходных sealed files сохранены
+в отдельном readonly архиве; разрешены изменения только четырёх evaluator
+source/test файлов в новом execution lock. Product и обработчики узлов не меняются.
+
 
 Статус: приёмка не завершена. Новая пара203142-5bf175 статически проверена;
 native prerequisites pending, новых model attempts0. Серия192418-c71363
