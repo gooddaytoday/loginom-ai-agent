@@ -1,9 +1,60 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline, assessResourceIncidents } from "../src/parallel-acceptance"
 import { sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
 import os from "node:os"
 import { readlink, stat } from "node:fs/promises"
 import { summarizeResourceSamples } from "../src/parallel-resource-summary"
+
+test("resource incidents reject new OOM counters while preserving unchanged historical counts", () => {
+  for (const [oom, oomKill, status] of [[5, 2, "passed"], [6, 2, "failed"], [5, 3, "failed"]] as const) {
+    const samples = [{ oom: 5, oom_kill: 2 }, { oom, oom_kill: oomKill }].map((events, index) => ({
+      sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+      host: { cpu: null, memory: null, collector_cgroup: { path: "/controlled-receipt", memory_events: events } },
+    }))
+    const summary = summarizeResourceSamples(samples), before = JSON.stringify({ samples, summary })
+    expect(assessResourceIncidents({ samples, summary })).toEqual(status === "passed" ? { status: "passed", codes: [] } : { status: "failed", codes: ["CGROUP_OOM_OBSERVED"] })
+    expect(JSON.stringify({ samples, summary })).toBe(before)
+  }
+})
+
+test("resource incidents retain a known OOM increase even when its counter later resets", () => {
+  const samples = [5, 6, 1].map((oom, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: null, collector_cgroup: { path: "/controlled-receipt", memory_events: { oom, oom_kill: 0 } } },
+  }))
+  const summary = summarizeResourceSamples(samples)
+  expect(summary.metrics.find(series => series.metric === "memory_events.oom")).toMatchObject({ delta: null, counter_resets: 1, counter_increases: 1 })
+  expect(assessResourceIncidents({ samples, summary })).toEqual({ status: "failed", codes: ["CGROUP_OOM_OBSERVED"] })
+})
+
+test("resource incidents cannot pass reset, interrupted or single-observation OOM series", () => {
+  for (const counts of [[5, 1, 1], [5, null, 5], [5]]) {
+    const samples = counts.map((oom, index) => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+      host: { cpu: null, memory: null, collector_cgroup: { path: "/controlled-receipt", memory_events: oom === null ? null : { oom, oom_kill: 0 } } },
+    }))
+    expect(assessResourceIncidents({ samples, summary: summarizeResourceSamples(samples) }))
+      .toEqual({ status: "incomplete", codes: ["CGROUP_OOM_OBSERVATIONS_INCOMPLETE"] })
+  }
+})
+
+test("resource incidents reject Docker OOM state even without a surviving running epoch", () => {
+  const samples = [0, 1].map(index => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: null }, containers: [{ container_id: "a".repeat(64), epoch_stable: index === 0,
+      inspect: { started_at: "observed-epoch", oom_killed: index === 1 } }],
+  }))
+  expect(assessResourceIncidents({ samples, summary: summarizeResourceSamples(samples) }))
+    .toEqual({ status: "failed", codes: ["CONTAINER_OOM_OBSERVED"] })
+})
+
+test("resource incidents cannot infer an absent Docker OOM observation as false", () => {
+  for (const oomKilled of [undefined, null, "false"]) {
+    const samples = [0, 1].map(index => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+      host: { cpu: null, memory: null }, containers: [{ container_id: "a".repeat(64), epoch_stable: true,
+        inspect: { started_at: "observed-epoch", oom_killed: index === 0 ? false : oomKilled } }],
+    }))
+    expect(assessResourceIncidents({ samples, summary: summarizeResourceSamples(samples) }))
+      .toEqual({ status: "incomplete", codes: ["CONTAINER_OOM_OBSERVATIONS_INCOMPLETE"] })
+  }
+})
 
 test("parallel acceptance fails on an intermediate rate limit even when the measured retry succeeds", () => {
   const receipt = {

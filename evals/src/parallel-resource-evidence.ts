@@ -33,7 +33,12 @@ export async function readResourceEvidence(input: { file: string; samplesFile: s
   const expected = resourceEvidence(source.file, bytes)
   if (saved.run_id !== input.runId || expected.receipt.run_id !== input.runId || saved.phase !== input.phase || expected.receipt.phase !== input.phase)
     throw new EvalFailure("RESOURCE_RECEIPT_CONTEXT_MISMATCH", 2)
-  if (JSON.stringify(saved.summary) !== JSON.stringify(expected.receipt.summary)) throw new EvalFailure("RESOURCE_SUMMARY_MISMATCH", 2)
+  const savedMetrics = resourceObject(saved.summary).metrics
+  // Older receipts omit this derived field; raw bytes still determine its returned value.
+  const comparable = { ...expected.receipt.summary, metrics: expected.receipt.summary.metrics.map((metric, index) =>
+    Object.fromEntries(Object.entries(metric).filter(([key]) => key !== "counter_increases" ||
+      Array.isArray(savedMetrics) && resourceObject(savedMetrics[index]).counter_increases !== undefined))) }
+  if (JSON.stringify(saved.summary) !== JSON.stringify(comparable)) throw new EvalFailure("RESOURCE_SUMMARY_MISMATCH", 2)
   return expected
 }
 
