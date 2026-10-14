@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { createPair, destroyPair, pairImages, readServerIdentity } from "../src/parallel-pair"
+import { createPair, destroyPair, pairImages, readServerIdentity, verifyParallelPair } from "../src/parallel-pair"
 import { parseSlots } from "../src/slots"
 import { cleanupIsolatedStorage } from "../src/artifact"
 import { writeLeaseReceipt } from "../src/lease"
@@ -34,6 +34,26 @@ integration("research pair: real create qualifies private route and epoch withou
     expect(created.status).toBe("infrastructure-ready")
     expect(created.identity.containerId).toMatch(/^[a-f0-9]{64}$/)
     expect(created.identity.serverEpoch).toMatch(/^[a-f0-9]{64}$/)
+    const journalBytes = await Bun.file(`${root}/controller/pair.json`).text()
+    expect(await verifyParallelPair(file, created.identity)).toEqual(created.identity)
+    expect(await Bun.file(`${root}/controller/pair.json`).text()).toBe(journalBytes)
+    await expect(verifyParallelPair(file, { ...created.identity, serverEpoch: "f".repeat(64) })).rejects.toThrow("SERVER_EPOCH_CHANGED")
+    const marker = (await Bun.$`docker exec ${created.identity.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet()).text()
+    try {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/.loginom-evals-isolated.json'} sh ${JSON.stringify({ ...JSON.parse(marker), inventory: [{ username: "eval-a", storage_dir: "/workdir/UserStorage/../SessionBackup", owner_nonce: created.nonce }] })}`.quiet()
+      await expect(verifyParallelPair(file, created.identity)).rejects.toThrow("PAIR_MARKER")
+    } finally {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/.loginom-evals-isolated.json'} sh ${marker}`.quiet()
+    }
+    const components = (await Bun.$`docker exec ${created.identity.containerId} cat /workdir/Components.cfg`.quiet()).text()
+    try {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/Components.cfg'} sh ${components.replace('Disabled="true"', 'Disabled="false"')}`.quiet()
+      await expect(verifyParallelPair(file, created.identity)).rejects.toThrow("PAIR_COMPONENTS_UNVERIFIED")
+    } finally {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/Components.cfg'} sh ${components}`.quiet()
+    }
+    expect(await verifyParallelPair(file, created.identity)).toEqual(created.identity)
+    expect(await Bun.file(`${root}/controller/pair.json`).text()).toBe(journalBytes)
     const conflict = { ...file, server: { ...file.server, container: `${name}-conflict-server`, studioContainer: `${name}-conflict-studio`, network: `${name}-conflict` },
       controller: { ...file.controller, stateDir: `${root}/conflict-controller` } }
     await expect(createPair(conflict, options)).rejects.toThrow("PAIR_PORT_BUSY")
