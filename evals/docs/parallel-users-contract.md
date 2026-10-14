@@ -48,6 +48,12 @@ metadata, run и fixed_at строго до startedAt. checkResourceEvidence п�
 budget file+captured SHA либо null (incomplete), сохраняя budget_source в result.
 Файл не перезаписывается; изменение caller bounds не меняет frozen snapshot.
 Этот механизм ещё не выбирает live thresholds и не заменяет mandatory manifest.
+sampleServerFilesystems читает только fixed UserStorage/SessionBackup capacity
+в подтверждённом Server container: exact ID/image/name/owner labels и running
+PID/startedAt проверяются вокруг read-only stat probe. CLI environment PATH-only,
+stat environment очищен; неизвестный root даёт null, healthy root сохраняется.
+Host filesystem не подставляется. Primitive проверен на bounded pinned image
+с tmpfs/sentinel; periodic frame/schema/summary и live admission ещё не wired.
 
 ## Конфигурация и граница режимов
 

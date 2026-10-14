@@ -5,6 +5,8 @@ import { EvalFailure } from "./fail"
 import type { SlotFile } from "./slots"
 import type { ProcessIdentity, ProcessOwner } from "./process-supervisor"
 
+type ResourceContainer = NonNullable<Awaited<ReturnType<typeof loadResourceContainers>>>[number]
+
 export async function sampleSupervisedResources() {
   const { supervisedProcesses } = await import("./process-supervisor")
   const snapshot = supervisedProcesses()
@@ -109,10 +111,43 @@ export async function collectHostResources(input: {
   } finally { await handle.close() }
 }
 
-async function sampleBoundContainerResources(target: NonNullable<Awaited<ReturnType<typeof loadResourceContainers>>>[number]) {
+export async function sampleServerFilesystems(target: ResourceContainer) {
+  if (target.role !== "server" || !/^[0-9a-f]{64}$/.test(target.id)) throw new EvalFailure("RESOURCE_STORAGE_TARGET", 2)
+  const paths = ["/workdir/UserStorage", "/workdir/SessionBackup"]
+  const before = await containerInspection(target.id).catch(() => null)
+  const bound = matchesResourceContainer(before, target) && before!.running
+  const child = bound ? Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", target.id,
+    "/usr/bin/env", "-i", "/usr/bin/timeout", "--signal=KILL", "1s", "/usr/bin/stat", "-f", "--printf=%n\t%a %b %S %d %c\n", ...paths],
+    { env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, stdin: "ignore", stdout: "pipe", stderr: "ignore" }) : undefined
+  const timer = child ? setTimeout(() => child.kill("SIGKILL"), 3000) : undefined
+  const result = child ? await Promise.allSettled([new Response(child.stdout).text(), child.exited]).finally(() => clearTimeout(timer)) : null
+  const after = bound ? await containerInspection(target.id).catch(() => null) : null
+  const stable = bound && matchesResourceContainer(after, target) && after!.running && before!.pid === after!.pid && before!.started_at === after!.started_at
+  const rows = result?.[0].status === "fulfilled" && result[1].status === "fulfilled" && [0, 1].includes(result[1].value)
+    ? result[0].value.trimEnd().split("\n").map(line => {
+      const fields = line.match(/^([^\t]+)\t(\d+) (\d+) (\d+) (\d+) (\d+)$/)
+      return fields ? { path: fields[1], values: fields.slice(2).map(Number) } : null
+    }).filter(row => row !== null) : []
+  const filesystems = paths.map(file => {
+    const matches = rows.filter(row => row.path === file), values = matches.length === 1 ? matches[0]!.values : undefined
+    const capacity = stable && values?.length === 5 && values.every(Number.isSafeInteger)
+      ? { total_bytes: values[1]! * values[2]!, available_bytes: values[0]! * values[2]!, total_inodes: values[4]!, available_inodes: values[3]! } : null
+    const valid = capacity && Object.values(capacity).every(value => Number.isSafeInteger(value) && value >= 0)
+    return { path: file, capacity: valid ? capacity : null, error: valid ? null : "SERVER_FILESYSTEM_UNAVAILABLE" }
+  })
+  return { container_id: target.id, inspect: before, observed_at: new Date().toISOString(), epoch_stable: Boolean(stable), filesystems,
+    errors: [...(!bound ? ["SERVER_STORAGE_IDENTITY_UNVERIFIED"] : !stable ? ["SERVER_STORAGE_EPOCH_UNVERIFIED"] : []),
+      ...filesystems.flatMap(file => file.error ? [file.error] : [])] }
+}
+
+function matchesResourceContainer(inspect: Awaited<ReturnType<typeof containerInspection>>, target: ResourceContainer) {
+  return inspect?.name === `/${target.name}` && inspect.image === target.image && inspect.owner_kind === "users" &&
+    inspect.owner_nonce === target.nonce && inspect.purpose === target.purpose
+}
+
+async function sampleBoundContainerResources(target: ResourceContainer) {
   const sample = await sampleContainerResources(target.id)
-  if (sample.inspect?.name === `/${target.name}` && sample.inspect.image === target.image &&
-    sample.inspect.owner_kind === "users" && sample.inspect.owner_nonce === target.nonce && sample.inspect.purpose === target.purpose)
+  if (matchesResourceContainer(sample.inspect, target))
     return { ...sample, role: target.role }
   return { ...sample, role: target.role, cpu: null, memory: null, pids: null, io: null, raw_stats: null, cgroup: null,
     errors: [...sample.errors, "CONTAINER_IDENTITY_UNVERIFIED"] }

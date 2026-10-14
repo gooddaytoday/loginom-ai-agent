@@ -3,13 +3,61 @@ import path from "node:path"
 import os from "node:os"
 import { chmod, mkdtemp, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
-import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
+import { collectHostResources, sampleCgroupResources, sampleContainerResources, sampleServerFilesystems } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
 import { assessCgroupCoverage, assessResourceTimeline, checkResourceEvidence } from "../src/parallel-acceptance"
 import { freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("server filesystem sampling binds private container storage and preserves its contents", async () => {
+  const image = pairImages.server, nonce = crypto.randomUUID(), name = `evals-storage-${nonce}`
+  const created = await Bun.$`docker --host unix:///var/run/docker.sock run --detach --pull=never --name ${name} --label loginom.evals.kind=users --label loginom.evals.nonce=${nonce} --label loginom.evals.purpose=research --env LOGINOM_ADMIN_PASSWORD=storage-private-env-canary --network none --read-only --tmpfs /workdir:size=16m --cap-drop ALL --security-opt no-new-privileges --memory 64m --cpus 0.25 --pids-limit 16 --entrypoint /bin/sh ${image} -c ${"mkdir -p /workdir/UserStorage /workdir/SessionBackup; printf 'storage-content-canary' > /workdir/UserStorage/sentinel; exec sleep 600"}`.quiet().nothrow()
+  expect(created.exitCode).toBe(0)
+  const id = created.text().trim()
+  expect(id).toMatch(/^[0-9a-f]{64}$/)
+  try {
+    const deadline = Date.now() + 5000
+    while ((await Bun.$`docker --host unix:///var/run/docker.sock exec ${id} test -f /workdir/UserStorage/sentinel`.quiet().nothrow()).exitCode !== 0) {
+      if (Date.now() > deadline) throw Error("Storage fixture did not initialize")
+      await Bun.sleep(10)
+    }
+    const before = await Bun.$`docker --host unix:///var/run/docker.sock exec ${id} sha256sum /workdir/UserStorage/sentinel`.quiet().nothrow()
+    expect(before.exitCode).toBe(0)
+    const sample = await sampleServerFilesystems({ role: "server", id, name, image, nonce, purpose: "research" })
+    expect(sample).toMatchObject({ container_id: id, epoch_stable: true, errors: [] })
+    expect(sample.filesystems.map(file => file.path)).toEqual(["/workdir/UserStorage", "/workdir/SessionBackup"])
+    for (const file of sample.filesystems) {
+      expect(file.capacity?.total_bytes).toBe(16 * 1024 * 1024)
+      expect(file.capacity?.available_bytes).toBeGreaterThan(0)
+      expect(file.capacity?.available_bytes).toBeLessThanOrEqual(file.capacity!.total_bytes)
+      expect(file.capacity?.available_inodes).toBeGreaterThan(0)
+      expect(file.capacity?.available_inodes).toBeLessThanOrEqual(file.capacity!.total_inodes)
+    }
+    expect(JSON.stringify(sample)).not.toContain("storage-private-env-canary")
+    const after = await Bun.$`docker --host unix:///var/run/docker.sock exec ${id} sha256sum /workdir/UserStorage/sentinel`.quiet().nothrow()
+    expect(after.exitCode).toBe(0)
+    expect(after.text()).toBe(before.text())
+    expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${id} rmdir /workdir/SessionBackup`.quiet().nothrow()).exitCode).toBe(0)
+    const partial = await sampleServerFilesystems({ role: "server", id, name, image, nonce, purpose: "research" })
+    expect(partial.epoch_stable).toBe(true)
+    expect(partial.filesystems[0]!.capacity?.total_bytes).toBe(16 * 1024 * 1024)
+    expect(partial.filesystems[1]!.capacity).toBeNull()
+    expect(partial.errors).toContain("SERVER_FILESYSTEM_UNAVAILABLE")
+    const refused = await sampleServerFilesystems({ role: "server", id, name, image, nonce: crypto.randomUUID(), purpose: "research" })
+    expect(refused.epoch_stable).toBe(false)
+    expect(refused.filesystems.every(file => file.capacity === null)).toBe(true)
+    expect(refused.errors).toContain("SERVER_STORAGE_IDENTITY_UNVERIFIED")
+    await expect(sampleServerFilesystems({ role: "studio", id, name, image, nonce, purpose: "research" })).rejects.toThrow("RESOURCE_STORAGE_TARGET")
+    await expect(sampleServerFilesystems({ role: "server", id: id.slice(0, 12), name, image, nonce, purpose: "research" })).rejects.toThrow("RESOURCE_STORAGE_TARGET")
+  } finally {
+    const owned = await Bun.$`docker --host unix:///var/run/docker.sock inspect --format ${'{{.Id}}|{{.Image}}|{{index .Config.Labels "loginom.evals.nonce"}}'} ${id}`.quiet().nothrow()
+    expect(owned.exitCode).toBe(0)
+    expect(owned.text().trim()).toBe(`${id}|${image}|${nonce}`)
+    expect((await Bun.$`docker --host unix:///var/run/docker.sock rm --force --volumes ${id}`.quiet().nothrow()).exitCode).toBe(0)
+  }
+}, 15000)
 
 test("resource CLI binds both pinned container roles from its private pair fixture journal", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-docker-cli-"))
