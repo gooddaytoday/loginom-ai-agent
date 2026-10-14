@@ -34,18 +34,29 @@ export async function prepareWorkspace(page, options, terminal) {
     if(retainOriginalRealm) {
       // Runs in the original browser realm before reserve/effect/creation. Only
       // cached data properties are read; no GetFileStorage/QueryInterface/RPC.
+      const slots=[];
       const ref=(object,key)=>{
+        const chain=[];
         for(let current=object;current;current=Object.getPrototypeOf(current)) {
+          chain.push(current);
           const d=Object.getOwnPropertyDescriptor(current,key);
-          if(d){if(!('value' in d))throw Error('TERMINAL_REALM_ACCESSOR');return d.value;}
+          if(d){if(!('value' in d))throw Error('TERMINAL_REALM_ACCESSOR');
+            slots.push({object,key,owner:current,chain:Object.freeze(chain),prototype:Object.getPrototypeOf(object),value:d.value,
+              writable:d.writable,enumerable:d.enumerable,configurable:d.configurable});return d.value;}
         }
         throw Error('TERMINAL_REALM_MISSING_'+key);
       };
       const root=globalThis,app=ref(ref(root,'bg'),'app'),main=ref(ref(ref(app,'Application'),'FInstance'),'FMainForm');
-      const connection=ref(ref(main,'FMapTree'),'FServerConnection'),nativeSession=ref(connection,'Session');
-      const account=ref(connection,'UserName');if(account!==expectedAccount)throw Error('TERMINAL_REALM_ACCOUNT_CHANGED');
+      const mapTree=ref(main,'FMapTree'),connection=ref(mapTree,'FServerConnection');
+      // Verified application publisher fields, not public Session/UserName getters.
+      const applicationSession=ref(connection,'FSession'),nativeSession=ref(applicationSession,'$S');
+      const urlUtils=ref(main,'FUrlUtils'),fileStorage=ref(urlUtils,'FFileStorage');
+      const storageSession=ref(fileStorage,'$S'),storageId=ref(fileStorage,'$');
+      if(!nativeSession||storageSession!==nativeSession||storageId==null)throw Error('TERMINAL_REALM_STORAGE_REPRESENTATION');
+      const account=ref(connection,'FUsername');if(account!==expectedAccount)throw Error('TERMINAL_REALM_ACCOUNT_CHANGED');
       const rpc=ref(root,'rpc'),bg=ref(root,'bg'),bgRpc=ref(bg,'rpc');
-      const bindings={document,preparation:state,receipts:ref(state,'receipts'),connection,nativeSession,account,
+      const bindings={document,preparation:state,receipts:ref(state,'receipts'),main,mapTree,connection,
+        applicationSession,urlUtils,fileStorage,storageSession,storageId,nativeSession,account,
         ObjectProxy:ref(rpc,'TBGObjectProxy'),FileStorage:ref(bgRpc,'TIBGFileStorage_Proxy'),
         StreamPersistProxy:ref(bgRpc,'TIBGStreamPersist_Proxy'),StreamPersist:ref(bg,'IBGStreamPersist'),
         ss:ref(root,'ss'),GuidHelper:ref(rpc,'GuidHelper'),MessageDynamicData:ref(rpc,'TBGMessageDynamicData'),HResult:ref(rpc,'HResult')};
@@ -57,18 +68,28 @@ export async function prepareWorkspace(page, options, terminal) {
         connected:ref(bindings.FileStoragePrototype,'get_Connected'),currentDirectory:ref(bindings.FileStoragePrototype,'get_CurrentDirectory'),
         ownDirectory:ref(bindings.FileStoragePrototype,'get_IsOwnCurrentDirectory'),rootPath:ref(bindings.FileStoragePrototype,'get_RootPath'),
         persist:ref(bindings.StreamPersistPrototype,'SaveToStream')});
+      if(ref(fileStorage,'get_Connected')!==bindings.connected||ref(fileStorage,'QueryInterface')!==bindings.query)
+        throw Error('TERMINAL_REALM_STORAGE_REPRESENTATION');
       const descriptor=Object.getOwnPropertyDescriptor(state,'terminalOriginalRealm');
       if(descriptor&&!('value' in descriptor))throw Error('TERMINAL_REALM_ACCESSOR');
       if(descriptor) {
         const retained=descriptor.value;
-        if(!Object.isFrozen(retained)||Object.keys(bindings).some(k=>ref(retained,k)!==bindings[k]))
+        const retainedSlots=Object.getOwnPropertyDescriptor(retained,'slots');
+        if(!retainedSlots||!('value' in retainedSlots))throw Error('TERMINAL_REALM_ACCESSOR');
+        const originalSlots=retainedSlots.value;
+        if(!Array.isArray(originalSlots))throw Error('TERMINAL_REALM_REPLACED');
+        if(!Object.isFrozen(retained)||Object.keys(bindings).some(k=>Object.getOwnPropertyDescriptor(retained,k)?.value!==bindings[k])
+          ||originalSlots.length!==slots.length||slots.some((slot,i)=>Object.keys(slot).some(k=>k==='chain'
+            ?slot.chain.length!==originalSlots[i].chain.length||slot.chain.some((v,j)=>v!==originalSlots[i].chain[j])
+            :!Object.is(slot[k],originalSlots[i][k]))))
           throw Error('TERMINAL_REALM_REPLACED');
       } else {
         if(mode!=='lookup')throw Error('TERMINAL_REALM_LATE_CAPTURE');
-        // Do not invent a cached CurrentUser/FileStorage receiver from types or
-        // __Session.$R IDs. Their defining cache producer is not yet qualified.
+        // FileStorage backing slots are retained; the projected UI User still
+        // cannot supply the original argument of CurrentUser.Set.
         Object.defineProperty(state,'terminalOriginalRealm',{value:Object.freeze({...bindings,
-          nativeReceiversQualified:false,reason:'CACHED_CURRENT_USER_FILE_STORAGE_PRODUCER_UNQUALIFIED'})});
+          slots:Object.freeze(slots.map(slot=>Object.freeze(slot))),
+          nativeReceiversQualified:false,reason:'ORIGINAL_USER_BEFORE_PROJECTION_NOT_RETAINED'})});
       }
     }
     const visible = e => !!e && !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height
@@ -157,14 +178,16 @@ export async function prepareWorkspace(page, options, terminal) {
       const creation={document,documentId:state.id,request:current.request,
         operationId:options.operationId,sessionId:options.sessionId,
         tab,packageNode,packageProxy:dataRef(packageNode,'Package'),connection,
-        nativeSession:dataRef(connection,'Session'),account:connection?.UserName,path};
+        nativeSession:retainOriginalRealm?state.terminalOriginalRealm.nativeSession:dataRef(connection,'Session'),
+        account:retainOriginalRealm?state.terminalOriginalRealm.account:connection?.UserName,path};
       if(current.terminalOriginalCreation) {
         if(Object.keys(creation).some(key=>!Object.is(creation[key],current.terminalOriginalCreation[key])))
           return {error:'WORKFLOW_CHANGED'};
       } else current.terminalOriginalCreation=Object.freeze(creation);
       current.tab=tab;current.packageNode=packageNode;current.crumbs=crumbs;current.phase='verified';
       current.workflowId ??= knownWorkflow?.workflowId ?? state.id+'-'+(state.sequence=(state.sequence??0)+1);
-      return {document_id:state.id,loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
+      return {document_id:state.id,loginom_account:retainOriginalRealm?state.terminalOriginalRealm.account:
+        app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
         workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:current.workflowId},
         package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},preserved_workflows:preserved,
         ownership_verified:options.intent==='new_draft',target_verified:true,

@@ -160,6 +160,13 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
   if(Object.values(proxyIds).some(value=>!Number.isInteger(value)||value<0))fail('DISCONNECTED');
   const proxyDependencies=take(proxy,['$II','$GetProxyMetaClass']);
   if(data(proxy,'$S')!==values.nativeSession)fail('FOREIGN_SESSION');
+  // Realm capsule records the verified application backing fields. Never
+  // invoke public Session/UserName getters or treat UI CurrentUser as a receiver.
+  const realmDescriptor=Object.getOwnPropertyDescriptor(preparation,'terminalOriginalRealm');
+  if(realmDescriptor&&!('value' in realmDescriptor))fail('ACCESSOR');
+  const realm=realmDescriptor?.value;
+  if(realm&&(data(realm,'connection')!==values.connection||data(realm,'nativeSession')!==values.nativeSession
+    ||data(realm,'fileStorage')!==start.nativeRefs.fileStorage||data(realm,'account')!==values.account))fail('FOREIGN_CREATION');
   const original=Object.freeze({...start.owner,...start.nativeRefs,tab:values.tab,
     packageNode:values.packageNode,packageProxy:proxy,path:values.path});
   const check=()=>{
@@ -169,8 +176,24 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
       ||data(receipt,'request')!==values.request||data(preparation,'document')!==values.document
       ||data(preparation,'id')!==values.documentId||start.receiptReader.read(values.operationId)!==receipt)fail('CREATION_REPLACED');
     same(creation,values);
-    if(data(values.packageNode,'Package')!==proxy||data(values.connection,'Session')!==values.nativeSession
-      ||data(values.connection,'UserName')!==values.account||data(proxy,'$')!==identity
+    if(realm){
+      if(data(preparation,'terminalOriginalRealm')!==realm
+        ||data(values.connection,'FSession')!==data(realm,'applicationSession')
+        ||data(data(realm,'applicationSession'),'$S')!==values.nativeSession
+        ||data(values.connection,'FUsername')!==values.account
+        ||data(data(realm,'urlUtils'),'FFileStorage')!==start.nativeRefs.fileStorage)fail('NATIVE_REPLACED');
+      for(const slot of data(realm,'slots')){
+        let effective=slot.object;for(const member of slot.chain){
+          if(effective!==member)fail('NATIVE_REPLACED');
+          if(Object.hasOwn(effective,slot.key))break;effective=Object.getPrototypeOf(effective);
+        }
+        if(effective!==slot.owner)fail('NATIVE_REPLACED');
+        const d=Object.getOwnPropertyDescriptor(effective,slot.key);
+        if(Object.getPrototypeOf(slot.object)!==slot.prototype||!d||!('value' in d)
+          ||!Object.is(d.value,slot.value)||d.writable!==slot.writable
+          ||d.enumerable!==slot.enumerable||d.configurable!==slot.configurable)fail('NATIVE_REPLACED');}
+    }else if(data(values.connection,'Session')!==values.nativeSession||data(values.connection,'UserName')!==values.account)fail('NATIVE_REPLACED');
+    if(data(values.packageNode,'Package')!==proxy||data(proxy,'$')!==identity
       ||data(proxy,'$S')!==values.nativeSession)fail('NATIVE_REPLACED');
     const rawPath=data(values.packageNode,'PackageFileName');
     const path=typeof rawPath==='string'&&rawPath?'/'+rawPath.replaceAll('\\','/').replace(/^\/+/, ''):null;

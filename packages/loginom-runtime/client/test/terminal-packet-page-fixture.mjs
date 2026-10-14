@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {createContext,runInContext} from 'node:vm';
 const build='7.4.2';
 function pageFixture({ authenticated = false, workflow = false, actualBuild = build, loseReply = false, blocked = false, entryDelay = 0, busyTicks = 0, native } = {}) {
+  // Genuine raw FileStorage proxy inherits the loaded ObjectProxy methods.
+  Object.setPrototypeOf(native.definitions.FileStoragePrototype,native.definitions.ObjectProxyPrototype);
   const events = [], tabs = [], packages = new Map();
   let url = 'about:blank', active = null, openedPath = null;
   const element = (tid, text = '') => ({tid,textContent:text,innerHTML:'',isConnected:true,
@@ -31,7 +33,10 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
       return exact?tabs.flatMap(t=>[t.graph,t.area,t.home]).filter(e=>e && e.tid===JSON.parse(exact[1])):[];
     }},bg:{app:{Version:actualBuild,PackageTreeNode:PackageNode,Application:{FInstance:{FMainForm:{Items:{Workspace:{
       getActiveTab:()=>({Controller:{Node:{data:{node:packages.get(active)}}}}),
-    }},FMapTree:{FServerConnection:{UserName:'test-account',Session:native.session}}}}}}}}));
+    }},FUrlUtils:{FFileStorage:native.storage},FMapTree:{FServerConnection:{
+      FUsername:'test-account',FSession:{$S:native.session},
+      get UserName(){return this.FUsername},get Session(){return this.FSession}
+    }}}}}}}}));
   const locator = selector => ({
     or() { return this; }, first() { return this; }, async waitFor() {}, async inputValue() { return ''; },
     async isVisible() {
