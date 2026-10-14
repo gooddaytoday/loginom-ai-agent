@@ -25,6 +25,28 @@ rebuild runtime не нужен.
 
 ### Коррекция после нарушения tags/2
 
+Новая версия skill исправлена отдельным commit `d99389dd2a`:17 строк в двух
+Product md, без handler/runtime изменений. Новый asset-only candidate
+`20261014T185528Z-ad0f2b`, digest `0ca88b2d03b546c358ce988637560a1c2c877581edd102252c7c66ec06e4b21b`.
+Штатная проверка installed Product skills, ссылки и payload manifest прошли;
+runtime остался659588. Изменены только два skill assets и два manifest-файла.
+Canonical quick_validate не поддерживает прежнее поле compatibility;
+проекция без этого поля прошла, реальное поле сохранено и accepted Host validator.
+Старая серия и её FAIL/violation не меняются. Новых моделей пока нет.
+
+Проверка новой версии сохраняет31позицию:6 completed baseline references и25
+новых candidate. Контракт [baseline reuse](../../../evals/docs/2026-10-14-node-selection-baseline-reuse.md)
+фиксируется до реализации/первого dispatch. Старые baseline identities и все
+шесть исходных исходов сохраняются; новые C17 старой версии не засчитываются.
+Controller получает только explicit opt-in/read-only existingOnly без fallback,
+сопоставимость и release проверяются до dispatch. Порядок C9→B6references→C16.
+Baseline описательный: один замер каждой задачи, историческое время исполнения;
+повторяемость baseline и статистическая эквивалентность не утверждаются.
+
+- [x] Исправить две инструкции skill по подтверждённому JS scope violation и проверить новый asset-only комплект без пересборки runtime.
+- [ ] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
+- [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
+
 Дизайн следующей версии: [JS gap scope correction](../specs/2026-10-14-loginom-js-gap-scope-correction.md).
 Перед JS проверяется соответствие каждой операции в коде обоснованному пробелу.
 Для переменного split JS оставляет исходные части; доступные Trim/Filter/Group/Sort
