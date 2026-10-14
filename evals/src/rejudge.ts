@@ -11,13 +11,14 @@ import { createJudgeGate, judgeInfo, judgedFields, type JudgeSettings } from "./
 import { aggregate, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
 import { describe, installSigint } from "./run"
 
-export async function rejudge(config: EvalConfig, runId: string) {
+export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?: (directory: string) => Promise<void>) {
   const controller = new AbortController()
   const removeSigint = installSigint(controller)
   try {
     const runDir = path.join(config.resultsDir, runId)
     const summaryFile = Bun.file(path.join(runDir, "summary.json"))
     if (!(await summaryFile.exists())) throw new EvalFailure(`Нет прогона ${runId}: ${runDir}/summary.json не найден`, 2)
+    await onRunDirectory?.(runDir)
     const prev = (await summaryFile.json()) as RunSummary
     const saved = await Bun.file(path.join(runDir, "config.json")).json().catch(() => undefined) as { tasksDir?: unknown } | undefined
     const tasksDir = config.tasksDirExplicit
