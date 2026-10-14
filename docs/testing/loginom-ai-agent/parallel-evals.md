@@ -161,6 +161,21 @@ Unknown clocks либо неполное окно дают incomplete. Actual su
 Ресурсный regression:81 PASS/564 assertions по семи files, typecheck/diff PASS.
 Frozen manifest и process lifetime coverage ещё не подключены к coordinator.
 
+Resource evidence coordinator читает verified raw bundle и применяет named
+timeline/coverage/cgroups/budget/incidents checks. Frozen declared budget создаётся
+через freezeResourceBudget: новый private/fsynced файл, automatic fixed_at,
+captured SHA до dispatch. checkResourceEvidence принимает этот file+SHA и
+проверяет bytes/run/time через readFrozenResourceBudget; post-run inline bounds
+не дают admission. Изменённые thresholds/source отвергаются, original files
+не перезаписываются. Actual fs budget2 PASS/22; policy/source/summary53 PASS/276,
+actual1000ms supervised command/coordinator PASS/12, typecheck/diff PASS.
+OOM/oom_kill positive transitions и Docker oom_killed отвергают resource gate;
+memory_events.counter_increases сохраняет known events после reset. Unknown
+observations дают incomplete. Historical summaries без optional field читаются
+с пересчётом raw source без переписывания; forged present field отвергается.
+Полный mandatory manifest, qualified runner anchor, lifetime coverage, server
+storage capacity, licence/limit producers и live dispatch ещё требуют реализации.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
