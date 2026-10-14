@@ -29,8 +29,14 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
   const scoped: EvalConfig = { ...config, judge: { ...config.judge,
     env: { ...config.judge.env, CODEX_HOME: environment.codexHome } } }
   let released = false
+  let runDir: string | null = null
+  const recordRunDirectory = async (directory: string) => {
+    runDir = directory
+    await writeLeaseReceipt(journal, { version: 2, kind: "offline-judge-command", commandId, state: "running", runDir })
+  }
   try {
-    const result = scoped.judgeOnly === undefined ? await calibrate(scoped) : await rejudge(scoped, scoped.judgeOnly)
+    const result = scoped.judgeOnly === undefined ? await calibrate(scoped, undefined, recordRunDirectory) : await rejudge(scoped, scoped.judgeOnly, recordRunDirectory)
+    runDir = result.runDir
     if (!result.judgeCleanupConfirmed) {
       await writeLeaseReceipt(journal, { version: 2, kind: "offline-judge-command", commandId, state: "quarantined", runDir: result.runDir })
       return { ...result, code: 1 }
@@ -44,7 +50,7 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
     return result
   } catch (error) {
     if (!released) await writeLeaseReceipt(journal, { version: 2, kind: "offline-judge-command", commandId,
-      state: "quarantined", reason: "command-failed" })
+      state: "quarantined", reason: "command-failed", runDir })
     throw error
   } finally { await lease.close() }
 }

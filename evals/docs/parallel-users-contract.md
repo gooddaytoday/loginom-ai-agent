@@ -182,6 +182,11 @@ Infra retry один, после cleanup на том же слоте, замен
 quality FAIL не повторяется. Неназначенные jobs не получают измерений.
 Судья выполняется под одним run-local mutex и host-global canonical CODEX_HOME
 lease; abort ожидания не меняет уже измеренный исход агента.
+Offline controller сохраняет selected/allocated run directory в private журнале
+до evaluation judge; calibrate/rejudge ждут эту запись. При result/release-proof
+persistence exception карантин сохраняет locator, reservation остаётся retained
+и следующий запуск запрещён. Preflight/version probes могут предшествовать
+allocation; полный command-bound process inventory и explicit recovery ещё нужны.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy

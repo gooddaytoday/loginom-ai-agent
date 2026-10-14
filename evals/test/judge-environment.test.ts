@@ -81,12 +81,43 @@ test("offline proof persistence exception quarantines the journal and preserves 
     await expect(pending).rejects.toThrow()
     expect((await Bun.file(reservations[0]!).json()).state).toBe("retained")
     expect((await Bun.file(admitted.journal).json()).state).toBe("quarantined")
-    expect(await Array.fromAsync(new Bun.Glob("*/calibration.json").scan(config.resultsDir))).toHaveLength(1)
+    const completed = await Array.fromAsync(new Bun.Glob("*/calibration.json").scan({ cwd: config.resultsDir, absolute: true }))
+    expect(completed).toHaveLength(1)
+    expect((await Bun.file(admitted.journal).json()).runDir).toBe(path.dirname(completed[0]!))
     const before = await Bun.file(trace).text()
     await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
     expect(await Bun.file(trace).text()).toBe(before)
   } finally { await pending.catch(() => {}); await rm(root, { recursive: true, force: true }) }
 }, 30_000)
+
+test("offline result persistence failure retains the admitted run directory before completion", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-result-error-"))
+  const fixture = await parallelFixture(root)
+  const file = path.join(root, "slots.json"), trace = path.join(root, "judge.jsonl")
+  await writeLeaseReceipt(file, fixture.slots)
+  const config = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
+    EVAL_SLOTS_FILE: file, EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `bun ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --gate-log ${trace} --delay-ms 500`,
+  })
+  const pending = runOfflineJudge(config, fixture.lockRoot)
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(trace).exists(); wait++) await Bun.sleep(10)
+    expect(await Bun.file(trace).exists()).toBe(true)
+    const configs = await Array.fromAsync(new Bun.Glob("*/config.json").scan({ cwd: config.resultsDir, absolute: true }))
+    expect(configs).toHaveLength(1)
+    const runDir = path.dirname(configs[0]!)
+    const reservations = await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: fixture.lockRoot, absolute: true }))
+    const retained = await Bun.file(reservations[0]!).json()
+    expect(await Bun.file(retained.journal).json()).toMatchObject({ state: "running", runDir })
+    await mkdir(path.join(runDir, "calibration.json"))
+    await expect(pending).rejects.toThrow()
+    expect((await Bun.file(reservations[0]!).json()).state).toBe("retained")
+    expect(await Bun.file(retained.journal).json()).toMatchObject({ state: "quarantined", reason: "command-failed", runDir })
+    const before = await Bun.file(trace).text()
+    await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
+    expect(await Bun.file(trace).text()).toBe(before)
+  } finally { await pending.catch(() => {}); await rm(root, { recursive: true, force: true }) }
+}, 30000)
 
 for (const kind of ["missing", "symlink", "hardlink", "public"]) test(`native judge refuses ${kind} auth before any probe or reservation`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-auth-private-"))
@@ -237,6 +268,13 @@ test("offline rejudge releases its lease while preserving historical slot metada
     const rows = (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line))
     expect(rows.filter(row => row.kind === "start")).toHaveLength(2)
     expect(rows.every(row => row.codexHome === fixture.slots.judge.codexHome)).toBe(true)
+    const result = path.join(dry.runDir!, "group-sum-qty", "1", "result.json")
+    await rm(result)
+    await mkdir(result)
+    await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow()
+    const retained = await Bun.file(reservations[0]!).json()
+    expect(retained.state).toBe("retained")
+    expect(await Bun.file(retained.journal).json()).toMatchObject({ state: "quarantined", reason: "command-failed", runDir: dry.runDir })
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
