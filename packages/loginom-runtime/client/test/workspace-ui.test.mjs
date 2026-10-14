@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
+import {pathToFileURL} from 'node:url';
+const {makeWorkspaceUiCode,validateUiAction,workspaceUiCapability}=await import(process.env.WORKSPACE_UI_UNDER_TEST
+  ?pathToFileURL(process.env.WORKSPACE_UI_UNDER_TEST).href:'../lib/workspace-ui.mjs');
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
@@ -1494,6 +1496,49 @@ function wizardStepFixture(page,direction='next') {
   const advance=()=>{marker.remove();page.add('div',base+';TuneDataSourceInputPortWizard;btnAddMappingColumn','',undefined,form);};
   return {base,form,marker,button,advance};
 }
+
+test('wizard step scopes every post-gesture read to its original form without a second gesture',async()=>{
+ for(const fullScanRefuses of [false,true]){
+  const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe();
+  const button=snapshot.ui.elements.find(e=>e.wizard_step),roots=[];
+  page.add('button','MF;global-background-control','Outside wizard',{x:900,y:400,width:50,height:20});
+  const evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>{
+   if(page.events.includes('click')&&Object.hasOwn(arg??{},'rootRef')){
+    roots.push(arg.rootRef);
+    if(fullScanRefuses&&!arg.rootRef)return{ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'controls'}};
+   }
+   return evaluate(fn,arg);
+  };
+  page.waitForTimeout=async()=>{};const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);c.advance();};
+  const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.ok(roots.length>=4);assert.ok(roots.every(r=>r===snapshot.wizard.root_ref));
+  assert.ok(!outcome.output.ui.elements.some(e=>e.tid==='MF;global-background-control'));
+  assert.ok(outcome.trace.some(e=>e.event==='wizard_step_settled'&&e.quiet_samples===3));
+ }
+});
+
+test('wizard step refuses a scan limit inside its original root after one gesture',async()=>{
+ const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ const evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>page.events.includes('click')&&Object.hasOwn(arg??{},'rootRef')
+  ?{ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'controls'}}:evaluate(fn,arg);
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();};
+ page.waitForTimeout=async()=>{};
+ const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
+ assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.error.code,'UI_SCAN_LIMIT');
+ assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(!outcome.trace.some(e=>e.event==='wizard_step_verified'));
+});
+
+test('wizard step scoped read still refuses a foreign global dialog after its gesture',async()=>{
+ const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();const dialog=page.add('div','foreign-dialog','Foreign',{x:500,y:400,width:100,height:100});dialog.attrs.role='dialog';};
+ page.waitForTimeout=async()=>{};
+ const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
+ assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.error.code,'WIZARD_STEP_NOT_CONFIRMED');
+ assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(!outcome.trace.some(e=>e.event==='wizard_step_verified'));
+});
 
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
   for(const direction of ['next','previous']) {
