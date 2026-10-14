@@ -4,11 +4,28 @@ import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { stageUserPreparation } from "../src/user-environment"
+import { readUserPreparation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("user preparation reader rejects a malformed durable nonce without changing the files", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
+  const fixture = await parallelFixture(root)
+  await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  try {
+    const staged = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
+    const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
+    await writeLeaseReceipt(journal, { ...staged, nonce: "f".repeat(36) })
+    const before = await Bun.file(journal).text()
+    const secret = await Bun.file(staged.secretFile).text()
+    await expect(readUserPreparation(fixture.slots, lease, staged.secretFile)).rejects.toThrow("USER_PREPARATION_CONFLICT")
+    expect(await Bun.file(journal).text()).toBe(before)
+    expect(await Bun.file(staged.secretFile).text()).toBe(secret)
+  } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+})
 
 test("user preparation durably stages one nonce and private credential before use", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
@@ -28,6 +45,7 @@ test("user preparation durably stages one nonce and private credential before us
     expect(second).toEqual(first)
     expect(await Bun.file(second.secretFile).text()).toBe(secret)
     expect((await stat(second.secretFile)).ino).toBe(before.ino)
+    expect(await readUserPreparation(fixture.slots, lease, first.secretFile)).toEqual(first)
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
 })
 
@@ -40,6 +58,7 @@ test("user preparation refuses a closed lease before creating an intent or secre
     await lease.close()
     const before = await readdir(fixture.slots.controller.stateDir)
     await expect(stageUserPreparation(fixture.slots, lease, "e".repeat(64))).rejects.toThrow("LEASE_NOT_HELD")
+    await expect(readUserPreparation(fixture.slots, lease, path.join(fixture.slots.controller.stateDir, "prepare-a.secret.json"))).rejects.toThrow("LEASE_NOT_HELD")
     expect(await readdir(fixture.slots.controller.stateDir)).toEqual(before)
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
 })
@@ -146,5 +165,6 @@ test("user preparation refuses credential drift without replacing either durable
     await expect(stageUserPreparation(fixture.slots, lease, "e".repeat(64))).rejects.toThrow("USER_PREPARATION_CONFLICT")
     expect(await Bun.file(journal).text()).toBe(before)
     expect(await Bun.file(staged.secretFile).text()).toBe(altered)
+    await expect(readUserPreparation(fixture.slots, lease, staged.secretFile)).rejects.toThrow("USER_PREPARATION_CONFLICT")
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
 })

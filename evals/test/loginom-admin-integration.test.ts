@@ -5,7 +5,9 @@ import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
 import { openLoginomAdmin } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
-import { loadSlots, parseSlots } from "../src/slots"
+import { acquireSlotLease, loadSlots, parseSlots } from "../src/slots"
+import { writeLeaseReceipt } from "../src/lease"
+import { parallelFixture } from "./helpers/parallel-fixture"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -23,6 +25,14 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   try {
     expect(connection.identity).toEqual(identity)
     await expect(connection.inspect()).rejects.toThrow("SESSION_IDENTITY_UNSUPPORTED")
+    const root = await mkdtemp(path.join(tmpdir(), "evals-admin-closed-lease-"))
+    const fixture = await parallelFixture(root)
+    await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+    const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+    try {
+      await lease.close()
+      await expect(connection.reconcileUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
+    } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
   } finally { await connection.dispose() }
   const directories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-") && !previous.has(name))
   expect(directories).toHaveLength(1)
@@ -53,6 +63,9 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   expect(receipt.processes.browserBindings.length).toBeGreaterThan(0)
   expect(receipt.processes.verification.map((pass: { owned_remaining: number }) => pass.owned_remaining)).toEqual([0, 0])
   expect(await readServerIdentity(file)).toEqual(identity)
+  const commands = await readdir(path.join(file.controller.stateDir, directories[0]!, "commands"))
+  expect((await Promise.all(commands.map(name => Bun.file(path.join(file.controller.stateDir, directories[0]!, "commands", name)).json())))
+    .some(command => command.op === "reconcile-user")).toBe(false)
 }, 90_000)
 
 integration("trusted bridge: failed initialization disposes the actual Node child with durable process proof", async () => {
