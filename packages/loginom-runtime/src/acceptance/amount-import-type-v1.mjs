@@ -5,6 +5,9 @@ import {parseCapabilityResult,withBrowserReceipt} from '../../client/lib/executo
 import {readPreparedNodeContext} from '../../client/lib/node-context.mjs';
 import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
 import {closePreparedWizard} from '../../client/lib/node-wizard-close.mjs';
+import {prepareAmountFormat} from './amount-format-preparation.mjs';
+import {readGraph} from '../../client/lib/node-target-browser.mjs';
+import {NODE_TYPES} from '../../client/lib/node-contracts.mjs';
 import {prepareAmountEditor} from './amount-editor-preparation.mjs';
 import {assertAmountControl,beginAmountControl} from './amount-caller-control.mjs';
 function readCapturePreparation(identity) {
@@ -149,6 +152,7 @@ async function captureAmountInternal({binding,identity,browser,record,caller}) {
   }`);
   return result;
  };
+ await prepareAmountFormat({channel,owner,current,record,readGraph:()=>execute(`async page=>(${readGraph.toString()})(page,${JSON.stringify({request:preparedNodeContext,types:NODE_TYPES,origin:bootstrap.origin,build:identity.loginom_build})})`)});
  await prepareAmountEditor({channel,observe:()=>observe({preparing:true}),owner,current,record});
  return {...identity,...await captureAmountDraft({owner,current,observe,snapshot,cancel:()=>closePreparedWizard(channel),record})};
 }
