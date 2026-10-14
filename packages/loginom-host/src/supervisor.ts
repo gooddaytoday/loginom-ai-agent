@@ -121,6 +121,9 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     string,
     { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; primary?:{value:unknown} }
   >()
+  // The physical Close request owns one callback. A diagnostic timeout may
+  // report failure, but must not discard that callback or dispatch Close again.
+  const originalClose: {reply?:Promise<unknown>;resolve?:(value:unknown)=>void;reject?:(reason:unknown)=>void;first?:{value:unknown}} = {}
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
     child.once("error", () => resolve({ code: 1, signal: null }))
@@ -132,6 +135,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       request.reject(request.primary?request.primary.value:new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     })
     pending.clear()
+    originalClose.reject?.(originalClose.first ? originalClose.first.value : new Error("LOGINOM_RUNTIME_DISCONNECTED"))
   }
   child.on("disconnect", fail)
   child.on("exit", fail)
@@ -192,6 +196,11 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
             ...(startup.phase?{bindingPhase:startup.phase,captureBinding:startup.binding}:{}),rejection:encodeReadRejection(current.primary.value)}})
           return
         }
+        if(operation==="close") {
+          originalClose.first ??= {value:reason}
+          reject(reason)
+          return // retain original pending id until reply/disconnect; never resend
+        }
         pending.delete(id);clearTimeout(timer);control?.signal.removeEventListener("abort",abort)
         // Cancellation belongs to this original request, never the next call.
         if(control && child.connected)child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{requestId:id,rejection:encodeReadRejection(reason)}})
@@ -199,7 +208,9 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       }
       const abort = () => cancel(control!.signal.reason)
       const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
-      pending.set(id, { resolve, reject, timer, ...(startup && (operation==="start" || amountCall)?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      pending.set(id, { resolve:operation==="close"?value=>{originalClose.resolve?.(value);resolve(value)}:resolve,
+        reject:operation==="close"?reason=>{originalClose.first??={value:reason};originalClose.reject?.(originalClose.first.value);reject(reason)}:reject,
+        timer, ...(startup && (operation==="start" || amountCall)?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
       child.send({ id, operation, input: value, ...(operation === "start" || amountCall ? { deadline:control?.deadline??deadline } : {}) }, (error) => { if (error) fail() })
       if(control?.signal.aborted)abort()
@@ -209,7 +220,16 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000)
+      let reply:unknown
+      if(!originalClose.reply) {
+        originalClose.reply=new Promise((resolve,reject)=>{originalClose.resolve=resolve;originalClose.reject=reject})
+        void originalClose.reply.catch(()=>undefined)
+        reply=await request("close",undefined,5000).catch(reason=>{
+          if(!child.connected){originalClose.first??={value:reason};originalClose.reject?.(reason)}
+          throw reason
+        })
+      } else reply=await originalClose.reply // storage/management settlement only
+
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
