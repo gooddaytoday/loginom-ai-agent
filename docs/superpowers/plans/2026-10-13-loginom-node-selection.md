@@ -3576,3 +3576,20 @@ Ledger advance14:15:25.526Z и новый baselineABC dispatch14:15:25.531Z по
 Session ses_ec53b2afaffeQZj5knUAPWS0kN живой в том же exec96749. Никакие прежние
 модели не повторялись, разница phases остаётся только skill. Observed receipt
 `root-auto-baseline-sales-to-abc-observed.json` сохранён wx0400.
+
+### 2026-10-14 14:19 UTC — независимая статическая проверка альтернативы ABC
+
+Prepared alternative-coverage-draft сохранён отдельно от основной матрицы31.
+Self-review `ff5ae710…` честно обозначен как проверка автора proposal. Второй
+reviewer независимо вычислил шесть строк до чтения oracle: total200, cumulative
+100/160/180/190/196/200, fraction .5/.8/.9/.95/.98/1, классы A/A/B/B/C/C.
+Все42 row-cells и18 aggregate-cells совпали; исходные200 строк отдельно совпали
+с18 бизнес-ячеек oracle в .01. Independent review `1f3eff3e…` wx0400:
+Approved-static только для coverage/map/math. Closed current-runtime receipts
+подтверждают компоненты CumulativeSum/Stat и отдельно nestedIF; полная
+IF(CumulativeSum/Stat) в одном Calculator и conditional aggregate evaluation
+не проверены live/parser. Wizard risk остаётся, full typed request ещё нужен.
+Mini6 не равноценен ABC200 по объёму и автономности; обычная Group не заменяет
+накопленную/статистическую/условную проверку. Исходный ABC failed сохраняется.
+Альтернатива не запускалась, в31 не засчитывается и не разрешает новый parallel
+Loginom model/session; prospective условия отдельного запуска ещё нужно закрепить.
