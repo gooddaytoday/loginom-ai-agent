@@ -33,6 +33,8 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
     const connection = await openLoginomAdmin(file, identity)
     try {
       await expect(connection.createBlockedUser(lease, prepared.secretFile)).rejects.toThrow("PAIR_OWNERSHIP")
+      await writeLeaseReceipt(path.join(file.controller.stateDir, "pair.json"), await readLeaseReceipt(path.join(source.controller.stateDir, "pair.json")) as object)
+      await expect(connection.createBlockedUser(lease, prepared.secretFile)).rejects.toThrow("SERVER_FENCE_UNCONFIRMED")
       const directory = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
       const commands = path.join(file.controller.stateDir, directory, "commands")
       expect((await Promise.all((await readdir(commands)).map(name => Bun.file(path.join(commands, name)).json())))
@@ -202,6 +204,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
       await lease.close()
       await expect(connection.createBlockedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.configureOwnedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
+      await expect(connection.reconcileOwnedAcl(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.observeOwnedSession(lease, path.join(root, "never-read.json"), [])).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.closeOwnedSession(lease, path.join(root, "never-read.json"), "never-read")).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.reconcileUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
@@ -220,6 +223,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
         const secretFile = path.join(recoveryRoot, "never-read.json")
         await expect(connection.createBlockedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.configureOwnedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
+        await expect(connection.reconcileOwnedAcl(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.reconcileUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.observeOwnedSession(recovered, secretFile, [])).rejects.toThrow("SLOT_RECOVERY_ONLY")
       } finally { await recovered.close() }

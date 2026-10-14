@@ -23,7 +23,7 @@ import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, mkdir, mkdtemp, open, readdir, realpath } from "node:fs/promises"
-import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
+import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
@@ -42,6 +42,8 @@ export type AdminConnection = {
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
   createBlockedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof readUserOwnership>>>
   configureOwnedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof recordUserConfiguration>>>
+  reconcileOwnedAcl(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string; policy: SharedDirectoryPolicy;
+    source: { path: string; id: string; sha256: string } }>
   observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
@@ -49,7 +51,9 @@ export type AdminConnection = {
   dispose(): Promise<void>
 }
 
-export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity, options: { binary?: string; signal?: AbortSignal } = {}): Promise<AdminConnection> {
+export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity, options: {
+  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>
+} = {}): Promise<AdminConnection> {
   if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
   const binary = options.binary ?? process.env.EVAL_CLI_BIN ?? Bun.which("loginom-ai-agent-cli")
   if (!binary) throw new EvalFailure("ADMIN_RUNTIME_UNAVAILABLE", 2)
@@ -85,6 +89,12 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     const result = sequence.then(async () => {
       if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       if (op === "reconcile-user") await verifyParallelPair(file, identity)
+      if (op === "reconcile-user" || op === "close-session") {
+        if (!options.serverLease || options.serverLease.reservation.key !== `server:${identity.containerId}` ||
+          JSON.stringify(options.serverLease.reservation.identity) !== JSON.stringify(identity) ||
+          op === "reconcile-user" && options.serverLease.reservation.state !== "retained") throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
+        await options.serverLease.assertHeld()
+      }
       await beforeSend?.()
       return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + 30_000, payload })
     })
@@ -202,6 +212,44 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       requireAdminReply(reply)
       return recordUserConfiguration(file, lease, secretFile, path.join(directory, "commands", `${reply.id}.json`), payload, reply)
     },
+    async reconcileOwnedAcl(lease, secretFile) {
+      await lease.assertHeld()
+      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
+      const prepared = await readUserPreparation(file, lease, secretFile)
+      const owned = await readUserOwnership(file, lease, secretFile)
+      if (owned.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+      if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      const configured = await readUserConfiguration(file, lease, secretFile)
+      if (!configured) throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+      const expectedPolicy = (await connection.inspectPolicy()).sharedDirectories
+      const payload = { phase: "acl", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
+        desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: owned.objectId, name: owned.username,
+          userKind: owned.userKind, preparationNonce: owned.preparationNonce, secretHash: configured.secretHash }, expectedPolicy }
+      const reply = await request("reconcile-user", payload, async () => {
+        if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared) ||
+          JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned) ||
+          JSON.stringify(await readUserConfiguration(file, lease, secretFile)) !== JSON.stringify(configured))
+          throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+      })
+      const data = requireAdminReply(reply)
+      if (!jsonObject(data) || Object.keys(data).length !== 2 || !Number.isSafeInteger(data.removed) || Number(data.removed) < 0)
+        throw new EvalFailure("ADMIN_PROTOCOL", 2)
+      const forbidden = (principal: SharedDirectoryPolicy[number]["permissions"][number]) =>
+        principal.name === "Everyone" && principal.userKind === 2 || principal.objectId === owned.objectId && principal.name === owned.username && principal.userKind === 0
+      const policy = sharedPolicy(data.policy)
+      if (data.removed !== expectedPolicy.flatMap(directory => directory.permissions.filter(forbidden)).length ||
+        JSON.stringify(normalizedPolicy(policy)) !== JSON.stringify(normalizedPolicy(expectedPolicy.map(directory =>
+          ({ ...directory, permissions: directory.permissions.filter(principal => !forbidden(principal)) })))))
+        throw new EvalFailure("ADMIN_ACL_READBACK_UNCONFIRMED", 2)
+      const commandFile = path.join(directory, "commands", `${reply.id}.json`)
+      const source = await readLeaseReceipt(commandFile)
+      if (!jsonObject(source) || source.id !== reply.id || source.op !== "reconcile-user" || source.state !== "confirmed" ||
+        JSON.stringify(source.expectedIdentity) !== JSON.stringify(identity) || source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(payload)).digest("hex") ||
+        source.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex")) throw new EvalFailure("ADMIN_ACL_READBACK_UNCONFIRMED", 2)
+      await lease.assertHeld()
+      return { userKey: owned.userKey, aclHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(normalizedPolicy(policy))).digest("hex"), policy,
+        source: { path: commandFile, id: reply.id, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") } }
+    },
     async observeOwnedSession(lease, secretFile, policy) {
       await lease.assertHeld()
       if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
@@ -298,6 +346,12 @@ function sharedPolicy(value: unknown): SharedDirectoryPolicy {
       typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name ||
       ![0, 1, 2].includes(Number(principal.userKind)) || typeof principal.userKind !== "number"))) throw new EvalFailure("ADMIN_PROTOCOL", 2)
   return value as SharedDirectoryPolicy
+}
+
+function normalizedPolicy(policy: SharedDirectoryPolicy) {
+  return policy.map(directory => ({ objectId: directory.objectId, name: directory.name,
+    permissions: directory.permissions.map(principal => ({ objectId: principal.objectId, name: principal.name, userKind: principal.userKind }))
+      .sort((a, b) => a.objectId.localeCompare(b.objectId)) })).sort((a, b) => a.objectId.localeCompare(b.objectId))
 }
 
 export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, output: WritableStream<Uint8Array>, journalDir: string) {
