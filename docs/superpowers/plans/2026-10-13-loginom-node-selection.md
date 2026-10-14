@@ -1,10 +1,27 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты пять candidate,
-политика подтверждена в пяти; один итоговый расчёт правильный, четыре результата
-не получены. Одна сессия завершена штатно, четыре освобождены адресно после отказа.
-Сейчас campaign-roi-by-channel/1 выполняется с20:58:05.501Z, CLI3172809;
-runner3172265/exec39639 продолжает последовательную серию. Ещё19candidate не начаты.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты шесть candidate,
+политика подтверждена во всех шести стандартных сценариях. Один итоговый расчёт
+правильный, пять результатов не получены. Одна сессия завершена штатно, пять
+освобождены адресно после отказа. Активных собственных процессов нет, профиль
+свободен;19candidate ещё не начаты. Следующий слот — explicit-js/1.
+
+Campaign-roi-by-channel/1 closed21:06:16.711Z: policy PASS `dc921fb2…`, mandatory
+failure review `4f990c9e…`;26messages/101parts/28tools/82events/2827runtime,
+JS0/childrennone. Import→Group→Calculator→Sort→Reform выполнены стандартными
+узлами; взвешенный ROI рассчитан из сумм бюджета и выручки. Export native execution
+completed, но read исчерпал поиск файла; полученных CSV/LGP/oracle нет, физическое
+отсутствие CSV не утверждается. Own248closed21:18:29.970Z/admin249logout21:18:31.589Z;
+девять собственных PID завершены, точный guard архивирован.18original/22recovery
+сохранены; descriptor `247773ca…`/review `b0c27565…`/readback `656d4848…`.
+Actual strict-release gate21:24:14.015Z разрешил technical-failed, сохранив FAIL.
+Неизвестная244 закрылась сервером по timeout до действия Root;247 не затронута.
+Уточнение точности mtime `5001ca00…` сохраняет исходную запись и raw nanoseconds.
+
+Шесть отдельных policy-v2 вердиктов и ссылки на исходные попытки закреплены в
+`policy-v2-candidate-first6-before-r2.json` (`2a53cec1…`). Это подтверждает
+содержательное стандартное покрытие, но не заменяет оставшиеся положительные
+проверки JS-исключений и recovery и не означает функциональные PASS отказов.
 
 Sales-by-category/1 closed20:25:22.530Z: policy PASS, oracle/calculationtrue,
 CLI0/cleanuptrue/Host3041636ACKtrue. Sidecar `2172b404…`: полные16messages/
@@ -146,6 +163,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Исправить две инструкции skill по подтверждённому JS scope violation и проверить новый asset-only комплект без пересборки runtime.
 - [x] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
 - [x] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
+- [x] Подтвердить содержательное policy coverage всех шести стандартных сценариев по полным журналам, сохранив пять отказов и независимые оценки результата и release.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
