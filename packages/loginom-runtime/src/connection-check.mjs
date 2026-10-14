@@ -294,7 +294,10 @@ function startupOwner(owner, profile, candidate) {
         if(owner.context && !owner.nativeConfirmed) {
           if(owner.nativeAttempted) throw new Error('LOGINOM_STARTUP_CLEANUP_UNKNOWN',{cause:owner.nativeFailure?.value})
           if(!owner.page) throw Error('LOGINOM_STARTUP_PAGE_UNKNOWN')
-          const observed=await startupReadiness(owner,!owner.initialReadinessCompleted)
+          // Cleanup is a strict fresh observation, not a retry of the failed
+          // initial readiness window. Original owner/upstream/signal guards
+          // still apply; unknown native effects remain non-replayable.
+          const observed=await startupReadiness(owner,false)
           if(observed.authenticated) {
             const fresh=await startupReadiness(owner,false,false)
             if(!fresh.authenticated)throw new Error('LOGINOM_INITIAL_READINESS_REFUSED',{cause:fresh})
