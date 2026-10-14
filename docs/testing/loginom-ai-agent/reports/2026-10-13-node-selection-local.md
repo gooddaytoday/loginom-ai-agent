@@ -1270,3 +1270,12 @@ SHA attempt `13ec8ec2…`, audit `efa96085…`.
 Во всех 11 baseline oracle/расчёт PASS, policy PASS у восьми. Root17410
 активен; текущий слот — `campaign-roi-by-channel/2`, далее first-last/2
 и пять третьих прогонов. Итоговая приёмка ещё не завершена.
+
+
+На 2026-10-14 01:30 UTC завершены 12/18 baseline, 0/25 candidate.
+`campaign-roi-by-channel/2`: oracle/полный расчёт/policy PASS, JS-узлов 0,
+CLI/wrapper exit 0, cleanup true. Session `ses_ec7feeac4ffeTlnFgqeXYj1gOS`,
+SHA attempt `335b6403…`, audit `2689a4a1…`.
+Во всех 12 baseline oracle/расчёт PASS, policy PASS у девяти. Root17410
+активен; текущий слот — `first-last-touch/2`, далее пять третьих прогонов.
+Итоговая приёмка ещё не завершена.
