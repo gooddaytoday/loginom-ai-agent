@@ -1364,3 +1364,20 @@ postmove-check запущен root23200: только оставшиеся ROI/3
 архивированием только finished cleanup-confirmed receipt/copied artifacts;
 каждый перенос требует того же exact pre/post-check и inverse map.
 Итоговая приёмка ещё не завершена.
+
+
+На 2026-10-14 02:26 UTC завершены 17/18 baseline, 0/25 candidate.
+`campaign-roi-by-channel/3`: oracle/полный расчёт/policy PASS, JS-узлов 0,
+CLI/wrapper exit 0, cleanup true. Session `ses_ec7cc35e5ffeOMtGOMaIZcZ0GG`,
+SHA attempt `1ffc6e9f…`, audit `d79df2c9…`.
+Первый плановый ordinary export после архивирования успешно получил CSV;
+sourceworker read-only извлекает actual scroll bound из его raw без extra probe.
+Postmove независимый review `6e1a3ae9…` подтвердил102targets/absenceoriginalpaths,
+213local evidence,10pins/locks,74source,288runtime каждого payload unchanged,
+а также failed CSV/input и архив guard. Recovery и storage действия завершены;
+активен только root23200 на последнем baseline `first-last-touch/3`.
+Во всех17startedslots16oracle/полных расчётов PASS,11policy PASS; failedclaims3
+сохранён. После последнего baseline запланирован exact incremental archive
+его и ROI3 шести успешных/copied файлов в тот же own archive, с прежними
+pre/postconditions и restore map. Сопоставимая серия/skill/source не меняются.
+Полная приёмка ещё не завершена.
