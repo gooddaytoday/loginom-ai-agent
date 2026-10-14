@@ -33,6 +33,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   expect(observation).toMatchObject({ version: 1, kind: "admin-session-observations", identity, sessionIdentityQualified: false })
   expect(observation.ownSession.guid).toBeString()
   expect(observation.ownSession.objectId).toBeString()
+  expect(observation.ownSession).toHaveProperty("managedObjectId")
   expect(observation.sessions.length).toBeGreaterThan(0)
   expect(observation.sessions.every((row: { objectId: string }) => typeof row.objectId === "string" && row.objectId.length > 0)).toBe(true)
   expect(receipt.processes.browserBindings.length).toBeGreaterThan(0)

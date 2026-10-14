@@ -799,3 +799,12 @@ matches0, pending/active rows сохранены. Receipt research/controller/ad
 session-observations.json. Public inspect не выдаёт qualified sessions; username
 не используется для close. Scope mapping/reconnect/CLI correlation и backup
 policy остаются следующими gates.
+
+
+Own Session→ManagedSessionInfo scope control: ScopeFindObjectAsync из pinned
+BG_Interfaces.js вернул null, managedObjectId:null сохранён. Own Session GUID
+122e93cc-0e44-4ee7-b6cf-deeef8ba0b28, managed matches0, rows10 в private
+research/controller/admin-x1eDkF/session-observations.json. Ordinary proxy ID не
+используется как managed identity. Target1 PASS/14 (6.49s); admin integration/
+unit/preflight48 PASS/130 (35.84s), typecheck/diff PASS. Qualification=false;
+обратная scope/CLI/reconnect/close связь требует дальнейшей проверки.
