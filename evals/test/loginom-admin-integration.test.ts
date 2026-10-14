@@ -36,6 +36,13 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   expect(observation.ownSession).toHaveProperty("managedObjectId")
   expect(observation.ownSession.isAdmin).toBe(true)
   expect(typeof observation.ownSession.isDesigner).toBe("boolean")
+  expect(observation.users.length).toBeGreaterThan(0)
+  const ownUser = observation.users.filter((user: { name: string }) => user.name === observation.ownSession.username)
+  expect(ownUser).toHaveLength(1)
+  expect(ownUser[0]).toMatchObject({ objectId: observation.ownSession.userObjectId, userKind: 0, isAdmin: true,
+    isDesigner: observation.ownSession.isDesigner })
+  expect(observation.users.every((user: Record<string, unknown>) => typeof user.name === "string" && user.name.length > 0 &&
+    user.userKind === 0 && [user.isAdmin, user.isDesigner, user.isViewer, user.blocked, user.useGlobalFileStorage, user.schedulerFullAccess].every(value => typeof value === "boolean"))).toBe(true)
   expect(observation.sessions.length).toBeGreaterThan(0)
   expect(observation.sessions.every((row: Record<string, unknown>) => Object.hasOwn(row, "sessionGuid"))).toBe(true)
   expect(observation.sessions.every((row: { objectId: string }) => typeof row.objectId === "string" && row.objectId.length > 0)).toBe(true)

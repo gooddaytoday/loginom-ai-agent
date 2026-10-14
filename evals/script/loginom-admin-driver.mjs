@@ -110,12 +110,24 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         }
         const ownManaged = await bg.ScopeFindObjectAsync(session, bg.IBGManagedSessionInfo)
         const user = await session.CurrentUser
+        const users = []
+        const collection = await session.GetUsers()
+        const enumerator = await collection.GetEnumerator(bg.TBGDeductorUserKinds.dukUser)
+        try {
+          while (await enumerator.MoveNext()) {
+            const listed = await cast(await enumerator.Current, bg.IBGDeductorUser)
+            users.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(listed)).toString(), name: await listed.Name, userKind: await listed.UserKind,
+              isAdmin: await listed.IsAdmin, isDesigner: await listed.IsDesigner, isViewer: await listed.IsViewer, blocked: await listed.Blocked,
+              useGlobalFileStorage: await listed.UseGlobalFileStorage, schedulerFullAccess: await listed.SchedulerFullAccess })
+          }
+        } finally { await ReleaseObject(enumerator) }
         return { sessions: rows, ownSession: { guid: String(await session.Guid),
+          username: await user.Name, userObjectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(),
           isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner,
           managedObjectId: ownManaged ? (await bg.ProxyObjectsHelper.GetObjectId(ownManaged)).toString() : null,
-          objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() } }
+          objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() }, users }
       }))
-      respond(id, "confirmed", { identity, rawSessions: observation.sessions, ownSession: observation.ownSession, sessionIdentityQualified: false })
+      respond(id, "confirmed", { identity, rawSessions: observation.sessions, ownSession: observation.ownSession, users: observation.users, sessionIdentityQualified: false })
       continue
     }
     // Name/CreateTime and package Count are not yet qualified ownership/operation proofs.

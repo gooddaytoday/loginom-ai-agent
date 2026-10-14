@@ -351,3 +351,12 @@ IsDesigner=false; наличие административной роли не 
 создать пакет. Пакетный linkage probe требует подготовленного design user;
 bootstrap rights не изменяются для такого опыта. Экспериментального probe-session
 в production allowlist нет. Эти flags не заменяют session ownership proof.
+
+User read-back использует Session.GetUsers(), GetEnumerator(dukUser=1),
+MoveNext/Current и штатный awaited cast к IBGDeductorUser. Enumerator освобождается
+через ReleaseObject, как в Studio AdminUtils. Observations сохраняет только
+objectId, exact Name, UserKind=0 и boolean IsAdmin/IsDesigner/IsViewer/Blocked/
+UseGlobalFileStorage/SchedulerFullAccess. Собственный CurrentUser записывается
+по exact username и object ID; actual enumerated row совпал с ним (4 users,
+один exact match). Это readonly capability, не доказательство стабильности ID
+между contexts, account ownership, AuthMode/password или effective group ACL.
