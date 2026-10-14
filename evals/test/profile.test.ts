@@ -10,6 +10,20 @@ import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
 
+test("writerIdentity: observes an owner published during initial guard creation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-initialization-"))
+  try {
+    await mkdir(path.join(root, ".writer"), { mode: 0o700 })
+    const pending = writerIdentity(root).catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }))
+    // Creation publishes the directory before the asynchronous owner write.
+    await Bun.sleep(40)
+    await writeFile(path.join(root, ".writer/owner"), "initialized-nonce", { mode: 0o600 })
+    const directory = await stat(path.join(root, ".writer"))
+    expect(await pending).toEqual({ device: directory.dev, inode: directory.ino, owner: "initialized-nonce" })
+    expect(await Bun.file(path.join(root, ".writer/owner")).text()).toBe("initialized-nonce")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("assertAuth: shared mode refuses local auth and exposes only the provider status code", async () => {
   const input = await sharedAuthFixture()
   try {
