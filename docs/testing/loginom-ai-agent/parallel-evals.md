@@ -125,6 +125,16 @@ applicability и привязка view к hierarchy ещё требуют qualif
 Actual sysfs/private EACCES namespace + resource/Docker/policy regression:
 69 PASS/490 assertions, typecheck/diff PASS. Controls/limits не менялись.
 
+Sampler связывает canonical proc cgroup path с sysfs через target PID в
+cgroup.procs и повторный proc/membership read после counters. Inherited
+global sysfs root в новой cgroup namespace больше не выдаётся за target
+scope; target exit во время blocked read даёт unknown+membership diagnostic.
+Aligned virtual-root view сохраняет local counters, но не доказывает
+видимость внешних ancestors. Реальные namespace/exit controls2 PASS/17;
+resource/policy/Docker/namespace71 PASS/507, typecheck/diff PASS.
+Global hierarchy/root applicability остаётся отдельным gate;
+controllers/limits/foreign processes не изменялись.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный

@@ -151,10 +151,21 @@ export async function sampleCgroupResources(pid = process.pid) {
   if (!Number.isSafeInteger(pid) || pid < 1) throw new EvalFailure("RESOURCE_PROCESS_IDENTITY", 2)
   const raw = (await readFile(`/proc/${pid}/cgroup`, "utf8").catch(() => undefined))
     ?.split("\n").find(line => line.startsWith("0::"))?.slice(3)
-  const group = raw && path.posix.isAbsolute(raw) && path.posix.normalize(raw) === raw ? raw : undefined
+  const canonical = raw && path.posix.isAbsolute(raw) && path.posix.normalize(raw) === raw ? raw : undefined
+  const group = canonical && await resourceCgroupMembership(canonical, pid) ? canonical : undefined
   const [current, ancestors] = await Promise.all([readCgroupResources(group), group
     ? Promise.all(group.split("/").filter(Boolean).map((_, index, parts) => readCgroupResources("/" + parts.slice(0, -index - 1).join("/")))) : null])
-  return { ...current, ancestors }
+  if (group && !await resourceCgroupMembership(group, pid)) {
+    const unknown = await readCgroupResources()
+    return { ...unknown, ancestors: null, errors: [...unknown.errors, "CGROUP_MEMBERSHIP_UNVERIFIED"] }
+  }
+  return { ...current, ancestors, errors: [...current.errors, ...(canonical && !group ? ["CGROUP_MEMBERSHIP_UNVERIFIED"] : [])] }
+}
+
+async function resourceCgroupMembership(group: string, pid: number) {
+  const [members, current] = await Promise.all([readFile(path.join("/sys/fs/cgroup", group, "cgroup.procs"), "utf8").catch(() => undefined),
+    readFile(`/proc/${pid}/cgroup`, "utf8").catch(() => undefined)])
+  return members?.split(/\s+/).includes(String(pid)) && current?.split("\n").some(line => line === `0::${group}`)
 }
 
 async function readCgroupResources(group?: string) {
