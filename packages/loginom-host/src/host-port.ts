@@ -310,7 +310,22 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         reply({ id: data.id, result: true })
         return
       }
-      if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
+      if (data.method !== "interrupt" && service.journal.pending().length) {
+        const saveArgs='args' in input?input.args as {action_key?:string}:undefined;
+        if(data.method!=="call" || !("name" in input) || input.name!=="dock_action_run"
+            || !['package.save_as','package.save_checkpoint'].includes(saveArgs?.action_key??''))
+          throw new Error("LOGINOM_RECOVERY_REQUIRED")
+        const held=service.retainedRuntime(run.lease.generation,run.chat);
+        const original=held?await held:undefined;
+        // Only the retained child can attest to a fully drained, pre-native
+        // save refusal. Never launch/reacquire to manufacture this permission.
+        if(data.method!=="call" || !("name" in input) || input.name!=="dock_action_run"
+            || !['package.save_as','package.save_checkpoint'].includes(saveArgs?.action_key??'')
+            || !held || service.retainedRuntime(run.lease.generation,run.chat)!==held
+            || !original?.canSaveAfterCloseRefusal?.() || state.closed || run.released
+            || runs.get(input.run)!==run || service.journal.pending().some(id=>!run.active.has(id)))
+          throw new Error("LOGINOM_RECOVERY_REQUIRED")
+      }
       // Refuse competing calls before durable admission. The active call keeps its
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
       if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")

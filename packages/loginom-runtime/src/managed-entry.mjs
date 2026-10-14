@@ -498,7 +498,8 @@ async function handle(message) {
       send({ id: message.id, result: { closed: true } }, true)
       return
     }
-    if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
+    if (state.closing && !(message.operation === "call" && state.bridge?.canSaveAfterCloseRefusal(message.input)))
+      throw Error("LOGINOM_RUNTIME_CLOSING")
     if (message.operation === "interrupt" && state.startupController) {
       state.startupController.abort(Error("LOGINOM_INITIAL_STARTUP_CANCELLED"))
       await recordClose("interrupt",{status:"startup_cancelled"})
@@ -597,7 +598,9 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
-      send({ id: message.id, result: {
+      const closeRecoveryReady=state.bridge.canResumeClose?.()===true;
+      if(closeRecoveryReady){state.closing=undefined;state.bridgeCloseAttempted=false;}
+      send({ id: message.id, ...(closeRecoveryReady?{closeRecoveryReady:true}:{}), result: {
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
       } })
     } finally {
@@ -607,7 +610,7 @@ async function handle(message) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     if(message.operation==="start" && state.controlledStartup)send({id:message.id,rejection:closeRejection(state.controlledStartup.propagate(error)),rejectionOrigin:state.controlledStartup.rejectionOrigin,
       ...(state.controlledStartup.secondary?{secondaryRejection:closeRejection(state.controlledStartup.secondary.value)}:{})})
-    else send({ id: message.id, error: code })
+    else send({ id: message.id, error: code, ...(message.operation==="close" && state.bridge?.canSaveAfterCloseRefusal()?{closeSaveRequired:true}:{}) })
     if (message.operation === "start") {
       state.startupFailure=error
       if (state.startupOwner?.context) {

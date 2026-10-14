@@ -10,5 +10,6 @@ test('product cleanup preserves the bridge shutdown contract',async()=>{
   catch(error){assert.fail(String(error.stdout)+'\n'+String(error.stderr));}
   assert.match(result.stdout,/ok 11 - guarded pending close retries only after the same owner operation settles/);
   assert.match(result.stdout,/ok 14 - bridge original drain: metadata-drift/);
-  assert.match(result.stdout,/pass 14/);assert.match(result.stdout,/fail 0/);
+  assert.match(result.stdout,/ok 18 - shutdown save-only recovery: unconfirmed-save/);
+  assert.match(result.stdout,/pass 18/);assert.match(result.stdout,/fail 0/);
 });

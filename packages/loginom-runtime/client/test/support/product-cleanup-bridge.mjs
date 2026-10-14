@@ -157,3 +157,37 @@ for(const drainCase of ['success','ambiguity','metadata-drift'])test('bridge ori
   assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
  }finally{release?.();await client?.close();await rm(directory,{recursive:true,force:true})}
 });
+
+for(const recovery of ['save','foreign','unknown','unconfirmed-save'])test('shutdown save-only recovery: '+recovery,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'shutdown-save-'));
+ const f=current={scenario:'success',events:[],busy:false,saves:0};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads')}}};
+ let bridge,client,release,calls=0;
+ try{
+  bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,ownedPackageCleanupAccount:'test-2'},session);
+  client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  await client.callTool({name:'dock_prepare',arguments:{}});
+  const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,run:async()=>{calls++;f.busy=true;f.unknown=true;await new Promise(r=>{release=r});f.busy=false;f.unknown=false;return {status:'SUCCEEDED',cleanup_complete:true}}});
+  runner.start({operation_id:'claimed-original'});f.drain=()=>runner.drain();
+  const original=bridge.close();await Promise.resolve();release();
+  const refused=await original;assert.equal(refused.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
+  assert.equal(calls,1);assert.equal(f.events.includes('package-cleanup'),false);
+  assert.equal(bridge.close(),original);assert.equal(bridge.canResumeClose(),false);
+  await assert.rejects(client.callTool({name:'dock_prepare',arguments:{}}),/shutdown/);
+  if(recovery==='foreign')session.metadata={...session.metadata};
+  if(recovery==='unknown')f.unknown=true;
+  if(recovery==='unconfirmed-save')f.scenario='unconfirmed-save';
+  const save={name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'save-after-refusal'}};
+  if(['foreign','unknown'].includes(recovery)){
+   assert.equal(bridge.canSaveAfterCloseRefusal(save),false);await assert.rejects(client.callTool(save),/shutdown/);assert.equal(f.saves,0);return;
+  }
+  assert.equal(bridge.canSaveAfterCloseRefusal(save),true);
+  const saved=await client.callTool(save);assert.notEqual(saved.isError,true);assert.equal(f.saves,1);
+  assert.equal(bridge.canSaveAfterCloseRefusal(save),false);
+  await assert.rejects(client.callTool(save),/shutdown/);assert.equal(f.saves,1);
+  if(recovery==='unconfirmed-save'){assert.equal(bridge.canResumeClose(),false);assert.equal(bridge.close(),original);return;}
+  assert.equal(bridge.canResumeClose(),true);await assert.rejects(client.callTool({name:'dock_prepare',arguments:{}}),/shutdown/);
+  const finished=await bridge.close();assert.equal(finished.cleanup_complete,true);assert.equal(finished.native_logout_confirmed,true);
+  assert.equal(calls,1);assert.equal(f.events.filter(e=>e==='package-cleanup').length,1);
+ }finally{release?.();await client?.close();await rm(directory,{recursive:true,force:true})}
+});

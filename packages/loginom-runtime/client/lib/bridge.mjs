@@ -194,6 +194,25 @@ export async function createBridge(config, session, { browserTransport: managedB
   // settled save on this bridge, never from a caller-supplied cleanup path.
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
+  let shutdownSave;
+  function assertShutdownSaveOwner() {
+    const b=shutdownSave;
+    if(!b || session.metadata!==b.metadata || session.directory!==b.directory
+        || session.metadata.sessionId!==b.sessionId || session.metadata.workspacePreparation!==b.prepared
+        || session.metadata.targetIdentity!==b.target || session.metadata.workspaceReady!==true
+        || clipboardUncertain || heldLeases.size || captureInFlight
+        || actionRuntime?.hasUnsettledWork?.() || actionRuntime?.hasActiveWork?.()
+        || [...cleanupWriters].some(f=>!f.closeComplete)) throw Error('LOGINOM_SHUTDOWN_SAVE_REFUSED');
+  }
+  function canSaveAfterCloseRefusal(request) {
+    try {assertShutdownSaveOwner();} catch {return false;}
+    return !shutdownSave.attempted && (!request || (request.name==='dock_action_run'
+      && ['package.save_as','package.save_checkpoint'].includes(request.arguments?.action_key)));
+  }
+  function canResumeClose() {
+    try {assertShutdownSaveOwner();} catch {return false;}
+    return shutdownSave.completed===true;
+  }
   let confirmedCleanup, retainedNativeCleanup, cleanupShutdownBinding, cleanupReceiptWritten = false;
   const cleanupWriters=new Set();
   let cleanupEvidenceBinding,cleanupPersistencePrimary,cleanupPublication;
@@ -300,10 +319,12 @@ export async function createBridge(config, session, { browserTransport: managedB
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(catalog.tools) }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
+      const shutdownSaving=shutdownStarted && canSaveAfterCloseRefusal(request.params);
+      if (shutdownStarted && !shutdownSaving) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
+      if(shutdownSaving){assertShutdownSaveOwner();shutdownSave.attempted=true;}
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
-      if ((cleanupRefused || captureInFlight) && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
+      if (!shutdownSaving && (cleanupRefused || captureInFlight) && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
         'dock_operation_inspect','dock_node_status','dock_node_wait','tool_search','tool_describe'].includes(request.params.name))
         throw new McpError(ErrorCode.InvalidRequest, 'Package cleanup is unconfirmed; only read-only diagnosis is allowed');
       if (request.params.name === 'dock_diagnostics') {
@@ -458,6 +479,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   : request.params.name === 'dock_ui_action' ? await actionRuntime.uiAct(args.action,
                     { observationId: args.observation_id, operationId: args.operation_id, recoveryOperationId: args.recovery_operation_id, signal: extra.signal })
                     : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId: args.operation_id });
+            if(shutdownSaving)assertShutdownSaveOwner();
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
@@ -469,6 +491,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 account:prepared?.loginom_account, packagePath:outcome.output.package_ref.path,
                 loginomUrl:config.loginomUrl, loginomBuild:session.metadata.targetIdentity?.loginom_build};
             }
+            if(shutdownSaving && managedSave?.operationId===outcome.operation_id){assertShutdownSaveOwner();shutdownSave.completed=true;}
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
@@ -1118,7 +1141,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       if(fpDraftRetained)return Promise.reject(Error('LOGINOM_FP_DRAFT_RETAINED'));
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
-      if(closing)return closing;
+      if(closing){
+        if(!canResumeClose())return closing;
+        closing=undefined;shutdownSave=undefined;
+      }
       if([...cleanupWriters].some(file=>!file.closeComplete &&
           (file.io?.pending || file.closeStarted || !file.openComplete || file.fd===undefined)))
         return Promise.reject(cleanupPersistencePrimary?cleanupPersistencePrimary.value:Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED'));
@@ -1235,6 +1261,10 @@ export async function createBridge(config, session, { browserTransport: managedB
           await recordExecution({event:'isolated_package_cleanup', cleanup});
           assertShutdownBound();
           if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
+          if(managedCleanup && cleanup.status==='BLOCKED' && cleanup.reason==='CONFIRMED_SAVE_REQUIRED'
+              && !retainedNativeCleanup && !confirmedCleanup) shutdownSave={...shutdownBinding,
+                prepared:session.metadata.workspacePreparation,target:session.metadata.targetIdentity,
+                attempted:false,completed:false};
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
             package_cleanup:cleanup,
@@ -1279,7 +1309,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         // Only guarded package cleanup can reconcile and retry on this owner.
         // Classic transport shutdown has an unknown effect and stays one-shot.
         if ((managedCleanup || config.acceptanceCleanupPackage)
-            && (result?.browser_transport_closed !== true || result.cleanup_complete===false)) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
+            && (result?.browser_transport_closed !== true || result.cleanup_complete===false)) { if(managedCleanup)cleanupRefused=true; if(!shutdownSave){closing = undefined; shutdownStarted = false;} }
         return result;
       }, async error => {
         if(managedCleanup)cleanupRefused=true;
@@ -1320,9 +1350,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         return Object.freeze({kind:'PRE_READY_CLOSED_READ',ready:false,cleanupComplete:false,observation:result.output});
       } finally {preReadyReading=false}
     }
-    const bridge={server,catalog,captureAcceptance,openImportPreconfig,readPreReady,
+    const bridge={server,catalog,captureAcceptance,openImportPreconfig,readPreReady,canSaveAfterCloseRefusal,canResumeClose,
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
-      hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
+      hasUnsettledWork:()=> (cleanupRefused && !canResumeClose()) || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};
     prepareLender?.bind(bridge);
     return bridge;

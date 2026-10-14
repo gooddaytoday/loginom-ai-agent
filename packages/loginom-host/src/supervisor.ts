@@ -124,7 +124,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; amount?:AmountCaptureFrame; cancelled?:boolean; primary?:{value:unknown}; closing?: { expired: boolean; acknowledged: boolean } }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; amount?:AmountCaptureFrame; cancelled?:boolean; primary?:{value:unknown}; shutdownSave?: boolean; closing?: { expired: boolean; acknowledged: boolean } }
   >()
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => {
@@ -159,6 +159,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       if (request.closing.acknowledged) return
       request.closing.acknowledged = true
       request.dispose?.()
+      if ("error" in message && "closeSaveRequired" in message && message.closeSaveRequired===true) closing.saveRequired=true;
       if ("error" in message) request.reject(new Error(
         typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
           ? message.error : "LOGINOM_RUNTIME_FAILED", { cause: message.error }))
@@ -194,6 +195,13 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
         ),
       )
       return
+    }
+    if(request.shutdownSave && closing.saveRequired && child.connected
+        && "closeRecoveryReady" in message && message.closeRecoveryReady===true) {
+      // Only this original child's save completion retires the known pre-effect
+      // refusal. Silence, timeout, peer loss and caller labels cannot remint close.
+      pending.forEach((held,id)=>{if(held.closing?.acknowledged){clearTimeout(held.timer);pending.delete(id)}})
+      closing.promise=undefined;closing.saveRequired=false;
     }
     request.resolve("result" in message ? message.result : undefined)
   })
@@ -243,7 +251,10 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
         if (closeState) { closeState.expired = true; return }
         cancel(new Error(control ? "LOGINOM_PRE_READY_READ_EXPIRED" : "LOGINOM_RUNTIME_TIMEOUT"))
       }, timeout)
-      pending.set(id, { resolve, reject, timer, ...(closeState ? { closing: closeState } : {}), ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      const saveInput=value as {name?:string;arguments?:{action_key?:string}}|undefined;
+      const shutdownSave=operation==='call' && closing.saveRequired===true && saveInput?.name==='dock_action_run'
+        && ['package.save_as','package.save_checkpoint'].includes(saveInput.arguments?.action_key??'');
+      pending.set(id, { resolve, reject, timer, ...(shutdownSave?{shutdownSave:true}:{}), ...(closeState ? { closing: closeState } : {}), ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
       child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),...(amountFrame?{amountCapture:amountFrame}:{}) }, (error) => {
         if(!error)return;
@@ -259,7 +270,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       if(control?.signal.aborted)abort()
     })
   }
-  const closing: { promise?: Promise<void> } = {}
+  const closing: { promise?: Promise<void>; saveRequired?: boolean } = {}
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
@@ -295,7 +306,8 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     if(amountCaptureClaimed)throw Error('LOGINOM_RECOVERY_REQUIRED');amountCaptureClaimed=true;
     return request('acceptance.capture',undefined,0,{signal:startup.signal,deadline:startup.deadline},outerRequestId);
   }
-  const runtime = { ready: undefined as unknown, request, readPreReady, close, exited, captureAmount }
+  const runtime = {
+    canSaveAfterCloseRefusal:()=>child.connected && closing.saveRequired===true, ready: undefined as unknown, request, readPreReady, close, exited, captureAmount }
   startup?.retain(runtime)
   async function failedStart(error: unknown): Promise<never> {
     if(startup) throw startup.reject(error)
