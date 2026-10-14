@@ -585,8 +585,9 @@ SIGINT и подтверждённый exit; его код блокера не �
 по результату. Финальные runner и audit фиксируются до оставшихся baseline и
 сборки candidate.
 
-Каждая строка запускается трижды с frozen baseline payload и трижды с candidate,
-в новых Session. Всего 18 baseline + 18 основных candidate попыток.
+По текущему протоколу064745 каждая строка запускается один раз с frozen baseline
+и трижды с candidate, в новых Session:6baseline+18standard candidate. Прежние
+три baseline повторения и43-slot locks относятся к историческому протоколу.
 
 | Eval ID | Покрытие стандартных возможностей | Строк результата |
 | --- | --- | ---: |
@@ -748,11 +749,12 @@ server container/UserStorage текущего аккаунта. В продук�
    Фактический тип подтвердить первым реальным JS-пакетом. Неполнота даёт
    `policyStatus:incomplete`, а не ноль JS. При отсутствии пакета полный trace
    может подтвердить только выбор узлов; XML-проверка остаётся недоступной.
-2. **Расчёт — не хуже baseline:** число oracle-pass в 18 candidate не меньше,
-   чем в 18 baseline, при одинаковых задачах/модели/лимитах. Показать также
-   результаты 0..3 по каждой задаче. Для содержательной приёмки необходим хотя
+2. **Расчёт — наблюдённая доля не ниже baseline:** C_oracle/18 ≥ B_oracle/6
+   (C≥3B), при одинаковых задачах/модели/лимитах. Показать B0..1/C0..3 по
+   каждой задаче; baseline1 не оценивает повторяемость, comparison описательное
+   и слабее прежних трёх повторов. Для содержательной приёмки необходим хотя
    бы один candidate package+oracle+graph успех по каждой из шести задач:
-   сравнение 0/18→0/18 или исчезновение покрытия целой задачи не является успехом.
+   сравнение0/6→0/18 или исчезновение покрытия целой задачи не является успехом.
 3. **Успешный расчёт отдельной попытки:** CLI exit 0, settlement, собственный
    сохранённый пакет, ровно один CSV, `checkOracle.passed===true`, valid XML и
    однозначное соответствие GUID экспортёра из успешной квитанции узлу
@@ -827,10 +829,11 @@ oracle на едином усиленном input и локальным JS; 1/1 
 ошибки отмечаются отдельно. Непроверенное исключение или не возникшая
 targeted диагностическая ошибка не позволяют объявить всю приёмку завершённой.
 
-Полная первоначальная серия — 43 модельных запуска: 18 baseline и 25 candidate
-(18 стандартных, 3 explicit-JS, 3 tags, 1 recovery). Pilot входит в 18 baseline,
-первая волна из 9 входит в 25 candidate. Корректировки skill требуют отдельной
-серии и не входят в эти 43. По 30 минут на запуск это максимум 21,5 часа окон
+Текущая полная серия064745 —31модельный запуск:6baseline+25candidate
+(18standard,3explicit-JS,3tags,1recovery). Первоначальные43 и pilot18baseline
+сохранены как исторические условия; текущие31 закрепляются доfirstmodel.
+Первая волна9 входит в25candidate. Корректировки skill требуют отдельной
+серии. По30минут на запуск это максимум15,5часа окон
 исполнения плюс сборка, cleanup и аудит; первая волна candidate — максимум
 4,5 часа окон. Оценка «около часа» данными не подтверждена. Это сумма окон,
 а не обещание срока: 90 секунд graceful ожидания после SIGINT — граница для
@@ -1953,3 +1956,54 @@ command/log сохранены отдельно, создан только со�
 сразу actual3args; full inventory/pins/static review pending. Ни один outcome
 050544 не переносится. Новый ordinary clipped Export с label action и остальные
 native gates, затем candidate9→clean→baseline18→candidate16/full43 открыты.
+## Текущий протокол проверки — 31 запуск (2026-10-14)
+
+Это изменение принято до первой модельной попытки серии `20261014T064745Z-367f4b`.
+Фактическое состояние: source `c5930ed689`, review/checks `17d4c19e30`; focused395/395,
+full3854PASS/10SKIP/0FAIL; оба build/source verify0. Независимо проверены14701source,
+61symlink и5726files каждого payload; общий runtime `21fcca85…`, различия только
+2skill+3metadata. Новые model Session/слоты0, native run/results0 на момент решения.
+Исторические43-slot locks и начатые прежние серии сохраняются без пересчёта.
+
+Выбран **baseline6 + candidate25 =31**: одна baseline-попытка для каждой из шести
+standard задач; candidate сохраняет18standard (6×3),3explicit-JS,3tags и1recovery.
+Сначала ordinary Import→Sort→Export на итоговой сборке с actual clipping, одним
+own scroll, допустимым guarded label click, native input0/mapping, точным CSV,
+Save/graph/own Logout/ACKexit0. Unit PASS этого gate не заменяет. Новый JS downstream
+с Export тоже проверяется. Join и15schema подтверждены в050544; повтор их live
+не нужен при byte-identical relevant dependencies. Это carried regression confidence,
+а не новый064745 native/model PASS; fresh minimal prepare сверяет текущие16cards.
+
+Порядок первой девятки: ABC/Pareto → первое/последнее касание → sales → monthly →
+claims → ROI → explicit-JS → tags → recovery. Затем полный clean gate всех9,
+baseline6, остальные candidate16. Нечистая волна не открывает повторы; policy
+violation останавливает digest. Начатые timeout/error/quota/incomplete остаются
+в знаменателе, не заменяются удачными retries. Одинаковы итоговые runtime, модель
+`openai/gpt-6-sol-fast`/medium, requestedpriority (actualtier неизвестен), параметры,
+входы/oracle; между версиями меняется только skill. Новые optimized inputs
+создаются отдельно0400; исходные frozen files не переписываются.
+
+Приёмка candidate не сокращается:18/18standard policy, ≥1fullcalc по каждой задаче,
+3/3explicit-JS,3/3tags, наблюдённый1/1recovery, первый9clean, прежние lineage/oracle/
+history/settlement иmanual reviews (все6JS, recovery, провалы/аномалии,3seeded successes).
+Сравнительный oracle gate нормализуется: C_standard/18 ≥ B_standard/6 (C≥3B).
+Показываются отдельно B:0..1 и C:0..3 по каждой задаче. Это описательное сравнение
+при одинаковых условиях; baseline1 не оценивает повторяемость старого skill и
+не равноценен43-запускам. Candidate имеет прежнее функциональное покрытие и3повтора,
+а надёжность baseline-сравнения слабее. Старые данные на другом runtime только история.
+
+Успешные standard candidate продолжаются thin sequential driver поверх существующего
+single runner: oracle/graph/policy/history/settlement/CLIexit0 + exact own bound
+package close/Logout/noDiscard, Host/resource close ACK/exit и свободный профиль.
+Отсутствие .writer само по себе недостаточно. Для baseline JS — наблюдение старой
+версии, не ложный policy PASS; его расчёт/история/завершение проверяются машиной.
+Неопределённый cleanup, живой процесс, unknown receipt, failure или blocker запрещают
+следующий запуск. JS/recovery требуют review; closed artifact review и финальный
+отчёт выполняются параллельно следующему разрешённому CLI. Loginom/CLI-процессы
+этого профиля остаются последовательными. Все допуски перед следующим процессом
+синхронны; глубокий review закрытых immutable artifacts не блокирует обычный успех.
+
+Экономия:12модельных процессов (28% от43), примерно1ч25мин при указанной средней
+7мин5с на процесс; фактическая длительность зависит от новых запусков. Максимум
+окон исполнения уменьшается21,5→15,5ч при прежнем deadline30мин; это не обещание
+wall-clock срока. Повторных full/focused проверок неизменного runtime нет.

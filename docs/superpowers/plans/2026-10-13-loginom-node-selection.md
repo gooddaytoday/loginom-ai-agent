@@ -65,8 +65,9 @@
    публикацию fixtures, runbook/report и других docs отложить до конца сборки.
 5. Для следующих matched пар после завершённой подготовки аудита: Task 5
    candidate9 после ordinary native gates и immutable pair pins; при чистом
-   проходе — все18baseline новой пары, затем ещё16candidate. Полные43слота
-   и сравнительные критерии сохраняются; исторические серии не переписываются.
+   проходе — шесть baseline новой пары, затем ещё16candidate. Текущий протокол31
+   и нормализованные сравнительные критерии заданы в разделе «Текущий протокол»;
+   первоначальные43 и исторические серии не переписываются.
    Task 6: итоговый машинный отчёт и выборочное независимое review.
 
 ## Task 1: Минимальный аудит, затем уточнение по реальным evidence
@@ -1369,7 +1370,8 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   Меняются только task ID/номер; пути и режим берутся из pins. Candidate run
   для новой matched пары начинается после native gates и заморозки обоих payload;
   digest активации сверяется каждый раз. Сначала candidate9; при чистой волне
-  baseline18, затем candidate16. Все43freshслота обязательны для приёмки.
+  baseline6, затем candidate16. Все31freshслот обязательны для текущей приёмки;
+  прежний43-slot порядок сохраняется в original immutable locks как история.
 - [ ] При первом доказанном нарушении policy немедленно остановить candidate:
   остальные слоты этой версии не запускать. Сохранить частичную серию со всеми
   исходами, не выдавать её за полную. Если parser не понимает evidence,
@@ -1379,12 +1381,12 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   политика; у шести standard и двух JS-исключений есть сохранённый пакет,
   oracle-pass, связность, settlement и exit 0; роль обоих JS проверена reviewer;
   recovery показал реальный отказ, отсутствие JS и успешное исправление.
-  Только после этого и baseline18 разрешены повторы. Обычный расчётный провал без нарушения
+  Только после этого и baseline6 разрешены повторы. Обычный расчётный провал без нарушения
   policy не запускает правку skill: при подтверждённом cleanup можно закончить
   первую волну для диагностики, но она не открывает вторую. Не повторять один
   неудачный слот до успеха. Причины и дальнейший scope при нечистой волне
   передаются владельцу; автоматической новой полной серии нет.
-- [ ] После чистой волны и всех18baseline выполнить ещё16слотов: все шесть standard и оба
+- [ ] После чистой волны и всех6baseline выполнить ещё16слотов: все шесть standard и оба
   JS-исключения с номером 2, затем те же с номером 3. Recovery не повторять.
   Первые девять не сбрасывать. Любая начавшаяся модельная попытка, включая
   timeout/отказ/квоту, остаётся в своей серии и знаменателе; retry допускается
@@ -1467,7 +1469,9 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   CLI exit, oracle, JS node/call counts, graph review, history completeness,
   runtime settlement, policyStatus, calculationPassed, итог/причина отказа и
   путь к локальным evidence. Показать отдельно baseline/candidate oracle-pass
-  из 18, результаты по каждой задаче и полные расчётные успехи. Инциденты до
+  из6 и18 соответственно, результаты по каждой задаче (B0..1/C0..3) и полные
+  расчётные успехи. Baseline comparison описательное, repeatability старого
+  skill не проверена;31 не равноценен43. Инциденты до
   первого model turn перечислить отдельно от матрицы; все начатые модельные
   попытки сохраняются в знаменателе. Это приёмка текущей системы, не isolated
   benchmark score и не доказательство статистической неухудшаемости.
@@ -1475,7 +1479,7 @@ bun script/run-node-selection-attempt.ts --pins "$selection_root/candidate-pins.
   выборочный семантический review. Зафиксировать длительность пилота/каждой
   попытки; прогноз оставшегося времени пересчитать по наблюдениям.
 - [ ] Завершить изменение только при 18/18 policy-pass основных candidate,
-  числе oracle-pass не ниже baseline и хотя бы одном полном расчётном успехе
+  доле oracle-pass C/18 не ниже B/6 и хотя бы одном полном расчётном успехе
   по каждой из шести задач; дополнительно обязательны 3/3 explicit-js,
   3/3 capability-gap и 1/1 наблюдённый recovery без JS с правильным исправлением,
   чистая первая волна и обязательный review. Честный recovery-блокер подтверждает
@@ -2216,13 +2220,14 @@ firstwave6/9 нечистая. Явные JS/tags/recovery и повторы э�
   mapping/Save/CSV/cleanup проходят; заново проверить соответствующие
   JS downstream, Join roles и catalog-gap gates. Private ABC trace не входит
   в acceptance runtime.
-- [ ] На новом matched runtime выполнить все18baseline и25candidate через
+- [ ] На новом matched runtime выполнить все6baseline и25candidate через
   существующий one-attempt runner. Candidate первая волна9 должна быть чистой
   до повторов; first policy violation останавливает серию. Сохранить full
   history, graph/oracle/runtime audit, recovery и обязательные manual reviews.
-  Порядок новой серии: native gates/pins, candidate9, clean gate, baseline18,
-  candidate16; все процессы последовательно. Не менять workload,
-  deadlines, число попыток или acceptance gates.
+  Порядок новой серии: необходимые native gates/pins, candidate9 (ABC/firstlast
+  первыми), clean gate, baseline6, candidate16; все процессы последовательно.
+  Candidate workload/deadlines/gates неизменны. Baseline сокращён prospectively
+  до first model по пользовательской оптимизации31; ограничения comparison явны.
 
 Каждое отмеченное выполнение отдельного пункта сохраняется отдельным
 описательным коммитом, как требует пользователь. Пока новые пункты открыты.
@@ -2696,3 +2701,54 @@ command/log сохранены отдельно, создан только со�
 сразу actual3args; full inventory/pins/static review pending. Ни один outcome
 050544 не переносится. Новый ordinary clipped Export с label action и остальные
 native gates, затем candidate9→clean→baseline18→candidate16/full43 открыты.
+## Текущий протокол проверки — 31 запуск (2026-10-14)
+
+Это изменение принято до первой модельной попытки серии `20261014T064745Z-367f4b`.
+Фактическое состояние: source `c5930ed689`, review/checks `17d4c19e30`; focused395/395,
+full3854PASS/10SKIP/0FAIL; оба build/source verify0. Независимо проверены14701source,
+61symlink и5726files каждого payload; общий runtime `21fcca85…`, различия только
+2skill+3metadata. Новые model Session/слоты0, native run/results0 на момент решения.
+Исторические43-slot locks и начатые прежние серии сохраняются без пересчёта.
+
+Выбран **baseline6 + candidate25 =31**: одна baseline-попытка для каждой из шести
+standard задач; candidate сохраняет18standard (6×3),3explicit-JS,3tags и1recovery.
+Сначала ordinary Import→Sort→Export на итоговой сборке с actual clipping, одним
+own scroll, допустимым guarded label click, native input0/mapping, точным CSV,
+Save/graph/own Logout/ACKexit0. Unit PASS этого gate не заменяет. Новый JS downstream
+с Export тоже проверяется. Join и15schema подтверждены в050544; повтор их live
+не нужен при byte-identical relevant dependencies. Это carried regression confidence,
+а не новый064745 native/model PASS; fresh minimal prepare сверяет текущие16cards.
+
+Порядок первой девятки: ABC/Pareto → первое/последнее касание → sales → monthly →
+claims → ROI → explicit-JS → tags → recovery. Затем полный clean gate всех9,
+baseline6, остальные candidate16. Нечистая волна не открывает повторы; policy
+violation останавливает digest. Начатые timeout/error/quota/incomplete остаются
+в знаменателе, не заменяются удачными retries. Одинаковы итоговые runtime, модель
+`openai/gpt-6-sol-fast`/medium, requestedpriority (actualtier неизвестен), параметры,
+входы/oracle; между версиями меняется только skill. Новые optimized inputs
+создаются отдельно0400; исходные frozen files не переписываются.
+
+Приёмка candidate не сокращается:18/18standard policy, ≥1fullcalc по каждой задаче,
+3/3explicit-JS,3/3tags, наблюдённый1/1recovery, первый9clean, прежние lineage/oracle/
+history/settlement иmanual reviews (все6JS, recovery, провалы/аномалии,3seeded successes).
+Сравнительный oracle gate нормализуется: C_standard/18 ≥ B_standard/6 (C≥3B).
+Показываются отдельно B:0..1 и C:0..3 по каждой задаче. Это описательное сравнение
+при одинаковых условиях; baseline1 не оценивает повторяемость старого skill и
+не равноценен43-запускам. Candidate имеет прежнее функциональное покрытие и3повтора,
+а надёжность baseline-сравнения слабее. Старые данные на другом runtime только история.
+
+Успешные standard candidate продолжаются thin sequential driver поверх существующего
+single runner: oracle/graph/policy/history/settlement/CLIexit0 + exact own bound
+package close/Logout/noDiscard, Host/resource close ACK/exit и свободный профиль.
+Отсутствие .writer само по себе недостаточно. Для baseline JS — наблюдение старой
+версии, не ложный policy PASS; его расчёт/история/завершение проверяются машиной.
+Неопределённый cleanup, живой процесс, unknown receipt, failure или blocker запрещают
+следующий запуск. JS/recovery требуют review; closed artifact review и финальный
+отчёт выполняются параллельно следующему разрешённому CLI. Loginom/CLI-процессы
+этого профиля остаются последовательными. Все допуски перед следующим процессом
+синхронны; глубокий review закрытых immutable artifacts не блокирует обычный успех.
+
+Экономия:12модельных процессов (28% от43), примерно1ч25мин при указанной средней
+7мин5с на процесс; фактическая длительность зависит от новых запусков. Максимум
+окон исполнения уменьшается21,5→15,5ч при прежнем deadline30мин; это не обещание
+wall-clock срока. Повторных full/focused проверок неизменного runtime нет.

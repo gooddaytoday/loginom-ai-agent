@@ -2171,3 +2171,15 @@ command/log сохранены отдельно, создан только со�
 сразу actual3args; full inventory/pins/static review pending. Ни один outcome
 050544 не переносится. Новый ordinary clipped Export с label action и остальные
 native gates, затем candidate9→clean→baseline18→candidate16/full43 открыты.
+
+
+Prospective optimization064745 (до models0):31=6baseline+25candidate,
+первыеABC/firstlast, затем clean9→baseline6→candidate16. Coverage candidate
+не меняется; comparison B/6 vs C/18 описательное, baseline repeatability не
+проверяется. Экономия12процессов≈85мин по7мин5с; maximum windows15,5ч.
+Sourcec593/full3854PASS10SKIP/noFAIL/buildbothverify0/rootphysicalPair PASS,
+original43metadata/pins сохранены. Новые optimized metadata отдельно0400,
+modeladmission закрыт доreview/nativeExport/auto-driver exactcleanup proof.
+Byte-identical Join/schema dependencies дают carried confidence050544,
+не новый064745 PASS; freshExport/JSdownstream required. CLIprofile sequential,
+standard machine gates synсhronous; closedartifacts/report review parallel.
