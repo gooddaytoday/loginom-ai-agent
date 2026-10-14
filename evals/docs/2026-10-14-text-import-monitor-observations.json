@@ -2101,6 +2101,197 @@
         "handled_by_existing_Evaler_task": "01a138e6-2fed-7a7a-8716-b4f4b7fa1ff5",
         "completion_not_reopened": true
       }
+    },
+    {
+      "checked_utc": "2026-10-14T06:33:26.424619+00:00",
+      "read_window": "2026-10-14T06:32:07Z–06:33:26Z; only missing LAB57 issue restored by isolated changed debug read",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "done",
+          "revision": 72,
+          "phase": "in_review",
+          "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+          "review_cycle": 2,
+          "reject_count": 0,
+          "metadata_sha256": "07f0c42e23c6bfe44c26e10b529f25803e7a4ade3b0636f77516231c1a812963",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "in_progress",
+          "revision": 332,
+          "phase": "blocked",
+          "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+          "review_cycle": 2,
+          "reject_count": 1,
+          "metadata_sha256": "7134441f30e49062ba950fe26e1a6fa1637095fe62ea94324cc6df0e9331d212",
+          "active_queued": [
+            {
+              "id": "01a1391a-8386-711e-a5df-bb3bb0ec4a8a",
+              "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+              "status": "running",
+              "started_at": "2026-10-14T09:30:01+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "e764ccd644a7734a0d9534cbea83b3089b75691e5440a447544751364036cd71",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "b4113127941a5d52f15437b33dd972f35835c52d28bb0905357113848c5b986c",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "68a0253f1c69dc43f3f0922348d803ab9c6abc23a252e344f06f9b841539d632",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "a36ce57a0ac88194eb12122a444c325e44f389b62c25721b775506779b8d6735",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "fe2418ea13f32267ae5f348010fc9adc063122f1d027eb525bad6479ccacc5ca",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "dc2448cfc26a0470e70d9014574c5d7676f00995ef5698d6de1c47bcf8ace97d",
+          "active_queued": []
+        }
+      ],
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "status": "online",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+        "last_seen_at": "2026-10-14T09:32:06+03:00"
+      },
+      "worker_settings": {
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "canonical_verification": "evals/docs/2026-10-14-text-import-prerequisite-provenance-verification.json",
+      "canonical_verification_sha256": "443752a9ed3008d838d0ef43b4d7a40ce3e091ff0c36f433de3d5c776ae9740a",
+      "owner_handoff": "evals/docs/2026-10-14-text-import-prerequisite-provenance-owner-handoff.json",
+      "owner_handoff_sha256": "9a531df91141f613766d2801706fbed47cf8737739a7ac52d17db4cededd8096",
+      "fresh_LAB57_stage_comment": "01a1391a-8372-751a-9141-9f361f132364",
+      "new_stage_comments_or_evidence": [
+        "01a138fc-1a87-737a-b42c-6fcdaff300de",
+        "01a1391a-8372-751a-9141-9f361f132364"
+      ],
+      "effective_stage": "READ_ONLY_ORIGINAL_CONFIG_CREDENTIAL_PRODUCER; exact e46 SOURCE_ACCEPTED, OPERATOR_NOT_READY",
+      "active_support_SHA": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+      "source_candidate_SHA": "e46bdc9003354cf4e58fb0899c4ba3b39152a1f0",
+      "independent_final_source_gate": "FULFILLED for exacte46 only",
+      "root_new_tests": 0,
+      "root_native_model_reference_product_cold_recovery_once_resource_profile_credential_mutations": 0,
+      "new_root_comments_dispatches": 1,
+      "delivered_prerequisite_payloads": 15,
+      "root_privileged_original_operator_directory_read": "existing AppArmor incident only; no usable Loginom credentials discovered; limited negative",
+      "root_original_image_Users_cfg_binding": "684bytes6ae9a3b8 exact lowerimage copy, docker diff no Users change; not plaintext password proof",
+      "original_reconnect_source": "actual public7.4.2 Client.js keeps original key in memory; selected nonbrowser JSON key scan negative; all possible persistence not ruled out",
+      "original_SQL_or_browser_LevelDB_reads": 0,
+      "unchanged_pin_and_full_tests_not_repeated": true,
+      "stand_original_last_proven": "BUSY",
+      "actual_cleanup_release_FREE_Ben_ACCEPT": "ABSENT",
+      "original_Ben_product": "6/6 spent originalwholeERROR/code2/all6qualityEXCLUDED/no retries",
+      "original_recovery": "0/1 lastproved; source diagnosis is not reservation",
+      "full_queues": {
+        "checked_utc": "2026-10-14T06:26:13.916641+00:00",
+        "agents": 12,
+        "records": 2020,
+        "pending_other": 6,
+        "all_other_runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "pagination_complete": true,
+        "current_e46_ALL_pending_gate_not_relaxed": true,
+        "disjointness_unproven": true
+      },
+      "inspection_errors_preserved": [
+        "first parallel fullqueue read UNKNOWN then changed serialized complete",
+        "parallel missingLAB57 read UNKNOWN then isolateddebug0",
+        "unsupported public class-file read UNKNOWN then actualClient.js producer located",
+        "initial original-runtime filename cap100 not absence proof",
+        "post executed once then local str/write_bytes bookkeeping TypeError reconciled unique server marker without repost",
+        "root handoff SHA print used loop-shadowed path; final targeted invariant check detected mismatch; actual unchanged receipt1556bytes SHA9a531df91141f613766d2801706fbed47cf8737739a7ac52d17db4cededd8096 restored in checkpoint; no repost/execution/release retry"
+      ],
+      "LAB58_to63_status_change": "actual backlog10/admission/no runs; metadata/project/assignee/description equal priorinprogress9; coordinator did not set these statuses",
+      "all_eight_done": false,
+      "status": "PREREQUISITE_PROVENANCE_BLOCKED_ONE_EVALER_READONLY_RUNNING_AUTOMATION_DELETED_BY_USER",
+      "automation": {
+        "id": "lab-56-lab-63",
+        "status": "DELETED_BY_USER",
+        "recreated": false,
+        "append_update_failed_automation_missing": true,
+        "explicit_user_confirmation": true,
+        "stop_receipt": "evals/docs/2026-10-14-text-import-monitor-automation-stop-receipt.json",
+        "stop_receipt_sha256": "2398a948bb3b28852adfbd64052749696104217800666f6676cbe1d5972c3fdd"
+      }
     }
   ]
 }

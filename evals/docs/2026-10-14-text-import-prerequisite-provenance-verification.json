@@ -1,0 +1,405 @@
+{
+  "format": "LAB57-COORDINATOR-PREREQUISITE-PROVENANCE-VERIFICATION-v1",
+  "checked_utc": "2026-10-14T06:26:13.916641+00:00",
+  "source_sha": "e46bdc9003354cf4e58fb0899c4ba3b39152a1f0",
+  "source_independent_gate": "FULFILLED; canonical closed-route-source-verification 49b14d977910347646e9222ef44bda22862a1da8aa6cc60bd37f445094b63168",
+  "operator_admitted": false,
+  "effective_stage": "READ_ONLY_ORIGINAL_CREDENTIAL_PRODUCER_DIAGNOSIS",
+  "cards_first_fresh_read_060114_UTC": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "done",
+      "revision": 72,
+      "phase": "in_review",
+      "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+      "review_cycle": 2,
+      "reject_count": 0,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "blocked",
+      "revision": 329,
+      "phase": "blocked",
+      "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "review_cycle": 2,
+      "reject_count": 1,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "active_queued": []
+    }
+  ],
+  "delivered_prerequisites": {
+    "report": "01a138fc-1a87-737a-b42c-6fcdaff300de",
+    "parent": "01a138ec-f852-7e9e-961d-01eef7bfc25e",
+    "created_utc": "2026-10-14T05:56:48Z",
+    "attachment": "01a138fc-1a5c-7430-a493-9572c3ad97fc",
+    "archive_bytes": 26762,
+    "archive_sha256": "03d55e99ba01f45ef42ce6750c00a548e62b1e96d6b485d89dab78e7375c32f8",
+    "manifest_sha256": "4780e5b4c9babf12a5afbf7a7852b68317abf4c14f6e24cb833d03aa4a037790",
+    "payloads": 15,
+    "all_CRC_unique_paths_regular_types_bytes_and_hashes_verified": true,
+    "embedded_prior_source_canonical_byte_equal": true,
+    "receipt_sha256": "ecb155953b7bbb4e35b00e46b5eb6fbb075f8c6f936387949e00eb8659afd24d",
+    "reported_pins_verified": [
+      {
+        "source": "89b416c257a43a187edef4c40b68f3c9b1fa4d53",
+        "files": 751,
+        "manifest_sha256": "a42974ffd939bac48f894c8bc8d0f913a2034a54af6761ff7948117a523f4ab1"
+      },
+      {
+        "source": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+        "files": 785,
+        "manifest_sha256": "760017f84ae1ebe8144a512243e3e80812db4b757b2407c2c24d82fec2671e5b"
+      },
+      {
+        "source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+        "files": 5389,
+        "manifest_sha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98"
+      }
+    ],
+    "reported_original_171_hashes_and_identities_unchanged": true,
+    "root_did_not_repeat_all_pin_or_171_reads": true,
+    "reported_stand": "BUSY",
+    "reported_cleanup": "UNCONFIRMED",
+    "original_recovery": "0/1"
+  },
+  "full_fresh_queue": {
+    "checked_utc": "2026-10-14T06:26:13.916641+00:00",
+    "diagnostic": "parallel first scan failed UNKNOWN without raw retained; changed serialized scan",
+    "agents": [
+      {
+        "agent": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "rows": 307
+      },
+      {
+        "agent": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "rows": 649
+      },
+      {
+        "agent": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "rows": 465
+      },
+      {
+        "agent": "40a17a39-3b9f-4f7b-a3a3-007bbb7cb6c7",
+        "runtime": "9f8907d3-de44-4f7f-bfa3-a2a2f94db70b",
+        "rows": 16
+      },
+      {
+        "agent": "39a9fa95-b0c4-4428-86eb-559d902db7f4",
+        "runtime": "d43715b5-dd8b-4468-a699-da7950ecf7dc",
+        "rows": 8
+      },
+      {
+        "agent": "edc52e36-a965-4f93-9118-6fa5640840b4",
+        "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "rows": 48
+      },
+      {
+        "agent": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+        "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "rows": 11
+      },
+      {
+        "agent": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "rows": 108
+      },
+      {
+        "agent": "77032943-ad18-4ae9-a2c6-668769077c86",
+        "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "rows": 11
+      },
+      {
+        "agent": "cdf5c2e3-9636-4726-b965-97f764f5891a",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "rows": 395
+      },
+      {
+        "agent": "5218b92b-71e0-4197-8225-4c30521a3467",
+        "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "rows": 2
+      },
+      {
+        "agent": "b1be40d2-6740-4b3c-9b3a-c3755f81370c",
+        "runtime": "490365fb-afb2-4cf3-a694-23459da7a6d1",
+        "rows": 0
+      }
+    ],
+    "records": 2020,
+    "pagination_complete": true,
+    "errors": [],
+    "pending": [
+      {
+        "agent": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "task": "01a13913-ee46-734e-b0dc-6f9bcd470d8e",
+        "status": "running",
+        "issue": "01a124e5-1222-7d75-8447-c66208fc7459"
+      },
+      {
+        "agent": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "task": "01a13884-799a-7679-86e0-05c560522e19",
+        "status": "queued",
+        "issue": "01a124e5-2403-75b1-87f2-539d1942a242"
+      },
+      {
+        "agent": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "task": "01a13545-d71b-7b39-9d4d-490dbfead7c8",
+        "status": "running",
+        "issue": "01a124e5-2403-75b1-87f2-539d1942a242"
+      },
+      {
+        "agent": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "task": "01a1390a-30fc-7327-b2f9-468576cd6cdf",
+        "status": "queued",
+        "issue": "01a124e5-0df9-7858-b4c8-525d9dd354f2"
+      },
+      {
+        "agent": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "task": "01a138e7-8d7a-76fb-a520-704459005b3a",
+        "status": "running",
+        "issue": "01a124e5-0df9-7858-b4c8-525d9dd354f2"
+      },
+      {
+        "agent": "cdf5c2e3-9636-4726-b965-97f764f5891a",
+        "runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "task": "01a13916-766b-7b42-b411-c8ee9818573a",
+        "status": "running",
+        "issue": "01a124e5-0df9-7858-b4c8-525d9dd354f2"
+      }
+    ]
+  },
+  "root_original_privileged_provenance": {
+    "checked_utc": "2026-10-14T06:10:14.144979+00:00",
+    "exact_original_host_container_only": true,
+    "operator_directory_readable_with_previously_supplied_admin_access": true,
+    "operator_directory_content": "only 12 preserved AppArmor incident entries; no usable Loginom credentials discovered",
+    "original_owner_bytes_and_Users_cfg_preserved": true,
+    "deployment_compose_labels_absent": true,
+    "own_SSH_closed": true,
+    "receipt_sha256": "30b74fb911c76d14d28e2f6def0785d5062f6b57584f6cb5250fcfe74f025bcb",
+    "not_all_sources_absence_proof": true
+  },
+  "root_exact_original_image_config": {
+    "checked_utc": "2026-10-14T06:12:32.237941+00:00",
+    "Users_cfg_bytes": 684,
+    "Users_cfg_sha256": "6ae9a3b811b26ff526ea628bdc5689243ad06e0baabc1b1a8dc78651b32e92a1",
+    "image": "sha256:282c6b2ac14668b21080af70027335fcddf8b3f2a30e996d07ba0570eaa94863",
+    "exact_current_cfg_matches_actual_lower_image_layer": true,
+    "lower_file_bytes_sha256_equal": true,
+    "original_container_diff_has_no_Users_cfg_change": true,
+    "observed_image_COPY_config_to_workdir": true,
+    "existing_setup_sources_examined": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/support/setup-loginom.sh",
+        "bytes": 1728,
+        "sha256": "7f9abf5c3842d4462e94a4a3b046885e6b24ff11ca5844388070b540af91af65",
+        "admin_mention_lines": [],
+        "Users_cfg_mention_lines": [],
+        "explicit_admin_password_assignment": false,
+        "values_exported": false
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/support/configure-runtime.py",
+        "bytes": 1994,
+        "sha256": "a756ce27e3e6d750231cd793f640aa80fc5a041de23da24b085f9b6a9c1f9417",
+        "admin_mention_lines": [],
+        "Users_cfg_mention_lines": [],
+        "explicit_admin_password_assignment": false,
+        "values_exported": false
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/support/setup-profiles.py",
+        "bytes": 1198,
+        "sha256": "088084ff2e1dda499412293e4746f73391f9b39183943614b0a621c37e97feb0",
+        "admin_mention_lines": [],
+        "Users_cfg_mention_lines": [],
+        "explicit_admin_password_assignment": false,
+        "values_exported": false
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/evidence/final-isolation.json",
+        "bytes": 174,
+        "sha256": "b40e49a101429bbccf3e1549a712d72daf6d457c246706414f436a713b054456",
+        "admin_mention_lines": [],
+        "Users_cfg_mention_lines": [],
+        "explicit_admin_password_assignment": false,
+        "values_exported": false
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/evidence/final-install.log",
+        "bytes": 91,
+        "sha256": "3dcc0bfd86aa476cb2ca50505e42aa4db02e45179cfb5928d3c339e090a7adf7",
+        "admin_mention_lines": [],
+        "Users_cfg_mention_lines": [],
+        "explicit_admin_password_assignment": false,
+        "values_exported": false
+      }
+    ],
+    "not_yet_proof_of_usable_plaintext_password": true,
+    "no_default_password_assumed_or_tested": true,
+    "receipt_sha256": "6a04dc64dacbbda756caad772fa699a252ac3afb8976998c2485d66191d36ae5",
+    "own_SSH_closed": true
+  },
+  "root_supported_reconnect_source": {
+    "actual_7_4_2_public_files": [
+      {
+        "path": "bg/app/Application.js",
+        "bytes": 45243,
+        "sha256": "1b922bfff58f5d71ab08bc25b3198da17ae2a4d2a7ce4c034265aca9de15bc78"
+      },
+      {
+        "path": "bg/app/ServerConnection.js",
+        "bytes": 16418,
+        "sha256": "4c8203aa04050c45f55f2dfec76ef65d93b056a9cbe092419a9bbea821e0c5a6"
+      },
+      {
+        "path": "bg/app/Client.js",
+        "bytes": 7856,
+        "sha256": "197b1efbee4aa846bdb91a15cc25b025181c35166da2f2c1408c071480873ee1"
+      }
+    ],
+    "actual_producer": "Client.js AfterCreateSession stores Session.ReconnectKey in FReconnectKey; Reconnect calls supported ConnectToSession on same container object",
+    "source_limits": "these sources show in-memory key; no key persistence observed in these files; absence of every possible producer is not asserted",
+    "original_nonbrowser_runtime_JSON_files_read": 6,
+    "authentic_reconnect_key_presence": "NOT_OBSERVED in selected runtime record key scan; browser LevelDB and original SQL not opened",
+    "source_source_only_no_connect_or_login": true,
+    "first_runtime_inventory_capped_100_not_absence_proof": true,
+    "subsequent_nonbrowser_JSON_only_key_scan": true,
+    "unsupported_class_URL_read_failure": "nonzero retained as UNKNOWN; actual class located in Client.js; old URL not retried",
+    "no_synthetic_key_or_new_login_as_old_key": true,
+    "records_receipt_sha256": "509a690dc82b56bca07239ca8a15fe8ed1b6f781969931d9210dcef93e13e9ad"
+  },
+  "coordinator_decision": {
+    "SOURCE_ACCEPTED": true,
+    "OPERATOR_NOT_READY": true,
+    "real_blockers": [
+      "TRUSTED_ADMIN_CREDENTIAL_PROVENANCE_UNAVAILABLE",
+      "RESOURCE_DISJOINTNESS_UNPROVEN_AND_EXACT_ALL_PENDING_QUEUE_GATE_NOT_FREE"
+    ],
+    "human_approval_gate": false,
+    "next_option": "read-only actual original image/config credential producer and documented existing credential provenance; source or vendor-defined offline proof only, no credential guessing/inversion/login; deliver exact usable provenance or precise capability blocker and supported next alternative",
+    "not_assigned_now": [
+      "install_or_pin",
+      "FINAL_OPERATOR_ADMITTED",
+      "connector_or_native_observer_or_login",
+      "once_or_recovery_reservation",
+      "resource_profile_role_account_credential_changes",
+      "foreign_tasks_processes_leases_messages",
+      "scenario_reference_product_cold_generations"
+    ],
+    "unchanged_all_pending_gate": "retained; no filtering, relaxation, source delta or cancellation",
+    "new_source_if_needed": "clean exact SHA plus independent code/diff/TDD/negatives/process proof before effects",
+    "do_not_repeat_unchanged_diagnostics": "old env/connection/operator-directory/full pin/full suites already checked; use new precise producer hypothesis",
+    "future_route": "all original owner/common lease/held guard/once/recovery/history/cessation/ordinary release/FREE/independent cases and validator ACCEPT gates from canonical49b14 unchanged"
+  },
+  "preserved_accounting": {
+    "Ben_product": "6/6 consumed; original whole ERROR/code2/all6 quality EXCLUDED/no retries",
+    "Ben_cold": "9/9/8 plus oldERROR1",
+    "Ben_model_rows": "77 actual Luna/high,5 official archives+1 pending, billedUNKNOWN",
+    "Rich_product": "4PASS2qualityFAIL0ERROR originalc26;1each",
+    "Rich_reference": "1/1/2/1/1/3 <=3",
+    "Rich_cold": "11/10/8; historical cleanup continuations2",
+    "same_cause_repeats": "3/10 remaining7; new source/read-only hypothesis0, no reset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1 exhausted",
+    "recovery": "0/1 last proven; read-only is not reservation"
+  },
+  "preserved_history": [
+    "original parent/harness admission missing",
+    "original lower writer cause UNKNOWN",
+    "initial SHM-index read STOP",
+    "original ERROR/FAIL/UNKNOWN",
+    "old wrong six-profile observation",
+    "once and attempt ledgers unchanged"
+  ],
+  "root_effects": {
+    "tests": 0,
+    "installation": 0,
+    "native": 0,
+    "login": 0,
+    "model": 0,
+    "reference_product_cold": 0,
+    "recovery_or_once": 0,
+    "profiles_storage_accounts_credentials": 0,
+    "source_changes": 0,
+    "raw_env_secrets_or_private_diagnostics_in_Git": false
+  },
+  "actual_final_cleanup_release_FREE_case_ACCEPT": "ABSENT",
+  "all_eight_done": false,
+  "automation": "ACTIVE30min; delete only all8 actualdone+ACCEPT/evidence/cleanup"
+}

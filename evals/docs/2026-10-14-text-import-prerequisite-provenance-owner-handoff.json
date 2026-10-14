@@ -1,0 +1,26 @@
+{
+  "checked_utc": "2026-10-14T06:33:26.424619+00:00",
+  "canonical": "evals/docs/2026-10-14-text-import-prerequisite-provenance-verification.json",
+  "canonical_bytes": 15838,
+  "canonical_sha256": "443752a9ed3008d838d0ef43b4d7a40ce3e091ff0c36f433de3d5c776ae9740a",
+  "owner_comment": "01a1391a-8372-751a-9141-9f361f132364",
+  "parent": "01a138fc-1a87-737a-b42c-6fcdaff300de",
+  "body_bytes": 6417,
+  "body_sha256": "a7dcf7991dc112f7eda25fa0a86b4fa805150ce2f61ea24e15550062b45e1820",
+  "body_equal_after_terminal_newline_normalization_and_parent_and_one_Evaler_mention_verified": true,
+  "attachment_id": "01a1391a-821b-7bde-b1b8-a14648363568",
+  "attachment_byte_readback_verified": true,
+  "post_outcome_reconciliation": "original post executed once; local str/write_bytes result-bookkeeping TypeError retained; unique server marker/body/parent/mention reconciled without repost",
+  "fresh_snapshot_read_reconciliation": "one LAB57 issue get failed in parallel UNKNOWN without raw retained; isolated changed --debug read exit0 restored missing issue; no native/release/installation retries",
+  "new_only_Evaler_readonly_task": {
+    "id": "01a1391a-8386-711e-a5df-bb3bb0ec4a8a",
+    "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "status": "running",
+    "started_at": "2026-10-14T09:30:01+03:00",
+    "trigger_comment_id": "01a1391a-8372-751a-9141-9f361f132364"
+  },
+  "no_duplicate_Ben_Rich_or_third_review": true,
+  "SOURCE_ONLY_current_stage": true,
+  "live_install_pin_admission_recovery_once_native_login": 0,
+  "all_eight_done": false
+}

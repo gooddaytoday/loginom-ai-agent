@@ -1,0 +1,20 @@
+{
+  "recorded_utc": "2026-10-14T06:40:14.512498+00:00",
+  "automation_id": "lab-56-lab-63",
+  "last_known_local_status_before_disappearance": "ACTIVE",
+  "last_known_prompt_chars": 76227,
+  "last_known_prompt_sha256": "a5aa9a0acb03acfbb93acfa128cc236580a1389928a26c0690738308cacda3b4",
+  "update_attempt": "append verified current prerequisite provenance/readonly owner decision; no delete or recreate requested by coordinator",
+  "update_tool_error": "Automation does not exist in the app and could not be updated. It may have been deleted manually by the user.",
+  "expected_new_prompt_chars": 83301,
+  "new_prompt_not_saved": true,
+  "local_original_automation_file_absent": true,
+  "matching_replacement_search_count": 0,
+  "view_tool_only_rendered_card_and_did_not_confirm_existence": true,
+  "explicit_user_confirmation": "это я ее удалил, пока не нужна",
+  "decision": "DO_NOT_RECREATE_OR_SCHEDULE_PERIODIC_CHECKS",
+  "all_eight_done": false,
+  "existing_Multica_readonly_Evaler_task_not_cancelled": "01a1391a-8386-711e-a5df-bb3bb0ec4a8a",
+  "delegated_case_criteria_budgets_cleanup_acceptance_unchanged": true,
+  "no_new_worker_message_or_dispatch_due_to_automation_deletion": true
+}
