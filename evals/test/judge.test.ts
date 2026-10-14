@@ -101,6 +101,40 @@ test("judgeInfo: version probe drains its child before returning metadata", asyn
   }
 }, 20_000)
 
+test("judgeInfo: abort during a version probe drains its child and refuses metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-version-abort-"))
+  const pidFile = path.join(root, "child.pid")
+  const abort = new AbortController()
+  const pending = judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --child-pid-file ${pidFile}` }), abort.signal)
+  const state = async () => {
+    if (!await Bun.file(pidFile).exists()) return undefined
+    const raw = await readFile(`/proc/${(await Bun.file(pidFile).text()).trim()}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw ? raw.slice(raw.lastIndexOf(")") + 2).split(" ") : undefined
+  }
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(pidFile).exists(); wait++) await Bun.sleep(10)
+    expect(await Bun.file(pidFile).exists()).toBe(true)
+    const birth = (await state())![19]
+    abort.abort()
+    await expect(pending).rejects.toThrow("JUDGE_VERSION_UNCONFIRMED")
+    const current = await state()
+    expect(!current || current[19] !== birth || ["Z", "X"].includes(current[0]!)).toBe(true)
+  } finally {
+    abort.abort()
+    await pending.catch(() => {})
+    for (let wait = 0; wait < 1200; wait++) {
+      const current = await state()
+      if (!current || ["Z", "X"].includes(current[0]!)) break
+      await Bun.sleep(10)
+    }
+    await rm(root, { recursive: true, force: true })
+  }
+}, 20_000)
+
 test("judgeInfo: --version не наследует секреты harness и сохраняет обычное окружение", async () => {
   const probe = await probeJudgeEnvironment("info")
   expect(probe.version).toBe("fake-codex 0.0.0")

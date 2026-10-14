@@ -19,8 +19,8 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
 
 async function calibrateBody(config: EvalConfig, corpusDir: string, signal: AbortSignal) {
   const tasks = await loadTasks(config.tasksDir, config.only)
-  await preflight(config, parseArtifactSource("docker", config.loginom))
-  const judge = await judgeInfo(config)
+  await preflight(config, parseArtifactSource("docker", config.loginom), signal)
+  const judge = await judgeInfo(config, signal)
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(new Date())}-calibrate`)
   const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))

@@ -26,6 +26,13 @@ readiness не резервирует среду. Run заново acquire/admis
 сохраняет durable reservations, несмотря на освобождение OS guard после crash.
 Recover требует incident/lineage/CAS и новых proofs, не удаления lease по PID.
 
+Ctrl+C во время проверки версии судьи теперь передаётся от calibrate/judge-only/run
+в supervisor: собственная цепочка завершается, команда отказывает с exit 2 до
+нового измеренного вывода; judge-only сохраняет прежний summary. Actual Bun и
+fake-codex qualification: 117 tests/661 assertions PASS, typecheck/diff PASS.
+Это проверка version admission; live OAuth и другие Loginom probe owners остаются
+открытыми. Неопределённый offline outcome сохраняет durable reservation.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —
