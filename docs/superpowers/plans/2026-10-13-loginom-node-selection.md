@@ -2100,3 +2100,18 @@ unchanged. Перед будущим reopen/reproduction обязательна 
 admin отсутствуют; Product/skill/build/pins unchanged. Candidate completed4/25
 (три полных PASS, ABC/1 incomplete), firstwave4/9 нечистая. Baseline18/18:
 17oracle/расчёт PASS,11policy PASS. Повторы закрыты, итоговая приёмка не завершена.
+
+
+На 2026-10-14 04:16 UTC independent postmove `16020b56…` подтвердил
+117 archive names/bytes/SHA/device/inode/mode/mtime и отсутствие всех117
+original paths; prior108 fullstats и excluded6 fullstats/SHA unchanged,
+root517 измерен. Protected268/3excluded refs/141V1+V2raw/4458diagnostic source,
+74acceptance source/10pins0400/обаruntime288 unchanged. Other root name equality
+подтверждена Root operator; независимый review не заявляет повторное сравнение
+полного before inventory, которого в receipt нет. Blockers отсутствуют.
+
+Frozen следующий `campaign-roi-by-channel/1` запущен Root32921; Session
+`ses_ec7615900ffeSpJbGwjzNPDotz`, стандартный импорт выполняется, JS-вызовов
+пока нет. Source/build/skill/pins неизменны, инструментация private diagnostics
+в этот model run не добавляется. Candidate completed4/25; первая волна4/9
+остаётся нечистой, повторы закрыты, полная приёмка не завершена.
