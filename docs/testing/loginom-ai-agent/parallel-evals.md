@@ -788,3 +788,14 @@ Target1 PASS/7 (6.22s); admin integration/unit/preflight48 PASS/123 (36.33s),
 typecheck/diff PASS. Full diagnosis в evals/docs/2026-10-14-admin-password-focus-diagnosis.md.
 Quarantined evidence сохранены; server session close/ACL/backup/licence counts,
 acceptance pair и native model/judge qualification остаются открытыми.
+
+
+Native readonly session observations: actual own Session GUID/proxy ID и managed
+IDs опубликованы private/fsynced, qualification=false. Await Session + поддержанный
+ProxyObjectsHelper.GetObjectId заменили cached-only чтение, которое было unknown.
+Native target1 PASS/13 (6.51s); admin integration/unit/preflight48 PASS/129 (36.69s),
+typecheck/diff PASS. Own GUID75f1cd6a-c753-460a-ae80-439a635ff4d7, direct managed-ID
+matches0, pending/active rows сохранены. Receipt research/controller/admin-w6rH8L/
+session-observations.json. Public inspect не выдаёт qualified sessions; username
+не используется для close. Scope mapping/reconnect/CLI correlation и backup
+policy остаются следующими gates.
