@@ -2326,7 +2326,7 @@ rewriter suite не повторяются. Независимый design/source
   pacing gate по TDD; новый immutable binding и independent source review.
 - [x] Root выполнить один paced private native run, сохранить actual timing,
   same-frame capture/no-repro/unknown и exact own close.
-- [ ] Независимо прочитать закрытый результат и определить следующий шаг только
+- [x] Независимо прочитать закрытый результат и определить следующий шаг только
   по фактическим данным, сохранив исходный failed slot и условия приёмки31.
 
 Paced private подготовка завершена: helper11lines,3focusedPASS (реальный таймер
@@ -2351,7 +2351,7 @@ logouttrue/noDiscard, Host1496283 ACKexit0/noSignal/noError; PID и .writer от
 Root conservation подтвердил source4456/fixture3/protected2181 без изменений,
 включая original16/effective74/previous closed private2064. Product не исправлялся.
 
-Интервал проверен как один фактор; прежний отказ и причина остаются unknown.
+Интервал проверен как один фактор; причина прежнего отказа остаётся unknown.
 Третий private diagnostic и model retry автоматически не разрешены. Текущая
 серия31 остаётся stopped: model started1/technicalfailed1/notstarted30/baseline0;
 оба private NO-REPRO не являются успешной приёмкой или заменой failed slot.
@@ -2360,3 +2360,10 @@ Parallel current progress readback SHA
 подтвердил frozen до first dispatch31=6+25, все25candidate coverage/order,
 completed gates/build/tests без rerun и ограниченность baseline comparison.
 85мин экономии — оценка12плановых модельных процессов, без диагностики/отказов.
+
+Independent closed paced readback SHA
+`70f70d56e4b283188bbc802ae2e190ac55fb829d82f22e7a60ebabcac56a27cf`:
+48receipts/2296rows/6requests/onegesture, exact timing/ownclose/PIDgone/.writerabsent,
+protected2181/effective74 unchanged. Causeunknown; no native/model acceptance.
+Новое ограничение владельца требует отменить branch standard-node production
+changes до исходной базы; дальнейшие standard fixes/diagnostic loops здесь запрещены.
