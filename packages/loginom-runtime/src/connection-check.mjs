@@ -28,6 +28,34 @@ export function loginomAddress(value) {
   return url.href
 }
 
+// Serialized read on the original startup document. Captures no input values.
+export function readStartupBootstrap(o) {
+  const own=globalThis.__loginomStartupV1;
+  if(own?.document!==document||own.id!==o.id||own.account!==o.account||location.origin!==o.origin)
+    throw Error('LOGINOM_STARTUP_PAGE_CHANGED');
+  const visible=e=>!!e&&!!e.getBoundingClientRect().width&&!!e.getBoundingClientRect().height&&getComputedStyle(e).visibility!=='hidden';
+  const blocker=[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].find(visible);
+  const avatar=document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]');
+  const username=document.querySelector('[data-tid="LoginForm;Login;edtUsername"]');
+  return {observed_at:new Date().toISOString(),owner_id:o.id,document_bound:true,
+    url:location.href,build:globalThis.bg?.app?.Version??null,
+    blocker:blocker?{data_tid:blocker.getAttribute('data-tid'),class:blocker.getAttribute('class'),
+      role:blocker.getAttribute('role'),text:(blocker.textContent??'').trim().slice(0,1000)}:null,
+    avatar:{in_dom:!!avatar,visible:visible(avatar)},username:{in_dom:!!username,visible:visible(username)},
+    read_only:true,mutation_authorized:false,release_authorized:false};
+}
+async function recordStartupBootstrap(page,owner,phase) {
+  if(owner.page!==page||owner.context?.pages().length!==1||owner.context.pages()[0]!==page)
+    throw Error('LOGINOM_STARTUP_PAGE_CHANGED');
+  owner.evidence.bootstrap??={};
+  if(Object.hasOwn(owner.evidence.bootstrap,phase))throw Error('LOGINOM_STARTUP_BOOTSTRAP_CONSUMED');
+  const snapshot=await page.evaluate(readStartupBootstrap,{id:owner.id,account:owner.account,origin:owner.origin});
+  if(owner.page!==page||owner.context.pages().length!==1||owner.context.pages()[0]!==page)
+    throw Error('LOGINOM_STARTUP_PAGE_CHANGED');
+  owner.evidence.bootstrap[phase]=snapshot;
+  await startupEvidence(owner);
+}
+
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, owner) {
@@ -42,7 +70,17 @@ export async function loginPage(page, candidate, owner) {
   }
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-  await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+  if(owner)await recordStartupBootstrap(page,owner,'before');
+  let waitFailed=false,waitFailure;
+  try {await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })}
+  catch(reason){waitFailed=true;waitFailure=reason}
+  // After belongs to the same original document, including a failed wait.
+  // Persistence/read failures must not replace its original falsy/Error cause.
+  if(owner) {
+    try {await recordStartupBootstrap(page,owner,'after')}
+    catch(secondary){if(!waitFailed)throw secondary;owner.evidence.bootstrap.after_rejection=startupRejection(secondary)}
+  }
+  if(waitFailed)throw waitFailure
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
     const password = field("edtPassword").locator("input")
