@@ -1983,3 +1983,34 @@ Fresh4452source/5fixtures/85protected и own idle проверены. Перво
 read-only process filter оказался шире own scope и отказал до mutations;
 повторная проверка scoped к этой серии, чужие процессы не затрагивались.
 Join outcome pending; no other Host/CLI/admin/model. Model slots0/stages open.
+
+
+Checkpoint 2026-10-14 06:14 UTC — fresh Join PASS/independent PASS.
+Root79801 exit0/result `5892db63337e7091aa7526f01b9ea47360d05c1a6e4b5df0508a64e07cf8ceac`;
+independent live `f3f3bd07bbc10d1a08526d4b4a54ef4f078bfe6840e607841b086d4b83544caa`.
+Actual role0/role1 native GUID/ACK→wizard observations, exact integer rows
+[1,5,15]/[1,10,15], both import projections и saved3nodes2rolelinks/noJS.
+Own package `/user/JDbbe947d8.lgp` closed без discard, Logout/HostACKtrue/exit0,
+PID1094100 absent. No standalone input reread/fresh hiddenDOM/model claim.
+1315ownjournal rows; raw36/source4452/fixtures5/protected85/effective10/runtime288×2
+unchanged. Это отдельный native gate, общая acceptance всё ещё открыта.
+
+Root9855 schema probe exit0/result
+`aa497d0c89338cc50437ff990a4066ff3a4338748d68f7463287dfe24620798a`:
+15standard schemas получены, ACKtrue/exit0/noSignal. Explicit Logout false,
+prepare/node/package/UI calls отсутствуют; actual16prepare проверен отдельным
+JS downstream. Independent schema live review pending. External admission
+`3673bd6ec208f5d2715bbb18939a4a35dab51b9ad39a81fa4d983fb0753f87b8`;
+readyFalse metadata-only не менялась. Gap scope ограничен known15/API/case,
+не универсальной математической невозможностью любого стандартного графа.
+
+Private U capture `native-export-port-cover-diagnostic` prepared/frozen:
+binding `979ee5bb4463687e11ee252d173b2e09526c2b8c0564d1b2034c73e0a2755d46`
+readyfalse0400, verification
+`110656399c41f97d5f971858bff8881e43841e5df62d35dcb6faf5f1bfbd9ed0`.
+Author7Node+11Bun65assert/typecheck/syntax0;4456source20fixtures70protected.
+Exact frame only, same9hit predicate/point/click/browsercall count; inverse
+byteequal test, bounded marker extracted before unchanged error slice500.
+Getter/oversize data fail to unknown/truncated, guard remains refusal.
+Independent static review pending; no live/Product/payload/profile change.
+Models0, clipped Export/full native stage/18+25 remain open.
