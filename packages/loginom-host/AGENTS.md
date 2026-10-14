@@ -72,3 +72,7 @@
 - `collect-build-notices.ts` copies package and nested npm license/notice texts for positive Bun output contributions into CLI licenses/bundled-npm. Its inventory remains explicitly incomplete for full attribution/source/relinking release audit, which the user deferred outside the technical Linux goal. Do not treat metadata license declarations or successful copying as compliance approval.
 
 - Private supervisor shutdown diagnostics are `runtime-close-<pid>-<uuid>.json` under the runtime state directory (0600): bounded request error class, ACK boolean and actual exit code/signal only. Never serialize remote replies or error messages. Diagnostic write failure must not change cleanup outcome; these records do not replace native package cleanup or process acceptance.
+
+## Уточнение области ветки node-javascript (2026-10-14)
+
+Обработчики стандартных узлов возвращаются к базе `38ee045e79720d363a35666484f17804162b55a1`; новые исправления этих узлов здесь запрещены. Общие процедуры портов, мастеров и таблиц вывода сохраняются, если они необходимы реализации JavaScript. Для сохранённых изменений указываются конкретные JS callers, tests или live evidence. Необходимая eval-инфраструктура сохранена. Ошибка стандартного узла не разрешает обход через JS.

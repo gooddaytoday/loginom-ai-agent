@@ -100,3 +100,7 @@
 - `resource-close.jsonl` records private resource shutdown stages in the owned session directory (0600), using fixed stage/status fields only. Snapshot admitted requests synchronously before any diagnostic await so close never drains itself. Preserve bridge ACK refusal and all resource failures; unavailable diagnostics neither certify nor block cleanup.
 
 - After a terminal close reply has flushed over IPC, managed-entry invokes its existing checked stop path explicitly. Do not rely solely on Node disconnect: a buffered incomplete later IPC frame can postpone that event after resources and ACK are complete. Preserve admitted-request draining, cleanup failure exit1 and supervisor ACK-plus-actual-exit checks; a successful send alone is never cleanup proof. Signal handlers call stop without forwarding the signal name as an exit code.
+
+## Уточнение области ветки node-javascript (2026-10-14)
+
+Обработчики стандартных узлов возвращаются к базе `38ee045e79720d363a35666484f17804162b55a1`; новые исправления этих узлов здесь запрещены. Общие процедуры портов, мастеров и таблиц вывода сохраняются, если они необходимы реализации JavaScript. Для сохранённых изменений указываются конкретные JS callers, tests или live evidence. Необходимая eval-инфраструктура сохранена. Ошибка стандартного узла не разрешает обход через JS.

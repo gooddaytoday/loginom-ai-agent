@@ -2364,3 +2364,11 @@ Independent closed paced readback SHA
 protected2181/effective74 unchanged. Causeunknown; no native/model acceptance.
 Новое ограничение владельца требует отменить branch standard-node production
 changes до исходной базы; дальнейшие standard fixes/diagnostic loops здесь запрещены.
+
+Checkpoint 2026-10-14 — уточнение владельца об общей инфраструктуре.
+Откат относится к обработчикам стандартных узлов; порты, мастера и таблицы
+вывода, необходимые JavaScript, разрешены. Незакоммиченный чрезмерный rollback
+Core/Host отменён: сохранены JS source/context, reply budgets, normal own shutdown
+и необходимая eval-инфраструктура. Прямые standard handlers продолжают rollback
+к38ee. Финальный scope review и проверки обновлённого source ещё не завершены.
+Новых live/model запусков после уточнения нет; прежние31locks/results не меняются.

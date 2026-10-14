@@ -10,13 +10,15 @@
 
 **Spec:** [Согласованный дизайн](../specs/2026-10-13-loginom-node-selection-design.md).
 
-Актуальный checkpoint 2026-10-14 09:16 UTC: протокол31 =6baseline+25candidate
-закреплён до первой новой model попытки. Итоговый Export gate, JS downstream,
-runtime checks/builds и auto-next завершены; без изменения не повторять.
-Серия064745 остановлена после technical ABC/1 failure, остальные30 не начаты.
-Один private replay шести standard requests без LLM дал NO-REPRO с подтверждённым
-own close; причина прежнего отказа неизвестна. Acceptance ещё не завершена,
-failed slot не заменять успешным replay. Подробности — последние checkpoints.
+Актуальный checkpoint 2026-10-14: уточнён откат только обработчиков
+стандартных узлов к исходной базе38ee. Общие порты, мастера и таблицы,
+необходимые JavaScript, сохраняются. Подготовленный чрезмерный shared откат
+пересматривается; новая matched сборка и31model slots ещё не начаты.
+Техническое продолжение реализовано и независимо проверено, адаптация к
+сохранённому normal shutdown receipt проверяется отдельно. Историческая
+серия064745: started1/technicalfailed1/notstarted30, собственная сессия закрыта,
+профиль свободен. Два private replay дали NO-REPRO; исходный failure сохранён.
+Приёмка открыта; условия новой серии приведены в последнем разделе.
 
 ## Global Constraints
 
@@ -3131,14 +3133,20 @@ changes до исходной базы; дальнейшие standard fixes/diag
 libfiles и99changed inventory SHA
 `bb5c82be6d53e7bc19ca2a282e702ee0931e24b92e15cbdf4da01fea1dc49dad`.
 
-В этой ветке запрещено менять production Import, Group, Sort, Join, Calculator,
-Export и любые другие standard узлы. Вернуть их код к38ee, включая дату импорта,
-Group/Sort preflight после JS, распознавание/scroll/label Export, общий UI для
-Join/input/output/console/mapping и общую процедуру downstream после JS.
-Общая обвязка не исключение. JS-only registration/lifecycle могут сохраниться
-лишь без изменения standard path; необходимые зависимости изолировать в JS
-области либо явно признать ограничение. Не сохранять standard fixes ради eval.
-Host/bridge/budgets требуют проверки каждого mixed hunk, а не общего исключения.
+В этой ветке запрещено менять обработчики production Import, Group, Sort,
+Join, Calculator, Export и любых других стандартных узлов. Их код возвращается
+к38ee, включая дату импорта, Group/Sort preflight после JS и специальную логику
+распознавания/scroll/label внутри Export. Новые исправления этих узлов ради eval
+запрещены.
+
+Уточнение владельца после attachment80e0c1d9: запрет относится к самим узлам,
+а не к общему коду портов, мастеров и таблиц вывода, необходимому JavaScript.
+Такие общие доработки сохраняются с конкретным JS caller/test/live evidence;
+требование возвращать все shared paths к38ee отменено. Общая инфраструктура
+JS registration/lifecycle/source/context, Host/bridge/budgets и необходимая
+eval-инфраструктура сохраняются. Самостоятельные изменения общих процедур,
+сделанные только ради стандартных узлов и не нужные JS, не получают этого
+исключения. Итоговый diff проверяется по назначению каждого mixed hunk.
 
 Сохраняются собственно JavaScript,2skill files и необходимая eval-инфраструктура.
 Откат — обычный обозримый commit, без reset/history/evidence/userfile deletion.
@@ -3186,8 +3194,9 @@ Clientgenerate без publicProtocol/HttpApi изменения.
 при technical failures полную приёмку не объявлять. Отдельное подтверждение —
 все запрещённые production deltas отменены, новых standard changes нет.
 
-- [ ] Отменить standard/common production deltas относительно38ee, сохранив
-  JS-only разработку/skill/eval; проверить зависимости и зафиксировать ограничения.
+- [ ] Отменить изменения обработчиков стандартных узлов относительно38ee;
+  сохранить JavaScript, необходимые общие порты/мастера/таблицы и skill/eval;
+  проверить назначение shared изменений и зафиксировать ограничения.
 - [ ] Независимо проверить итоговый scope diff и необходимые changed-code/JS
   проверки; rollback сохранить обычным описательным commit.
 - [ ] По TDD добавить отдельный technical continuation/recovery/history path
