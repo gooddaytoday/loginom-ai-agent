@@ -10,6 +10,7 @@ export function retainAmountSource(retained, source, {guard, signal, runtime, re
   const original = assertAmountManagedStartup(retained.state.controlledStartup, retained.state);
   const session = retained.session, store = session.artifactStore;
   const fail = () => { throw Error('LOGINOM_AMOUNT_SOURCE_UNAVAILABLE'); };
+  if (!source || typeof source !== 'object' || Array.isArray(source)) fail();
   captureData(source);
   if (!store || typeof runtime?.deliverArtifact !== 'function' || signal !== original.signal
       || Object.keys(source).sort().join(',') !== 'artifact_id,bytes,name,sha256,upload'
@@ -54,7 +55,7 @@ export function retainAmountSource(retained, source, {guard, signal, runtime, re
   };
   return Object.freeze({
     unsettled: () => pending || uncertain,
-    assert(value) { current(); if (value !== result || pending || uncertain) fail(); return true; },
+    assert(value) { current(); if (!result || value !== result || pending || uncertain) fail(); return true; },
     async deliver() {
       current();
       // The original pair is consumed before any read or dispatch, including

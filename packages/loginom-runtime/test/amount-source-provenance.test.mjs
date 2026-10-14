@@ -49,6 +49,8 @@ for(const mode of modes){
   const record=async event=>{records++;if(mode.startsWith('record-'))return failure;return journal(event)};
   const args={guard:()=>{},signal:f.controller.signal,runtime,record};
   const provider=retainAmountSource(f.retained,source,args);
+  assert.throws(()=>provider.assert(undefined),/SOURCE_UNAVAILABLE/);
+  assert.throws(()=>retainAmountSource(f.retained,null,args),/SOURCE_UNAVAILABLE/);
   if(mode==='local-byte-drift')await writeFile(join(directory,'artifacts',source.artifact_id),'changed');
   let originalNow=Date.now;
   let value,caught,present=false;
