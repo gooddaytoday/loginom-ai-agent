@@ -1,3 +1,4 @@
+import { receivePrivateAdmission } from "./private-admission.mjs"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Product, productChannel } from "@loginom-ai-agent/product"
@@ -20,6 +21,7 @@ export async function standalone(
   args: string[],
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
 ) {
+  await receivePrivateAdmission()
   const options = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
   if (args.length === 1 && args[0] === "--capabilities") {
     process.stdout.write(JSON.stringify({ capabilities: capabilities() }) + "\n")

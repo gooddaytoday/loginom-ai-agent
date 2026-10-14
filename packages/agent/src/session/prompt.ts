@@ -1,3 +1,4 @@
+import { relayPromptInput, promptSDKContext } from "@/cli/private-admission.mjs"
 import { attachmentPreview } from "@/util/attachment-preview"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
@@ -1087,7 +1088,7 @@ const layer = Layer.effect(
       }
 
       if (input.noReply === true) return message
-      return yield* loop({ sessionID: input.sessionID })
+      return yield* loop(relayPromptInput(input, { sessionID: input.sessionID }))
     })
 
     const lastAssistant = Effect.fnUntraced(function* (sessionID: SessionID) {
@@ -1098,8 +1099,8 @@ const layer = Layer.effect(
       throw new Error("Impossible")
     })
 
-    const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
-      function* (sessionID: SessionID) {
+    const runLoop: (sessionID: SessionID, originalContext?: object) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
+      function* (sessionID: SessionID, originalContext?: object) {
         const loginomStatus: { failure?: string } = {}
         const loginom = yield* Effect.acquireRelease(
           Effect.promise(() =>
@@ -1316,6 +1317,7 @@ const layer = Layer.effect(
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
+              originalContext,
               user: lastUser,
               agent,
               permission: session.permission,
@@ -1390,7 +1392,7 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID, promptSDKContext(input)))
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(
@@ -1510,14 +1512,14 @@ const layer = Layer.effect(
         { parts },
       )
 
-      const result = yield* prompt({
+      const result = yield* prompt(relayPromptInput(input, {
         sessionID: input.sessionID,
         messageID: input.messageID,
         model: userModel,
         agent: userAgent,
         parts,
         variant: input.variant,
-      })
+      }))
       yield* events.publish(Command.Event.Executed, {
         name: input.command,
         sessionID: input.sessionID,

@@ -1,3 +1,4 @@
+import { retainRunCommandCreation, retainPromptSender, associatePromptRequest, relayPromptRequest } from "../private-admission.mjs"
 import { standaloneCancellation } from "../standalone-cancellation"
 import { exitCli } from "../exit"
 import { runToolOutcome } from "../run-outcome"
@@ -126,7 +127,7 @@ async function toolError(part: ToolPart) {
   }
 }
 
-export const RunCommand = effectCmd({
+const OriginalRunCommand = effectCmd({
   command: "run [message..]",
   describe: "run opencode with a message",
   // --attach connects to a remote server (no local instance needed); the
@@ -264,6 +265,7 @@ export const RunCommand = effectCmd({
         describe: "enable direct interactive demo slash commands; pass one as the message to run it immediately",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
+    const originalCreation = retainRunCommandCreation(args, standaloneCancellation())
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
@@ -916,14 +918,16 @@ export const RunCommand = effectCmd({
               return
             }
             if (args.command) {
-              const result = await client.session.command({
+              const originalInput = {
                 sessionID,
                 agent,
                 model: args.model,
                 command: args.command,
                 arguments: message,
                 variant: args.variant,
-              })
+              }
+              retainPromptSender(originalCreation, originalInput, "command")
+              const result = await client.session.command(originalInput)
               if (result.error) {
                 if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
                 process.exitCode = 1
@@ -935,13 +939,15 @@ export const RunCommand = effectCmd({
             }
 
             const model = pick(args.model)
-            const result = await client.session.prompt({
+            const originalInput = {
               sessionID,
               agent,
               model,
               variant: args.variant,
               parts: [...files, { type: "text", text: message }],
-            })
+            }
+            retainPromptSender(originalCreation, originalInput, "prompt")
+            const result = await client.session.prompt(originalInput)
             if (result.error) {
               if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
               process.exitCode = 1
@@ -1009,7 +1015,7 @@ export const RunCommand = effectCmd({
           const headers = new Headers(request.headers)
           const auth = ServerAuth.header()
           if (auth) headers.set("Authorization", auth)
-          return Server.Default().app.fetch(new Request(request, { headers }))
+          return Server.Default().app.fetch(relayPromptRequest(request, new Request(request, { headers })))
         }) as typeof globalThis.fetch
 
         try {
@@ -1043,11 +1049,11 @@ export const RunCommand = effectCmd({
 
       const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const { Server } = await import("@/server/server")
-        const request = new Request(input, init)
+        const request = associatePromptRequest(originalCreation, new Request(input, init))
         const headers = new Headers(request.headers)
         const auth = ServerAuth.header()
         if (auth) headers.set("Authorization", auth)
-        return Server.Default().app.fetch(new Request(request, { headers }))
+        return Server.Default().app.fetch(relayPromptRequest(request, new Request(request, { headers })))
       }) as typeof globalThis.fetch
       const sdk = createOpencodeClient({
         baseUrl: "http://opencode.internal",
@@ -1058,6 +1064,15 @@ export const RunCommand = effectCmd({
     })
   }),
 })
+
+// Retain the actual command caller before effectCmd's first framework await.
+export const RunCommand = {
+  ...OriginalRunCommand,
+  handler(rawArgs: Parameters<NonNullable<typeof OriginalRunCommand.handler>>[0]) {
+    retainRunCommandCreation(rawArgs, standaloneCancellation())
+    return OriginalRunCommand.handler!(rawArgs)
+  },
+}
 
 type MiniCommandInput = {
   directory?: string
