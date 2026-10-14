@@ -1,3 +1,4 @@
+import {readAmountDraftPage} from '../../src/amount-draft-page.mjs';
 import {inspectAmountOwnPage} from '../../src/amount-own-page.mjs';
 import {retainAmountPreparation,assertAmountPreparation,beginAmountCompletion,retainAmountConsumerResult,sealAmountCompletion,assertAmountCompletion} from '../../src/amount-capture-lifecycle.mjs';
 import {assertAmountCaptureProxy,beginAmountCaptureProxy,rejectAmountCaptureAwait} from '../../src/amount-capture-proxy.mjs';
@@ -816,23 +817,29 @@ export async function createBridge(config, session, { browserTransport: managedB
       const options=()=>({signal,timeout:Math.max(1,Math.min(binding.expires,retained.owner.deadline)-Date.now())});
       // Fresh original same-Page empty-cache proof precedes every opening/Save.
       await owned(()=>inspectAmountOwnPage(retained,{guard,record:recordExecution,signal}));
-      await owned(()=>client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:binding.packagePath,
+      await owned(()=>client.callTool({name:'dock_prepare',arguments:{intent:'new_draft',
         operation_id:'amount-prepare:'+binding.admission}},undefined,options()));
       requirePreparedWorkspace(session.metadata);
-      const prepared=session.metadata.workspacePreparation?.state;
-      if(prepared?.package_ref?.path!==binding.packagePath || prepared.loginom_account!==binding.account
+      const originalPreparation=session.metadata.workspacePreparation,originalPreparationBytes=JSON.stringify(originalPreparation);
+      const prepared=originalPreparation?.state;
+      if(prepared?.package_ref?.path!==null || prepared.ownership_verified!==true || prepared.loginom_account!==binding.account
           || !prepared.workflow_ref?.workflow_id || !Array.isArray(prepared.workflow_ref.navigation_path))
         throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_UNAVAILABLE');
-      // Do not checkpoint historical/foreign dirty work: the original native
-      // reader checks exact Page/session/package, inventory and running state.
-      const expected={sessionId:binding.session,documentId:prepared.document_id,account:binding.account,
-        packagePath:binding.packagePath,tabTid:prepared.workflow_ref.tab_tid,loginomUrl:config.loginomUrl,
-        loginomBuild:session.metadata.targetIdentity.loginom_build};
-      const response=await owned(()=>browserGate(()=>browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(expected)}},undefined,options())));
-      const state=parseSavedPackageState(response,expected);
-      if(state.modified!==false)throw Error('LOGINOM_AMOUNT_DIRTY_PACKAGE_REFUSED');
-      await owned(()=>client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',
-        parameters:{path:binding.packagePath,conflict_policy:'replace'},operation_id:'amount-save:'+binding.admission}},undefined,options()));
+      // Verify the original newly created draft, then Save As with refusal on
+      // a pre-existing destination. Never open or overwrite historical work.
+      const draftOptions={owner:retained.owner.id,origin:retained.owner.origin,session:binding.session,
+        document:prepared.document_id,operation:prepared.operation_id,workflow:prepared.workflow_ref.workflow_id,
+        tab:prepared.workflow_ref.tab_tid,account:binding.account};
+      const draft=await owned(()=>retained.page.evaluate(readAmountDraftPage,draftOptions));
+      const originalDraft=()=>{
+        if(session.metadata.workspacePreparation!==originalPreparation || JSON.stringify(originalPreparation)!==originalPreparationBytes)
+          throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_CHANGED');
+      };
+      originalDraft();
+      await owned(()=>recordExecution({event:'amount_original_draft',admission:binding.admission,receipt:draft}));
+      originalDraft();
+      await owned(()=>client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',
+        parameters:{path:binding.packagePath,conflict_policy:'fail'},operation_id:'amount-save:'+binding.admission}},undefined,options()));
       if(session.metadata.workspacePreparation!==amountSavePreparation || JSON.stringify(amountSavePreparation)!==amountSavePreparationBytes)
         throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_CHANGED');
       amountPreparation=retainAmountPreparation(retained,amountSavePreparation,amountSaveOutcome);
