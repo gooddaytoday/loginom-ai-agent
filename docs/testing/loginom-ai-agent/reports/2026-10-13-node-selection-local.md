@@ -1,5 +1,19 @@
 # Локальная приёмка выбора узлов Loginom — промежуточный отчёт
 
+Текущий checkpoint 2026-10-14 13:58 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588af…`. Приняты четыре стандартные попытки
+(first-last-touch, sales, monthly, claims/1) и explicit-js/1. ABC, ROI и tags/1
+сохранены как technical-failed; полная приёмка не подтверждена.
+Освобождение собственной сессии tags user:197 и admin:198, завершение восьми
+PID и архивирование точного guard подтверждены независимым review `a1afae67…`.
+Root puregate разрешил продолжение с причиной `TECHNICAL_FAILURE_RECORDED`,
+сохранив исходный провал и policy incomplete. Ни один слот не повторялся.
+Recovery/1 запущен: dispatch13:56:48.548Z, CLI2103270/Host2103496,
+Session `ses_ec54c3ad1ffej4BQ6ZeXA479GK`, exec95454. Закрыто8/принято5/
+технических отказов3; recovery выполняется, не начато22, baseline0.
+После его завершения обязательны manual review и strict own release перед
+следующим слотом. Матрица31 и её условия остаются неизменными.
+
 Статус: приёмка не завершена. Новая пара203142-5bf175 статически проверена;
 native prerequisites pending, новых model attempts0. Серия192418-c71363
 остановлена после2baseline/0candidate: salesPASS, ABC group-target runtime blocker.
@@ -2710,3 +2724,15 @@ History/evidence/pkgs сохранены, original17 hashes unchanged. Descripto
 recovery; finalindependentrelease reviewpending. Rootnextpuregate→recovery/1 ifapproved,
 безtagsrerun/noPASSupgrade. Started8/closed8/accepted5/technicalfailed3/notstarted23/
 baseline0. Main31/compare/fullacceptanceopen; source/runtime/skill/model/pins/inputs/lockпрежние.
+
+### 2026-10-14 13:58 UTC — tags release и допуск recovery/1
+
+Tags/1 остаётся провалом: Import и JS-распаковка выполнены, standard Trim
+остановился на upstream port; пакета и CSV нет. Descriptor `4f2b12f7…` и
+независимый release-review `a1afae67…` подтверждают только безопасное
+продолжение другими слотами. Реальный root gate сохранён в
+`series/candidate-tags-1/recovery/root-continuation-gate.json`.
+Команда `root-series-resume-6-command.json` и observed receipt сохранены
+с wx0400. Runner перечитал восемь существующих исходов и начал только recovery/1.
+Модель, runtime, inputs, oracle, последовательность и критерии не изменены.
+JS→Sort уже подтверждён explicit-js/1; JS→Group пока не подтверждён.
