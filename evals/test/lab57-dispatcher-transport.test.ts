@@ -5,7 +5,7 @@ import { dispatcherFixture } from "./lab57-dispatcher.test"
 import { dispatcherBrowserCode } from "../src/lab57-dispatcher-browser"
 import { dispatcherDigest, dispatcherScope } from "../src/lab57-dispatcher"
 import { parseDispatcherResponse, reserveDispatcherClose, runDispatcherBoundary } from "../src/lab57-dispatcher-transport"
-import { connectDispatcherMcp } from "../src/lab57-dispatcher-host"
+import { connectDispatcherMcp, validateDispatcherLaunch } from "../src/lab57-dispatcher-host"
 import type { DispatcherInventory } from "../src/lab57-dispatcher"
 
 const root = async () => {const r=await mkdtemp("/tmp/dispatcher-test-");await chmod(r,0o700);return r}
@@ -154,6 +154,18 @@ test("MCP connector refuses before opening any native/config source if original 
   await expect(connectDispatcherMcp({directory:"/unavailable",browserCli:"/unavailable",browserConfig:"/unavailable"},async()=>{
     throw Error("OWNER_OR_ONCE_UNCONFIRMED")
   })).rejects.toThrow("OWNER_OR_ONCE_UNCONFIRMED")
+})
+test("launcher rejects unmanifested executable or MCP script even beneath the resource prefix",()=> {
+  const r="/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b"
+  const session={directory:"/private/new-observer",browserConfig:"/private/new-observer/playwright.json",browserCli:r+"/resources/loginom/runtime/client/node_modules/@playwright/mcp/cli.js"}
+  const config={browser:{browserName:"chromium",userDataDir:"/private/new-observer/browser-profile",launchOptions:{headless:true,chromiumSandbox:true,args:["--no-proxy-server"],executablePath:r+"/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome"}}}
+  expect(()=>validateDispatcherLaunch(session,config)).not.toThrow()
+  expect(()=>validateDispatcherLaunch({...session,browserCli:r+"/resources/loginom/runtime/client/node_modules/foreign.js"},config)).toThrow()
+  expect(()=>validateDispatcherLaunch(session,{browser:{...config.browser,launchOptions:{...config.browser.launchOptions,executablePath:r+"/resources/foreign"}}})).toThrow()
+  for(const change of [{headless:false},{chromiumSandbox:false},{args:["--no-sandbox"]},{args:["--remote-debugging-port=9222"]},{args:["--no-proxy-server","--load-extension=/foreign"]}])
+    expect(()=>validateDispatcherLaunch(session,{browser:{...config.browser,launchOptions:{...config.browser.launchOptions,...change}}})).toThrow()
+  expect(()=>validateDispatcherLaunch(session,{browser:{...config.browser,browserName:"firefox"}})).toThrow()
+  expect(()=>validateDispatcherLaunch(session,{browser:{...config.browser,contextOptions:{storageState:"/foreign"} as unknown as {viewport:{width:number;height:number}}}})).toThrow()
 })
 test("Node executable candidate builds and functions on exact bundled Node without native connection",async()=> {
   const build=await Bun.build({entrypoints:[new URL("../src/lab57-dispatcher-runtime.ts",import.meta.url).pathname],target:"node",format:"esm"})

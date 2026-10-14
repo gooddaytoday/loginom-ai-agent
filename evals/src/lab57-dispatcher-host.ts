@@ -1,7 +1,24 @@
 import { createRequire } from "node:module"
 import path from "node:path"
-import { readFile, lstat, readlink } from "node:fs/promises"
+import { readFile, lstat, readlink, realpath, readdir } from "node:fs/promises"
 import { createHash } from "node:crypto"
+import { pathToFileURL } from "node:url"
+
+type DiagnosticSession={directory:string;browserCli:string;browserConfig:string}
+type DiagnosticConfig={browser?:{browserName?:string;initScript?:string[];contextOptions?:{viewport?:{width:number;height:number}};
+  userDataDir?:string;launchOptions?:{headless?:boolean;chromiumSandbox?:boolean;args?:string[];executablePath?:string}}}
+export function validateDispatcherLaunch(session:DiagnosticSession,config:DiagnosticConfig) {
+  const root="/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b"
+  const client=path.join(root,"resources/loginom/runtime/client"),launch=config.browser?.launchOptions
+  if(session.browserCli!==path.join(client,"node_modules/@playwright/mcp/cli.js") || !path.isAbsolute(session.directory) || session.directory.includes("/roles/ben/")
+    || session.browserConfig!==path.join(session.directory,"playwright.json") || config.browser?.userDataDir!==path.join(session.directory,"browser-profile")
+    || config.browser?.browserName!=="chromium" || launch?.headless!==true || launch.chromiumSandbox!==true
+    || launch.executablePath!==path.join(root,"resources/loginom/browsers/chromium-1243/chrome-linux64/chrome")
+    || JSON.stringify(launch.args)!==JSON.stringify(["--no-proxy-server"])
+    || Object.keys(launch).some(k=>!["headless","chromiumSandbox","executablePath","args"].includes(k))
+    || Object.keys(config.browser!).some(k=>!["browserName","userDataDir","initScript","launchOptions","contextOptions"].includes(k))
+    || (config.browser!.contextOptions && Object.keys(config.browser!.contextOptions).some(k=>k!=="viewport")))throw Error("SANDBOX_OR_PROFILE_CHANGED")
+}
 
 /** Connects the exact d6 managed browser MCP using its public SDK, ONLY in a later admitted recovery.
  * Does not log in, load an old profile, create a lease, or acknowledge a recovery journal. */
@@ -23,12 +40,19 @@ export async function connectDispatcherMcp(session: {directory: string; browserC
     || !path.isAbsolute(session.directory) || session.directory.includes("/roles/ben/")
     || session.browserConfig!==path.join(session.directory,"playwright.json")) throw Error("NEW_DIAGNOSTIC_SESSION_REQUIRED")
   const info=await lstat(session.directory)
-  if(!info.isDirectory() || info.isSymbolicLink() || info.uid!==process.getuid!() || (info.mode&0o777)!==0o700)throw Error("PRIVATE_DIAGNOSTIC_SESSION_REQUIRED")
-  const config=JSON.parse(await readFile(session.browserConfig,"utf8")) as {browser?:{userDataDir?:string;launchOptions?:{headless?:boolean;chromiumSandbox?:boolean;args?:string[];executablePath?:string}}}
-  const launch=config.browser?.launchOptions
-  if(config.browser?.userDataDir!==path.join(session.directory,"browser-profile") || launch?.headless!==true
-    || launch.chromiumSandbox!==true || !launch.executablePath?.startsWith(root+"/resources/")
-    || launch.args?.some(a=>/no-sandbox|disable-setuid-sandbox|remote-debugging/.test(a)))throw Error("SANDBOX_OR_PROFILE_CHANGED")
+  if(!info.isDirectory() || info.isSymbolicLink() || info.uid!==process.getuid!() || (info.mode&0o777)!==0o700
+    || await realpath(session.directory)!==session.directory)throw Error("PRIVATE_DIAGNOSTIC_SESSION_REQUIRED")
+  const config=JSON.parse(await readFile(session.browserConfig,"utf8")) as DiagnosticConfig
+  validateDispatcherLaunch(session,config)
+  const script=path.join(session.directory,"browser-downloads.js")
+  if(JSON.stringify(config.browser?.initScript)!==JSON.stringify([script]))throw Error("OWN_INIT_SCRIPT_REQUIRED")
+  const scriptInfo=await lstat(script)
+  const {browserDownloadScript}=await import(pathToFileURL(path.join(client,"lib/browser-downloads.mjs")).href) as {browserDownloadScript(url:string):string}
+  if(!scriptInfo.isFile() || scriptInfo.isSymbolicLink() || scriptInfo.uid!==process.getuid!() || (scriptInfo.mode&0o777)!==0o600
+    || await readFile(script,"utf8")!==browserDownloadScript("http://localhost/app/"))throw Error("OWN_INIT_SCRIPT_CHANGED")
+  const profile=path.join(session.directory,"browser-profile"),profileInfo=await lstat(profile)
+  if(!profileInfo.isDirectory() || profileInfo.isSymbolicLink() || profileInfo.uid!==process.getuid!() || (profileInfo.mode&0o777)!==0o700
+    || await realpath(profile)!==profile || (await readdir(profile)).length!==0)throw Error("FRESH_EMPTY_DIAGNOSTIC_PROFILE_REQUIRED")
   const require=createRequire(path.join(client,"package.json"))
   type McpClient={connect(t:unknown):Promise<void>;listTools():Promise<{tools:{name:string}[]}>;
     callTool(r:{name:"browser_run_code_unsafe";arguments:{code:string}},options?:unknown,timeout?:{timeout:number}):Promise<unknown>;close():Promise<void>}
