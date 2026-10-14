@@ -358,6 +358,154 @@
         "normalized_exact_readback": true,
         "other_fields_unchanged": true
       }
+    },
+    {
+      "checked_utc": "2026-10-14T01:28:00.212794+00:00",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "done",
+          "revision": 70,
+          "phase": "in_review",
+          "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "blocked",
+          "revision": 295,
+          "phase": "blocked",
+          "metadata_sha256": "0e9812d5c10dad1cac513d735cfec9d176d4a14dba7cbb2ed234842118160943",
+          "active_queued": [
+            {
+              "id": "01a13800-0e7e-7a06-b9f9-fa673320765b",
+              "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+              "status": "running",
+              "started_at": "2026-10-14T04:22:02+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+          "active_queued": []
+        }
+      ],
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "status": "online",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+        "last_seen_at": "2026-10-14T04:27:36+03:00"
+      },
+      "worker_settings": {
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "fresh_LAB56_stage_comment": "01a136b2-3b9c-7a29-aa23-f364b13e54b9",
+      "fresh_LAB57_stage_comment": "01a13800-0e67-765f-80ca-962c4e052ab2",
+      "new_stage_comments_or_evidence": [
+        "01a137ef-d9d2-73f6-ba73-8520bf90df8f",
+        "01a13800-0e67-765f-80ca-962c4e052ab2"
+      ],
+      "canonical_verification": "evals/docs/2026-10-14-text-import-original-session-transport-verification.json",
+      "canonical_verification_sha256": "d352a2175dbeb0cdb195ecf92edd73551da06ea941a7156f96d0342b30e6c742",
+      "Rich_safe_progress": {
+        "checked_utc": "2026-10-14T01:28:00.212426+00:00",
+        "task_id": "01a13800-0e7e-7a06-b9f9-fa673320765b",
+        "message_count": 0,
+        "last_seq": 0,
+        "type_counts": {},
+        "safe_tail": [],
+        "raw_contents_not_saved_or_printed": true
+      },
+      "blocked_source_SHA": "144e607a68bd603a1d67d228ebef990eeeff3b89",
+      "active_support_SHA": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+      "root_new_isolated_targeted_tests_PASS": 42,
+      "root_new_isolated_targeted_tests_FAIL": 0,
+      "root_model_native_product_recovery_calls": 0,
+      "new_root_comments_dispatches_issue_host_mutations": 0,
+      "prepared_owner_draft_not_posted_due_fresh_existing_equivalent_handoff": true,
+      "independent_ACCEPT": "ABSENT",
+      "actual_cleanup_release_FREE": "ABSENT",
+      "status": "NEW_ORIGINAL_SERVER_TRANSPORT_BLOCKER_VERIFIED_SINGLE_RICH_DISPATCHER_SOURCE_TASK_RUNNING",
+      "all_eight_done": false,
+      "automation": {
+        "id": "lab-56-lab-63",
+        "status": "ACTIVE",
+        "every_minutes": 30,
+        "saved_prompt_chars": 56909,
+        "saved_prompt_sha256": "7595ace1e42b5d1ab65182337efe1305e5f411c85845d172906f2da92f054ec2",
+        "mutations": 1,
+        "normalized_exact_readback": true,
+        "other_fields_unchanged": true
+      }
     }
   ]
 }
