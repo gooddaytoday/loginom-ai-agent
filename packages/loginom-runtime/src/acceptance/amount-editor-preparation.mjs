@@ -17,9 +17,23 @@ function original(state,owner){
 // repeated opening. The normal procedure owns gesture receipts and UNKNOWN.
 export async function prepareAmountEditor({channel,observe,owner,current,record}){
  current();const initial=await observe();current();const bound=original(initial,owner),fieldBytes=JSON.stringify(bound.field);
+ const pageIdentity=state=>JSON.stringify([state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref]);
+ const pageBytes=pageIdentity(initial);
  if(!bound.wizard.import_column_editor){
-  await record({event:'amount_editor_preparation',phase:'before_gesture',owner,field:bound.field,node:bound.node});current();
-  await openImportColumnEditor(channel,initial,1,'type');current();
+  // The private scan is a guard, not a procedure snapshot. Reobserve through
+  // the actual channel, whose native/context checks and durable journal own
+  // the snapshot. Never import an externally supplied snapshot into it.
+  const prepared=await channel.observe({condition:'original Amount editor cell bound to procedure',
+    importColumnPage:{offset:0,limit:8},ready:state=>{
+      const checked=original(state,owner);
+      if(pageIdentity(state)!==pageBytes)refuse('same_original_Page_before_gesture');
+      if(JSON.stringify(checked.field)!==fieldBytes||checked.wizard.import_column_editor)refuse('unchanged_original_Amount_column');
+      return true;
+    }});current();
+  const checked=original(prepared,owner);
+  if(JSON.stringify(checked.field)!==fieldBytes)refuse('unchanged_original_Amount_column');
+  await record({event:'amount_editor_preparation',phase:'before_gesture',owner,field:checked.field,node:checked.node});current();
+  await openImportColumnEditor(channel,prepared,1,'type');current();
  }
  const after=await observe();current();const checked=original(after,owner);
  if(JSON.stringify(checked.field)!==fieldBytes)refuse('unchanged_original_Amount_column');
