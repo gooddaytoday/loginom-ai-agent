@@ -39,6 +39,9 @@ export function readStartupBootstrap(o) {
   const username=document.querySelector('[data-tid="LoginForm;Login;edtUsername"]');
   return {observed_at:new Date().toISOString(),owner_id:o.id,document_bound:true,
     url:location.href,build:globalThis.bg?.app?.Version??null,
+    document_state:{ready_state:document.readyState??null,body_present:!!document.body,
+      body_children:[...(document.body?.children??[])].slice(0,12).map(e=>({tag:e.tagName??null,class:e.getAttribute?.('class')??null,data_tid:e.getAttribute?.('data-tid')??null})),
+      scripts:[...(document.scripts??[])].slice(0,24).map(e=>{try{const u=new URL(e.src,location.href);return {origin:u.origin,path:u.pathname}}catch{return {invalid:true}}})},
     blocker:blocker?{data_tid:blocker.getAttribute('data-tid'),class:blocker.getAttribute('class'),
       role:blocker.getAttribute('role'),text:(blocker.textContent??'').trim().slice(0,1000)}:null,
     avatar:{in_dom:!!avatar,visible:visible(avatar)},username:{in_dom:!!username,visible:visible(username)},
@@ -52,14 +55,24 @@ async function recordStartupBootstrap(page,owner,phase) {
   const snapshot=await page.evaluate(readStartupBootstrap,{id:owner.id,account:owner.account,origin:owner.origin});
   if(owner.page!==page||owner.context.pages().length!==1||owner.context.pages()[0]!==page)
     throw Error('LOGINOM_STARTUP_PAGE_CHANGED');
-  owner.evidence.bootstrap[phase]=snapshot;
+  owner.evidence.bootstrap[phase]={...snapshot,page_events:owner.bootstrapEvents?{available:true,errors:[...owner.bootstrapEvents.errors],failed_requests:[...owner.bootstrapEvents.failed_requests],truncated:owner.bootstrapEvents.truncated}: {available:false}};
   await startupEvidence(owner);
 }
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, owner) {
-  if(owner) owner.navigationStarted=true
+  if(owner) {
+    owner.navigationStarted=true
+    if(owner.page!==page)throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
+    if(typeof page.on==='function'){
+      if(owner.bootstrapEvents)throw Error('LOGINOM_STARTUP_BOOTSTRAP_CONSUMED')
+      const events={errors:[],failed_requests:[],truncated:false};owner.bootstrapEvents=events
+      const append=(target,value)=>{if(owner.page!==page)return;if(target.length<16)target.push(value);else events.truncated=true}
+      page.on('pageerror',error=>append(events.errors,{name:String(error?.name??'Error').slice(0,80),message:String(error?.message??error).slice(0,500)}))
+      page.on('requestfailed',request=>{try{const u=new URL(request.url());append(events.failed_requests,{origin:u.origin,path:u.pathname,type:request.resourceType(),error:String(request.failure()?.errorText??'unknown').slice(0,240)})}catch{append(events.failed_requests,{invalid:true})}})
+    }
+  }
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   if(owner) {
     await page.evaluate(o=>{
