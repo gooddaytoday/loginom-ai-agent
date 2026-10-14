@@ -2,7 +2,7 @@ import path from "node:path"
 import { lstat, mkdtemp, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { superviseProcess } from "./process-supervisor"
-import type { ProcessIdentity } from "./process-supervisor"
+import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 
 export type JudgeProcessEvidence = { file: string; commandId: string; assertHeld(): Promise<void> }
 
@@ -28,22 +28,9 @@ export async function readJudgeProcessInventory(input: { file: string; commandId
     const proof = evidenceObject(await readLeaseReceipt(reference.path))
     if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== reference.sha256)
       throw new EvalFailure("JUDGE_PROCESS_PROOF_HASH_MISMATCH", 2)
-    const lifetime = evidenceObject(proof.lifetime), launcher = lifetime.launcher
-    if (proof.status !== "confirmed" || proof.error !== null || proof.capture_complete !== true || proof.observation_mode !== "continuous" ||
-      !Number.isSafeInteger(evidenceObject(proof.observations).count) || Number(evidenceObject(proof.observations).count) < 1 ||
-      !Array.isArray(proof.unknownProcesses) || proof.unknownProcesses.length ||
-      !Array.isArray(proof.verification) || proof.verification.length !== 2 || proof.verification.some((value, index, passes) => {
-        const pass = evidenceObject(value)
-        return pass.owned_remaining !== 0 || typeof pass.observed_at !== "string" || !Number.isFinite(Date.parse(pass.observed_at)) ||
-          Date.parse(pass.observed_at) < Date.parse(String(lifetime.finished_at)) ||
-          index > 0 && Date.parse(pass.observed_at) <= Date.parse(String(evidenceObject(passes[index - 1]).observed_at))
-      }) || lifetime.producer_pid !== input.producerPid || JSON.stringify(lifetime.owner) !== JSON.stringify(owner) ||
-      typeof lifetime.started_at !== "string" || typeof lifetime.finished_at !== "string" ||
-      ![lifetime.started_at, lifetime.finished_at].every(value => Number.isFinite(Date.parse(value))) || Date.parse(lifetime.finished_at) < Date.parse(lifetime.started_at) ||
-      !validEvidenceIdentity(launcher) || evidenceObject(proof.launcher).pid !== launcher.pid ||
-      !Array.isArray(proof.processes) || !proof.processes.every(validEvidenceIdentity) || !proof.processes.some(identity => JSON.stringify(identity) === JSON.stringify(launcher)))
-      throw new EvalFailure("JUDGE_PROCESS_PROOF_UNCONFIRMED", 2)
-    processes.push({ owner: { kind: "judge" as const, id: owner.id }, launcher, identities: proof.processes,
+    const qualified = qualifyClosedProcessEvidence(proof, { owner: { kind: "judge", id: owner.id }, producerPid: input.producerPid })
+    if (!qualified) throw new EvalFailure("JUDGE_PROCESS_PROOF_UNCONFIRMED", 2)
+    processes.push({ owner: { kind: "judge" as const, id: owner.id }, launcher: qualified.launcher, identities: qualified.identities,
       source: { path: reference.path, sha256: reference.sha256 } })
   }
   return { commandId: input.commandId, processes }
@@ -82,11 +69,4 @@ export async function superviseJudgeProcess(input: Parameters<typeof supervisePr
 
 function evidenceObject(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
-}
-
-function validEvidenceIdentity(value: unknown): value is ProcessIdentity {
-  const identity = evidenceObject(value)
-  return typeof identity.starttime === "string" && /^\d+$/.test(identity.starttime) && typeof identity.executable === "string" && path.isAbsolute(identity.executable) &&
-    ["pid", "group", "session"].every(key => Number.isSafeInteger(identity[key]) && Number(identity[key]) >= 1) &&
-    ["uid", "parent", "device", "inode"].every(key => Number.isSafeInteger(identity[key]) && Number(identity[key]) >= 0)
 }

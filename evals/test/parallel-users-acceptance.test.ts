@@ -15,6 +15,13 @@ test("process resource coverage observes every frame inside the admitted owner l
     processes: { scopes: elapsed > 0 && elapsed < 3000 ? [scope] : [] },
   }))
   expect(assessProcessResourceTimeline({ samples, owners: [owner], intervalMs: 1000 })).toEqual({ status: "passed", codes: [] })
+  const produced = samples.map(sample => ({ ...sample, processes: { ...sample.processes, producer_pid: 123 } }))
+  expect(assessProcessResourceTimeline({ samples: produced, owners: [{ ...owner, producerPid: 123 }], intervalMs: 1000 }))
+    .toEqual({ status: "passed", codes: [] })
+  expect(assessProcessResourceTimeline({ samples: produced.map((sample, index) => index === 2
+    ? { ...sample, processes: { ...sample.processes, producer_pid: 124 } } : sample), owners: [{ ...owner, producerPid: 123 }], intervalMs: 1000 }))
+    .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] })
+
   expect(assessProcessResourceTimeline({ samples: samples.map((sample, index) => index === 2 ? { ...sample, processes: { scopes: [] } } : sample), owners: [owner], intervalMs: 1000 }))
     .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] })
   for (const change of [{ status: "unavailable" }, { processes: [] },
