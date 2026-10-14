@@ -31,10 +31,16 @@ test.each(["summary.json", "code-verdict.json", "txt-semicolon-cp1251-decimal/1/
   expect(prepareLab57CleanupProposal(input).missing).toContain(`SOURCE_BYTES_CHANGED:${file}`)
 })
 
-test.each(["path", "device", "inode", "uid", "mode", "size", "sha256"])("LAB57: refuses changed registration %s", async field => {
+test.each(["path", "device", "inode", "uid", "mode", "size", "sha256", "mtimeNs", "ctimeNs"])("LAB57: refuses changed registration %s", async field => {
   const input = await fixture()
   input.registration[field] = "changed"
   expect(prepareLab57CleanupProposal(input).missing).toContain("REGISTRATION_BINDING_CHANGED")
+})
+
+test.each(["path", "device", "inode", "uid", "mode", "size", "sha256", "mtimeNs", "ctimeNs"])("LAB57: refuses changed guard owner %s", async field => {
+  const input=await fixture()
+  input.guardOwner[field]="changed"
+  expect(prepareLab57CleanupProposal(input).missing).toContain("LEGACY_GUARD_BINDING_CHANGED")
 })
 
 test.each(["path", "device", "inode", "uid", "mode"])("LAB57: refuses changed guard %s", async field => {

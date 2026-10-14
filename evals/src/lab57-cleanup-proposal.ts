@@ -84,9 +84,11 @@ export function prepareLab57CleanupProposal(input: unknown) {
       result.environment_cleanup.status !== "failed" || result.environment_cleanup.error !== cleanup.processes.error) missing.push("SOURCE_TERMINAL_CHANGED")
   }
   if (!same(value.registration, { path: `${profile}.process-group`, device: 64512, inode: 3710822, uid: 1000, mode: 0o600, size: 7,
-    sha256: "f03f26330addd250ebebfc615ffb52350ba77aba21b95bc94ce93344dc27a0a9" })) missing.push("REGISTRATION_BINDING_CHANGED")
-  if (!same(value.guard, { path: `${profile}.harness-lease`, device: 64512, inode: 3840909, uid: 1000, mode: 0o700 }) ||
-    !same(value.guardOwner, { path: `${profile}.harness-lease/owner.json`, uid: 1000, mode: 0o600,
+    mtimeNs:"1791933110497611176",ctimeNs:"1791933110497611176",sha256: "f03f26330addd250ebebfc615ffb52350ba77aba21b95bc94ce93344dc27a0a9" })) missing.push("REGISTRATION_BINDING_CHANGED")
+  if (!same(value.guard, { path: `${profile}.harness-lease`, device: 64512, inode: 3840909, uid: 1000, mode: 0o700, size:4096,
+      mtimeNs:"1791931825725205266",ctimeNs:"1791931825725205266" }) ||
+    !same(value.guardOwner, { path: `${profile}.harness-lease/owner.json`, device:64512,inode:3840913,uid: 1000, mode: 0o600,size:96,
+      mtimeNs:"1791931825725205266",ctimeNs:"1791931825725205266",
       sha256: "f3d323b799d38e4a1ebe1ad901bf69a08e572479674cc94d6f1751642ea87106" }) ||
     !same(value.guardCurrentBirth, { pid: 2126565, uid: 1000, starttime: "99114278" })) missing.push("LEGACY_GUARD_BINDING_CHANGED")
   // No retroactive harness admission. A separately preserved ORIGINAL parent capture must fill the gap.
