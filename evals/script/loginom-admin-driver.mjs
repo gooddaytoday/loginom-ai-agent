@@ -100,8 +100,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure", "acl", "activate"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== (["acl", "activate"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (!["blocked", "configure", "acl", "activate", "session-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== (["acl", "activate", "session-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -110,7 +110,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
           payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (["acl", "activate"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+      if (["acl", "activate", "session-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
         Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
@@ -145,8 +145,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
           const flags = [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]
-          if (owned && phase !== "activate" && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
-          if (phase === "acl" || phase === "activate") {
+          if (owned && !["activate", "session-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (["acl", "activate", "session-probe"].includes(phase)) {
             stage = "ACL"
             console.info("ADMIN_USER_STAGE_ACL")
             const snapshot = async () => {
@@ -178,7 +178,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const before = await snapshot()
             if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
-            if (phase === "activate") {
+            if (phase === "activate" || phase === "session-probe") {
               const safePolicy = async () => owned.secretHash === secretHash && await user.AuthMode === bg.TBGDeductorUserAuthMode.uamLocal &&
                 (await Promise.all(flags.map(async ([name, value]) => await user[name] === value))).every(Boolean)
               if (before.some(directory => directory.permissions.length) || !await safePolicy())
@@ -187,6 +187,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               console.info("ADMIN_USER_STAGE_ACTIVATE")
               const blocked = await user.Blocked
               if (typeof blocked !== "boolean") throw Error("readback")
+              if (phase === "session-probe") return blocked ? { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_ACTIVE" } }
+                : { outcome: "confirmed", data: { probeAllowed: true } }
               if (blocked) { applied = true; await user.set_Blocked(false) }
               const observed = { objectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), name: await user.Name,
                 userKind: await user.UserKind, blocked: await user.Blocked }
@@ -239,6 +241,66 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
         password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null }))
+      if (payload.phase === "session-probe" && result.outcome === "confirmed") {
+        const snapshot = () => bounded(request, page.evaluate(async () => {
+          const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+          const manager = await (await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)).GetSessionsManager()
+          await manager.UpdateSessionInfos()
+          const rows = []
+          for (let index = 0; index < await manager.Count; index++) {
+            const row = await manager.SessionInfo(index)
+            rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
+              createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect, packageCount: await row.Count })
+          }
+          return rows
+        }))
+        const baseline = await snapshot()
+        process.stderr.write("ADMIN_USER_PROBE_STAGE_BROWSER\n")
+        const probeContext = await context.browser().newContext()
+        const observed = await (async () => {
+          try {
+            const probePage = await probeContext.newPage()
+            await probePage.goto(page.url(), { timeout: remaining(request) })
+            const login = probePage.locator('input[placeholder="Логин"]')
+            const password = probePage.locator('input[placeholder="Пароль"]')
+            const submit = probePage.getByText("Войти", { exact: true })
+            await Promise.all([login, password, submit].map(locator => locator.waitFor({ state: "visible", timeout: remaining(request) })))
+            if (await login.count() !== 1 || await password.count() !== 1 || await submit.count() !== 1) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+            process.stderr.write("ADMIN_USER_PROBE_STAGE_LOGIN\n")
+            await login.fill(credentials.username)
+            await password.focus()
+            await password.fill(credentials.password)
+            await password.blur()
+            await submit.click()
+            await probePage.waitForFunction(() => typeof bg !== "undefined" && Boolean(bg.app?.Application?.FInstance?.FServerConnection?.ServerContainer?.Session), null, { timeout: remaining(request) })
+            process.stderr.write("ADMIN_USER_PROBE_STAGE_SESSION\n")
+            const ownSession = await bounded(request, probePage.evaluate(async () => {
+              const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+              const user = await session.CurrentUser
+              return { guid: String(await session.Guid), objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString(),
+                userObjectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), username: await user.Name,
+                isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner }
+            }))
+            if (ownSession.username !== credentials.username || ownSession.userObjectId !== payload.owned.objectId ||
+              ownSession.isAdmin !== false || ownSession.isDesigner !== true) throw Error("ADMIN_USER_IDENTITY_CHANGED")
+            const opened = await snapshot()
+            process.stderr.write("ADMIN_USER_PROBE_STAGE_CREATE\n")
+            const handle = await bounded(request, probePage.evaluateHandle(async () =>
+              (await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session).CreatePackage()))
+            try {
+              const withPackage = await snapshot()
+              process.stderr.write("ADMIN_USER_PROBE_STAGE_CLOSE\n")
+              await bounded(request, probePage.evaluate(async item => {
+                const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+                await session.ClosePackage(new Ref(item), 5000)
+              }, handle))
+              return { ownSession, baseline, opened, withPackage, afterPackage: await snapshot(), sessionIdentityQualified: false }
+            } finally { await handle.dispose() }
+          } finally { await probeContext.close() }
+        })()
+        respond(id, "confirmed", observed)
+        continue
+      }
       respond(id, result.outcome, result.data)
       continue
     }
@@ -303,7 +365,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
   } catch (error) {
     const codes = ["ADMIN_REQUEST_INVALID", "ADMIN_DEADLINE", "ADMIN_ALREADY_INITIALIZED", "ADMIN_NOT_INITIALIZED", "ADMIN_CREDENTIAL_PRIVATE",
       "ADMIN_CREDENTIAL_INVALID", "ADMIN_RUNTIME_PATH", "ADMIN_RUNTIME_HASH", "ADMIN_PROFILE_OWNERSHIP", "ADMIN_CAPABILITY_UNSUPPORTED",
-      "ADMIN_IDENTITY_CHANGED", "SERVER_EPOCH_CHANGED", "SESSION_IDENTITY_UNSUPPORTED"]
+      "ADMIN_IDENTITY_CHANGED", "ADMIN_USER_IDENTITY_CHANGED", "SERVER_EPOCH_CHANGED", "SESSION_IDENTITY_UNSUPPORTED"]
     respond(id, dispatched ? "unknown" : "not_applied", { code: codes.includes(error?.message) ? error.message : "ADMIN_OUTCOME_UNKNOWN" })
   }
 }

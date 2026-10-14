@@ -80,3 +80,20 @@ setter — exact native identity и повторная policy проверка. 
 missing configured SHA отказали до активации. Target1 PASS/43 assertions
 (21.69s), typecheck/diff PASS. Пара после confirmed native dispose/process proof
 удалена. Admission/effective ACL/session close этим не квалифицированы.
+
+Causal design-session probe прошёл на disposable pair. Fixed reconcile-user
+phase session-probe проверяет exact active account/credential/policy, создаёт
+отдельный browser context внутри supervised native browser и выполняет штатный
+login/CreatePackage/ClosePackage(new Ref(...),5000). Bootstrap admin flags
+не меняются. Native user identity в design context совпала с созданным account;
+единственная новая managed row (eval-a:2) сохраняла objectId/Name/CreateTime
+на переходе package Count 0→1→0. Probe context подтверждённо закрыт до ответа.
+
+Target1 PASS/53 assertions (29.28s); admin/user codecs30 PASS/98 (1.187s),
+typecheck/diff PASS. Private whitelist evidence:
+`research/evidence/native-user-8a546f36-7fdc-4c82-baea-479e671f2e03/session-probe.json`.
+Сама disposable pair и profiles удалены после confirmed native process disposal.
+Это causal observation текущей сборки: sessionIdentityQualified=false.
+Reconnect stability, negative close races, durable ownership ledger, target
+CloseSession и SessionBackup ещё не подтверждены; имя само по себе authority
+не получает. Модель/судья не запускались.
