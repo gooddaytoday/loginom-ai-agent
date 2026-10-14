@@ -1767,3 +1767,27 @@ viewport/port/anchor в существующем perform identity. Shared perfor
 native port ownership/hit guards unchanged; final freeze/negative suite/
 approval ещё ожидаются. Trigger ограничен наблюдавшимся выходом порта
 за нижнюю границу viewport (804>800), не всеми видами clipping canvas.
+
+
+На 2026-10-14 05:04 UTC TDD исправление Export lower-viewport input0
+завершено: Product изменён только в text-export-node.mjs (+24строки), SHA
+`1e5772e763f81b67ac374722389b65ad7bbf97a835388d51b1630086cef44956`.
+Новый actual factory test SHA
+`e4190d32047d6ad64276c6d6e99288600e4cde08ab1c99d2bd1e31a2114561a0`.
+RED original source: Port has no observed interaction point. GREEN проходит
+через настоящий serialized observer/guarded scroll/native opener, проверяет
+ровно один ui_scroll_applied с exact owner/from0/to82 и verified input wizard.
+Отдельный actual UI_EPOCH_CHANGED RED закрыт pre-gesture identity binding
+fresh node/context/owner/viewport/port/anchor; shared perform не менялся.
+17/17 focused PASS, две syntax checks и diffcheck0; verification SHA
+`f86a556646355c40ba3f911907ed3f19d7d0305be2d66f9fe4677844ccddb0e5`.
+
+Independent final source review Approved-source, SHA
+`96f0bf54ef3aa22817b38d4cea9f1dfee503338c74e5391b820c72b08fa8ef67`:
+отдельные pinned Node17/17PASS/0SKIP, hashes до/после совпали, actual journal/
+четыре line hashes и10author evidence проверены; observer/channel/opener/
+context/shared fixture byteequalHEAD. Initial lock не допускает scroll;
+если lock появился уже после scroll-prepared, безопасная own scroll может
+завершиться, но fresh readiness запрещает даже начало открытия порта.
+Общий Node suite и связанные модули, ordinary new-payload proof и модели
+этим verdict не заменяются. Root related checks active; остальные stages открыты.

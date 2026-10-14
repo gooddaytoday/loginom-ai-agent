@@ -48,6 +48,30 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     need(mappings.length===0,'Requested export mappings unsupported');
     if(ctx.receipt_id===operation.id+':output_mapping')return verified({not_applicable:true,tabular_outputs:0});
     enter(ctx);if(operation.nodeApply.request.finish==='close')return verified({not_applicable:true,source_identity_verified:false});
+    // Link can restore the canvas offset after node placement. Reveal only observed lower-viewport clipping.
+    const graph=await channel.observe({condition:'export input viewport',ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+    const ports=graph.ui.elements.filter(e=>e.kind==='port'&&e.tid?.startsWith(graph.prepared_node_context.tid+';Input_Data-'));
+    const port=ports.length===1?ports[0]:null,viewport=graph.geometry?.viewport;
+    if(port?.interaction?.state==='point_not_observed'&&Number.isFinite(viewport?.height)
+      &&Number.isFinite(port.bounding_box?.y)&&Number.isFinite(port.bounding_box?.height)
+      &&port.bounding_box.y+port.bounding_box.height>viewport.height) {
+     const owner=graph.graph_identity;
+     need(owner?.status==='observed'&&port.scroll?.ref===owner.container_ref,'Export input scroll owner is unverified');
+     need(Number.isInteger(port.scroll.top)&&Number.isInteger(port.scroll.max_top)&&port.scroll.top>=0&&port.scroll.max_top>port.scroll.top,'Export input has no remaining scroll range');
+     const anchor=graph.ui.elements.find(e=>e.scope==='graph'&&e.tid?.startsWith(owner.native_prefix)
+      &&e.signature?.native_graph?.status==='non_script'&&e.scroll?.ref===owner.container_ref
+      &&e.scroll.top===port.scroll.top&&e.scroll.max_top===port.scroll.max_top
+      &&e.interaction?.state==='point_observed'&&e.allowed_actions.includes('scroll'));
+     need(anchor,'Export input has no observed canvas scroll anchor');
+     await channel.perform({condition:'reveal clipped export input',initialObservation:graph,
+      ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent',
+      identity:s=>({node:s.prepared_node_context,owner:s.graph_identity,viewport:s.geometry?.viewport,
+       port:s.ui.elements.filter(e=>e.ref===port.ref),anchor:s.ui.elements.filter(e=>e.ref===anchor.ref)}),
+      resolve:()=>({verb:'scroll',ref:anchor.ref,delta_y:Math.min(1000,port.scroll.max_top-port.scroll.top)})});
+     const fresh=await channel.observe({condition:'export input after canvas scroll',ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+     need(['document_id','workflow_id','node_id','tid'].every(k=>fresh.prepared_node_context[k]===graph.prepared_node_context[k])
+      &&['container_ref','container_tid','native_prefix'].every(k=>fresh.graph_identity?.[k]===owner[k]),'Export input graph changed during scroll');
+    }
     await channel.openInputPort(0);
     const s=await channel.observe({condition:'complete native export input mapping',readMappings:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
     inputMapping=s.node_mapping;
