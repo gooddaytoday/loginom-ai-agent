@@ -59,6 +59,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       process.stderr.write("ADMIN_INIT_STAGE_BROWSER\n")
       context = await chromium.launchPersistentContext(payload.profileDir, { executablePath: browser, headless: true, timeout: remaining(request) })
       page = context.pages()[0] ?? await context.newPage()
+      page.on("console", message => {
+        if (/^ADMIN_USER_STAGE_(ENUMERATE|ADD|BLOCK|READBACK)$/.test(message.text())) process.stderr.write(message.text() + "\n")
+      })
       page.setDefaultTimeout(remaining(request))
       process.stderr.write("ADMIN_INIT_STAGE_NAVIGATION\n")
       await page.goto(url.href, { timeout: remaining(request) })
@@ -93,6 +96,60 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (!context || !identity) throw Error("ADMIN_NOT_INITIALIZED")
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
+    if (request.op === "reconcile-user") {
+      const payload = request.payload
+      if (payload?.phase !== "blocked") throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== 7 || payload.phase !== "blocked" || !payload.slot || typeof payload.slot.username !== "string" ||
+        !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
+        typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
+        [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
+        payload.owned !== null && (!payload.owned || Object.keys(payload.owned).length !== 4 || typeof payload.owned.objectId !== "string" || !payload.owned.objectId ||
+          payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce))
+        throw Error("ADMIN_REQUEST_INVALID")
+      const credentials = await readCredentials(payload.secretFile)
+      if (credentials.username !== payload.slot.username || createHash("sha256").update(JSON.stringify(credentials)).digest("hex") !== payload.secretHash)
+        throw Error("ADMIN_CREDENTIAL_INVALID")
+      dispatched = true
+      const result = await bounded(request, page.evaluate(async ({ username, owned }) => {
+        let applied = false
+        let stage = "ENUMERATE"
+        try {
+          console.info("ADMIN_USER_STAGE_ENUMERATE")
+          const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+          const users = await session.GetUsers()
+          const enumerator = await users.GetEnumerator(bg.TBGDeductorUserKinds.dukAll)
+          const matches = []
+          try {
+            while (await enumerator.MoveNext()) {
+              const user = await enumerator.Current
+              if ((await user.Name).toLowerCase() === username.toLowerCase()) matches.push(user)
+            }
+          } finally {
+            // Deferred disposal can retain the enumeration lock while Add waits.
+            await ReleaseObject(enumerator, true)
+          }
+          if (!owned && matches.length || owned && (matches.length !== 1 || await matches[0].Name !== owned.name ||
+            await matches[0].UserKind !== owned.userKind || (await bg.ProxyObjectsHelper.GetObjectId(matches[0])).toString() !== owned.objectId))
+            return { outcome: "not_applied", data: { code: "ADMIN_USER_OWNERSHIP_CONFLICT" } }
+          if (!owned) applied = true
+          stage = "ADD"
+          console.info("ADMIN_USER_STAGE_ADD")
+          const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
+          if (owned && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          stage = "BLOCK"
+          console.info("ADMIN_USER_STAGE_BLOCK")
+          if (!owned) await user.set_Blocked(true)
+          stage = "READBACK"
+          console.info("ADMIN_USER_STAGE_READBACK")
+          const observed = { objectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), name: await user.Name,
+            userKind: await user.UserKind, blocked: await user.Blocked }
+          if (observed.name !== username || observed.userKind !== 0 || observed.blocked !== true) throw Error("readback")
+          return { outcome: "confirmed", data: { created: !owned, user: observed } }
+        } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
+      }, { username: payload.slot.username, owned: payload.owned }))
+      respond(id, result.outcome, result.data)
+      continue
+    }
     if (request.op === "inspect") {
       dispatched = true
       const observation = await bounded(request, page.evaluate(async () => {

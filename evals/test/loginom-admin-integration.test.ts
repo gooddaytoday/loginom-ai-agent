@@ -3,17 +3,89 @@ import path from "node:path"
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
-import { openLoginomAdmin } from "../src/loginom-admin"
+import { createJournaledAdminChannel, openLoginomAdmin, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { superviseProcess } from "../src/process-supervisor"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
 
 const liveIntegration = process.env.EVAL_ADMIN_LIVE_CONFIG ? test : test.skip
+
+liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
+  const fixture = await parallelFixture(root)
+  const name = `evals-admin-user-${crypto.randomUUID().slice(0, 8)}`
+  const port = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${port.port}/app/`
+  port.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
+  const pair = await createPair(file, options)
+  try {
+    const runtime = await verifyAdminRuntime(process.env.EVAL_CLI_BIN!)
+    const profile = path.join(root, "admin-profile")
+    const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-user-${crypto.randomUUID()}`)
+    await mkdir(evidence, { mode: 0o700 })
+    const journal = path.join(evidence, "commands")
+    await mkdir(profile, { mode: 0o700 })
+    await mkdir(journal, { mode: 0o700 })
+    const credentials = { username: file.slots[0]!.username, password: "E-" + crypto.randomUUID() + "!" }
+    const secretFile = path.join(root, "slot-secret.json")
+    await writeLeaseReceipt(secretFile, credentials)
+    const input = new TransformStream<Uint8Array, Uint8Array>()
+    const output = new TransformStream<Uint8Array, Uint8Array>()
+    const abort = new AbortController()
+    const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
+      env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
+      timeoutMs: 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
+    const channel = createJournaledAdminChannel(output.readable, input.writable, journal)
+    const request = async (op: AdminOperation, payload: unknown) => {
+      expect(await readServerIdentity(file)).toEqual(pair.identity)
+      return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: pair.identity, deadline: Date.now() + 30_000, payload })
+    }
+    let complete = false
+    try {
+      expect((await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
+        credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(profile, "loginom/runtime/admin/attempts/context/browser-profile") })).outcome).toBe("confirmed")
+      const payload = { phase: "blocked", slot: file.slots[0]!, secretFile, preparationNonce: crypto.randomUUID(), desiredHash: "e".repeat(64),
+        secretHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(credentials)).digest("hex"), owned: null }
+      const first = await request("reconcile-user", payload)
+      expect(first).toMatchObject({ outcome: "confirmed" })
+      const user = (first.data as { user: { objectId: string; name: string; userKind: number; blocked: boolean } }).user
+      expect(user).toMatchObject({ name: credentials.username, userKind: 0, blocked: true })
+      expect(user.objectId.length).toBeGreaterThan(0)
+      const second = await request("reconcile-user", { ...payload, owned: { objectId: user.objectId, name: user.name, userKind: 0, preparationNonce: payload.preparationNonce } })
+      expect(second).toMatchObject({ outcome: "confirmed", data: { created: false, user } })
+      expect(await request("reconcile-user", payload)).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_USER_OWNERSHIP_CONFLICT" } })
+      const observation = await request("inspect", {})
+      expect(observation.outcome).toBe("confirmed")
+      const users = (observation.data as { users: { name: string }[] }).users.filter(user => user.name === credentials.username)
+      expect(users).toHaveLength(1)
+      expect(users[0]).toMatchObject({ userKind: 0, blocked: true })
+      complete = true
+    } finally {
+      const disposed = await request("dispose", {}).catch(() => undefined)
+      if (disposed?.outcome !== "confirmed") abort.abort()
+      await channel.end().catch(() => abort.abort())
+      const run = await pending
+      await channel.close().catch(() => undefined)
+      expect(run.processCleanup.status).toBe("confirmed")
+      expect(run.processCleanup.capture_complete).toBe(true)
+      expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+      if (complete) {
+        expect(disposed?.outcome).toBe("confirmed")
+        expect(run.exitCode).toBe(0)
+      }
+    }
+  } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+}, 120_000)
 
 liveIntegration("trusted bridge: configured research admin login reads the role and disposes its native browser", async () => {
   const file = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)

@@ -379,3 +379,11 @@ path, durable staged nonce/endpoint/identity и credential SHA; secret не
 Закрытый lease в actual native bridge даёт LEASE_NOT_HELD без reconcile-user
 в journal. Это preflight gate; реальный account create/update/ACL/unblock и
 неизменность секретных байтов внутри driver перед mutation ещё требуют реализации.
+
+Native wire reconcile-user phase blocked проверяет private credential SHA до
+dispatch и all-kind name collision, затем Add/Blocked/getter read-back. Supplied
+owner observation содержит exact name/UserKind/objectId/preparationNonce; repeat
+принимает только уже blocked account. Unknown после Add сохраняет uncertainty.
+Перед Add enumerator освобождается немедленно через ReleaseObject(..., true):
+deferred disposal оставлял read lock и приводил к timeout. Ready phase и parent
+ownership manifest пока закрыты; native capability proof не является admission.

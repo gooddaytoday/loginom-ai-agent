@@ -1,5 +1,18 @@
 # Блокеры parallel evals
 
+## Draft admission fixture: retained unused slot reservation
+
+2026-10-14: /tmp/evals-admin-user-e3H9B4, own research nonce
+eddb11f2-bde0-4659-aba7-d6ff61201875, server full ID
+1790125f8e1408aca0312cc2db75c1214708d1cf198f70d98f3c8c44d4ed9ef0,
+Studio2d467bf07fddc87fff4a7418dee81f15681c0b67fe0b3118ff40a3c8e779776f.
+Первый draft упал до отсутствующего createBlockedUser; finally close оставил
+reservation, destroyPair отказал PAIR_RETAINED_INCIDENT. Pair/root/secret/journals
+сохранены; отсутствие нынешнего PID не разрешает remove reservation или destroy.
+Нужны recovery-only CAS и доказанное unused/clean release (account absence,
+native process proof, committed archive) через lifecycle API. Native wire CRUD
+продолжен на других disposable pairs без slot admission; они штатно уничтожены.
+
 ## Незавершённый live admin dispose — причина пока не воспроизведена
 
 Research admin-fYV8vv: probe unknown/dispose confirmed, затем test timeout90s;
