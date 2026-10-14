@@ -77,6 +77,16 @@ liveIntegration("native user capability: creates one blocked account and refuses
       const reused = await request("reconcile-user", { ...payload, phase: "configure", owned: { ...owned, secretHash: payload.secretHash } })
       expect(reused).toMatchObject({ outcome: "confirmed", data: { passwordChanged: false, authModeChanged: false, secretHash: payload.secretHash,
         user: (configured.data as { user: unknown }).user } })
+      const policy = (observation.data as { sharedDirectories: { objectId: string; name: string; permissions: { objectId: string; name: string; userKind: number }[] }[] }).sharedDirectories
+      expect(policy).toHaveLength(2)
+      const acl = { ...payload, phase: "acl", owned: { ...owned, secretHash: payload.secretHash }, expectedPolicy: policy }
+      expect(await request("reconcile-user", { ...acl, expectedPolicy: [] })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } })
+      const changed = await request("reconcile-user", acl)
+      expect(changed).toMatchObject({ outcome: "confirmed", data: { removed: 2 } })
+      const after = (changed.data as { policy: { objectId: string; name: string; permissions: unknown[] }[] }).policy
+      expect(after).toHaveLength(2)
+      expect(after.every(directory => directory.permissions.length === 0)).toBe(true)
+      expect(await request("reconcile-user", { ...acl, expectedPolicy: after })).toMatchObject({ outcome: "confirmed", data: { removed: 0, policy: after } })
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)

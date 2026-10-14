@@ -51,3 +51,17 @@ confirmed/capture true/final00. Unknown prior configure в native-user-03387245.
 сохранён и не объявлен успехом. Protected parent manifest и подтверждение idle
 для повторной подготовки ранее activated account ещё не реализованы;
 blocked flag сам по себе не является доказательством отсутствия старых sessions.
+
+Следующий vertical slice acl: shortened expectedPolicy=[] RED вернул unsupported;
+после реализации отказал ADMIN_ACL_POLICY_CHANGED до Delete. Штатные
+Permissions.Delete([base-user proxies]) по SharedDirectoryForm.js:73–77/rpc
+method1972 сняли2 actual Everyone grants на двух dirs. Read-back сравнивается
+с полной исходной policy за вычетом targets; repeat removed0. Target1 PASS/35
+(22.67s), typecheck PASS. Own target требует name/kind/objectId; stale same-name
+principal сохраняется с отказом. Непустые Everyone grants проверены реально;
+own explicit grant/stale principal race/foreign grant preservation ветки пока
+не имеют отдельного live fixture. Effective storage isolation и global parent
+guard этой проверкой не подтверждены.
+Combined after principal identity guard: 58 PASS/212 assertions (52.63s),
+typecheck/diff PASS. Private evidence native-user-a2cd4df6-1049-49bd-a6a8-f199251d1f22;
+supervisor confirmed/capture true/final00, own disposable pair destroyed.
