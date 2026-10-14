@@ -22,12 +22,19 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   const connection = await openLoginomAdmin(file, identity)
   try {
     expect(connection.identity).toEqual(identity)
+    await expect(connection.inspect()).rejects.toThrow("SESSION_IDENTITY_UNSUPPORTED")
   } finally { await connection.dispose() }
   const directories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-") && !previous.has(name))
   expect(directories).toHaveLength(1)
   const receipt = await Bun.file(path.join(file.controller.stateDir, directories[0]!, "connection.json")).json()
   expect(receipt).toMatchObject({ kind: "loginom-admin-connection", status: "disposed", initialization: "confirmed", dispose: "confirmed",
     identity, processes: { status: "confirmed", error: null, observation_mode: "continuous", capture_complete: true } })
+  const observation = await Bun.file(path.join(file.controller.stateDir, directories[0]!, "session-observations.json")).json()
+  expect(observation).toMatchObject({ version: 1, kind: "admin-session-observations", identity, sessionIdentityQualified: false })
+  expect(observation.ownSession.guid).toBeString()
+  expect(observation.ownSession.objectId).toBeString()
+  expect(observation.sessions.length).toBeGreaterThan(0)
+  expect(observation.sessions.every((row: { objectId: string }) => typeof row.objectId === "string" && row.objectId.length > 0)).toBe(true)
   expect(receipt.processes.browserBindings.length).toBeGreaterThan(0)
   expect(receipt.processes.verification.map((pass: { owned_remaining: number }) => pass.owned_remaining)).toEqual([0, 0])
   expect(await readServerIdentity(file)).toEqual(identity)
