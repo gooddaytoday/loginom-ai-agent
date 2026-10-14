@@ -64,10 +64,8 @@ def deliver(args):
             raise DeliveryError('Existing assignment does not match the source and recipient')
     else:
         existing = None
-    matches = [c for c in comments if marker in c.get('content', '').splitlines()]
-    if len(matches) > 1 or (matches and matches[0]['content'] != text):
-        raise DeliveryError('Action identity conflicts; reconcile existing assignments')
-    found = existing or (matches[0] if matches else None)
+    runs = request(base, headers, f'issues/{issue}/task-runs')
+    found = select_assignment(comments, runs, existing, text, key, issue, agent, args.sha, args.scope)
     if not found:
         if record['state'] != 'prepared':
             raise DeliveryError('Unknown POST outcome; never blindly repost')
@@ -97,10 +95,16 @@ def deliver(args):
         found = next((c for c in comments if c['id'] == record['comment'] and c.get('content') == text), None)
     if not found:
         raise DeliveryError('Read-back missing; preserve receipt')
+    sender = assignment_sender(found, request(base, headers, f'issues/{issue}/task-runs'), issue)
     record['comment'] = found['id']
+    record['comment_fingerprint'] = hashlib.sha256(found['content'].encode()).hexdigest()
+    record['source_sha'] = args.sha
+    record['scope'] = args.scope
+    record['sender_task'] = sender['id']
+    record['sender_agent'] = sender['agent_id']
     runs = request(base, headers, f'issues/{issue}/task-runs')
     # Deferred/planned and queued/coalesced obligations survive the active run's finish.
-    linked = [r for r in runs if r.get('agent_id') == agent and (
+    linked = [r for r in runs if r.get('agent_id') == agent and r.get('issue_id') == issue and (
         r.get('trigger_comment_id') == found['id'] or any(found['id'] in (r.get(field) or [])
         for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids')))]
     if not linked:
@@ -116,6 +120,66 @@ def deliver(args):
                   delivery='durable_assignment', acceptance='not_verified')
     save(path, record)
     print(json.dumps(record))
+
+
+def assignment_sender(comment, runs, issue):
+    senders = [r for r in runs if r.get('id') == comment.get('source_task_id')]
+    if (comment.get('issue_id') != issue or comment.get('author_type') != 'agent'
+            or len(senders) != 1 or senders[0].get('issue_id') != issue
+            or senders[0].get('agent_id') != comment.get('author_id')):
+        raise DeliveryError('Original assignment sender/issue metadata is not confirmed')
+    return senders[0]
+
+
+def select_assignment(comments, runs, existing, text, key, issue, agent, sha, scope):
+    # Generated headers identify an action. A release result can quote the same
+    # marker later in its body; the marker alone is never an assignment identity.
+    assignments = []
+    for comment in comments:
+        body = comment.get('content', '')
+        header = body.split('\n\n', 1)[0]
+        markers = re.findall(r'^Handoff-ID: `?([0-9a-f]{64})`?$', header, re.M)
+        if key in markers:
+            if (markers != [key] or re.findall(r'^Source-SHA: ([0-9a-f]{40})$', header, re.M) != [sha]
+                    or re.findall(r'^Action: (.+)$', header, re.M) != [scope]):
+                raise DeliveryError('Action identity conflicts; reconcile existing assignments')
+            assignments.append(comment)
+    if existing:
+        # Legacy explicit adoption can have no generated header. Its exact
+        # original body binds the action through its already-pinned descriptors.
+        if existing not in assignments:
+            descriptors = re.findall(r'^Artifact-handoff: (.+)$', existing['content'], re.M)
+            try:
+                rows = json.loads(descriptors[0]) if len(descriptors) == 1 else []
+            except ValueError:
+                rows = []
+            if (not isinstance(rows, list) or not rows or any(not isinstance(row, dict)
+                    or row.get('handoff') != key for row in rows)
+                    or not any(row.get('sha') == sha for row in rows)):
+                raise DeliveryError('Legacy assignment action/source/scope is not bound')
+            assignments.append(existing)
+    if len(assignments) > 1 or (assignments and assignments[0]['content'] != (existing['content'] if existing else text)):
+        raise DeliveryError('Action identity conflicts; reconcile existing assignments')
+    found = assignments[0] if assignments else None
+    if found:
+        assignment_sender(found, runs, issue)
+    for comment in comments:
+        if comment in assignments:
+            continue
+        body = comment.get('content', '')
+        if not re.search(r'^Handoff-ID: `?' + re.escape(key) + r'`?$', body, re.M):
+            continue
+        receiver = [r for r in runs if r.get('id') == comment.get('source_task_id')]
+        release = re.findall(r'^Artifact-release: ([0-9a-f]{64})$', body, re.M)
+        if (not found or not release or comment.get('issue_id') != issue
+                or comment.get('author_type') != 'agent' or comment.get('author_id') != agent
+                or len(receiver) != 1 or receiver[0].get('agent_id') != agent
+                or receiver[0].get('issue_id') != issue
+                or not (receiver[0].get('trigger_comment_id') == found['id'] or any(found['id'] in
+                    (receiver[0].get(field) or []) for field in
+                    ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids')))):
+            raise DeliveryError('Ambiguous action marker; reconcile original assignment and result')
+    return found
 
 
 def main():

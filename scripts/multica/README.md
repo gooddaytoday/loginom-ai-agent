@@ -60,3 +60,29 @@ python3 checkpoint.py --issue <UUID> --revision <fresh-revision> \
 ## Допуск прогона
 
 См. [admission.md](admission.md). Проверки обвязки: из `scripts/multica` выполнить `python3 -m unittest discover -s . -p 'test_*.py'`. Эти HTTP/process тесты не означают модельную или узловую приёмку.
+
+## Assignment identity and release-result adoption
+
+A quoted `Handoff-ID` in a completed receiver's `Artifact-release` result is not
+another assignment. Selection requires canonical action headers and exact body;
+explicit legacy adoption can use its original pinned artifact descriptors to bind
+source/scope/key. The full original body is compared without whitespace repair.
+Sender comment author, source task and issue must match authoritative run metadata;
+receiver result must belong to that same issue and a run linked to the original
+assignment. Duplicate originals, conflicting headers, unlinked markers and missing
+metadata refuse. A marker is never skipped merely because its body differs.
+
+Receipts retain their original wrapper fingerprint and add a separate complete
+comment fingerprint, source/scope and verified sender identity only through normal
+readback reconciliation. Existing prepared fingerprints are never repaired.
+`--existing-comment` remains read-only: no POST/rePOST, server/task/outcome edit,
+artifact release or pin rewrite. Historical acceptance is unchanged. Missing
+provenance means refusal to reconcile, not cancellation of the original work.
+
+Addressed controls: `python3 -m unittest test_handoff_adoption` from this directory.
+`replay_handoff_adoption.py` can verify a supplied complete original/release body,
+run metadata and prepared receipts against a selected source helper through local
+HTTP/process/filesystem fixtures. It redirects all requests to loopback, uses an
+offline token, and never invokes admission/model/native work. Installed pinned kit
+replacement and central source/catalog pins require the existing publisher/owner
+workflow after independent review; changing this checkout does not install it.

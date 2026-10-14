@@ -63,8 +63,15 @@ class HandoffTest(unittest.TestCase):
                         case.read_gate.wait(10)
                     return self.reply([{'id': ISSUE, 'status': 'in_progress', 'description': case.description}])
                 if self.path.endswith('/task-runs'):
-                    sender = [{'id': SENDER, 'status': 'running', 'trigger_comment_id': PARENT}] if case.sender == SENDER else []
+                    sender = [] if any(r['id'] == SENDER for r in case.runs) else [{'id': SENDER, 'agent_id': SENDER, 'issue_id': ISSUE, 'status': 'running', 'trigger_comment_id': PARENT}]
+                    for r in case.runs:
+                        r.setdefault('issue_id', ISSUE)
                     return self.reply(case.runs + sender)
+                for c in case.comments:
+                    c.setdefault('issue_id', ISSUE)
+                    c.setdefault('author_type', 'agent')
+                    c.setdefault('author_id', SENDER)
+                    c.setdefault('source_task_id', SENDER)
                 self.reply(case.comments)
 
             def do_POST(self):
@@ -430,7 +437,10 @@ class HandoffTest(unittest.TestCase):
         self.assertEqual(self.posts, 0)
 
     def test_adopt_existing_assignment_without_post(self):
-        text = '[@Receiver](mention://agent/' + AGENT + ') Source ' + 'a' * 40
+        base = f'http://127.0.0.1:{self.server.server_port}'
+        key = hashlib.sha256(json.dumps([base, ISSUE, AGENT, 'a' * 40, 'capture-receiving']).encode()).hexdigest()
+        text = ('[@Receiver](mention://agent/' + AGENT + ') Source ' + 'a' * 40
+                + '\nArtifact-handoff: ' + json.dumps([{'handoff': key, 'sha': 'a' * 40}]))
         (self.root / 'message').write_text(text)
         self.comments = [{'id': COMMENT, 'content': text}]
         self.runs = [{'id': TASK, 'agent_id': AGENT, 'status': 'running', 'trigger_comment_id': COMMENT}]
