@@ -147,7 +147,8 @@ test("resource evidence refuses malformed cgroup counters instead of silently re
     expect((await writeResourceSummary({ samplesFile, out: path.join(root, "control.json") })).summary.samples).toBe(1)
     for (const [index, change] of [{ memory_current_bytes: "malformed-counter-canary" },
       { memory_events: { oom: "malformed-counter-canary", oom_kill: 0 } },
-      { cpu_max: { quota_usec: 1000, period_usec: "malformed-counter-canary" } }].entries()) {
+      { cpu_max: { quota_usec: 1000, period_usec: "malformed-counter-canary" } },
+      { controllers: "malformed-counter-canary" }, { controllers: [null] }].entries()) {
       const out = path.join(root, `invalid-${index}.json`)
       await writeFile(samplesFile, JSON.stringify({ ...frame, host: { ...host, collector_cgroup: { ...host.collector_cgroup, ...change } } }) + "\n")
       await expect(writeResourceSummary({ samplesFile, out })).rejects.toThrow("RESOURCE_SAMPLES_INVALID")
