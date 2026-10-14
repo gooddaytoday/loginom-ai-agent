@@ -34,3 +34,8 @@ SDK/Page/native/session doubles, no factory/host/granted-handle replacement. Cur
 service returns HOST_NOT_READY; no qualified original acquired tuple/capability is
 returned. Source-compiled parent and literal installed defining core are not an
 embedded installed factory/native proof. Fixture finalization is not cleanup/ACK.
+
+Owned cancellation is boxed before sending its exact original request-ID packet.
+A rejected cancel post is a separate owned event retained as secondary, even if
+its raw value equals primary or is undefined. Pending lasts until the original
+peer reply/loss; propagation/terminal closure does not invent another event.
