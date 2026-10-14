@@ -87,7 +87,7 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     await writeLeaseReceipt(probeSource, originalProbe)
     const leaseManifest = await Bun.file(lease.receipt).json()
     await writeLeaseReceipt(lease.receipt, { ...leaseManifest, token: "foreign-lease" })
-    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_ADMISSION_UNCONFIRMED")
+    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("LEASE_NOT_HELD")
     await writeLeaseReceipt(lease.receipt, leaseManifest)
     const closeReply = { v: 1 as const, id: "close-a", outcome: "confirmed" as const, data: { closed: true, disposition: "rpc_closed" } }
     const closePayload = { proofId: observed.id, session: binding }

@@ -200,9 +200,15 @@ export async function recoverSlotLease(file: SlotFile, slot: SlotDefinition, ide
 
 function slotLease(receipt: string, manifest: { version: number; token: string; slot: SlotDefinition; identity: ServerIdentity; commandId: string;
   resources: { receipt: string; key: string; token: string; revision: number }[]; incident?: string }, resources: Awaited<ReturnType<typeof acquireResourceLease>>[]): SlotLease {
+  const assertHeld = async () => {
+    await Promise.all(resources.map(resource => resource.assertHeld()))
+    if (JSON.stringify(await readLeaseReceipt(receipt).catch(() => { throw new EvalFailure("LEASE_NOT_HELD", 2) })) !==
+      JSON.stringify({ ...manifest, state: manifest.incident ? "recovery-only" : "retained" })) throw new EvalFailure("LEASE_NOT_HELD", 2)
+  }
   return { slot: manifest.slot, identity: manifest.identity, receipt, token: manifest.token, recoveryOnly: Boolean(manifest.incident),
-    async assertHeld() { await Promise.all(resources.map(resource => resource.assertHeld())) },
+    assertHeld,
     async close() { await Promise.all(resources.map(resource => resource.close())) }, async release(cleanupReceipt: string) {
+    await assertHeld()
     const evidence = record(await readLeaseReceipt(cleanupReceipt))
     if (evidence.status !== "confirmed" || evidence.slotId !== manifest.slot.id || evidence.leaseToken !== manifest.token || evidence.serverEpoch !== manifest.identity.serverEpoch ||
       evidence.processes !== "confirmed" || evidence.serverSessions !== "confirmed" || evidence.archive !== "committed" ||
