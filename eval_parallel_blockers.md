@@ -1,5 +1,17 @@
 # Блокеры parallel evals
 
+## Незавершённый live admin dispose — причина пока не воспроизведена
+
+Research admin-fYV8vv: probe unknown/dispose confirmed, затем test timeout90s;
+финальный connection receipt остался ready. Подтверждённого cleanup этого
+incident нет. Пять локальных channel/supervisor tests×3 и два actual Node/pipe
+order probes прошли (15 PASS/63 assertions, оба final00). Последующие live
+read-only/design-refusal проверки завершились; перестановка await как fix не
+подтверждена. Journals/profiles сохраняются, targeted closure/admission остаются
+gates. Диагноз: evals/docs/2026-10-14-admin-design-capability-diagnosis.md.
+Продолжение: проверить lifecycle на квалификации design user, сохраняя incident;
+отсутствие нынешнего PID не разрешает освобождение его fence или удаление данных.
+
 ## Bootstrap administrator — внешний вход получен, live qualification открыта
 
 Обновление 2026-10-14 16:23 UTC: оба **фактически настроенных** файла
