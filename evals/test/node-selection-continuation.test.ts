@@ -5,6 +5,56 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { selectionAttempt } from "../script/run-node-selection-attempt"
 import { runSeriesSlot } from "../script/run-node-selection-series"
+import { assessTechnicalContinuation } from "../src/node-selection-continuation"
+
+test("v2 can release an import-before-execution failure using a complete native action ledger and two dispatcher snapshots", async () => {
+  const fixture = await nativeActionFixture()
+  try {
+    const before = await Bun.file(path.join(fixture.plan.directory, "attempt.json")).text()
+    expect(await assessTechnicalContinuation(fixture.plan, fixture.directory, fixture.pinsFile, "audit", "runtime", fixture.acceptance))
+      .toMatchObject({ decision: "advance", outcome: "technical-failed", calculationPassed: false, policyStatus: "incomplete" })
+    expect(await Bun.file(path.join(fixture.plan.directory, "attempt.json")).text()).toBe(before)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("a v2 context preserves the original executed-node v1 release contract", async () => {
+  const fixture = await technicalFixture()
+  try {
+    expect(await assessTechnicalContinuation(fixture.plan, fixture.directory, fixture.pinsFile, "audit", "runtime",
+      { criteriaVersion: "node-selection-policy-v2", criteriaSha256: "f".repeat(64) }))
+      .toMatchObject({ decision: "advance", outcome: "technical-failed" })
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test.each(["no-opt-in", "wrong-criteria", "v1-descriptor", "active-user", "missing-header", "tampered-ledger",
+  "active-snapshot", "empty-snapshot", "missing-review", "self-review", "foreign-close", "guard-inode", "oracle-failed"] as const)
+  ("v2 native action release rejects %s without relabeling the original failure", async (change) => {
+    const fixture = await nativeActionFixture()
+    try {
+      if (change === "v1-descriptor") { fixture.descriptor.version = 1; await fixture.seal() }
+      if (change === "active-user") await fixture.raw("ledger.log", fixture.ledger +
+        '2026-10-14T08:19:00Z info abc (loginomd:5000>user:174) - Инициализирована сессия для пользователя user{"USER_NAME":"user"}\n')
+      if (change === "missing-header") await fixture.raw("ledger.log", fixture.ledger.split("\n").slice(1).join("\n"))
+      if (change === "tampered-ledger") {
+        await chmod(path.join(fixture.directory, "ledger.log"), 0o600)
+        await Bun.write(path.join(fixture.directory, "ledger.log"), fixture.ledger.replace("user:172", "user:999"))
+        await chmod(path.join(fixture.directory, "ledger.log"), 0o400)
+      }
+      if (change === "active-snapshot") await fixture.raw("dispatcher-2.yml", fixture.dispatcher + '  - row "2 user:174":\n')
+      if (change === "empty-snapshot") await fixture.raw("dispatcher-2.yml", "allUserSessionsAbsent: true\n")
+      if (change === "missing-review") await rm(path.join(fixture.directory, "native-review.json"))
+      if (change === "self-review") await fixture.recovery("native-review.json", { ...JSON.parse(await Bun.file(path.join(fixture.directory, "native-review.json")).text()), reviewer: fixture.descriptor.preparedBy })
+      if (change === "foreign-close") await fixture.raw("ledger.log", fixture.ledger.replace("08:02:39.500 info abc (loginomd:4047>user:172)", "08:02:39.500 info abc (loginomd:4047>user:999)"))
+      if (change === "guard-inode") await fixture.recovery("guard.json", { ...JSON.parse(await Bun.file(path.join(fixture.directory, "guard.json")).text()), ownerInode: 1 })
+      if (change === "oracle-failed") await fixture.original("attempt.json", { ...JSON.parse(fixture.originals["attempt.json"]), oraclePassed: false })
+      const result = await assessTechnicalContinuation(fixture.plan, fixture.directory, fixture.pinsFile, "audit", "runtime",
+        change === "no-opt-in" ? undefined : { ...fixture.acceptance, criteriaSha256: change === "wrong-criteria" ? "0".repeat(64) : fixture.acceptance.criteriaSha256 })
+      expect(result.decision).toBe("halt")
+      if (change === "active-user") expect(result.reason).toBe("TECHNICAL_ACCOUNT_SESSION_ACTIVE")
+      if (change === "oracle-failed") expect(result.reason).toBe("TECHNICAL_FAILURE_UNCONFIRMED")
+      expect(JSON.parse(await Bun.file(path.join(fixture.plan.directory, "attempt.json")).text()).calculationPassed).toBe(false)
+    } finally { await rm(fixture.root, { recursive: true, force: true }) }
+  })
 
 test("a recovered technical slot advances without rerunning or rewriting the failed attempt", async () => {
   const fixture = await technicalFixture()
@@ -202,7 +252,7 @@ test("a historical protocol or a missing independent release review cannot reope
 
 // Sanitized terminal/refusal and manual-release shapes from the stopped ABC/1.
 // Native identity and administrative release are separate from normal cleanup.
-async function technicalFixture(phase = "candidate") {
+async function technicalFixture(phase = "candidate", reviewedAt = "2026-10-14T08:21:00Z") {
   const root = await mkdtemp(path.join(tmpdir(), "selection-technical-"))
   const pins = { runID: "technical-1", phase, resultsRoot: path.join(root, "results"),
     workspaceRoot: path.join(root, "workspace"), payload: path.join(root, "payload"), profile: path.join(root, "profile"),
@@ -292,7 +342,7 @@ async function technicalFixture(phase = "candidate") {
     const file = path.join(directory, "technical-continuation.json"); await chmod(file, 0o600).catch(() => {}); await Bun.write(file, JSON.stringify(descriptor)); await chmod(file, 0o400)
     const review = path.join(directory, "technical-continuation-review.json"); await chmod(review, 0o600).catch(() => {})
     await Bun.write(review, JSON.stringify({ version: 1, descriptorSha256: digest(JSON.stringify(descriptor)), verdict: "approved", reviewer: "independent",
-      reviewedAt: "2026-10-14T08:21:00Z", notes: "Technical failure retained; only own resources released" })); await chmod(review, 0o400)
+      reviewedAt, notes: "Technical failure retained; only own resources released" })); await chmod(review, 0o400)
   }
   await seal()
   const recovery = async (name: string, value: unknown, jsonl = false) => {
@@ -311,3 +361,69 @@ async function technicalFixture(phase = "candidate") {
 }
 
 function digest(value: string) { return createHash("sha256").update(value).digest("hex") }
+
+// Sanitized early-import failure: no executed native node or direct GUID binding.
+async function nativeActionFixture() {
+  const fixture = await technicalFixture("baseline", "2026-10-14T08:38:00Z")
+  const acceptance = { criteriaVersion: "node-selection-policy-v2" as const, criteriaSha256: "f".repeat(64) }
+  Object.assign(fixture.descriptor, { version: 2, ...acceptance })
+  fixture.server.closedAt = "2026-10-14T08:32:40Z"
+  fixture.administrative.closedAt = "2026-10-14T08:34:00Z"
+  fixture.administrative.processesExitedAt = "2026-10-14T08:35:00Z"
+  fixture.guard.archivedAt = "2026-10-14T08:36:00Z"
+  fixture.descriptor.release.releasedAt = "2026-10-14T08:37:00Z"
+  await fixture.recovery("admin.json", fixture.administrative)
+  const snapshot = { ...fixture.snapshot, parts: fixture.snapshot.parts.filter((part) => part.id !== "p-failed").map((part) => {
+    if (part.id === "p-prepare") return { ...part, state: { ...part.state,
+      time: { start: Date.parse("2026-10-14T07:55:08Z"), end: Date.parse("2026-10-14T07:55:12Z") },
+      output: JSON.stringify({ ...JSON.parse(part.state.output), workspace: { ...JSON.parse(part.state.output).workspace,
+        authenticated: true, created_draft: true, ownership_verified: true, target_verified: true, replayed: false } }) } }
+    if (part.id !== "p-import") return part
+    return { ...part, state: { ...part.state, output: JSON.stringify({ operation_id: "import-1", status: "AMBIGUOUS",
+      cleanup_complete: false, execution: { status: "not_requested" }, error: { code: "UI_SCAN_LIMIT" } }) } }
+  }) }
+  await fixture.original("parts.json", snapshot)
+  await fixture.original("events.jsonl", snapshot.parts.map((part) => ({ type: "tool_use", sessionID: "ses_own", part })), true)
+  const runtimeName = Object.keys(fixture.originals).find((name) => name.endsWith("execution-events.jsonl"))!
+  await fixture.original(runtimeName, [{ ...JSON.parse(fixture.originals[runtimeName as keyof typeof fixture.originals]!.trim()),
+    outcome: JSON.parse(snapshot.parts.find((part) => part.id === "p-import")!.state.output) }], true)
+  await fixture.original("runtime-journals.json", Object.keys(fixture.originals).filter((name) => name.startsWith("runtime/")).map((name) => ({ path: name,
+    source: path.join(fixture.plan.pins.profile, "loginom", name), sha256: fixture.descriptor.originalFiles[name] })))
+  const raw = async (name: string, data: string) => {
+    const file = path.join(fixture.directory, name)
+    await chmod(file, 0o600).catch(() => {}); await Bun.write(file, data); await chmod(file, 0o400)
+    fixture.descriptor.recoveryFiles[name] = digest(data); await fixture.seal()
+  }
+  const native = (time: string, name: string, message: string) => `2026-10-14T${time.replace(/Z$/, "")} info abc (loginomd:4047>${name}) - ${message}`
+  const ledger = ["2026-10-14T07:54:00Z info abc (loginomd:1>) - Лог-файл создан Loginom Enterprise 7.4.2",
+    '2026-10-14T07:54:01Z warn abc (loginomd:1>) - Multiline historical node warning\ncontinued warning text',
+    native("07:55:10Z", "user:172", 'Инициализирована сессия для пользователя user{"USER_NAME":"user"}'),
+    native("07:55:11Z", "user:172", "Создан черновик пакета"),
+    native("08:02:39.500Z", "user:172", "Обнаружен разрыв связи"),
+    native("08:02:39.500Z", "user:172", "Сессия сохранена после обнаруженного разрыва связи"),
+    native("08:10:00Z", "admin:173", 'Инициализирована сессия для пользователя admin{"USER_NAME":"admin"}'),
+    native("08:32:39.500Z", "user:172", "Сессия закрыта по тайм-ауту после разрыва связи: 1800 секунд"),
+    native("08:32:40Z", "user:172", 'Закрыта сессия для пользователя user{"USER_NAME":"user"}'),
+    native("08:34:00Z", "admin:173", 'Закрыта сессия для пользователя admin{"USER_NAME":"admin"}')].join("\n") + "\n"
+  await raw("ledger.log", ledger)
+  const dispatcher = '- generic: Администрирование\n  - generic: Диспетчер\n    - generic: Сессии и пакеты\n    - table:\n      - rowgroup:\n        - row "1 admin:173":\n          - cell "admin:173"\n        - row "Общие пакеты":\n        - row "Пул пакетов 0 из 10":\n'
+  await raw("dispatcher-1.yml", dispatcher)
+  await raw("dispatcher-2.yml", dispatcher + "- generic: Обновить (Alt+F5)\n")
+  await fixture.recovery("native-review.json", { version: 1, reviewer: "independent", reviewedAt: "2026-10-14T08:33:00Z",
+    sessionID: "ses_own", resourceSessionID: "dock-own", documentID: "document-own", targetBackendSession: "user:172",
+    nativeActionBinding: { verified: true }, directGuidLogBinding: { verified: false }, notes: "Two unique exact native RPC anchors" })
+  await fixture.recovery("resource.jsonl", [
+    { version: 1, stage: "client", status: "started", recorded_at: "2026-10-14T08:02:39.100Z" },
+    { version: 1, stage: "client", status: "fulfilled", recorded_at: "2026-10-14T08:02:39.150Z" },
+    { version: 1, stage: "bridge", status: "started", recorded_at: "2026-10-14T08:02:39.160Z" },
+    { version: 1, stage: "bridge", status: "fulfilled", recorded_at: "2026-10-14T08:02:39.200Z" },
+    { version: 1, stage: "bridge_ack", status: "rejected", recorded_at: "2026-10-14T08:02:39.210Z" },
+  ], true)
+  await fixture.recovery("server.json", { ...fixture.server, version: 2, nativeNodeIDs: [], nativeGuidBindingVerified: false,
+    closeMethod: "native-auto-timeout", nativeActionProof: { review: "native-review.json", ledger: "ledger.log",
+      snapshots: ["dispatcher-1.yml", "dispatcher-2.yml"], resourceClose: "resource.jsonl" } })
+  await fixture.recovery("guard.json", { ...fixture.guard, directoryInode: (await stat(fixture.guard.archivePath)).ino,
+    ownerInode: (await stat(path.join(fixture.guard.archivePath, "owner"))).ino })
+  await fixture.seal()
+  return { ...fixture, acceptance, raw, ledger, dispatcher }
+}

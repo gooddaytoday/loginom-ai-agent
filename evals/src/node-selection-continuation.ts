@@ -7,14 +7,17 @@ import { inspectSelection, inspectSelectionHistory, inspectSelectionProvenance, 
 // This imports a separately reviewed release. It never repairs an attempt or
 // performs recovery, and deliberately does not reuse the normal success closure.
 export async function assessTechnicalContinuation(plan: ReturnType<typeof selectionAttempt>, directory: string,
-  pinsFile: string, auditVersion: string, runtimeRevision?: string) {
+  pinsFile: string, auditVersion: string, runtimeRevision?: string,
+  acceptance?: { criteriaVersion: "node-selection-policy-v2"; criteriaSha256: string }) {
   try {
     const descriptorFile = await boundFile(directory, "technical-continuation.json", undefined, true)
     const descriptorHash = await hash(descriptorFile)
     const value = object(await Bun.file(descriptorFile).json())
     const reviewFile = await boundFile(directory, "technical-continuation-review.json", undefined, true)
     const review = object(await Bun.file(reviewFile).json())
-    if (value.version !== 1 || value.kind !== "technical-continuation" || value.classification !== "technical-failure"
+    const nativeActionRelease = value.version === 2 && acceptance?.criteriaVersion === "node-selection-policy-v2"
+      && digest(acceptance.criteriaSha256) && value.criteriaVersion === acceptance.criteriaVersion && value.criteriaSha256 === acceptance.criteriaSha256
+    if (!(value.version === 1 || nativeActionRelease) || value.kind !== "technical-continuation" || value.classification !== "technical-failure"
       || !nonempty(value.reason) || !nonempty(value.preparedBy) || value.runID !== plan.pins.runID || value.phase !== plan.pins.phase
       || value.taskID !== plan.taskID || value.attempt !== plan.number || value.pinsSha256 !== await hash(pinsFile)
       || value.auditVersion !== auditVersion || value.runtimeRevision !== runtimeRevision || !runtimeRevision
@@ -138,15 +141,19 @@ export async function assessTechnicalContinuation(plan: ReturnType<typeof select
         return record(output.node) && record(output.execution) && output.execution.status === "completed"
           && output.node.document_id === value.documentID && output.node.workflow_id === value.workflowID ? [output.node.node_id] : []
       })
-      if (server.version !== 1 || ["sessionID", "resourceSessionID", "documentID", "workflowID", "containerID", "account"].some((key) => server[key] !== value[key])
+      const withoutExecution = nativeActionRelease && nativeIDs.length === 0 && server.version === 2
+        && Array.isArray(server.nativeNodeIDs) && server.nativeNodeIDs.length === 0 && server.nativeGuidBindingVerified === false
+        && server.closeMethod === "native-auto-timeout"
+      if (!(server.version === 1 || withoutExecution) || ["sessionID", "resourceSessionID", "documentID", "workflowID", "containerID", "account"].some((key) => server[key] !== value[key])
         || !nonempty(server.name) || !server.name.startsWith(String(value.account) + ":") || !Array.isArray(server.nativeNodeIDs)
-        || !server.nativeNodeIDs.length || server.nativeNodeIDs.some((id) => !nativeIDs.includes(id))
-        || server.nativeGuidBindingVerified !== true || server.absentAfterClose !== true
+        || !withoutExecution && (!server.nativeNodeIDs.length || server.nativeNodeIDs.some((id) => !nativeIDs.includes(id)) || server.nativeGuidBindingVerified !== true)
+        || server.absentAfterClose !== true
         || !orderedTimes(attempt.cliStartedAt, server.createdAt, attempt.cliFinishedAt, server.closedAt, release.releasedAt, review.reviewedAt))
         throw Error("TECHNICAL_SERVER_RELEASE_UNBOUND")
       if (admin.version !== 1 || admin.containerID !== value.containerID || !nonempty(admin.name) || admin.name === server.name || admin.loggedOut !== true
         || !Array.isArray(admin.processIDs) || !admin.processIDs.length || admin.processIDs.some((value) => !pid(value) || [cliPid, host.pid].includes(value))
         || !orderedTimes(admin.createdAt, server.closedAt, admin.closedAt, admin.processesExitedAt, release.releasedAt)) throw Error("TECHNICAL_ADMIN_RELEASE_UNBOUND")
+      if (withoutExecution) await verifyNativeActionRelease(directory, value, server, admin, host, attempt, parts, recovery)
       if (guard.version !== 1 || guard.status !== "archived" || guard.sessionID !== value.sessionID || guard.cliPid !== cliPid
         || guard.sourcePath !== path.join(plan.pins.profile, ".writer") || !nonempty(guard.archivePath)
         || path.dirname(guard.archivePath) !== plan.pins.profile || !path.basename(guard.archivePath).startsWith(".writer-")
@@ -156,6 +163,8 @@ export async function assessTechnicalContinuation(plan: ReturnType<typeof select
         throw Error("TECHNICAL_GUARD_RELEASE_UNBOUND")
       const archivedOwner = await boundFile(guard.archivePath, "owner", guard.ownerSha256)
       if (await Bun.file(archivedOwner).text() !== guard.nonce || (await lstat(archivedOwner)).mtimeMs !== guard.archivedMtimeMs)
+        throw Error("TECHNICAL_GUARD_RELEASE_UNBOUND")
+      if (withoutExecution && ((await lstat(guard.archivePath)).ino !== guard.directoryInode || (await lstat(archivedOwner)).ino !== guard.ownerInode))
         throw Error("TECHNICAL_GUARD_RELEASE_UNBOUND")
     }
     if (release.kind === "normal-close") {
@@ -209,6 +218,109 @@ export async function assessTechnicalContinuation(plan: ReturnType<typeof select
   } catch (error) {
     return { decision: "halt" as const, reason: error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message)
       ? error.message : "TECHNICAL_EVIDENCE_UNAVAILABLE" }
+  }
+}
+
+// The no-execution v2 path uses two unique native action anchors. It never
+// substitutes an absence claim for the complete account-session event ledger.
+async function verifyNativeActionRelease(directory: string, value: Record<string, unknown>, server: Record<string, unknown>,
+  admin: Record<string, unknown>, host: Record<string, unknown>, attempt: Record<string, unknown>,
+  parts: Record<string, unknown>[], recovery: Record<string, unknown>) {
+  const proof = object(server.nativeActionProof)
+  const file = async (name: unknown) => {
+    if (!nonempty(name) || !digest(recovery[name])) throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+    return boundFile(directory, name, recovery[name], true)
+  }
+  const review = object(await Bun.file(await file(proof.review)).json())
+  if (review.version !== 1 || !nonempty(review.reviewer) || review.reviewer === value.preparedBy
+    || ["sessionID", "resourceSessionID", "documentID"].some((key) => review[key] !== value[key])
+    || review.targetBackendSession !== server.name || !record(review.nativeActionBinding) || review.nativeActionBinding.verified !== true
+    || !record(review.directGuidLogBinding) || review.directGuidLogBinding.verified !== false
+    || !orderedTimes(attempt.cliFinishedAt, review.reviewedAt, object(value.release).releasedAt)) throw Error("TECHNICAL_NATIVE_ACTION_REVIEW_REQUIRED")
+  const prepared = parts.filter((part) => part.tool === "loginom_dock_prepare" && record(part.state) && part.state.status === "completed")
+  if (prepared.length !== 1) throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+  const receipt = object(readSelectionReceipt(prepared[0]!)), workspace = object(receipt.workspace)
+  const time = object(object(prepared[0]!.state).time)
+  if (workspace.authenticated !== true || workspace.created_draft !== true || workspace.ownership_verified !== true
+    || workspace.target_verified !== true || workspace.replayed !== false || receipt.sessionId !== value.resourceSessionID
+    || workspace.document_id !== value.documentID || workspace.loginom_account !== value.account
+    || !Number.isSafeInteger(time.start) || !Number.isSafeInteger(time.end) || Number(time.end) < Number(time.start)
+    || Number(time.start) < Date.parse(String(attempt.cliStartedAt)) || Number(time.end) > Date.parse(String(attempt.cliFinishedAt)))
+    throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+  const resources = await lines(await file(proof.resourceClose))
+  if (resources.some((row) => !record(row) || row.version !== 1
+    || !["drain", "client", "bridge", "bridge_ack", "browser_server", "browser", "profile", "complete"].includes(String(row.stage))
+    || !["started", "fulfilled", "rejected"].includes(String(row.status))
+    || !orderedTimes(host.started_at, row.recorded_at, host.completed_at))) throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+  const stages = ["client", "bridge"].flatMap((stage) => ["started", "fulfilled"].map((status) => {
+    const rows = resources.filter(record).filter((row) => row.stage === stage && row.status === status)
+    if (rows.length !== 1) throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+    return rows[0]!.recorded_at
+  }))
+  if (!orderedTimes(...stages)) throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+  const raw = (await Bun.file(await file(proof.ledger)).text()).split(/\r?\n/).filter((line) => line.trim())
+  if (!raw[0]?.includes(" - Лог-файл создан ") || raw.filter((line) => line.includes(" - Лог-файл создан ")).length !== 1)
+    throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
+  const ledger = raw.reduce<{ time: string; at: number; thread: string; name: string; message: string }[]>((rows, line) => {
+    const match = /^(\S+) .* \((loginomd:[^>]+)>([^)]*)\) - (.*)$/.exec(line)
+    if (!match) {
+      if (!rows.length || /^\d{4}-\d{2}-\d{2}T/.test(line)) throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
+      rows[rows.length - 1]!.message += "\n" + line
+      return rows
+    }
+    // Native server logs omit the UTC suffix; the owned RPC anchors establish
+    // UTC. Never interpret these timestamps using the operator's local zone.
+    const time = /(?:Z|[+-]\d{2}:\d{2})$/.test(match[1]!) ? match[1]! : match[1]! + "Z"
+    if (!Number.isFinite(Date.parse(time))) throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
+    rows.push({ time, at: Date.parse(time), thread: match[2]!, name: match[3]!, message: match[4]! })
+    return rows
+  }, [])
+  const inPrepare = ledger.filter((row) => row.at >= Number(time.start) && row.at <= Number(time.end))
+  const init = inPrepare.filter((row) => row.message.startsWith("Инициализирована сессия для пользователя "))
+  const draft = inPrepare.filter((row) => row.message === "Создан черновик пакета")
+  const inClose = ledger.filter((row) => orderedTimes(host.started_at, row.time, host.completed_at))
+  const disconnect = inClose.filter((row) => row.message === "Обнаружен разрыв связи")
+  const retained = inClose.filter((row) => row.message === "Сессия сохранена после обнаруженного разрыва связи")
+  if ([init, draft, disconnect, retained].some((rows) => rows.length !== 1 || rows[0]!.name !== server.name)
+    || init[0]!.at !== Date.parse(String(server.createdAt)) || draft[0]!.thread !== init[0]!.thread || disconnect[0]!.thread !== init[0]!.thread
+    || retained[0]!.thread !== init[0]!.thread || !orderedTimes(stages[3], disconnect[0]!.time, retained[0]!.time))
+    throw Error("TECHNICAL_NATIVE_ACTION_UNBOUND")
+  const pending = new Map<string, number>()
+  for (const row of ledger.filter((row) => row.name.startsWith(String(value.account) + ":"))) {
+    const key = row.thread + ">" + row.name
+    if (row.message.startsWith("Инициализирована сессия для пользователя ")) {
+      if (pending.has(key) || object(JSON.parse(row.message.slice(row.message.indexOf("{")))).USER_NAME !== value.account)
+        throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
+      pending.set(key, row.at)
+    }
+    if (row.message.startsWith("Закрыта сессия для пользователя ")) {
+      if (!pending.has(key) || row.at < pending.get(key)! || object(JSON.parse(row.message.slice(row.message.indexOf("{")))).USER_NAME !== value.account)
+        throw Error("TECHNICAL_NATIVE_LEDGER_INCOMPLETE")
+      pending.delete(key)
+    }
+  }
+  if (pending.size) throw Error("TECHNICAL_ACCOUNT_SESSION_ACTIVE")
+  const own = ledger.filter((row) => row.name === server.name && row.thread === init[0]!.thread && row.at >= init[0]!.at)
+  const closed = own.filter((row) => row.message.startsWith("Закрыта сессия для пользователя "))
+  const timeout = own.filter((row) => row.message.startsWith("Сессия закрыта по тайм-ауту после разрыва связи: "))
+  const timeoutSeconds = Number(/: (\d+) секунд$/.exec(timeout[0]?.message ?? "")?.[1])
+  if (own.filter((row) => row.message.startsWith("Инициализирована сессия для пользователя ")).length !== 1
+    || closed.length !== 1 || closed[0]!.at !== Date.parse(String(server.closedAt)) || timeout.length !== 1
+    || !Number.isSafeInteger(timeoutSeconds) || timeoutSeconds <= 0 || timeout[0]!.at - disconnect[0]!.at < timeoutSeconds * 1000
+    || !orderedTimes(disconnect[0]!.time, timeout[0]!.time, closed[0]!.time, admin.closedAt)) throw Error("TECHNICAL_NATIVE_TIMEOUT_UNCONFIRMED")
+  for (const [message, expected] of [["Инициализирована сессия для пользователя ", admin.createdAt], ["Закрыта сессия для пользователя ", admin.closedAt]]) {
+    const rows = ledger.filter((row) => row.name === admin.name && row.message.startsWith(String(message)))
+    if (rows.at(-1)?.at !== Date.parse(String(expected))) throw Error("TECHNICAL_ADMIN_RELEASE_UNBOUND")
+  }
+  if (!Array.isArray(proof.snapshots) || proof.snapshots.length !== 2 || proof.snapshots[0] === proof.snapshots[1])
+    throw Error("TECHNICAL_ACCOUNT_SNAPSHOTS_UNBOUND")
+  for (const snapshot of proof.snapshots) {
+    const text = await Bun.file(await file(snapshot)).text()
+    const rows = text.split(/\r?\n/).filter((line) => /^\s*- row "/.test(line))
+    if (!text.includes("Администрирование") || !text.includes("Диспетчер") || !text.includes("Сессии и пакеты")
+      || !text.includes("- table") || !text.includes("- rowgroup") || !rows.some((row) => row.includes(String(admin.name)))
+      || !rows.some((row) => row.includes("Общие пакеты")) || !rows.some((row) => row.includes("Пул пакетов"))
+      || text.includes(String(value.account) + ":")) throw Error("TECHNICAL_ACCOUNT_SNAPSHOTS_UNBOUND")
   }
 }
 
