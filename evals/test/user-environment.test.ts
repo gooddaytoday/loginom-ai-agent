@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { claimUserOwnership, readUserActivation, readUserOwnership, readUserPreparation, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readServerSession, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -60,6 +60,35 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     await expect(stageUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_ACTIVATION_CONFLICT")
     expect(await Bun.file(activationFile).text()).toBe(foreignActivation)
     await writeLeaseReceipt(activationFile, activation)
+    const row = { objectId: "managed-session-73", name: "eval-a:2", createdAt: "2026-10-15T00:00:00.000Z", pendingDisconnect: false, packageCount: 0 }
+    const binding = { remoteKey: row.objectId, userKey: claimed.userKey, username: "eval-a", serverEpoch: identity.serverEpoch,
+      name: row.name, createdAt: row.createdAt }
+    const observed = { v: 1 as const, id: "probe-a", outcome: "confirmed" as const, data: {
+      ownSession: { guid: "11111111-1111-1111-1111-111111111111", objectId: "session-proxy-73", userObjectId: claimed.objectId,
+        username: "eval-a", isAdmin: false, isDesigner: true }, baseline: [], opened: [row], withPackage: [{ ...row, packageCount: 1 }],
+      afterPackage: [row], sessionIdentityQualified: false, afterDisconnect: [{ ...row, pendingDisconnect: true }], binding } }
+    const probePayload = { phase: "session-probe", slot: lease.slot, secretFile: prepared.secretFile, preparationNonce: prepared.nonce,
+      desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: claimed.objectId, name: "eval-a", userKind: 0,
+        preparationNonce: prepared.nonce, secretHash: prepared.secretHash }, expectedPolicy: [] }
+    const probeSource = path.join(fixture.slots.controller.stateDir, "probe-a.json")
+    await writeLeaseReceipt(probeSource, { version: 1, kind: "loginom-admin-command", id: observed.id, op: "reconcile-user", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(probePayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(observed)).digest("hex"), settledAt: new Date().toISOString() })
+    const session = await recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed)
+    expect(session).toMatchObject({ kind: "owned-server-session", slotId: "a", identity, preparationNonce: prepared.nonce,
+      binding, state: "observed", sessionGuid: observed.data.ownSession.guid })
+    const sessionFile = path.join(fixture.slots.controller.stateDir, "session-probe-a.json")
+    expect((await stat(sessionFile)).mode & 0o777).toBe(0o600)
+    expect(await recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed)).toEqual(session)
+    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toEqual(session)
+    const originalProbe = await Bun.file(probeSource).json()
+    await writeLeaseReceipt(probeSource, { ...originalProbe, settledAt: new Date(Date.parse(originalProbe.settledAt) + 1).toISOString() })
+    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_SOURCE_UNCONFIRMED")
+    await writeLeaseReceipt(probeSource, originalProbe)
+    const leaseManifest = await Bun.file(lease.receipt).json()
+    await writeLeaseReceipt(lease.receipt, { ...leaseManifest, token: "foreign-lease" })
+    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_ADMISSION_UNCONFIRMED")
+    await writeLeaseReceipt(lease.receipt, leaseManifest)
     const originalSource = await Bun.file(source).json()
     await writeLeaseReceipt(source, { ...originalSource, settledAt: new Date(Date.parse(originalSource.settledAt) + 1).toISOString() })
     await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
