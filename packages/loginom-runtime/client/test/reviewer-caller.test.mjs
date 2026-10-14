@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {MessageChannel} from 'node:worker_threads';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
-const {retainUnionOriginalCaller}=await import(pathToFileURL(join(process.env.UNION_CALLER_LIB,'union-original-caller.mjs')));
+const {retainUnionOriginalCaller}=await import(process.env.UNION_CALLER_LIB ? pathToFileURL(join(process.env.UNION_CALLER_LIB,'union-original-caller.mjs')) : new URL('../lib/union-original-caller.mjs',import.meta.url));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};};
 function fixture(){
  const controller=new AbortController(),ipc=new MessageChannel(),wait=deferred(),started=deferred();let sends=0;

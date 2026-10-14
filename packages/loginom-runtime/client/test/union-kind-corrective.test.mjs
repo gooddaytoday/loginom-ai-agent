@@ -9,7 +9,7 @@ for(const primary of [Error('original',{cause:0}),undefined,null,false,0,'']) {
   const f=await fixture('transform.union_data');
   try {
    // Mint a fresh scope with this raw first failure; no helper invocation.
-   const {retainUnionConfigureCleanup}=await import(process.env.UNION_CLEANUP_MODULE);
+   const {retainUnionConfigureCleanup}=await import(process.env.UNION_CLEANUP_MODULE || new URL('../lib/union-configure-cleanup.mjs',import.meta.url).href);
    const p=f.operation,tuple=f.tuple,current=f.current;let close=0,read=0,write=0;
    const originalClose=async()=>{close++;};tuple.close=originalClose;current.close=originalClose;
    const originalRequest=JSON.stringify(p.parameters),before=structuredClone(p);

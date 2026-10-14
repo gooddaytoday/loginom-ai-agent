@@ -4,7 +4,7 @@ import {writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {fixture,unionCleanupWitness} from './reviewer-kind-fixture.mjs';
-const lib=process.env.UNION_PRODUCER_LIB || new URL('../loginom-ai-agent/packages/loginom-runtime/client/lib/',import.meta.url).pathname;
+const lib=process.env.UNION_PRODUCER_LIB || new URL('../lib/',import.meta.url).pathname;
 const {nodeApplyInputSchema}=await import(pathToFileURL(join(lib,'node-api.mjs')));
 const {createUnionNodeSupport}=await import(pathToFileURL(join(lib,'union-node.mjs')));
 const kinds=nodeApplyInputSchema.properties.target.properties.type.enum;
