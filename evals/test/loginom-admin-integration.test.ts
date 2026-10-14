@@ -6,15 +6,41 @@ import { verifyAdminRuntime } from "../src/preflight"
 import { createJournaledAdminChannel, openLoginomAdmin, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots } from "../src/slots"
-import { writeLeaseReceipt } from "../src/lease"
+import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
+import { stageUserPreparation } from "../src/user-environment"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
 
 const liveIntegration = process.env.EVAL_ADMIN_LIVE_CONFIG ? test : test.skip
+
+liveIntegration("trusted bridge: held user preparation without its pair journal is refused before dispatch", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const credential = await readLeaseReceipt(source.controller.adminCredentialsFile) as { username: string }
+  const root = await mkdtemp(path.join(tmpdir(), "evals-admin-pair-guard-"))
+  const fixture = await parallelFixture(root)
+  const file = parseSlots({ ...fixture.slots, server: source.server,
+    controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile },
+    slots: [{ ...fixture.slots.slots[0]!, username: credential.username }] }, 1)
+  const identity = await readServerIdentity(file)
+  await writeLeaseReceipt(path.join(file.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireSlotLease(file, file.slots[0]!, identity, fixture.lockRoot)
+  try {
+    const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
+    const connection = await openLoginomAdmin(file, identity)
+    try {
+      await expect(connection.createBlockedUser(lease, prepared.secretFile)).rejects.toThrow("PAIR_OWNERSHIP")
+      const directory = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
+      const commands = path.join(file.controller.stateDir, directory, "commands")
+      expect((await Promise.all((await readdir(commands)).map(name => Bun.file(path.join(commands, name)).json())))
+        .some(command => command.op === "reconcile-user")).toBe(false)
+    } finally { await connection.dispose() }
+    expect(await readServerIdentity(file)).toEqual(identity)
+  } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+}, 90_000)
 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
