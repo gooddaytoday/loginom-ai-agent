@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { assessParallelLimits } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits } from "../src/parallel-acceptance"
 
 test("parallel acceptance fails on an intermediate rate limit even when the measured retry succeeds", () => {
   const receipt = {
@@ -66,4 +66,85 @@ test("parallel acceptance validates HTTP status metadata on otherwise classified
     .toEqual({ status: "incomplete", codes: ["LIMIT_EVENT_INVALID"] })
   expect(assessParallelLimits({ coverage, events: [{ source: "provider", kind: "other", status: 500 }] }))
     .toEqual({ status: "passed", codes: [] })
+})
+
+
+test("parallel licence policy requires evidence and accepts a complete receipt for the selected identities", () => {
+  const fixture = licenceFixture()
+  expect(assessParallelLicence({ ...fixture, receipt: null })).toEqual({ status: "incomplete", codes: ["LICENCE_EVIDENCE_MISSING"] })
+  expect(assessParallelLicence(fixture)).toEqual({ status: "passed", codes: [] })
+})
+
+function licenceFixture() {
+  const identity = { containerId: "a".repeat(64), studioContainerId: "b".repeat(64), startedAt: "2026-10-14T10:00:00Z",
+    studioStartedAt: "2026-10-14T10:00:00Z", serverEpoch: "fixture-epoch", configurationHash: "c".repeat(64) }
+  const users = ["eval-a", "eval-b"]
+  return { identity, users, receipt: { version: 1, kind: "loginom-licence-receipt", server: { ...identity },
+    status: "issued", readback: "confirmed", licence_type: "redacted-fixture-class", limit_scope: "all_sessions",
+    session_limit: 3, session_count: 3, admin_sessions: 1, connected_users: [...users],
+  } }
+}
+
+test("parallel licence policy cannot accept unknown issuance, readback, limits or concurrency", () => {
+  const fixture = licenceFixture()
+  for (const item of [
+    { change: { version: 0 }, code: "LICENCE_RECEIPT_INVALID" },
+    { change: { readback: "unavailable" }, code: "LICENCE_READBACK_UNPROVEN" },
+    { change: { status: "unknown" }, code: "LICENCE_ISSUANCE_UNPROVEN" },
+    { change: { licence_type: "" }, code: "LICENCE_RECEIPT_INVALID" },
+    { change: { session_limit: null }, code: "LICENCE_LIMIT_UNKNOWN" },
+    { change: { limit_scope: "unproven" }, code: "LICENCE_LIMIT_SCOPE_UNPROVEN" },
+    { change: { session_count: null }, code: "LICENCE_SESSION_COUNT_UNKNOWN" },
+    { change: { admin_sessions: 0 }, code: "LICENCE_ADMIN_CONCURRENCY_UNPROVEN" },
+    { change: { connected_users: ["eval-a"] }, code: "LICENCE_USER_CONCURRENCY_UNPROVEN" },
+    { change: { connected_users: ["eval-a", "eval-a"] }, code: "LICENCE_USER_CONCURRENCY_UNPROVEN" },
+  ]) {
+    expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, ...item.change } }))
+      .toEqual({ status: "incomplete", codes: [item.code] })
+  }
+})
+
+test("parallel licence policy binds the receipt to the exact Server and Studio epochs", () => {
+  const fixture = licenceFixture()
+  for (const key of Object.keys(fixture.identity)) expect(assessParallelLicence({ ...fixture,
+    receipt: { ...fixture.receipt, server: { ...fixture.identity, [key]: "changed" } } }))
+    .toEqual({ status: "failed", codes: ["LICENCE_SERVER_IDENTITY_MISMATCH"] })
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, server: null } }))
+    .toEqual({ status: "incomplete", codes: ["LICENCE_SERVER_IDENTITY_UNVERIFIED"] })
+})
+
+test("parallel licence policy refuses denied or exceeded issuance and requires simultaneous admin and user counts", () => {
+  const fixture = licenceFixture()
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, status: "denied", session_limit: null } }))
+    .toEqual({ status: "failed", codes: ["LICENCE_DENIED"] })
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, session_limit: 2 } }))
+    .toEqual({ status: "failed", codes: ["LICENCE_SESSION_LIMIT_EXCEEDED"] })
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, session_count: 2 } }))
+    .toEqual({ status: "incomplete", codes: ["LICENCE_CONCURRENCY_UNPROVEN"] })
+  expect(assessParallelLicence({ ...fixture, users: ["eval-a"], receipt: { ...fixture.receipt, connected_users: ["eval-a"], session_count: 2, session_limit: 2 } }))
+    .toEqual({ status: "passed", codes: [] })
+})
+
+test("parallel licence policy rejects empty or duplicate selections and inconsistent observed user counts", () => {
+  const fixture = licenceFixture()
+  for (const users of [[], ["eval-a", "eval-a"], [""]]) expect(assessParallelLicence({ ...fixture, users }))
+    .toEqual({ status: "incomplete", codes: ["LICENCE_SELECTED_USERS_UNVERIFIED"] })
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, connected_users: ["eval-a", "eval-b", null] } }))
+    .toEqual({ status: "incomplete", codes: ["LICENCE_USER_CONCURRENCY_UNPROVEN"] })
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, connected_users: ["eval-a", "eval-b", "other-user"] } }))
+    .toEqual({ status: "incomplete", codes: ["LICENCE_CONCURRENCY_UNPROVEN"] })
+})
+
+test("a bound explicit licence denial remains failed without metadata for a successful issuance", () => {
+  const fixture = licenceFixture()
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, status: "denied", licence_type: null, readback: "unavailable", session_limit: null } }))
+    .toEqual({ status: "failed", codes: ["LICENCE_DENIED"] })
+})
+
+test("parallel licence policy distinguishes an explicitly observed unlimited limit from an unknown value", () => {
+  const fixture = licenceFixture()
+  expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, session_limit: "unlimited", session_count: 10 } }))
+    .toEqual({ status: "passed", codes: [] })
+  for (const session_limit of [null, 0, "unknown"]) expect(assessParallelLicence({ ...fixture, receipt: { ...fixture.receipt, session_limit } }))
+    .toEqual({ status: "incomplete", codes: ["LICENCE_LIMIT_UNKNOWN"] })
 })
