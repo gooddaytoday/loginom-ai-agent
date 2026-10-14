@@ -2407,3 +2407,16 @@ candidatecheckoutclean. Независимый physicalpair reviewSHA
 Один необходимый no-model ordinary27BImport→Sort→Export активирован после
 independent nativeadmissionSHA98f4b4e287537ed6d41d460db33d14f3b35bddc465af1959e7d3d4e219f32f62.
 Native result/ownclose pending; model0. Исторические locks/outcomes не изменены.
+
+Checkpoint 2026-10-14 — владелец разрешил вернуть ранее выполненные исправления
+Import/Join/Export/Calculator/Group/Sort и JS output-preview/helper/hook.
+Пара105540 остаётся исторической до моделей0: её shortnativefail сохранён.
+Independent closedreadback dd5130add04ffc71e2c64cea08a8f3d9e1a03f3c271ca347eaf783eee79c1339
+подтвердил clipped inputbottom804>800, scroll0/max82, Export AMBIGUOUS/noexecution,
+noSave/CSV/LGP и normalcleanupfalse/HostACKfalseexit1. Root адресно закрыл
+только ownuser177 (server11:12:53.445/.447), admin178logout11:14:32.949,
+loginUI/pageclosed/Host1661655gone/.writerabsent. RecoveryfinalSHA
+03f7195672b223496534096086ff11bd2b2fe6a305960cb5eabcecde17b2f2d8;
+независимый recovery review pending. Исходный отказ не становитсяPASS.
+Восстановление15путей exact15e выполняется с targeted RED→GREEN; Variant2base.
+Нужны новый финальныйsource, matchedbuild и prospective31seal до моделей.

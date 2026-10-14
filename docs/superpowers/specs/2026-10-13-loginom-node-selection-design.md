@@ -1,6 +1,6 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Актуально на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
+Историческое состояние на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
 к базе38ee (127productionfiles independentlychecked), а общие порты, мастера
 и таблицы, необходимые JavaScript, сохранены. Rollbackd445c8ea65 и sourcegate
 35c7bc60eb завершены; changedclient/JS2154PASS. Technicalcontinuation6993d7ca4a
@@ -2462,3 +2462,42 @@ Clientgenerate без publicProtocol/HttpApi изменения.
 - [ ] При blockedcoverage заранее закрепить обоснованную alternative с oracle,
   проверить отдельно и сохранить оригинальный failure; не объявлять удобную замену.
 - [ ] Подготовить итоговый трёхосевой отчёт с scope/base evidence и ограничениями.
+
+## Действующее уточнение владельца: восстановить разрешённые исправления (2026-10-14)
+
+Владелец после предыдущего уточнения явно разрешил вернуть отдельные ранее
+выполненные исправления Import, Join и Export, затем Калькулятора, Group и Sort,
+а также javascript-output-preview.mjs и его подключение. Этот раздел заменяет
+запрет восстановления перечисленных изменений из предыдущего раздела.
+
+Восстанавливаются проверенные изменения из15e2f43c5d: дата/формат Import,
+специальная видимость входов Join/Export, открытие/scroll/label Export,
+Calculator wizard check, Group/Sort preflight после JS, общий openJavascriptPreview
+и его helper/test. Это точное возвращение существующего кода и соответствующих
+тестов, без новых произвольных правок стандартных обработчиков. Остальные
+неразрешённые изменения стандартных узлов остаются на исходной базе38ee;
+Variant-reader не включён в разрешение и остаётся отменённым. Общие зависимости
+JavaScript и необходимая eval-инфраструктура сохранены.
+
+Правило skill не меняется: standard-first; ошибка стандартного узла не позволяет
+JS fallback, допускаются только explicit JS или подтверждённый функциональный
+пробел. Technicalcontinuation сохраняет failure и требует strict own release;
+подтверждённый candidate policy violation останавливает серию. Матрица31 и
+ограничение сравнения baseline1×6 сохраняются.
+
+Пара105540 на rollback runtimeb85167 остаётся исторической, models0. Единственный
+short Import→Sort→Export воспроизвёл clipped input: bottom804>viewport800,
+scroll0/max82, no interactionpoint; Import/Sort succeeded, Export AMBIGUOUS
+input_mapping до execution. Нет CSV/Save/LGP; normalcleanupfalse/HostACKfalseexit1
+не повышаются доPASS. Sessionuser177 адресно закрыта изadmin178, logout admin
+и browser pageclose выполнены; независимый ownrelease review pending.
+После разрешённого восстановления нужна новая matched пара и новый prospective
+lock до firstmodel. Старые failure, pins, drafts и review остаются неизменными.
+
+- [ ] Восстановить15разрешённых runtime/test путей exact15e2f43c5d, включая
+  JS→Group/Sort helper и его hook; сохранить Variant/base и чужие файлы.
+- [ ] Независимо проверить разрешённый diff и targeted restoration regressions;
+  сохранённый failure/ownrelease оформить в отчёте, восстановление — обычным commit.
+
+Новые matched build/pins/live31 и итоговый трёхосевой отчёт остаются открытыми
+задачами основного протокола. При technical failures полная приёмка не заявляется.
