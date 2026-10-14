@@ -2665,3 +2665,25 @@ receipt-linkedidentities, безподставныхрезультатов. До
 Reportготовитсяпараллельно, безповторногоoracle/model/native/tests.
 Started7/closed7/accepted4/technicalfailed2/pendingreview1/notstarted24/baseline0;
 full31/compare/fullacceptanceopen. Runtime/source/pins/lock/skill/model/inputs unchanged.
+
+Checkpoint 2026-10-14 13:31 UTC — explicitJS/1 accepted, tags/1 live.
+Wx graph-reviewb465b688a7815576e75fa8d0d7372d3bb59f63ca0accc2a5edcb14521e2be33e
+passed/requested-aggregation; details915f14f8…/savedJS03a9e9ac… equals typedrequest.
+JSInputTable.RowCount/Get(category,total,quantity,unit_price)→Map/count/sum/means→
+OutputTable; noop/data-constants/substitutedresults absent. IndependentDecimal500rows/
+25CSVcells+5completeJSsamples checked. XML4businessnodes/3links Import→JS→Sort→Export,
+receiptlinkedJS/export/executionidentities;35originalprotectedfiles unchanged.
+Actualruntime line1287 sorting_preflight_completed binds sourceJS5c3c…/portGUID/
+execution1274:4: nativepreviewinventory_complete/5typedfields/cleanuptrue/
+settings_changedfalse, followedSortSUCCEEDED. Restored JS→Sort helpercoverage proven;
+JS→Group не покрыт этим прогоном и остаётся отдельной возможностью в tags.
+Rootauditrefresh diffonlyreviewStatus pending→passed, SHA8c06fc8fefaffd1c314c5e1d65aea807161044eb945b2b7beeab7ed5d7df89a0;
+originalaudit400 retained/wrapper2unchanged. Puregateadvance/null;400binding saved.
+Samefrozen31resume5/exec89372/runner2049826; ledgerexplicitrecheck13:30:18.322Z.
+Tags/1 admitted13:30:18.328Z/CLI2050385start13:30:27.066Z,
+Session ses_ec56485e0ffeSm4LTnr9DvULJz/actualPIDalive. Вход150tags+varlengths/independent
+oracle входятвfrozenfixtures; дополнительныхсессийдляvariationsнет. Mandatorymanual
+reviewпослеmachineclose проверитvariable-unpack-only/безhardcodedрезультатов.
+Started8/closed7/accepted5(4standard+1explicit)/technicalfailed2/notstarted23/baseline0.
+Full31/compare/fullacceptanceopen; всеисходники/model/runtime/source/pins/lock прежние.
+Reportamendment009/45f13218… сохраняетinitialpendingreview, новыйoutcomeотдельно.
