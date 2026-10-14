@@ -33,6 +33,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     score: number | null; failed: string[]; error: string | null
     case_id?: string; expected_failed?: string[]; expected_oracle_pass?: boolean
     oracle_pass?: boolean | null; oracle_error?: string | null; expectations_met?: boolean
+    judge_cleanup_unconfirmed?: true
   }[] = []
   for (const [index, task] of tasks.entries()) {
     const checklist = task.checklist.filter((item) => !item.requiresRun && (!item.requiresResultFile || !!task.oracle))
@@ -86,6 +87,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
         score: judged.ok ? judged.score : null,
         failed: judged.ok ? judged.items.filter((item) => !item.passed).map((item) => item.id) : [],
         error: judged.ok ? null : judged.error,
+        ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true as const } : {}),
       })
       console.error(`[calibrate ${task.id}/${kind}] score=${judged.ok ? judged.score : "error"}`)
     }
@@ -105,6 +107,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
       expectations_met: judged.ok && entry.mutation.expected_failed.every((id) => failed.includes(id)) &&
         entry.oracle.passed === entry.mutation.expected_oracle_pass,
       score: judged.ok ? judged.score : null, failed, error: judged.ok ? null : judged.error,
+      ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true as const } : {}),
     })
     console.error("[calibrate " + entry.task.id + "/" + entry.mutation.id + "] score=" + (judged.ok ? judged.score : "error"))
   }
@@ -153,5 +156,5 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
   ].join("\n")
   await Bun.write(path.join(runDir, "calibration.md"), report)
   console.log(report)
-  return { code: warnings.length ? 1 : 0, runDir }
+  return { code: warnings.length ? 1 : 0, runDir, judgeCleanupConfirmed: !rows.some(row => row.judge_cleanup_unconfirmed) }
 }

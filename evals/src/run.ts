@@ -26,6 +26,10 @@ export async function main(argv: string[], env: Record<string, string | undefine
     config.judge.env = { CODEX_HOME: fixture.file.judge.codexHome }
     return executeRun(config, fixture)
   }
+  if (config.slotsFile && (config.judgeOnly !== undefined || config.calibrate)) {
+    const { runOfflineJudge } = await import("./judge-environment")
+    return runOfflineJudge(config)
+  }
   if (config.judgeOnly !== undefined) {
     const { rejudge } = await import("./rejudge")
     return rejudge(config, config.judgeOnly)
