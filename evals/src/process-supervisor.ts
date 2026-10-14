@@ -13,7 +13,7 @@ type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string
 type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper"; parent?: string; observed_at: string }
 type ProcessEntry = {
   process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
-  binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean; foreign?: boolean
+  binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean
 }
 export type ProcessOwner = { kind: "slot" | "admin" | "judge" | "command"; id: string }
 export type WriterIdentity = { device: number; inode: number; owner: string }
@@ -463,10 +463,6 @@ export async function superviseProcess(input: {
     // Keep it unadmitted until CLI identity or native admission resolves it.
     const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry),
       admission: browser && via === "subreaper" ? "pending" : "allowed" }
-    if (tracked.foreign) {
-      tracked.foreign = false; tracked.admission = "refused"
-      cleanup.error ??= `Browser binding differs PID ${entry.pid}`
-    }
     tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
     ledger.set(key(entry), tracked)
   }
@@ -600,14 +596,11 @@ export async function superviseProcess(input: {
         const knownType = type && ["zygote", "gpu-process", "utility", "renderer", "broker", ...(browser.fake ? ["parent", "helper"] : [])].includes(type)
         const knownExecutable = browser.helpers.some((helper) => current.device === helper.device && current.inode === helper.inode)
         if (!entry.origin) {
-          const parent = live.find((candidate) => candidate.pid === current.parent)
-          const parentData = parent ? dataDir(parent) : undefined
-          entry.foreign ||= Boolean(data && !inside(data, profile!) || parentData && !inside(parentData, profile!))
-          entry.admission = entry.foreign ? "refused" : "pending"
+          entry.admission = "pending"
           continue
         }
         if (entry.admission === "refused") continue
-        if (entry.foreign || entry.binding && data && data !== path.join(entry.binding.runtimeDirectory, "browser-profile") || data && (!runtime || !mainExecutable) || mainExecutable && type && !knownType || !mainExecutable && !knownExecutable) {
+        if (entry.binding && data && data !== path.join(entry.binding.runtimeDirectory, "browser-profile") || data && (!runtime || !mainExecutable) || mainExecutable && type && !knownType || !mainExecutable && !knownExecutable) {
           entry.admission = "refused"
           cleanup.bindingRefusals ??= []
           cleanup.bindingRefusals.push({ process: identity(current), has_data_dir: Boolean(data), data_inside_profile: Boolean(data && inside(data, profile!)),
@@ -632,7 +625,7 @@ export async function superviseProcess(input: {
     }
     const owned = [...ledger.values()].filter((entry) => entry.origin)
     cleanup.processes = owned.map((entry) => entry.process)
-    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => !entry.foreign && entry.admission !== "allowed").map((entry) => entry.process)
+    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => entry.admission !== "allowed").map((entry) => entry.process)
     cleanup.browserBindings = owned.filter((entry) => entry.binding).map((entry) => ({ process: entry.process, ...entry.binding! }))
     cleanup.admissions = [...ledger.values()].map((entry) => ({ pid: entry.process.pid, starttime: entry.process.starttime, status: entry.admission }))
     cleanup.origins = owned.map((entry) => {
