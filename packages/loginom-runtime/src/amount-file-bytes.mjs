@@ -34,7 +34,23 @@ export async function amountFilePhase(o) {
    ||location.origin!==e.origin||s.map.FPackagesParentNode!==s.root||s.map.PackageNodes!==s.inventory||s.connection.Connected!==true||s.connection.UserName!==e.account||s.app.Version!=='7.4.2'
    ||s.inventory?.Count!==0||s.session.get_FileStorage!==s.getStorage||s.getInfo&&s.storage.GetFileInfo!==s.getInfo||s.openFile&&s.storage.OpenFile!==s.openFile||s.transport&&(s.storage.$S!==s.transport||s.session.$S!==s.transport))fail('ORIGINAL_FILE_OWNER_CHANGED');
  };
- const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name]){const v=Error('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name,{cause:{name,expected:o.functions[name],observed:typeof fn==='function'?Function.prototype.toString.call(fn):typeof fn}});refusals.add(v);throw v}};
+ const providerDescriptors=()=>{
+  const namespaces=[['global',globalThis],['filestorage',s.bg?.filestorage],
+    ...['core','remote'].map(name=>[name,Object.getOwnPropertyDescriptor(s.bg,name)?.value]),['storage',s.storage],['sessionTransport',s.transport]];
+  return namespaces.map(([namespace,value])=>{
+   const entries=[];if(!value)return {namespace,available:false,entries};
+   let object=value;for(let depth=0;object&&depth<3;depth++,object=Object.getPrototypeOf(object)){
+    for(const name of Object.getOwnPropertyNames(object).filter(x=>/release|dispose|filedownloader/i.test(x)).slice(0,24)){
+     const d=Object.getOwnPropertyDescriptor(object,name),fn=d?.value;
+     const source=typeof fn==='function'?Function.prototype.toString.call(fn):undefined;
+     entries.push({name,depth,kind:source?'function':d?.get?'getter':typeof fn,
+       ...(source?{source:source.slice(0,8192),source_complete:source.length<=8192}:{})});
+    }
+   }
+   return {namespace,available:true,entries};
+  });
+ };
+ const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name]){const v=Error('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name,{cause:{name,expected:o.functions[name],observed:typeof fn==='function'?Function.prototype.toString.call(fn):typeof fn,...(name==='constructor'?{provider_descriptors:providerDescriptors()}:{} )}});refusals.add(v);throw v}};
  const getter=(obj,name)=>{for(let d=0;obj&&d<8;d++,obj=Object.getPrototypeOf(obj)){const p=Object.getOwnPropertyDescriptor(obj,name);if(p)return p.get}};
  const construct=()=>{
   pin('constructor',s.bg.filestorage?.FileDownloader);const name=s.path.split('/').at(-1),dir=s.path.slice(0,-name.length);
