@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { collectSeriesSlot, inspectSeriesTransition, inspectSeriesLiveParts, runSeriesSlot, runSelectionSeries, selectionSeriesSlots, verifySeriesInputs } from "../script/run-node-selection-series"
 import { selectionAttempt } from "../script/run-node-selection-attempt"
+import { buildAgentPrompt, loadTasks } from "../src/task"
 
 // Sanitized projection of completed candidate sales1 (233119), including the
 // managed_saved_package_cleanup event. No credentials or browser state.
@@ -122,6 +123,10 @@ test("a real single-runner preflight failure is dispatched once, preserved and n
     const filename = path.join(root, "pins.json")
     await Bun.write(filename, JSON.stringify(pins))
     await Bun.write(path.join(pins.payload, "cli-manifest.json"), "changed payload")
+    expect(await runSeriesSlot(filename, "sales-by-category", 1, "audit", undefined, false, undefined, true))
+      .toEqual({ decision: "halt", reason: "REFERENCE_SLOT_NOT_DISPATCHED" })
+    expect(await Bun.file(path.join(pins.resultsRoot, "series/candidate-sales-by-category-1/dispatch.json")).exists()).toBe(false)
+    expect(await readdir(root)).not.toContain("results")
     expect((await runSeriesSlot(filename, "sales-by-category", 1, "audit")).decision).toBe("halt")
     expect(await readdir(path.join(pins.resultsRoot, "incidents"))).toHaveLength(1)
     const before = await readdir(path.join(pins.resultsRoot, "incidents"))
@@ -495,6 +500,8 @@ test("the frozen 9 → 6 → 16 schedule preserves all slots and rejects duplica
   expect(slots[8]).toEqual({ phase: "candidate", task: "recovery", attempt: 1 })
   expect(slots[9]?.phase).toBe("baseline")
   expect(slots[15]?.phase).toBe("candidate")
+  expect(selectionSeriesSlots({ ...lock, plannedModelSlots: 25, plannedComparisonSlots: 31, referencedBaselineSlots: 6,
+    baselineReferences: { version: 1 } })).toEqual(slots)
   expect(() => selectionSeriesSlots({ ...lock, technicalContinuationVersion: undefined })).toThrow("SERIES_SCHEDULE_INVALID")
   expect(() => selectionSeriesSlots({ ...lock, executionSchedule: { ...schedule, completedFirst9RequiredBeforeBaseline: false } }))
     .toThrow("SERIES_SCHEDULE_INVALID")
@@ -612,3 +619,261 @@ test("the interslot seal refuses a changed auditor source before the next slot c
     await expect(verifySeriesInputs(inputs)).rejects.toThrow("SERIES_INPUT_CHANGED")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("a prospective series consumes six closed baseline references without dispatch or rewriting their identities", async () => {
+  const fixture = await baselineReuseFixture()
+  try {
+    const before = await Promise.all(fixture.references.slots.flatMap((slot) => Object.keys(slot.evidence))
+      .map(async (file) => [file, await Bun.file(path.join(fixture.baseline.resultsRoot, file)).text()]))
+    expect(await runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance))
+      .toEqual({ status: "machine-complete-review-required", dispatched: 0 })
+    const rows = (await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).text()).trim().split("\n").map((line) => JSON.parse(line))
+    expect(rows).toHaveLength(31)
+    const reused = rows.filter((row) => row.reference === true)
+    expect(reused).toHaveLength(6)
+    expect(reused.every((row) => row.originRunID === fixture.baseline.runID && row.rechecked === true && row.decision === "advance")).toBe(true)
+    expect(rows.slice(0, 9).every((row) => row.slot.phase === "candidate")).toBe(true)
+    for (const [file, bytes] of before) expect(await Bun.file(path.join(fixture.baseline.resultsRoot, file!)).text()).toBe(bytes!)
+    expect(await Bun.file(path.join(fixture.baseline.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+    expect(await readdir(fixture.candidate.resultsRoot)).not.toContain("incidents")
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("a reference seal must include the actual close copies before any candidate slot is considered", async () => {
+  const fixture = await baselineReuseFixture()
+  try {
+    delete fixture.references.slots[0]!.evidence["series/baseline-sales-by-category-1/host-close.json"]
+    await fixture.reseal()
+    await expect(runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance))
+      .rejects.toThrow("BASELINE_REFERENCE_INCOMPLETE")
+    expect(await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("baseline references require the original pin bytes, not only equivalent JSON", async () => {
+  const fixture = await baselineReuseFixture()
+  try {
+    Object.assign(fixture.references.pins, await fixture.seal(fixture.references.pins.path,
+      (await Bun.file(fixture.references.pins.path).text()) + "\n"))
+    await fixture.reseal()
+    await expect(runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance))
+      .rejects.toThrow("BASELINE_COMPARABILITY_INVALID")
+    expect(await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("comparability cannot omit a required auditor or task dependency from its seal", async () => {
+  const fixture = await baselineReuseFixture()
+  try {
+    const comparison = await Bun.file(fixture.references.comparison.path).json()
+    delete comparison.taskFiles["evals/src/node-selection.ts"]
+    Object.assign(fixture.references.comparison, await fixture.seal(fixture.references.comparison.path, comparison))
+    await fixture.reseal()
+    await expect(runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance))
+      .rejects.toThrow("BASELINE_COMPARABILITY_INVALID")
+    expect(await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("a sealed sidecar from another Session cannot certify a baseline reference", async () => {
+  const fixture = await baselineReuseFixture()
+  try {
+    const slot = fixture.references.slots[0]!, relative = `policy-v2/baseline/${slot.task}/1.json`
+    const file = path.join(fixture.baseline.resultsRoot, relative)
+    slot.evidence[relative] = (await fixture.seal(file, { ...await Bun.file(file).json(), sessionID: "foreign-session" })).sha256
+    await fixture.reseal()
+    await expect(runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance))
+      .rejects.toThrow("BASELINE_REFERENCE_IDENTITY_INVALID")
+    expect(await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+test("baseline reference admission rejects missing, duplicate, candidate and foreign identities", async () => {
+  for (const mutation of ["missing", "duplicate", "candidate", "foreign-session", "changed-hash", "writable", "symlink"]) {
+    const fixture = await baselineReuseFixture()
+    try {
+      const slot = fixture.references.slots[0]!, relative = `baseline/${slot.task}/1/parts.json`
+      const file = path.join(fixture.baseline.resultsRoot, relative)
+      if (mutation === "missing") fixture.references.slots.pop()
+      if (mutation === "duplicate") fixture.references.slots[1] = slot
+      if (mutation === "candidate") slot.phase = "candidate"
+      if (mutation === "foreign-session") slot.sessionID = "foreign-session"
+      if (mutation === "changed-hash") slot.evidence[relative] = "0".repeat(64)
+      if (mutation === "writable") await chmod(file, 0o600)
+      if (mutation === "symlink") {
+        const copy = path.join(fixture.root, "foreign-parts.json")
+        await fixture.seal(copy, await Bun.file(file).text())
+        await rm(file)
+        await symlink(copy, file)
+      }
+      await fixture.reseal()
+      await expect(runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance)).rejects.toThrow()
+      expect(await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+      expect(await readdir(fixture.candidate.resultsRoot)).not.toContain("incidents")
+    } finally { await rm(fixture.root, { recursive: true, force: true }) }
+  }
+})
+
+test("baseline comparability rejects changed runtime, model and task inputs", async () => {
+  for (const mutation of ["runtime", "model", "task-input", "task-oracle", "skill"]) {
+    const fixture = await baselineReuseFixture()
+    try {
+      if (mutation === "runtime") fixture.references.runtimeRevision = "0".repeat(64)
+      if (mutation === "skill") fixture.references.expectedSkillDigest = "0".repeat(64)
+      if (["model", "task-input", "task-oracle"].includes(mutation)) {
+        const file = path.join(fixture.candidate.resultsRoot, "candidate-pins.json")
+        const pins = await Bun.file(file).json()
+        if (mutation === "model") pins.variant = "high"
+        if (mutation === "task-input") pins.tasks["sales-by-category"].inputHashes["data/dataset.csv"] = "0".repeat(64)
+        if (mutation === "task-oracle") pins.tasks["sales-by-category"].oracleSha256 = "0".repeat(64)
+        const changed = await fixture.seal(file, pins)
+        fixture.lockValue.pinsSha256["candidate-pins.json"] = changed.sha256
+        const comparison = await Bun.file(fixture.references.comparison.path).json()
+        comparison.candidatePinsSha256 = changed.sha256
+        Object.assign(fixture.references.comparison, await fixture.seal(fixture.references.comparison.path, comparison))
+      }
+      await fixture.reseal()
+      await expect(runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance))
+        .rejects.toThrow("BASELINE_COMPARABILITY_INVALID")
+      expect(await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+    } finally { await rm(fixture.root, { recursive: true, force: true }) }
+  }
+})
+
+test("a pending first-wave review stops before any baseline reference is consumed", async () => {
+  const fixture = await baselineReuseFixture()
+  try {
+    const file = path.join(fixture.candidate.resultsRoot, "series/candidate-abc-pareto-groups-1/closure.json")
+    await fixture.seal(file, { ...await Bun.file(file).json(), historyAnomaly: true })
+    const result = await runSelectionSeries(fixture.lock.path, fixture.lock.sha256, 1, fixture.acceptance)
+    expect(result).toMatchObject({ status: "review", reason: "MANUAL_REVIEW_REQUIRED", dispatched: 0 })
+    const rows = (await Bun.file(path.join(fixture.candidate.resultsRoot, "series/ledger.jsonl")).text()).trim().split("\n").map((line) => JSON.parse(line))
+    expect(rows).toHaveLength(1)
+    expect(rows[0].reference).toBeUndefined()
+    expect(await Bun.file(path.join(fixture.baseline.resultsRoot, "series/ledger.jsonl")).exists()).toBe(false)
+  } finally { await rm(fixture.root, { recursive: true, force: true }) }
+})
+
+async function baselineReuseFixture() {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-baseline-reference-"))
+  const repo = path.resolve(import.meta.dir, "../..")
+  const sha = (value: string) => createHash("sha256").update(value).digest("hex")
+  const seal = async (file: string, value: unknown) => {
+    await chmod(file, 0o600).catch(() => {})
+    await Bun.write(file, typeof value === "string" ? value : JSON.stringify(value))
+    await chmod(file, 0o400)
+    return { path: file, sha256: sha(await Bun.file(file).text()) }
+  }
+  const standard = ["sales-by-category", "abc-pareto-groups", "monthly-demand", "risky-approved-claims", "campaign-roi-by-channel", "first-last-touch"]
+  const first = ["abc-pareto-groups", "first-last-touch", "sales-by-category", "monthly-demand", "risky-approved-claims", "campaign-roi-by-channel", "explicit-js", "tags", "recovery"]
+  const tasks = Object.fromEntries(await Promise.all(first.map(async (id) => {
+    const directory = path.join(repo, "evals", standard.includes(id) ? "tasks/analytic" : "fixtures/node-selection", id)
+    const task = (await loadTasks(path.dirname(directory), [id]))[0]!
+    return [id, { directory, mode: id === "explicit-js" ? "explicit-js" : id === "tags" ? "capability-gap" : id === "recovery" ? "standard-recovery" : "standard",
+      attempts: id === "recovery" ? [1] : [1, 2, 3], promptSha256: sha(task.prompt),
+      inputHashes: Object.fromEntries(await Promise.all(task.inputs.map(async (name) => [name, sha(await Bun.file(path.join(directory, name)).text())]))),
+      oracleSha256: sha(await Bun.file(path.join(directory, "oracle.csv")).text()) }]
+  })))
+  const models = await seal(path.join(root, "models.json"), {})
+  const common = { workspaceRoot: path.join(root, "workspaces"), payload: path.join(root, "payload"), profile: path.join(root, "profile"),
+    manifestSha256: "a".repeat(64), expectedSkillDigest: "b".repeat(64), model: "openai/gpt-6-sol-fast", variant: "medium",
+    apiModel: "gpt-6-sol", requestedServiceTier: "priority", reviewSeed: "e".repeat(64),
+    frozenModelsPath: models.path, frozenModelsSha256: models.sha256, deadlineSeconds: 1800, graceSeconds: 90,
+    connection: { url: "http://localhost/app/", username: "user", folder: "/user" },
+    container: { id: "d".repeat(64), name: "loginom-test" }, storageDir: "/workdir/UserStorage/user", auditVersion: "f".repeat(64) }
+  const baseline = { ...common, runID: "old-run", phase: "baseline", resultsRoot: path.join(root, "old"),
+    tasks: Object.fromEntries(standard.map((id) => [id, { ...tasks[id]!, attempts: [1] }])) }
+  const candidate = { ...common, runID: "new-run", phase: "candidate", resultsRoot: path.join(root, "new"), expectedSkillDigest: "c".repeat(64), tasks }
+  const baselinePins = await seal(path.join(baseline.resultsRoot, "baseline-pins.json"), baseline)
+  const candidatePins = await seal(path.join(candidate.resultsRoot, "candidate-pins.json"), candidate)
+  await seal(path.join(candidate.resultsRoot, "baseline-pins.json"), baseline)
+  const schedule = { candidateFirst9: first.map((task) => ({ phase: "candidate", task, attempt: 1 })),
+    baseline6: standard.map((task) => ({ phase: "baseline", task, attempt: 1 })),
+    candidateRemaining16: [2, 3].flatMap((attempt) => first.filter((id) => id !== "recovery").map((task) => ({ phase: "candidate", task, attempt }))),
+    completedFirst9RequiredBeforeBaseline: true, technicalFailuresRemainFailed: true, strictReleaseBeforeNext: true,
+    trustedHistoryBeforeContinuation: true, noStartedAttemptReplacement: true, comparativePassRequiresBothPhasesComplete: true, policyViolationStopsDigestImmediately: true }
+  const slots = [...schedule.candidateFirst9, ...schedule.baseline6, ...schedule.candidateRemaining16]
+  const names = ["evals/script/run-node-selection-series.ts", "evals/test/node-selection-series.test.ts",
+    "evals/src/node-selection-continuation.ts", "evals/test/node-selection-continuation.test.ts", "evals/script/run-node-selection-attempt.ts", "evals/src/node-selection.ts"]
+  const taskFiles = Object.fromEntries(await Promise.all(standard.map(async (id) => {
+    const name = path.relative(repo, path.join(tasks[id]!.directory, "task.json")); return [name, sha(await Bun.file(path.join(repo, name)).text())]
+  })))
+  const files = { ...Object.fromEntries(await Promise.all(names.map(async (name) => [name, sha(await Bun.file(path.join(repo, name)).text())]))), ...taskFiles }
+  const protocol = await seal(path.join(baseline.resultsRoot, "acceptance-lock.json"), { runID: baseline.runID, files,
+    auditVersion: common.auditVersion, pinsSha256: { "baseline-pins.json": baselinePins.sha256 } })
+  const revision = "d".repeat(64)
+  const runtime = { baseline: { revision, manifest: [{ path: "./fixture.mjs", sha256: "f".repeat(64) }] },
+    candidate: { revision, manifest: [{ path: "./fixture.mjs", sha256: "f".repeat(64) }] } }
+  const runtimePins = await seal(path.join(baseline.resultsRoot, "runtime-source-pins.json"), runtime)
+  const newRuntimePins = await seal(path.join(candidate.resultsRoot, "runtime-source-pins.json"), runtime)
+  const criteria = await seal(path.join(candidate.resultsRoot, "criteria.json"), { version: "node-selection-policy-v2" })
+  const cli = Bun.spawn([process.execPath, "-e", ""], { stdout: "ignore", stderr: "ignore" }); await cli.exited
+  const host = Bun.spawn([process.execPath, "-e", ""], { stdout: "ignore", stderr: "ignore" }); await host.exited
+  const matrix = []
+  const references = { version: 1, originRunID: baseline.runID, originResultsRoot: baseline.resultsRoot,
+    protocol, pins: baselinePins, runtimePins, summary: { path: "", sha256: "" }, runtimeRevision: revision,
+    expectedSkillDigest: baseline.expectedSkillDigest, comparison: { path: "", sha256: "" },
+    slots: [] as { phase: string; task: string; attempt: number; sessionID: string; evidence: Record<string, string> }[] }
+  for (const slot of slots) {
+    const pins = slot.phase === "baseline" ? baseline : candidate
+    const plan = selectionAttempt(pins, slot.task, slot.attempt)
+    const task = (await loadTasks(path.dirname(plan.task.directory), [slot.task]))[0]!
+    matrix.push({ ...slot, mode: plan.task.mode, directory: plan.directory, prefix: plan.prefix, workspace: plan.workspace,
+      packagePath: plan.packagePath, resultName: plan.resultName, promptSha256: sha(buildAgentPrompt(task.prompt, plan.packagePath, plan.resultName)) })
+    const directory = path.join(pins.resultsRoot, "series", `${slot.phase}-${slot.task}-${slot.attempt}`)
+    const value = evidence(), sessionID = `ses_${slot.phase}_${slot.task}_${slot.attempt}`
+    const bound: Record<string, string> = {}, copied: Record<string, string> = {}
+    const save = async (file: string, content: unknown) => { const sealed = await seal(file, content); bound[path.relative(pins.resultsRoot, file)] = sealed.sha256; return sealed.sha256 }
+    for (const [name, data] of Object.entries({ "saved-package-cleanup.json": { ...value.packageCleanup, package_path: plan.packagePath },
+      "host-close.json": { ...value.hostClose[0], pid: host.pid },
+      "resource-close.jsonl": value.resourceClose.map((row) => JSON.stringify(row)).join("\n") + "\n",
+      "terminal-close.jsonl": value.terminalClose.map((row) => JSON.stringify(row)).join("\n") + "\n" }))
+      copied[name] = await save(path.join(directory, name), data)
+    const packageSha = await save(path.join(plan.directory, "artifact/package.lgp"), "closed fixture package")
+    const attempt = { ...value.attempt, sessionID, taskID: slot.task, mode: plan.task.mode, evidence: plan.directory, packagePath: plan.packagePath }
+    const protectedFiles = { "attempt.json": await save(path.join(plan.directory, "attempt.json"), attempt),
+      "parts.json": await save(path.join(plan.directory, "parts.json"), { sessionID }),
+      "runtime-journals.json": await save(path.join(plan.directory, "runtime-journals.json"), []) }
+    await save(path.join(plan.directory, "selection-audit.json"), { ...value.audit, taskID: slot.task, mode: plan.task.mode,
+      auditVersion: common.auditVersion, packageSha256: packageSha, oracleSha256: plan.task.oracleSha256,
+      reviewStatus: plan.task.mode === "standard" ? "not-required" : "passed" })
+    if (plan.task.mode !== "standard") await save(path.join(plan.directory, "graph-review.json"), { verdict: "passed", reviewer: "independent",
+      notes: "Closed fixture role reviewed", sessionID, packageSha256: packageSha, recoveryObserved: true,
+      javascriptRole: plan.task.mode === "explicit-js" ? "requested-aggregation" : "variable-unpack-only", evidence: ["artifact/package.lgp"] })
+    await save(path.join(directory, "closure.json"), { ...value, phase: slot.phase, taskID: slot.task, mode: plan.task.mode,
+      sessionID, packagePath: plan.packagePath, auditVersion: common.auditVersion, runtimeRevision: revision, cliPid: cli.pid,
+      copied, protectedFiles, pinsSha256: sha(JSON.stringify(plan.pins)) })
+    await save(path.join(directory, "dispatch.json"), { pinsSha256: slot.phase === "baseline" ? baselinePins.sha256 : candidatePins.sha256, taskID: slot.task, number: slot.attempt })
+    await save(path.join(directory, "returned.json"), { interruptReason: null, evidence: plan.directory, attemptSha256: protectedFiles["attempt.json"] })
+    if (slot.phase === "baseline") {
+      await save(path.join(pins.resultsRoot, "policy-v2/baseline", slot.task, "1.json"), { version: 2, criteriaVersion: "node-selection-policy-v2", criteria,
+        sessionID, phase: "baseline", taskID: slot.task, attempt: 1 })
+      references.slots.push({ ...slot, sessionID, evidence: bound })
+    }
+  }
+  references.summary = await seal(path.join(baseline.resultsRoot, "summary.json"), { phase: "baseline", criteriaVersion: "node-selection-policy-v2", criteria, records: references.slots.map((slot) => ({ taskID: slot.task, attempt: slot.attempt, sessionID: slot.sessionID })) })
+  references.comparison = await seal(path.join(candidate.resultsRoot, "comparison.json"), { version: 1, verdict: "approved", reviewer: "independent",
+    baselinePinsSha256: baselinePins.sha256, candidatePinsSha256: candidatePins.sha256, runtimeRevision: revision, commonAssetsEqual: true,
+    taskFiles: Object.fromEntries(Object.entries(files).filter(([name]) => !names.slice(0, 4).includes(name))),
+    evidence: [await seal(path.join(candidate.resultsRoot, "asset.json"), { runtimeRevision: revision })] })
+  const matrixRef = await seal(path.join(candidate.resultsRoot, "matrix.json"), { promptArgumentCount: 3, slots: matrix })
+  const lockValue = { ready: true, runID: candidate.runID, technicalContinuationVersion: 1, plannedModelSlots: 25, plannedComparisonSlots: 31,
+    referencedBaselineSlots: 6, plannedBaselineSlots: 6, plannedCandidateSlots: 25, executionSchedule: schedule, baselineReferences: references,
+    auditVersion: common.auditVersion, files, pinsSha256: { "baseline-pins.json": baselinePins.sha256, "candidate-pins.json": candidatePins.sha256 },
+    matrixInterfaceCheckPath: matrixRef.path, matrixInterfaceCheckSha256: matrixRef.sha256, runtimeSourcePins: newRuntimePins }
+  const lock = await seal(path.join(candidate.resultsRoot, "lock.json"), lockValue)
+  const sourceFiles = Object.fromEntries(await Promise.all(Object.keys(files).map(async (name) => [name,
+    await seal(path.join(root, "archive", name), await Bun.file(path.join(repo, name)).text())])))
+  const index = await seal(path.join(candidate.resultsRoot, "archive-index.json"), { version: 1, originalProtocolSha256: lock.sha256, sourceFiles })
+  const acceptanceValue = { version: 2, ready: true, criteriaVersion: "node-selection-policy-v2", criteriaPath: criteria.path, criteriaSha256: criteria.sha256,
+    originalProtocolPath: lock.path, originalProtocolSha256: lock.sha256, originalSourceArchiveIndexPath: index.path,
+    originalSourceArchiveIndexSha256: index.sha256, sourceOverrides: Object.fromEntries(names.slice(0, 4).map((name) => [name, files[name]!])) }
+  const acceptance = await seal(path.join(candidate.resultsRoot, "acceptance.json"), acceptanceValue)
+  const reseal = async () => {
+    Object.assign(lock, await seal(lock.path, lockValue))
+    const nextIndex = await seal(index.path, { version: 1, originalProtocolSha256: lock.sha256, sourceFiles })
+    Object.assign(acceptanceValue, { originalProtocolSha256: lock.sha256, originalSourceArchiveIndexSha256: nextIndex.sha256 })
+    Object.assign(acceptance, await seal(acceptance.path, acceptanceValue))
+  }
+  return { root, baseline, candidate, lock, lockValue, acceptance, acceptanceValue, references, seal, reseal }
+}

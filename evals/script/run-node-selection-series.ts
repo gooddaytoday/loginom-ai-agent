@@ -80,7 +80,9 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
     const raw = await sealedSeriesFile(file, pinHashes[names[0]!])
     inputs.set(file, String(pinHashes[names[0]!]))
     const plan = selectionAttempt(raw, slot.task, slot.attempt)
-    if (plan.pins.phase !== slot.phase || plan.pins.resultsRoot !== path.dirname(lockFile) || plan.pins.runID !== lock.runID
+    const reference = slot.phase === "baseline" && record(lock.baselineReferences) ? lock.baselineReferences : undefined
+    if (plan.pins.phase !== slot.phase || plan.pins.resultsRoot !== (reference?.originResultsRoot ?? path.dirname(lockFile))
+      || plan.pins.runID !== (reference?.originRunID ?? lock.runID)
       || !record(raw) || raw.auditVersion !== lock.auditVersion) throw Error("SERIES_PINS_MISMATCH")
     const projected = matrixSlots[index]
     const task = (await loadTasks(path.dirname(plan.task.directory), [slot.task]))[0]!
@@ -99,6 +101,7 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
     const count = Object.values(pinned.tasks).reduce((sum, task) => sum + task.attempts.length, 0)
     if (count !== (phase === "baseline" ? 6 : 25)) throw Error("SERIES_PINNED_SLOTS_MISMATCH")
   }
+  const references = await readBaselineReferences(lock, plans, runtime, context, inputs, path.dirname(lockFile))
   for (const required of ["evals/script/run-node-selection-series.ts", "evals/script/run-node-selection-attempt.ts",
     "evals/src/node-selection-continuation.ts", "evals/src/node-selection.ts", "evals/test/node-selection-series.test.ts",
     "evals/test/node-selection-continuation.test.ts"])
@@ -119,13 +122,15 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
   try {
     for (const [index, item] of plans.entries()) {
       await verifySeriesInputs(inputs)
-      const existing = await exists(path.join(directory, `${item.plan.pins.phase}-${item.plan.taskID}-${item.plan.number}`, "dispatch.json"))
-      if (!existing && dispatched >= limit) return { status: "paused-limit", next: slots[index], dispatched }
-      if (!existing) dispatched++
-      const result = await runSeriesSlot(item.file, item.plan.taskID, item.plan.number, lock.auditVersion, item.revision, true, context)
+      const reference = item.plan.pins.phase === "baseline" ? references.get(item.plan.taskID) : undefined
+      const existing = await exists(path.join(item.plan.pins.resultsRoot, "series", `${item.plan.pins.phase}-${item.plan.taskID}-${item.plan.number}`, "dispatch.json"))
+      if (!reference && !existing && dispatched >= limit) return { status: "paused-limit", next: slots[index], dispatched }
+      if (!reference && !existing) dispatched++
+      const result = await runSeriesSlot(item.file, item.plan.taskID, item.plan.number, lock.auditVersion, item.revision, true, context, !!reference)
       const auditFile = path.join(item.plan.directory, "selection-audit.json")
       await appendFile(path.join(directory, "ledger.jsonl"), JSON.stringify({ recordedAt: new Date().toISOString(), lockSha256: expectedHash,
         ...(context ? { version: 2, ...context, acceptanceLockSha256: acceptance!.sha256 } : {}),
+        ...(reference ? { reference: true, ...reference } : {}),
         slot: slots[index], rechecked: existing, ...result, auditSha256: await exists(auditFile) ? await hash(auditFile) : null }) + "\n", { mode: 0o600 })
       if (result.decision !== "advance") return { status: result.decision, slot: slots[index], reason: result.reason, dispatched }
     }
@@ -134,8 +139,130 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
   } finally { await unlink(lease) }
 }
 
+async function readBaselineReferences(lock: Record<string, unknown>, plans: { plan: ReturnType<typeof selectionAttempt>; file: string; revision: string }[],
+  runtime: Record<string, unknown>, context: SeriesAcceptance | undefined, inputs: Map<string, string>, resultsRoot: string) {
+  const result = new Map<string, { originRunID: string; sessionID: string; evidence: Record<string, string> }>()
+  if (lock.baselineReferences === undefined) return result
+  const value = lock.baselineReferences
+  if (!context || !record(value) || value.version !== 1 || !nonempty(value.originRunID) || value.originRunID === lock.runID
+    || !nonempty(value.originResultsRoot) || !path.isAbsolute(value.originResultsRoot) || value.originResultsRoot === resultsRoot
+    || !Array.isArray(value.slots) || value.slots.length !== 6 || !digest(value.runtimeRevision) || !digest(value.expectedSkillDigest))
+    throw Error("BASELINE_REFERENCE_INVALID")
+  const origin = value.originResultsRoot
+  const sealed = async (root: string, ref: unknown) => {
+    if (!record(ref) || !nonempty(ref.path) || !path.isAbsolute(ref.path) || !digest(ref.sha256)) throw Error("BASELINE_REFERENCE_INVALID")
+    const file = await ownFile(root, path.relative(root, ref.path))
+    if ((await lstat(file)).mode & 0o222 || await hash(file) !== ref.sha256) throw Error("BASELINE_REFERENCE_CHANGED")
+    inputs.set(file, ref.sha256)
+    return file
+  }
+  const oldProtocol = await Bun.file(await sealed(origin, value.protocol)).json() as unknown
+  const oldPins = await Bun.file(await sealed(origin, value.pins)).json() as unknown
+  const oldRuntime = await Bun.file(await sealed(origin, value.runtimePins)).json() as unknown
+  const summary = await Bun.file(await sealed(origin, value.summary)).json() as unknown
+  const comparison = await Bun.file(await sealed(resultsRoot, value.comparison)).json() as unknown
+  const baseline = plans.find((item) => item.plan.pins.phase === "baseline")!
+  const candidate = plans.find((item) => item.plan.pins.phase === "candidate")!
+  const pinsHash = await hash(baseline.file), candidateHash = await hash(candidate.file)
+  if (!record(oldProtocol) || oldProtocol.runID !== value.originRunID || !record(oldProtocol.pinsSha256)
+    || oldProtocol.pinsSha256["baseline-pins.json"] !== pinsHash || oldProtocol.auditVersion !== lock.auditVersion
+    || !record(value.pins) || value.pins.sha256 !== pinsHash
+    || !record(oldPins) || JSON.stringify(oldPins) !== JSON.stringify(baseline.plan.pins)
+    || !record(oldRuntime) || !record(oldRuntime.baseline) || !record(runtime.baseline) || !record(runtime.candidate)
+    || oldRuntime.baseline.revision !== value.runtimeRevision || runtime.baseline.revision !== value.runtimeRevision
+    || runtime.candidate.revision !== value.runtimeRevision || !Array.isArray(oldRuntime.baseline.manifest) || !oldRuntime.baseline.manifest.length
+    || JSON.stringify(oldRuntime.baseline.manifest) !== JSON.stringify(runtime.baseline.manifest)
+    || JSON.stringify(oldRuntime.baseline.manifest) !== JSON.stringify(runtime.candidate.manifest)
+    || oldPins.expectedSkillDigest !== value.expectedSkillDigest || oldPins.expectedSkillDigest === candidate.plan.pins.expectedSkillDigest
+    || !record(summary) || summary.phase !== "baseline" || !Array.isArray(summary.records) || summary.records.length !== 6
+    || !record(comparison) || comparison.version !== 1 || comparison.verdict !== "approved" || !nonempty(comparison.reviewer)
+    || comparison.baselinePinsSha256 !== pinsHash || comparison.candidatePinsSha256 !== candidateHash
+    || comparison.runtimeRevision !== value.runtimeRevision || comparison.commonAssetsEqual !== true
+    || !record(comparison.taskFiles) || !Array.isArray(comparison.evidence) || !comparison.evidence.length)
+    throw Error("BASELINE_COMPARABILITY_INVALID")
+  for (const ref of comparison.evidence) await sealed(resultsRoot, ref)
+  const current = candidate.plan.pins as unknown as Record<string, unknown>
+  for (const key of ["model", "variant", "apiModel", "requestedServiceTier", "frozenModelsSha256", "deadlineSeconds", "graceSeconds",
+    "connection", "container", "storageDir", "profile", "reviewSeed", "auditVersion"])
+    if (oldPins[key] === undefined || JSON.stringify(oldPins[key]) !== JSON.stringify(current[key])) throw Error("BASELINE_COMPARABILITY_INVALID")
+  for (const pins of [baseline.plan.pins, candidate.plan.pins]) {
+    if (await hash(pins.frozenModelsPath) !== pins.frozenModelsSha256) throw Error("BASELINE_COMPARABILITY_INVALID")
+    inputs.set(pins.frozenModelsPath, pins.frozenModelsSha256)
+  }
+  const repo = path.resolve(import.meta.dir, "../..")
+  if (!record(oldProtocol.files) || !record(lock.files)) throw Error("BASELINE_COMPARABILITY_INVALID")
+  const changed = ["evals/script/run-node-selection-series.ts", "evals/test/node-selection-series.test.ts",
+    "evals/src/node-selection-continuation.ts", "evals/test/node-selection-continuation.test.ts"]
+  for (const name of Object.keys(oldProtocol.files).filter((name) => name.startsWith("evals/") && !changed.includes(name)))
+    if (comparison.taskFiles[name] !== oldProtocol.files[name]) throw Error("BASELINE_COMPARABILITY_INVALID")
+  for (const [name, expected] of Object.entries(comparison.taskFiles)) {
+    if (!digest(expected) || oldProtocol.files[name] !== expected || lock.files[name] !== expected
+      || await hash(await ownFile(repo, name)) !== expected) throw Error("BASELINE_COMPARABILITY_INVALID")
+    inputs.set(path.join(repo, name), expected)
+  }
+  for (const row of value.slots) {
+    if (!record(row) || row.phase !== "baseline" || !nonempty(row.task) || row.attempt !== 1 || !nonempty(row.sessionID)
+      || result.has(row.task) || [...result.values()].some((item) => item.sessionID === row.sessionID) || !record(row.evidence))
+      throw Error("BASELINE_REFERENCE_INVALID")
+    const item = plans.find((item) => item.plan.pins.phase === "baseline" && item.plan.taskID === row.task)
+    const peer = plans.find((item) => item.plan.pins.phase === "candidate" && item.plan.taskID === row.task)
+    if (!item || !peer || item.plan.task.mode !== "standard" || peer.plan.task.mode !== "standard"
+      || !summary.records.some((entry) => record(entry) && entry.taskID === row.task && entry.attempt === 1 && entry.sessionID === row.sessionID))
+      throw Error("BASELINE_REFERENCE_INVALID")
+    for (const key of ["directory", "mode", "promptSha256", "inputHashes", "oracleSha256"] as const)
+      if (JSON.stringify(item.plan.task[key]) !== JSON.stringify(peer.plan.task[key])) throw Error("BASELINE_COMPARABILITY_INVALID")
+    const taskFile = path.relative(repo, path.join(item.plan.task.directory, "task.json"))
+    if (!digest(comparison.taskFiles[taskFile])) throw Error("BASELINE_COMPARABILITY_INVALID")
+    for (const [name, expected] of Object.entries({ ...item.plan.task.inputHashes, "oracle.csv": item.plan.task.oracleSha256 })) {
+      const file = await ownFile(item.plan.task.directory, name)
+      if (await hash(file) !== expected) throw Error("BASELINE_COMPARABILITY_INVALID")
+      inputs.set(file, expected)
+    }
+    const evidence: Record<string, string> = {}
+    for (const [relative, expected] of Object.entries(row.evidence)) {
+      const file = await ownFile(origin, relative)
+      await sealed(origin, { path: file, sha256: expected })
+      evidence[relative] = String(expected)
+    }
+    const attemptPath = path.relative(origin, path.join(item.plan.directory, "attempt.json"))
+    const directory = `series/baseline-${row.task}-1`
+    const required = [attemptPath, `baseline/${row.task}/1/parts.json`, `baseline/${row.task}/1/runtime-journals.json`,
+      `${directory}/dispatch.json`, `${directory}/returned.json`, `policy-v2/baseline/${row.task}/1.json`]
+    if (required.some((file) => !digest(evidence[file]))) throw Error("BASELINE_REFERENCE_INCOMPLETE")
+    const attempt = await Bun.file(path.join(origin, attemptPath)).json() as unknown
+    const sidecar = await Bun.file(path.join(origin, `policy-v2/baseline/${row.task}/1.json`)).json() as unknown
+    if (!record(sidecar) || sidecar.version !== 2 || sidecar.criteriaVersion !== context.criteriaVersion
+      || !record(sidecar.criteria) || sidecar.criteria.sha256 !== context.criteriaSha256 || sidecar.phase !== "baseline"
+      || sidecar.taskID !== row.task || sidecar.attempt !== 1 || sidecar.sessionID !== row.sessionID
+      || !record(attempt) || attempt.sessionID !== row.sessionID || attempt.taskID !== row.task || attempt.mode !== "standard")
+      throw Error("BASELINE_REFERENCE_IDENTITY_INVALID")
+    if (await exists(path.join(origin, directory, "technical-continuation.json"))) {
+      if (!["technical-continuation.json", "technical-continuation-review.json"].every((name) => digest(evidence[`${directory}/${name}`])))
+        throw Error("BASELINE_REFERENCE_INCOMPLETE")
+      const descriptor = await Bun.file(path.join(origin, directory, "technical-continuation.json")).json() as unknown
+      if (!record(descriptor) || !record(descriptor.originalFiles) || !record(descriptor.recoveryFiles)) throw Error("BASELINE_REFERENCE_INCOMPLETE")
+      for (const [root, entries] of [[`baseline/${row.task}/1`, descriptor.originalFiles], [directory, descriptor.recoveryFiles]] as const)
+        for (const [name, expected] of Object.entries(entries))
+          if (!digest(expected) || evidence[`${root}/${name}`] !== expected) throw Error("BASELINE_REFERENCE_INCOMPLETE")
+    } else {
+      if (!digest(evidence[`${directory}/closure.json`]) || !digest(evidence[`baseline/${row.task}/1/selection-audit.json`]))
+        throw Error("BASELINE_REFERENCE_INCOMPLETE")
+      const closure = await Bun.file(path.join(origin, directory, "closure.json")).json() as unknown
+      if (!record(closure) || !record(closure.copied) || !record(closure.protectedFiles)) throw Error("BASELINE_REFERENCE_INCOMPLETE")
+      for (const [root, entries] of [[`baseline/${row.task}/1`, closure.protectedFiles], [directory, closure.copied]] as const)
+        for (const [name, expected] of Object.entries(entries))
+          if (!digest(expected) || evidence[`${root}/${name}`] !== expected) throw Error("BASELINE_REFERENCE_INCOMPLETE")
+    }
+    result.set(row.task, { originRunID: value.originRunID, sessionID: row.sessionID, evidence })
+  }
+  return result
+}
+
 export function selectionSeriesSlots(lock: unknown): { phase: string; task: string; attempt: number }[] {
-  if (!record(lock) || lock.technicalContinuationVersion !== 1 || !record(lock.executionSchedule) || lock.plannedModelSlots !== 31
+  if (!record(lock) || lock.technicalContinuationVersion !== 1 || !record(lock.executionSchedule)
+    || (lock.baselineReferences === undefined ? lock.plannedModelSlots !== 31
+      : !record(lock.baselineReferences) || lock.baselineReferences.version !== 1 || lock.plannedModelSlots !== 25
+        || lock.plannedComparisonSlots !== 31 || lock.referencedBaselineSlots !== 6)
     || lock.plannedBaselineSlots !== 6 || lock.plannedCandidateSlots !== 25) throw Error("SERIES_SCHEDULE_INVALID")
   const schedule = lock.executionSchedule
   if (!["completedFirst9RequiredBeforeBaseline", "technicalFailuresRemainFailed", "strictReleaseBeforeNext", "trustedHistoryBeforeContinuation",
@@ -157,16 +284,17 @@ export function selectionSeriesSlots(lock: unknown): { phase: string; task: stri
 }
 
 export async function runSeriesSlot(pinsFile: string, taskID: string, number: number, auditVersion: string, runtimeRevision?: string, technicalContinuation = false,
-  acceptance?: SeriesAcceptance) {
+  acceptance?: SeriesAcceptance, existingOnly = false) {
   const plan = selectionAttempt(await Bun.file(pinsFile).json() as unknown, taskID, number)
   const directory = path.join(plan.pins.resultsRoot, "series", `${plan.pins.phase}-${taskID}-${number}`)
-  await mkdir(directory, { recursive: true, mode: 0o700 })
   if (await exists(path.join(directory, "dispatch.json"))) {
     if (technicalContinuation && await exists(path.join(directory, "technical-continuation.json")))
       return assessTechnicalContinuation(plan, directory, pinsFile, auditVersion, runtimeRevision, acceptance)
     if (!await exists(path.join(directory, "closure.json"))) return { decision: "halt", reason: "SLOT_ALREADY_DISPATCHED" }
     return assessCollected(plan, directory, auditVersion, runtimeRevision, acceptance)
   }
+  if (existingOnly) return { decision: "halt", reason: "REFERENCE_SLOT_NOT_DISPATCHED" }
+  await mkdir(directory, { recursive: true, mode: 0o700 })
   if (await exists(plan.directory)) return { decision: "halt", reason: "SLOT_ALREADY_EXISTS" }
   if (await exists(path.join(plan.pins.profile, ".writer"))) return { decision: "halt", reason: "PROFILE_BUSY" }
   const before = await hostFiles(plan.pins.profile)
