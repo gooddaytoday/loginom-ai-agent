@@ -22,11 +22,19 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 16:11 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены16 из31,
-закрыты15; candidate Sales/2 безопасно выполняется, CLI2392797,
-dispatch16:10:48.751Z. Новый runnerPID2392222/exec59059; прежнийexec45610terminal.
-Впереди15candidate и текущийSales/2, все модельные процессы последовательны.
+Текущий checkpoint 2026-10-14 16:23 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены17 из31,
+закрыты16; candidate ABC/2 безопасно выполняется, CLI2403275,
+dispatch16:16:32.087Z. RunnerPID2392222/exec59059 активен; прежнийexec45610terminal.
+Впереди14candidate и текущийABC/2, модельные процессы последовательны.
+Sales/2 finished16:16:31.961Z/CLI0/Host2393038ACK0/cleanuptrue,
+oracle/calculationPASS/JS0/connectedgraph. Audit `6db41087…`,
+отдельныйpolicy-v2 verdict `e6b1c79b…` подтверждаетполнуюисториюиstandardlineage.
+СледующийABC/2 начат автоматически послеimmediategates безручнойпаузы;
+подробныйновыйverdictготовилсяпараллельноABC. Autoadvanceproof `f50f55c4…`.
+Candidate10closed summary `a0c6df66…`: policy10PASS/0violated/0insufficient,
+analytics6correct/4notobtained, normalcompletion6/manualpostfailure4.
+Полнаяcandidate25приёмкаиseeded3ещёоткрыты;старыеотказынепереименованы.
 Baseline6 закрыт и описательно оценён:4correct/2notobtained,
 normalcompletion4/technicalfailure2 с отдельными approved strict releases.
 ROI/1 oraclePASS/JS0/normalcleanuptrue автоматически перешёл кfirstlast;
@@ -39,9 +47,9 @@ admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchiv
 сохранив technical-failed/policyfailed/calculationfalse. Соседние211/213 не закрывались.
 Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
-Candidate: девять отдельных policy-v2 PASS; все шесть стандартных задач и три
-исключения содержательно покрыты. Исходная аналитика: пять успешных результатов,
-четыре технических отказа без результата; normalcleanup5, ручных recovery4.
+Candidate: десять отдельных policy-v2 PASS; все шесть стандартных задач и три
+исключения содержательно покрыты. Исходная аналитика: шесть успешных результатов,
+четыре технических отказа без результата; normalcleanup6, ручных recovery4.
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
