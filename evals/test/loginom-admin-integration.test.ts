@@ -43,6 +43,10 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
     isDesigner: observation.ownSession.isDesigner })
   expect(observation.users.every((user: Record<string, unknown>) => typeof user.name === "string" && user.name.length > 0 &&
     user.userKind === 0 && [user.isAdmin, user.isDesigner, user.isViewer, user.blocked, user.useGlobalFileStorage, user.schedulerFullAccess].every(value => typeof value === "boolean"))).toBe(true)
+  expect(observation.sharedDirectories).toBeArray()
+  expect(observation.sharedDirectories.every((directory: { objectId: string; name: string; permissions: { objectId: string; name: string; userKind: number }[] }) =>
+    directory.objectId.length > 0 && directory.name.length > 0 && Array.isArray(directory.permissions) && directory.permissions.every(permission =>
+      permission.objectId.length > 0 && permission.name.length > 0 && [0, 1, 2].includes(permission.userKind)))).toBe(true)
   expect(observation.sessions.length).toBeGreaterThan(0)
   expect(observation.sessions.every((row: Record<string, unknown>) => Object.hasOwn(row, "sessionGuid"))).toBe(true)
   expect(observation.sessions.every((row: { objectId: string }) => typeof row.objectId === "string" && row.objectId.length > 0)).toBe(true)

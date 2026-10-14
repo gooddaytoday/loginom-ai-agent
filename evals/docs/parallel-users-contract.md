@@ -360,3 +360,12 @@ UseGlobalFileStorage/SchedulerFullAccess. Собственный CurrentUser з�
 по exact username и object ID; actual enumerated row совпал с ним (4 users,
 один exact match). Это readonly capability, не доказательство стабильности ID
 между contexts, account ownership, AuthMode/password или effective group ACL.
+
+Shared-directory read-back использует GetSharedDirectories/GetEnumerator и
+Permissions.GetEnumerator с MoveNext/Current; оба уровня enumerators освобождаются.
+Private whitelist: directory objectId/name, grant principal objectId/name/UserKind
+(0 user, 1 group, 2 standard group). Research actual snapshot содержит две shared
+directories и по одному grant Everyone/UserKind=2. Read-only enumeration не
+подтверждает write semantics, возможность Delete/Add, удаление этих grants или
+effective isolation. До допуска design user нужны scoped mutation/read-back
+под guards и реальные negative access tests. Session qualification остаётся false.

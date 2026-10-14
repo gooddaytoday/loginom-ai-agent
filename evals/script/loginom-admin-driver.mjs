@@ -121,13 +121,32 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               useGlobalFileStorage: await listed.UseGlobalFileStorage, schedulerFullAccess: await listed.SchedulerFullAccess })
           }
         } finally { await ReleaseObject(enumerator) }
+        const sharedDirectories = []
+        const directories = await session.GetSharedDirectories()
+        const directoryEnumerator = await directories.GetEnumerator()
+        try {
+          while (await directoryEnumerator.MoveNext()) {
+            const directory = await directoryEnumerator.Current
+            const permissions = []
+            const access = await directory.Permissions
+            const permissionEnumerator = await access.GetEnumerator()
+            try {
+              while (await permissionEnumerator.MoveNext()) {
+                const principal = await permissionEnumerator.Current
+                permissions.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(principal)).toString(), name: await principal.Name, userKind: await principal.UserKind })
+              }
+            } finally { await ReleaseObject(permissionEnumerator) }
+            sharedDirectories.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(directory)).toString(), name: await directory.Name, permissions })
+          }
+        } finally { await ReleaseObject(directoryEnumerator) }
         return { sessions: rows, ownSession: { guid: String(await session.Guid),
           username: await user.Name, userObjectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(),
           isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner,
           managedObjectId: ownManaged ? (await bg.ProxyObjectsHelper.GetObjectId(ownManaged)).toString() : null,
-          objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() }, users }
+          objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() }, users, sharedDirectories }
       }))
-      respond(id, "confirmed", { identity, rawSessions: observation.sessions, ownSession: observation.ownSession, users: observation.users, sessionIdentityQualified: false })
+      respond(id, "confirmed", { identity, rawSessions: observation.sessions, ownSession: observation.ownSession,
+        users: observation.users, sharedDirectories: observation.sharedDirectories, sessionIdentityQualified: false })
       continue
     }
     // Name/CreateTime and package Count are not yet qualified ownership/operation proofs.
