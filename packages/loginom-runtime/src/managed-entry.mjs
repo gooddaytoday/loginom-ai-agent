@@ -451,12 +451,12 @@ async function handle(message) {
       if(!state.controlledStartup?.cancel(message.input))throw Error("LOGINOM_HANDSHAKE_INVALID")
       send({id:message.id,result:{accepted:true,pending:state.controlledStartup.pending,nativeCancellationConfirmed:false}});return
     }
-    if(state.controlledStartup && !state.controlledStartup.accepted)throw Error("LOGINOM_NOT_READY")
     if (message.operation === "close") {
       await close()
       send({ id: message.id, result: { closed: true } }, true)
       return
     }
+    if(state.controlledStartup && !state.controlledStartup.accepted)throw Error("LOGINOM_NOT_READY")
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "acceptance.resources" || message.operation === "acceptance.capture" || message.operation === "acceptance.prepare") {

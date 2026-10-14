@@ -156,7 +156,6 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
     }
-    if(state.amountStartup && !state.amountStartup.accepted)throw Error("LOGINOM_HOST_NOT_READY")
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "close") {
       // Stop admission now, but exclude this close request from its own drain.
@@ -169,6 +168,7 @@ async function dispatch(message: unknown) {
       )
       return
     }
+    if(state.amountStartup && !state.amountStartup.accepted)throw Error("LOGINOM_HOST_NOT_READY")
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
@@ -222,7 +222,10 @@ async function recordClose(stage: string, detail: object) {
 function stop() {
   if (state.stopping) return state.stopping
   state.stopping = (async () => {
-    await state.starting
+    // Failed admission still owns its original children. Drain that attempt,
+    // preserving its refusal, before requesting the original owner cleanup.
+    const startup = await Promise.allSettled([state.starting])
+    if(startup[0].status==="rejected")await recordClose("startup_refusal",{rejection:closeRejection(startup[0].reason)})
     await recordClose("interrupt",{status:"started"})
     let primary: {stage:string,error:Error} | undefined
     try {
