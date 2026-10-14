@@ -40,7 +40,10 @@ for p in profiles:
             if f.is_symlink() or f.is_file() and str(f.relative_to(p)) not in retained:markers.append(str(f))
 agents=json.loads(command(['/usr/local/bin/multica','agent','list','--output','json']))
 assert isinstance(agents,list) and len(agents)>=8
-queues=queue_pages.collect_queues(agents,followup,mode)
+runtimes=json.loads(command(['/usr/local/bin/multica','runtime','list','--output','json']))
+assert isinstance(runtimes,list),'Runtime placement inventory incomplete'
+runtime_placements=[{k:r.get(k) for k in ['id','daemon_id','owner_id','provider','runtime_mode']} for r in runtimes]
+queues=queue_pages.collect_queues(agents,followup,mode,runtime_placements)
 container=cfg['container']['id']; c=json.loads(command(['/usr/bin/docker','inspect',container]))[0]
 names=command(['/usr/bin/docker','exec',container,'find','/workdir/UserStorage','/workdir/SessionBackup','-mindepth','1','-type','f']).splitlines()
 storage=[{'path':n,'identity':command(['/usr/bin/docker','exec',container,'stat','-c','%d:%i:%s:%f',n]).strip(),'sha256':command(['/usr/bin/docker','exec',container,'sha256sum','--',n]).split()[0]} for n in names]

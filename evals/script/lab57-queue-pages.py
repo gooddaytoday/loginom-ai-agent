@@ -4,6 +4,7 @@ status_contract=json.loads((pathlib.Path(__file__).parent.parent/'src/lab57-task
 PENDING=status_contract['pending']
 TERMINAL=status_contract['terminal']
 STATES=set(PENDING+TERMINAL)
+extension=json.loads((pathlib.Path(__file__).parent.parent/'src/lab57-mas-runtime-extension.json').read_bytes())
 def parse_page(stdout,stderr):
     rows=json.loads(stdout)
     assert isinstance(rows,list) and all(isinstance(t,dict) and isinstance(t.get('id'),str) and isinstance(t.get('status'),str) for t in rows),'Queue page malformed'
@@ -45,13 +46,26 @@ ORIGINAL='a5fa993f-2903-4997-a832-955ffbb1203c'
 BEN='99804e93-d241-45f2-872d-8a1e16ec7f3d'
 AMENDMENT='e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3'
 
-def collect_queues(agents,followup,mode="ben-task"):
+def cursor_mas_placement(rows):
+    if rows is None:return False
+    expected=[
+        {'id':extension['originalRuntime'],'daemon_id':extension['originalDaemon'],'owner_id':extension['runtimeOwner'],'provider':'codex','runtime_mode':extension['runtimeMode']},
+        {'id':extension['masRuntime'],'daemon_id':extension['masDaemon'],'owner_id':extension['runtimeOwner'],'provider':extension['masProvider'],'runtime_mode':extension['runtimeMode']},
+        {'id':extension['cursorMasRuntime'],'daemon_id':extension['masDaemon'],'owner_id':extension['runtimeOwner'],'provider':extension['cursorProvider'],'runtime_mode':extension['runtimeMode']},
+    ]
+    return all(len([r for r in rows if r['id']==e['id']])==1 and all(next(r for r in rows if r['id']==e['id']).get(k)==v for k,v in e.items()) for e in expected)
+
+def collect_queues(agents,followup,mode="ben-task",runtime_placements=None):
     assert mode in ['ben-task','codex-coordinator'],'Unknown controller mode'
     assert (isinstance(followup,str) and re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',followup) and followup!='01a1375d-ce4a-7c35-a3a3-94cf64a8b589') if mode=='ben-task' else followup is None,'Controller binding required'
     assert isinstance(agents,list) and len(agents)>=8,'Queue roster incomplete'
     roster=[{k:a.get(k) for k in ['id','runtime_id']} for a in agents]
     assert len({a['id'] for a in roster})==len(roster),'Queue roster duplicate'
+    if runtime_placements is not None:
+        assert isinstance(runtime_placements,list) and all(isinstance(r,dict) and isinstance(r.get('id'),str) and re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',r['id']) for r in runtime_placements),'Runtime inventory malformed'
+        assert len({r['id'] for r in runtime_placements})==len(runtime_placements),'Runtime inventory duplicate'
     inventory={'roster':roster,'agents':[{'id':a['id'],'pages':task_pages(a['id'])} for a in roster]}
+    if runtime_placements is not None:inventory['runtimePlacements']=runtime_placements
     excluded=[];blocked=[];controller=[];ids=set();records=0;pages=0
     for agent,scan in zip(roster,inventory['agents']):
         pages+=len(scan['pages'])
@@ -67,6 +81,8 @@ def collect_queues(agents,followup,mode="ben-task"):
                     row['reason']='EXACT_BEN_CONTROLLER';controller.append(row);continue
                 if not (mode=='codex-coordinator' and agent['id']==BEN) and t['id'] not in [followup,'01a1375d-ce4a-7c35-a3a3-94cf64a8b589'] and bound and t['runtime_id']==MAS and agent['runtime_id']==MAS:
                     row.update(reason='OWNER_ATTESTED_EXACT_MAS',ownerAmendmentSha256=AMENDMENT);excluded.append(row);continue
+                if not (mode=='codex-coordinator' and agent['id']==BEN) and t['id'] not in [followup,'01a1375d-ce4a-7c35-a3a3-94cf64a8b589'] and bound and t['runtime_id']==extension['cursorMasRuntime'] and agent['runtime_id']==extension['cursorMasRuntime'] and cursor_mas_placement(runtime_placements):
+                    row.update(reason='OWNER_ATTESTED_EXACT_CURSOR_MAS',ownerDecisionSha256=extension['ownerDecisionSha256'],placementSha256=digest(runtime_placements));excluded.append(row);continue
                 row['reason']='UNEXEMPTED_OR_UNBOUND_PENDING';blocked.append(row)
     assert len(controller)==(1 if mode=='ben-task' else 0),'Controller inventory mismatch'
     ledger={'version':1,'ownerAmendmentSha256':AMENDMENT,'inventorySha256':digest(inventory),'rosterCount':len(roster),

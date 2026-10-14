@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "originalRuntime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+  "masRuntime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+  "cursorMasRuntime": "490365fb-afb2-4cf3-a694-23459da7a6d1",
+  "originalDaemon": "01a11562-4949-78b7-9ddf-15a69d670749",
+  "masDaemon": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+  "runtimeOwner": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+  "runtimeMode": "local",
+  "masProvider": "codex",
+  "cursorProvider": "cursor",
+  "ownerDecisionSha256": "bfc38c4263a99d1f99aa3475a10e3d7ea2dec740af6a011d94b7d5706a39f5bf",
+  "baseOwnerAmendmentSha256": "e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3"
+}

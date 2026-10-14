@@ -1,12 +1,14 @@
 import {createHash} from "node:crypto"
 import statusContract from "./lab57-task-statuses.json"
+import extension from "./lab57-mas-runtime-extension.json"
 
 export const masQueueScope=Object.freeze({mas:"24aa980b-b8c3-43e2-b087-bad8f79c9517",original:"a5fa993f-2903-4997-a832-955ffbb1203c",
   ben:"99804e93-d241-45f2-872d-8a1e16ec7f3d",originalOwner:"01a1375d-ce4a-7c35-a3a3-94cf64a8b589",ownerAmendmentSha256:"e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3"})
 type Agent={id:string;runtime_id:unknown}
 type Task={id:string;status:string;agent_id:unknown;runtime_id:unknown}
 type Page={before:string|null;next:string|null;rows:Task[];rowsSha256:string;stdoutSha256:string;stderrSha256:string}
-export type QueueInventory={roster:Agent[];agents:{id:string;pages:Page[]}[]}
+type Runtime={id:string;daemon_id:unknown;owner_id:unknown;provider:unknown;runtime_mode:unknown}
+export type QueueInventory={roster:Agent[];agents:{id:string;pages:Page[]}[];runtimePlacements?:Runtime[]}
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const sha=/^[0-9a-f]{64}$/
 const terminal=new Set(statusContract.terminal)
@@ -26,6 +28,9 @@ export function inspectQueueInventory(inventory:QueueInventory,followup:string|n
   const fail=()=>{throw Error("QUEUE_INVENTORY_REFUSED")}
   if(!["ben-task","codex-coordinator"].includes(mode)||(mode==="ben-task"?typeof followup!=="string"||!uuid.test(followup)||followup===masQueueScope.originalOwner:followup!==null)||!inventory||!Array.isArray(inventory.roster)||inventory.roster.length<8||!Array.isArray(inventory.agents)
     ||inventory.agents.length!==inventory.roster.length||new Set(inventory.roster.map(a=>a?.id)).size!==inventory.roster.length)fail()
+  if(inventory.runtimePlacements!==undefined&&(!Array.isArray(inventory.runtimePlacements)
+    ||inventory.runtimePlacements.some(r=>!r||!uuid.test(r.id))
+    ||new Set(inventory.runtimePlacements.map(r=>r.id)).size!==inventory.runtimePlacements.length))fail()
   const seen=new Set<string>(),excluded:Record<string,unknown>[]=[],blocked:Record<string,unknown>[]=[],controller:Record<string,unknown>[]=[]
   let pageCount=0,recordCount=0
   for(const [i,agent] of inventory.roster.entries()){
@@ -51,6 +56,11 @@ export function inspectQueueInventory(inventory:QueueInventory,followup:string|n
         if(!(mode==="codex-coordinator"&&agent.id===masQueueScope.ben)&&task.id!==followup&&task.id!==masQueueScope.originalOwner&&bound&&task.runtime_id===masQueueScope.mas&&agent.runtime_id===masQueueScope.mas){
           excluded.push({...row,reason:"OWNER_ATTESTED_EXACT_MAS",ownerAmendmentSha256:masQueueScope.ownerAmendmentSha256});continue
         }
+        if(!(mode==="codex-coordinator"&&agent.id===masQueueScope.ben)&&task.id!==followup&&task.id!==masQueueScope.originalOwner&&bound
+          &&task.runtime_id===extension.cursorMasRuntime&&agent.runtime_id===extension.cursorMasRuntime&&cursorMasPlacement(inventory.runtimePlacements)){
+          excluded.push({...row,reason:"OWNER_ATTESTED_EXACT_CURSOR_MAS",ownerDecisionSha256:extension.ownerDecisionSha256,
+            placementSha256:queueDigest(inventory.runtimePlacements)});continue
+        }
         blocked.push({...row,reason:"UNEXEMPTED_OR_UNBOUND_PENDING"})
       }
     }
@@ -58,4 +68,16 @@ export function inspectQueueInventory(inventory:QueueInventory,followup:string|n
   if(controller.length!==(mode==="ben-task"?1:0))fail()
   return {version:1,ownerAmendmentSha256:masQueueScope.ownerAmendmentSha256,inventorySha256:queueDigest(inventory),rosterCount:inventory.roster.length,
     pageCount,recordCount,pendingCount:excluded.length+blocked.length+controller.length,excluded,blocked,controller}
+}
+
+function cursorMasPlacement(rows:Runtime[]|undefined) {
+ if(!rows)return false
+ return [
+  {id:extension.originalRuntime,daemon_id:extension.originalDaemon,owner_id:extension.runtimeOwner,provider:"codex",runtime_mode:extension.runtimeMode},
+  {id:extension.masRuntime,daemon_id:extension.masDaemon,owner_id:extension.runtimeOwner,provider:extension.masProvider,runtime_mode:extension.runtimeMode},
+  {id:extension.cursorMasRuntime,daemon_id:extension.masDaemon,owner_id:extension.runtimeOwner,provider:extension.cursorProvider,runtime_mode:extension.runtimeMode},
+ ].every(expected=>{
+  const matches=rows.filter(r=>r.id===expected.id)
+  return matches.length===1&&Object.entries(expected).every(([k,v])=>matches[0]![k as keyof Runtime]===v)
+ })
 }
