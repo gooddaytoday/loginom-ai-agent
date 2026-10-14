@@ -15,5 +15,7 @@ if (process.env.EVAL_FAKE_BROWSER_HELPER_PID_FILE && !process.argv.includes("--t
     await writeFile(process.env.EVAL_FAKE_BROWSER_HELPER_PID_FILE, String(helper.pid))
     process.exit(0)
   }
+  if (process.env.EVAL_FAKE_BROWSER_HELPER_DELAY_MS)
+    await new Promise(resolve => setTimeout(resolve, Number(process.env.EVAL_FAKE_BROWSER_HELPER_DELAY_MS)))
   spawn(process.execPath, [...(process.env.EVAL_FAKE_BROWSER_SCRIPT ? [process.env.EVAL_FAKE_BROWSER_SCRIPT] : []), "--type=parent"], { stdio: "ignore", env: process.env })
 }
