@@ -1071,9 +1071,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
        previous_workflow_ref:{...o.previous,workflow_id:source.workflowId},workflow_ref:{...o.current,workflow_id:workflowId,navigation_path:crumbs},graph:o.graph,previous_graph:o.previousGraph};
     },{previous:before.workflow_ref,current:reopenedWorkflow,path:normalizedPath,operation:task.operation_id,graph:signature,previousGraph:before.graph});
     await ensureReady();if(!same(workflow,reopenedWorkflow))throw Error('Saved continuation changed before projection');
+    if(continuation)record('save_continuation_observed',{continuation});
     phase = 'verified';
     record('postcondition_verified', { reopened: true, package_path: normalizedPath, tab_caption: identity, graph: signature });
-    return result('SUCCEEDED', { package_ref: { kind: 'package', path: normalizedPath, active_identity: normalizedPath }, reopened: true, ...(continuation?{save_continuation:continuation}:{}) });
+    return result('SUCCEEDED', { package_ref: { kind: 'package', path: normalizedPath, active_identity: normalizedPath }, reopened: true });
   };
   const writeFileName = async (field, value) => {
     const input = field.locator('input');

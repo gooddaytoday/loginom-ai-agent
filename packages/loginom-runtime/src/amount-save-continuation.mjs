@@ -1,7 +1,9 @@
 // Only a confirmed producer Save As receipt can advance private preparation.
 export function amountSaveContinuation(original,save,binding) {
  const fail=()=>{throw Error('LOGINOM_AMOUNT_SAVE_CONTINUATION_UNAVAILABLE')};
- const p=original?.state,c=save?.output?.save_continuation,w=c?.workflow_ref,previous=c?.previous_workflow_ref;
+ const events=save?.trace?.filter(x=>x.event==='save_continuation_observed');
+ if(!events||events.length!==1)fail();
+ const p=original?.state,c=events[0].continuation,w=c?.workflow_ref,previous=c?.previous_workflow_ref;
  if(!original?.attempted||p?.status!=='READY'||save?.status!=='SUCCEEDED'||save.phase!=='verified'
   ||save.cleanup_complete!==true||save.action_key!=='package.save_as'||save.output.reopened!==true
   ||save.output.package_ref?.path!==binding.packagePath||c?.package_path!==binding.packagePath
