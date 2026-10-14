@@ -657,3 +657,32 @@ incomplete; JS-вызовов не наблюдалось. Baseline остаёт
 проверяет trace без изменения guard/control flow. Live diagnostic ещё не
 запущен. Его результат не заменяет ABC/1 и не считается acceptance.
 Первая волна остаётся нечистой, повторы закрыты, полная приёмка не завершена.
+
+
+На 2026-10-14 03:35 UTC separate native ABC diagnostic воспроизвёл отказ
+`calc-share-1` на пятом узле после четырёх успешных стандартных операций.
+Root 32456 завершён exit 3; модельных вызовов 0. Result SHA
+`307e12720ae23ae2e76d554ccdb08d94a201b15cb5591fc1e738c2bb9dfdaf6d`.
+Instrumented результат не считается acceptance и не заменяет candidate ABC/1.
+Private helper выполнен по TDD: четыре теста, целевой typecheck и syntax PASS;
+static independent review `600579b3…` подтвердил неизменный исходный guard,
+4456 source hashes, один исходный browser send без дополнительных чтений.
+Root сохранил reviewed binding `fc84c59b…`; изменены только ready/status,
+active binding `40984ed7…`. Product, matched payload и acceptance pins unchanged.
+
+В captured pre-catch tuple для `calc-share-1:n29` через 534 ms после начала
+browser call `contextMatches=true`, `intendedWizard=true`, native GUID before/
+after совпал, dialogs 0. Единственный отказавший conjunct — две busy-маски.
+У первой `target_tid=MF;TF-1;WizrdMCF`, у второй target_tid/dialog_ref null;
+поэтому `ownedLoading` отказал и ожидание масок не начиналось. Источник второй
+маски пока не установлен: её class/parent/geometry/cache identity отсутствуют
+в первой trace. Это основание для уточнения диагностики, не для blanket-ignore
+или изменения product guard. Готовится отдельная private v2 trace, сохраняющая
+readonly DOM ownership в том же исходном browser call; v1 files/raw не меняются.
+
+Cleanup/logout/shutdown диагностического Host не подтверждены, own PID 794091
+в close receipt завершён exit 1 / ACK false. Package1 не сохранён. Нужны strict
+server binding и адресное Root recovery этой новой собственной сессии; admin
+inventory получен, сессии ещё не закрыты. Next candidate claims/1 не запускался.
+Candidate остаётся 3/25 (два полных PASS, один incomplete), baseline 18/18.
+Firstwave нечистая, повторы закрыты, итоговая приёмка не завершена.
