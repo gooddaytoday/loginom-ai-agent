@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { claimUserOwnership, readServerSession, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readServerSession, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -37,6 +37,33 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     expect(await readUserOwnership(fixture.slots, lease, prepared.secretFile)).toEqual(claimed)
     expect((await stat(path.join(fixture.slots.controller.stateDir, "user-a.json"))).mode & 0o777).toBe(0o600)
     expect(JSON.stringify(claimed)).not.toContain((await Bun.file(prepared.secretFile).json()).password)
+    expect(await readUserConfiguration(fixture.slots, lease, prepared.secretFile)).toBeUndefined()
+    const configuredReply = { v: 1 as const, id: "configure-a", outcome: "confirmed" as const, data: { authModeChanged: true, passwordChanged: true,
+      secretHash: prepared.secretHash, user: { objectId: claimed.objectId, name: "eval-a", userKind: 0, blocked: true, authMode: 1,
+        isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false, allowPublish: false } } }
+    const configurePayload = { ...payload, phase: "configure", owned: { objectId: claimed.objectId, name: claimed.username,
+      userKind: 0, preparationNonce: prepared.nonce, secretHash: null } }
+    const configureSource = path.join(fixture.slots.controller.stateDir, "configure-a.json")
+    await writeLeaseReceipt(configureSource, { version: 1, kind: "loginom-admin-command", id: configuredReply.id, op: "reconcile-user", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(configurePayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(configuredReply)).digest("hex"), settledAt: new Date().toISOString() })
+    const configured = await recordUserConfiguration(fixture.slots, lease, prepared.secretFile, configureSource, configurePayload, configuredReply)
+    expect(configured).toMatchObject({ kind: "owned-user-configuration", slotId: "a", preparationNonce: prepared.nonce, identity,
+      userKey: claimed.userKey, objectId: claimed.objectId, secretHash: prepared.secretHash })
+    expect(await readUserConfiguration(fixture.slots, lease, prepared.secretFile)).toEqual(configured)
+    const originalConfigure = await Bun.file(configureSource).json()
+    await writeLeaseReceipt(configureSource, { ...originalConfigure, settledAt: new Date(Date.parse(originalConfigure.settledAt) + 1).toISOString() })
+    await expect(readUserConfiguration(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_CONFIGURATION_UNCONFIRMED")
+    await writeLeaseReceipt(configureSource, originalConfigure)
+    expect((await stat(path.join(fixture.slots.controller.stateDir, "configure-a.receipt.json"))).mode & 0o777).toBe(0o600)
+    expect(JSON.stringify(configured)).not.toContain((await Bun.file(prepared.secretFile).json()).password)
+    const skippedPassword = { ...configuredReply, id: "configure-no-write", data: { ...configuredReply.data, authModeChanged: false, passwordChanged: false } }
+    const skippedSource = path.join(fixture.slots.controller.stateDir, `${skippedPassword.id}.json`)
+    await writeLeaseReceipt(skippedSource, { ...await Bun.file(configureSource).json(), id: skippedPassword.id,
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(skippedPassword)).digest("hex") })
+    await expect(recordUserConfiguration(fixture.slots, lease, prepared.secretFile, skippedSource, configurePayload, skippedPassword))
+      .rejects.toThrow("USER_CONFIGURATION_UNCONFIRMED")
+    expect(await readUserConfiguration(fixture.slots, lease, prepared.secretFile)).toEqual(configured)
     const target = path.join(fixture.slots.controller.stateDir, "user-a.json")
     const before = await stat(target)
     expect(await claimUserOwnership(fixture.slots, lease, prepared.secretFile, source, reply)).toEqual(claimed)
@@ -54,6 +81,8 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     expect(JSON.stringify(activation)).not.toContain((await Bun.file(prepared.secretFile).json()).password)
     expect(await readUserActivation(fixture.slots, lease, prepared.secretFile)).toEqual(activation)
     expect((await readUserOwnership(fixture.slots, lease, prepared.secretFile)).everActivated).toBe(true)
+    await expect(recordUserConfiguration(fixture.slots, lease, prepared.secretFile, configureSource, configurePayload, configuredReply))
+      .rejects.toThrow("USER_IDLE_UNCONFIRMED")
     await writeLeaseReceipt(activationFile, { ...activation, objectId: "foreign-user" })
     const foreignActivation = await Bun.file(activationFile).text()
     await expect(readUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_ACTIVATION_CONFLICT")
