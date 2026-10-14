@@ -10,8 +10,11 @@ Private CleanupReceipt включает leaseToken/serverEpoch: release свер
 Resource sampler хранит неизвестные host/cgroup/container counters как null.
 Docker primitive использует immutable full ID и фиксированный local Unix socket;
 исходный stats body сохраняется вместе с проекцией counters. Его bounded-container
-smoke не подтверждает live Loginom/resource acceptance; Server/Studio binding и
-зафиксированный до run бюджет ещё требуют реализации.
+smoke не подтверждает live Loginom/resource acceptance. CLI связывает Server/Studio
+с private ready pair journal и повторно проверяет selected inspect identity/owner
+labels перед проекцией counters; Config.Env не читается. Missing journal означает
+неизвестный scope, invalid journal запрещает output. Зафиксированный до run бюджет,
+owned-process/cgroup coverage и итоговый acceptance gate ещё требуют реализации.
 
 ## Конфигурация и граница режимов
 

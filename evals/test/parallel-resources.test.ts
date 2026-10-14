@@ -2,14 +2,58 @@ import { expect, test } from "bun:test"
 import { chmod, mkdtemp, readdir, rm, stat, statfs } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { collectHostResources, sampleCgroupResources, sampleContainerResources, sampleHostResources } from "../src/parallel-resources"
+import { collectHostResources, loadResourceContainers, sampleCgroupResources, sampleContainerResources, sampleHostResources } from "../src/parallel-resources"
 import { loadResourceSlots } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { pairImages } from "../src/parallel-pair"
+
+test("resource container selection binds exact IDs to private prepared-pair metadata without credentials", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-pair-"))
+  try {
+    const fixture = await parallelFixture(root)
+    expect(await loadResourceContainers(fixture.slots)).toBeNull()
+    const nonce = crypto.randomUUID()
+    const journal = path.join(fixture.slots.controller.stateDir, "pair.json")
+    await writeLeaseReceipt(journal, { version: 2, kind: "pair-provision", phase: "ready", purpose: "research", nonce,
+      daemonId: crypto.randomUUID(), server: fixture.slots.server, images: pairImages,
+      resources: { server: "a".repeat(64), studio: "b".repeat(64) } })
+    const before = await Bun.file(journal).text()
+    expect(await loadResourceContainers(fixture.slots)).toEqual([
+      { role: "server", id: "a".repeat(64), name: fixture.slots.server.container, image: pairImages.server, nonce, purpose: "research" },
+      { role: "studio", id: "b".repeat(64), name: fixture.slots.server.studioContainer, image: pairImages.studio, nonce, purpose: "research" },
+    ])
+    expect(await Bun.file(journal).text()).toBe(before)
+    expect(await Bun.file(fixture.slots.controller.adminCredentialsFile).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("container sampling refuses names and shortened IDs before Docker observation", async () => {
   await expect(sampleContainerResources("eval-server")).rejects.toThrow("RESOURCE_CONTAINER_ID")
   await expect(sampleContainerResources("d138ce018adb")).rejects.toThrow("RESOURCE_CONTAINER_ID")
+})
+
+test("resource container selection refuses changed, incomplete and aliased pair metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-pair-drift-"))
+  try {
+    const fixture = await parallelFixture(root)
+    const journal = path.join(fixture.slots.controller.stateDir, "pair.json")
+    const ready = { version: 2, kind: "pair-provision", phase: "ready", purpose: "research", nonce: crypto.randomUUID(),
+      daemonId: crypto.randomUUID(), server: fixture.slots.server, images: pairImages,
+      resources: { server: "a".repeat(64), studio: "b".repeat(64) } }
+    for (const change of [{ phase: "configured" }, { intent: { operation: "destroy" } },
+      { resources: { server: "a".repeat(64), studio: "a".repeat(64) } },
+      { resources: { server: "a".repeat(12), studio: "b".repeat(64) } },
+      { images: { ...pairImages, studio: "foreign" } }, { server: { ...fixture.slots.server, container: "foreign" } }]) {
+      await writeLeaseReceipt(journal, { ...ready, ...change })
+      const before = await Bun.file(journal).text()
+      await expect(loadResourceContainers(fixture.slots)).rejects.toThrow("RESOURCE_PAIR_UNVERIFIED")
+      expect(await Bun.file(journal).text()).toBe(before)
+    }
+    await writeLeaseReceipt(journal, ready)
+    await chmod(journal, 0o644)
+    await expect(loadResourceContainers(fixture.slots)).rejects.toThrow("RESOURCE_PAIR_UNVERIFIED")
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test("resource sampling observes its actual unified cgroup without inventing unavailable throttling counters", async () => {
