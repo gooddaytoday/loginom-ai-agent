@@ -2558,6 +2558,231 @@
       "root_native_model_product_reference_cold_recovery_once_resource_profile_stand_mutations": 0,
       "all_eight_done": false,
       "automation": "DELETED_BY_USER; not recreated"
+    },
+    {
+      "checked_utc": "2026-10-14T09:36:24.950619+00:00",
+      "trigger": "DIRECT_HUMAN_TASK; automationOFF",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "done",
+          "revision": 72,
+          "phase": "in_review",
+          "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+          "review_cycle": 2,
+          "reject_count": 0,
+          "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "in_progress",
+          "revision": 373,
+          "phase": "ben",
+          "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+          "review_cycle": 2,
+          "reject_count": 1,
+          "metadata_sha256": "bb44eb5782f71db64587342d283da2b3a0420e66bf67120eae92eae8d3b63148",
+          "active_queued": [
+            {
+              "id": "01a139b9-8fa8-7afb-ad70-71d280a151cd",
+              "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+              "status": "running",
+              "started_at": "2026-10-14T12:24:04+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+          "active_queued": []
+        }
+      ],
+      "canonical_verification": "evals/docs/2026-10-14-text-import-status-repaired-source-verification.json",
+      "canonical_verification_sha256": "834a5c860edb96e7719f6f9afb4a0b4518baccc4dd04ff5d505a9c94bb10ba6e",
+      "operator_handoff": "evals/docs/2026-10-14-text-import-status-repaired-source-operator-handoff.json",
+      "operator_handoff_sha256": "c941a144b02a37a2263568008768b12a93e5b565a76bc0e1bc1d36c41f31ea5a",
+      "source": "150396a9a8062711ec94ae6cf4f31e6136a27eb9",
+      "independent_source_gate": "FULFILLED Root56PASS+Evaler132PASS/code/diff/build/processproof",
+      "current_task": {
+        "task": "01a139b9-8fa8-7afb-ad70-71d280a151cd",
+        "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+        "status": "running",
+        "started_at": "2026-10-14T12:24:04+03:00",
+        "scope": "ONE original-owned NONMODEL closed cleanup after independently admitted exactsource; actual private file must bind this task; original owner01a1375d/config/acquiredAt/token unchanged",
+        "running_is_not_reservation_or_native_success": true
+      },
+      "root_prepared_operator_comment": "NOT_POSTED because existing Evaler exactadmission+oneBen already observed; no duplicate",
+      "recovery": "0/1 lastproved; futureactualuse notinferred fromrunning",
+      "actual_cleanup_RELEASED_FREE_case_ACCEPT": "ABSENT",
+      "original_Ben_product": "6/6 consumed/wholeERROR/all6qualityEXCLUDED/no retries",
+      "all_eight_done": false,
+      "automation": "DELETED_BY_USER/OFF"
+    },
+    {
+      "checked_at": "2026-10-14T09:59:18.208540+00:00",
+      "kind": "HUMAN_ROOT_OPERATOR_TAKEOVER",
+      "cards": [
+        {
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "card": "LAB-56",
+          "status": "done",
+          "revision": 72,
+          "phase": "in_review",
+          "active": []
+        },
+        {
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "card": "LAB-57",
+          "status": "in_progress",
+          "revision": 382,
+          "phase": "ben",
+          "active": [
+            {
+              "id": "01a139d3-c45f-706d-a455-45f6fb6541af",
+              "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+              "status": "queued",
+              "started_at": null
+            },
+            {
+              "id": "01a139d0-0ab0-7a46-907f-8004baa51254",
+              "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+              "status": "running",
+              "started_at": "2026-10-14T12:48:25+03:00"
+            }
+          ]
+        },
+        {
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "card": "LAB-58",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "active": []
+        },
+        {
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "card": "LAB-59",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "active": []
+        },
+        {
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "card": "LAB-60",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "active": []
+        },
+        {
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "card": "LAB-61",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "active": []
+        },
+        {
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "card": "LAB-62",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "active": []
+        },
+        {
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "card": "LAB-63",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "active": []
+        }
+      ],
+      "canonical_handover": "evals/docs/2026-10-14-text-import-root-operator-handover.json",
+      "canonical_sha256": "fb0507f2b1ca03eb84f653b5e6df83185157d5b321efcca06be182c0ea0d5148",
+      "owner_comment": "01a139d3-c44d-798e-98af-2c76f66a3756",
+      "source_supplement": "01a139d6-5a38-7c9f-813c-a893b58619da",
+      "operator": "Codex root coordinator; Ben final independent ACCEPT only",
+      "BenOperator": "STOP before once/reservation; actual currentBenactive0; no parallel cleanup",
+      "currentSourceTask": "01a139d0-0ab0-7a46-907f-8004baa51254",
+      "root_original_host_read": "09:54:02UTC owner retained/operation once recovery absent/privileged46+9FD complete",
+      "recovery": "0/1 verified unspent; source activity notcharge",
+      "root_native_scenario_resource_profile_effects": 0,
+      "cleanup_RELEASED_FREE_ACCEPT": "ABSENT",
+      "automation": "DELETED_BY_USER/OFF",
+      "all_eight_done": false
     }
   ]
 }

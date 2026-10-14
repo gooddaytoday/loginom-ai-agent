@@ -1,0 +1,123 @@
+{
+  "kind": "LAB57_ROOT_OPERATOR_HANDOVER",
+  "recordedAt": "2026-10-14T09:56:57.125936+00:00",
+  "ownerInstruction": "Explicit current human request: coordinator executes cleanup directly on dedicated eval-tests; Ben independently validates final cases/validators/attestation and ACCEPT; no repeated human approval or management deadline",
+  "rootCodexThread": "01a120d5-a234-7481-b7ac-e68bbacc5f6d",
+  "boardTakeoverComment": "01a139d3-c44d-798e-98af-2c76f66a3756",
+  "boardTakeoverParent": "01a139c9-ecde-75a5-a7f1-59101e1d0b37",
+  "currentOperator": "Codex root coordinator",
+  "oldBenOperatorTask": "01a139b9-8fa8-7afb-ad70-71d280a151cd",
+  "handoverBoundary": "Ben foreground execute exited2 before reservation/once; current active list noBen; no parallel cleanup; original lower reason NOT_RECORDED retained",
+  "originalLease": {
+    "ownerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "role": "ben",
+    "phase": "eval",
+    "frozen": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "acquiredAt": "2026-10-13T22:28:17.228Z",
+    "configSha256": "d20475fc9ef2e273b6098943c810886f5f2af580bd76ba82d739022594f84981",
+    "rawConfigSha256": "ffbc373a557e0156a4726874d424a330922286545310bb0e0cd9b12863646b35",
+    "ownerSha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "device": 64512,
+    "inode": 17837096,
+    "rebinding": false
+  },
+  "lastIndependentlyAcceptedSource": "150396a9a8062711ec94ae6cf4f31e6136a27eb9",
+  "installedSource150": {
+    "installerAttempts": 1,
+    "verifiedFiles": 841,
+    "existingTreePreserved": true,
+    "executeAttempts": 1,
+    "exit": 2,
+    "effectsBeforeOnce": 0
+  },
+  "safeBoundaryEvidence": {
+    "reportComment": "01a139c9-ecde-75a5-a7f1-59101e1d0b37",
+    "zipSha256": "66d63eb88aebe5c1112cf1656622a144976b01c5fc872bd7c361cc97ca0fa38a",
+    "manifestSha256": "bc4fa5b8751d424cf299a7077e3abfd8ef992ca243d5e950d9e0a58588833b2d",
+    "payloads": 26,
+    "CRCPathsTypesBytesHashes": "PASS",
+    "rootOriginalHostReadAt": "2026-10-14T09:54:02.147043+00:00",
+    "operation": "ABSENT",
+    "overallOnce": "ABSENT",
+    "recovery": "0/1; exact original incident record ABSENT",
+    "oldController2206192": "ABSENT",
+    "registration": "PRESENT exact original inode3710822/hashf03f2633",
+    "legacyGuard": "PRESENT exact original inode3840909"
+  },
+  "fdDiagnosis": {
+    "unprivileged": "Exact systemd2028 and sd-pam2030 PermissionError retained",
+    "privilegedRead": "COMPLETE via already supplied sudo on original eval-tests;46/9FD; runtime refs0",
+    "births": [
+      "11658",
+      "11666"
+    ],
+    "notFutureFreshAdmission": true,
+    "noAmbientProcessException": true
+  },
+  "authorityRepair": {
+    "existingSourceTask": "01a139d0-0ab0-7a46-907f-8004baa51254",
+    "supplementComment": "01a139d6-5a38-7c9f-813c-a893b58619da",
+    "actualOutcome": "steered; supplement pending at post receipt",
+    "scope": "SOURCE-only exact150 derivative: explicit codex-coordinator admission, Root thread/member takeover/handover binding; full privileged read-only FD observer and private pre-once producer diagnostics",
+    "rootLiveExecution": "Only Root after independently accepted exact NEW source; no new Ben cleanup chain",
+    "queueRootMode": "Full inventory and status validation; zero fictional Ben controller; all original/unknown/foreign pending block except proven exactMAS",
+    "nativeUID": "1000; original Ben lease owner preserved; do not run whole route asUID0 or impersonate a MulticaBen run",
+    "independentSourceGate": "REQUIRED before helper provisioning/install/native/profile/resource effects"
+  },
+  "accounting": {
+    "referenceConsumed": [
+      1,
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "referenceLimitPerCase": 3,
+    "RichProduct": "6 initial;4PASS2qualityFAIL0ERROR",
+    "BenProduct": "6/6 consumed;all6 qualityEXCLUDED",
+    "RichCold": [
+      11,
+      10,
+      8
+    ],
+    "BenCold": [
+      9,
+      9,
+      8
+    ],
+    "BenColdErrors": 1,
+    "repeats": "3/10;remaining7",
+    "admission": "3/3 exhausted",
+    "wrapper": "1/1 exhausted",
+    "recovery": "0/1 unspent verified after STOP",
+    "normalCleanupContinuations": 2,
+    "newScenarioModelReferenceProductColdCalls": 0,
+    "sourceSelfReview": 0,
+    "newCaseReview": 0,
+    "scientificCharge": 0,
+    "closedEntrypointCalls": 1,
+    "afterStopEntrypointRetries": 0,
+    "automation": "disabled"
+  },
+  "history": {
+    "originalError": "ERROR/code2",
+    "BenQuality": "all6 EXCLUDED",
+    "source9642": "REJECT/MUST_NOT_INSTALL",
+    "rejectedC26": "PRESERVED",
+    "originalMissingHarnessAdmission": "MISSING; no synthesis",
+    "originalLowerWriterCause": "UNKNOWN",
+    "DBOriginalRootSqlReads": 0,
+    "originalHistory171And28972": "Ben delivery independently hash-verified; root current read did not repeat full28972 scan"
+  },
+  "rootEffectsThisRecord": {
+    "modelReferenceProductCold": 0,
+    "recoveryReservation": 0,
+    "nativeLogin": 0,
+    "resourceProfileMutation": 0,
+    "manualLocksRemoval": 0,
+    "syntheticCompletion": 0
+  },
+  "next": "Actual handover ACK and independent exact derivative admission; Root foreground guarded cleanup; Ben independent final ACCEPT after genuine completion/RELEASED/FREE",
+  "automation": "DELETED; keep disabled"
+}

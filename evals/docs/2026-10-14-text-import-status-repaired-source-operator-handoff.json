@@ -1,0 +1,241 @@
+{
+  "format": "LAB57-150-INDEPENDENT-OPERATOR-CONTINUATION-VERIFICATION-v1",
+  "checked_utc": "2026-10-14T09:36:24.950619+00:00",
+  "current_cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "done",
+      "revision": 72,
+      "phase": "in_review",
+      "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+      "review_cycle": 2,
+      "reject_count": 0,
+      "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "in_progress",
+      "revision": 373,
+      "phase": "ben",
+      "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "review_cycle": 2,
+      "reject_count": 1,
+      "metadata_sha256": "bb44eb5782f71db64587342d283da2b3a0420e66bf67120eae92eae8d3b63148",
+      "active_queued": [
+        {
+          "id": "01a139b9-8fa8-7afb-ad70-71d280a151cd",
+          "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "status": "running",
+          "started_at": "2026-10-14T12:24:04+03:00"
+        }
+      ]
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+      "active_queued": []
+    }
+  ],
+  "root_source_canonical": {
+    "file": "evals/docs/2026-10-14-text-import-status-repaired-source-verification.json",
+    "sha256": "834a5c860edb96e7719f6f9afb4a0b4518baccc4dd04ff5d505a9c94bb10ba6e",
+    "publication": "1df3248e34",
+    "root_independent_status_tests": "56PASS0FAIL200expects; code/manifest/Git/diff/build/process proofs checked"
+  },
+  "Evaler_source_admission": {
+    "comment": "01a139b9-8f85-7cc4-86f7-358e7472d124",
+    "parent": "01a139a9-61f5-7085-829f-3bd71587ed92",
+    "created_at": "2026-10-14T12:23:44+03:00",
+    "one_Ben_mention": true,
+    "attachment": "01a139b9-8f51-7486-9ba1-653dec25bb90",
+    "archive_bytes": 32902,
+    "archive_sha256": "74b4c3d6f40854694e3cec2ef66274fe66a4a816c2ac205e36e71a61cfa2d826",
+    "manifest_sha256": "13116d69e591b99b7d973a918ad6f661c782712032a2e8a07b5c7abf97d6a562",
+    "all16payload_CRC_paths_regular_types_bytes_hashes_verified": true,
+    "actual_independent_source_review": {
+      "delivery_archive_sha256": "f2b8d4a0558ce058293747891b616dd34c389a300fa62f4c8a3909950f1e8ab3",
+      "delivery_payload_hashes_verified": 1868,
+      "source_files_verified": 841,
+      "git_blobs_verified_against_remote_commit": 840,
+      "parent_blobs_unchanged": 834,
+      "changed_paths": 6,
+      "actual_code_diff_and_tests_read": true,
+      "supervisor_and_lifecycle_unchanged": true,
+      "author_genuine_captures_verified": 11,
+      "independent_tests": "132 PASS /0 FAIL /316 expects, four addressed files; typecheck PASS",
+      "independent_build_byte_equal": "bd2aa7186fe8221760a07f89fe4348f806c856da445ebfdd1cf473c31a7ecafd",
+      "independent_process_proofs": [
+        {
+          "label": "evaler150-regression",
+          "command_result_sha256": "221b9201364c051bd40313ed8901728631f3ddd1021ce8d67ac73e52d749dbe5",
+          "exit": 0,
+          "cleanup": "confirmed",
+          "zero_passes": 2
+        },
+        {
+          "label": "evaler150-build",
+          "command_result_sha256": "0aac67160f21058880950224e79e513d7dc553deffb0290130becd1affe204c8",
+          "exit": 0,
+          "cleanup": "confirmed",
+          "zero_passes": 2
+        },
+        {
+          "label": "evaler150-types",
+          "command_result_sha256": "4f7ffe1dce7655c8d409e41dc1ce62572ae0b19731c8ee64b51a912b9d0441b2",
+          "exit": 0,
+          "cleanup": "confirmed",
+          "zero_passes": 2
+        }
+      ],
+      "new_full_or_unchanged_suite_runs": 0,
+      "installed_pins_full_scans": 0
+    },
+    "root_verified_source_review_captures": {
+      "source": "150396a9a8062711ec94ae6cf4f31e6136a27eb9",
+      "source_accept": true,
+      "reviewer_independent_of_author": true,
+      "all16payload_verified": true,
+      "three_captures": [
+        {
+          "label": "evaler150-regression",
+          "command_result_sha256": "221b9201364c051bd40313ed8901728631f3ddd1021ce8d67ac73e52d749dbe5",
+          "processes": 217,
+          "mode": "continuous",
+          "zero_passes": 2
+        },
+        {
+          "label": "evaler150-build",
+          "command_result_sha256": "0aac67160f21058880950224e79e513d7dc553deffb0290130becd1affe204c8",
+          "processes": 2,
+          "mode": "continuous",
+          "zero_passes": 2
+        },
+        {
+          "label": "evaler150-types",
+          "command_result_sha256": "4f7ffe1dce7655c8d409e41dc1ce62572ae0b19731c8ee64b51a912b9d0441b2",
+          "processes": 1,
+          "mode": "unit_after_exit",
+          "zero_passes": 2
+        }
+      ],
+      "actual132PASS_typecheck_build_bound": true,
+      "native_admission_not_native_success": true
+    }
+  },
+  "source_gate": "FULFILLED for exact150396a9a8062711ec94ae6cf4f31e6136a27eb9 independently by Root and Evaler; rejected9642/held ownerdecision and negative history preserved",
+  "current_execution": {
+    "task": "01a139b9-8fa8-7afb-ad70-71d280a151cd",
+    "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+    "status": "running",
+    "started_at": "2026-10-14T12:24:04+03:00",
+    "scope": "ONE original-owned NONMODEL closed cleanup after independently admitted exactsource; actual private file must bind this task; original owner01a1375d/config/acquiredAt/token unchanged",
+    "running_is_not_reservation_or_native_success": true
+  },
+  "root_duplicate_avoidance": {
+    "prepared_marker": "LAB57-STATUS-REPAIR-OPERATOR-ADMITTED-20261014-150396a9",
+    "prepared_body": "NOT_POSTED; before dispatch root found Evaler already admitted exactsource and one Ben continuation",
+    "no_unknown_post_outcome_or_later_retry": true,
+    "new_root_comments_workers_reviewers_on_this_transition": 0
+  },
+  "operator_scope_sha256": "2842dcb4e74a670dcd65da8fc82b53f04c66b698372e93ac2e45246bfa08beba",
+  "operator_scope": "Delivered full closed route and all original guard/once/recovery/Node/snapshot/cessation/logout/history/guardCSV/completion/releaseFREE and final independent acceptance ordering retained; no scenario model/product/reference/cold/probe generation, no foreign work or original token/config rebinding",
+  "accounting_last_proven": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 3
+    },
+    "reference_limit_per_case": 3,
+    "product": 6,
+    "cold": 8,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 11,
+    "cold_browser_launch_attempts": 10,
+    "normal_cleanup_browser_continuations": 2,
+    "product_consumed_by_executor": {
+      "Rich": "1 per each6 IDs",
+      "Ben": "1 per each6 IDs;6/6 consumed; no retries"
+    }
+  },
+  "recovery_last_proven": "0/1; read new actual reservation from subsequent evidence, never infer from running",
+  "original_outcome": "ERROR/code2/all6 Ben quality EXCLUDED; no retries; Rich4PASS2qualityFAIL0ERROR preserved",
+  "root_new_effects": "native/model/product/reference/cold/recovery/once/profile/resource/stand0",
+  "actual_cleanup_RELEASED_FREE_independent_case_ACCEPT": "ABSENT by latest delivery; originalBUSY lastproved",
+  "automation": "DELETED_BY_USER; no recreation",
+  "next": "Read actual operator delivery, independently validate genuine cessation/history/cleanup/attestation/ordinaryRELEASED/FREE and cases/validators; only then ownerDONE57/next58"
+}

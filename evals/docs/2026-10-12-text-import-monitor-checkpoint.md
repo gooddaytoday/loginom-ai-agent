@@ -1,20 +1,20 @@
-# Мониторинг LAB-56–LAB-63
-
-- Fresh full8 07:53:52UTC14Oct: LAB56 done72; LAB58–63 backlog10/admission/no runs. LAB57 partial09:15:20UTC in_progress369/frozeneb1/review2/reject1; only Evaler01a13978-5001 running after Ben repaired source delivery.
-- Automation lab-56-lab-63 удалена владельцем и не восстанавливается. Текущая работа продолжена отдельным прямым поручением владельца; это не новый recurring monitor.
-- Direct human14Oct supplies Loginom administrator admin/admin for dedicated eval-tests; explicitly allows this exact test pair in Git docs. Canonical evals/AGENTS.md section committed/pushed125507f837/SHA6d4bffa4…2aa6; SSH/Multica/model/production secrets excluded.
-- Human confirms runtime mas24aa980b-b8c3-43e2-b087-bad8f79c9517 disjoint from originaleval-tests a5fa993f. Its active/queued do notblock; globalidle requirement superseded for exactmas only. No foreign tasks/processes/leases/hosts/messages interference.
-- Credential/config-producer search is SUPERSEDED by supplied valid pair; no defaultguess/provenance repeat needed. Other unknown/missing/conflicting task runtime is notmas; original-resource fresh gates remain.
-- Owner clarification01a13932-b536 parentlatestEvalerreport01a1392b: body/parent/one routedEvalermention and both AGENTS9790bytes6d4bffa4+receipt3434bytese2925de3 exact attachment readback verified. No duplicate task.
-- Ben report01a139a9-61f5 parentrepair01a13977-b6a3: clean published150396a9a8062711ec94ae6cf4f31e6136a27eb9 from rejected9642; one shared manifested vocabulary binds actualCLI0.6.1/source2ea01/platform8states. Root independent primarySQL read matches.
-- NewZIP3329932/f2b8d4a0…8ab3/manifestc7a8f49c…4485/1868payload CRC/regularpaths/hash/equality;841source=840Git+exe/all834 otherparent blobs unchanged/exact6pathdiff/publication verified; ownbare removed.
-- Root new concreteCLI→Node status tests56PASS0FAIL200expects;11genuine saved captures/typecheck/regression132PASS/finalcompound1PASS/build binding verified. Initial23PASS33FAIL/stalecompoundhash failure preserved; no unchanged suite/native/profile effects.
-- Root exact150 SOURCE_ACCEPTED; new manifest a7fb89d6…c52a/executablebd2aa718…cafd. Rejected964 admissionHELD remainshistory. Current Evaler coordinates one original-ownedNONMODEL cleanup under new privateadmission/freshtechnicalgates; no human/time or globalmas-idle gate.
-- OriginalBen task01a1375d/acquired22:28:17.228/eb1/configd204/dev64512inode17837096 lastprovenBUSY; fullregistration/legacyguard/CSV/pendinghistory retained. No owner/token/configrebind/oldABANDONEDreuse/uncertainretry.
-- Future original commonlease+heldoperationguard+oneoriginalunspent recovery+wx0600file/parentfsynconce BEFOREfirst native/profile/resourceeffect; coherent originalDBWALSHM/runtime/session snapshot first.
-- Immediately fresh scoped queues/ALL6actualCFG/processancestry/absence/FD/debugger/exactcontainer/nobindmounts/storage/pins/rawowner/config/registration/guard; exactd6 process.execPath AND /proc/self/exe path/bytes/dev/inode/SHA beforeEVERYeffect.
-- Genuine full originalscope cessation/unique readonly-nonrunning target closure; ACK notcessation. Ownemptydiagnostic actual logout/processcleanup/continuousproof and official77Luna-high history BEFOREwholeguard/CSV.
-- Fresh separate genuine attestation/completion/ordinaryRELEASED/FREE and independentfinalcases/validator/attestationACCEPT required. LAB57done/LAB58 only verified gates; all8donefalse.
-- Benproduct6/6 spent/originalwholeERROR/code2/all6qualityEXCLUDED/no repeats/77Luna-high5archives+1pending/billedUNKNOWN/SHMSTOP; Rich4PASS2qualityFAIL0ERROR/refs1/1/2/1/1/3/product1each/cold11/10/8/cleanupcontinuations2; Bencold9/9/8+ERROR1.
-- Repeats3/10remaining7/admission3/3/wrapper1/1/recovery0/1 lastproved preserved/noresetprecharge; lowerwriterUNKNOWN/missingparent-harnessproofs/wrongprofile history retained. Coordinator native/model/recovery/resource mutations0.
-- Canonical status-repaired-source-verification.json records exact150 independentgate; prior owner125/policy743/rejections/stop/handoffs retained. Next exactsourceoperatorhandoff→ownedcleanup→independentcaseACCEPT; automationOFF; actualdone57 absent.
+# LAB-56–LAB-63 checkpoint
+Fresh full8: 2026-10-14T09:59:18.208540Z; host read09:54:02UTC.
+LAB56 done72/no runs; original independent ACCEPT/cleanup retained.
+LAB57 in_progress382/phaseben/frozeneb1/review2/reject1; final ACCEPT absent.
+LAB58–63 backlog10/admission/no runs; chain gates retained.
+Human directs Root coordinator to execute cleanup; Ben final independent cases/validators/attestation ACCEPT only.
+Ben last task01a139b9 STOP execute150/code2 before reservation/once; no runningBen/currentparallelcleanup.
+Source150 installed841/841 once; rejected964 neverinstalled; pre-once lower reason UNKNOWN preserved.
+Safe STOP ZIP66d63eb8/manifestbc4fa5b8/26payload CRC/path/type/bytes/hash independently verified.
+Root host owner7d34/original task/acquired/config/stand inode17837096 preserved; registration/guard retained.
+Actual operation/overallonce/diagnostic/recovery record and oldPID2206192 ABSENT; recovery0/1.
+Unprivileged FD EACCES systemd2028/sd-pam2030 retained; root read complete46/9FD, runtime refs0 (notfutureadmission).
+Root takeover01a139d3/parentBenSTOP; no Ben cleanup dispatch; queuedEvaler handover task01a139d3-c45f.
+Existing Rich SOURCE01a139d0-0ab0 running; Root actor/privileged full observer/pre-once diagnostics supplement01a139d6 steered.
+Canonical root handoverfb0507f2 and evals/docs/2026-10-14-lab57-root-operator-plan.md; newexactsource independent gate beforeeffects.
+Ben6/6 consumed/wholeERROR/all6qualityEXCLUDED/no retries/77Luna-high5archives+1pending/billedUNKNOWN/oldSHMSTOP retained.
+Rich4PASS2qualityFAIL0ERROR/refs1/1/2/1/1/3/product1each/cold11/10/8/cleanupcontinuations2; Bencold9/9/8+ERROR1.
+Repeats3/10remaining7/admission3/3/wrapper1/1/recovery0/1; noreset/precharge/newmodelrefproductcold0.
+Next: independent exact Root-authority source admission→Root guarded genuine cessation/history/completion/RELEASED/FREE→Ben ACCEPT→ownerdone57.
+Automation lab-56-lab-63 DELETED/OFF; neverrestore. No human/time gate; technical once/identity/independent gates remain.
