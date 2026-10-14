@@ -9,7 +9,7 @@ import {randomUUID} from 'node:crypto';
 // Resources/auth/Page/context/SDK/service/bridge are labelled doubles, FS is real.
 // Original object references and startup binding are constructed by production start.
 const root=process.env.READONLY_RUNTIME_ROOT ?? new URL('../',import.meta.url).pathname;
-const text=await readFile(join(root,'src/managed-entry.mjs'),'utf8');
+const text=await readFile(join(root,'src/managed-session.mjs'),'utf8');
 const code=text.slice(text.indexOf('async function handle(message)'))+';handle';
 const cases=['owner','page','context','account','origin','generation','chat','client','session','bridge'];
 const directories=new Set();

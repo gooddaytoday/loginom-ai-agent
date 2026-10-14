@@ -1,11 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs/promises';
 import {join} from 'node:path';
-const source=await fs.readFile(process.env.MANAGED_ENTRY_SOURCE??new URL('../src/managed-entry.mjs',import.meta.url),'utf8');
+const source=await fs.readFile(process.env.MANAGED_ENTRY_SOURCE??new URL('../src/managed-session.mjs',import.meta.url),'utf8');
 function fixture(receipt,{startup=false,missingBridge=false}={}){
  const events=[],failure=Error('evidence persistence failed'),page={id:'original-page',closed:false},bridge={receipt,async close(){events.push('bridge');if(this.receipt==='throw')throw failure;return this.receipt}},state={controller:{abort(){events.push('abort')}},client:{async close(){events.push('client')}},bridge:missingBridge?undefined:bridge,browser:startup?undefined:{page,async close(){page.closed=true;events.push('browser')}},browserProfile:startup?undefined:'original-profile'};
  if(startup)state.bridge=undefined;
  const listeners={},sandbox={state,requests:new Set(),Promise,Error,join,writeFile:fs.writeFile,rm:async()=>events.push('remove-profile'),process:{on:(name,fn)=>listeners[name]=fn,exit:code=>events.push('exit:'+code)}};
- const chunk=source.slice(source.indexOf('function closeRejection('),source.indexOf('process.on("message"'));
+ const chunk=source.slice(source.indexOf('function closeRejection('),source.indexOf('export function receiveManagedMessage'));
  const api=vm.runInNewContext(chunk+';({close,stop})',sandbox);
  return {state,page,bridge,events,failure,listeners,...api};
 }
@@ -23,7 +23,7 @@ test('existing IPC owner inspects exact actual pending runtime then closes',asyn
  const events=[],messages=[],listeners={},state={client:{close:async()=>{},callTool:async input=>actual.inspect(input.arguments)},bridge:{hasUnsettledWork:actual.hasUnsettledWork,hasActiveWork:actual.hasActiveWork,close:async()=>({browser_transport_closed:!actual.hasUnsettledWork(),cleanup_complete:!actual.hasUnsettledWork()})},browser:{page,close:async()=>events.push('browser-close')}};
  const process={connected:true,on:(name,fn)=>listeners[name]=fn,exit:code=>events.push('exit:'+code),send:(m,cb)=>{messages.push(m);cb()},disconnect:()=>{process.connected=false;events.push('disconnect')}};
  const send=source.slice(source.indexOf('const send ='),source.indexOf('function close()'));
- const close=source.slice(source.indexOf('function close()'),source.indexOf('process.on("message"'));
+ const close=source.slice(source.indexOf('function close()'),source.indexOf('export function receiveManagedMessage'));
  const handle=source.slice(source.indexOf('async function handle(message)'));
  const api=vm.runInNewContext(send+close+handle+';({handle})',{state,requests:new Set(),process,Promise,Error,AbortController,setImmediate});
  await api.handle({id:'refusal',operation:'close'});assert.equal(process.connected,true);assert.deepEqual(events,[]);assert.equal(state.browser.page,page);assert.equal(actual.hasUnsettledWork(),true);

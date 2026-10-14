@@ -10,7 +10,7 @@ const path=process.env.STARTUP_SOURCE??new URL('../src/connection-check.mjs',imp
 const {terminalSourceForOwner,retainTerminalSourceStartup}=await import(new URL('./terminal-source-startup.mjs',typeof path==='string'?pathToFileURL(path):path));
 const source=await readFile(path,'utf8');
 const code=source.slice(source.indexOf('export function browserEnvironment')).replaceAll('export ','');
-const managed=await readFile(process.env.STARTUP_MANAGED??new URL('../src/managed-entry.mjs',import.meta.url),'utf8');
+const managed=await readFile(process.env.STARTUP_MANAGED??new URL('../src/managed-session.mjs',import.meta.url),'utf8');
 const managedCode=managed.slice(managed.indexOf('function closeRejection('),managed.indexOf('const stop ='));
 const values=[Error('original startup refusal'),undefined,null,false,0,''];
 function fixture(directory,phase,rejected){

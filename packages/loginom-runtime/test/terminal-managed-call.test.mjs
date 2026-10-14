@@ -2,11 +2,11 @@ import test from 'node:test';import assert from 'node:assert/strict';import fs f
 const root=process.env.MANAGED_CANDIDATE_ROOT?new URL('file://'+process.env.MANAGED_CANDIDATE_ROOT+'/'):new URL('../',import.meta.url);
 const rootApi=await import(new URL('src/terminal-root-association.mjs',root));
 const helperSource=(await fs.readFile(new URL('src/terminal-managed-call.mjs',root),'utf8')).replaceAll('export function','function').replace(/^import .*$/m,'');
-const source=await fs.readFile(new URL('src/managed-entry.mjs',root),'utf8');
+const source=await fs.readFile(new URL('src/managed-session.mjs',root),'utf8');
 function fixture(){const listeners={},sent=[],requests=new Set(),sdk=Promise.withResolvers();let calls=0,token;
  const state={controller:undefined,client:{callTool(input,unused,options){calls++;token=context.custody.terminalManagedCallForBridge(state.bridge);assert.equal(input,token.facts.input);assert.equal(options.signal,token.inspect().controller.signal);return sdk.promise}},bridge:{hasUnsettledWork:()=>false,hasActiveWork:()=>false},session:{}};
  const context={state,requests,process:{on:(name,fn)=>listeners[name]=fn},send:m=>sent.push(m),Error,AbortController,AbortSignal,...rootApi};
- const listener=source.slice(source.indexOf('process.on("message"'),source.indexOf('async function handle(message'));
+ const listener=source.slice(source.indexOf('export function receiveManagedMessage'),source.indexOf('async function handle(message')).replace('export function','function')+';process.on("message",receiveManagedMessage);';
  const handle=source.slice(source.indexOf('async function handle(message'));
  vm.runInNewContext(helperSource+';'+listener+handle+';globalThis.custody={terminalManagedCallForBridge}',context);
  const message={id:'actual',operation:'call',input:{name:'dock_prepare',arguments:{operation_id:'same'}}};
