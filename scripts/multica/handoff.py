@@ -139,7 +139,9 @@ def select_assignment(comments, runs, existing, text, key, issue, agent, sha, sc
         body = comment.get('content', '')
         header = body.split('\n\n', 1)[0]
         markers = re.findall(r'^Handoff-ID: `?([0-9a-f]{64})`?$', header, re.M)
-        if key in markers:
+        release_marker = re.search(r'^Artifact-release: [0-9a-f]{64}$', body, re.M)
+        action_header = re.search(r'^(Source-SHA|Action): ', header, re.M)
+        if key in markers and (action_header or not release_marker):
             if (markers != [key] or re.findall(r'^Source-SHA: ([0-9a-f]{40})$', header, re.M) != [sha]
                     or re.findall(r'^Action: (.+)$', header, re.M) != [scope]):
                 raise DeliveryError('Action identity conflicts; reconcile existing assignments')

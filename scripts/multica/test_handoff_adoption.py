@@ -84,3 +84,15 @@ class AdoptionIdentityTest(unittest.TestCase):
         self.comments[0]['content'] = text
         (self.root / 'message').write_text(text)
         self.assertNotEqual(self.client(existing=COMMENT).returncode, 0); self.assertEqual(self.posts, 0)
+
+    def test_release_only_first_block_is_not_assignment(self):
+        key, _ = self.original(); self.release(key)
+        self.comments[-1]['content'] = f'Artifact-release: {"b" * 64}\nHandoff-ID: {key}'
+        result = self.client(existing=COMMENT); self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.posts, 0)
+
+    def test_conflicting_headers_cannot_hide_as_release(self):
+        key, _ = self.original(); self.release(key)
+        self.comments[-1]['content'] = (f'[@Receiver](mention://agent/{AGENT})\nHandoff-ID: {key}\n'
+            f'Source-SHA: {"a" * 40}\nAction: different-scope\n\nArtifact-release: {"b" * 64}')
+        self.assertNotEqual(self.client(existing=COMMENT).returncode, 0); self.assertEqual(self.posts, 0)
