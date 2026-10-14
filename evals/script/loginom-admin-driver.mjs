@@ -60,7 +60,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       context = await chromium.launchPersistentContext(payload.profileDir, { executablePath: browser, headless: true, timeout: remaining(request) })
       page = context.pages()[0] ?? await context.newPage()
       page.on("console", message => {
-        if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|READBACK)|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
+        if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|READBACK)|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
       })
       page.setDefaultTimeout(remaining(request))
       process.stderr.write("ADMIN_INIT_STAGE_NAVIGATION\n")
@@ -98,21 +98,26 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== 7 || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (!["blocked", "configure", "acl"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== (payload.phase === "acl" ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
-        payload.phase === "configure" && !payload.owned || payload.owned !== null && (!payload.owned ||
-          Object.keys(payload.owned).length !== (payload.phase === "configure" ? 5 : 4) || typeof payload.owned.objectId !== "string" || !payload.owned.objectId ||
+        payload.phase !== "blocked" && !payload.owned || payload.owned !== null && (!payload.owned ||
+          Object.keys(payload.owned).length !== (payload.phase !== "blocked" ? 5 : 4) || typeof payload.owned.objectId !== "string" || !payload.owned.objectId ||
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
-          payload.phase === "configure" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
+          payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
+        throw Error("ADMIN_REQUEST_INVALID")
+      if (payload.phase === "acl" && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+        Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
+        !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
+          typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
         throw Error("ADMIN_REQUEST_INVALID")
       const credentials = await readCredentials(payload.secretFile)
       if (credentials.username !== payload.slot.username || createHash("sha256").update(JSON.stringify(credentials)).digest("hex") !== payload.secretHash)
         throw Error("ADMIN_CREDENTIAL_INVALID")
       dispatched = true
-      const result = await bounded(request, page.evaluate(async ({ username, owned, phase, password, secretHash }) => {
+      const result = await bounded(request, page.evaluate(async ({ username, owned, phase, password, secretHash, expectedPolicy }) => {
         let applied = false
         let stage = "ENUMERATE"
         try {
@@ -138,6 +143,53 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
           if (owned && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (phase === "acl") {
+            stage = "ACL"
+            console.info("ADMIN_USER_STAGE_ACL")
+            const snapshot = async () => {
+              const collection = await session.GetSharedDirectories()
+              const enumerator = await collection.GetEnumerator()
+              const directories = []
+              try {
+                while (await enumerator.MoveNext()) {
+                  const directory = await enumerator.Current
+                  const access = await directory.Permissions
+                  const grants = await access.GetEnumerator()
+                  const permissions = []
+                  try {
+                    while (await grants.MoveNext()) {
+                      const principal = await grants.Current
+                      permissions.push({ principal, objectId: (await bg.ProxyObjectsHelper.GetObjectId(principal)).toString(), name: await principal.Name, userKind: await principal.UserKind })
+                    }
+                  } finally { await ReleaseObject(grants, true) }
+                  directories.push({ access, objectId: (await bg.ProxyObjectsHelper.GetObjectId(directory)).toString(), name: await directory.Name, permissions })
+                }
+              } finally { await ReleaseObject(enumerator, true) }
+              return directories
+            }
+            const normalize = directories => directories.map(directory => ({ objectId: directory.objectId, name: directory.name,
+              permissions: directory.permissions.map(principal => ({ objectId: principal.objectId, name: principal.name, userKind: principal.userKind }))
+                .sort((a, b) => a.objectId.localeCompare(b.objectId)) })).sort((a, b) => a.objectId.localeCompare(b.objectId))
+            const forbidden = principal => principal.name === "Everyone" && principal.userKind === 2 ||
+              principal.name === username && principal.userKind === 0 && principal.objectId === owned.objectId
+            const before = await snapshot()
+            if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
+              return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
+            if (before.some(directory => directory.permissions.some(principal => principal.name === username && principal.userKind === 0 && principal.objectId !== owned.objectId)))
+              return { outcome: "not_applied", data: { code: "ADMIN_ACL_PRINCIPAL_CHANGED" } }
+            let removed = 0
+            for (const directory of before) {
+              const targets = directory.permissions.filter(forbidden)
+              if (!targets.length) continue
+              applied = true
+              await directory.access.Delete(targets.map(target => target.principal))
+              removed += targets.length
+            }
+            const policy = normalize(await snapshot())
+            const preserved = normalize(before.map(directory => ({ ...directory, permissions: directory.permissions.filter(principal => !forbidden(principal)) })))
+            if (JSON.stringify(policy) !== JSON.stringify(preserved)) throw Error("readback")
+            return { outcome: "confirmed", data: { removed, policy } }
+          }
           stage = "BLOCK"
           console.info("ADMIN_USER_STAGE_BLOCK")
           if (!owned) await user.set_Blocked(true)
@@ -166,7 +218,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           return { outcome: "confirmed", data: phase === "configure" ? { authModeChanged, passwordChanged, secretHash, user: observed } : { created: !owned, user: observed } }
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
-        password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash }))
+        password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null }))
       respond(id, result.outcome, result.data)
       continue
     }
