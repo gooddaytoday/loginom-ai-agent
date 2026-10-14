@@ -106,6 +106,7 @@ liveIntegration("native user capability: creates one blocked account and refuses
       const policy = (observation.data as { sharedDirectories: { objectId: string; name: string; permissions: { objectId: string; name: string; userKind: number }[] }[] }).sharedDirectories
       expect(policy).toHaveLength(2)
       const acl = { ...payload, phase: "acl", owned: { ...owned, secretHash: payload.secretHash }, expectedPolicy: policy }
+      expect(await request("reconcile-user", { ...acl, phase: "activate" })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_USER_POLICY_CHANGED" } })
       expect(await request("reconcile-user", { ...acl, expectedPolicy: [] })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } })
       const changed = await request("reconcile-user", acl)
       expect(changed).toMatchObject({ outcome: "confirmed", data: { removed: 2 } })
@@ -113,6 +114,12 @@ liveIntegration("native user capability: creates one blocked account and refuses
       expect(after).toHaveLength(2)
       expect(after.every(directory => directory.permissions.length === 0)).toBe(true)
       expect(await request("reconcile-user", { ...acl, expectedPolicy: after })).toMatchObject({ outcome: "confirmed", data: { removed: 0, policy: after } })
+      const activation = { ...acl, phase: "activate", expectedPolicy: after }
+      expect(await request("reconcile-user", { ...activation, owned })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_USER_POLICY_CHANGED" } })
+      expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: true,
+        user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
+      expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: false,
+        user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)
