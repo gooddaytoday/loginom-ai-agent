@@ -180,10 +180,15 @@ export async function judgeTask(input: {
   signal?: AbortSignal
   checklist?: ChecklistItem[]
 }) {
+  return judgeInvocation(input)
+}
+
+async function judgeInvocation(input: Parameters<typeof judgeTask>[0], admit?: () => void) {
   const checklist = input.checklist ?? input.task.checklist
   const checked = input.run ? await checkOracle(input.task, input.artifactDir) : { passed: null, error: null }
   const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
+  admit?.()
   const first = await invoke(input, checklist, 1)
   if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: 1 as const }
   if (input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
@@ -209,9 +214,15 @@ export function createJudgeGate() {
     return Promise.race([previous, cancelled.promise]).then<Judged>(() => {
       if (input.signal?.aborted) return { ok: false, error: "interrupted before judge", attempts: 0 }
       if (poisoned) return { ok: false, error: "Judge gate blocked by unconfirmed cleanup", attempts: 0, cleanupUnconfirmed: true }
-      return judgeTask(input).then(result => {
+      let admitted = false
+      return judgeInvocation(input, () => { admitted = true }).then(result => {
         if ("cleanupUnconfirmed" in result && result.cleanupUnconfirmed) poisoned = true
         return result
+      }).catch((error: unknown) => {
+        if (!admitted) throw error
+        // An exception can happen after spawning, before the cleanup outcome reaches this gate.
+        poisoned = true
+        return { ok: false, error: "Judge invocation failed without confirmed result", attempts: 0, cleanupUnconfirmed: true }
       })
     }).finally(() => {
       input.signal?.removeEventListener("abort", abort)
