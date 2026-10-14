@@ -1,6 +1,6 @@
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,rename,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
@@ -56,12 +56,12 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
     run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',cleanup_complete:f.scenario!=='managed-unsettled-save',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
   };
 }}});
-const {createBridge}=await import('../../lib/bridge.mjs');
+const {createBridge}=await import(process.env.CAPTURE_BRIDGE_MODULE??'../../lib/bridge.mjs');
 
 
 const scenarios=(process.env.CALCULATOR_CAPTURE_CASES?.split(',')??['success','no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved','cancel-missing','cancel-applied','identity-after','receipt-write','falsy-false','falsy-zero','falsy-empty','falsy-null','falsy-undefined','resource-error','resource-falsy','resource-foreign','resource-count','resource-running',
  'confirmed-refusal-error','confirmed-refusal-undefined','confirmed-refusal-null','confirmed-refusal-false','confirmed-refusal-zero','confirmed-refusal-empty',
- 'confirmed-refusal-drift','foreign-cancel-node','foreign-cancel-owner','foreign-cancel-flag']);
+ 'confirmed-refusal-drift','foreign-cancel-node','foreign-cancel-owner','foreign-cancel-flag','observation-write-failure']);
 for(const scenario of scenarios)test('private capture transaction: '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'capture-bridge-'));
  const f=current={scenario,events:[],busy:false,saves:0};
@@ -75,8 +75,16 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
  if(scenario==='wrong-session')binding.session='foreign';if(scenario==='wrong-account')binding.account='foreign';
  if(scenario==='wrong-path')binding.packagePath='/foreign/pkg.lgp';if(scenario==='expired')binding.expires=0;
  const falsy={'falsy-false':false,'falsy-zero':0,'falsy-empty':'','falsy-null':null,'falsy-undefined':undefined};
- const harness=async({identity,browser,record})=>{
+  const harness=async({identity,browser,record})=>{
   assert.ok(browser);f.events.push('capture-before');f.events.push('capture-after');
+  if(scenario==='success'||scenario==='observation-write-failure'){
+   const event={phase:'node_observation_completed',outcome:{output:{document_id:identity.document_id,
+    prepared_node_context:{verified:true,node_id:'own-node'}}}};
+   const persisted=await record(event);
+   assert.equal(JSON.stringify(persisted.outcome),JSON.stringify(event.outcome),'the procedure must receive the durable observation ACK');
+   const written=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+   assert.equal(JSON.stringify(written.at(-1)),JSON.stringify(persisted),'the returned ACK must already be on disk');
+  }
   if(scenario.startsWith('confirmed-refusal')||scenario.startsWith('foreign-cancel')){
    const owner={...identity,...Object.fromEntries(['owner','lease','run','generation','chat'].map(k=>[k,binding[k]])),workflow_id:'own-workflow',node_id:'own-node'};
    const primary={'confirmed-refusal-undefined':undefined,'confirmed-refusal-null':null,'confirmed-refusal-false':false,'confirmed-refusal-zero':0,'confirmed-refusal-empty':''};
@@ -96,7 +104,8 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
      if(scenario==='foreign-cancel-node')event.cancellation.node_context={...event.cancellation.node_context,node_id:'foreign'};
      if(scenario==='foreign-cancel-owner')event.owner={...event.owner,lease:'foreign'};
      if(scenario==='foreign-cancel-flag')event.cancellation={...event.cancellation,draft_discarded:false};
-     await record(event);
+     const persisted=await record(event);
+     assert.equal(JSON.stringify(persisted.cancellation),JSON.stringify(event.cancellation),'cancel ACK must survive the ownership guard');
      if(scenario==='confirmed-refusal-drift')session.metadata.workspacePreparation.state.document_id='foreign';
     }});
   }
@@ -123,6 +132,10 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
   if(scenario==='wrong-document')session.metadata.workspacePreparation.state.document_id='foreign';
   f.busy=scenario==='pending';f.unknown=scenario==='unknown';
   if(scenario==='receipt-write')await (await import('node:fs/promises')).mkdir(join(directory,'acceptance-capture.json'));
+  if(scenario==='observation-write-failure'){
+   await rename(join(directory,'execution-events.jsonl'),join(directory,'execution-events-before.jsonl'));
+   await mkdir(join(directory,'execution-events.jsonl'));
+  }
   const result=await bridge.captureAcceptance().then(value=>({ok:true,value}),error=>({ok:false,error}));
   if(scenario==='success'){
    assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.value.cleanupComplete,true);
@@ -145,6 +158,12 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
    if(confirmed){assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));}
   }else{
    assert.equal(result.ok,false);assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
+   if(scenario==='observation-write-failure'){
+    assert.equal(result.error.code,'EISDIR');
+    assert.equal(f.events.includes('verified-cancel'),false);
+    const rejected=await bridge.close().catch(error=>error);
+    assert.equal(rejected,result.error,'persistence failure must remain the original capture refusal');
+   }
    if(scenario in falsy){
     assert.equal(result.error,falsy[scenario]);const close=await bridge.close().then(()=>({ok:true}),error=>({ok:false,error}));
     assert.equal(close.ok,false);assert.equal(close.error,falsy[scenario]);assert.equal(f.events.includes('package-cleanup'),false);

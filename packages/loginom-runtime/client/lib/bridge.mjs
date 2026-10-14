@@ -502,10 +502,12 @@ export async function createBridge(config, session, { browserTransport: managedB
                 || c.settings_applied!==false||c.execution_started!==false
                 || ['document_id','workflow_id','node_id'].some(key=>c.node_context?.[key]!==owner[key]))
               throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
-            await recordExecution(event);
+            const persisted=await recordExecution(event);
             assertBound();
             cancelledDraft=true;
-          } else await recordExecution(event);
+            return persisted;
+          }
+          return await recordExecution(event);
         };
         let receipt;
         try { receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordCapture}); }
