@@ -1,11 +1,24 @@
 const need=(v,m)=>{if(!v)throw Error(m);};
 const name=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!/[\x00-\x1f]/.test(v);
+export function validateUnionPrefixes(prefixes){
+ const keys=prefixes&&Object.keys(prefixes).sort().join(',');
+ need(prefixes&&typeof prefixes.enabled==='boolean'&&(keys==='enabled,preserve_native'
+  ?prefixes.enabled===false&&prefixes.preserve_native===true
+  :keys==='enabled,label,name'&&typeof prefixes.label==='string'&&prefixes.label.length<=128
+   &&typeof prefixes.name==='string'&&prefixes.name.length<=128),'Explicit union prefix settings required');
+ need(!prefixes.enabled||/^[A-Za-z_][A-Za-z0-9_]*$/.test(prefixes.name),'Union prefix must be an identifier');
+}
+export function resolveUnionPrefixes(prefixes,native){
+ validateUnionPrefixes(prefixes);
+ if(!Object.hasOwn(prefixes,'preserve_native'))return {...prefixes};
+ need(native&&typeof native.enabled==='boolean'&&typeof native.name==='string'&&native.name.length<=128
+  &&typeof native.label==='string'&&native.label.length<=128,'Union native prefix settings unavailable');
+ return {enabled:false,name:native.name,label:native.label};
+}
 export function validateUnionParameters(p,mode,r){
  need(mode==='append_all','Union supports append_all');
  need(p&&Object.keys(p).sort().join(',')==='prefixes,tables','Explicit union tables and prefixes required');
- need(p.prefixes&&Object.keys(p.prefixes).sort().join(',')==='enabled,label,name'&&typeof p.prefixes.enabled==='boolean'
-  &&typeof p.prefixes.label==='string'&&p.prefixes.label.length<=128&&typeof p.prefixes.name==='string'&&p.prefixes.name.length<=128,'Explicit union prefix settings required');
- need(!p.prefixes.enabled||/^[A-Za-z_][A-Za-z0-9_]*$/.test(p.prefixes.name),'Union prefix must be an identifier');
+ validateUnionPrefixes(p.prefixes);
  need(Array.isArray(p.tables)&&p.tables.length>=1&&p.tables.length<=14,'Union requires two to fifteen tables');
  for(const [i,t] of p.tables.entries()){
   need(t&&Object.keys(t).sort().join(',')==='fields,port'&&t.port===i+1,'Union tables must be ordered and contiguous');

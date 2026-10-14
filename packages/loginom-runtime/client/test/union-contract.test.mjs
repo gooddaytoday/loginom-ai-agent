@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyInputSchema} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
@@ -13,4 +14,18 @@ test('two-input Union declares only the joined table and explains accidental mai
  assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));
  r.parameters.tables.push({port:2,fields:[{source:'Extra',main:null}]});
  assert.throws(()=>validateNodeApplyRequest(r,handlers),/requires 3 input sources at ports 0\.\.2.*never the main table at port 0/);
+});
+test('public and installed typed Union schemas admit preserve-native and reject mixed forms',()=>{
+ const schema=handlers.get('transform.union_data').parameter_schema;
+ const provider=new AjvJsonSchemaValidator(),publicCheck=provider.getValidator(nodeApplyInputSchema),typedCheck=provider.getValidator(schema);
+ const r=request();r.parameters.prefixes={enabled:false,preserve_native:true};
+ assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema,r));
+ assert.doesNotThrow(()=>validateActionParameters(schema,r.parameters));
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));
+ assert.equal(publicCheck(r).valid,true);assert.equal(typedCheck(r.parameters).valid,true);
+ for(const prefixes of [{enabled:true,preserve_native:true},{enabled:false,preserve_native:true,name:'Union'},{enabled:false,preserve_native:true,label:''}]){
+  r.parameters.prefixes=prefixes;
+  assert.equal(publicCheck(r).valid,false);assert.equal(typedCheck(r.parameters).valid,false);
+  assert.throws(()=>validateNodeApplyRequest(r,handlers));
+ }
 });
