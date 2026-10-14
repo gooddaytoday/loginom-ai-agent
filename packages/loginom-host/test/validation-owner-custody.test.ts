@@ -66,6 +66,7 @@ for(const mode of ['start-refusal-host','ready-close-refusal']) test(`same host 
   try {
     const failure=await host.request('connection.check',candidate).catch(error=>error)
     expect(failure).toBeInstanceOf(Error)
+    if (!(failure instanceof Error)) throw Error('Expected a rejected connection check')
     if(mode.startsWith('start-refusal'))expect(failure.message).toBe('LOGINOM_LOGIN_REJECTED')
     const before=await f.calls();expect(before.starts).toBe(1)
     await expect(host.request('connection.check',candidate)).rejects.toThrow()

@@ -28,6 +28,62 @@ function fixture() {
   owner.readinessBinding = Object.freeze({...owner});
   return {owner, page, controller, connection, session, user, tree, packages, globals, events};
 }
+const identityChanges = {
+  document: f => { f.globals.document = {}; },
+  marker: f => { f.globals.__loginomStartupV1 = {...f.globals.__loginomStartupV1}; },
+  'marker.document': f => { f.globals.__loginomStartupV1.document = {}; },
+  'marker.id': f => { f.globals.__loginomStartupV1.id = 'different'; },
+  'marker.account': f => { f.globals.__loginomStartupV1.account = 'different'; },
+  origin: f => { f.globals.location.origin = 'https://different.invalid'; },
+  build: f => { f.globals.bg.app.Version = 'different'; },
+  tree: f => { f.globals.bg.app.Application.FInstance.FMainForm.FMapTree = {...f.tree}; },
+  connection: f => { f.tree.FServerConnection = {...f.connection}; },
+  session: f => { f.connection.Session = {...f.session}; },
+  connected: f => { f.connection.Connected = false; },
+  account: f => { f.connection.UserName = 'different'; },
+  packages: f => { f.tree.PackageNodes = {...f.packages}; },
+};
+for (const [member, change] of Object.entries(identityChanges))
+  test(`diagnostic first member ${member} retains refusal and does not replay`, async () => {
+    const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
+    change(f);
+    let first;
+    for (let i = 0; i < 2; i++) {
+      await assert.rejects(reader.read(), error => {
+        assert.equal(error.message, 'LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED');
+        assert.equal(error.cause, member);
+        if (i === 0) first = error; else assert.equal(error, first);
+        return true;
+      });
+    }
+    assert.deepEqual(f.events, ['retain']);
+  });
+test('diagnostic first mismatch short-circuits later getters', async () => {
+  const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
+  identityChanges.document(f);
+  Object.defineProperty(f.tree, 'FServerConnection', {get() {throw Error('later getter must not run');}});
+  await assert.rejects(reader.read(), error => error.cause === 'document');
+});
+for (const stage of ['user', 'name'])
+  test(`diagnostic identity loss after ${stage} await retains member`, async () => {
+    const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
+    if (stage === 'user') f.session.get_CurrentUser = async () => {identityChanges.session(f); return f.user;};
+    else f.user.get_Name = async () => {identityChanges.packages(f); return 'own';};
+    await assert.rejects(reader.read(), error => {
+      assert.equal(error.message, stage === 'user' ? 'LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED' : 'LOGINOM_CALCULATOR_RESOURCE_CHANGED');
+      assert.equal(error.cause, stage === 'user' ? 'session' : 'packages');
+      return true;
+    });
+  });
+for (const value of [undefined, null, false, 0, '', Error('getter', {cause: 0})])
+  test(`diagnostic throwing identity getter preserves raw ${String(value)}`, async () => {
+    const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
+    Object.defineProperty(f.connection, 'Session', {get() {throw value;}});
+    const observed = await reader.read().then(() => ({ok:true}), error => ({ok:false,error}));
+    assert.equal(observed.ok, false);
+    if (value instanceof Error) {assert.equal(observed.error.message,value.message);assert.equal(observed.error.cause,0);}
+    else assert.equal(observed.error,value);
+  });
 test('same Page opaque refs produce only bounded current-session facts', async () => {
   const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
   const result = await reader.read();

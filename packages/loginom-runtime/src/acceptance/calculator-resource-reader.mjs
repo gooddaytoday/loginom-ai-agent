@@ -61,29 +61,43 @@ export async function createCalculatorResourceReader(owner) {
           return {kind: 'unsupported'};
         };
         try {
+        let identityFailure;
         const same = () => {
           const marker = globalThis.__loginomStartupV1;
           const app = globalThis.bg?.app;
           const tree = app?.Application?.FInstance?.FMainForm?.FMapTree;
-          return document === refs.document && marker === refs.marker && marker?.document === document
-            && marker.id === refs.id && marker.account === refs.account && location.origin === refs.origin
-            && app?.Version === '7.4.2' && tree === refs.tree && tree.FServerConnection === refs.connection
-            && refs.connection.Session === refs.session && refs.connection.Connected === true
-            && refs.connection.UserName === refs.account && tree.PackageNodes === refs.packages;
+          // Preserve the original short-circuit order and getter calls. Only a
+          // fixed member name leaves this realm, never a native object/value.
+          const reject = member => { identityFailure = member; return false; };
+          if (document !== refs.document) return reject('document');
+          if (marker !== refs.marker) return reject('marker');
+          if (marker?.document !== document) return reject('marker.document');
+          if (marker.id !== refs.id) return reject('marker.id');
+          if (marker.account !== refs.account) return reject('marker.account');
+          if (location.origin !== refs.origin) return reject('origin');
+          if (app?.Version !== '7.4.2') return reject('build');
+          if (tree !== refs.tree) return reject('tree');
+          if (tree.FServerConnection !== refs.connection) return reject('connection');
+          if (refs.connection.Session !== refs.session) return reject('session');
+          if (refs.connection.Connected !== true) return reject('connected');
+          if (refs.connection.UserName !== refs.account) return reject('account');
+          if (tree.PackageNodes !== refs.packages) return reject('packages');
+          identityFailure = undefined;
+          return true;
         };
-        if (!same()) throw Error('LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED');
+        if (!same()) throw new Error('LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED', {cause: identityFailure});
         const count = refs.packages.Count, running = refs.tree.HasRunningNodes();
         if (!Number.isSafeInteger(count) || count < 0)
           throw new Error('LOGINOM_CALCULATOR_RESOURCE_FACT_UNKNOWN', {cause: count});
         if (typeof running !== 'boolean')
           throw new Error('LOGINOM_CALCULATOR_RESOURCE_FACT_UNKNOWN', {cause: running});
         const user = await refs.session.get_CurrentUser();
-        if (!same()) throw Error('LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED');
+        if (!same()) throw new Error('LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED', {cause: identityFailure});
         if (!user || typeof user.get_Name !== 'function')
           throw new Error('LOGINOM_CALCULATOR_NATIVE_USER_REFUSED', {cause: user});
         const name = await user.get_Name();
         if (!same() || name !== refs.account || refs.packages.Count !== count
-            || refs.tree.HasRunningNodes() !== running) throw Error('LOGINOM_CALCULATOR_RESOURCE_CHANGED');
+            || refs.tree.HasRunningNodes() !== running) throw new Error('LOGINOM_CALCULATOR_RESOURCE_CHANGED', {cause: identityFailure});
         return {ok: true, value: {scope: 'current-owned-session', owner: refs.id, account: refs.account,
           package_count: count, running, observed_at: new Date().toISOString(),
           historical_cleanup_verified: false, account_wide_safety_verified: false}};
