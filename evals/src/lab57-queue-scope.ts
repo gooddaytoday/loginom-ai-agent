@@ -1,4 +1,5 @@
 import {createHash} from "node:crypto"
+import statusContract from "./lab57-task-statuses.json"
 
 export const masQueueScope=Object.freeze({mas:"24aa980b-b8c3-43e2-b087-bad8f79c9517",original:"a5fa993f-2903-4997-a832-955ffbb1203c",
   ben:"99804e93-d241-45f2-872d-8a1e16ec7f3d",originalOwner:"01a1375d-ce4a-7c35-a3a3-94cf64a8b589",ownerAmendmentSha256:"e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3"})
@@ -8,7 +9,8 @@ type Page={before:string|null;next:string|null;rows:Task[];rowsSha256:string;std
 export type QueueInventory={roster:Agent[];agents:{id:string;pages:Page[]}[]}
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const sha=/^[0-9a-f]{64}$/
-const pending=new Set(["queued","pending","running","retrying","scheduled"])
+const terminal=new Set(statusContract.terminal)
+const states=new Set([...statusContract.pending,...statusContract.terminal])
 export function queueDigest(value:unknown):string {
   const canonical=(v:unknown):unknown=>Array.isArray(v)?v.map(canonical):v&&typeof v==="object"
     ?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([k,item])=>[k,canonical(item)])):v
@@ -37,9 +39,9 @@ export function inspectQueueInventory(inventory:QueueInventory,followup:string) 
       if(page.next!==null)cursors.add(page.next)
       before=page.next;pageCount++
       for(const task of page.rows){
-        if(!task||!uuid.test(task.id)||typeof task.status!=="string"||!task.status||seen.has(task.id)||task.agent_id!==agent.id)fail()
+        if(!task||!uuid.test(task.id)||typeof task.status!=="string"||!states.has(task.status)||seen.has(task.id)||task.agent_id!==agent.id)fail()
         seen.add(task.id);recordCount++
-        if(!pending.has(task.status))continue
+        if(terminal.has(task.status))continue
         const row:Record<string,unknown>={task:task.id,agent:task.agent_id,status:task.status,taskRuntime:task.runtime_id,agentRuntime:agent.runtime_id,rosterAgent:agent.id}
         const bound=task.agent_id===agent.id
         if(task.id===followup&&bound&&agent.id===masQueueScope.ben&&task.status==="running"&&task.runtime_id===masQueueScope.original&&agent.runtime_id===masQueueScope.original){

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "platformSource": "https://github.com/multica-ai/multica",
+  "platformCommit": "2ea01ae4ef55de4310b99af192d2dbd367832883",
+  "contract": "server/migrations/128_comment_routing_escalation.up.sql: agent_task_queue_status_check; server/pkg/db/queries/agent.sql: CancelAgentTasksByIssue",
+  "pending": ["queued", "dispatched", "running", "waiting_local_directory", "deferred"],
+  "terminal": ["completed", "failed", "cancelled"]
+}

@@ -91,7 +91,7 @@ test("full paginated inventory preserves mas rows and a blocking last-page row",
 })
 test("the five handed-off mas identities and every pending status retain exact binding and accounting",()=>{
  const v=queueFixture(),ids=["01a13927-fe40-76bb-b3d3-303a35454c6f","01a13922-14d1-7c76-8dea-a96d925a5a4a","01a13919-c844-73f5-b0a6-f05629b14a26","01a13884-799a-7679-86e0-05c560522e19","01a13545-d71b-7b39-9d4d-490dbfead7c8"]
- v.agents[1]!.pages[0]!.rows=ids.map((id,i)=>({id,status:["queued","pending","running","retrying","scheduled"][i]!,agent_id:queueForeign,runtime_id:queueMas}));resign(v)
+ v.agents[1]!.pages[0]!.rows=ids.map((id,i)=>({id,status:["queued","deferred","running","dispatched","waiting_local_directory"][i]!,agent_id:queueForeign,runtime_id:queueMas}));resign(v)
  const s=state(v);expect(s.queueLedger.excluded.map(r=>r.task)).toEqual(ids);expect(s.queueLedger.pendingCount).toBe(6)
  expect(s.queueLedger.recordCount).toBe(6);expect(s.queueLedger.blocked.length).toBe(0)
  expect(()=>validateFreshRouteState(s,false,queueFollowup)).not.toThrow()

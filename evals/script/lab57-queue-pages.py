@@ -1,8 +1,13 @@
 """Concrete authenticated CLI pagination. No capped history can stand in for full queues."""
-import subprocess,json,re,datetime,hashlib
+import subprocess,json,re,datetime,hashlib,pathlib
+status_contract=json.loads((pathlib.Path(__file__).parent.parent/'src/lab57-task-statuses.json').read_bytes())
+PENDING=status_contract['pending']
+TERMINAL=status_contract['terminal']
+STATES=set(PENDING+TERMINAL)
 def parse_page(stdout,stderr):
     rows=json.loads(stdout)
     assert isinstance(rows,list) and all(isinstance(t,dict) and isinstance(t.get('id'),str) and isinstance(t.get('status'),str) for t in rows),'Queue page malformed'
+    assert all(t['status'] in STATES for t in rows),'Queue task status unsupported; STOP before partition'
     assert len({t['id'] for t in rows})==len(rows),'Queue page duplicate'
     if not stderr.strip():return rows,None
     match=re.fullmatch(r'More runs available; use --before "([^"\n]+)" to fetch the next page\.',stderr.strip())
@@ -39,7 +44,6 @@ MAS='24aa980b-b8c3-43e2-b087-bad8f79c9517'
 ORIGINAL='a5fa993f-2903-4997-a832-955ffbb1203c'
 BEN='99804e93-d241-45f2-872d-8a1e16ec7f3d'
 AMENDMENT='e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3'
-PENDING=['queued','pending','running','retrying','scheduled']
 
 def collect_queues(agents,followup):
     assert re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',followup) and followup!='01a1375d-ce4a-7c35-a3a3-94cf64a8b589','Original owner cannot be followup'
@@ -54,7 +58,7 @@ def collect_queues(agents,followup):
             for t in page['rows']:
                 assert t['id'] not in ids,'Queue duplicate across agents/race'
                 ids.add(t['id']);records+=1
-                if t['status'] not in PENDING:continue
+                if t['status'] in TERMINAL:continue
                 row={'task':t['id'],'agent':t['agent_id'],'status':t['status'],'taskRuntime':t['runtime_id'],
                      'agentRuntime':agent['runtime_id'],'rosterAgent':agent['id']}
                 bound=t['agent_id']==agent['id']
