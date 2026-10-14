@@ -40,6 +40,33 @@ test("неизвестный case ID остаётся ERROR/2 при failed по
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("node run rejects an unknown slot before accepting failed-attempt evidence", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-unknown-slot-"))
+  try {
+    const id = "crosstable-fixed-sum"
+    await writeSummary(path.join(directory, "summary.json"), JSON.stringify({ config: { repeat: 1, parallel: 2 }, storage_leftovers: [],
+      slots: [{ id: "a" }, { id: "b" }], tasks: [{ id, attempts: [{ attempt: 1, status: "failed", slot_id: "unknown",
+        environment_cleanup: { status: "confirmed" } }] }] }))
+    const result = await validateNodeRun(directory, [id], path.join(directory, "cases"))
+    expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+    expect(result.errors.join(" ")).toContain("Unknown node evidence slot")
+  } finally { await rm(directory, { recursive: true }) }
+})
+
+test("node run cannot pick the first ambiguous slot or use a missing parallel table", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-ambiguous-slot-"))
+  try {
+    const id = "crosstable-fixed-sum"
+    for (const slots of [[{ id: "a" }, { id: "a" }], undefined]) {
+      await writeSummary(path.join(directory, "summary.json"), JSON.stringify({ config: { repeat: 1, parallel: 2 }, storage_leftovers: [],
+        slots, tasks: [{ id, attempts: [{ attempt: 1, status: "failed", slot_id: "a", environment_cleanup: { status: "confirmed" } }] }] }))
+      const result = await validateNodeRun(directory, [id], path.join(directory, "cases"))
+      expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+      expect(result.errors.join(" ")).toContain("Unknown node evidence slot")
+    }
+  } finally { await rm(directory, { recursive: true }) }
+})
+
 test("незавершённый run получает ERROR/2, даже если generic harness завершился успешно", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
   try {

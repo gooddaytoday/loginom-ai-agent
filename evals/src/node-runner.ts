@@ -2,7 +2,7 @@ import path from "node:path"
 import { main } from "./run"
 import { evalsRoot, loadConfig } from "./config"
 import { loadTasks } from "./task"
-import { validateNodeRun } from "./node-evals"
+import { requireNodeEvidenceSlot, validateNodeRun } from "./node-evals"
 import { coverageCaseIds, nodeCaseIds } from "./node-cases"
 import { collectNodeNativeEvidence } from "./node-native"
 import { textImportIds, textImportChecks, collectTextImportEvidence, assertTextImportModel } from "./text-import"
@@ -31,9 +31,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   const summary=await Bun.file(path.join(run.runDir,"summary.json")).json() as RunSummary
   for (const task of summary.tasks) for (const attempt of task.attempts) {
     if (attempt.status !== "completed" || attempt.environment_cleanup?.status !== "confirmed") continue
-    const slot = summary.slots?.find(slot => slot.id === attempt.slot_id)
-    if (summary.slots && !slot || (summary.config.parallel ?? 1) > 1 && !summary.slots)
-      throw Error("Unknown node evidence slot")
+    const slot = requireNodeEvidenceSlot(summary, attempt.slot_id)
     if (task.id === "crosstable-min-max" || coverageCaseIds.includes(task.id))
       await collectNodeNativeEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), slot?.profileDir ?? config.profileDir, slot?.historyDir)
     if (textImportIds.includes(task.id))
