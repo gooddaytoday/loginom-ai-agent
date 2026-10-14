@@ -59,6 +59,14 @@ typecheck/diff PASS. Summary не является acceptance PASS. Labels
 измеренным run. Standalone CLI не подключён к реестру другого процесса: processes=null. Controller
 binding и итоговая resource/licence acceptance ещё открыты; этот CLI не выдаёт readiness.
 
+Receipt policy assessParallelLimits отвергает rate/quota/HTTP429 даже перед
+успешным retry, а также classified licence/session/OOM/ENOSPC events.
+Неполная provider/Dock/judge coverage или malformed event дают incomplete;
+известный limit остаётся failed. Сохраняются quality attempts и прежний
+failure_kinds.provider. Шесть redacted receipt tests PASS; реальные producers
+ещё должны доказать coverage до объявления complete. Этот policy gate не
+наблюдает transport и не предоставляет live admission сам по себе.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
