@@ -403,3 +403,11 @@ finishedAt, cleanup true, отсутствия blocker/collection failures/timeo
 wrapper exit 0 или 1. Baseline policy failure остаётся измерением; техническая
 аномалия останавливает очередь для разбора. Candidate в очередь не включён.
 Текущий слот — sales/3; полная серия и итоговая приёмка ещё не завершены.
+
+
+На 2026-10-14 01:00 UTC завершены 8/18 baseline, 0/25 candidate.
+`sales-by-category/3` прошёл oracle, полный расчёт и policy, JS-узлов 0;
+CLI/wrapper exit 0, cleanup подтверждён. Session `ses_ec818eb1cffeXh48iCuXH9H55q`,
+SHA attempt `7fe5ccbf…`. Все три sales-прогона успешны. Root17410 продолжает
+ту же последовательную очередь; текущий слот — `abc-pareto-groups/2`.
+Новые результаты не переносятся из прежних серий; приёмка ещё не завершена.
