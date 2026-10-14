@@ -86,6 +86,7 @@ export function summarizeResourceSamples(samples: readonly ResourceSummarySample
       return { scope: series.scope, metric: series.metric, observed: observed.length, missing: series.values.length - observed.length,
         min: observed.length ? Math.min(...observed) : null, peak: observed.length ? Math.max(...observed) : null,
         delta: observed.length > 1 && !resets ? observed.at(-1)! - observed[0]! : null,
+        ...(series.metric.startsWith("memory_events.") ? { counter_increases: observed.slice(1).filter((value, index) => value > observed[index]!).length } : {}),
         ...(counter ? { counter_resets: resets } : {}) }
     }) : [],
   }

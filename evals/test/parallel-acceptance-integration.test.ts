@@ -352,7 +352,7 @@ test("resource timeline covers an actual owned command through confirmed cleanup
       startedAt, finishedAt, coverage: { paths: [root], containers: [], owners: [] }, view: samples[0].host.collector_cgroup.view, budget }
     const result = await checkResourceEvidence(request)
     expect(result).toMatchObject({ status: "passed", codes: [], source: receipt.source })
-    expect(Object.keys(result.checks)).toEqual(["timeline", "coverage", "cgroups", "budget"])
+    expect(Object.keys(result.checks)).toEqual(["timeline", "coverage", "cgroups", "budget", "incidents"])
     expect(await checkResourceEvidence({ ...request, budget: null })).toMatchObject({ status: "incomplete", codes: ["RESOURCE_BUDGET_MISSING"] })
     expect(await checkResourceEvidence({ ...request, finishedAt: new Date(Date.parse(finishedAt) + 10000).toISOString(),
       budget: { ...request.budget, bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: null, maximum: 0 }] } }))
