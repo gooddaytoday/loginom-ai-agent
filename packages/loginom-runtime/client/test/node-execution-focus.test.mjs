@@ -59,3 +59,29 @@ for(const closeFault of [false,true])test('failed group cleans only its console 
  else {const r=await f.driver.waitCompleted();assert.equal(r.status,'failed');assert.equal(r.cleanup_complete,true);assert.equal(r.error.message,'Missing own CSV');}
  assert.deepEqual(f.actions.map(a=>a.ref),['ConsoleForm;btnClose']);
 });
+
+
+for(const drift of ['revision','document','root','grid'])test('console readiness retains its own identity under '+drift+' drift',async()=>{
+ let sample=0,menu=false,opened=true;
+ const actions=[],el=(tid,verbs=['click'])=>({tid,ref:tid,allowed_actions:verbs});
+ const state=()=>({dom_epoch:{document:drift==='document'&&sample>0?'foreign':'original',revision:sample},
+  prepared_node_context:{...node,verified:true,surface:'graph'},
+  node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:drift==='root'&&sample>0?'foreign':'root',node_context:{...node,verified:true},processes:[]},
+  ui:{elements:[el(button),...(opened?[{...el(grid,['right_click']),signature:{tag:'div',tid:grid,process_grid:{panel_ref:'panel',grid_id:drift==='grid'&&sample>0?'foreign':'original'}}},el('ConsoleForm;btnClose')]:[]),
+   ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[])]}});
+ const channel={observe:async o=>{
+   const before=state();assert.ok(o.ready(before),o.condition);
+   if(o.confirmIdentity){sample++;const after=state();assert.ok(o.ready(after));
+    if(JSON.stringify(o.confirmIdentity(before))!==JSON.stringify(o.confirmIdentity(after)))throw Error('Original console changed');
+    return structuredClone(after);
+   }
+   return structuredClone(before);
+  },perform:async o=>{const s=state();assert.ok(o.ready(s));const a=o.resolve(s);actions.push(a);
+   if(a.verb==='right_click')menu=true;if(a.verb==='press')menu=false;if(a.ref==='ConsoleForm;btnClose')opened=false;
+   return {status:'SUCCEEDED'};
+  }};
+ const driver=createNodeExecutionProcedure(channel,node);
+ if(drift==='revision'){const result=await driver.prepare();assert.ok(result);assert.equal(actions.filter(a=>a.verb==='right_click').length,1);}
+ else{await assert.rejects(driver.prepare(),/Original console changed/);assert.deepEqual(actions,[]);}
+ assert.equal(actions.some(a=>a.verb==='execute_graph_node'),false);
+});
