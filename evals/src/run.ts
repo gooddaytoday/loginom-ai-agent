@@ -60,7 +60,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const source = parseArtifactSource(config.artifactSource, config.loginom)
   const environment = fixture
     ? { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
-    : await preflight(config, source)
+    : await preflight(config, source, controller.signal)
   const startedAt = new Date()
   const runDir = await reserveRunDirectory(config.resultsDir,
     `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`)
@@ -71,7 +71,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   }, null, 2))
   const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
-  const judge = config.skipJudge ? null : await judgeInfo(config)
+  const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal)
   const settings: JudgeSettings | undefined = judge
     ? {
         command: config.judge.command,

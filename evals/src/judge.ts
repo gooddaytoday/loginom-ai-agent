@@ -74,8 +74,8 @@ function parseJson(text: string): unknown {
   }
 }
 
-export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env"> }) {
-  const version = await judgeVersion(config.judge)
+export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env"> }, signal?: AbortSignal) {
+  const version = await judgeVersion(config.judge, signal)
   return {
     backend: "codex" as const,
     codex_version: version.exitCode === 0 ? version.stdout.trim() : null,
@@ -87,9 +87,9 @@ export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" |
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
 
-export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env">) {
+export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env">, signal?: AbortSignal) {
   const version = await superviseProcess({ cmd: [...judge.command, "--version"], cwd: evalsRoot,
-    env: judgeEnvironment(judge.env), timeoutMs: 10_000, owner: { kind: "judge", id: "version" } })
+    env: judgeEnvironment(judge.env), timeoutMs: 10_000, signal, owner: { kind: "judge", id: "version" } })
     .catch(() => { throw new EvalFailure("Судья недоступен: проверка версии не подтверждена", 2) })
   if (version.processCleanup.status !== "confirmed" || !version.processCleanup.capture_complete || version.timedOut || version.interrupted)
     throw new EvalFailure("JUDGE_VERSION_UNCONFIRMED", 2)

@@ -12,23 +12,23 @@ import { aggregate, aggregateTask, renderReport, writeSummary, type AttemptResul
 import { describe, installSigint } from "./run"
 
 export async function rejudge(config: EvalConfig, runId: string) {
-  const runDir = path.join(config.resultsDir, runId)
-  const summaryFile = Bun.file(path.join(runDir, "summary.json"))
-  if (!(await summaryFile.exists())) throw new EvalFailure(`Нет прогона ${runId}: ${runDir}/summary.json не найден`, 2)
-  const prev = (await summaryFile.json()) as RunSummary
-  const saved = await Bun.file(path.join(runDir, "config.json")).json().catch(() => undefined) as { tasksDir?: unknown } | undefined
-  const tasksDir = config.tasksDirExplicit
-    ? config.tasksDir
-    : prev.config.tasks_dir ?? (typeof saved?.tasksDir === "string" ? saved.tasksDir : config.tasksDir)
-  const tasks = await loadTasks(tasksDir, prev.task_ids)
-  await preflight(config, parseArtifactSource("docker", config.loginom))
-  const judge = await judgeInfo(config)
-  if ((await agentInputsHash(tasks)) !== prev.agent_inputs_hash)
-    console.error("Предупреждение: agent_inputs_hash текущих задач отличается от прогона — артефакты созданы под прежними входами")
-  await cp(path.join(runDir, "summary.json"), path.join(runDir, "summary.prev.json"))
   const controller = new AbortController()
   const removeSigint = installSigint(controller)
   try {
+    const runDir = path.join(config.resultsDir, runId)
+    const summaryFile = Bun.file(path.join(runDir, "summary.json"))
+    if (!(await summaryFile.exists())) throw new EvalFailure(`Нет прогона ${runId}: ${runDir}/summary.json не найден`, 2)
+    const prev = (await summaryFile.json()) as RunSummary
+    const saved = await Bun.file(path.join(runDir, "config.json")).json().catch(() => undefined) as { tasksDir?: unknown } | undefined
+    const tasksDir = config.tasksDirExplicit
+      ? config.tasksDir
+      : prev.config.tasks_dir ?? (typeof saved?.tasksDir === "string" ? saved.tasksDir : config.tasksDir)
+    const tasks = await loadTasks(tasksDir, prev.task_ids)
+    await preflight(config, parseArtifactSource("docker", config.loginom), controller.signal)
+    const judge = await judgeInfo(config, controller.signal)
+    if ((await agentInputsHash(tasks)) !== prev.agent_inputs_hash)
+      console.error("Предупреждение: agent_inputs_hash текущих задач отличается от прогона — артефакты созданы под прежними входами")
+    await cp(path.join(runDir, "summary.json"), path.join(runDir, "summary.prev.json"))
     const judgeAttempt = createJudgeGate()
     const settings: JudgeSettings = {
       command: config.judge.command,
