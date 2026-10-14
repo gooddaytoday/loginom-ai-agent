@@ -2381,3 +2381,28 @@ bound approval ожидается. JS/Join/schema подготовлены др�
 25tests/3typecheck0; их independently принимает другой reviewer, чтобы автор
 не принимал собственный proof. Model/native live0, current-run historical233119;
 полная приёмка и stage сборки+live остаются открытыми.
+
+
+На 2026-10-14 05:29 UTC все bound ordinary proof получили independent static
+approval: clipped Export `1b7c80af6d886273ed1da31b84689e5e049d86dd1ab0a333c2d75d58dd80a61b`;
+JS `6145511ebcf611b03fb691229b8377895d4df32b6c1ecd752d70a65010b6860f`;
+Join `1bb87b801a6b07a10fefe3f2ec5c5f185e4bb189ef37b150dd50c28b51be9eb6`;
+schema `339d5242f782543d488ba9959f096d76da187ffff0d148a66d9b27ec05a2e92e`.
+Approvals подтверждают static bindings/checks, не свежие native результаты.
+
+Root запустил clipped Export первым, Root25228 active. Exact container0c72…
+running, writer absent, run dir absent проверены перед допуском. Reviewed binding
+`5b498da175e98e9e23b31e2e1cb02138b138f0d43f559f7f27001d512e28e692`
+сохранена0400/byteequal; активированы только ready/status, active SHA
+`973307358d75a95a7aef1e0e3cdbfc7872192c9b1d0b57f9da0aa98f404ab2a8`,
+exclusive admission
+`70ecc163420614cf53f8bc6b56302d4edbb32e0a2218eec50666dd2069874018`.
+Первый preserve отказался O_EXCL, потому что reviewed copy уже существовала;
+до повторного допуска подтверждены её exact bytes/mode, никакой overwrite
+или дополнительный native запуск не происходил.
+
+Own ordinary prepare и input delivery прошли; Import1 SUCCEEDED/cleanuptrue,
+Calculator выполняется. Actual7standard prefix, Export3position900,640 и
+no early Save сохраняются. Clipping/scroll/CSV/graph/финальный cleanup ещё
+не подтверждены. Другие native/CLI/admin/модели не запускаются одновременно;
+model slots0, current-run ещё historical233119. Цель и stages live/18+25 открыты.
