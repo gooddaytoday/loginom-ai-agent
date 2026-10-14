@@ -12,7 +12,8 @@ function installOriginalUserPublisher(origin) {
   const digest=root.crypto?.subtle?.digest?.bind(root.crypto.subtle),Encoder=root.TextEncoder;
   const key='__loginomOriginalUserPublisherV1';
   if(descriptor(root,key))return; // Never replace a previous/foreign publisher.
-  let sample,acquisition,failure,checks=[],sealed=false;
+  let sample,acquisition,failure,checks=[],sealed=false,pendingSS;
+  let initializers=Object.freeze({complete:false,reason:'INITIAL_SS_NOT_OBSERVED',sourceExecutionQualified:false,closureIdentityQualified:false});
   const unavailable=()=>{throw Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE')};
   const remember=error=>{failure??={value:error}};
   const data=(object,name)=>{
@@ -38,6 +39,11 @@ function installOriginalUserPublisher(origin) {
     const bindings={};let complete=true;
     const optional=(object,name)=>{
       if(object==null){complete=false;return undefined}
+      if(object===root&&name==='ss'&&pendingSS){
+        const expected=pendingSS;complete=false;
+        checks.push(()=>{const now=descriptor(root,'ss');if(!now||Reflect.ownKeys(expected).some(key=>now[key]!==expected[key]))unavailable()});
+        return undefined;
+      }
       const chain=[];
       for(let p=object;p;p=prototype(p)){
         chain.push(p);
@@ -64,7 +70,7 @@ function installOriginalUserPublisher(origin) {
     capture('exceptionWrap',optional(ss,'Exception'),'wrap');capture('awaiter',root,'__awaiter');
     capture('selectAsync',bg,'selectAsync');capture('objectEquals',bg,'ObjectEquals');
     if(Object.values(bindings).some(value=>value==null))complete=false;
-    return Object.freeze({bindings:Object.freeze(bindings),complete,closureIdentityQualified:false});
+    return Object.freeze({bindings:Object.freeze(bindings),complete,initializers,closureIdentityQualified:false});
   };
   const guard=()=>{
     if(acquisition?.failed)throw acquisition.error;
@@ -285,6 +291,88 @@ function installOriginalUserPublisher(origin) {
       if(!failure)try{next(value)}catch(error){remember(error)}
     }});
   };
+  const bindInitializers=(ss,initialBase)=>{
+    const d=descriptor(ss,'initClass');
+    if(!d||!('value'in d)||typeof d.value!=='function'||!d.writable)return;
+    hold(root,'ss');
+    const original=d.value,records=[],methods={ObjectProxy:['QueryInterface'],
+      FileStorage:['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'],StreamPersist:['SaveToStream']};
+    const lookup=(object,key)=>{
+      for(let p=object;p;p=prototype(p)){const d=descriptor(p,key);if(d){if(!('value'in d))unavailable();return d.value}}
+    };
+    const snapshot=object=>{
+      const parent=prototype(object),entries=Reflect.ownKeys(object).map(key=>{
+        const d=descriptor(object,key);if(!d||!('value'in d))unavailable();return [key,d];
+      });
+      return ()=>{if(prototype(object)!==parent||Reflect.ownKeys(object).length!==entries.length)unavailable();
+        for(const[key,d]of entries){const now=descriptor(object,key);
+          if(!now||Reflect.ownKeys(d).some(key=>!Object.is(now[key],d[key])))unavailable();
+        }};
+    };
+    let restored=false;
+    function retainedInitClass(ctor,asm,members,baseType,interfaces){
+      let kind,record;
+      try{
+        const rpc=lookup(root,'rpc'),bg=lookup(root,'bg'),bgRpc=bg&&lookup(bg,'rpc');
+        if(ctor===lookup(rpc,'TBGObjectProxy'))kind='ObjectProxy';
+        else if(ctor===lookup(bgRpc,'TIBGFileStorage_Proxy'))kind='FileStorage';
+        else if(ctor===lookup(bgRpc,'TIBGStreamPersist_Proxy'))kind='StreamPersist';
+        if(kind){
+          if(this!==ss||records.some(r=>r.kind===kind)||restored)unavailable();
+          const checkMembers=snapshot(members),heldMethods={};
+          for(const key of methods[kind]){const method=lookup(members,key);if(typeof method!=='function')unavailable();heldMethods[key]=method}
+          const dependencies=Object.freeze({shallowCopy:hold(ss,'shallowCopy'),prepareProperties:hold(ss,'prepareProperties'),initialBase});
+          if(interfaces)checks.push(snapshot(interfaces));
+          hold(asm,'__types');hold(asm,'name');hold(ctor,'__typeName');
+          const basePrototype=baseType?hold(baseType,'prototype'):undefined;
+          record=Object.freeze({kind,ctor,assembly:asm,members,baseType,basePrototype,interfaces,dependencies,receiver:this,
+            methods:Object.freeze(heldMethods),initializer:original,ss});
+          checks.push(checkMembers);guard();
+        }
+      }catch(error){remember(error)}
+      let value;try{value=apply(original,this,arguments)}catch(error){remember(error);throw error}
+      if(record)try{
+        guard();const proto=hold(ctor,'prototype');
+        if(hold(ctor,'__assembly')!==asm)unavailable();
+        for(const key of methods[kind])if(hold(proto,key)!==record.methods[key])unavailable();
+        if(kind==='ObjectProxy'){
+          hold(hold(root,'rpc'),'TBGObjectProxy');
+        }else hold(hold(hold(root,'bg'),'rpc'),kind==='FileStorage'?'TIBGFileStorage_Proxy':'TIBGStreamPersist_Proxy');
+        records.push(record);
+        if(records.length===3){
+          const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'?now.value!==retainedInitClass:now[key]!==d[key]))unavailable();
+          define(ss,'initClass',d);restored=true;hold(root,'ss');hold(ss,'initClass');
+          initializers=Object.freeze({complete:true,records:Object.freeze(records.slice()),
+            sourceExecutionQualified:false,closureIdentityQualified:false});
+        }
+      }catch(error){remember(error)}
+      return value;
+    }
+    define(ss,'initClass',{...d,value:retainedInitClass});
+    checks.push(()=>{const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'
+      ?now.value!==(restored?original:retainedInitClass):now[key]!==d[key]))unavailable()});
+  };
+  const awaitFinalInitializer=ss=>{
+    const initial=descriptor(ss,'initClass');
+    if(!initial||!('value'in initial)||typeof initial.value!=='function'||!initial.configurable)return;
+    let waiting=true;
+    const get=()=>initial.value;
+    const set=value=>{
+      define(ss,'initClass',{...initial,value});waiting=false;
+      try{
+        // Shape only: this does not qualify the executing module/lexical environment.
+        if(typeof value!=='function'||apply(toString,value,[]).replace(/\r\n/g,'\n')!=="function bg$initClass(ctor, asm, members, baseType, interfaces, __options) {\n    if (baseType === undefined && arguments.length >= 4)\n        console.warn(\"BaseType for \" + ctor.__typeName + \" class is undefined\");\n    ss_initClass(ctor, asm, members, baseType, interfaces);\n\n    var xForcePrepareProperties = false;\n    var xDisablePrepareProperties = false;\n    if (typeof __options !== \"undefined\") {\n        var xForcePrepareProperties = !!__options.forcePrepareProperties;\n        var xDisablePrepareProperties = !!__options.disablePrepareProperties;\n    }\n\n    // \u041f\u0440\u043e\u043f\u0443\u0441\u043a\u0430\u0435\u043c \u0434\u0436\u0435\u043d\u0435\u0440\u0438\u043a\u0438\n    if (typeof ctor.__genericTypeDefinition === \"undefined\" || xForcePrepareProperties) {\n        if (!xDisablePrepareProperties/* && xForcePrepareProperties*/) {\n            ss.prepareProperties(ctor);\n        }\n    }\n}")unavailable();
+        bindInitializers(ss,initial.value);
+      }catch(error){remember(error)}
+    };
+    define(ss,'initClass',{get,set,enumerable:initial.enumerable,configurable:true});
+    checks.push(()=>{if(waiting){const d=descriptor(ss,'initClass');if(!d||d.get!==get||d.set!==set||d.enumerable!==initial.enumerable||!d.configurable)unavailable()}});
+  };
+  // Only a namespace born after this init script can witness initializers.
+  // Existing ss is deliberately left alone; no late reflection can repair it.
+  try{if(!descriptor(root,'ss')){arm(root,'ss',ss=>{pendingSS=undefined;awaitFinalInitializer(ss)});pendingSS=descriptor(root,'ss');}
+    else initializers=Object.freeze({complete:false,reason:'INITIAL_SS_ALREADY_PRESENT',sourceExecutionQualified:false,closureIdentityQualified:false});
+  }catch(error){remember(error)}
   try{arm(root,'bg',bg=>arm(bg,'app',app=>{
     if(descriptor(app,'CurrentUser'))unavailable(); // Late installation cannot recover Set's argument.
     if(descriptor(app,'ServerConnection'))unavailable();

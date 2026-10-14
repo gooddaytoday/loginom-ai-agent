@@ -200,6 +200,9 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
           const loadedDefinitions=data(acquisition,'loadedDefinitions');
           if(loadedDefinitions!==data(realm,'userLoadedDefinitions')||data(loadedDefinitions,'complete')!==true
             ||data(loadedDefinitions,'closureIdentityQualified')!==false)fail('NATIVE_REPLACED');
+          const initializers=data(loadedDefinitions,'initializers');
+          if(initializers!==data(realm,'userInitializers')||data(initializers,'sourceExecutionQualified')!==false
+            ||data(initializers,'closureIdentityQualified')!==false)fail('NATIVE_REPLACED');
           const initialExports=data(loadedDefinitions,'bindings');
           for(const key of ['ObjectProxy','FileStorage','StreamPersistProxy','StreamPersist','ss','GuidHelper','MessageDynamicData','HResult',
             'ObjectProxyPrototype','FileStoragePrototype','StreamPersistPrototype','query','connected','currentDirectory','ownDirectory','rootPath','persist']){

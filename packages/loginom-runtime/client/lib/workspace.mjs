@@ -101,7 +101,10 @@ export async function prepareWorkspace(page, options, terminal) {
             'ObjectProxyPrototype','FileStoragePrototype','StreamPersistPrototype','query','connected','currentDirectory','ownDirectory','rootPath','persist']){
             if(receiptRef(initialExports,key)!==bindings[key])throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
           }
-          bindings.userLoadedDefinitions=loadedDefinitions;
+          const userInitializers=receiptRef(loadedDefinitions,'initializers');
+          if(!Object.isFrozen(userInitializers)||receiptRef(userInitializers,'sourceExecutionQualified')!==false
+            ||receiptRef(userInitializers,'closureIdentityQualified')!==false)throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          Object.assign(bindings,{userLoadedDefinitions:loadedDefinitions,userInitializers});
           const lower=receiptRef(acquisition,'lower');
           if(lower){
             if(receiptRef(acquisition,'rpcCompletionVerified')!==true||receiptRef(lower,'user')!==bindings.user
