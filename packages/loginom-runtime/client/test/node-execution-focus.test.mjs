@@ -70,6 +70,7 @@ for(const drift of ['revision','document','root','grid'])test('console readiness
   ui:{elements:[el(button),...(opened?[{...el(grid,['right_click']),signature:{tag:'div',tid:grid,process_grid:{panel_ref:'panel',grid_id:drift==='grid'&&sample>0?'foreign':'original'}}},el('ConsoleForm;btnClose')]:[]),
    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[])]}});
  const channel={observe:async o=>{
+   assert.equal(o.timeoutMs,60000);
    const before=state();assert.ok(o.ready(before),o.condition);
    if(o.confirmIdentity){sample++;const after=state();assert.ok(o.ready(after));
     if(JSON.stringify(o.confirmIdentity(before))!==JSON.stringify(o.confirmIdentity(after)))throw Error('Original console changed');

@@ -697,3 +697,28 @@ test('readiness expiry retains geometry across a final incomplete scan',async()=
   await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
   assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
 });
+
+
+for(const [window,originalDeadline,success] of [[60000,90000,true],[15000,90000,false],[60000,10000,false]])
+ test('durable process sample window '+window+' retains original absolute deadline '+originalDeadline,async()=>{
+  let time=1,reads=0,mutations=0;
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
+   prepared_node_context:{...binding.node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import'},scan:{complete:true},wizard:{status:'absent'},
+   ui:{elements:[{ref:'ui-button',allowed_actions:['click']}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'slow-record',action:{action_key:'node.apply',revision:'1'},deadline:originalDeadline};
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,record:async e=>{if(e.phase==='node_observation_sample')time+=21000;return structuredClone(e);},
+   wrapMutation:(code,receipt)=>({code,receipt}),execute:async code=>{
+    if(typeof code==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)};}
+    mutations++;return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};}});
+  const observe=()=>channel.observe({condition:'process menu closed',readProcesses:true,ready:()=>true,timeoutMs:window});
+  if(success){await observe();await channel.act({verb:'click',ref:'ui-button'});assert.equal(mutations,1);}
+  else{await assert.rejects(observe(),/readiness timeout/);await assert.rejects(channel.act({verb:'click',ref:'ui-button'}));assert.equal(mutations,0);}
+  assert.equal(operation.deadline,originalDeadline);assert.equal(reads,3);
+ });
+test('ordinary observation keeps the fifteen second ceiling',async()=>{
+ const f=fixture();await assert.rejects(f.channel.observe({condition:'ordinary',ready:()=>true,timeoutMs:60000}),/bounded readiness/);
+ assert.equal(f.records.length,0);assert.ok(!f.events.includes('mutated'));
+});

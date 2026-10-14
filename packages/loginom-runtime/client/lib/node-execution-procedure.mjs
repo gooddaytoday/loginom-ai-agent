@@ -79,7 +79,9 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
 
 export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false}={}) {
   let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false;
-  const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
+  // Include durable process-snapshot recording in the initial readiness window.
+  // NodeProcedure still clamps this to the original operation deadline.
+  const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,timeoutMs:60000,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>e.tid===current&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
