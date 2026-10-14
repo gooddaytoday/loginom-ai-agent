@@ -1,18 +1,18 @@
 # Локальная приёмка выбора узлов
 
-Текущий checkpoint 2026-10-14 13:58 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588af…`. Приняты четыре стандартные попытки
-(first-last-touch, sales, monthly, claims/1) и explicit-js/1. ABC, ROI и tags/1
-сохранены как technical-failed; полная приёмка не подтверждена.
-Освобождение собственной сессии tags user:197 и admin:198, завершение восьми
-PID и архивирование точного guard подтверждены независимым review `a1afae67…`.
-Root puregate разрешил продолжение с причиной `TECHNICAL_FAILURE_RECORDED`,
-сохранив исходный провал и policy incomplete. Ни один слот не повторялся.
-Recovery/1 запущен: dispatch13:56:48.548Z, CLI2103270/Host2103496,
-Session `ses_ec54c3ad1ffej4BQ6ZeXA479GK`, exec95454. Закрыто8/принято5/
-технических отказов3; recovery выполняется, не начато22, baseline0.
-После его завершения обязательны manual review и strict own release перед
-следующим слотом. Матрица31 и её условия остаются неизменными.
+Текущий checkpoint 2026-10-14 14:11 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588af…`. Первые девять candidate закрыты: пять приняты
+(first-last-touch, sales, monthly, claims/1 и explicit-js/1), четыре technical-failed
+(ABC, ROI, tags, recovery/1). Чистый проход и полная приёмка не подтверждены.
+Recovery initial Calculator выполнен, native parse error наблюдён; required
+restored-draft receipt, исправление и итоговый LGP/CSV не подтверждены, JS0.
+Own user:200/admin:201 закрыты, все девять собственных PID отсутствуют, точный
+guard архивирован. Descriptor `3a492045…`, release-review `607cd451…` и root gate
+подтвердили только освобождение неуспешной попытки и продолжение другими слотами.
+Baseline sales/1 выполняется: dispatch14:09:31.860Z, CLI2137066,
+Session `ses_ec5408ffbffeKCgRXPRQT2Iukc`, exec96749. Всего started10/closed9/
+accepted5/technicalfailed4/notstarted21; baseline started1/closed0.
+Матрица31, runtime/модель/inputs/oracle/условия прежние; повторов слотов нет.
 
 Источник требований — согласованные spec и plan в `docs/superpowers/`.
 Этот запуск выполняется в текущей системе без общего isolated runner.
@@ -1895,3 +1895,23 @@ Tags/1 остаётся провалом: Import и JS-распаковка вы
 с wx0400. Runner перечитал восемь существующих исходов и начал только recovery/1.
 Модель, runtime, inputs, oracle, последовательность и критерии не изменены.
 JS→Sort уже подтверждён explicit-js/1; JS→Group пока не подтверждён.
+
+### 2026-10-14 14:11 UTC — recovery failure/release и baseline admission
+
+Recovery/1 finished14:00:28.920Z, CLI2103270exit1/cleanupfalse/wrapper3,
+initialCalculator95c36129… Profit=Revenue executed. Invalid-check получил
+AMBIGUOUS configure «Calculator settings changed during rejection verification»;
+raw native parse errors не заменяют required restored-draft/correction evidence.
+No LGP/CSV, JS0; диагностический PASS отсутствует.
+Actual managedHost2103724 ACKfalse/exit1 сохранён отдельно от bridge2103496.
+Ownuser200 init13:57:12.731Z связан actualImport/CalculatorGUID, closed14:04:54.294Z;
+admin201 init14:02:54.347Z/logout14:04:56.400Z. Два refresh snapshots подтверждают
+ownabsence/neighbor199present; actualCDP6 + CLI/bridge/managedHost9PIDgone.
+Exactguard архивирован14:06:28.133808Z с сохранёнными nonce/SHA/inodes/Node.mtime,
+source.writerabsent. Independent pre-reviewbe5a3856… и finalrelease607cd451…
+подтвердили17original+14recovery400 и исходfailed. Descriptor3a492045…; rootpuregate
+advance/TECHNICAL_FAILURE_RECORDED, policyincomplete/calculationfalse сохранены.
+Resume7 rechecked девять слотов без моделей и начал baseline sales/1 по frozenorder.
+Dispatch14:09:31.860Z/CLI14:09:43.101Z/PID2137066/Session ses_ec5408ffbffeKCgRXPRQT2Iukc;
+exec96749 живой. Command/observed/gate wx0400 сохранены; следующая попытка только
+после машинных gates либо независимого review и strict own release при отказе.
