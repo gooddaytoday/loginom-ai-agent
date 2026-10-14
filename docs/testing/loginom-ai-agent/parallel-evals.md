@@ -33,6 +33,23 @@ fake-codex qualification: 117 tests/661 assertions PASS, typecheck/diff PASS.
 Это проверка version admission; live OAuth и другие Loginom probe owners остаются
 открытыми. Неопределённый offline outcome сохраняет durable reservation.
 
+Реализован host-only resource collector: raw CPU ticks, MemAvailable/swap,
+disk/inodes и пропуски измерений в private JSONL. Он не читает credentials или
+содержимое профилей и не требует готовых users. Запускать с очищенным env;
+в приёмке collector принадлежит trusted supervisor, отдельная команда пригодна
+для диагностического host sampling:
+
+```bash
+cd /home/kiselev/.codex/worktrees/96cd/loginom-ai-agent/evals
+env -i PATH="$PATH" bun run script/sample-parallel-resources.ts --config /home/kiselev/.local/state/loginom-evals/parallel/slots.json --out /home/kiselev/.local/state/loginom-evals/parallel/evidence/resources-before.jsonl --interval-ms 1000 --run-id acceptance-two --phase before
+```
+
+Output parent должен уже быть canonical private0700; existing evidence не
+перезаписывается. SIGINT/SIGTERM завершает запись и закрывает collector. Labels
+обозначают заявленный контекст, без flags остаются null и не доказывают связь с
+измеренным run. Docker/process/cgroup counters, controller binding и итоговая
+resource/licence acceptance ещё не реализованы; этот CLI не выдаёт readiness.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —
