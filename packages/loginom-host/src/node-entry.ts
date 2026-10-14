@@ -22,7 +22,7 @@ const state: {
   stopping?: Promise<void>
   closed: boolean
   root?: string
-  shutdown?: { stages: object[], primaryFailure?:unknown, persistenceFailure?:unknown }
+  shutdown?: { stages: object[], primaryFailure?:unknown, persistenceFailure?:unknown, managementRefusals?: {requestId:string;method:string;rejection:unknown}[], managementPersistenceFailure?:unknown }
   closeFailure?: unknown
 } = { closed: false }
 const port: HostPort = {
@@ -177,6 +177,7 @@ async function dispatch(message: unknown) {
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
+    if(message.method==='connection.check')await recordManagementRefusal(message.id,error)
     if(message.method==="start" && state.amountStartup)reply({id:message.id,rejection:closeRejection(error),rejectionOrigin:state.amountStartup.rejectionOrigin,...(state.amountStartup.secondary?{secondaryRejection:closeRejection(state.amountStartup.secondary.value)}:{})})
     else reply({ id: message.id, error: hostError(error) })
   }
@@ -209,6 +210,14 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   throw new Error("LOGINOM_METHOD_INVALID")
 }
 
+async function recordManagementRefusal(requestId: string, error: unknown) {
+  state.shutdown ??= {stages:[]}
+  const failures=state.shutdown.managementRefusals??=[]
+  if(failures.some((row: {requestId:string})=>row.requestId===requestId))return
+  failures.push({requestId,method:'connection.check',rejection:closeRejection(error)})
+  try {await recordClose('connection_check_refusal',{requestId,rejection:closeRejection(error)})}
+  catch(persistenceFailure){state.shutdown.managementPersistenceFailure??=closeRejection(persistenceFailure)}
+}
 function closeRejection(value: unknown): unknown {
   return value instanceof Error ? {kind:"Error",name:value.name,message:value.message,
     ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
