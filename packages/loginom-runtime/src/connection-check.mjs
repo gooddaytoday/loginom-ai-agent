@@ -62,7 +62,7 @@ export async function loginPage(page, candidate, owner) {
   const identity = await page.evaluate(
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
   )
-  if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+  if (identity !== candidate.username && (!owner || identity !== null)) throw Error("LOGINOM_ACCOUNT_MISMATCH")
   if(owner) {
     // A visible avatar precedes the asynchronous package-tree initialization.
     // Stay read-only within the original login UI allowance; do not turn an
@@ -74,9 +74,12 @@ export async function loginPage(page, candidate, owner) {
       const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree
       if(own?.document!==document||own?.id!==o.id||own?.account!==o.account||location.origin!==o.origin)
         throw Error("LOGINOM_STARTUP_IDENTITY_CHANGED")
-      if(m?.FServerConnection?.UserName!==o.account||m.FServerConnection.Connected!==true)
-        throw Error("LOGINOM_ACCOUNT_MISMATCH")
-      return !!m.FPackagesParentNode
+      const connection=m?.FServerConnection,account=connection?.UserName,connected=connection?.Connected
+      // Missing initialization is pending, never evidence of authentication.
+      // A defined foreign account or disconnected connection is a refusal.
+      if(account!=null&&account!==o.account)throw Error("LOGINOM_ACCOUNT_MISMATCH")
+      if(connected!==undefined&&connected!==true)throw Error("LOGINOM_ACCOUNT_MISMATCH")
+      return account===o.account&&connected===true&&!!m?.FPackagesParentNode
     },{id:owner.id,account:owner.account,origin:owner.origin},{timeout:remaining})
     if(owner.page!==page||Date.now()>=loginReadyDeadline)throw Error("LOGINOM_STARTUP_IDENTITY_CHANGED")
   }
@@ -192,6 +195,16 @@ function startupOwner(owner, profile, candidate) {
               build:exact(build),connected:exact(connected),
               package_parent:{type:typeof parent,is_undefined:parent===undefined,is_null:parent===null},
               package_parent_ready:!!parent,count:exact(count),dialogs:{available:false},running:{...exact(undefined),available:false,observed:false}};
+            // Diagnostic metadata cannot grant cleanup authority. Keep it bounded
+            // and omit query strings, input values and page text.
+            try {
+              const visible=e=>!!e.getBoundingClientRect().width&&!!e.getBoundingClientRect().height&&getComputedStyle(e).visibility!=='hidden';
+              const login=[...document.querySelectorAll('[data-tid="LoginForm;Login;edtUsername"]')];
+              const avatar=[...document.querySelectorAll('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')];
+              snapshot.page_ui={available:true,pathname:location.pathname,title:document.title?.slice(0,256),ready_state:document.readyState,
+                data_tid_count:document.querySelectorAll('[data-tid]').length,
+                login:{attached:login.length,visible:login.some(visible)},avatar:{attached:avatar.length,visible:avatar.some(visible)}};
+            } catch(error) {snapshot.page_ui={available:false,rejection:rejection(error)}}
             const result=value=>({...value,snapshot});
             if(!o.navigationStarted && location.href==='about:blank' && !app) return result({unauthenticated:true});
             if(!documentMatches||origin!==o.origin) return result({reason:'STARTUP_DOCUMENT_CHANGED'});
