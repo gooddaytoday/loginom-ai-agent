@@ -1593,3 +1593,30 @@ Source review и checks закрыты отдельно от ordinary native/mod
 Private clipped Export proof проходит отдельный static review: нужны точный
 saved XML noJS gate и canonical own scroll completed/trace; эти fixes не
 меняют Product/runtime. Новые immutable bindings и live ещё не допущены.
+
+
+На 2026-10-14 05:15 UTC новая matched пара050544 frozen без model/native calls.
+Source `a8db3e0f4cdde78399f6f81114e936fa16980920`, own clean detached checkout;
+baseline build/verify0 до restore двух старых skill-файлов, candidate build/
+verify0 после restore. Runtime обеих фаз
+`7982512e1949b23bc019305d22bf8fbfd54c4c3dc0258258497134e904e640f3`,
+288files; относительно233119 изменён только text-export-node.mjs.
+Full buildsource14701files, paired inventory5726: CLI/deps/browser equal,
+различаются только2skill-файла и3metadata с original-specifier normalization.
+
+Immutable0400 pins: baseline
+`fb31e4f286a3fec4afa4a0896e34e40b98233fa789a321f6f2bead5740278adf`,
+candidate
+`dd65ee0a1e4a1e187925ebd16c94ec87d633b4abe239f5afb5e107869185ff67`;
+effective lock
+`afc1c7d94b5df4760d4efce3e5bf92b8d0640dfd89ec2102bdba2c470a485378`,
+provenance
+`f478535935cbf5c5c2174244d0eba393758465382b4f0abc8c1366d54585d8cb`.
+Все10 operational inputs0400, historical72+2/audit2654 unchanged,
+15defs/43unique18+25 без reservation. Lock закрепляет native/pair/pins→
+candidate9→clean gate→baseline18→candidate16, comparative PASS только
+после обеих фаз. Старые outcomes0; current-run остаётся historical233119.
+
+Independent pair/pins review начат отдельно от автора сборок. Private reader
+fixes и ordinary bound native gates ещё впереди; stage сборки+live не закрыт.
+Полная модельная приёмка ещё не начата на этой паре; цель остаётся активной.
