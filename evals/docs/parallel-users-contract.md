@@ -317,3 +317,11 @@ Node evidence selection теперь едина для collector wrapper и stan
 Admin static source inspection (2026-10-14): exact Studio69ce44ac image, собственный created container networknone/read-only/capdropALL без start/ports, только public Apache htdocs. Private admin-source-4905babb/rpc-inventory.json600 read-back содержит12 interfaces/8 source hashes. Подтверждены Session.Guid, bg.objectId selector gettermethod5, UI key по cached object ID и CloseSession с observed SessionInfo proxy/timeout; users Add/Delete/SetPassword/role flags, shared Permissions.Add/Delete. CLI session GUID и managed object ID пока разные неквалифицированные domains; не приравнивать их и не закрывать по Name/CreateTime. Real correlation/epoch/reconnect/close-readback ждут Loginom qualification. Собственный контейнер b06bfcdea62b… удалён после fresh ownership/state checks, никогда не стартовал; private sources сохранены. Dev/legacy containers и credentials не использовались.
 
 Current-code process proof set обновлён после fresh-peer failure guard: native2 PASS/25 (8.98s), отдельный kernel PID reuse1 PASS/11 (1.69s), без зачёта integration skip. Candidate receipt processEvidence теперь содержит tested harness31f8392608 и SHA/paths process-proof-refresh-Iv7Was/{single,parallel,pid-reuse}.json, read-back PASS/liveQualified=false. Public/shared model product pins сохранены. Прежние timing numbers относятся к предыдущим наблюдениям; для текущего кода использовать этот proof set.
+
+
+parseEvents сохраняет safe limitEvidence для visible APIError.data.statusCode429;
+raw message/responseBody исключены из этого metadata. runAgent сохраняет его в
+run.json вместе с прежними исходными полями. Поздний ответ/exit0 не стирает
+known event; assessParallelLimits возвращает failed. Headless JSON не даёт полной
+transport/retry visibility, coverage остаётся unavailable и без события даёт
+incomplete. Этот producer не доказывает отсутствие hidden limits.

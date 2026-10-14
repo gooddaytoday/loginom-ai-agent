@@ -21,7 +21,7 @@ type Part = {
   tokens?: { input?: number; output?: number; reasoning?: number }
   state?: { status?: string; input?: Record<string, unknown>; output?: string; error?: string }
 }
-type Event = { type?: string; sessionID?: string; part?: Part; error?: { name?: string; data?: { message?: string } } }
+type Event = { type?: string; sessionID?: string; part?: Part; error?: { name?: string; data?: { message?: string; statusCode?: number } } }
 
 export function parseEvents(text: string) {
   const events = text.split("\n").flatMap((line) => {
@@ -65,6 +65,12 @@ export function parseEvents(text: string) {
       input: sum((part) => part?.tokens?.input),
       output: sum((part) => part?.tokens?.output),
       reasoning: sum((part) => part?.tokens?.reasoning),
+    },
+    limitEvidence: {
+      // Headless JSON does not expose every retry or transport diagnostic.
+      coverage: { provider: "unavailable", dock: "unavailable", judge: "unavailable" },
+      events: errorEvents.flatMap(event => event.error?.name === "APIError" && event.error.data?.statusCode === 429
+        ? [{ source: "provider" as const, kind: "http" as const, status: 429 as const }] : []),
     },
     errors: errorEvents.flatMap((event) => (event.error?.name ? [event.error.name] : [])),
     errorTexts: errorEvents.map((event) => `${event.error?.name ?? ""} ${event.error?.data?.message ?? ""}`),
