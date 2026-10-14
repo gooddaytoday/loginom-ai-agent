@@ -1,3 +1,4 @@
+import {amountSaveContinuation} from '../../src/amount-save-continuation.mjs';
 import {readAmountDraftPage} from '../../src/amount-draft-page.mjs';
 import {inspectAmountOwnPage} from '../../src/amount-own-page.mjs';
 import {retainAmountPreparation,assertAmountPreparation,beginAmountCompletion,retainAmountConsumerResult,sealAmountCompletion,assertAmountCompletion} from '../../src/amount-capture-lifecycle.mjs';
@@ -428,8 +429,13 @@ export async function createBridge(config, session, { browserTransport: managedB
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
             if ((managedCleanup || acceptanceCapture) && outcome.status === 'SUCCEEDED' && outcome.cleanup_complete === true
                 && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key) && outcome.output?.package_ref?.path) {
+              if(amountAdmission&&outcome.action_key==='package.save_as'){
+                if(session.metadata.workspacePreparation!==originalAmountSavePreparation||JSON.stringify(originalAmountSavePreparation)!==originalAmountSaveBytes)
+                  throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_CHANGED');
+                session.metadata.workspacePreparation=amountSaveContinuation(originalAmountSavePreparation,outcome,amountAdmission.binding);
+              }
               const prepared=session.metadata.workspacePreparation?.state;
-              if(amountAdmission){amountSaveOutcome=outcome;amountSavePreparation=originalAmountSavePreparation;amountSavePreparationBytes=originalAmountSaveBytes;}
+              if(amountAdmission){amountSaveOutcome=outcome;amountSavePreparation=session.metadata.workspacePreparation;amountSavePreparationBytes=JSON.stringify(amountSavePreparation);}
               managedSave={operationId:outcome.operation_id, sessionId:session.metadata.sessionId,
                 documentId:prepared?.document_id, tabTid:prepared?.workflow_ref?.tab_tid,
                 account:prepared?.loginom_account, packagePath:outcome.output.package_ref.path,
