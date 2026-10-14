@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
 import { createJournaledAdminChannel, openLoginomAdmin, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
-import { acquireSlotLease, loadSlots, parseSlots } from "../src/slots"
+import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
@@ -205,6 +205,23 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
       await expect(connection.closeOwnedSession(lease, path.join(root, "never-read.json"), "never-read")).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.reconcileUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
     } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+    const recoveryRoot = await mkdtemp(path.join(tmpdir(), "evals-admin-recovery-only-"))
+    const recoveryFixture = await parallelFixture(recoveryRoot)
+    await writeLeaseReceipt(path.join(recoveryFixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+    try {
+      const child = Bun.spawn([process.execPath, "-e", `const {acquireSlotLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+        const file=${JSON.stringify(recoveryFixture.slots)};const lease=await acquireSlotLease(file,file.slots[0],${JSON.stringify(identity)},${JSON.stringify(recoveryFixture.lockRoot)});
+        console.log(lease.receipt);await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+      expect(await child.exited).toBe(0)
+      const incident = (await new Response(child.stdout).text()).trim()
+      const recovered = await recoverSlotLease(recoveryFixture.slots, recoveryFixture.slots.slots[0]!, identity, incident, recoveryFixture.lockRoot)
+      try {
+        const secretFile = path.join(recoveryRoot, "never-read.json")
+        await expect(connection.createBlockedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
+        await expect(connection.reconcileUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
+        await expect(connection.observeOwnedSession(recovered, secretFile, [])).rejects.toThrow("SLOT_RECOVERY_ONLY")
+      } finally { await recovered.close() }
+    } finally { await rm(recoveryRoot, { recursive: true, force: true }) }
   } finally { await connection.dispose() }
   const directories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-") && !previous.has(name))
   expect(directories).toHaveLength(1)
