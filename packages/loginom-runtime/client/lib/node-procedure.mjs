@@ -1,4 +1,3 @@
-import {makeJavascriptOutputPreviewCode} from './javascript-output-preview.mjs';
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
 import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
 import {makeNodeProcessControlCode} from './node-process-control.mjs';
@@ -182,51 +181,6 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     return structuredClone(result.output);
   };
   const channel = {
-    async openJavascriptPreview(port){
-      checkBudget();
-      if(!preparedNodeContext||!['transform.group_data','transform.sorting'].includes(operation.parameters?.target?.type))
-        throw Error('Managed preview is restricted to native Group and Sort preflight');
-      const task={operation_id:operation.id+':preview'+nextStep(),owner:preparedNodeContext.node,
-        workflow_ref:{prefix:preparedNodeContext.workflow_ref.prefix,tab_tid:preparedNodeContext.workflow_ref.tab_tid},
-        output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
-        targetOrigin,targetBuild,deadline:operation.deadline};
-      const read=mode=>execute(makeJavascriptOutputPreviewCode({...task,mode}),{timeout:Math.max(5000,operation.deadline-now()+5000)});
-      let expected=await read('capture');
-      snapshot=null;evidenceSnapshot=null;
-      try{
-        for(const mode of ['select','open']){
-          checkBudget();
-          const step=nextStep(),id=operation.id+':n'+step,actionKey='node.javascript.preview.'+mode+'.internal';
-          const action={verb:'javascript_preview_'+mode,lease_operation_id:task.operation_id,owner:task.owner,port_guid:port.port_guid,expected};
-          const signature=digest([id,action,task]);
-          const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,signature});
-          if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))
-            throw Error('Managed preview step was not durably prepared');
-          checkBudget();
-          const code=makeJavascriptOutputPreviewCode({...task,mode,gesture_id:id,expected});
-          let result;
-          try{result=await execute(wrapMutation(code,{id,signature,action_key:actionKey}),{timeout:Math.max(5000,operation.deadline-now()+5000)});}
-          catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
-          if(result?.operation_id!==id||result.action_key!==actionKey||result.action_revision!=='1'){
-            operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Managed preview receipt identity differs');
-          }
-          operation.cleanupConfirmed=false;operation.nodeEffectPossible ||= result.effect_possible===true;
-          const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
-          if(JSON.stringify(completed?.outcome)!==JSON.stringify(result)){
-            operation.cleanupConfirmed=false;throw Error('Managed preview outcome was not durably preserved');
-          }
-          if(result.status!=='SUCCEEDED'||result.effect_possible!==true||result.cleanup_complete!==(mode==='select')
-            ||result.output?.verified!==true||result.output.execution_started!==false||result.output.port_guid!==port.port_guid
-            ||!['document_id','workflow_id','node_id'].every(k=>result.output.node_context?.[k]===task.owner[k]))
-            throw new NodeProcedureStepError(result);
-          operation.cleanupConfirmed=mode==='select';
-          if(mode==='select'){
-            do{checkBudget();expected=await read('inspect');if(!expected.selected)await wait(100);}while(!expected.selected);
-          }
-        }
-      }finally{if(!operation.transportUncertain)await read('dispose');}
-      return {verified:true,port_guid:port.port_guid,execution_started:false};
-    },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async openOutputPort(port) {return channel.openPort('output',port);},

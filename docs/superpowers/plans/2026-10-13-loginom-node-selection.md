@@ -3194,9 +3194,11 @@ Clientgenerate без publicProtocol/HttpApi изменения.
 при technical failures полную приёмку не объявлять. Отдельное подтверждение —
 все запрещённые production deltas отменены, новых standard changes нет.
 
-- [ ] Отменить изменения обработчиков стандартных узлов относительно38ee;
-  сохранить JavaScript, необходимые общие порты/мастера/таблицы и skill/eval;
-  проверить назначение shared изменений и зафиксировать ограничения.
+- [x] Отменить изменения обработчиков стандартных узлов относительно38ee;
+  сохранить JavaScript, необходимые общие порты/мастера/таблицы и skill/eval.
+  Независимо подтверждены15nonJSfamilies/127productionfiles exactbase;
+  сохранены58JSfiles,18sharedJSdependencies и21Core/Host/runtime/CLIfiles.
+  Group/Sort-only postJS helper/API удалены; новые standard fixes запрещены.
 - [ ] Независимо проверить итоговый scope diff и необходимые changed-code/JS
   проверки; rollback сохранить обычным описательным commit.
 - [x] По TDD добавить отдельный technical continuation/recovery/history path

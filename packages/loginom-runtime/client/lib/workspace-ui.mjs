@@ -80,8 +80,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const waitForMasks = async (observed, read, unchanged) => {
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
     const maskStarted=Date.now();
-    record('ui_mask_wait_started',{remaining_ms:timeout(),masks:observed.ui.masks.map(mask=>({ref:mask.ref,kind:mask.kind,target_tid:mask.target_tid,
-      dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
+    record('ui_mask_wait_started',{remaining_ms:timeout()});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
       timeout();observed=await read();
@@ -763,14 +762,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)context.status='bounded';
         else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i>=7&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
-          // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
-          // Join input roles have fixed captions; retain the native port and node icon binding.
+          // Ext may hide the final wizard breadcrumb in the overflow menu.
+          // Admit only its fixed caption with an independently bound native port.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
-              ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
-              ||(preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
-                ||preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица')
-                &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1));
+            &&(i===8&&e.textContent.trim()==='Настройка'||i===7&&e.textContent.trim()==='Входной источник данных');
           const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
@@ -2954,12 +2949,7 @@ function readRenderedInputMapping(observation) {
       // its controls must still pass exact painted hit ownership before acting.
       const owner = dialogRef(element), ownText = element.getAttribute('bg-mask-text');
       const kind = foregroundElement && !foregroundElement.contains(element) && !element.contains(foregroundElement) ? 'modal_background' : 'busy';
-      const importPreview=wizard.status==='observed'&&wizard.stage==='text_import_file'
-        &&getTid(element)===wizard.root_tid+';ImportTextFilePreviewWizard;pnlPreview'
-        &&wizardForms.length===1&&wizardForms[0].contains(element)
-        &&(tids.get(getTid(element))??[]).filter(visible).length===1;
-      return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
-        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}) };
+      return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element) };
     });
     const messages = readTexts('[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under');
     const definitionOnly=!!definitionPrefix && wizard.status==='observed';
@@ -3905,14 +3895,8 @@ function readRenderedInputMapping(observation) {
               &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path);
           };
           const ownedLoading=fresh=>contextMatches(fresh)&&intendedWizard(fresh)
-            &&fresh.ui.masks.every(mask=>mask.kind==='busy'&&!mask.dialog_ref
-              &&(mask.ref===fresh.wizard.root_ref&&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF'
-                // Live text import has a second, independently settling preview
-                // mask. Admit only its exact contained DOM owner and native node.
-                ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
-                  &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='text_import_file'
-                  &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF;ImportTextFilePreviewWizard;pnlPreview'
-                  &&mask.import_preview_owner_ref===fresh.wizard.root_ref));
+            &&fresh.ui.masks.every(mask=>mask.kind==='busy'&&mask.ref===fresh.wizard.root_ref
+              &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF'&&!mask.dialog_ref);
           // The opening click is already sent. Observe its own loading mask
           // within the original node deadline; never reissue the click.
           observed=await waitForMasks(observed,readOpeningUi,ownedLoading);

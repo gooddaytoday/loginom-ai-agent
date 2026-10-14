@@ -2384,3 +2384,14 @@ locks/outcomes не изменены. Новый31-slot lock требует tech
 первая9 исполняется и освобождается передbaseline6, functionalPASS не обязателен.
 Live нового протокола пока не запускался. Verificationrevision2SHA
 `d38ec9ae49a6a78ce265881a0b4b340e9defdf6142b5270c7e4660ccfa1875ea`.
+
+Checkpoint 2026-10-14 — обработчики стандартных узлов возвращены к базе38ee.
+Независимый scope review SHA1870619a15fc49274fe850d96ddb68edaa0cd4625cf8b83b10907e9879c3398c:
+15registered nonJSfamilies/127productionfiles exactbase, findings0. Сохранены
+58JSimplementationfiles,18sharedJSdependencies и21Core/Host/runtime/CLIpaths
+с конкретными callers/evidence. Отменён только Group/Sort-specific postJShelper/API
+и стандартные Import/Join/Export-specific UI additions. Общие порты, мастера,
+outputTable, console/Stop, mapping/source/context, budgets и own shutdown сохранены.
+Один итоговый изменённыйclient+JSaggregate:2154PASS/0FAIL/0SKIP,168.38s;
+собственные PIDs1634368/1635009 отсутствуют. Исторические payload/results сохранены.
+Новая серия20261014T105540Z-47e030 подготовлена:models0/native0, build и pins pending.

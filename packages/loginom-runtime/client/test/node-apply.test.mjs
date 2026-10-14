@@ -461,11 +461,11 @@ test('JavaScript full UI read requires an installed capability and the complete 
  assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
 });
 
-test('tabular handler publishes JavaScript full UI capability only when its implementation opts in',()=>{
+test('standard tabular factory does not acquire JavaScript full UI capability',()=>{
  const config={targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'};
  const implementation={type:'programming.javascript',mode:'script',revision:'javascript-test',validate(){},configure(){}};
  assert.equal(createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers.get(implementation.type).fullUiOutput,undefined);
- assert.equal(createTabularTransformNodeSupport(config,{...implementation,fullUiOutput:true}).nodeApplyHandlers.get(implementation.type).fullUiOutput,true);
+ assert.equal(createTabularTransformNodeSupport(config,{...implementation,fullUiOutput:true}).nodeApplyHandlers.get(implementation.type).fullUiOutput,undefined);
 });
 
 for(const complete of [true,false])test('JavaScript full UI read accepts only complete observed rows '+complete,async()=>{

@@ -45,7 +45,6 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
  if(implementation){nodeApplyHandlers.clear();nodeApplyHandlers.set(implementation.type,{
   revision:implementation.revision,modes:implementation.modes??[implementation.mode],output_wizard:'separate',
   configurationReadback:implementation.readback,parameter_schema:implementation.parameterSchema,
-  ...(implementation.fullUiOutput===true?{fullUiOutput:true}:{}),
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
@@ -309,13 +308,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async readOutput(read,ctx) {
     enter(ctx);requireValue(executionReceipt?.verified&&executionReceipt.owner_verified&&executionReceipt.execution_id===ctx.execution.execution_id,'Calculator execution proof missing');
     if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
-    if(read.coverage==='full'&&implementation?.nativeFullOutput===true){
+    if(read.coverage==='full'){
+     requireValue(implementation?.nativeFullOutput===true,'Full native output is unavailable for this handler');
      const output=await readCollapseNativeOutput(channel,read,ctx,{...options,nativeExecutionProof:executionReceipt},{targetOrigin,targetBuild},implementation.type==='transform.cross_table'?configured:null);
      if(implementation.type==='transform.cross_table'){const materialized=implementation.materializedSchema(output.ports[0].schema,configured,{node:ctx.node,execution:ctx.execution});output.ports[0].category_fields=materialized.category_fields;}
      return output;
     }
-    if(read.coverage==='full')requireValue(implementation?.fullUiOutput===true&&read.sample_rows===100,
-     'Full bounded UI output is unavailable for this handler');
     if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,ctx,multipleOutputs);}
     const table=await openNewOutputTable(channel,0),formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
     let readSettings,data,formatRestoration;
@@ -328,8 +326,6 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       if(materialized)data.category_fields=materialized.category_fields;
     } finally { if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof); }
     const returned=await returnFromOutputTable(channel,table.table);
-    if(read.coverage==='full')requireValue(data.sample_complete===true&&data.sample_rows===data.row_count
-     &&!data.limitations?.length,'Full bounded UI output exceeds the readable row/cell/byte window');
     return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,
      ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],table_creation:table,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:returned});
    },
