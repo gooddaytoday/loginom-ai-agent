@@ -22,7 +22,7 @@ function cursor(value:unknown) {
 /** Replay complete, safe concrete CLI observations. Neither labels nor filtered arrays grant admission. */
 export function inspectQueueInventory(inventory:QueueInventory,followup:string) {
   const fail=()=>{throw Error("QUEUE_INVENTORY_REFUSED")}
-  if(!uuid.test(followup)||!inventory||!Array.isArray(inventory.roster)||inventory.roster.length<8||!Array.isArray(inventory.agents)
+  if(!uuid.test(followup)||followup===masQueueScope.originalOwner||!inventory||!Array.isArray(inventory.roster)||inventory.roster.length<8||!Array.isArray(inventory.agents)
     ||inventory.agents.length!==inventory.roster.length||new Set(inventory.roster.map(a=>a?.id)).size!==inventory.roster.length)fail()
   const seen=new Set<string>(),excluded:Record<string,unknown>[]=[],blocked:Record<string,unknown>[]=[],controller:Record<string,unknown>[]=[]
   let pageCount=0,recordCount=0

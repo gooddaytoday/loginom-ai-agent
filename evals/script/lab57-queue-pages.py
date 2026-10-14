@@ -42,6 +42,7 @@ AMENDMENT='e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3'
 PENDING=['queued','pending','running','retrying','scheduled']
 
 def collect_queues(agents,followup):
+    assert re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',followup) and followup!='01a1375d-ce4a-7c35-a3a3-94cf64a8b589','Original owner cannot be followup'
     assert isinstance(agents,list) and len(agents)>=8,'Queue roster incomplete'
     roster=[{k:a.get(k) for k in ['id','runtime_id']} for a in agents]
     assert len({a['id'] for a in roster})==len(roster),'Queue roster duplicate'
