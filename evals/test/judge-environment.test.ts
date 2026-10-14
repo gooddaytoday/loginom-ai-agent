@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, lstat, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, link, lstat, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { loadJudgeEnvironment } from "../src/slots"
@@ -9,21 +9,31 @@ import { runOfflineJudge } from "../src/judge-environment"
 import { main } from "../src/run"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
-test("missing private native judge auth refuses before creating a reservation or probe", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-auth-missing-"))
+for (const kind of ["missing", "symlink", "hardlink", "public"]) test(`native judge refuses ${kind} auth before any probe or reservation`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-auth-private-"))
   try {
     const fixture = await parallelFixture(root)
     const file = path.join(root, "slots.json")
     const binary = path.join(root, "codex")
     const probe = path.join(root, "version-called")
+    const borrowed = path.join(root, "parent-auth-canary")
+    const auth = path.join(fixture.slots.judge.codexHome, "auth.json")
     await writeLeaseReceipt(file, fixture.slots)
-    await writeFile(binary, `#!/bin/sh\nprintf 'called' > '${probe}'\nprintf 'fake-codex 0.0.0\\n'\n`, { mode: 0o700 })
-    const config = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
+    if (kind === "public") await writeFile(auth, "private-auth-canary", { mode: 0o644 })
+    if (["symlink", "hardlink"].includes(kind)) {
+      await writeFile(borrowed, "parent-auth-canary", { mode: 0o600 })
+      if (kind === "symlink") await symlink(borrowed, auth)
+      if (kind === "hardlink") await link(borrowed, auth)
+    }
+    await writeFile(binary, '#!/bin/sh\nprintf called > "$PROBE_JUDGE_HOME_FILE"\nprintf "fake-codex 0.0.0\\n"\n', { mode: 0o700 })
+    const config: EvalConfig = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
       EVAL_SLOTS_FILE: file, EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: binary,
     })
-    await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow("Нет входа Codex")
+    config.judge.env = { PROBE_JUDGE_HOME_FILE: probe }
+    await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow(kind === "missing" ? "Нет входа Codex" : "JUDGE_AUTH_PRIVATE")
     expect(await Bun.file(probe).exists()).toBe(false)
     expect(await Array.fromAsync(new Bun.Glob("*.reservation.json").scan(fixture.lockRoot))).toEqual([])
+    if (["symlink", "hardlink"].includes(kind)) expect(await Bun.file(borrowed).text()).toBe("parent-auth-canary")
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
