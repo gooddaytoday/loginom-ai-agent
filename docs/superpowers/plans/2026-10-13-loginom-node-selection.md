@@ -2446,3 +2446,39 @@ admission
 `aa1786cadade63c231efabe819476c9b8af0c70e87f8c49875df50618eb4246a`.
 Другой Host/CLI/admin не активен. Новые native результаты ещё ожидаются;
 model slots0, current-run historical233119, цель и live/model stages открыты.
+
+
+Checkpoint 2026-10-14 06:03 UTC — pair050544, model slots0.
+Ordinary JS downstream Root49772 завершён exit0: Group A17/B21,
+direct Sort B21/A11/A6, native CSV27B и saved5nodes4links/source/schema/socket
+проверены. Own package closed без discard, Logout/HostACKtrue/exit0.
+Result SHA `c33451733c68f2cd52e2c8bd2d3f7a94e6d8f18f7c1dc7b4574dc6b0dd230d93`;
+independent live review `4a25b1108464fe429d2ee77b96ce6360d556e2e9d06fd8f950f21efd7260766b`.
+Это PASS отдельного native gate, не model acceptance/18+25.
+
+Minimal ordinary Import→Sort→Export Root40322 завершён exit3:
+Import/Sort SUCCEEDED, Export input_mapping AMBIGUOUS/cleanupfalse,
+noSave/CSV/Logout/ACK. Result `4e90c98213335b3582dacbf3f199820fd3701ddbd2f040ec2c7231d399ee3877`
+сохранён failed. Raw740 input bottom804/viewport800;741–742 один own scroll
+0→82;744/746 same owner/ref/identity, input bottom722 внутри viewport.
+Masks/dialogs0, но covering `<u>` без установленных owner/class/ancestors;
+все9 native hits отказали до меню/клика. Вертикальное clipping устранено,
+full mapping/CSV gate NOTPASS. Report clippingReproduced=false осталось
+initial default: evidence reader не вызван после отказа, это не отсутствие
+clipping в raw. Read-only diagnosis
+`1c791af08cd3e754d3c1b423e4632e967bfa83db804d65a6802b811797a70eaa`.
+Неизвестный U не основание для ослабления native guard или Product patch.
+
+Strict native/server GUID binding связал только user:163 latest init05:50:57.982Z,
+SHA `a9048d46a9473bb04d0b37ffb2437424d69bc69770cd91599e1a03643a7c7943`.
+Root SDK7158 закрыл exactfresh163 после exact confirmation; отсутствие
+подтверждено двумя refresh06:02:29.022/29.789Z. Own admin164 Logout06:02:50.254Z,
+login visible; browser closed/bridgeexit0. Guard отсутствовал, originals/profile
+не менялись. Независимый final recovery/read-back ещё ожидается.
+
+Следующий private diagnostic собирает ограниченные DOM/parent/cache data-values
+того же9hit evaluate только own Export input0; getters/новые browsercalls/clicks/
+изменение predicate запрещены. TDD и independent static review до live,
+no acceptance credit. Join/schema static approved, fresh live ещё не выполнены.
+Runtime/payload/effective corrected pins unchanged; current-run historical233119.
+Stages fresh native/build acceptance и18+25 остаются открыты.
