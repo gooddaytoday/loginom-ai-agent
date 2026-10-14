@@ -10,7 +10,7 @@ export async function amountFilePhase(o) {
  const key='__loginomAmountFileReadV1';
  const refusals=new Set();const fail=code=>{const v=Error(code);refusals.add(v);throw v};
  const encoded=JSON.stringify(o.expected),e=o.expected;
- if(!e||Object.keys(e).sort().join(',')!=='account,deadline,id,operation,origin,path,request,run'
+ if(!e||Object.keys(e).sort().join(',')!=='account,bindingOwner,chat,deadline,generation,id,lease,operation,origin,path,request,run'
   ||!['storage','info','size','info_release','open','open_info','open_size','open_info_release','read','release'].includes(o.phase)
   ||typeof e.path!=='string'||!e.path.startsWith('/'+e.account+'/')
   ||e.path.split('/').length!==3||! /^[^/\\\x00-\x1f]+\.lgp$/.test(e.path.split('/').at(-1)))fail('ORIGINAL_FILE_PATH_REQUIRED');
@@ -20,7 +20,7 @@ export async function amountFilePhase(o) {
   const bg=globalThis.bg,app=bg?.app,application=app?.Application,instance=application?.FInstance,main=instance?.FMainForm;
   const own=globalThis.__loginomStartupV1,map=main?.FMapTree,connection=map?.FServerConnection,session=connection?.Session;
   table={phase:'new',busy:false,firstPresent:false};
-  for(const [k,v] of Object.entries({encoded,bg,app,application,instance,main,own,map,connection,session,root:map?.FPackagesParentNode,inventory:map?.PackageNodes,path:e.path}))Object.defineProperty(table,k,{value:v});
+  for(const [k,v] of Object.entries({encoded,bg,app,application,instance,main,own,map,connection,session,root:map?.FPackagesParentNode,inventory:map?.PackageNodes,getStorage:session?.get_FileStorage,path:e.path}))Object.defineProperty(table,k,{value:v});
   if(!own||Object.hasOwn(own,'__amountFileReadV1'))fail('ORIGINAL_FILE_ALREADY_ATTEMPTED');
   Object.defineProperty(own,'__amountFileReadV1',{value:table});globalThis[key]=table;
  }
@@ -32,9 +32,9 @@ export async function amountFilePhase(o) {
    ||s.instance.FMainForm!==s.main||s.main.FMapTree!==s.map||s.map.FServerConnection!==s.connection||s.connection.Session!==s.session
    ||globalThis.__loginomStartupV1!==s.own||s.own?.document!==document||s.own.id!==e.id||s.own.account!==e.account
    ||location.origin!==e.origin||s.map.FPackagesParentNode!==s.root||s.map.PackageNodes!==s.inventory||s.connection.Connected!==true||s.connection.UserName!==e.account||s.app.Version!=='7.4.2'
-   ||s.inventory?.Count!==0||s.transport&&(s.storage.$S!==s.transport||s.session.$S!==s.transport))fail('ORIGINAL_FILE_OWNER_CHANGED');
+   ||s.inventory?.Count!==0||s.session.get_FileStorage!==s.getStorage||s.getInfo&&s.storage.GetFileInfo!==s.getInfo||s.openFile&&s.storage.OpenFile!==s.openFile||s.transport&&(s.storage.$S!==s.transport||s.session.$S!==s.transport))fail('ORIGINAL_FILE_OWNER_CHANGED');
  };
- const pin=(name,fn)=>{if(typeof fn!=='function'||fn.toString()!==o.functions[name])fail('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name)};
+ const pin=(name,fn)=>{if(typeof fn!=='function'||Function.prototype.toString.call(fn)!==o.functions[name])fail('NATIVE_FILE_FUNCTION_UNAVAILABLE:'+name)};
  const getter=(obj,name)=>{for(let d=0;obj&&d<8;d++,obj=Object.getPrototypeOf(obj)){const p=Object.getOwnPropertyDescriptor(obj,name);if(p)return p.get}};
  const construct=()=>{
   pin('constructor',s.bg.filestorage?.FileDownloader);const name=s.path.split('/').at(-1),dir=s.path.slice(0,-name.length);
@@ -59,15 +59,15 @@ export async function amountFilePhase(o) {
  if(o.phase!=='release'&&s.phase!==previous[o.phase])fail('ORIGINAL_FILE_PHASE_CHANGED');
  s.busy=true;let result;
  try{
-  if(o.phase==='storage'){authority();if(typeof s.session.get_FileStorage!=='function')fail('NATIVE_FILE_STORAGE_UNAVAILABLE');retain('storage',await s.session.get_FileStorage());authority();if(!s.storage)fail('NATIVE_FILE_STORAGE_UNAVAILABLE');if(!s.session.$S||s.storage.$S!==s.session.$S)fail('NATIVE_FILE_PROXY_OWNER_UNAVAILABLE');retain('transport',s.session.$S);pin('GetFileInfo',s.storage.GetFileInfo);pin('OpenFile',s.storage.OpenFile);if(s.bg.TBGFileOpenMode.fomRead!==0)fail('NATIVE_FILE_MODE_UNAVAILABLE');s.phase='storage';}
-  if(o.phase==='info'){authority();retain('info',await s.storage.GetFileInfo(s.path));if(!s.info)fail('NATIVE_FILE_INFO_UNAVAILABLE');if(s.info.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.infoOwned=true;retain('infoRelease',construct());s.infoRelease.FFileStream=s.info;authority();s.phase='info';}
-  if(o.phase==='size'){authority();retain('size',await s.info.Size);authority();if(!Number.isSafeInteger(s.size)||s.size<1||s.size>262144)fail('NATIVE_FILE_SIZE_UNAVAILABLE');s.phase='size';}
+  if(o.phase==='storage'){authority();if(typeof s.session.get_FileStorage!=='function')fail('NATIVE_FILE_STORAGE_UNAVAILABLE');retain('storage',await s.session.get_FileStorage());authority();if(!s.storage)fail('NATIVE_FILE_STORAGE_UNAVAILABLE');if(!s.session.$S||s.storage.$S!==s.session.$S)fail('NATIVE_FILE_PROXY_OWNER_UNAVAILABLE');retain('transport',s.session.$S);pin('GetFileInfo',s.storage.GetFileInfo);pin('OpenFile',s.storage.OpenFile);retain('getInfo',s.storage.GetFileInfo);retain('openFile',s.storage.OpenFile);if(s.bg.TBGFileOpenMode.fomRead!==0)fail('NATIVE_FILE_MODE_UNAVAILABLE');s.phase='storage';}
+  if(o.phase==='info'){authority();retain('info',await s.getInfo.call(s.storage,s.path));if(!s.info)fail('NATIVE_FILE_INFO_UNAVAILABLE');if(s.info.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.infoOwned=true;if(typeof s.info.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('infoSize',s.info.get_Size);retain('infoRelease',construct());s.infoRelease.FFileStream=s.info;authority();s.phase='info';}
+  if(o.phase==='size'){authority();retain('size',await s.infoSize.call(s.info));authority();if(!Number.isSafeInteger(s.size)||s.size<1||s.size>262144)fail('NATIVE_FILE_SIZE_UNAVAILABLE');s.phase='size';}
   if(o.phase==='info_release'){await release(s.infoRelease,s.info);authority();s.infoReleased=true;s.phase='info_released';}
-  if(o.phase==='open'){authority();retain('downloader',construct());retain('stream',await s.storage.OpenFile(s.path,0,1));if(s.stream?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.streamOwned=true;s.downloader.FFileStream=s.stream;authority();pin('ReadBuffer',s.stream.ReadBuffer);s.phase='open';}
-  if(o.phase==='open_info'){authority();retain('openInfo',await s.storage.GetFileInfo(s.path));if(s.openInfo?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.openInfoOwned=true;retain('openInfoRelease',construct());s.openInfoRelease.FFileStream=s.openInfo;authority();s.phase='open_info';}
-  if(o.phase==='open_size'){authority();const size=await s.openInfo.Size;authority();if(size!==s.size)fail('ORIGINAL_FILE_SIZE_CHANGED');s.phase='open_size';}
+  if(o.phase==='open'){authority();retain('downloader',construct());retain('stream',await s.openFile.call(s.storage,s.path,0,1));if(s.stream?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.streamOwned=true;s.downloader.FFileStream=s.stream;authority();pin('ReadBuffer',s.stream.ReadBuffer);retain('readBuffer',s.stream.ReadBuffer);s.phase='open';}
+  if(o.phase==='open_info'){authority();retain('openInfo',await s.getInfo.call(s.storage,s.path));if(s.openInfo?.$S!==s.transport)fail('ORIGINAL_FILE_FOREIGN_HANDLE');s.openInfoOwned=true;if(typeof s.openInfo.get_Size!=='function')fail('NATIVE_FILE_SIZE_GETTER_UNAVAILABLE');retain('openInfoSize',s.openInfo.get_Size);retain('openInfoRelease',construct());s.openInfoRelease.FFileStream=s.openInfo;authority();s.phase='open_info';}
+  if(o.phase==='open_size'){authority();const size=await s.openInfoSize.call(s.openInfo);authority();if(size!==s.size)fail('ORIGINAL_FILE_SIZE_CHANGED');s.phase='open_size';}
   if(o.phase==='open_info_release'){await release(s.openInfoRelease,s.openInfo);s.openInfoReleased=true;authority();s.phase='open_info_released';}
-  if(o.phase==='read'){authority();const bytes=new Uint8Array(s.size);await s.stream.ReadBuffer(bytes);authority();s.base64=btoa(Array.from(bytes,x=>String.fromCharCode(x)).join(''));s.phase='read';result={base64:s.base64,bytes:s.size};}
+  if(o.phase==='read'){authority();const bytes=new Uint8Array(s.size);const reply=await s.readBuffer.call(s.stream,bytes);authority();if(reply!==null&&reply!==undefined)throw reply;s.base64=btoa(Array.from(bytes,x=>String.fromCharCode(x)).join(''));s.phase='read';result={base64:s.base64,bytes:s.size};}
   if(o.phase==='release'){
    owned();if(s.openInfo&&!s.openInfoReleased){if(!s.openInfoOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.openInfoRelease,s.openInfo);s.openInfoReleased=true;}
    if(s.stream&&!s.streamReleased){if(!s.streamOwned)fail('ORIGINAL_FILE_FOREIGN_HANDLE');await release(s.downloader,s.stream);s.streamReleased=true;}
@@ -82,7 +82,7 @@ export async function amountFilePhase(o) {
 export function createAmountFileRead(retained,{guard,record,signal}) {
  const original=assertAmountManagedStartup(retained.state.controlledStartup,retained.state);
  const fixed={binding:retained.binding,owner:retained.owner,page:retained.page,context:retained.context,session:retained.session,startup:retained.startup,state:retained.state};
- const expected={id:retained.owner.id,account:retained.owner.account,origin:retained.owner.origin,path:retained.binding.packagePath,
+ const expected={bindingOwner:retained.binding.owner,lease:retained.binding.lease,generation:retained.binding.generation,chat:retained.binding.chat,id:retained.owner.id,account:retained.owner.account,origin:retained.owner.origin,path:retained.binding.packagePath,
   operation:original.operation,request:original.request,run:retained.binding.run,deadline:Math.min(original.deadline,retained.binding.expires)};
  let attempted=false,pending=false,held=false,unknown=false;
  const current=()=>{guard();assertCaptureOwner(retained);signal.throwIfAborted()};

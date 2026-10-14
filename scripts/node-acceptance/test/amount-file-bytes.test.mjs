@@ -3,7 +3,7 @@ const root=process.argv[2]??new URL('../../../packages/loginom-runtime',import.m
 const{amountFilePhase}=await import(pathToFileURL(root+'/src/amount-file-bytes.mjs'));
 let passes=0;
 async function scenario(mode){
- const calls=[],doc={},nativeError=Error('read',{cause:0}),bytes=new Uint8Array([1,2,3,4]),info={get Size(){calls.push('size');if(mode==='size-drift')connection.Session={};return Promise.resolve(mode==='size-change-after-open'&&calls.includes('open')?5:4)}};
+ const calls=[],doc={},nativeError=Error('read',{cause:0}),bytes=new Uint8Array([1,2,3,4]),info={get_Size(){calls.push('size');if(mode==='size-drift')connection.Session={};return Promise.resolve(mode==='size-change-after-open'&&calls.includes('open')?5:4)}};
  const stream={ReadBuffer:async b=>{calls.push('read');if(mode==='read-false'||mode==='equal-false')throw false;if(mode==='read-undefined')throw undefined;if(mode==='read-error')throw nativeError;b.set(bytes)}};
  const storage={GetFileInfo:async path=>{calls.push('info');if(mode==='info-drift')connection.Session={};return info},OpenFile:async(path,m,share)=>{calls.push('open');assert.equal(m,0);assert.equal(share,1);return stream}};
  const session={get_FileStorage:async()=>{calls.push('storage');return storage}},connection={Connected:true,UserName:'own',Session:session},map={PackageNodes:{Count:0},FServerConnection:connection};
@@ -18,7 +18,7 @@ async function scenario(mode){
  const transport={};session.$S=storage.$S=info.$S=stream.$S=transport;
  const funcs={constructor:FileDownloader.toString(),ReleaseStreamObj:FileDownloader.prototype.ReleaseStreamObj.toString(),IsStreamReleased:FileDownloader.prototype.IsStreamReleased.toString(),IsDisposed:Object.getOwnPropertyDescriptor(FileDownloader.prototype,'IsDisposed').get.toString(),Dispose:FileDownloader.prototype.Dispose.toString(),OpenFile:storage.OpenFile.toString(),GetFileInfo:storage.GetFileInfo.toString(),ReadBuffer:stream.ReadBuffer.toString()};
  const ctx={document:doc,location:{origin:'https://app.loginom.ai'},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:map}}}},filestorage:{FileDownloader},TBGFileOpenMode:{fomRead:0}},__loginomStartupV1:{document:doc,id:'owner',account:'own'},btoa:s=>Buffer.from(s,'binary').toString('base64'),Uint8Array,Error,Date};
- const fn=vm.runInNewContext('('+amountFilePhase.toString()+')',ctx),expected={id:'owner',account:'own',origin:'https://app.loginom.ai',path:'/own/accepted.lgp',operation:'original',request:'request',run:'run',deadline:Date.now()+60000},invoke=phase=>fn({expected,phase,functions:funcs});
+ const fn=vm.runInNewContext('('+amountFilePhase.toString()+')',ctx),expected={bindingOwner:'host-owner',lease:'host-owner:run',generation:1,chat:'chat',id:'owner',account:'own',origin:'https://app.loginom.ai',path:'/own/accepted.lgp',operation:'original',request:'request',run:'run',deadline:Date.now()+60000},invoke=phase=>fn({expected,phase,functions:funcs});
  if(mode==='foreign'){ctx.__loginomStartupV1.id='foreign';const r=await invoke('storage');assert.equal(r.ok,false);assert.deepEqual(calls,[]);return}
  for(const phase of ['storage','info','size','info_release','open','open_info','open_size','open_info_release','read']){
   const r=await invoke(phase);
