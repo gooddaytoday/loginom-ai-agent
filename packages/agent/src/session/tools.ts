@@ -1,4 +1,4 @@
-import { retainSDKInvocation } from "@/cli/private-admission.mjs"
+import { retainSDKInvocation, assertSDKInvocation } from "@/cli/private-admission.mjs"
 import { retainUnionInvocation } from "./union-invocation"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
@@ -565,7 +565,14 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             } as JSONSchema7),
           ),
           execute(args, options) {
-            retainSDKInvocation(args, options)
+            const sdkInvocation = retainSDKInvocation(args, options)
+            if (sdkInvocation) {
+              // This same-process record is genuine SDK lineage, not an acquired
+              // host owner. Never fall back to a packetless call or mint Union
+              // authority until the original owner/purpose binder is available.
+              assertSDKInvocation(sdkInvocation, args, options)
+              throw new Error("ORIGINAL_SDK_ACQUIRED_CARRIER_UNAVAILABLE")
+            }
             const invocation = retainUnionInvocation({ definition, request: args, options, owner: loginom, sessionInput: input, user: user.info })
             return run.promise(
               Effect.gen(function* () {
