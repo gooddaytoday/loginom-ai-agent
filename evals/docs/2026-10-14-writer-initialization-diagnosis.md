@@ -25,5 +25,14 @@ replaced-owner refusal 2 PASS/4 assertions; typecheck/diff PASS.
 Private GREEN signal: `/tmp/evals-writer-initialization-green-signal-nl9nu_jn.json`.
 Собственные test roots удалены штатным finally; чужие native processes не трогались.
 
-Повтор полного набора после test-only fix ещё требуется. SKIP не доказывают
-успех native/live checks; Admin/OAuth и полная v2 admission остаются отдельными gates.
+Повтор полного набора на `6068b57b65` завершён: 911 PASS, 16 SKIP, 0 FAIL,
+4663 assertions, 927 tests/74 files, 1045.92s, exit 0. `bun typecheck` и
+`git diff --check` также PASS. Private log0600:
+`/tmp/evals-parallel-full-6068b57b65-f6EKYA.log`, SHA256
+`ac38904460efec3463a9c3155cd0380245e8ddc55df64f2f349f80a6d8400c72`;
+stable metadata/hash read-back подтверждён. Результаты первого прогона сохранены.
+
+SKIP не доказывают успех native/live checks: opt-in pair/admin/candidate/PID-reuse
+проверки не включались; часть native settlement/release проверок требует чистого
+стенда и сохраняет nativeBusy guard. Чужие процессы не останавливались.
+Admin/OAuth и полная v2 admission остаются отдельными gates.
