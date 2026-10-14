@@ -468,3 +468,17 @@ SHA11a9ad4c4f9b355d83a5a430cc644449312ea07d3b6699bd1a9d4ffe9b6151f8/read-back
 PASS, namespace separation проверена, liveQualified=false. Host guard paths,
 dev/legacy/другие контроллеры не изменены; native Codex auth/exception recovery
 остаются открытыми.
+
+Offline exception journalf904b0417a: actual cleanup proof rename EISDIR после
+завершённого fake-codex сохраняет calibration output и retained reservation,
+journal становится quarantined/command-failed; повтор RECOVERY_REQUIRED не
+создаёт новый child. После подтверждённого release catch не публикует quarantine.
+13 environment tests/56 assertions PASS (10.91s), typecheck/diff PASS; explicit
+recovery этого incident ещё не реализован.
+
+Global guards protection23e43bbbff: directory graph v2 включает фиксированный
+globalLockRoot в protected paths. Profile root, совпадающий с guards, вложенный
+в него или содержащий его, отвергается до mutations/mounts. Lexical и canonical
+validation используют общую проверку. 94 slots/config/sandbox/environment tests/
+308 assertions PASS (19.21s), typecheck/diff PASS. Unit CI не создаёт/меняет fixed
+/var/lib root; legacy/dev/чужие guards не затронуты.
