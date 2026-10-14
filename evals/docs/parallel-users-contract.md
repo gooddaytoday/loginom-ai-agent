@@ -543,3 +543,9 @@ ServerIdentity и сохраняет наблюдение без user mutation. 
 Held slot ownership включает точное содержимое private composite manifest и обе
 resource reservations. Его подмена снимает held authority до provisioning/release;
 release проверяет manifest до первого resource tombstone.
+
+`configureOwnedUser` допускает только never-activated protected user под normal
+held lease. Подтверждённая LocalAuth/safe design конфигурация сохраняется с
+source journal SHA; повтор использует её secret hash, затем проверяет native
+read-back. Первая установка без password write не считается подтверждённой.
+Это configure phase; positive parent lifecycle и общий admission ещё открыты.
