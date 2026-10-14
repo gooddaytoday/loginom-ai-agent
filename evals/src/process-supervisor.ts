@@ -692,7 +692,8 @@ export async function superviseProcess(input: {
     for (const candidate of candidates) {
       if (Date.now() >= deadline) { cleanup.error ??= "Process cleanup deadline exceeded"; return }
       if (!await checkedScan()) return
-      const tracked = ledger.get(candidate)!
+      const tracked = ledger.get(candidate)
+      if (!tracked) continue
       const saved = tracked.process
       if (tracked.admission !== "allowed" || !tracked.origin || root && key(saved) === key(root)) continue
       // bwrap does not forward signals. Killing either reaper first bypasses
