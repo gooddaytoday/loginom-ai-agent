@@ -1658,3 +1658,25 @@ Session ses_ec5ac2d8fffe15FRObifENEobd. Initial attempt exit3/modelStartednull �
 accepted0/notstarted29/baseline0. Следующая попытка допускается только после
 обязательных machine gates; никаких параллельных профильных CLI/Loginom-сессий.
 Закрытые evidence и отчёт разбираются параллельно текущей модели.
+
+Checkpoint 2026-10-14 12:25 UTC — first-last-touch/1 закрыт, machine PASS/review pending.
+Attempt finished12:23:07.498Z, CLI1857207exit0/normalcleanup=true; Host1857900
+closed_ack=true/exit0/noSignal/noError12:23:05.615Z. Обе ownPIDgone, .writerabsent.
+CSV d4a002e1… совпал с oracle b1506490…; пакет2515144f… сохранён action save-1.
+Audit7f444963… complete: policy/oracle/calculation/history/runtime/identity/graph/
+export=true, failures=[], JS calls/nodes/successfulcalls0. Closure.historyAnomaly=true;
+runnerexec88234 terminalexit2/ledger12:23:07.698Z MANUAL_REVIEW_REQUIRED.
+Ошибки export-1..3 и успешныйexport-4 должны быть разобраны по полным tool outputs,
+сохранённому графу и runtime; независимое семантическое ревью branch_base pending.
+Исходный machine audit сохранён0400 в series/candidate-first-last-touch-1/
+selection-audit-before-manual-review.json; исходные attempt/history/closure неизменны.
+Модель не повторяется; следующий слот запрещён до manual gate. Started2/closed2/
+technicalfailed1/machinepassed1/accepted0/notstarted29/baseline0.
+
+Отдельно подготовлен offline alternative-coverage-draft/proposal.json16cb1c47…:
+mini-ABC с6строками и независимым Decimal oracle, оба порога0.8/0.95 и3класса;
+Import→Sort→ONE Calculator(CumulativeSum+Stat+inlineIF)→Group→Sort→Export.
+Это убирает второй classCalculator, общий wizard остаётся; livePASS не утверждается.
+Исходный200-row business oracle также независимо пересчитан. Драфт не запускается
+сейчас, не меняет31матрицу/denominator и не заменяет failedABC1; при отдельном запуске
+покрытие/ожидаемыйрезультат/параметры будут закреплены заранее.
