@@ -89,6 +89,7 @@ class Handle {
   async boundingBox() { this.page.playwrightBoxReads++; return this.element.isConnected ? { ...this.element.box, ...this.page.playwrightBox } : null; }
   async click() { this.page.events.push('click'); this.page.document.activeElement = this.element; }
   async dblclick() { this.page.events.push('double_click'); this.page.document.activeElement = this.element; }
+  async focus() { this.page.document.activeElement = this.element; this.page.onFocus?.(this.element); }
   async press(key) {
     this.page.events.push(key);
     this.page.onPress?.(key,this.element);
@@ -5143,4 +5144,47 @@ test('fractional Reform rows retain complete definitions and native record bindi
   assert.equal(s.wizard.reform_columns.definition_coverage.status,'complete_configured_fields',String(scale));
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
+});
+
+
+test('F3 sends one key through the original checked output without joining ElementHandle.press', async () => {
+  const page = new Page();
+  const port = page.add('div', 'MF;TF-1;Graph;Source;Output_Data-0', '', {x:100,y:100,width:20,height:20});
+  const snapshot = await page.observe(), ref = snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']).ref;
+  page.onPress = () => { throw Error('ElementHandle.press must not own Preview settlement'); };
+  page.keyboard.press = async key => {
+    assert.equal(page.document.activeElement,port); assert.equal(key,'F3');
+    page.events.push(key);
+    page.add('div','MF;TF-1;ModelForm;PreviewWindow','Loading',{x:200,y:200,width:100,height:100});
+  };
+  const result = await page.act({verb:'press',ref,key:'F3'},snapshot);
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.output.verification_required,true);
+  assert.equal(result.output.node_preview_schema,undefined);
+  assert.deepEqual(page.events,['F3']);
+  assert.equal(result.trace.filter(e=>e.event==='ui_key_delivered').length,1);
+});
+
+test('F3 retains raw browser failure and never sends a replacement key', async () => {
+  const page = new Page();
+  const port = page.add('div','MF;TF-1;Graph;Source;Output_Data-0','',{x:100,y:100,width:20,height:20});
+  const snapshot=await page.observe(),ref=snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']).ref;
+  const failure=Error('Keyboard dispatch reply lost');failure.name='TimeoutError';
+  page.keyboard.press=async key=>{page.events.push(key);throw failure;};
+  const result=await page.act({verb:'press',ref,key:'F3'},snapshot);
+  assert.equal(result.status,'AMBIGUOUS');assert.deepEqual(page.events,['F3']);
+  assert.deepEqual(result.trace.find(e=>e.event==='ui_action_failed').browser_error,{name:'TimeoutError',message:failure.message});
+  assert.equal(result.trace.some(e=>e.event==='ui_key_delivered'),false);
+});
+
+test('F3 epoch refusal sends no key and ordinary Enter retains ElementHandle semantics', async () => {
+  const page=new Page();const port=page.add('div','MF;TF-1;Graph;Source;Output_Data-0','',{x:100,y:100,width:20,height:20});
+  const snapshot=await page.observe(),ref=snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']).ref;
+  page.keyboard.press=async()=>{throw Error('No raw dispatch allowed');};
+  const ordinary=await page.act({verb:'press',ref,key:'Enter'},snapshot);assert.equal(ordinary.status,'SUCCEEDED');
+  assert.deepEqual(page.events,['Enter']);
+  const current=await page.observe();page.mutationObserver.pending.push({type:'attributes',target:port,attributeName:'data-tid'});
+  const stale=await page.act({verb:'press',ref,key:'F3'},current);
+  assert.equal(stale.status,'NOT_APPLIED');assert.equal(stale.error.code,'UI_EPOCH_CHANGED');
+  assert.deepEqual(page.events,['Enter']);
 });

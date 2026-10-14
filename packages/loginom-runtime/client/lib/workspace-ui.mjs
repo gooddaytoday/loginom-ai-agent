@@ -3484,6 +3484,15 @@ function readRenderedInputMapping(observation) {
         if (task.action.verb === 'click' || ['execute_graph_node', 'deactivate_graph_node','wizard_step','select_wizard_option','apply_expression_parameters','cancel_expression_parameters','open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb)) await clickTarget(1);
         else if (task.action.verb === 'double_click' || task.action.verb === 'enter_table') await clickTarget(2);
         else if (task.action.verb === 'right_click') await clickTarget(1, 'right');
+        else if (task.action.verb === 'press' && task.action.key === 'F3') {
+          // Keep the original checked output handle, but send the key directly.
+          // ElementHandle.press joins browser navigation signals; the procedure's
+          // next observe owns waiting for the original Preview schema.
+          timeout(); await first.focus(); timeout();
+          record('ui_key_delivery_started', { key: 'F3', ref: task.action.ref });
+          await page.keyboard.press('F3');
+          record('ui_key_delivered', { key: 'F3', ref: task.action.ref });
+        }
         else if (task.action.verb === 'press') await first.press(task.action.key, { timeout: timeout() });
         else if (task.action.verb === 'set_checked') {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref).check_state;
@@ -4018,7 +4027,9 @@ function readRenderedInputMapping(observation) {
         outcome = result('SUCCEEDED', { ...observed, gesture_applied: effectPossible, verification_required: true });
       }
     } catch (error) {
-      record('ui_action_failed', { code: error?.code ?? 'UI_BROWSER_CALL_FAILED' });
+      record('ui_action_failed', { code: error?.code ?? 'UI_BROWSER_CALL_FAILED',
+        ...(task.action?.verb === 'press' && task.action.key === 'F3' && !error?.code
+          ? { browser_error: { name: error?.name, message: error?.message } } : {}) });
       let observed = {};
       if (error?.code === 'UI_SCAN_LIMIT') observed = { observation_required: true, scan: { complete: false, limit_exceeded: true } };
       else try { observed = await readUi(); } catch { /* Never replace uncertainty with a fabricated observation. */ }
