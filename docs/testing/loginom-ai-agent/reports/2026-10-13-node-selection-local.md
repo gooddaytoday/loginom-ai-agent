@@ -2395,3 +2395,15 @@ outputTable, console/Stop, mapping/source/context, budgets и own shutdown со�
 Один итоговый изменённыйclient+JSaggregate:2154PASS/0FAIL/0SKIP,168.38s;
 собственные PIDs1634368/1635009 отсутствуют. Исторические payload/results сохранены.
 Новая серия20261014T105540Z-47e030 подготовлена:models0/native0, build и pins pending.
+
+Checkpoint 2026-10-14 11:05 UTC — новая matched пара105540 собрана и проверена.
+Source35c7bc60eb; оба build/verify0, baselineverifiedдоrestore2skillfiles,
+candidatecheckoutclean. Независимый physicalpair reviewSHA
+2275a3261fa08a8f49b18e8adafe5d5666dcff9f3f53b9452bf3c8468a5e035e:
+5726physicalfiles/links each,2skill+3metadata differences плюс внешний manifest,
+никаких прочих отличий. Runtime287/b85167c0b71799eb1f616e477ac60cb6af9ad7bc22f47307c6c824b1487a6d5f
+общий;127standardpayload exact38ee и58JS preserved. Новыйprotocol draft0400
+имеет76current source hashes,31slots,technicalVersion1 и readyfalse до gate/review.
+Один необходимый no-model ordinary27BImport→Sort→Export активирован после
+independent nativeadmissionSHA98f4b4e287537ed6d41d460db33d14f3b35bddc465af1959e7d3d4e219f32f62.
+Native result/ownclose pending; model0. Исторические locks/outcomes не изменены.

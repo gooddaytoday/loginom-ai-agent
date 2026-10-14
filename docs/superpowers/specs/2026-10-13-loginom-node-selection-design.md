@@ -1,14 +1,16 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Актуально на 2026-10-14: владелец уточнил область отката — обработчики
-стандартных узлов возвращаются к базе38ee, а общие порты, мастера и таблицы,
-необходимые реализации JavaScript, сохраняются. Итоговый source/runtime ещё
-не заморожен. Новая matched серия31=6baseline+25candidate ещё не начата;
-технические отказы могут продолжать другие слоты только после проверенного
-освобождения собственной сессии и профиля. Политическое нарушение останавливает
-серию. Историческая064745: один technicalfailed, остальные30 не начаты;
-оба private NO-REPRO не заменяют этот отказ. Подробности текущего протокола
-и уточнённой области — в последнем разделе; прежние checkpoints исторические.
+Актуально на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
+к базе38ee (127productionfiles independentlychecked), а общие порты, мастера
+и таблицы, необходимые JavaScript, сохранены. Rollbackd445c8ea65 и sourcegate
+35c7bc60eb завершены; changedclient/JS2154PASS. Technicalcontinuation6993d7ca4a
+прошёл44PASS/typecheck/source review. Новая matched пара20261014T105540Z-47e030
+имеет единый runtime287files/b85167…; physicalpair reviewPASS, skill-only разница.
+Основная матрица31=6baseline+25candidate и prospective technical continuation
+закреплены доmodels0. Один необходимый ordinary Import→Sort→Export сейчас
+выполняется локально; никакие старые live outcomes в новую серию не перенесены.
+Полная приёмка открыта; technical failure остаётся failed, confirmed JS-policy
+violation останавливает серию, strict own closure обязателен перед nextdispatch.
 
 ## История реализации и прежних серий
 
