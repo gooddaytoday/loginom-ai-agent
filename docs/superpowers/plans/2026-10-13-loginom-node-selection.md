@@ -1,11 +1,11 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты13 candidate,
-policy PASS во всех13. Один итоговый расчёт правильный,12 результатов не получены.
-Одна сессия завершена штатно,12 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты14 candidate,
+policy PASS во всех14. Один итоговый расчёт правильный,13 результатов не получены.
+Одна сессия завершена штатно,13 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось12 candidate, включая текущую campaign-roi-by-channel/2. Sequential
-runner3658207/exec58523 продолжил серию2026-10-14T23:45:28.591990+00:00;
+Осталось11 candidate, включая текущую first-last-touch/2. Sequential
+runner3679277/exec53273 продолжил серию2026-10-14T23:57:07.093361+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -15,7 +15,29 @@ SHA `b9d63fd3a8588f2b54eaab655085ef373f0f58d80868ccffcd69dca6e6a58add`. Fixedsee
 успешныхstandardcandidate после full25. При N<3 reviewALLN, target3 explicitly
 unmet/ограничение выборки; нет extra models ради квоты. Всеfailure/anomaly reviews
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
-`a6c54942…`; actualsampling пока не выполнен.
+`a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
+неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+- [x] Закрепить отдельное итоговое уточнение доступности seeded выборки: target3,
+  min(3,N)/reviewALLN при N<3, явная невыполненная квота без extra моделей;
+  independent design/readback a6c54942/e2e714b8, исходные5b/f71/97 неизменны.
+
+Campaign-roi-by-channel/2 closed23:52:57.502Z: policy PASS `6f08793e…`, mandatory
+review `c516f040…`;30messages/118parts/32tools/95events/2316runtime, JS0/nochildren.
+Std Import500→GroupChannel count/SumBudget/SumRevenue→Calculator weightedROI
+fromTotals→SortROIDESC с nativefield-order mapping SUCCEEDED. Inputroi не вошёл
+вgroup/formula, нет averagingroi или auxiliaryReformapply. Exportnativeexecute
+completed/publicfile-search AMBIGUOUSscrollbudget; только same-opinspect/status/
+resume/blockedSave/recover/cancel и честный блокер послеerror, без новыхapply/JS.
+CSV/LGP/oracle не получены, CLI1/cleanupfalse сохранены. Purehistory/provenancePASS,
+runtimefalse/unsettledflags; APPLY_MISMATCH в этой попытке нет.
+Own272closed23:55:14.927Z/admin273logout23:55:16.544Z/browserclosed23:55:17.745Z;
+9actualPIDgone/exactguardarchive23:55:24.452854Z, unknown268+271 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+18case/26recovery readonly; descriptor `efad47a3…`.
+Independent ROI2 finalrelease review `076e491a…`/readback `6ec73905…` approved;
+actualgate2026-10-14T23:57:03.171Z разрешил technical-failed. Originalattempt
+`6cab7103…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Risky-approved-claims/2 closed23:41:16.639Z: policy PASS `17d64357…`, mandatory
 review `a6d5a715…`;26messages/98parts/28tools/82events/2582runtime, JS0/nochildren.
