@@ -751,3 +751,16 @@ summary/policy/process tests/405 assertions PASS (8.68s), typecheck/diff PASS.
 Container records в этом тесте — normalized input receipts; live generation
 qualification, все runtime actors/thresholds/quotas и ordinary v2 dispatch binding
 остаются открытыми. Manifest не выдаёт разрешение на model dispatch.
+
+
+Retained process windows: actual native supervisor proof → private source read,
+semantic SHA/owner/producer/continuous ready launcher/final00 qualification →
+full persisted dispatch-to-exit window в resource coordinator. Inline window не
+подменяет source; changed producer frame не получает numeric timeline credit.
+При manifest требуется proof каждого выбранного slot ID: actual A/N=1 positive,
+тот же source без B/N=2 incomplete. Container records этого control остаются
+normalized metadata, не live pair qualification. Wrong owner/producer/hash,
+duplicate source и unready launcher refused. Shared closed-proof validator также
+прошёл offline qualification/recovery regression:80 tests/570 assertions PASS
+(40.10s), typecheck/diff PASS. Полный runtime actor/attempt inventory и production
+binding ещё открыты; readonly proofs не разрешают signals/delete/recovery.
