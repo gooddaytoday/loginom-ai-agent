@@ -28,10 +28,35 @@ export function loginomAddress(value) {
   return url.href
 }
 
+// Pre-widget diagnostics only: no response bodies, headers, query, console text
+// or input values. The collector grants no readiness/cleanup authority.
+export function startupPageDiagnostics(page, origin) {
+  const evidence={version:1,started_at:new Date().toISOString(),requests:[],dropped_requests:0,page_errors:[],console_counts:{},stopped:false};
+  const requests=new WeakMap();
+  const request=r=>{try {
+    if(evidence.requests.length>=64){evidence.dropped_requests++;return}
+    const url=new URL(r.url()),item={same_origin:url.origin===origin,pathname:url.pathname.slice(0,256),method:r.method(),started_at:new Date().toISOString(),state:'pending'};
+    requests.set(r,item);evidence.requests.push(item);
+  }catch{evidence.dropped_requests++}};
+  const finish=r=>{const item=requests.get(r);if(item){item.state='finished';item.settled_at=new Date().toISOString()}};
+  const fail=r=>{const item=requests.get(r);if(item){item.state='failed';item.settled_at=new Date().toISOString()}};
+  const error=e=>{if(evidence.page_errors.length<16)evidence.page_errors.push({name:typeof e?.name==='string'?e.name:'unknown',observed_at:new Date().toISOString()})};
+  const consoleEvent=e=>{const type=e.type();if(['error','warning','log','info','debug'].includes(type))evidence.console_counts[type]=(evidence.console_counts[type]??0)+1};
+  const listeners=[['request',request],['requestfinished',finish],['requestfailed',fail],['pageerror',error],['console',consoleEvent]];
+  for(const [event,listener]of listeners)page.on(event,listener);
+  return {evidence,stop(){if(evidence.stopped)return;for(const [event,listener]of listeners)page.off(event,listener);evidence.stopped=true;evidence.stopped_at=new Date().toISOString()}};
+}
+
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, owner) {
-  if(owner) owner.navigationStarted=true
+  if(owner) {
+    owner.navigationStarted=true
+    if(typeof page.on==='function'&&typeof page.off==='function') {
+      owner.startupDiagnostics??=startupPageDiagnostics(page,owner.origin)
+      owner.evidence.startup_diagnostics=owner.startupDiagnostics.evidence
+    }
+  }
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   if(owner) {
     await page.evaluate(o=>{
@@ -42,7 +67,8 @@ export async function loginPage(page, candidate, owner) {
   }
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-  await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+  try {await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })}
+  finally {owner?.startupDiagnostics?.stop()}
   let loginReadyDeadline=Date.now()+30_000
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
@@ -362,6 +388,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     if(!keepOpen) {await owner.close();return result}
     return {...result,context:owner.context}
   } catch(error) {
+    owner.startupDiagnostics?.stop()
     owner.primaryFailure=error
     owner.evidence.primary_rejection=startupRejection(error)
     try {await startupEvidence(owner)} catch(persistenceFailure) {owner.evidence.persistence_failure=startupRejection(persistenceFailure)}
