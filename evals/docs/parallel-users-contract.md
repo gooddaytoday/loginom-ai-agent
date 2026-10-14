@@ -480,3 +480,19 @@ logout для native fault injection; CLI SIGKILL этим не квалифиц
 Native retained-row name/time refusal и actual RPC+repeat verified:
 60 admin/native/codec/preflight PASS/271 (77.49s), typecheck/diff PASS.
 Volatile binding не даёт authority после нового admin context/recovery.
+
+Activation lifecycle fence (2026-10-15): stageUserActivation под held lease
+связывает private/fsynced activation-<slot>.json с preparation generation,
+credential SHA, user key/native observed ID/epoch и creation source SHA до
+unblock. Reader повторно проверяет immutable sources и schema; repeat сохраняет
+nonce/bytes/inode, foreign intent не перезаписывается.
+
+Creation claim хранит исходный snapshot everActivated=false. Effective
+readUserOwnership консервативно возвращает true при любом activation journal:
+planned или malformed запись не разрешает считать account никогда не активным.
+readUserActivation отдельно проверяет содержимое. Parent blocked-create
+отклоняет такой account USER_IDLE_UNCONFIRMED до RPC; serialized reread
+отклонит intent, появившийся после исходного ownership read. Ledger не удаляется
+по одному Blocked getter. Native parent activation ещё не подключена и обязана
+вызывать stage до mutation; это local FS lifecycle, не live activation proof.
+49 user/admin/slots PASS/151 assertions (1.69s), typecheck/diff PASS.

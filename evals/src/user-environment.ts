@@ -117,8 +117,47 @@ export async function readUserOwnership(file: SlotFile, lease: SlotLease, secret
   const owned = await ownershipFromCreation(file, lease, prepared, source.path, { v: 1, id: source.id, outcome: "confirmed",
     data: { created: true, user: { objectId: value.objectId, name: value.username, userKind: value.userKind, blocked: true } } })
   if (JSON.stringify(value) !== JSON.stringify(owned)) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+  const activation = await lstat(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+  })
   await lease.assertHeld()
-  return owned
+  return { ...owned, everActivated: Boolean(activation) }
+}
+
+export async function stageUserActivation(file: SlotFile, lease: SlotLease, secretFile: string) {
+  const existing = await readUserActivation(file, lease, secretFile)
+  if (existing) return existing
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const owned = await readUserOwnership(file, lease, secretFile)
+  const intent = userActivationIntent(prepared, owned, crypto.randomUUID())
+  await lease.assertHeld()
+  await writeLeaseReceipt(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`), intent)
+  return intent
+}
+
+export async function readUserActivation(file: SlotFile, lease: SlotLease, secretFile: string) {
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const owned = await readUserOwnership(file, lease, secretFile)
+  const saved = await readLeaseReceipt(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+  })
+  if (saved === undefined) return undefined
+  const existing = record(saved)
+  if (typeof existing.nonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(existing.nonce))
+    throw new EvalFailure("USER_ACTIVATION_CONFLICT", 2)
+  const intent = userActivationIntent(prepared, owned, existing.nonce)
+  if (Object.keys(existing).length !== Object.keys(intent).length || Object.entries(intent)
+    .some(([key, value]) => JSON.stringify(existing[key]) !== JSON.stringify(value))) throw new EvalFailure("USER_ACTIVATION_CONFLICT", 2)
+  await lease.assertHeld()
+  return intent
+}
+
+function userActivationIntent(prepared: Awaited<ReturnType<typeof readUserPreparation>>, owned: Awaited<ReturnType<typeof readUserOwnership>>, nonce: string) {
+  return { version: 2, kind: "user-activation-intent", nonce, slotId: prepared.slotId, username: prepared.username,
+    preparationNonce: prepared.nonce, userKey: owned.userKey, objectId: owned.objectId, identity: prepared.identity,
+    secretHash: prepared.secretHash, ownerSource: owned.source.sha256, state: "planned" }
 }
 
 async function ownershipFromCreation(file: SlotFile, lease: SlotLease, prepared: Awaited<ReturnType<typeof readUserPreparation>>, commandFile: string, reply: AdminReply) {

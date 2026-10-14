@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { claimUserOwnership, readUserOwnership, readUserPreparation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readUserActivation, readUserOwnership, readUserPreparation, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -41,6 +41,25 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     const before = await stat(target)
     expect(await claimUserOwnership(fixture.slots, lease, prepared.secretFile, source, reply)).toEqual(claimed)
     expect((await stat(target)).ino).toBe(before.ino)
+    const activation = await stageUserActivation(fixture.slots, lease, prepared.secretFile)
+    expect(activation).toMatchObject({ kind: "user-activation-intent", state: "planned", slotId: "a", username: "eval-a",
+      preparationNonce: prepared.nonce, userKey: claimed.userKey, objectId: claimed.objectId, identity })
+    const activationFile = path.join(fixture.slots.controller.stateDir, "activation-a.json")
+    const activationBefore = await stat(activationFile)
+    const activationBytes = await Bun.file(activationFile).text()
+    expect(activationBefore.mode & 0o777).toBe(0o600)
+    expect(await stageUserActivation(fixture.slots, lease, prepared.secretFile)).toEqual(activation)
+    expect(await Bun.file(activationFile).text()).toBe(activationBytes)
+    expect((await stat(activationFile)).ino).toBe(activationBefore.ino)
+    expect(JSON.stringify(activation)).not.toContain((await Bun.file(prepared.secretFile).json()).password)
+    expect(await readUserActivation(fixture.slots, lease, prepared.secretFile)).toEqual(activation)
+    expect((await readUserOwnership(fixture.slots, lease, prepared.secretFile)).everActivated).toBe(true)
+    await writeLeaseReceipt(activationFile, { ...activation, objectId: "foreign-user" })
+    const foreignActivation = await Bun.file(activationFile).text()
+    await expect(readUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_ACTIVATION_CONFLICT")
+    await expect(stageUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_ACTIVATION_CONFLICT")
+    expect(await Bun.file(activationFile).text()).toBe(foreignActivation)
+    await writeLeaseReceipt(activationFile, activation)
     const originalSource = await Bun.file(source).json()
     await writeLeaseReceipt(source, { ...originalSource, settledAt: new Date(Date.parse(originalSource.settledAt) + 1).toISOString() })
     await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
@@ -51,6 +70,8 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     expect(await Bun.file(target).text()).toBe(foreign)
     await lease.close()
     await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("LEASE_NOT_HELD")
+    await expect(readUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("LEASE_NOT_HELD")
+    await expect(stageUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("LEASE_NOT_HELD")
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
 })
 
