@@ -22,11 +22,16 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 15:46 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены14 из31,
-закрыты13; baseline ROI/1 безопасно выполняется. Dispatch15:45:58.739Z,
-CLI2347693, runnerPID2346840/exec45610; baseline first-last-touch/1 и16candidate
-ещё впереди. Модельные процессы текущего профиля последовательны.
+Текущий checkpoint 2026-10-14 15:56 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены15 из31,
+закрыты14; baseline first-last-touch/1 безопасно выполняется, CLI2364287,
+dispatch15:53:32.765Z. RunnerPID2346840/exec45610; впереди16candidate.
+ROI/1 завершён15:53:32.592Z: oracle/calculationPASS, JS0, CLI2347693exit0,
+Host2347969ACK/exit0 и оба PIDgone; normalcleanuptrue. Audit `4d580da3…`,
+LGP `70a708cb…`, CSV `1d8460f2…`, autoadvance proof `82bcc882…`.
+Import→Group→Calculator→Sort→Export, следующие слоты без ручной паузы.
+Модельные процессы текущего профиля последовательны; baseline now5closed,
+аналитика4correct/1notobtained, normalcompletion4/manualpostfailure1.
 
 Candidate: девять отдельных policy-v2 PASS; все шесть стандартных задач и три
 исключения содержательно покрыты. Исходная аналитика: пять успешных результатов,
