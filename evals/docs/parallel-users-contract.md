@@ -514,3 +514,18 @@ lease RED missing method→GREEN1 PASS/27 (6.59s), journal без mutation.
 Codec/slots/admin49 PASS/157 (1.73s), typecheck/diff PASS. Положительный native
 parent producer ещё не квалифицирован; wire probe evidence предыдущей стадии
 этого не заменяет. Parent close/confirmed close state и crash recovery далее.
+
+Management close ledger: recordServerSessionClosed сохраняет отдельный private
+fsynced terminal receipt. Source должен быть confirmed close-session из того же
+command directory, с exact original proofId/binding/epoch, desired+reply SHA и
+semantic source SHA. readServerSession повторно проверяет обе source цепочки
+и возвращает effective closed state; corrupt/null terminal и changed source
+не разрешают release/admission. Original observed record сохраняется.
+
+Parent closeOwnedSession читает held generation-bound ledger, проверяет current
+server identity и принадлежность native context; beforeSend перечитывает ledger
+и pair guard. После confirmed native reply пишет terminal proof. Closed state
+идемпотентен после fresh identity check. Generic close без proof не расширен.
+Data-only fs/flock tests49 PASS/163 (2.14s); native closed lease RED missing API
+→GREEN1 PASS/28 (7.07s), typecheck/diff PASS. Положительный native parent close,
+recovery lineage, real CLI/setup/check producers и active packages ещё open.
