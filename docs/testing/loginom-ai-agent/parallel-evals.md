@@ -77,6 +77,15 @@ licence producer ещё не квалифицирован: нет bootstrap admi
 scopes остаются incomplete до отдельного подтверждённого контракта; licence
 keys и успешная реальная выдача этими unit inputs не создаются.
 
+assessResourceBudget проверяет version1 declared bounds по scope/metric с
+nullable minimum/maximum. Budget связан с run_id и fixed_at строго до
+startedAt; min/peak violation даёт failed, missing/reset/whole lost interval
+— incomplete. Malformed/empty bounds не пропускаются. Policy18 PASS/95
+assertions, вместе с reducer/private evidence29 PASS/138, typecheck PASS.
+Список обязательных scopes и quotas, source SHA/read-back и фактический frozen
+manifest проверяются отдельными gates; этот reducer policy сам не доказывает
+полноту бюджета или coverage всего run.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
