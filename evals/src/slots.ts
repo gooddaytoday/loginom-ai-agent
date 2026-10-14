@@ -74,29 +74,8 @@ export function parseSlots(value: unknown, parallel: number): SlotFile {
 }
 
 export async function loadSlots(file: string, parallel: number, installRoot?: string): Promise<SlotFile> {
-  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => {
-    throw new EvalFailure("SLOTS_FILE_PRIVATE", 2)
-  })
-  const input = await (async () => {
-    try {
-      const info = await handle.stat()
-      if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o600)
-        throw new EvalFailure("SLOTS_FILE_PRIVATE", 2)
-      return parseSlots(JSON.parse(await handle.readFile("utf8")), parallel)
-    } catch (error) {
-      if (error instanceof EvalFailure) throw error
-      throw new EvalFailure("SLOTS_SCHEMA", 2)
-    } finally { await handle.close() }
-  })()
-  const canonical: SlotFile = {
-    ...input,
-    controller: { stateDir: await canonicalPath(input.controller.stateDir), adminCredentialsFile: await canonicalPath(input.controller.adminCredentialsFile) },
-    judge: { codexHome: await canonicalPath(input.judge.codexHome) },
-    ...(input.auth ? { auth: { sharedDir: await canonicalPath(input.auth.sharedDir) } } : {}),
-    slots: await Promise.all(input.slots.map(async slot => ({ ...slot,
-      profileDir: await canonicalPath(slot.profileDir), workspaceRoot: await canonicalPath(slot.workspaceRoot), historyDir: await canonicalPath(slot.historyDir),
-    }))),
-  }
+  const input = await readSlotFile(file, parallel)
+  const canonical = await canonicalSlots(input)
   validatePaths(canonical, [await canonicalPath(path.resolve(file)), ...(installRoot ? [await canonicalPath(path.resolve(installRoot))] : [])])
   await requirePrivatePath(input.controller.adminCredentialsFile, true)
   await Promise.all([input.controller.stateDir, input.judge.codexHome, ...(input.auth ? [input.auth.sharedDir] : []),
@@ -106,6 +85,15 @@ export async function loadSlots(file: string, parallel: number, installRoot?: st
     .map(value => requirePrivatePath(value, false)))
   await requirePrivatePath(canonical.controller.adminCredentialsFile, true)
   return canonical
+}
+
+export async function loadJudgeEnvironment(file: string) {
+  const input = await readSlotFile(file, 1)
+  const canonical = await canonicalSlots(input)
+  validatePaths(canonical, [await canonicalPath(path.resolve(file))])
+  await Promise.all([input.controller.stateDir, input.judge.codexHome, canonical.controller.stateDir, canonical.judge.codexHome]
+    .map(value => requirePrivatePath(value, false)))
+  return { codexHome: canonical.judge.codexHome, stateDir: canonical.controller.stateDir }
 }
 
 export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease> {
@@ -190,4 +178,31 @@ function text(value: unknown) {
 function identifier(value: unknown) {
   if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(text(value))) throw new EvalFailure("SLOT_IDENTIFIER", 2)
   return text(value)
+}
+
+async function readSlotFile(file: string, parallel: number) {
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => {
+    throw new EvalFailure("SLOTS_FILE_PRIVATE", 2)
+  })
+  try {
+    const info = await handle.stat()
+    if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o600)
+      throw new EvalFailure("SLOTS_FILE_PRIVATE", 2)
+    return parseSlots(JSON.parse(await handle.readFile("utf8")), parallel)
+  } catch (error) {
+    if (error instanceof EvalFailure) throw error
+    throw new EvalFailure("SLOTS_SCHEMA", 2)
+  } finally { await handle.close() }
+}
+
+async function canonicalSlots(input: SlotFile): Promise<SlotFile> {
+  return {
+    ...input,
+    controller: { stateDir: await canonicalPath(input.controller.stateDir), adminCredentialsFile: await canonicalPath(input.controller.adminCredentialsFile) },
+    judge: { codexHome: await canonicalPath(input.judge.codexHome) },
+    ...(input.auth ? { auth: { sharedDir: await canonicalPath(input.auth.sharedDir) } } : {}),
+    slots: await Promise.all(input.slots.map(async slot => ({ ...slot,
+      profileDir: await canonicalPath(slot.profileDir), workspaceRoot: await canonicalPath(slot.workspaceRoot), historyDir: await canonicalPath(slot.historyDir),
+    }))),
+  }
 }
