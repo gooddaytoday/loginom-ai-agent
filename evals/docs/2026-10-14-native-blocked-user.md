@@ -97,3 +97,31 @@ typecheck/diff PASS. Private whitelist evidence:
 Reconnect stability, negative close races, durable ownership ledger, target
 CloseSession и SessionBackup ещё не подтверждены; имя само по себе authority
 не получает. Модель/судья не запускались.
+
+Bound close read-back: первоначальный close test стабильно отказал3/3
+SESSION_IDENTITY_CHANGED (26.553/27.246/24.836s). Native process cleanup и
+удаление own disposable pairs подтверждены. Private signal report:
+`/tmp/evals-native-session-close-signal-9svh_v_6.json`. Probe до disconnect
+имел согласованные binding/Name/CreateTime/Count; этого не хватало для вывода
+о состоянии после закрытия context.
+
+Добавленный afterDisconnect snapshot показал отсутствие исходной row и по ID,
+и по Name/CreateTime (native-user-52ff023d...). Primary Application.js:599–601
+вызывает DoDisconnect на pagehide, ServerConnection.js:304–310 — Finalize.
+Source path сам по себе не доказывал server closure; fresh manager read-back
+подтвердил именно отсутствие ранее causally bound session на этой сборке.
+
+Driver хранит binding только текущего fixed probe в памяти. close-session
+требует его proofId/exact tuple/user key/current epoch, повторно проверяет
+account native ID и полный fresh manager inventory. После подтверждённого
+закрытия probe writer context отсутствие и по ID, и по Name/CreateTime даёт
+closed=true/disposition=observed_absent. Foreign proof/name/time refused;
+repeat read-back идемпотентен. Retained/changed/ambiguous row не получает
+разрешения на mutation; реальный manager.CloseSession RPC ещё не квалифицирован.
+Общий parent close без probe proof по-прежнему unsupported.
+
+Current native/admin/codec/preflight60 PASS/260 assertions (73.81s),
+typecheck/diff PASS. Whitelist successful evidence:
+`research/evidence/native-user-172fece6-5dc0-464e-aaa3-94a60211241a/session-probe.json`.
+Durable session ledger, reconnect/retained session/backup и production admission
+остаются открыты. Context exit без server read-back authority не получает.
