@@ -4,7 +4,7 @@ import { readFile, realpath } from "node:fs/promises"
 import { createHash, randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
-import { transport, privateFPTransport, privateAmountTransport, type Port } from "./transport"
+import { transport, privateNodeHostTransport, privateFPTransport, privateAmountTransport, type Port } from "./transport"
 
 type NodeHostInput = {
   node: string
@@ -228,6 +228,86 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
   } })
 }
 
+// Private original factory-channel registry. Projected IPC scalars are not an
+// owner capability: acquisition/currentness must complete on this same channel.
+type ParentRoot={port:Port;input:NodeHostInput;snapshot:NodeHostInput;alive():boolean;
+ request:ReturnType<typeof privateNodeHostTransport>["requestOwnedAcquire"];methods:Readonly<Port>;environment:string;runs:Map<string,ParentAcquisition>}
+type ParentAcquisition={root:ParentRoot;run:string;session:string;phase:"pending"|"acquired"|"disposed"|"refused";
+ value?:Readonly<{owner:string;run:string;lease:string;generation:number;chat:string;account:string}>;
+ primary?:{value:unknown};secondary?:{value:unknown};checking?:boolean;capability:object}
+const originalParentPorts=new WeakMap<Port,ParentRoot>(),parentAcquisitions=new WeakMap<object,ParentAcquisition>()
+function guardParent(p:ParentAcquisition) {
+ if(p.primary)throw p.primary.value
+ const r=p.root
+ if(p.phase==="disposed" || !r.alive() || originalParentPorts.get(r.port)!==r || r.runs.get(p.run)!==p
+    || ['postMessage','on','off','start','onClose'].some(k=>(r.port as any)[k] !== (r.methods as any)[k])
+    || r.input.environment!==r.snapshot.environment || JSON.stringify(runtimeEnvironment(r.input.environment??process.env))!==r.environment
+    || ["node","entry","root","resources","headless","strictRecovery","acceptanceCleanupPackage"].some(k=>(r.input as any)[k] !== (r.snapshot as any)[k]))
+   {p.primary={value:Error("LOGINOM_ORIGINAL_HOST_OWNER_CHANGED")};p.phase='refused';throw p.primary.value}
+}
+function originalProjection(value:any,p:ParentAcquisition) {
+ const t=value?.acquiredService
+ if(!value || Object.keys(value).sort().join(',')!=='acquiredService,generation' || !t
+    || Object.keys(t).sort().join(',')!=='account,chat,generation,lease,owner,phase,run'
+    || t.phase!=='acquired-service' || t.run!==p.run || t.lease!==t.owner+':'+p.run
+    || !Number.isSafeInteger(t.generation) || t.generation<1 || value.generation!==t.generation
+    || !['owner','account'].every(k=>typeof t[k]==='string'&&t[k])
+    || t.chat!==createHash('sha256').update(p.session).digest('hex'))throw Error('LOGINOM_ORIGINAL_HOST_REPLY_INVALID')
+ return Object.freeze({owner:t.owner,run:t.run,lease:t.lease,generation:t.generation,chat:t.chat,account:t.account})
+}
+async function verifyOriginalParentInventory(p:ParentAcquisition) {
+ const {root:r}=p,product=resolve(r.snapshot.resources,'../..')
+ const cli=JSON.parse(await readFile(join(product,'cli-manifest.json'),'utf8'));guardParent(p)
+ const manifest=JSON.parse(await readFile(join(r.snapshot.resources,'resource-manifest.json'),'utf8'));guardParent(p)
+ if(cli.format!=='loginom-cli-artifact-v1' || !Array.isArray(cli.files) || !Array.isArray(manifest.files))throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ for(const[path,file,rows]of [['resources/loginom/host/node-host.mjs',r.snapshot.entry,cli.files],['bin/node',r.snapshot.node,manifest.files]] as const) {
+  const pins=rows.filter((row:any)=>row.path===path)
+  if(pins.length!==1 || pins[0].link || pins[0].directory || !/^[a-f0-9]{64}$/.test(pins[0].sha256))throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+  const canonical=await realpath(file);guardParent(p)
+  if(canonical!==file)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+  const bytes=await readFile(file);guardParent(p)
+  if(createHash('sha256').update(bytes).digest('hex')!==pins[0].sha256)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ }
+}
+export function hasOriginalNodeHostPort(port:Port) {return originalParentPorts.has(port)}
+export async function acquireOriginalNodeHostOwner(port:Port,run:string,session:string) {
+ const root=originalParentPorts.get(port)
+ if(!root || !run || !session || root.runs.has(run))throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ const capability=Object.freeze({}),p:ParentAcquisition={root,run,session,capability,phase:'pending'}
+ root.runs.set(run,p);parentAcquisitions.set(capability,p);guardParent(p)
+ try {
+  await verifyOriginalParentInventory(p);guardParent(p)
+  const value=await root.request({run,session,receiverPurpose:'union-acquired-service-v1'},p)
+  guardParent(p);if(!value)throw Error('LOGINOM_HOST_NOT_READY');p.value=originalProjection(value,p);p.phase='acquired'
+  return {capability,generation:p.value.generation}
+ }catch(value){p.primary??={value};p.phase='refused';throw p.primary.value}
+}
+export async function assertOriginalNodeHostOwner(capability:object) {
+ const p=parentAcquisitions.get(capability)
+ if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ guardParent(p)
+ if(p.phase!=='acquired' || !p.value)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ if(p.checking)throw Error('LOGINOM_RECOVERY_REQUIRED')
+ p.checking=true
+ try {
+  const value=await p.root.request({run:p.run,receiverPurpose:'union-acquired-service-v1',receiverPhase:'current'},p)
+  guardParent(p);const next=originalProjection(value,p)
+  if(Object.keys(next).some(k=>next[k as keyof typeof next]!==p.value![k as keyof typeof next]))throw Error('LOGINOM_ORIGINAL_HOST_OWNER_CHANGED')
+  return p.value
+ }catch(value){p.primary??={value};throw p.primary.value}finally{p.checking=false}
+}
+export function refuseOriginalUnionCreation(capability:object):never {
+ const p=parentAcquisitions.get(capability)
+ if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ guardParent(p)
+ if(p.phase!=='acquired')throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ throw Error('UNION_ORIGINAL_SDK_CREATION_UNAVAILABLE')
+}
+export function disposeOriginalNodeHostOwner(capability:object) {
+ const p=parentAcquisitions.get(capability)
+ if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ p.phase='disposed'
+}
 export async function launchNodeHost(input: NodeHostInput) {
   // Ordinary product callers cannot turn structural fields into authority.
   if ("acceptanceCapture" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
@@ -238,6 +318,7 @@ export async function launchNodeHost(input: NodeHostInput) {
   fp?.guard()
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  const originalInput={...input}
   const environment = runtimeEnvironment(input.environment ?? process.env)
   const child = fork(input.entry, [], {
     execPath: input.node,
@@ -260,6 +341,8 @@ export async function launchNodeHost(input: NodeHostInput) {
   function closePort() {
     if (state.closed) return
     state.closed = true
+    const root=originalParentPorts.get(port)
+    if(root)for(const p of root.runs.values())p.primary??={value:Error('LOGINOM_HOST_CLOSED')}
     events.emit("close")
   }
   child.on("disconnect", closePort)
@@ -287,7 +370,8 @@ export async function launchNodeHost(input: NodeHostInput) {
   }
   const fpClient = diagnostic?.harness === "field-parameters-preservation-v1" ? privateFPTransport(port) : undefined
   const amountClient=amount ? privateAmountTransport(port,amount.receive):undefined
-  const client = amountClient ?? fpClient ?? transport(port)
+  const ownerClient=!amountClient&&!fpClient?privateNodeHostTransport(port):undefined
+  const client = amountClient ?? fpClient ?? ownerClient!
   const startupInput = {
     protocol: 1 as const,
     ...(amount&&diagnostic?{amountStartup:{purpose:"amount-import-type-v1" as const,authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request,deadline:amount.control.deadline}}:{}),
@@ -339,6 +423,12 @@ export async function launchNodeHost(input: NodeHostInput) {
     if (!fp && !amount) { child.kill("SIGTERM"); client.close() }
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   }
+  // Only this fixed ordinary Node entry can issue a parent receiver. FP,
+  // Amount and arbitrary entry callers retain their existing routes.
+  if(!diagnostic && !fp && !amount && input.strictRecovery===true && input.entry===join(input.resources,'host/node-host.mjs')
+      && input.node===join(input.resources,'bin',process.platform==='win32'?'node.exe':'node'))
+    originalParentPorts.set(port,{port,input,snapshot:originalInput,alive:()=>!state.closed&&child.connected,
+      request:ownerClient!.requestOwnedAcquire,methods:Object.freeze({...port}),environment:JSON.stringify(environment),runs:new Map()})
   return handle
   function close() {
       if (state.closing) return state.closing

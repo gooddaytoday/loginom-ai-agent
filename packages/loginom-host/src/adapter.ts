@@ -1,3 +1,4 @@
+import {hasOriginalNodeHostPort,acquireOriginalNodeHostOwner,assertOriginalNodeHostOwner,disposeOriginalNodeHostOwner,refuseOriginalUnionCreation} from './node-client'
 import type { InputFile } from "./inputs"
 export * as LoginomHost from "./adapter"
 
@@ -8,26 +9,29 @@ import { types } from "node:util"
 import { transport, type Port } from "./transport"
 
 type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }> }
-const state: { connection?: ReturnType<typeof transport>; owner?: Owner } = {}
+const state: { connection?: ReturnType<typeof transport>; owner?: Owner;port?:Port } = {}
 export function connect(port: Port, owner?: Owner) {
   state.connection?.close()
   state.connection = transport(port)
   state.owner = owner
+  state.port = port
 }
 export function disconnect() {
   state.connection?.close()
   state.connection = undefined
   state.owner = undefined
+  state.port = undefined
 }
 export async function acquire(session: string) {
   const connection = state.connection
   if (!connection) return
-  const run = randomUUID()
-  const value = await connection.request("acquire", { session, run })
+  const port=state.port,owner=state.owner,run = randomUUID()
+  const acquired=port && hasOriginalNodeHostPort(port)?await acquireOriginalNodeHostOwner(port,run,session):undefined
+  const value=acquired?{generation:acquired.generation}:await connection.request("acquire", { session, run })
+  if(acquired && (state.connection!==connection || state.owner!==owner || state.port!==port))throw Error('LOGINOM_ORIGINAL_HOST_OWNER_CHANGED')
   if (!value) throw new Error("LOGINOM_HOST_NOT_READY")
   if (typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number")
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
-  const owner = state.owner
   const queue = { tail: Promise.resolve(), released: false }
   const lease = {
     generation: value.generation,
@@ -53,6 +57,10 @@ export async function acquire(session: string) {
             || invocation.request !== args || invocation.signal !== signal
             || invocation.userMessage !== userMessage || invocation.generation !== lease.generation)
           throw Error("UNION_INVOCATION_BINDING_CHANGED")
+        if(acquired) {
+          await assertOriginalNodeHostOwner(acquired.capability)
+          refuseOriginalUnionCreation(acquired.capability)
+        }
         throw Error("ORIGINAL_UNION_ACQUIRED_PROVIDER_UNAVAILABLE")
       }
       // Serialize before transport admission so waiting does not consume the IPC timeout
@@ -78,6 +86,7 @@ export async function acquire(session: string) {
     async release() {
       if (owner?.deferRelease) return
       queue.released = true
+      if(acquired)disposeOriginalNodeHostOwner(acquired.capability)
       await connection.request("release", { run }).catch(() => undefined)
       owner?.leases.delete(lease)
     },
