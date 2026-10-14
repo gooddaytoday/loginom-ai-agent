@@ -54,23 +54,27 @@ async function assertProfileSettled(profile: string) {
 }
 
 /** Move every attempt's durable evidence outside the single mounted profile. */
-export async function archiveProfileHistory(profileDir: string, archiveId: string) {
+export async function archiveProfileHistory(profileDir: string, archiveId: string, beforeEffect?: () => Promise<void>) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(archiveId)) throw new EvalFailure("Неверный ID архива профиля", 2)
   const profile = await realpath(profileDir)
   await assertProfileSettled(profile)
   const files = await profileHistory(profile)
   const root = `${profile}.history`
+  await beforeEffect?.()
   await mkdir(root, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
   const info = await lstat(root)
   if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0)
     throw new EvalFailure("Архив профиля не является закрытым каталогом", 2)
+  await beforeEffect?.()
   const archive = await mkdtemp(path.join(root, `${archiveId}-`))
   const moved: { source: string; destination: string }[] = []
   try {
     for (const file of files) {
       const destination = path.join(archive, path.relative(profile, file))
+      await beforeEffect?.()
       await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 })
       const before = await lstat(file)
+      await beforeEffect?.()
       await rename(file, destination)
       moved.push({ source: file, destination })
       const after = await lstat(destination)
@@ -80,6 +84,9 @@ export async function archiveProfileHistory(profileDir: string, archiveId: strin
     await assertProfileClean(profile)
     return archive
   } catch (error) {
+    // Closed owned recovery keeps an uncertain partial move plus the coherent before-snapshot.
+    // A failed admission cannot authorize rollback effects. Legacy callers retain their existing behavior.
+    if (beforeEffect) throw error
     // A failed move must not split a database from its WAL/SHM at next admission.
     for (const file of moved.reverse()) await rename(file.destination, file.source)
     throw error
@@ -93,8 +100,10 @@ const exists = (file: string) =>
   )
 
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
+  await command.beforeManagementEffect?.()
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
+  await command.beforeManagementEffect?.()
   const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
     env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, outDir: out })
   if (out) {
@@ -105,6 +114,7 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   }
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
+  await command.beforeManagementEffect?.()
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
     await archiveDiagnostics(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.runtimeDirectories, out, command.cleanupSecrets)
   if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
@@ -333,15 +343,16 @@ export async function assertAuth(config: EvalConfig, command: AgentCommand) {
   )
 }
 
-export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
-  const first = await status(command, exitCode)
+export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2, beforeEffect?: () => Promise<void>) {
+  const guarded={...command,beforeManagementEffect:beforeEffect??command.beforeManagementEffect}
+  const first = await status(guarded, exitCode)
   const acknowledged = Boolean(first.recoveries?.length)
   if (acknowledged) {
-    const recover = await management(command, ["loginom", "recover", "--acknowledge", "--format", "json"])
+    const recover = await management(guarded, ["loginom", "recover", "--acknowledge", "--format", "json"])
     if (recover.exitCode !== 0)
       throw new EvalFailure(`loginom recover завершился кодом ${recover.exitCode}:\n${recover.stderr.trim()}`, exitCode)
   }
-  const view = await settle(command, acknowledged ? await status(command, exitCode) : first, exitCode)
+  const view = await settle(guarded, acknowledged ? await status(guarded, exitCode) : first, exitCode)
   if (view.state !== "ready" || view.recoveries?.length)
     throw new EvalFailure(
       `Профиль Loginom не готов: state=${view.state} failure=${view.failure ?? "—"} recoveries=${view.recoveries?.length ?? 0}` +

@@ -1,8 +1,9 @@
 import { createRequire } from "node:module"
 import path from "node:path"
-import { readFile, lstat, readlink, realpath, readdir } from "node:fs/promises"
+import { readFile, lstat, readlink, realpath, readdir, open } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { pathToFileURL } from "node:url"
+import {assertClosedNativePermit} from "./lab57-native-permit"
 
 type DiagnosticSession={directory:string;browserCli:string;browserConfig:string}
 type DiagnosticConfig={browser?:{browserName?:string;initScript?:string[];contextOptions?:{viewport?:{width:number;height:number}};
@@ -23,8 +24,10 @@ export function validateDispatcherLaunch(session:DiagnosticSession,config:Diagno
 /** Connects the exact d6 managed browser MCP using its public SDK, ONLY in a later admitted recovery.
  * Does not log in, load an old profile, create a lease, or acknowledge a recovery journal. */
 export async function connectDispatcherMcp(session: {directory: string; browserCli: string; browserConfig: string},
-  assertOriginalAdmissionAndRecoveryOnce: () => Promise<void>) {
-  await assertOriginalAdmissionAndRecoveryOnce()
+  assertOriginalAdmissionAndRecoveryOnce: () => Promise<unknown>,diagnostics?:{directory:string;sandbox:true}) {
+  const admit=async()=>{const permit=await assertOriginalAdmissionAndRecoveryOnce();if(diagnostics)assertClosedNativePermit(permit,session.directory)}
+  if(diagnostics&&diagnostics.directory!==session.directory)throw Error("OWN_DIAGNOSTIC_OUTPUT_REQUIRED")
+  await admit()
   const root = "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b"
   const client = path.join(root,"resources/loginom/runtime/client")
   const manifestBytes=await readFile(path.join(root,"cli-manifest.json"))
@@ -57,22 +60,36 @@ export async function connectDispatcherMcp(session: {directory: string; browserC
   type McpClient={connect(t:unknown):Promise<void>;listTools():Promise<{tools:{name:string}[]}>;
     callTool(r:{name:"browser_run_code_unsafe";arguments:{code:string}},options?:unknown,timeout?:{timeout:number}):Promise<unknown>;close():Promise<void>}
   const {Client}=require("@modelcontextprotocol/sdk/client/index.js") as {Client:new(i:{name:string;version:string})=>McpClient}
-  const {StdioClientTransport}=require("@modelcontextprotocol/sdk/client/stdio.js") as {StdioClientTransport:new(i:{command:string;args:string[];cwd:string;env:Record<string,string>;stderr:"pipe"})=>{stderr?:{on(name:string,callback:()=>void):void}}}
-  const transport=new StdioClientTransport({command:process.execPath,args:[session.browserCli,"--config",session.browserConfig],cwd:session.directory,
+  const {StdioClientTransport}=require("@modelcontextprotocol/sdk/client/stdio.js") as {StdioClientTransport:new(i:{command:string;args:string[];cwd:string;env:Record<string,string>;stderr:"pipe"})=>{stderr?:{on(name:string,callback:(data:Uint8Array)=>void):void};onclose?:()=>void}}
+  await admit()
+  const stderr=diagnostics?await open(session.directory+"/private-browser-stderr.txt","wx",0o600):null
+  const boundary=diagnostics?["--unshare-user","--unshare-pid","--unshare-ipc","--die-with-parent","--new-session","--ro-bind","/usr","/usr",
+    "--symlink","usr/bin","/bin","--symlink","usr/lib","/lib","--symlink","usr/lib64","/lib64","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--tmpfs","/dev/shm",
+    "--ro-bind",root,root,"--bind",session.directory,session.directory,"--chdir",session.directory,
+    ...["/etc/ld.so.cache","/etc/nsswitch.conf","/etc/resolv.conf","/etc/hosts","/etc/passwd","/etc/group","/etc/fonts","/etc/ssl/certs"].flatMap(f=>["--ro-bind",f,f]),
+    "--",process.execPath,session.browserCli,"--config",session.browserConfig]:[session.browserCli,"--config",session.browserConfig]
+  const transport=new StdioClientTransport({command:diagnostics?"/usr/bin/bwrap":process.execPath,args:boundary,cwd:session.directory,
     env:{PATH:"/usr/bin:/bin",TMPDIR:"/tmp"},stderr:"pipe"})
-  // Browser stderr can contain page details; it is never forwarded to a safe receipt.
-  transport.stderr?.on("data",()=>{})
+  let pending=Promise.resolve(),terminated=false
+  transport.onclose=()=>{terminated=true}
+  // Raw lower causes are retained ONLY in a private observer file, outside deliveries/model mounts.
+  transport.stderr?.on("data",data=>{if(stderr)pending=pending.then(async()=>{await stderr.write(data)})})
   const mcp=new Client({name:"lab57-owned-dispatcher",version:"1"})
-  await assertOriginalAdmissionAndRecoveryOnce()
+  await admit()
   try {
     await mcp.connect(transport)
     if(!(await mcp.listTools()).tools.some(t=>t.name==="browser_run_code_unsafe"))throw Error("PINNED_BROWSER_TOOL_UNAVAILABLE")
-  } catch {
-    await mcp.close().catch(()=>{})
+  } catch(error) {
+    if(stderr){await pending;await stderr.write(String(error));await stderr.sync()}
+    await admit();await mcp.close().catch(()=>{})
+    await pending;if(stderr)await stderr.close()
     // Protocol close is not a process/server cleanup attestation. The admitted supervisor must settle it.
     throw Error("DISPATCHER_CONNECT_UNCONFIRMED")
   }
   return {callTool:async(r:{name:"browser_run_code_unsafe";arguments:{code:string}})=>{
-    await assertOriginalAdmissionAndRecoveryOnce();return mcp.callTool(r,undefined,{timeout:90000})
-  },close:()=>mcp.close()}
+    await admit();return mcp.callTool(r,undefined,{timeout:90000})
+  },close:async()=>{await admit();await mcp.close();await pending;
+    if(stderr){await stderr.sync();await stderr.close()}
+    if(diagnostics&&!terminated)throw Error("DIAGNOSTIC_STDIO_TERMINATION_UNCONFIRMED")
+    return {browserTransportClosed:true,browserProcessTerminated:terminated}}}
 }

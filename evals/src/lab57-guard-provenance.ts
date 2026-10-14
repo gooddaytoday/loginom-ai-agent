@@ -2,7 +2,7 @@ import { prepareLab57CleanupProposal, validateCapturedLineage, lab57CleanupScope
 import type { ProcessCleanup } from "./process-supervisor"
 
 // Exact coordinator-accepted original records. This exception does not amend generic retirement.
-const accepted = {
+export const equivalentGuardPins = {
   "source_file_hashes": {
     "evals/script/run-node-evals.ts": "ff0d34669d1514b3529d043c1c39d3cf43db3368dc72cea39b9629495c10df29",
     "evals/src/node-runner.ts": "5bdebe3842d48b0634e081652f3d79f9053e26fcbd22290ecfe1d3fd8eb50531",
@@ -97,12 +97,12 @@ export function validateLab57EquivalentGuard(original: unknown, provenance: unkn
   ].includes(reason))
   if (input.guardParentCapture !== null && input.guardParentCapture !== undefined) missing.push("SYNTHESIZED_PARENT_CAPTURE_REFUSED")
   if (JSON.stringify(input.guardEntries) !== '["owner.json"]') missing.push("GUARD_INVENTORY_CHANGED")
-  for (const [file, expected] of Object.entries(accepted.source_file_hashes)) {
+  for (const [file, expected] of Object.entries(equivalentGuardPins.source_file_hashes)) {
     const bytes = object(v.sources)[file]
     if (typeof bytes !== "string" || hash(bytes) !== expected) missing.push(`FROZEN_PRODUCER_CHANGED:${file}`)
   }
-  if (typeof v.command !== "string" || hash(v.command) !== accepted.original_product_command_sha256) missing.push("ORIGINAL_COMMAND_CHANGED")
-  for (const expected of accepted.captured_parent_edges) {
+  if (typeof v.command !== "string" || hash(v.command) !== equivalentGuardPins.original_product_command_sha256) missing.push("ORIGINAL_COMMAND_CHANGED")
+  for (const expected of equivalentGuardPins.captured_parent_edges) {
     const bytes = object(v.captures)[expected.case]
     if (typeof bytes !== "string" || hash(bytes) !== expected.original_cleanup_sha256) {
       missing.push(`ORIGINAL_PARENT_EDGE_CHANGED:${expected.case}`)

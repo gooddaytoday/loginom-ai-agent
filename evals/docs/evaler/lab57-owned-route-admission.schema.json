@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "type":"object","additionalProperties":false,
+  "required":["version","operation","decision","sourceSha","sourceManifestSha","executableSha","followupTask","administratorFile","administratorSha","historyInventory","canonicalVerificationSha"],
+  "properties":{
+    "version":{"const":1},"operation":{"const":"LAB57-closed-owned-v1"},"decision":{"const":"FINAL_OPERATOR_ADMITTED"},
+    "sourceSha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "sourceManifestSha":{"type":"string","pattern":"^[0-9a-f]{64}$"},"executableSha":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "followupTask":{"type":"string","format":"uuid"},"administratorFile":{"type":"string","pattern":"^/"},
+    "administratorSha":{"type":"string","pattern":"^[0-9a-f]{64}$"},"historyInventory":{"type":"string","pattern":"^/"},
+    "canonicalVerificationSha":{"const":"d0a88e88421acc203fb7917050e4b7bbfe00bd59345d6f717a3b0c2af27faa35"}
+  }
+}

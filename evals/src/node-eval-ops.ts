@@ -660,10 +660,16 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
         once.status !== "CONSUMED_BEFORE_MUTATION" || once.originalReceipt !== recoveryReceiptPath(config, lease) ||
         await digest(once.originalReceipt) !== once.originalSha256) throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     }
-    const receipt = await readPrivateJson(completion.receipt) as { status?: string; owner?: NodeStandOwner; acquiredAt?: string; profile?: string; historyArchive?: string; processEvidence?: string; execution?: BaselineCleanupExecution }
+    const receipt = await readPrivateJson(completion.receipt) as { status?: string; owner?: NodeStandOwner; acquiredAt?: string; profile?: string; historyArchive?: string; processEvidence?: string; execution?: BaselineCleanupExecution; operation?: string }
     if (receipt.status !== "SETTLED" || !ownerMatches(receipt.owner, lease) || receipt.acquiredAt !== lease.acquiredAt || receipt.profile !== completion.profile ||
       receipt.historyArchive !== completion.historyArchive || receipt.processEvidence !== completion.processEvidence ||
       JSON.stringify(receipt.execution) !== JSON.stringify(completion.execution)) throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
+    if (receipt.operation === "LAB57-closed-owned-v1") {
+      const { verifyLab57Recovery } = await import("./lab57-recovery-attestation")
+      await verifyLab57Recovery(config, lease, completion)
+      await verifyHistoryArchive(nodeProfile(config, lease.role, completion.profile), completion.historyArchive)
+      return
+    }
     if (continued && completion.processEvidence !== path.join(directory(config), "owned-registration-processes.json"))
       throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     await evidencePath(config, lease, completion.processEvidence, continued)
