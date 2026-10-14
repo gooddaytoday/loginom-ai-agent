@@ -109,7 +109,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             packageCount: await row.Count, activeOperations: null })
         }
         const ownManaged = await bg.ScopeFindObjectAsync(session, bg.IBGManagedSessionInfo)
+        const user = await session.CurrentUser
         return { sessions: rows, ownSession: { guid: String(await session.Guid),
+          isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner,
           managedObjectId: ownManaged ? (await bg.ProxyObjectsHelper.GetObjectId(ownManaged)).toString() : null,
           objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() } }
       }))

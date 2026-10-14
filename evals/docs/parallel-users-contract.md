@@ -344,3 +344,10 @@ research; observations сохраняет managedObjectId:null. Обычный S
 null для всех observed rows на research. Row sessionGuid:null сохраняет
 недоступность linkage; username/proxy ID не используются вместо неизвестного
 GUID и не разрешают close/delete.
+
+Read-only ownSession observations сохраняет проверенные boolean IsAdmin и
+IsDesigner отдельно. Bootstrap research account фактически IsAdmin=true,
+IsDesigner=false; наличие административной роли не подтверждает возможность
+создать пакет. Пакетный linkage probe требует подготовленного design user;
+bootstrap rights не изменяются для такого опыта. Экспериментального probe-session
+в production allowlist нет. Эти flags не заменяют session ownership proof.
