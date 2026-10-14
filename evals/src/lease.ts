@@ -58,11 +58,11 @@ export async function acquireJudgeLease(input: { codexHome: string; journal: str
   })
 }
 
-export function recoverResourceLease(input: ResourceRequest, expected: { token: string; revision: number; incidentToken?: string }) {
-  return acquireResource(input, expected)
+export function recoverResourceLease(input: ResourceRequest, expected: { token: string; revision: number; incidentToken?: string }, admitReleased?: (previous: Reservation) => Promise<void>) {
+  return acquireResource(input, expected, undefined, admitReleased)
 }
 
-async function acquireResource(input: ResourceRequest, expected?: { token: string; revision: number; incidentToken?: string }, admit?: (previous: Reservation | undefined) => Promise<void>) {
+async function acquireResource(input: ResourceRequest, expected?: { token: string; revision: number; incidentToken?: string }, admit?: (previous: Reservation | undefined) => Promise<void>, admitReleased?: (previous: Reservation) => Promise<void>) {
   await requireLockRoot(input.lockRoot)
   await readLeaseReceipt(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
   const key = new Bun.CryptoHasher("sha256").update(input.key).digest("hex")
@@ -71,7 +71,7 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
     const receipt = path.join(input.lockRoot, `${key}.reservation.json`)
     const previous = await readReservation(receipt, input.key)
     await admit?.(previous)
-    if (expected && (!previous || previous.state === "released" || previous.token !== expected.token || previous.revision !== expected.revision))
+    if (expected && (!previous || previous.state === "released" && !admitReleased || previous.token !== expected.token || previous.revision !== expected.revision))
       throw new EvalFailure("LEASE_CAS_STALE", 2)
     if (!expected && previous && previous.state !== "released") throw new EvalFailure("RECOVERY_REQUIRED", 2)
     if (expected && previous) {
@@ -88,6 +88,7 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
         throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
       }) : undefined
       if (owner && owner.slice(owner.lastIndexOf(")") + 2).split(" ")[19] === previous.owner.starttime) throw new EvalFailure("BUSY", 2)
+      if (previous.state === "released") await admitReleased!(previous)
     }
     const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
     const reservation: Reservation = {
