@@ -1667,3 +1667,14 @@ SHA attempt `ead66583…`, audit `0d683b46…`. Завершены 4/18 baseline
 0/25 candidate. После завершения root2256 и проверки отсутствия `.writer`
 запущен `risky-approved-claims/1` (root97266); далее планируется
 `campaign-roi-by-channel/1`. Итоговая приёмка остаётся незавершённой.
+
+
+На 2026-10-14 00:43 UTC завершены 5/18 baseline, 0/25 candidate.
+`risky-approved-claims/1` прошёл oracle, полный расчёт и policy, JS-узлов 0;
+CLI/wrapper exit 0, cleanup подтверждён. Session `ses_ec82a8030ffeJirBk4gJptkkLo`,
+SHA attempt `0d9e0e8c…`, audit `a221aa9c…`. Наблюдённый `REQUEST_REJECTED`
+из-за неподдерживаемой подписи Filter исправлен новым запросом к стандартному
+Filter, который затем получил `SUCCEEDED`; это baseline evidence, а не
+candidate recovery PASS. Root97266 завершён, `.writer` отсутствовал перед
+запуском `campaign-roi-by-channel/1` (root29101). Следующий плановый слот —
+`first-last-touch/1`; итоговая приёмка ещё не завершена.
