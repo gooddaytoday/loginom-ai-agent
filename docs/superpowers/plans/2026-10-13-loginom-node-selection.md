@@ -23,7 +23,7 @@ original attempt/audit. Runtime и76locked source files неизменны; rebu
 ### Выполнение приёмки v2
 
 - [x] Зафиксировать отдельную версию критериев до следующего model dispatch, сохранить исходный протокол и получить независимое сравнение с прямым указанием пользователя.
-- [ ] Добавить отдельные policy-v2 verdicts для первых девяти закрытых candidate без изменения старых аналитических/runtime результатов.
+- [x] Добавить отдельные policy-v2 verdicts для первых девяти закрытых candidate без изменения старых аналитических/runtime результатов.
 - [ ] Закончить неизменную матрицу31 и оценить оставшиеся16candidate поv2.
 - [ ] Завершить обязательные reviews всех исключений/отказов/аномалий и трёх seeded standard successes.
 - [ ] Подготовить итог с тремя независимыми оценками и решить приёмку политики по достаточности доказательств.
@@ -3643,3 +3643,22 @@ ses_ec5350c53ffeJWJrjpK3aNuwAs в том же exec96749. Observedreceipt wx0400 
 Import→JS→JS→Export, actual Group/Sort engines и preflight receipts отсутствуют.
 Независимый targeted readback общего restored helper фиксирует этот предел,
 без повторных oracle/live и без candidate-credit. JS→Group всё ещё не доказан.
+
+### 2026-10-14 — переоценка первых девяти candidate по policy-v2
+
+Все9 отдельных immutable verdicts получили policy passed: шесть содержательно
+покрытых стандартных задач, положительные explicit-JS/capability-gap и поведение
+при standard error→blocker без JSfallback. Два независимых reviewer проверили
+весь построительный journal/child sessions/failed+temporary requests и provenance,
+а не только сохранённый пакет. Причины и evidence hashes находятся в
+`policy-v2/candidate/<task>/1.json`; summarySHA `130bcf6e…`. Criteria/source/auth
+references всех9 совпадают с версиейv2 и сохранённым originalprotocol.
+Аналитика: correct-result5, not-obtained4. Runtime: normalcompletion5,
+originalfailure+confirmedmanualrelease4. Все прежние FAIL/exit/ACK/cleanup
+сохранены; новый policyPASS не превращает их в functionalPASS.
+Наблюдённого policy coverage первых9 достаточно для всех заданных категорий;
+альтернативный ABC только ради получения правильного расчёта не требуется
+и не запускается. Overall25/finalseeded3/вся31series ещёне завершены.
+Baseline claims находится до substantive analytics: earlyImport/UI_SCAN_LIMIT,
+по одному JS0 policyPASS не присваивается. Его ownrelease пока не подтверждён,
+поэтому новый model запрещён несмотря на смягчённую functionalприёмку.
