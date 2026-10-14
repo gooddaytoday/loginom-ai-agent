@@ -19,8 +19,9 @@ Staged commands (future coordinator operation only; no command below was execute
 #    The attached verify-source.py verifies manifest/executable/source count; --install refuses existing destinations.
 python3 ./verify-source.py ./support --verify
 # After the recorded final operator decision, --install copies only the verified delivered tree into its SHA path.
-python3 ./verify-source.py ./support --install
-# 2. Record the private final admission using the delivered source/executable/manifest hashes and trusted private administrator file.
+python3 ./verify-source.py ./support --install "$PRIVATE_FINAL_ADMISSION"
+# Private final admission must exist before installation; then keep that exact file for execution.
+# 2. Record/verify the private final admission using the delivered source/executable/manifest hashes and trusted private administrator file.
 #    Schema: evals/docs/evaler/lab57-owned-route-admission.schema.json. No raw credentials or lease token in argv/comments.
 # 3. Pure plan is safe offline; it reports SOURCE_ONLY_NOT_APPLIED and grants no READY.
 "$D6_NODE" "$APPROVED_SUPPORT/lab57-owned-route.mjs" plan
