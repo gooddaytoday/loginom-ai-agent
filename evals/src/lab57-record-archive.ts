@@ -1,11 +1,12 @@
 import path from "node:path"
 import { constants } from "node:fs"
-import { lstat, open, readdir, realpath } from "node:fs/promises"
+import { lstat, open, readdir, readFile, realpath } from "node:fs/promises"
 
 export type PrivateRecordEntry = { name: string; kind: "file" | "directory"; device: number; inode: number; uid: number;
   mode: number; size: number; mtimeNs: string; ctimeNs: string; sha256: string | null }
 export type RecordArchivePlan = { root: string; source: string; destination: string; once: string; expected: PrivateRecordEntry[] }
-type RecordArchiveReservation = RecordArchivePlan & {onceSha256:string;onceDevice:number;onceInode:number;onceMtimeNs:string;onceCtimeNs:string}
+type RecordArchiveReservation = RecordArchivePlan & {onceSha256:string;onceDevice:number;onceInode:number;onceMtimeNs:string;onceCtimeNs:string;
+  owner:{pid:number;uid:number;starttime:string}}
 const hash = (bytes: Uint8Array | string) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -42,6 +43,11 @@ async function syncDirectory(directory: string) {
   try {await handle.sync()} finally {await handle.close()}
 }
 
+async function currentOwner() {
+  const raw=await readFile(`/proc/${process.pid}/stat`,"utf8")
+  return {pid:process.pid,uid:process.getuid!(),starttime:raw.slice(raw.lastIndexOf(")")+2).split(" ")[19]!}
+}
+
 /** wx+fsync file AND parent. Crash/error never makes this reservation repeatable. */
 export async function reserveRecordArchive(plan: RecordArchivePlan) {
   if ([plan.destination,plan.once].some(file=>path.dirname(file)!==plan.root ||
@@ -50,18 +56,20 @@ export async function reserveRecordArchive(plan: RecordArchivePlan) {
   if (!same(await snapshotPrivateRecord(plan.root,plan.source),plan.expected)) throw Error("Record identity changed")
   const found=await lstat(plan.destination).catch((error:NodeJS.ErrnoException)=>{if(error.code!=="ENOENT")throw error})
   if (found) throw Error("Archive destination already exists")
-  const bytes=JSON.stringify({version:1,status:"CONSUMED_BEFORE_MUTATION",operation:"record-archive-proposal-v1",plan,
+  const owner=await currentOwner()
+  const bytes=JSON.stringify({version:1,status:"CONSUMED_BEFORE_MUTATION",operation:"record-archive-proposal-v1",plan,owner,
     expectedSha256:hash(JSON.stringify(plan.expected)),at:new Date().toISOString()})
   const file=await open(plan.once,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600)
   try {await file.writeFile(bytes);await file.sync()} finally {await file.close()}
   await syncDirectory(plan.root)
   const identity=await lstat(plan.once,{bigint:true})
-  return {...plan,onceSha256:hash(bytes),onceDevice:Number(identity.dev),onceInode:Number(identity.ino),
+  return {...plan,owner,onceSha256:hash(bytes),onceDevice:Number(identity.dev),onceInode:Number(identity.ino),
     onceMtimeNs:String(identity.mtimeNs),onceCtimeNs:String(identity.ctimeNs)}
 }
 
 /** Linux RENAME_NOREPLACE preserves the entire object. No unlink, delete, rollback or retry. */
 export async function archiveReservedRecord(reservation: RecordArchiveReservation) {
+  if (!same(reservation.owner,await currentOwner())) throw Error("Reservation owner changed")
   const once=await lstat(reservation.once,{bigint:true})
   const handle=await open(reservation.once,constants.O_RDONLY|constants.O_NOFOLLOW)
   try {
@@ -72,10 +80,15 @@ export async function archiveReservedRecord(reservation: RecordArchiveReservatio
         String(observed.mtimeNs)!==reservation.onceMtimeNs || String(observed.ctimeNs)!==reservation.onceCtimeNs) throw Error("Once identity changed")
     }
     if (hash(bytes)!==reservation.onceSha256) throw Error("Once bytes changed")
-    const recorded=JSON.parse(bytes.toString()) as {status:string;plan:RecordArchivePlan}
-    if (recorded.status!=="CONSUMED_BEFORE_MUTATION" || !same(recorded.plan,{root:reservation.root,source:reservation.source,
+    const recorded=JSON.parse(bytes.toString()) as {status:string;plan:RecordArchivePlan;owner:RecordArchiveReservation["owner"]}
+    if (recorded.status!=="CONSUMED_BEFORE_MUTATION" || !same(recorded.owner,reservation.owner) || !same(recorded.plan,{root:reservation.root,source:reservation.source,
       destination:reservation.destination,once:reservation.once,expected:reservation.expected})) throw Error("Once plan changed")
   } finally {await handle.close()}
+  const attempted=await open(`${reservation.once}.archive-attempted`,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600)
+    .catch(()=>{throw Error("Archive already attempted")})
+  try {await attempted.writeFile(JSON.stringify({status:"ATTEMPTED",onceSha256:reservation.onceSha256,owner:reservation.owner}));await attempted.sync()}
+  finally {await attempted.close()}
+  await syncDirectory(reservation.root)
   const snapshot=await snapshotPrivateRecord(reservation.root,reservation.source)
   if (!same(snapshot,reservation.expected)) throw Error("Record identity changed after reservation")
   const original=snapshot.find(r=>r.name===".")!

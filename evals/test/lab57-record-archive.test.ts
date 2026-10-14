@@ -110,3 +110,29 @@ test("LAB57 proposal: noncanonical parent and external paths are refused before 
     expect(await Bun.file(plan.once).exists()).toBe(false)
   } finally {await rm(plan.root,{recursive:true,force:true})}
 })
+
+test("LAB57 proposal: failed archive cannot be repeated after fixing destination", async () => {
+  const plan=await record()
+  try {
+    const reservation=await reserveRecordArchive(plan)
+    await writeFile(plan.destination,"FOREIGN",{mode:0o600})
+    await expect(archiveReservedRecord(reservation)).rejects.toThrow()
+    await rm(plan.destination) // Own synthetic foreign object only, not an operational recovery.
+    await expect(archiveReservedRecord(reservation)).rejects.toThrow("Archive already attempted")
+    expect(await readFile(plan.source,"utf8")).toBe("1234567")
+  } finally {await rm(plan.root,{recursive:true,force:true})}
+})
+
+test("LAB57 proposal: a saved reservation cannot resume in another process after original exits", async () => {
+  const plan=await record()
+  try {
+    const planFile=path.join(plan.root,"plan.json"),saved=path.join(plan.root,"saved-reservation.json")
+    await writeFile(planFile,JSON.stringify(plan),{mode:0o600})
+    const proc=Bun.spawn([process.execPath,new URL("./fixtures/lab57-cleanup-proposal/reserve-worker.ts",import.meta.url).pathname,planFile,saved],
+      {stdout:"pipe",stderr:"pipe",env:{PATH:"/usr/bin:/bin",TMPDIR:os.tmpdir()}})
+    expect(await proc.exited).toBe(17)
+    await expect(archiveReservedRecord(JSON.parse(await readFile(saved,"utf8")))).rejects.toThrow("Reservation owner changed")
+    expect(await readFile(plan.source,"utf8")).toBe("1234567")
+    await expect(reserveRecordArchive(plan)).rejects.toThrow()
+  } finally {await rm(plan.root,{recursive:true,force:true})}
+})
