@@ -8,6 +8,22 @@ export function makeImportOpeningCode(task,mode) {
 export function importOpeningPage({task,mode}) {
  const fail=m=>{throw Error('LOGINOM_IMPORT_NATIVE_OPENING_'+m);};
  const own=(o,k)=>{const d=o&&Object.getOwnPropertyDescriptor(o,k);if(!d||!Object.hasOwn(d,'value'))fail('OWN_DATA');return d.value;};
+ // Loginom7.4.2 exposes these properties through fixed prototype getters.
+ // Read only their inert cached fields; never execute a supplied accessor.
+ const connectionValue=(o,k)=>{
+  if(!o||typeof o!=='object')fail('CONNECTION_DESCRIPTOR');
+  const direct=Object.getOwnPropertyDescriptor(o,k);
+  if(direct){if(!Object.hasOwn(direct,'value'))fail('CONNECTION_DESCRIPTOR');
+   if(k==='Connected'&&typeof direct.value!=='boolean'||k==='Session'&&(!direct.value||typeof direct.value!=='object'))fail('CONNECTION_CACHE');
+   return direct.value;}
+  const fields={UserName:['FUsername','function () { return this.FUsername; }'],Session:['FSession','function () { return this.FSession; }'],Connected:['FConnected','function () { return !!this.FConnected; }']};
+  const proto=Object.getPrototypeOf(o),d=proto&&Object.getOwnPropertyDescriptor(proto,k),f=fields[k];
+  if(!f||!d||Object.hasOwn(d,'value')||typeof d.get!=='function'
+   ||Function.prototype.toString.call(d.get)!==f[1])fail('CONNECTION_DESCRIPTOR');
+  const value=own(o,f[0]);
+  if(k==='Connected'&&typeof value!=='boolean'||k==='Session'&&(!value||typeof value!=='object'))fail('CONNECTION_CACHE');
+  return value;
+ };
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
  const app=globalThis.bg?.app,p=globalThis.__loginomDockPreparationV1;
  if(!task||!Number.isSafeInteger(task.deadline)||Date.now()>=task.deadline||location.origin!==task.origin
@@ -16,11 +32,22 @@ export function importOpeningPage({task,mode}) {
  const prepared=records.find(r=>r.nodeTargetWorkflowNode),tabs=exact(task.tab_tid);
  if(!prepared||records.some(r=>r.tab!==prepared.tab||r.packageNode!==prepared.packageNode)
   ||tabs.length!==1||tabs[0]!==prepared.tab||!tabs[0].classList.contains('x-tab-active'))fail('WORKFLOW');
- const workspace=app.Application?.FInstance?.FMainForm?.Items?.Workspace,card=workspace?.getActiveTab();
+ const instance=app.Application?.FInstance,main=instance?.FMainForm;
+ const workspace=main?.Items?.Workspace,card=workspace?.getActiveTab();
  const controller=card&&own(card,'Controller'),model=controller&&own(controller,'FController');
- const map=app.Application?.FInstance?.FMap,connection=map&&own(map,'FServerConnection');
- if(own(connection,'Connected')!==true||typeof task.session_id!=='string'||!task.session_id||own(connection,'UserName')!==task.account)fail('ACCOUNT');
- const key='importPreconfigOpening',bytes=JSON.stringify(task),slot=Object.getOwnPropertyDescriptor(prepared,key);
+ const canonicalMap=main&&Object.getOwnPropertyDescriptor(main,'FMapTree');
+ if(main&&'FMapTree' in main&&!canonicalMap)fail('MAP_DESCRIPTOR');
+ if(canonicalMap&&!Object.hasOwn(canonicalMap,'value'))fail('MAP_DESCRIPTOR');
+ // The prior own-data layout remains supported, but cannot replace an existing canonical map.
+ const map=canonicalMap?canonicalMap.value:instance&&own(instance,'FMap'),connection=map&&own(map,'FServerConnection');
+ if(connectionValue(connection,'Connected')!==true||typeof task.session_id!=='string'||!task.session_id||connectionValue(connection,'UserName')!==task.account)fail('ACCOUNT');
+ const connectionShape=()=>['Connected','UserName','Session'].map(k=>{
+  const direct=Object.getOwnPropertyDescriptor(connection,k),owner=direct?connection:Object.getPrototypeOf(connection);
+  const d=direct??Object.getOwnPropertyDescriptor(owner,k);
+  if(!d)fail('CONNECTION_DESCRIPTOR');
+  return {owner,value:d.value,get:d.get,set:d.set,enumerable:d.enumerable,configurable:d.configurable,writable:d.writable};
+ });
+ const key='importPreconfigOpening' ,bytes=JSON.stringify(task),slot=Object.getOwnPropertyDescriptor(prepared,key);
  let r=slot?.value;
  if(slot&&!Object.hasOwn(slot,'value'))fail('SLOT_DESCRIPTOR');
  if(mode==='reserve') {
@@ -34,13 +61,13 @@ export function importOpeningPage({task,mode}) {
   const inventory=groups.map(group=>{const items=own(group,'FCollection');if(!Array.isArray(items))fail('PORT_GROUP');
    return {group,items,ports:items.map(port=>({port,data:own(port,'data'),parent:own(port,'parent'),
     index:Object.getOwnPropertyDescriptor(port,'FPortIndex'),guid:own(port,'FGuid')}))};});
-  r={phase:'reserved',task:bytes,prepared,document,workspace,card,controller,map,connection,session:own(connection,'Session'),
-   account:own(connection,'UserName'),packageNode:prepared.packageNode,workflow:prepared.nodeTargetWorkflowNode,
+  r={phase:'reserved',task:bytes,prepared,document,workspace,card,controller,main,canonicalMap:!!canonicalMap,map,connection,connectionShape:connectionShape(),session:connectionValue(connection,'Session'),
+   account:connectionValue(connection,'UserName'),packageNode:prepared.packageNode,workflow:prepared.nodeTargetWorkflowNode,
    node,nodeData,cell,body,groups,inventory};
   Object.defineProperty(prepared,key,{value:r,enumerable:false,writable:false,configurable:false});
  }
  if(!r||r.prepared!==prepared||r.task!==bytes||r.document!==document||r.workspace!==workspace||r.map!==map
-  ||r.connection!==connection||own(connection,'UserName')!==r.account||own(connection,'Session')!==r.session
+  ||r.connection!==connection||connectionValue(connection,'UserName')!==r.account||connectionValue(connection,'Session')!==r.session
   ||r.packageNode!==prepared.packageNode||r.workflow!==prepared.nodeTargetWorkflowNode)fail('ORIGINAL_SLOT');
  const inventory=()=>{
   if(own(r.node,'data')!==r.nodeData||own(r.node,'FGuid')!==task.node_id||own(r.node,'FCell')!==r.cell
@@ -96,11 +123,15 @@ export function importOpeningPage({task,mode}) {
  // Finish provider reads first, then compare every retained sibling binding.
  const lastCard=workspace.getActiveTab();
  const finalTabs=exact(task.tab_tid),finalRoots=w?exact(task.prefix+';WizrdMCF'):null;
- if(lastCard!==card||own(card,'Controller')!==controller||own(controller,'FController')!==model
+ if(app!==globalThis.bg?.app||app.Application?.FInstance!==instance||lastCard!==card||own(card,'Controller')!==controller||own(controller,'FController')!==model
+  ||instance.FMainForm!==r.main||main.Items?.Workspace!==workspace
+  ||!!Object.getOwnPropertyDescriptor(main,'FMapTree')!==r.canonicalMap
+  ||(r.canonicalMap?own(main,'FMapTree'):own(instance,'FMap'))!==r.map
   ||finalTabs.length!==1||finalTabs[0]!==r.prepared.tab||w&&(finalRoots.length!==1||finalRoots[0]!==r.root)
   ||p!==globalThis.__loginomDockPreparationV1||p.document!==document||p.id!==task.document_id
-  ||own(map,'FServerConnection')!==connection||own(connection,'Connected')!==true||own(connection,'UserName')!==r.account
-  ||own(connection,'Session')!==r.session||Date.now()>=task.deadline)fail('CURRENT_OWNER');
+  ||own(map,'FServerConnection')!==connection||connectionValue(connection,'Connected')!==true||connectionValue(connection,'UserName')!==r.account
+  ||connectionValue(connection,'Session')!==r.session||Date.now()>=task.deadline)fail('CURRENT_OWNER');
+ if(connectionShape().some((d,i)=>Object.keys(d).some(k=>d[k]!==r.connectionShape[i][k])))fail('FINAL_CONNECTION_BINDING');
  inventory();
  if(w&&(own(own(own(controller,'Node'),'data'),'node')!==r.tree||own(r.tree,'ParentNode')!==r.nodeTree
   ||own(r.nodeTree,'ParentNode')!==r.workflow||own(r.nodeTree,'FGuid')!==task.node_id||own(r.nodeTree,'FModelNode')!==r.nodeData||own(model,'FModelNode')!==r.nodeData

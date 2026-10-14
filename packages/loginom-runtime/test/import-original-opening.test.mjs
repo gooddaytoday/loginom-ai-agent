@@ -148,3 +148,38 @@ test('final provider GUID drift refuses before sample/record and caches refusal 
   assert.deepEqual(f.dispatch,{configure:0,mapping:0,finish:0,execute:0});
  }finally{await f.cleanup();}
 });
+
+const native742=`bg.app.Application.FInstance.FMainForm.FMapTree=bg.app.Application.FInstance.FMap;delete bg.app.Application.FInstance.FMap;
+connection.FUsername=connection.UserName;connection.FSession=connection.Session;connection.FConnected=connection.Connected;
+delete connection.UserName;delete connection.Session;delete connection.Connected;
+Object.setPrototypeOf(connection,Object.create(Object.prototype,{UserName:{get:function () { return this.FUsername; },configurable:true},Session:{get:function () { return this.FSession; },configurable:true},Connected:{get:function () { return !!this.FConnected; },configurable:true}}));`;
+test('measured742 canonical MapTree/inherited getter ABI builds original slot without invoking getters',async()=>{
+ const f=await fixture();try{vm.runInContext(native742,f.native);const node=await f.openNode(),r=await f.adapterFor(node).readPreconfigSample();
+  assert.equal(r.status,'DIAGNOSTIC_READ');assert.equal(r.native_proof,false);assert.equal(r.opening_effect,true);
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,1);assert.equal(f.calls.filter(c=>c.mode==='read').length,1);
+  assert.deepEqual(f.dispatch,{configure:0,mapping:0,finish:0,execute:0});
+ }finally{await f.cleanup();}
+});
+for(const [name,code] of Object.entries({
+ map:'bg.app.Application.FInstance.FMainForm.FMapTree={}',
+ session:'connection.FSession={}',
+ connected_type:'connection.FConnected=1',
+ missing_session:'connection.FSession=undefined',
+ cached_accessor:'Object.defineProperty(connection,"FUsername",{get:()=>"account"})',
+ getter:'Object.defineProperty(Object.getPrototypeOf(connection),"UserName",{get:()=>"account",configurable:true})',
+ instance:'bg.app.Application.FInstance={}',
+ same_getter_new_binding:'Object.defineProperty(Object.getPrototypeOf(connection),"UserName",{get:function () { return this.FUsername; },configurable:true})'
+}))test('canonical742 final provider refuses '+name+' drift before sample/record',async()=>{
+ const f=await fixture();try{vm.runInContext(native742,f.native);const node=await f.openNode();
+  vm.runInContext('let finalTurn=0;workspace.getActiveTab=()=>{if(++finalTurn===2){'+code+'}return card;}',f.native);
+  await assert.rejects(f.adapterFor(node).readPreconfigSample());
+  assert.equal(f.calls.filter(c=>c.mode==='read').length,0);assert.equal(f.events.filter(e=>e.event==='fixed_import_preconfigure_observation').length,0);
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,1);assert.equal(f.operation().cleanupConfirmed,false);
+ }finally{await f.cleanup();}
+});
+test('unknown prototype getter refuses without invoking foreign function',async()=>{
+ const f=await fixture();try{vm.runInContext(native742+'globalThis.getterCalls=0;Object.defineProperty(Object.getPrototypeOf(connection),"Connected",{get(){getterCalls++;return true;},configurable:true});',f.native);
+  await assert.rejects(f.openNode());assert.equal(vm.runInContext('getterCalls',f.native),0);
+  assert.equal(f.calls.filter(c=>c.verb==='begin_wizard').length,0);
+ }finally{await f.cleanup();}
+});
