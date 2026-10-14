@@ -1,10 +1,24 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты девять candidate,
-policy PASS во всех девяти: шесть стандартных, explicit-JS, gap и recovery.
-Один итоговый расчёт правильный, восемь результатов не получены. Одна сессия
-завершена штатно, восемь адресно освобождены после отказа. Сейчас собственных
-процессы были завершены перед продолжением, профиль был свободен. Independent
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты десять candidate,
+policy PASS во всех десяти. Один итоговый расчёт правильный, девять результатов
+не получены. Одна сессия завершена штатно, девять адресно освобождены после отказа.
+Сейчас активных собственных процессов нет, профиль свободен;15candidate ещё не начаты.
+Sales/2 final release review и actual gate ожидаются до ABC/Pareto/2.
+
+Sales-by-category/2 closed22:40:57.751Z: policy PASS `03a4a477…`, mandatory
+failure review `4a252108…`;30messages/119parts/32tools/95events/2042runtime,
+JS0/nochildren. Std Import500→GroupCategory count/sumtotal/avgquantity/avgprice→
+SortRevenueDESC SUCCEEDED; Native Export execution completed, fileverification
+осталась AMBIGUOUS/scrollbudget. Same-operation inspect/observe/blockedSave/
+recover/resume/blocker, новыхapply/JS нет. RuntimeMismatch и unsettled сохранены,
+нет утверждения export reconciliation. CSV/LGP/oracle не получены, CLI1/cleanupfalse
+остаются. Own260closed22:46:09.112Z/admin261logout22:46:10.745Z/browserclosed22:46:11.950Z;
+9PIDgone/точный guard архивирован;256и259сохраненывдвухUIreadbacks.
+Root publicreader независимо подтвердил native scope доclose.17original неизменны,
+review даёт18casefiles;26recovery; descriptor `c1c55b97…`, finalreview/gate ещёpending.
+
+Первая девятка завершена по политике и strict own release. Independent
 recovery release review `38048716…`/readback `91d8a205…` одобрены; actual public
 gate22:32:27.046Z разрешил technical-failed, originalattempt598e1481… неизменен.
 First9 core summary `522c2589…` связывает64existinghash refs,9вердиктов и8mandatory
@@ -16,8 +30,8 @@ Runner3427800/exec30452 продолжил серию22:34:19.022Z: шесть b
 Исходы baseline:4correct/2notobtained,4normal/2manual, policy3PASS/2violation/
 1insufficient. Эти baseline policyviolation не переносятся в candidate и не
 скрываются. Одно наблюдение каждой задачи не доказывает повторяемость старого skill.
-Sales-by-category/2 активен: dispatch22:34:28.147Z/CLI3428412 с22:34:36.343Z;
-один candidate активен,15ещё не начаты. Full25/finalseeded3 ещё не завершены.
+Sales-by-category/2 был dispatch22:34:28.147Z/CLI3428412 с22:34:36.343Z;
+закрытый отказ сохранён выше. Full25/finalseeded3 ещё не завершены.
 
 Recovery/1 closed22:24:30.652Z: policy PASS sidecar `1690878c…`, mandatory
 failure/anomaly review `db95a803…`;21messages/84parts/23tools/67events/949runtime,
