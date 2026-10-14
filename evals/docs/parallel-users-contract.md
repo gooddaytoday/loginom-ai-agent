@@ -454,3 +454,12 @@ browser логинится как design user, читает CurrentUser/Session.
 наблюдения сохранены private; qualification=false до negative close/reconnect
 и durable ledger. Общий inspect/parent close не выдают authority по этому
 research observation автоматически.
+
+Native fixed probe теперь сохраняет afterDisconnect и volatile binding keyed
+по command proofId. Ограниченный close-session read-back принимает только exact
+binding; fresh account ID/epoch/manager inventory должны подтвердить отсутствие
+известной сессии и по observed ID, и по Name/CreateTime после writer context
+closure. Ответ observed_absent отличает этот путь от исполнения CloseSession.
+Foreign/missing proof и changed tuple отвергаются. Retained row остаётся
+unsupported до отдельной native mutation qualification. In-memory map не
+заменяет durable ledger/recovery и не выдаёт общей readiness.

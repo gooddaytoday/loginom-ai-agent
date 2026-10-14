@@ -125,7 +125,9 @@ liveIntegration("native user capability: creates one blocked account and refuses
       const observed = probe.data as { ownSession: { guid: string; objectId: string; userObjectId: string; username: string; isAdmin: boolean; isDesigner: boolean };
         baseline: { objectId: string }[]; opened: { objectId: string; name: string; createdAt: string; packageCount: number }[];
         withPackage: { objectId: string; name: string; createdAt: string; packageCount: number }[];
-        afterPackage: { objectId: string; name: string; createdAt: string; packageCount: number }[]; sessionIdentityQualified: boolean }
+        afterPackage: { objectId: string; name: string; createdAt: string; packageCount: number }[]; sessionIdentityQualified: boolean;
+        afterDisconnect: { objectId: string; name: string; createdAt: string }[];
+        binding: { remoteKey: string; userKey: string; username: string; serverEpoch: string; name: string; createdAt: string } }
       await writeLeaseReceipt(path.join(evidence, "session-probe.json"), { version: 1, identity: pair.identity, ...observed })
       expect(observed.ownSession).toMatchObject({ userObjectId: user.objectId, username: user.name, isAdmin: false, isDesigner: true })
       expect(observed.ownSession.guid).toBeString()
@@ -136,6 +138,15 @@ liveIntegration("native user capability: creates one blocked account and refuses
       expect(candidate[0]!.packageCount).toBe(0)
       expect(observed.withPackage.find(row => row.objectId === candidate[0]!.objectId)).toMatchObject({ ...candidate[0]!, packageCount: 1 })
       expect(observed.afterPackage.find(row => row.objectId === candidate[0]!.objectId)).toMatchObject(candidate[0]!)
+      expect(observed.afterDisconnect.some(row => row.objectId === candidate[0]!.objectId ||
+        row.name === candidate[0]!.name && row.createdAt === candidate[0]!.createdAt)).toBe(false)
+      expect(await request("close-session", { proofId: crypto.randomUUID(), session: observed.binding })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_OWNERSHIP_UNCONFIRMED" } })
+      expect(await request("close-session", { proofId: probe.id, session: { ...observed.binding, name: "eval-b:1" } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
+      expect(await request("close-session", { proofId: probe.id, session: { ...observed.binding, createdAt: "2026-10-13T00:00:00.000Z" } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } })
+      expect(await request("close-session", { proofId: probe.id, session: observed.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
+      expect(await request("close-session", { proofId: probe.id, session: observed.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
+      const closed = await request("inspect", {})
+      expect((closed.data as { rawSessions: { objectId: string }[] }).rawSessions.some(row => row.objectId === candidate[0]!.objectId)).toBe(false)
       complete = true
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)

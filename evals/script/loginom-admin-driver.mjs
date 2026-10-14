@@ -10,6 +10,7 @@ let context
 let page
 let identity
 let disposed = false
+const sessionBindings = new Map()
 
 for await (const line of createInterface({ input: process.stdin, crlfDelay: Infinity })) {
   const request = (() => { try { return JSON.parse(line) } catch { return undefined } })()
@@ -98,6 +99,52 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (!context || !identity) throw Error("ADMIN_NOT_INITIALIZED")
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
+    if (request.op === "close-session") {
+      if (typeof request.payload?.proofId !== "string") throw Error("SESSION_IDENTITY_UNSUPPORTED")
+      const binding = sessionBindings.get(request.payload.proofId)
+      if (!binding) { respond(id, "not_applied", { code: "SESSION_OWNERSHIP_UNCONFIRMED" }); continue }
+      if (Object.keys(request.payload).length !== 2 || !request.payload.session || Object.keys(request.payload.session).length !== 6 ||
+        Object.entries(binding.session).some(([key, value]) => request.payload.session[key] !== value)) {
+        respond(id, "not_applied", { code: "SESSION_IDENTITY_CHANGED" }); continue
+      }
+      dispatched = true
+      const result = await bounded(request, page.evaluate(async binding => {
+        try {
+          const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+          const scoped = await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)
+          const manager = await scoped.GetSessionsManager()
+          const users = await session.GetUsers()
+          const enumerator = await users.GetEnumerator(bg.TBGDeductorUserKinds.dukAll)
+          const matches = []
+          try {
+            while (await enumerator.MoveNext()) {
+              const user = await enumerator.Current
+              if ((await user.Name).toLowerCase() === binding.session.username.toLowerCase()) matches.push(user)
+            }
+          } finally { await ReleaseObject(enumerator, true) }
+          if (matches.length !== 1 || await matches[0].Name !== binding.session.username || await matches[0].UserKind !== 0 ||
+            (await bg.ProxyObjectsHelper.GetObjectId(matches[0])).toString() !== binding.userObjectId)
+            return { outcome: "not_applied", data: { code: "SESSION_USER_IDENTITY_CHANGED" } }
+          await manager.UpdateSessionInfos()
+          const rows = []
+          for (let index = 0; index < await manager.Count; index++) {
+            const row = await manager.SessionInfo(index)
+            rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
+              createdAt: (await row.CreateTime).toISOString() })
+          }
+          const retained = rows.filter(row => row.objectId === binding.session.remoteKey ||
+            row.name === binding.session.name && row.createdAt === binding.session.createdAt)
+          if (retained.length > 1) return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_AMBIGUOUS" } }
+          if (retained.some(row => row.name !== binding.session.name || row.createdAt !== binding.session.createdAt))
+            return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } }
+          if (retained.length) return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_UNSUPPORTED" } }
+          // The fixed probe closed its only writer context; fresh server absence completes this bound observation.
+          return { outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } }
+        } catch { return { outcome: "not_applied", data: { code: "SESSION_OBSERVATION_UNKNOWN" } } }
+      }, binding))
+      respond(id, result.outcome, result.data)
+      continue
+    }
     if (request.op === "reconcile-user") {
       const payload = request.payload
       if (!["blocked", "configure", "acl", "activate", "session-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
@@ -250,7 +297,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           for (let index = 0; index < await manager.Count; index++) {
             const row = await manager.SessionInfo(index)
             rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
-              createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect, packageCount: await row.Count })
+              createdAt: (await row.CreateTime).toISOString(), pendingDisconnect: await row.PendingDisconnect, packageCount: await row.Count })
           }
           return rows
         }))
@@ -298,7 +345,16 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             } finally { await handle.dispose() }
           } finally { await probeContext.close() }
         })()
-        respond(id, "confirmed", observed)
+        const candidates = observed.opened.filter(row => !observed.baseline.some(previous => previous.objectId === row.objectId) &&
+          row.name.startsWith(credentials.username + ":") && /^[1-9]\d*$/.test(row.name.slice(credentials.username.length + 1)) && row.packageCount === 0 &&
+          observed.withPackage.some(item => item.objectId === row.objectId && item.name === row.name && item.createdAt === row.createdAt && item.packageCount === 1) &&
+          observed.afterPackage.some(item => item.objectId === row.objectId && item.name === row.name && item.createdAt === row.createdAt && item.packageCount === 0))
+        if (candidates.length !== 1) throw Error("SESSION_IDENTITY_UNSUPPORTED")
+        const binding = { remoteKey: candidates[0].objectId,
+          userKey: createHash("sha256").update(JSON.stringify({ generation: payload.preparationNonce, name: credentials.username, userKind: 0 })).digest("hex"),
+          username: credentials.username, serverEpoch: identity.serverEpoch, name: candidates[0].name, createdAt: candidates[0].createdAt }
+        sessionBindings.set(request.id, { session: binding, userObjectId: payload.owned.objectId })
+        respond(id, "confirmed", { ...observed, afterDisconnect: await snapshot(), binding })
         continue
       }
       respond(id, result.outcome, result.data)
