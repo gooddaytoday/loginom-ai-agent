@@ -1,4 +1,4 @@
-import { standaloneCancellation } from "../standalone-cancellation"
+import { standaloneCancellation, standaloneRunControl } from "../standalone-cancellation"
 import { exitCli } from "../exit"
 import { runToolOutcome } from "../run-outcome"
 import type { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
@@ -902,7 +902,12 @@ export const RunCommand = effectCmd({
             // Await and report failure from finally; never leak an unhandled rejection.
             void cancellation.pending.catch(() => {})
           }
-          if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) process.on("SIGINT", interrupt)
+          const originalRunControl = standaloneRunControl()
+          const originalRunSignal = originalRunControl?.signal
+          if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) {
+            process.on("SIGINT", interrupt)
+            originalRunSignal?.addEventListener("abort", interrupt, { once: true })
+          }
           async function finish() {
             if (args.attach) return
             const error = await completed
@@ -963,6 +968,7 @@ export const RunCommand = effectCmd({
               }
             } finally {
               process.off("SIGINT", interrupt)
+              originalRunSignal?.removeEventListener("abort", interrupt)
             }
           }
           // Legacy CLI owns the process. Leave after a rejected prompt so
