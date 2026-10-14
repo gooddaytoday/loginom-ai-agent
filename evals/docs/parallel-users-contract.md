@@ -534,3 +534,8 @@ server identity и принадлежность native context; beforeSend пе�
 Data-only fs/flock tests49 PASS/163 (2.14s); native closed lease RED missing API
 →GREEN1 PASS/28 (7.07s), typecheck/diff PASS. Положительный native parent close,
 recovery lineage, real CLI/setup/check producers и active packages ещё open.
+
+`AdminConnection.inspectPolicy()` читает native shared-directory ACL с fresh
+ServerIdentity и сохраняет наблюдение без user mutation. Возврат policy не означает
+квалифицированную session identity или effective ACL; `inspect()` сохраняет свой
+строгий session gate.
