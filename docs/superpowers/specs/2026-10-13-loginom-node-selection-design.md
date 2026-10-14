@@ -1,5 +1,26 @@
 # Приоритет стандартных узлов в loginom-automation
 
+Текущий checkpoint новой серии: ABC/1 closed19:32:25.838Z. Отдельный
+policy-v2 PASS `d46e66c0…`, mandatory failure review `a9d05ad9…`:full32messages/
+124parts/36tools/101events/2769runtime, JS0/childrennone. Стандартные CumulativeSum,
+Data(last running total), IF .8/.95 и Group count/sums содержательно покрыли ABC;
+конкретный вызов Stat(...,Sum) не утверждается. CSV/LGP не получены, CLI1/
+cleanupfalse/Host2841409ACKfalse; второй Calculator WIZARD_OPEN_NOT_CONFIRMED/
+AMBIGUOUS, попытки inspect/resume и честный блокер без JS.
+
+Own234 closed19:43:56.732Z, admin235logout19:45:31.881Z, wholeMCPbrowserclosed;
+9PIDgone,2ownabsence snapshots, неизвестная233 не закрывалась. Точный guard
+архивирован: ino7921008/mtime1792005811455.764, proof1134632b…; original19SHA
+сохранены. Descriptor941ab5b5/independent review4d7303e8/finalrelease09714ab1;
+actualpublicgate19:53:18.258Z разрешил advance TECHNICAL_FAILURE_RECORDED,
+originalpolicyincomplete/mathfalse остаются. ПолитикаPASS не означает functionalPASS.
+
+Next first-last-touch/1 начат19:54:40.938Z, CLI2946499; runner2945739/exec13648
+с19:54:30.413Z, sources/criteria/protocol прежние. Новая серия:1closedpolicyPASS,
+0correct/1notobtained,0normal/1manualreleased и1active; policy acceptance пока нет.
+24candidate slots оставались до стартаfirst-last. Baseline6references неизменны;
+новая серия не заменяет originalFAIL и не запускает ABC retry.
+
 ## Действующая приёмка: политика выбора узлов, версия 2
 
 Прямое указание пользователя от2026-10-14 заменяет функциональные пороги
