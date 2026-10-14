@@ -202,14 +202,20 @@ token/revision/incident lineage, квалифицирует closed inventory и�
 и проверяет current PID/birth при том же boot. Unknown/planned/live запрещают
 release; функция не посылает signals и не удаляет files. Confirmed private proof
 освобождает reservation, results сохраняются. Terminal marker позволяет readonly
-replay после нового run без stale CAS. Recovery CLI, active-child reconciliation
-и crash между reservation release и terminal marker ещё требуют проверки.
+replay после нового run без stale CAS. Active-child reconciliation остаётся открытым.
 Released reservation без terminal marker согласуется по validated reservation
 lineage и captured releaseEvidence SHA: обновляются только старые journals,
 повторный CAS не выполняется. Пока finalization не подтверждён, acquireJudgeLease
 под OS guard запрещает новый owner до probes и сохраняет tombstone. Изменённый
 release proof не обходит gate сменой reason. Fixture воспроизводит persisted
-release с прежними quarantine/intent journals; CLI и active-child recovery открыты.
+release с прежними quarantine/intent journals. Offline CLI:
+`bun run script/parallel-env.ts recover --config <slots.json> --incident <judge-command/journal.json> --out <new-private-dir>`.
+Команда выводит только status/journal/proof и сохраняет private receipt; выбирает
+актуальный CAS через original incident lineage, без token/revision в argv.
+Global lock root фиксирован; out требует canonical parent700 и новый каталог700,
+пересечения с protected roots запрещены. Принимаются только offline command
+incidents с qualified closed proofs. Slot/admin recovery, prepare/verify/status
+и active-child recovery ещё открыты.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy
