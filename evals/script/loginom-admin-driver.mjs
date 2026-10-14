@@ -60,7 +60,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       context = await chromium.launchPersistentContext(payload.profileDir, { executablePath: browser, headless: true, timeout: remaining(request) })
       page = context.pages()[0] ?? await context.newPage()
       page.on("console", message => {
-        if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|READBACK)|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
+        if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK)|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
       })
       page.setDefaultTimeout(remaining(request))
       process.stderr.write("ADMIN_INIT_STAGE_NAVIGATION\n")
@@ -100,8 +100,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure", "acl"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== (payload.phase === "acl" ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (!["blocked", "configure", "acl", "activate"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== (["acl", "activate"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -110,7 +110,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
           payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (payload.phase === "acl" && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+      if (["acl", "activate"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
         Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
@@ -144,8 +144,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           stage = "ADD"
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
-          if (owned && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
-          if (phase === "acl") {
+          const flags = [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]
+          if (owned && phase !== "activate" && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (phase === "acl" || phase === "activate") {
             stage = "ACL"
             console.info("ADMIN_USER_STAGE_ACL")
             const snapshot = async () => {
@@ -177,6 +178,22 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const before = await snapshot()
             if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
+            if (phase === "activate") {
+              const safePolicy = async () => owned.secretHash === secretHash && await user.AuthMode === bg.TBGDeductorUserAuthMode.uamLocal &&
+                (await Promise.all(flags.map(async ([name, value]) => await user[name] === value))).every(Boolean)
+              if (before.some(directory => directory.permissions.length) || !await safePolicy())
+                return { outcome: "not_applied", data: { code: "ADMIN_USER_POLICY_CHANGED" } }
+              stage = "ACTIVATE"
+              console.info("ADMIN_USER_STAGE_ACTIVATE")
+              const blocked = await user.Blocked
+              if (typeof blocked !== "boolean") throw Error("readback")
+              if (blocked) { applied = true; await user.set_Blocked(false) }
+              const observed = { objectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), name: await user.Name,
+                userKind: await user.UserKind, blocked: await user.Blocked }
+              if (observed.objectId !== owned.objectId || observed.name !== username || observed.userKind !== 0 || observed.blocked !== false ||
+                !await safePolicy()) throw Error("readback")
+              return { outcome: "confirmed", data: { activated: blocked, user: observed } }
+            }
             if (before.some(directory => directory.permissions.some(principal => principal.name === username && principal.userKind === 0 && principal.objectId !== owned.objectId)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_PRINCIPAL_CHANGED" } }
             let removed = 0
@@ -202,7 +219,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             console.info("ADMIN_USER_STAGE_CONFIGURE")
             if (authModeChanged) { applied = true; console.info("ADMIN_USER_WRITE_AUTHMODE"); await user.set_AuthMode(bg.TBGDeductorUserAuthMode.uamLocal) }
             if (passwordChanged) { applied = true; console.info("ADMIN_USER_WRITE_PASSWORD"); await user.SetPassword(password) }
-            for (const [name, value] of [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]) {
+            for (const [name, value] of flags) {
               if (await user[name] === value) continue
               applied = true
               await user["set_" + name](value)
