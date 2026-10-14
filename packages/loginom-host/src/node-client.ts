@@ -106,7 +106,8 @@ export async function launchNodeHost(input: {
     close() {
       if (state.closing) return state.closing
       state.closing = (async () => {
-        const result = await client.request("close", {}, 30_000)
+        // Enclose the runtime's 110s receipt wait and 5s confirmed-exit wait.
+        const result = await client.request("close", {}, 120_000)
         if (!result || typeof result !== "object" || !("closed" in result) || result.closed !== true)
           throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
         // An acknowledgement alone does not prove exit. Bound a stuck host while

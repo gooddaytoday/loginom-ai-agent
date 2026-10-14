@@ -150,9 +150,10 @@ export async function supervise(input: Launch) {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
       // The native close, original IO callbacks and durable receipts precede ACK.
-      // Leave the existing 30s host caller budget room for the confirmed exit;
-      // a 5s ACK cap can expire just before an otherwise successful close reply.
-      const reply = await request("close", undefined, 25_000)
+      // Browser/context close plus durable evidence can outlast 25s even after
+      // native logout. Use the ordinary 120s RPC budget, leaving room for the
+      // confirmed child exit and the enclosing host's own completion.
+      const reply = await request("close", undefined, 110_000)
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
