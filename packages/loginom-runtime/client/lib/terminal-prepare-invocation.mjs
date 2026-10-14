@@ -39,7 +39,10 @@ export function retainTerminalPrepareInvocation(source,input,control){
 export function invokeTerminalPrepareInvocation(token){
   const entry=entries.get(token);if(!entry)refuse();
   // Return the original pending/rejected Promise; never re-enter a reader or creation.
-  if(entry.work)return entry.work;
+  if(entry.work){
+    try{entry.check()}catch(error){if(entry.failed)return entry.work;throw error}
+    return entry.work;
+  }
   entry.check();
   entry.work=Promise.resolve().then(async()=>{
     entry.check();const packet=await prepareTerminalOriginalPacket(entry.initial,entry.input);entry.check();
@@ -47,6 +50,6 @@ export function invokeTerminalPrepareInvocation(token){
       record:async()=>{throw Error('TERMINAL_EVIDENCE_WRITER_NOT_BOUND')}});
     const receipt=await component.read();entry.check();const facts=component.inspect(receipt);
     return Object.freeze({packet,component,facts});
-  });
+  }).catch(error=>{entry.failed=true;throw error});
   return entry.work;
 }

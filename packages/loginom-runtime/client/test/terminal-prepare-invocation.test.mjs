@@ -51,3 +51,7 @@ test('original abort is first even when deadline descriptor is foreign',()=>cont
  let caught=false;try{retainTerminalPrepareInvocation(f.source,f.input,f.control)}catch(value){caught=true;assert.equal(value,false)}
  assert(caught);assert.equal(gets,0);assert.equal(f.preparation.receipts.size,0);
 }));
+test('successful completed invocation cannot be reused after typed input drift',()=>control(async f=>{
+ const token=retainTerminalPrepareInvocation(f.source,f.input,f.control);const work=invokeTerminalPrepareInvocation(token);await work;
+ f.input.operationId='foreign';assert.throws(()=>invokeTerminalPrepareInvocation(token));
+}));
