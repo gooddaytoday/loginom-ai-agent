@@ -764,3 +764,14 @@ duplicate source и unready launcher refused. Shared closed-proof validator та
 прошёл offline qualification/recovery regression:80 tests/570 assertions PASS
 (40.10s), typecheck/diff PASS. Полный runtime actor/attempt inventory и production
 binding ещё открыты; readonly proofs не разрешают signals/delete/recovery.
+
+
+Visible provider429 metadata: explicit APIError.data.statusCode из headless JSON
+сохраняется в run.json.limitEvidence без raw message/body. Actual Bun child и
+supervisor подтвердили сохранение event при exit0/последующем text; limit policy
+остаётся failed. Нет полных retry/transport observations, coverage unavailable;
+empty/textual/malformed/foreign error controls incomplete. Target3 tests/17
+assertions; CLI/report/fixture parallel/policy118 tests/563 assertions PASS
+(223.25s), typecheck/diff PASS. Источник формы APIError проверен в текущем
+packages/core/src/v1/session.ts и JSON emitter packages/agent/src/cli/cmd/run.ts;
+native model transport и hidden limit absence не квалифицированы.
