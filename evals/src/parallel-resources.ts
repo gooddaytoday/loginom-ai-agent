@@ -1,8 +1,40 @@
 import { constants } from "node:fs"
-import { lstat, open, readFile, realpath, statfs } from "node:fs/promises"
+import { lstat, open, readFile, readlink, realpath, stat, statfs } from "node:fs/promises"
 import path from "node:path"
 import { EvalFailure } from "./fail"
 import type { SlotFile } from "./slots"
+import type { ProcessIdentity, ProcessOwner } from "./process-supervisor"
+
+export async function sampleProcessResources(input: { identity: ProcessIdentity; owner: ProcessOwner }) {
+  if (!Number.isSafeInteger(input.identity.pid) || input.identity.pid < 1) throw new EvalFailure("RESOURCE_PROCESS_IDENTITY", 2)
+  const before = await resourceProcessView(input.identity.pid).catch(() => undefined)
+  const cgroup = before && matchesResourceProcess(before, input.identity) ? await sampleCgroupResources(input.identity.pid) : null
+  const after = await resourceProcessView(input.identity.pid).catch(() => undefined)
+  const matched = before && after && [before, after].every(current => matchesResourceProcess(current, input.identity))
+  const boundCgroup = matched && cgroup?.path && before.cgroup === cgroup.path && after.cgroup === cgroup.path ? cgroup : null
+  const cpu = matched && cgroupNumber(before.fields[11]) !== null && cgroupNumber(before.fields[12]) !== null
+    ? { user_ticks: cgroupNumber(before.fields[11])!, system_ticks: cgroupNumber(before.fields[12])! } : null
+  const rss = matched ? cgroupNumber(before.status.match(/^VmRSS:\s+(\d+) kB$/m)?.[1]) : null
+  const rssBytes = rss !== null && Number.isSafeInteger(rss * 1024) ? rss * 1024 : null
+  return { owner: input.owner, identity: input.identity, observed_at: new Date().toISOString(), verified: Boolean(matched), cpu, rss_bytes: rssBytes, cgroup: boundCgroup,
+    errors: [...(matched ? [] : ["PROCESS_IDENTITY_UNVERIFIED"]), ...(cpu ? [] : ["PROCESS_CPU_UNAVAILABLE"]),
+      ...(rssBytes !== null ? [] : ["PROCESS_RSS_UNAVAILABLE"]), ...(boundCgroup ? [] : ["PROCESS_CGROUP_UNVERIFIED"])] }
+}
+
+async function resourceProcessView(pid: number) {
+  const [raw, status, owner, executable, file, cgroup] = await Promise.all([readFile(`/proc/${pid}/stat`, "utf8"),
+    readFile(`/proc/${pid}/status`, "utf8"), stat(`/proc/${pid}`), readlink(`/proc/${pid}/exe`), stat(`/proc/${pid}/exe`),
+    readFile(`/proc/${pid}/cgroup`, "utf8").catch(() => undefined)])
+  const fields = raw.slice(raw.lastIndexOf(")") + 2).trim().split(/\s+/)
+  if (["Z", "X"].includes(fields[0]!)) return undefined
+  return { fields, status, starttime: fields[19], uid: owner.uid, group: Number(fields[2]), session: Number(fields[3]),
+    executable, device: file.dev, inode: file.ino, cgroup: cgroup?.split("\n").find(line => line.startsWith("0::"))?.slice(3) }
+}
+
+function matchesResourceProcess(current: NonNullable<Awaited<ReturnType<typeof resourceProcessView>>>, saved: ProcessIdentity) {
+  return current.starttime === saved.starttime && current.uid === saved.uid && current.group === saved.group && current.session === saved.session &&
+    current.executable === saved.executable && current.device === saved.device && current.inode === saved.inode
+}
 
 export async function loadResourceContainers(file: SlotFile) {
   const { readLeaseReceipt } = await import("./lease")
@@ -106,8 +138,9 @@ export async function sampleHostResources(paths: string[]) {
   }
 }
 
-export async function sampleCgroupResources() {
-  const group = (await readFile("/proc/self/cgroup", "utf8").catch(() => undefined))
+export async function sampleCgroupResources(pid = process.pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1) throw new EvalFailure("RESOURCE_PROCESS_IDENTITY", 2)
+  const group = (await readFile(`/proc/${pid}/cgroup`, "utf8").catch(() => undefined))
     ?.split("\n").find(line => line.startsWith("0::"))?.slice(3)
   const files = group ? await Promise.all(["cpu.stat", "memory.events", "memory.current", "memory.max", "memory.swap.current", "memory.swap.max"]
     .map(name => readFile(path.join("/sys/fs/cgroup", group, name), "utf8").catch(() => undefined))) : []
