@@ -34,6 +34,11 @@ export async function activatePreparedWorkflow(page, task) {
       const account=main?.FMapTree?.FServerConnection?.UserName;
       const packagePath=receipt.packageNode?.PackageFileName;
       const baseline=receipt.nodeNavigationBinding;
+      const requestPin=Object.getOwnPropertyDescriptor(receipt,'nodePreparedRequest');
+      const originalRequest=Object.getOwnPropertyDescriptor(receipt,'request');
+      if(baseline && (!requestPin || !('value' in requestPin) || typeof requestPin.value!=='string'
+        || !requestPin.value || requestPin.writable || requestPin.configurable
+        || !originalRequest || !('value' in originalRequest) || originalRequest.value!==requestPin.value))return null;
       if(baseline) {
         if(!samePath(expected,baseline.path)||baseline.tab!==receipt.tab||baseline.packageNode!==receipt.packageNode
           ||baseline.workflow!==receipt.nodeTargetWorkflowNode||baseline.account!==account||baseline.connection!==main?.FMapTree?.FServerConnection||baseline.packagePath!==packagePath
@@ -42,9 +47,14 @@ export async function activatePreparedWorkflow(page, task) {
       if(samePath(expected,observed)) {
         if(capture&&!baseline&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
           &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
-          &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
+          &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode) {
+          if(!originalRequest || !('value' in originalRequest) || typeof originalRequest.value!=='string'
+            || !originalRequest.value || requestPin && (!('value' in requestPin)
+              || requestPin.value!==originalRequest.value || requestPin.writable || requestPin.configurable))return null;
+          if(!requestPin)Object.defineProperty(receipt,'nodePreparedRequest',{value:originalRequest.value});
           receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,
             workflow:receipt.nodeTargetWorkflowNode,account,connection:main.FMapTree.FServerConnection,packagePath};
+        }
         return {verified:true};
       }
       if(!baseline)return null;
