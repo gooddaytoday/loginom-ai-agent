@@ -33,7 +33,7 @@ type AmountInput = NodeHostInput & { packagePath: string }
 type AmountRoot = {
   input: AmountInput; control: AmountStartupControl; original: Readonly<AmountStartupControl>;
   authorization: string; phase: "inventory" | "provider_unavailable" | "refused" | "startup" | "host_ready" | "acquired";
-  pending: boolean; host?: Awaited<ReturnType<typeof launchNodeHost>>; acquireRun?:string; acquireSession?:string; primary?: { value: unknown }; secondary?: { value: unknown };
+  pending: boolean; captureClaimed?:boolean; host?: Awaited<ReturnType<typeof launchNodeHost>>; acquireRun?:string; acquireSession?:string; primary?: { value: unknown }; secondary?: { value: unknown };
 }
 // Stage A retains the real foreground object before inventory IO. It makes no
 // claim about a run/lease that stage B has not acquired. Map entries also fence
@@ -109,7 +109,15 @@ export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountIn
     const options={...snapshot};diagnostics.set(options,{authorization:root.authorization,packagePath:snapshot.packagePath,harness:"amount-import-type-v1"});
     amountStarts.set(options,{control:original,guard,observed,receive,retain(host){root.host=host}});
     root.phase="startup";const host=await observed(()=>launchNodeHost(options));root.phase="host_ready";
-    return Object.assign(host,{acquire:async(run:string,session:string)=>{
+    return Object.assign(host,{capture:async(run:string)=>{
+      guard();
+      if(root.phase!=="acquired" || run!==root.acquireRun || root.pending || root.captureClaimed)throw Error("LOGINOM_RECOVERY_REQUIRED");
+      root.captureClaimed=true;
+      // Original Stage-A lifetime continues. A reply does not grant cleanup/ACK.
+      const send=amountCaptureSenders.get(host);
+      if(!send)throw Error("LOGINOM_AMOUNT_CAPTURE_PROXY_UNAVAILABLE");
+      return observed(()=>send(run));
+    },acquire:async(run:string,session:string)=>{
       guard();if(root.acquireRun!==undefined)throw Error("LOGINOM_RECOVERY_REQUIRED");
       if(!run||!session)throw Error("LOGINOM_RUN_INVALID");root.acquireRun=run;root.acquireSession=session;
       try {const result=await observed(()=>host.acquireAmount(run,session));guard();
@@ -129,13 +137,14 @@ export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountIn
     return Object.freeze({original:root.original,authorization:root.authorization,phase:root.phase,pending:root.pending,host:root.host,run:root.acquireRun,session:root.acquireSession,
       primaryFailurePresent:root.primary!==undefined,primaryFailure:root.primary?.value,
       secondaryFailurePresent:root.secondary!==undefined,secondaryFailure:root.secondary?.value,
-      originalControlRetained:true,bindingPhase:root.phase==="acquired"?"acquired" as const:"unavailable" as const,nativeOwnerVerified:false,
+      captureClaimed:root.captureClaimed===true,originalControlRetained:true,bindingPhase:root.phase==="acquired"?"acquired" as const:"unavailable" as const,nativeOwnerVerified:false,
       evidenceSettled:false,cleanupSettled:false,acknowledged:false})
   },
 })
 
 type AmountStart={control:Readonly<AmountStartupControl>;guard():void;observed<T>(work:()=>Promise<T>):Promise<T>;receive(value:unknown,origin:unknown,secondary?:{value:unknown}):unknown;retain(host:Awaited<ReturnType<typeof launchNodeHost>>):void}
 const amountStarts=new WeakMap<object,AmountStart>();
+const amountCaptureSenders=new WeakMap<object,(run:string)=>Promise<unknown>>();
 // Closed diagnostic launcher. Resource paths and harness are fixed; callers
 // cannot supply executable code, a module path or a transport capability.
 export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
@@ -397,6 +406,7 @@ export async function launchNodeHost(input: NodeHostInput) {
     close,
   }
   fp?.retain(handle)
+  if(amountClient&&amount&&diagnostic)amountCaptureSenders.set(handle,(run)=>{amount.guard();return amountClient.capture({run,authorization:diagnostic.authorization,amountControl:{authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request}},amount.control)});
   amount?.retain(handle)
   const ready = await (amount && amountClient && diagnostic
     ? amountClient.start(startupInput as Parameters<typeof amountClient.start>[0],amount.control)

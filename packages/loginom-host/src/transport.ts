@@ -55,6 +55,9 @@ export function privateAmountTransport(port: Port, receive:(value:unknown,origin
       return client.amountControlled("start",input,control,{phase:"startup",authorization,harness:"amount-import-type-v1",deadline:control.deadline,
         operation:control.operation,request:control.request},receive);
     },
+    capture(input:{run:string;authorization:string;amountControl:{authorization:string;operation:string;request:string}},control:AmountControl) {
+      return client.amountControlled("acceptance.capture",input,control,{phase:"capture",run:input.run,...input.amountControl,deadline:control.deadline},receive);
+    },
     acquire(input:{run:string;session:string;amountControl:{authorization:string;operation:string;request:string}},control:AmountControl) {
       return client.amountControlled("acquire",input,control,{phase:"acquired",run:input.run,...input.amountControl,deadline:control.deadline},receive);
     }}
@@ -70,7 +73,7 @@ function decode(value: any): unknown {
 }
 function requests(port: Port) {
   const state = { closed: false }
-  const pending = new Map<string, { resolve(value: unknown): void; reject(value: unknown): void; dispose(): void; controlled?: boolean; ownedReply?:boolean;owned?:OwnedRejection; receive?:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown; cancel?(value: unknown): void }>()
+  const pending = new Map<string, { resolve(value: unknown): void; reject(value: unknown): void; dispose(): void; controlled?: boolean; primary?:{value:unknown}; ownedReply?:boolean;owned?:OwnedRejection; receive?:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown; cancel?(value: unknown): void }>()
   function settle(id: string, error: boolean, value: unknown) {
     const request = pending.get(id)
     if (!request) return
@@ -92,7 +95,12 @@ function requests(port: Port) {
       if(owned.owned.primary){settle(data.id,true,owned.owned.primary.value);return}
     }
     if ("rejection" in data && pending.get(data.id)?.controlled) { const request=pending.get(data.id)!;const value=decode(data.rejection);settle(data.id, true, request.receive ? request.receive(value,"rejectionOrigin" in data?data.rejectionOrigin:"guard","secondaryRejection" in data?{value:decode(data.secondaryRejection)}:undefined):value); return }
-    if ("error" in data) { settle(data.id, true, new Error(hostError(data.error))); return }
+    if ("error" in data) {
+      const request=pending.get(data.id),error=new Error(hostError(data.error));
+      settle(data.id,true,request?.primary&&request.receive?request.receive(error,"await"):error);return
+    }
+    const cancelled=pending.get(data.id)?.primary
+    if(cancelled){settle(data.id,true,cancelled.value);return}
     settle(data.id, false, "result" in data ? data.result : undefined)
   }
   let removeClose: unknown
@@ -117,17 +125,21 @@ function requests(port: Port) {
       timeout = control.deadline - Date.now()
     }
     const id = randomUUID()
+    // This fixed sender owns the capture ID before dispatch. Never write into
+    // caller input; cancellation targets this same request, not its successor.
+    const amountCapture=receive && method==="acceptance.capture"
+    const wireInput=amountCapture?{...(input as object),captureRequestId:id}:input
     return new Promise<unknown>((resolve, reject) => {
       let dispatched = false, cancelled=false
       function cancel(value: unknown) {
         if (!pending.has(id) || cancelled && !state.closed) return
-        if (control && dispatched) {
+        if (control && dispatched && !(amountCapture&&cancelled)) {
           try { port.postMessage({ id: randomUUID(), method: "readonly.preReady.cancel",
-            input: { ...(cancellation ?? input as object), requestId: id, rejection: encode(value) } }) } catch { /* Original refusal remains primary. */ }
+            input: { ...(cancellation ?? input as object), requestId: id, ...(amountCapture?{captureRequestId:id}:{}), rejection: encode(value) } }) } catch { /* Original refusal remains primary. */ }
         }
         if(owned && dispatched && !state.closed){owned.primary??={value};cancelled=true;return}
         if(owned){owned.primary??={value};settle(id,true,owned.primary.value);return}
-        if(receive && dispatched && !state.closed){receive(value,"control");cancelled=true;return}
+        if(receive && dispatched && !state.closed){const reason=receive(value,"control");if(amountCapture)pending.get(id)!.primary??={value:reason};cancelled=true;return}
         settle(id, true, receive?receive(value,"await"):value)
       }
       const abort = () => cancel(control!.signal.reason)
@@ -135,13 +147,13 @@ function requests(port: Port) {
       pending.set(id, {resolve, reject, ...(ownedReply?{ownedReply:true,controlled:true}:{}),...(owned?{owned,cancel}:{}), ...(receive?{receive}:{}), ...(control ? {cancel,controlled:true} : {}), dispose() { clearTimeout(timer); control?.signal.removeEventListener("abort", abort) }})
       control?.signal.addEventListener("abort", abort, {once: true})
       if (control?.signal.aborted) { cancel(control.signal.reason); return }
-      try { dispatched = true; port.postMessage({id, method, input, ...(control ? {deadline: control.deadline} : {})}) }
+      try { dispatched = true; port.postMessage({id, method, input:wireInput, ...(control ? {deadline: control.deadline} : {})}) }
       catch (error) { if (control) settle(id, true, error); close() }
     })
   }
   return { request: (method: string, input: unknown, timeout = 180_000) => send(method, input, timeout),
     ownedAcquire:(input:{run:string;session?:string;receiverPurpose:'union-acquired-service-v1';receiverPhase?:'current'},owned:OwnedRejection)=>send('acquire',input,180_000,undefined,undefined,undefined,true,owned),
     startControlled: (input: unknown, control:Control, cancellation:object) => send("start", input, 0, control, cancellation),
-    amountControlled:(method:"start"|"acquire",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
+    amountControlled:(method:"start"|"acquire"|"acceptance.capture",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
     controlled: (input: {run:string;authorization:string}, control:Control) => send("readonly.preReady", input, 0, control), close }
 }
