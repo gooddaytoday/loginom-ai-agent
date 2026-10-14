@@ -149,7 +149,10 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000)
+      // The native close, original IO callbacks and durable receipts precede ACK.
+      // Leave the existing 30s host caller budget room for the confirmed exit;
+      // a 5s ACK cap can expire just before an otherwise successful close reply.
+      const reply = await request("close", undefined, 25_000)
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
