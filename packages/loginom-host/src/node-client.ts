@@ -23,7 +23,7 @@ type AmountInput = NodeHostInput & { packagePath: string }
 type AmountRoot = {
   input: AmountInput; control: AmountStartupControl; original: Readonly<AmountStartupControl>;
   authorization: string; phase: "inventory" | "provider_unavailable" | "refused" | "startup" | "host_ready" | "acquired" | "inspecting" | "preparing" | "prepared" | "capturing" | "completed";
-  pending: boolean; resourcesAttempted?:boolean;prepareAttempted?:boolean; captureAttempted?:boolean; host?: Awaited<ReturnType<typeof launchNodeHost>>; acquireRun?:string; acquireSession?:string; primary?: { value: unknown }; secondary?: { value: unknown };
+  pending: boolean; resourcesAttempted?:boolean;fileAttempted?:boolean;prepareAttempted?:boolean; captureAttempted?:boolean; host?: Awaited<ReturnType<typeof launchNodeHost>>; acquireRun?:string; acquireSession?:string; primary?: { value: unknown }; secondary?: { value: unknown };
 }
 // Stage A retains the real foreground object before inventory IO. It makes no
 // claim about a run/lease that stage B has not acquired. Map entries also fence
@@ -101,10 +101,11 @@ export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountIn
     const options={...snapshot};diagnostics.set(options,{authorization:root.authorization,packagePath:snapshot.packagePath,harness:"amount-import-type-v1"});
     amountStarts.set(options,{control:original,guard,observed,receive,retain(host){root.host=host}});
     root.phase="startup";const host=await observed(()=>launchNodeHost(options));root.phase="host_ready";
-    const dispatch=async(method:"acceptance.resources"|"acceptance.prepare"|"acceptance.capture",run:string)=>{
+    const dispatch=async(method:"acceptance.resources"|"acceptance.files"|"acceptance.prepare"|"acceptance.capture",run:string)=>{
       guard();if(run!==root.acquireRun || !run)throw Error("LOGINOM_RUN_INVALID");
       const resources=method==="acceptance.resources",preparing=method==="acceptance.prepare";
       if(resources){if(root.phase!=="acquired" || root.resourcesAttempted)throw Error("LOGINOM_RECOVERY_REQUIRED");root.resourcesAttempted=true;root.phase="inspecting";const result=await observed(()=>host.dispatchAmount(method,run));if(!result || typeof result!=="object" || !("resourceReadComplete" in result) || result.resourceReadComplete!==true){root.phase="refused";throw primary(Error("LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE"))}root.phase="acquired";return result;}
+      if(method==='acceptance.files'){if(root.phase!=='acquired'||!root.resourcesAttempted||root.fileAttempted)throw Error('LOGINOM_RECOVERY_REQUIRED');root.fileAttempted=true;root.phase='inspecting';const result=await observed(()=>host.dispatchAmount(method,run));if(!result||typeof result!=='object'||!('fileReadComplete' in result)||result.fileReadComplete!==true){root.phase='refused';throw primary(Error('LOGINOM_AMOUNT_FILE_UNAVAILABLE'))}root.phase='acquired';return result;}
       if(preparing ? root.phase!=="acquired" || root.prepareAttempted : root.phase!=="prepared" || root.captureAttempted)throw Error("LOGINOM_RECOVERY_REQUIRED");
       if(preparing)root.prepareAttempted=true;else root.captureAttempted=true;
       root.phase=preparing?"preparing":"capturing";
@@ -114,7 +115,7 @@ export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountIn
       }
       root.phase=preparing?"prepared":"completed";return result;
     };
-    return Object.assign(host,{resources:(run:string)=>dispatch("acceptance.resources",run),prepare:(run:string)=>dispatch("acceptance.prepare",run),capture:(run:string)=>dispatch("acceptance.capture",run),acquire:async(run:string,session:string)=>{
+    return Object.assign(host,{files:(run:string)=>dispatch('acceptance.files',run),resources:(run:string)=>dispatch("acceptance.resources",run),prepare:(run:string)=>dispatch("acceptance.prepare",run),capture:(run:string)=>dispatch("acceptance.capture",run),acquire:async(run:string,session:string)=>{
       guard();if(root.acquireRun!==undefined)throw Error("LOGINOM_RECOVERY_REQUIRED");
       if(!run||!session)throw Error("LOGINOM_RUN_INVALID");root.acquireRun=run;root.acquireSession=session;
       try {const result=await observed(()=>host.acquireAmount(run,session));guard();
@@ -250,7 +251,7 @@ export async function launchNodeHost(input: NodeHostInput) {
   }
   const handle = {
     port, exited, request: client.request,
-    dispatchAmount:(method:"acceptance.resources"|"acceptance.prepare"|"acceptance.capture",run:string)=>{if(!amountClient||!amount||!diagnostic)throw Error("LOGINOM_HANDSHAKE_INVALID");amount.guard();return amountClient.dispatch(method,{run,authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request},amount.control)},
+    dispatchAmount:(method:"acceptance.resources"|"acceptance.files"|"acceptance.prepare"|"acceptance.capture",run:string)=>{if(!amountClient||!amount||!diagnostic)throw Error("LOGINOM_HANDSHAKE_INVALID");amount.guard();return amountClient.dispatch(method,{run,authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request},amount.control)},
     acquireAmount:(run:string,session:string)=>{if(!amountClient||!amount||!diagnostic)throw Error("LOGINOM_HANDSHAKE_INVALID");amount.guard();return amountClient.acquire({run,session,amountControl:{authorization:diagnostic.authorization,operation:amount.control.operation,request:amount.control.request}},amount.control)},
     get alive() { return !state.closed },
     close,

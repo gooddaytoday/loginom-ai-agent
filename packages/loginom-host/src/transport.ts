@@ -25,7 +25,7 @@ export function privateAmountTransport(port: Port, receive:(value:unknown,origin
     acquire(input:{run:string;session:string;amountControl:{authorization:string;operation:string;request:string}},control:AmountControl) {
       return client.amountControlled("acquire",input,control,{phase:"acquired",run:input.run,...input.amountControl,deadline:control.deadline},receive);
     },
-    dispatch(method:"acceptance.resources"|"acceptance.prepare"|"acceptance.capture",input:{run:string;authorization:string;operation:string;request:string},control:AmountControl) {
+    dispatch(method:"acceptance.resources"|"acceptance.files"|"acceptance.prepare"|"acceptance.capture",input:{run:string;authorization:string;operation:string;request:string},control:AmountControl) {
       return client.amountControlled(method,input,control,{phase:"dispatch",method,...input,deadline:control.deadline},receive);
     }}
 }
@@ -98,6 +98,6 @@ function requests(port: Port) {
   }
   return { request: (method: string, input: unknown, timeout = 180_000) => send(method, input, timeout),
     startControlled: (input: unknown, control:Control, cancellation:object) => send("start", input, 0, control, cancellation),
-    amountControlled:(method:"start"|"acquire"|"acceptance.resources"|"acceptance.prepare"|"acceptance.capture",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
+    amountControlled:(method:"start"|"acquire"|"acceptance.resources"|"acceptance.files"|"acceptance.prepare"|"acceptance.capture",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
     controlled: (input: {run:string;authorization:string}, control:Control) => send("readonly.preReady", input, 0, control), close }
 }

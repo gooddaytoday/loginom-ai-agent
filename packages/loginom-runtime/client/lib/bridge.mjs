@@ -1,3 +1,4 @@
+import {createAmountFileRead} from '../../src/amount-file-bytes.mjs';
 import {amountSaveContinuation} from '../../src/amount-save-continuation.mjs';
 import {readAmountDraftPage} from '../../src/amount-draft-page.mjs';
 import {inspectAmountOwnPage} from '../../src/amount-own-page.mjs';
@@ -773,14 +774,14 @@ export async function createBridge(config, session, { browserTransport: managedB
         assertCaptureEvidenceBinding();
       }
     }
-    let amountResourceAttempted=false,amountResourceResult;
-    function amountResourceGuard(signal) {
+    let amountResourceAttempted=false,amountResourceResult,amountFileRead,amountFileResult;
+    function amountResourceGuard(signal,allowFile=false) {
       const binding=amountAdmission?.binding,retained=acceptanceCapture?.retained;
       if(!binding || !retained?.runtime?.client || amountAdmission.amountControl!==acceptanceCapture.amountControl
           || shutdownStarted || cleanupRefused || captureConsumed || amountPrepareAttempted)
         throw Error('LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE');
       assertAmountCaptureProxy(amountAdmission.amountControl,binding,signal);
-      if(clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
+      if(!allowFile&&amountFileRead?.unsettled() || clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
         throw Error('LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE');
       return retained;
     }
@@ -800,13 +801,22 @@ export async function createBridge(config, session, { browserTransport: managedB
       if(result!==amountResourceResult)throw Error('LOGINOM_AMOUNT_RESOURCES_UNAVAILABLE');
       return true;
     }
+    async function inspectAmountFile({signal}={}) {
+      const retained=amountResourceGuard(signal);
+      if(!amountResourceResult||amountFileRead)throw Error('LOGINOM_AMOUNT_FILE_UNAVAILABLE');
+      amountFileRead=createAmountFileRead(retained,{guard:()=>amountResourceGuard(signal,true),record:recordExecution,signal});
+      try{const receipt=await amountFileRead.read();amountResourceGuard(signal);
+        amountFileResult=freezeCaptureResult({fileReadComplete:true,receipt});return amountFileResult;
+      }catch(reason){try{amountResourceGuard(signal)}catch(primary){retained.state.controlledStartup.propagate(primary)}throw retained.state.controlledStartup.propagate(reason)}
+    }
+    function assertAmountFile(result,signal){amountResourceGuard(signal);if(result!==amountFileResult||amountFileRead?.unsettled())throw Error('LOGINOM_AMOUNT_FILE_UNAVAILABLE');return true;}
     async function prepareAmount({signal}={}) {
       const binding=amountAdmission?.binding,retained=acceptanceCapture?.retained,client=retained?.runtime?.client;
       const guard=()=>{
         if(!binding || !client || amountAdmission.amountControl!==acceptanceCapture.amountControl || shutdownStarted || cleanupRefused || captureConsumed)
           throw Error('LOGINOM_AMOUNT_PREPARATION_UNAVAILABLE');
         assertAmountCaptureProxy(amountAdmission.amountControl,binding,signal);
-        if(clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
+        if(amountFileRead?.unsettled() || clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
           throw Error('LOGINOM_AMOUNT_PREPARATION_UNAVAILABLE');
       };
       guard();
@@ -887,7 +897,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         }
         actionRuntime.assertPreparationAllowed();
         const prepared=session.metadata.workspacePreparation;
-        if (clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
+        if (amountFileRead?.unsettled() || clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
             || Date.now() >= binding.expires || session.metadata.workspaceReady !== true
             || binding.session !== session.metadata.sessionId || !prepared?.attempted
             || prepared.state.loginom_account !== binding.account || !managedSave
@@ -1105,7 +1115,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
           if (confirmedCleanup) cleanup=confirmedCleanup;
-          else if (managedCleanup && (clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
+          else if (managedCleanup && (amountFileRead?.unsettled() || clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
             cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
           else if (!prepared?.attempted && authenticatedReadiness) {
             actionRuntime.assertPreparationAllowed();
@@ -1236,10 +1246,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       });
       return closing;
     }
-    return {server,catalog,captureAcceptance,prepareAmount,assertAmountPrepared,inspectAmountResources,assertAmountResources,
+    return {server,catalog,captureAcceptance,prepareAmount,assertAmountPrepared,inspectAmountResources,assertAmountResources,inspectAmountFile,assertAmountFile,
       assertAmountCompletion:result=>assertAmountCompletion(amountPreparation,result,session.metadata.workspacePreparation,amountSaveOutcome),
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
-      hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
+      hasUnsettledWork:()=>amountFileRead?.unsettled() || cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};
   } catch (error) {
     await closeClients();

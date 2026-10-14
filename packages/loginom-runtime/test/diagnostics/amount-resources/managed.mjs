@@ -9,7 +9,7 @@ const {retainAmountCaptureProxy}=await load('src/amount-capture-proxy.mjs');
 const fixturePath=process.argv[4]??join(root,'test/diagnostics/amount-capture-proxy/run.mjs');
 const fixtures=await readFile(fixturePath,'utf8');
 const fixture=Function('retainAmountManagedStartup','retainCaptureOwner','bindCaptureRuntime','retainAmountCaptureProxy',fixtures.slice(fixtures.indexOf('function fixture('),fixtures.indexOf('const rows=[];'))+'return fixture;')(retainAmountManagedStartup,retainCaptureOwner,bindCaptureRuntime,retainAmountCaptureProxy);
-const text=await readFile(join(root,'src/managed-entry.mjs'),'utf8'),start=text.indexOf('    if (message.operation === "acceptance.resources"'),end=text.indexOf('    if (message.operation === "admit")',start);
+const text=await readFile(join(root,'src/managed-entry.mjs'),'utf8'),start=text.indexOf('    if (message.operation === "acceptance.files"'),end=text.indexOf('    if (message.operation === "admit")',start);
 assert(start>=0&&end>start);const run=Object.getPrototypeOf(async function(){}).constructor('state','message','assertAmountManagedStartup','assertCaptureOwner','send','closeRejection','AbortController',text.slice(start,end));
 const rows=[];
 for(const mode of ['original-controller','missing-completion','late-abort-false']){

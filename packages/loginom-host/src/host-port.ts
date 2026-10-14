@@ -26,6 +26,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       draftRetained?: boolean
       preReadyHeld?: boolean
       amountHeld?:boolean
+      fileAttempted?:boolean
       resourcesAttempted?:boolean
       prepareAttempted?:boolean
       prepared?:boolean
@@ -134,7 +135,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
-      if(run.amountHeld && !["acceptance.resources","acceptance.prepare","acceptance.capture"].includes(data.method))throw Error("LOGINOM_RECOVERY_REQUIRED")
+      if(run.amountHeld && !["acceptance.resources","acceptance.files","acceptance.prepare","acceptance.capture"].includes(data.method))throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (run.captureRefused) {
         if (data.method !== "call" || !("name" in input) || typeof input.name !== "string"
             || !["dock_diagnostics", "dock_workspace_observe", "dock_operation_inspect", "dock_node_status"].includes(input.name)
@@ -151,23 +152,23 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         } finally { run.calls-- }
         return
       }
-      if (data.method === "acceptance.resources" || data.method === "acceptance.capture" || data.method === "acceptance.prepare") {
-        const resources=data.method==="acceptance.resources",preparing=data.method==="acceptance.prepare";
+      if (data.method === "acceptance.resources" || data.method === "acceptance.files" || data.method === "acceptance.capture" || data.method === "acceptance.prepare") {
+        const files=data.method==="acceptance.files",resources=data.method==="acceptance.resources",preparing=data.method==="acceptance.prepare";
         const amount=run.amountHeld?service.amountStartupControl?.():undefined;
         if(run.amountHeld){
           if(!amount || Object.keys(input).sort().join(",")!=="authorization,operation,request,run"
             || !("operation" in input) || input.operation!==amount.tuple.operation || !("request" in input) || input.request!==amount.tuple.request
             || !("deadline" in data) || data.deadline!==amount.control.deadline)throw Error("LOGINOM_METHOD_INVALID");
           amountRequest=true;amount.guard();
-          if(resources ? run.resourcesAttempted || run.prepareAttempted : preparing ? run.prepareAttempted : !run.prepared)throw Error("LOGINOM_RECOVERY_REQUIRED");
-        } else if(preparing || resources)throw Error("LOGINOM_METHOD_INVALID");
+          if(files ? !run.resourcesAttempted || run.fileAttempted || run.prepareAttempted : resources ? run.resourcesAttempted || run.prepareAttempted : preparing ? run.prepareAttempted : !run.prepared)throw Error("LOGINOM_RECOVERY_REQUIRED");
+        } else if(preparing || resources || files)throw Error("LOGINOM_METHOD_INVALID");
         if ((!amount && Object.keys(input).sort().join(",") !== "authorization,run")
             || !("authorization" in input) || !service.authorizeCapture?.(input.authorization,owner,input.run,run.chat,run.lease) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
         if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
           throw Error("LOGINOM_CALL_BUSY")
         service.assertCapture?.(owner,input.run,run.chat,run.lease)
-        if(resources)run.resourcesAttempted=true;else if(preparing)run.prepareAttempted=true;else run.captured = true
+        if(files)run.fileAttempted=true;else if(resources)run.resourcesAttempted=true;else if(preparing)run.prepareAttempted=true;else run.captured = true
         if(amount)amountDispatches.set(data.id,{run:input.run,method:data.method,startup:amount});
         run.dispatching = true
         run.calls++
@@ -195,9 +196,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(id)
           assertCapture()
-          const result = await runtime.request(resources?"acceptance.resources":preparing?"acceptance.prepare":"acceptance.capture",undefined,120_000,amount?.control)
+          const result = await runtime.request(files?"acceptance.files":resources?"acceptance.resources":preparing?"acceptance.prepare":"acceptance.capture",undefined,120_000,amount?.control)
           assertCapture()
-          if (!result || typeof result !== "object" || (resources ? !("resourceReadComplete" in result) || result.resourceReadComplete!==true : preparing ? !("preparationComplete" in result) || result.preparationComplete!==true : !("cleanupComplete" in result) || result.cleanupComplete !== true)) {
+          if (!result || typeof result !== "object" || (files ? !("fileReadComplete" in result) || result.fileReadComplete!==true : resources ? !("resourceReadComplete" in result) || result.resourceReadComplete!==true : preparing ? !("preparationComplete" in result) || result.preparationComplete!==true : !("cleanupComplete" in result) || result.cleanupComplete !== true)) {
             run.captureRefused = true
             run.lease.holdRecovery()
             service.recoveries.set(run.chat, run.lease)
@@ -205,7 +206,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             reply({id:data.id,result})
             return
           }
-          if(resources){await service.journal.settle(id,true);assertCapture();run.active.delete(id);reply({id:data.id,result});return}
+          if(files || resources){await service.journal.settle(id,true);assertCapture();run.active.delete(id);reply({id:data.id,result});return}
           if(preparing){await service.journal.settle(id,true);assertCapture();run.active.delete(id);run.prepared=true;reply({id:data.id,result});return}
           await runtime.close()
           if(amount){amount.control.signal.throwIfAborted();if(Date.now()>=amount.control.deadline)throw Error("LOGINOM_AMOUNT_EXPIRED")}
@@ -344,7 +345,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
     } catch (error) {
       const amount=service.amountStartupControl?.();
-      if(amount && amountRequest && ["acquire","acceptance.resources","acceptance.prepare","acceptance.capture"].includes(data.method))reply({id:data.id,rejection:encodeAmountRejection(amount.propagate(error)),rejectionOrigin:amount.rejectionOrigin,
+      if(amount && amountRequest && ["acquire","acceptance.resources","acceptance.files","acceptance.prepare","acceptance.capture"].includes(data.method))reply({id:data.id,rejection:encodeAmountRejection(amount.propagate(error)),rejectionOrigin:amount.rejectionOrigin,
         ...(amount.secondary?{secondaryRejection:encodeAmountRejection(amount.secondary.value)}:{})});
       else reply({ id: data.id, error: hostError(error) })
     }
