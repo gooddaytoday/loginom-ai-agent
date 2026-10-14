@@ -41,7 +41,7 @@ disk/inodes и пропуски измерений в private JSONL. Он не �
 
 ```bash
 cd /home/kiselev/.codex/worktrees/96cd/loginom-ai-agent/evals
-env -i PATH="$PATH" bun run script/sample-parallel-resources.ts --config /home/kiselev/.local/state/loginom-evals/parallel/slots.json --out /home/kiselev/.local/state/loginom-evals/parallel/evidence/resources-before.jsonl --interval-ms 1000 --run-id acceptance-two --phase before
+env -i PATH="$PATH" bun --no-env-file run script/sample-parallel-resources.ts --config /home/kiselev/.local/state/loginom-evals/parallel/slots.json --out /home/kiselev/.local/state/loginom-evals/parallel/evidence/resources-before.jsonl --interval-ms 1000 --run-id acceptance-two --phase before
 ```
 
 Output parent должен уже быть canonical private0700; existing evidence не
@@ -98,15 +98,18 @@ cgroup как bound scope. Actual bounded container: kernel memory.max64MiB,
 CPU quota ratio0.25, OOM/throttling counters; 29 resource tests PASS/259 assertions
 (17.24s), typecheck/diff PASS. Это Docker resource epoch, не Loginom serverEpoch.
 
-Durable smoke для harness5c9f312333:
-`/home/kiselev/.local/state/loginom-evals/parallel/evidence/resource-proof-cSHgaZ/receipt.json`
-(0600, SHA25602fda2c109ed6e49a64360b9201b0c6bab065ef67cb1c9e432ead9a108529a52).
-Сохранены before/after host snapshots, self process sample, bounded pinned Server
+Durable smoke для harness56e96130ee (runtime5c9f312333):
+`/home/kiselev/.local/state/loginom-evals/parallel/evidence/resource-proof-ozd6NS/receipt.json`
+(0600, SHA2564aee253363151ccb0be2fa3f7bbdf933075f87bc58a7f39deee09f897fbb079e).
+env -i PATH-only, bun --no-env-file, credential-prefixed keys0. Сохранены intent,
+before/after host snapshots, self process sample, bounded pinned Server
 image shell sample и run.jsonl:3 actual frames/1000ms, missed0. Контейнер удалён
-после exact ID/image/nonce check; fresh absence и hashes/private metadata всех5
+после exact ID/image/nonce check; HTTP404 и hashes/private metadata всех6
 evidence files проверены. Scope nonmodel-bounded-container-and-self-only,
 liveQualified=false; Studio/Loginom/browser/judge/licence/model/budgets/acceptance
-остаются вне этого proof. Текущий self cgroup разделён с приложением.
+остаются вне этого proof. Текущий self cgroup разделён с приложением. Superseded
+resource-proof-cSHgaZ удалён после ownership/hash/inventory checks; закрытый
+superseded-cleanup.json прочитан обратно, signals0.
 
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
