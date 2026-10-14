@@ -28,6 +28,7 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
   const lease = await acquireJudgeLease({ codexHome: environment.codexHome, journal, commandId, lockRoot })
   const scoped: EvalConfig = { ...config, judge: { ...config.judge,
     env: { ...config.judge.env, CODEX_HOME: environment.codexHome } } }
+  let released = false
   try {
     const result = scoped.judgeOnly === undefined ? await calibrate(scoped) : await rejudge(scoped, scoped.judgeOnly)
     if (!result.judgeCleanupConfirmed) {
@@ -38,7 +39,12 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
     await writeLeaseReceipt(proof, { version: 2, status: "confirmed", reason: "judge-processes-confirmed",
       key: lease.reservation.key, token: lease.reservation.token, revision: lease.reservation.revision, runDir: result.runDir })
     await lease.release(proof)
+    released = true
     await writeLeaseReceipt(journal, { version: 2, kind: "offline-judge-command", commandId, state: "released", runDir: result.runDir })
     return result
+  } catch (error) {
+    if (!released) await writeLeaseReceipt(journal, { version: 2, kind: "offline-judge-command", commandId,
+      state: "quarantined", reason: "command-failed" })
+    throw error
   } finally { await lease.close() }
 }
