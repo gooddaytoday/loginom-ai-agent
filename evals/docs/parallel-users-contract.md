@@ -390,7 +390,7 @@ ownership manifest пока закрыты; native capability proof не явл�
 
 Wire configure phase для supplied owner требует Blocked=true. Local AuthMode,
 password при смене режима/SHA и design flags меняются последовательно; getter
-read-back подтверждает IsAdmin/IsViewer/UseGlobalFileStorage/SchedulerFullAccess=false,
+read-back подтверждает IsAdmin/IsViewer/UseGlobalFileStorage/SchedulerFullAccess/AllowPublish=false,
 IsDesigner=true и uamLocal=1. Blocked сохраняется. Unchanged local credential
 не вызывает AuthMode/password setters (native call-site telemetry). Все inspect
 enumerators освобождаются immediate: read-only inspect не оставляет read lock
