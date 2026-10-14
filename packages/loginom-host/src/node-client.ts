@@ -82,6 +82,8 @@ export const launchStagedAmountDiagnostic = Object.assign(async (input: AmountIn
       ["resources/loginom/host/amount-private-launcher.mjs",join(product,"resources/loginom/host/amount-private-launcher.mjs"),cli.files],
       ["resources/loginom/host/amount-launcher-build-inputs.json",join(product,"resources/loginom/host/amount-launcher-build-inputs.json"),cli.files],
       ["bin/node",snapshot.node,manifest.files],
+      ["runtime/src/amount-file-bytes.mjs",join(snapshot.resources,"runtime/src/amount-file-bytes.mjs"),manifest.files],
+      ["runtime/src/amount-file-functions.json",join(snapshot.resources,"runtime/src/amount-file-functions.json"),manifest.files],
       ["runtime/src/acceptance/amount-import-type-v1.mjs",join(snapshot.resources,"runtime/src/acceptance/amount-import-type-v1.mjs"),manifest.files],
       ["runtime/src/acceptance/ui-scan-collector.mjs",join(snapshot.resources,"runtime/src/acceptance/ui-scan-collector.mjs"),manifest.files],
     ] as const) {
