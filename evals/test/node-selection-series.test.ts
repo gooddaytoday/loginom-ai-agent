@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -235,6 +235,146 @@ test.each(["package-cleanup.json", "saved-package-cleanup.json"])("copyout binds
     await chmod(auditFile, 0o400)
     expect(await assessV2()).toEqual({ decision: "advance", reason: null })
     expect(await Bun.file(auditFile).text()).toBe(auditBytes)
+    // Actual first-last-touch/2: partial package saved, four no-effect Export
+    // refusals, no CSV, original machine flags still false after normal release.
+    const failedAttempt = { ...attempt, exitCode: 2, resultPath: null, policyStatus: "incomplete",
+      calculationPassed: false, oraclePassed: false, collectionFailures: ["RESULT_RECEIPT_MISSING_OR_AMBIGUOUS"] }
+    const failedAudit = { ...audit, policyStatus: "incomplete", calculationPassed: false, oraclePassed: false,
+      runtimeSettled: false, identityVerified: false, graphComplete: false, exportIdentityVerified: false,
+      failures: ["RESULT_RECEIPT_UNVERIFIED", "RUNTIME_APPLY_MISMATCH", "TOOL_RECEIPT_INCOMPLETE", "CATALOG_UNVERIFIED", "GRAPH_IMPORT_EXPORT_REQUIRED"] }
+    await write(path.join(plan.directory, "attempt.json"), failedAttempt)
+    await chmod(auditFile, 0o600)
+    await write(auditFile, failedAudit)
+    await chmod(auditFile, 0o400)
+    const boundFile = async (file: string) => ({ path: file, sha256: createHash("sha256").update(await Bun.file(file).bytes()).digest("hex") })
+    const failureClosure = { ...closure, historyAnomaly: true, protectedFiles: { ...closure.protectedFiles,
+      "attempt.json": (await boundFile(path.join(plan.directory, "attempt.json"))).sha256 } }
+    await write(path.join(closed, "closure.json"), failureClosure)
+    await rm(reviewFile)
+    const failureReviewFile = path.join(plan.directory, "independent-failed-attempt-review.json")
+    const failureReview = { ...review, criteriaVersion: "node-selection-policy-v2",
+      criteriaSha256: "5b5053d14aecf7462e317b75fa3a14fa3bff6717080128edf0da582171a015fa",
+      phase: "candidate", taskID: plan.taskID, attempt: 1, policyVerdict: "passed", functionalResultPassed: false,
+      historyComplete: true, substantiveSelectionSufficient: true, jsApplyAttempts: 0, unjustifiedJsAttempts: 0,
+      publicOperationsSettled: true, catalogIdentityVerified: true,
+      notes: "Standard analytics executed; Export refused without effect. Failure accounting, not functional PASS.",
+      evidence: ["attempt.json", "selection-audit.json", "parts.json", "runtime-journals.json", "artifact/package.lgp"] }
+    await write(failureReviewFile, failureReview)
+    await chmod(failureReviewFile, 0o400)
+    const sidecarFile = path.join(plan.pins.resultsRoot, "policy-v2/candidate", plan.taskID, "1.json")
+    const sidecar = { version: 2, criteriaVersion: "node-selection-policy-v2",
+      criteria: { sha256: "5b5053d14aecf7462e317b75fa3a14fa3bff6717080128edf0da582171a015fa" },
+      phase: "candidate", taskID: plan.taskID, attempt: 1, sessionID: value.sessionID, reviewer: "independent",
+      packageSha256: review.packageSha256, failureReview: await boundFile(failureReviewFile),
+      policy: { verdict: "passed", reason: "Seven standard analytical nodes; four settled no-effect Export refusals, no JavaScript.",
+        historyComplete: true, substantiveSelectionSufficient: true, entireToolLedgerReviewed: true,
+        temporaryAndFailedJsAttemptsIncluded: true, jsApplyAttempts: 0, successfulJsCalls: 0, savedJsNodes: 0,
+        unjustifiedJsAttempts: 0, standardFailureUsedAsJsJustification: false, manualReview: await boundFile(failureReviewFile),
+        substantiveSelections: [{ type: "imports.text", toolState: "completed" },
+          { type: "transform.calculator", toolState: "completed" }, { type: "transform.group_data", toolState: "completed" }] },
+      analytics: { originalAudit: failedAudit },
+      trustedHistory: { parentID: null, childSessionIDs: [], allSessionAndMessageBindingsMatch: true, allEventsOwnSession: true },
+      runtime: { publicOperationsSettled: true, catalogIdentityVerified: true, originalRuntimeSettled: false, originalIdentityVerified: false },
+      evidence: await Promise.all(["attempt.json", "selection-audit.json", "parts.json", "runtime-journals.json", relative,
+        "independent-failed-attempt-review.json", "artifact/package.lgp"].map((file) => boundFile(path.join(plan.directory, file)))
+        .concat(boundFile(path.join(closed, "closure.json")))) }
+    await write(sidecarFile, sidecar)
+    await chmod(sidecarFile, 0o400)
+    expect(await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime"))
+      .toEqual({ decision: "halt", reason: "ATTEMPT_NOT_COMPLETE" })
+    const failedAuditBytes = await Bun.file(auditFile).text()
+    expect(await assessV2()).toMatchObject({ decision: "advance", reason: "POLICY_V2_FAILURE_RECORDED",
+      calculationPassed: false, oraclePassed: false, policyStatus: "incomplete", jsCalls: 0 })
+    expect(await Bun.file(auditFile).text()).toBe(failedAuditBytes)
+    const sealSidecar = async (change: Record<string, unknown> = {}) => {
+      await chmod(sidecarFile, 0o600)
+      await write(sidecarFile, { ...sidecar, evidence: await Promise.all(sidecar.evidence.map((item) => boundFile(item.path))), ...change })
+      await chmod(sidecarFile, 0o400)
+    }
+    await rm(sidecarFile)
+    expect((await assessV2()).reason).toBe("POLICY_V2_FAILURE_REVIEW_REQUIRED")
+    await write(sidecarFile, sidecar)
+    await chmod(sidecarFile, 0o400)
+    for (const change of [{ criteria: { sha256: "a".repeat(64) } }, { phase: "baseline" }, { taskID: "foreign" },
+      { attempt: 2 }, { sessionID: "foreign" }, { packageSha256: "b".repeat(64) }, { reviewer: "" },
+      ...[{ verdict: "failed" }, { historyComplete: false }, { substantiveSelectionSufficient: false }, { jsApplyAttempts: 1 },
+        { substantiveSelections: [{ type: "imports.text", toolState: "completed" }] }].map((change) => ({ policy: { ...sidecar.policy, ...change } })),
+      { trustedHistory: { ...sidecar.trustedHistory, childSessionIDs: ["foreign"] } },
+      { runtime: { ...sidecar.runtime, publicOperationsSettled: false } }, { runtime: { ...sidecar.runtime, catalogIdentityVerified: false } },
+      { evidence: sidecar.evidence.filter((item) => item.path !== path.join(closed, "closure.json")) },
+      { evidence: sidecar.evidence.map((item) => ({ ...item, sha256: "a".repeat(64) })) }]) {
+      await sealSidecar(change)
+      expect((await assessV2()).decision).not.toBe("advance")
+    }
+    await sealSidecar()
+    await chmod(sidecarFile, 0o600)
+    expect((await assessV2()).decision).toBe("halt")
+    await chmod(sidecarFile, 0o400)
+    const sealedSidecar = await Bun.file(sidecarFile).text()
+    await Bun.write(path.join(root, "foreign-sidecar.json"), sealedSidecar)
+    await chmod(path.join(root, "foreign-sidecar.json"), 0o400)
+    await rm(sidecarFile)
+    await symlink(path.join(root, "foreign-sidecar.json"), sidecarFile)
+    expect((await assessV2()).decision).toBe("halt")
+    await rm(sidecarFile)
+    await Bun.write(sidecarFile, sealedSidecar)
+    await chmod(sidecarFile, 0o400)
+    const failureReviewBytes = await Bun.file(failureReviewFile).text()
+    for (const change of [{ verdict: "failed" }, { sessionID: "foreign" }, { packageSha256: "b".repeat(64) }, { evidence: [] },
+      { criteriaSha256: "a".repeat(64) }, { taskID: "foreign" }, { attempt: 2 }, { functionalResultPassed: true },
+      { publicOperationsSettled: false }, { catalogIdentityVerified: false }, { jsApplyAttempts: 1 }]) {
+      await chmod(failureReviewFile, 0o600)
+      await write(failureReviewFile, { ...failureReview, ...change })
+      await chmod(failureReviewFile, 0o400)
+      const changedReview = await boundFile(failureReviewFile)
+      await sealSidecar({ failureReview: changedReview, policy: { ...sidecar.policy, manualReview: changedReview } })
+      expect((await assessV2()).decision).toBe("halt")
+    }
+    await chmod(failureReviewFile, 0o600)
+    await Bun.write(failureReviewFile, failureReviewBytes)
+    await chmod(failureReviewFile, 0o400)
+    for (const change of [{ jsCalls: 1 }, { jsNodes: 1 }, { historyComplete: false }, { policyStatus: "failed" }, { failures: ["UNKNOWN_FAILURE"] }]) {
+      await chmod(auditFile, 0o600)
+      await write(auditFile, { ...failedAudit, ...change })
+      await chmod(auditFile, 0o400)
+      await sealSidecar()
+      expect((await assessV2()).decision).toBe("halt")
+    }
+    await chmod(auditFile, 0o600)
+    await Bun.write(auditFile, failedAuditBytes)
+    await chmod(auditFile, 0o400)
+    const copiedBytes = await Promise.all(Object.keys(failureClosure.copied).map(async (name) => ({ name, text: await Bun.file(path.join(closed, name)).text() })))
+    for (const change of [{ name: cleanupFile, patch: { package_closed: false } }, { name: cleanupFile, patch: { logged_out: false } },
+      { name: cleanupFile, patch: { unsaved_changes_discarded: true } }, { name: cleanupFile, patch: { account: "foreign" } },
+      { name: "host-close.json", patch: { closed_ack: false } }, { name: "host-close.json", patch: { exit_code: 1 } }]) {
+      const before = await Bun.file(path.join(closed, change.name)).text()
+      const receipt: Record<string, unknown> = JSON.parse(before)
+      await write(path.join(closed, change.name), { ...receipt, ...change.patch })
+      await write(path.join(closed, "closure.json"), { ...failureClosure,
+        copied: { ...failureClosure.copied, [change.name]: (await boundFile(path.join(closed, change.name))).sha256 } })
+      await sealSidecar()
+      expect((await assessV2()).decision).toBe("halt")
+      await Bun.write(path.join(closed, change.name), before)
+    }
+    for (const name of ["resource-close.jsonl", "terminal-close.jsonl"]) {
+      await Bun.write(path.join(closed, name), "")
+      await write(path.join(closed, "closure.json"), { ...failureClosure,
+        copied: { ...failureClosure.copied, [name]: (await boundFile(path.join(closed, name))).sha256 } })
+      await sealSidecar()
+      expect((await assessV2()).decision).toBe("halt")
+      await Bun.write(path.join(closed, name), copiedBytes.find((item) => item.name === name)!.text)
+    }
+    await write(path.join(closed, "closure.json"), { ...failureClosure, cliPid: process.pid })
+    await sealSidecar()
+    expect((await assessV2()).reason).toBe("OWN_PROCESS_NOT_GONE")
+    await write(path.join(closed, "closure.json"), failureClosure)
+    await sealSidecar()
+    await mkdir(path.join(plan.pins.profile, ".writer"))
+    expect((await assessV2()).reason).toBe("PROFILE_WRITER_PRESENT_OR_UNKNOWN")
+    await rm(path.join(plan.pins.profile, ".writer"), { recursive: true })
+    expect((await assessV2()).reason).toBe("POLICY_V2_FAILURE_RECORDED")
+    expect(await Bun.file(auditFile).text()).toBe(failedAuditBytes)
+    expect(await Bun.file(path.join(plan.directory, "attempt.json")).json()).toEqual(failedAttempt)
     await Bun.write(path.join(plan.directory, "parts.json"), "changed history")
     expect((await runSeriesSlot(path.join(root, "pins.json"), plan.taskID, 1, "audit", "runtime")).reason).toBe("ATTEMPT_CHANGED")
   } finally { await rm(root, { recursive: true, force: true }) }

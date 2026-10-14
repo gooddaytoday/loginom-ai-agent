@@ -315,6 +315,19 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
   const audit: unknown = await Bun.file(path.join(plan.directory, "selection-audit.json")).json()
   if (!record(audit) || audit.packageSha256 !== await hash(path.join(plan.directory, "artifact/package.lgp"))
     || audit.oracleSha256 !== plan.task.oracleSha256) return { decision: "halt", reason: "AUDIT_ARTIFACT_BINDING_CHANGED" }
+  const deadPids = []
+  for (const pid of [closure.cliPid, record(host) ? host.pid : undefined]) {
+    if (typeof pid === "number" && Number.isSafeInteger(pid) && pid > 0 && !await exists(`/proc/${pid}`)) deadPids.push(pid)
+  }
+  const cleanup = await selectionPackageCleanup(directory)
+  if (!digest(closure.copied[cleanup.name])) return { decision: "halt", reason: "CLOSE_COPY_CHANGED" }
+  const input = { ...closure, attempt: await Bun.file(path.join(plan.directory, "attempt.json")).json() as unknown, audit,
+    packageCleanup: cleanup.cleanup,
+    resourceClose: await jsonLines(path.join(directory, "resource-close.jsonl")), terminalClose: await jsonLines(path.join(directory, "terminal-close.jsonl")),
+    hostClose: [host], deadPids, writerAbsent: !await exists(path.join(plan.pins.profile, ".writer")) }
+  if (acceptance?.criteriaVersion === "node-selection-policy-v2" && digest(acceptance.criteriaSha256)
+    && plan.pins.phase === "candidate" && plan.task.mode === "standard" && audit.calculationPassed === false && audit.oraclePassed === false)
+    return assessNormalReleaseFailure(plan, directory, input, acceptance)
   const reviewFile = path.join(plan.directory, "graph-review.json")
   const review: unknown = await exists(reviewFile) ? await Bun.file(reviewFile).json() : null
   const reviewed = inspectSelectionReview({ review, mode: plan.task.mode, sessionID: closure.sessionID, packageSha256: audit.packageSha256 })
@@ -329,19 +342,85 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
     if (!nonempty(file)) return { decision: "review", reason: "REVIEW_EVIDENCE_MISSING" }
     await ownFile(plan.directory, file)
   }
-  const deadPids = []
-  for (const pid of [closure.cliPid, record(host) ? host.pid : undefined]) {
-    if (typeof pid === "number" && Number.isSafeInteger(pid) && pid > 0 && !await exists(`/proc/${pid}`)) deadPids.push(pid)
-  }
-  const cleanup = await selectionPackageCleanup(directory)
-  if (!digest(closure.copied[cleanup.name])) return { decision: "halt", reason: "CLOSE_COPY_CHANGED" }
-  return inspectSeriesTransition({ ...closure,
-    attempt: await Bun.file(path.join(plan.directory, "attempt.json")).json(),
-    audit: effectiveAudit,
-    packageCleanup: cleanup.cleanup,
-    resourceClose: await jsonLines(path.join(directory, "resource-close.jsonl")), terminalClose: await jsonLines(path.join(directory, "terminal-close.jsonl")),
-    hostClose: [host], deadPids, writerAbsent: !await exists(path.join(plan.pins.profile, ".writer")),
-  })
+  return inspectSeriesTransition({ ...input, audit: effectiveAudit })
+}
+
+async function assessNormalReleaseFailure(plan: ReturnType<typeof selectionAttempt>, directory: string,
+  input: Record<string, unknown>, acceptance: SeriesAcceptance) {
+  const stop = (reason: string) => ({ decision: "halt" as const, reason })
+  if (!record(input.attempt) || !record(input.audit)) return stop("SERIES_EVIDENCE_INCOMPLETE")
+  const attempt = input.attempt, audit = input.audit
+  const invalidAttempt = inspectClosedAttempt(input, attempt)
+  if (invalidAttempt) return invalidAttempt
+  if (input.phase !== "candidate" || input.mode !== "standard" || input.taskID !== plan.taskID
+    || attempt.exitCode !== 2 || attempt.resultPath !== null || !Array.isArray(attempt.collectionFailures)
+    || attempt.collectionFailures.length !== 1 || attempt.collectionFailures[0] !== "RESULT_RECEIPT_MISSING_OR_AMBIGUOUS"
+    || audit.auditStage !== "complete" || audit.auditVersion !== input.auditVersion || audit.taskID !== input.taskID
+    || audit.mode !== "standard" || audit.policyStatus !== "incomplete" || audit.reviewStatus !== "not-required" || audit.historyComplete !== true
+    || !["jsNodes", "jsCalls", "successfulJsCalls"].every((key) => audit[key] === 0)
+    || !Array.isArray(audit.failures) || !audit.failures.length || !audit.failures.every((reason) =>
+      ["RESULT_RECEIPT_UNVERIFIED", "RUNTIME_APPLY_MISMATCH", "TOOL_RECEIPT_INCOMPLETE", "CATALOG_UNVERIFIED", "GRAPH_IMPORT_EXPORT_REQUIRED"].includes(String(reason))))
+    return stop("POLICY_V2_FAILURE_NOT_ELIGIBLE")
+  const invalidRelease = inspectSeriesRelease(input, attempt)
+  if (invalidRelease) return invalidRelease
+  const sidecarPath = `policy-v2/${plan.pins.phase}/${plan.taskID}/${plan.number}.json`
+  if (!await exists(path.join(plan.pins.resultsRoot, sidecarPath))) return { decision: "review" as const, reason: "POLICY_V2_FAILURE_REVIEW_REQUIRED" }
+  try {
+    const sidecarFile = await ownFile(plan.pins.resultsRoot, sidecarPath)
+    const sidecar: unknown = await Bun.file(sidecarFile).json()
+    if ((await lstat(sidecarFile)).mode & 0o222 || !record(sidecar) || sidecar.version !== 2
+      || sidecar.criteriaVersion !== acceptance.criteriaVersion || !record(sidecar.criteria) || sidecar.criteria.sha256 !== acceptance.criteriaSha256
+      || sidecar.phase !== plan.pins.phase || sidecar.taskID !== plan.taskID || sidecar.attempt !== plan.number
+      || sidecar.sessionID !== input.sessionID || sidecar.packageSha256 !== audit.packageSha256 || !nonempty(sidecar.reviewer)
+      || !record(sidecar.policy) || !record(sidecar.runtime) || !record(sidecar.trustedHistory) || !record(sidecar.analytics)
+      || !record(sidecar.analytics.originalAudit) || sidecar.analytics.originalAudit.packageSha256 !== audit.packageSha256)
+      return stop("POLICY_V2_FAILURE_REVIEW_INVALID")
+    const policy = sidecar.policy, history = sidecar.trustedHistory
+    if (policy.verdict !== "passed" || !nonempty(policy.reason) || policy.historyComplete !== true || policy.substantiveSelectionSufficient !== true
+      || policy.entireToolLedgerReviewed !== true || policy.temporaryAndFailedJsAttemptsIncluded !== true
+      || !["jsApplyAttempts", "successfulJsCalls", "savedJsNodes", "unjustifiedJsAttempts"].every((key) => policy[key] === 0)
+      || policy.standardFailureUsedAsJsJustification !== false || !Array.isArray(policy.substantiveSelections)
+      || !policy.substantiveSelections.some((item) => record(item) && nonempty(item.type) && item.type.startsWith("transform.") && item.toolState === "completed")
+      || history.parentID !== null || !empty(history.childSessionIDs) || history.allSessionAndMessageBindingsMatch !== true || history.allEventsOwnSession !== true
+      || sidecar.runtime.publicOperationsSettled !== true || sidecar.runtime.catalogIdentityVerified !== true)
+      return stop("POLICY_V2_FAILURE_REVIEW_INSUFFICIENT")
+    const reviewFile = await ownFile(plan.directory, "independent-failed-attempt-review.json")
+    if ((await lstat(reviewFile)).mode & 0o222 || !record(sidecar.failureReview) || !record(policy.manualReview)
+      || sidecar.failureReview.path !== reviewFile || !digest(sidecar.failureReview.sha256)
+      || policy.manualReview.path !== reviewFile || policy.manualReview.sha256 !== sidecar.failureReview.sha256
+      || await hash(reviewFile) !== sidecar.failureReview.sha256) return stop("POLICY_V2_FAILURE_REVIEW_UNBOUND")
+    const review: unknown = await Bun.file(reviewFile).json()
+    if (inspectSelectionReview({ review, mode: plan.task.mode, sessionID: input.sessionID, packageSha256: audit.packageSha256 }).reviewStatus !== "passed"
+      || !record(review) || !Array.isArray(review.evidence) || !review.evidence.length
+      || review.criteriaVersion !== acceptance.criteriaVersion || review.criteriaSha256 !== acceptance.criteriaSha256
+      || review.phase !== plan.pins.phase || review.taskID !== plan.taskID || review.attempt !== plan.number
+      || review.policyVerdict !== "passed" || review.functionalResultPassed !== false || review.historyComplete !== true
+      || review.substantiveSelectionSufficient !== true || review.jsApplyAttempts !== 0 || review.unjustifiedJsAttempts !== 0
+      || review.publicOperationsSettled !== true || review.catalogIdentityVerified !== true) return stop("POLICY_V2_FAILURE_REVIEW_INVALID")
+    const manifest: unknown = await Bun.file(path.join(plan.directory, "runtime-journals.json")).json()
+    if (!Array.isArray(manifest) || !manifest.length || !Array.isArray(sidecar.evidence)) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
+    const expected = new Map<string, string>()
+    for (const item of sidecar.evidence) {
+      if (!record(item) || !nonempty(item.path) || !digest(item.sha256) || expected.has(item.path)) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
+      const file = await ownFile(plan.pins.resultsRoot, path.relative(plan.pins.resultsRoot, item.path))
+      if (file !== item.path || await hash(file) !== item.sha256) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
+      expected.set(file, item.sha256)
+    }
+    const required = ["attempt.json", "selection-audit.json", "parts.json", "runtime-journals.json", "artifact/package.lgp", "independent-failed-attempt-review.json"]
+    for (const item of manifest) {
+      if (!record(item) || !nonempty(item.path) || !digest(item.sha256)
+        || expected.get(await ownFile(plan.directory, item.path)) !== item.sha256) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
+      required.push(item.path)
+    }
+    for (const relative of [...required, ...review.evidence]) {
+      if (!nonempty(relative) || !expected.has(await ownFile(plan.directory, relative))) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
+    }
+    if (!expected.has(await ownFile(directory, "closure.json"))) return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID")
+    return { decision: "advance" as const, reason: "POLICY_V2_FAILURE_RECORDED", outcome: "failed" as const,
+      policyStatus: audit.policyStatus, policyVerdict: policy.verdict, calculationPassed: audit.calculationPassed,
+      oraclePassed: audit.oraclePassed, jsCalls: audit.jsCalls, jsNodes: audit.jsNodes,
+      sidecarSha256: await hash(sidecarFile), failureReviewSha256: sidecar.failureReview.sha256 }
+  } catch { return stop("POLICY_V2_FAILURE_EVIDENCE_INVALID") }
 }
 
 async function ownFile(root: string, relative: string) {
@@ -398,14 +477,9 @@ export function inspectSeriesTransition(input: unknown): { decision: "advance" |
   if (!record(input) || !record(input.attempt) || !record(input.audit)) return stop("SERIES_EVIDENCE_INCOMPLETE")
   const attempt = input.attempt
   const audit = input.audit
-  if (!['candidate', 'baseline'].includes(String(input.phase)) || attempt.sessionID !== input.sessionID
-    || !["sessionID", "resourceSessionID", "documentID", "account", "packagePath", "saveOperationID", "auditVersion"].every((key) => nonempty(input[key]))
-    || attempt.taskID !== input.taskID || attempt.mode !== input.mode || attempt.packagePath !== input.packagePath
-    || attempt.modelStarted !== true || attempt.cliExitCode !== 0 || attempt.cleanupConfirmed !== true
-    || attempt.blocker !== null || attempt.timedOut !== false || attempt.interruptSentAt !== null
-    || !nonempty(attempt.resultPath) || !empty(attempt.collectionFailures)
-    || !orderedTimes(attempt.startedAt, attempt.cliStartedAt, attempt.cliFinishedAt, attempt.finishedAt))
-    return stop("ATTEMPT_NOT_COMPLETE")
+  const invalidAttempt = inspectClosedAttempt(input, attempt)
+  if (invalidAttempt) return invalidAttempt
+  if (!nonempty(attempt.resultPath) || !empty(attempt.collectionFailures)) return stop("ATTEMPT_NOT_COMPLETE")
   if (audit.auditStage !== "complete" || audit.auditVersion !== input.auditVersion || audit.taskID !== input.taskID || audit.mode !== input.mode
     || !["oraclePassed", "calculationPassed", "historyComplete", "runtimeSettled", "identityVerified", "graphComplete", "exportIdentityVerified"]
       .every((key) => audit[key] === true) || !digest(audit.packageSha256)
@@ -419,6 +493,30 @@ export function inspectSeriesTransition(input: unknown): { decision: "advance" |
     || typeof attempt.exitCode !== "number"
     || ![0, ...(baselineJavascript ? [1] : []), ...(input.mode !== "standard" ? [2] : [])].includes(attempt.exitCode)) return stop("POLICY_OR_WRAPPER_FAILED")
   if (input.mode === "standard" && !baselineJavascript && (audit.jsNodes !== 0 || audit.jsCalls !== 0)) return stop("JAVASCRIPT_NOT_ALLOWED")
+  const invalidRelease = inspectSeriesRelease(input, attempt)
+  if (invalidRelease) return invalidRelease
+  if (audit.reviewStatus === "failed") return stop("SEMANTIC_REVIEW_FAILED")
+  if (!["standard", "explicit-js", "capability-gap", "standard-recovery"].includes(String(input.mode))) return stop("MODE_UNKNOWN")
+  if ((input.mode !== "standard" || input.phase === "candidate" && input.historyAnomaly === true) && audit.reviewStatus !== "passed"
+    || !["passed", "not-required"].includes(String(audit.reviewStatus)))
+    return { decision: "review", reason: "MANUAL_REVIEW_REQUIRED" }
+  return { decision: "advance", reason: null }
+}
+
+function inspectClosedAttempt(input: Record<string, unknown>, attempt: Record<string, unknown>) {
+  const stop = (reason: string) => ({ decision: "halt" as const, reason })
+  if (!['candidate', 'baseline'].includes(String(input.phase)) || attempt.sessionID !== input.sessionID
+    || !["sessionID", "resourceSessionID", "documentID", "account", "packagePath", "saveOperationID", "auditVersion"].every((key) => nonempty(input[key]))
+    || attempt.taskID !== input.taskID || attempt.mode !== input.mode || attempt.packagePath !== input.packagePath
+    || attempt.modelStarted !== true || attempt.cliExitCode !== 0 || attempt.cleanupConfirmed !== true
+    || attempt.blocker !== null || attempt.timedOut !== false || attempt.interruptSentAt !== null
+    || !orderedTimes(attempt.startedAt, attempt.cliStartedAt, attempt.cliFinishedAt, attempt.finishedAt))
+    return stop("ATTEMPT_NOT_COMPLETE")
+  return null
+}
+
+function inspectSeriesRelease(input: Record<string, unknown>, attempt: Record<string, unknown>) {
+  const stop = (reason: string) => ({ decision: "halt" as const, reason })
   const cleanup = input.packageCleanup
   if (!record(cleanup) || cleanup.version !== 1 || cleanup.status !== "SUCCEEDED" || cleanup.reason !== null
     || cleanup.session_id !== input.resourceSessionID || cleanup.document_id !== input.documentID || cleanup.account !== input.account
@@ -446,12 +544,7 @@ export function inspectSeriesTransition(input: unknown): { decision: "advance" |
   if (!Number.isSafeInteger(input.cliPid) || Number(input.cliPid) <= 0 || input.cliPid === host.pid
     || !Array.isArray(deadPids) || ![input.cliPid, host.pid].every((pid) => deadPids.includes(pid))) return stop("OWN_PROCESS_NOT_GONE")
   if (input.writerAbsent !== true) return stop("PROFILE_WRITER_PRESENT_OR_UNKNOWN")
-  if (audit.reviewStatus === "failed") return stop("SEMANTIC_REVIEW_FAILED")
-  if (!["standard", "explicit-js", "capability-gap", "standard-recovery"].includes(String(input.mode))) return stop("MODE_UNKNOWN")
-  if ((input.mode !== "standard" || input.phase === "candidate" && input.historyAnomaly === true) && audit.reviewStatus !== "passed"
-    || !["passed", "not-required"].includes(String(audit.reviewStatus)))
-    return { decision: "review", reason: "MANUAL_REVIEW_REQUIRED" }
-  return { decision: "advance", reason: null }
+  return null
 }
 
 function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value) }
