@@ -65,3 +65,10 @@ guard этой проверкой не подтверждены.
 Combined after principal identity guard: 58 PASS/212 assertions (52.63s),
 typecheck/diff PASS. Private evidence native-user-a2cd4df6-1049-49bd-a6a8-f199251d1f22;
 supervisor confirmed/capture true/final00, own disposable pair destroyed.
+
+AllowPublish добавлен к configure policy по штатному getter/setter pinned
+Studio (UserForm.js:95). На native disposable account read-back false, repeat
+проверяет тот же account и не ротирует password/AuthMode. RED: отсутствовал
+allowPublish в observed user; GREEN:60 admin/native/codec/preflight PASS/229
+assertions (60.90s), typecheck/diff PASS. Activation и effective access этим
+не подтверждены.
