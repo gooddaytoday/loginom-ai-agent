@@ -3,7 +3,7 @@ import {captureControlledAmount,captureAmount} from '../../src/acceptance/amount
 import {assertCaptureOwner,capturePublication,assertCapturePublication,freezeCaptureResult} from '../../src/retained-capture.mjs';
 import {captureImportPreconfig,validateCaptureResult} from '../../src/acceptance/import-preconfig-adapter-v1.mjs';
 import {captureData} from '../../src/retained-capture.mjs';
-import {open as captureOpen,writeFile as captureWrite,fsync as captureSync,close as captureClose} from 'node:fs';
+import {open as captureOpen,writeFile as captureWrite,fsync as captureSync,close as captureClose,rename as captureRename,fstat as captureFstat,constants as captureConstants} from 'node:fs';
 import {originalPrepareLenderForSession} from '../../src/original-prepare-lender.mjs';
 import {qualifyPreReadyRead} from "../../src/qualified-pre-ready.mjs";
 import {makeFieldParametersNativeContextCode} from '../../src/acceptance/field-parameters-native-context.mjs';
@@ -144,6 +144,8 @@ function shutdownRejection(value) {
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture, authenticatedReadiness } = {}) {
+  const capturePersistenceOrigin=Object.freeze({directory:session.directory,metadata:session.metadata,sessionId:session.metadata.sessionId});
+  const capturePersistenceMetadata=capturePersistenceOrigin.metadata;
   const importAdmission=acceptanceCapture ? Object.freeze({binding:acceptanceCapture.binding,registration:acceptanceCapture.registration,
     retained:acceptanceCapture.retained,harness:acceptanceCapture.harness,amountControl:acceptanceCapture.amountControl}) : undefined;
   if(acceptanceCapture?.binding?.harness==='field-parameters-preservation-v1'&&config.mode!=='executor-replay')throw Error('LOGINOM_FP_EXECUTOR_REQUIRED');
@@ -198,6 +200,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const cleanupPersistenceFailures=[];
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection, captureEvidence;
   const captureWriters=new Set(),capturePersistenceFailures=[];
+  const capturePublications=new Map(),capturePreparedRecords=new Map();
   let capturePersistencePrimary,captureEvidenceBinding,captureReceiptWritten=false,captureJournalWritten=false;
   let fpDraftRetained=false;
   let closing, shutdownStarted = false, shutdownStage;
@@ -581,12 +584,16 @@ export async function createBridge(config, session, { browserTransport: managedB
     function rememberCapturePersistence(value,phase) {
         capturePersistencePrimary??={phase,value};
         capturePersistenceFailures.push({phase,rejection:shutdownRejection(value)});
-        const metadata=captureEvidenceBinding?.metadata??session.metadata;
+        const metadata=captureEvidenceBinding?.metadata??capturePersistenceMetadata;
         metadata.capturePersistencePrimary??={phase:capturePersistencePrimary.phase,
           rejection:shutdownRejection(capturePersistencePrimary.value)};
         metadata.capturePersistenceFailures=capturePersistenceFailures;
     }
     async function drainCaptureWriters() {
+      if([...capturePublications.values()].some(p=>p.pending || p.renamed && !p.succeeded)){
+        rememberCapturePersistence(Error('LOGINOM_CAPTURE_RENAME_UNKNOWN'),'rename');
+        throw capturePersistencePrimary.value;
+      }
       for(const file of captureWriters){
         if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
           try{await closeCaptureWriter(file)}catch(value){file.closeFailure??={value};rememberCapturePersistence(value,'retained_close')}
@@ -599,56 +606,147 @@ export async function createBridge(config, session, { browserTransport: managedB
       }
     }
     async function writeCaptureEvidence(name,bytes) {
-      await drainCaptureWriters();
-      const persist=async(path,write)=>{
+      assertCaptureEvidenceBinding();captureIOAssert?.();
+      const original=captureEvidenceBinding??Object.freeze({directory:session.directory,
+        metadata:capturePersistenceMetadata,sessionId:capturePersistenceMetadata.sessionId});
+      const current=()=>{
+        assertCaptureEvidenceBinding();captureIOAssert?.();
+        if(session.directory!==original.directory || session.metadata!==original.metadata
+            || session.metadata.sessionId!==original.sessionId)
+          throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+      };
+      current();
+      let publication=capturePublications.get(name);
+      if(publication && (publication.bytes!==bytes || publication.directory!==original.directory
+          || publication.metadata!==original.metadata || publication.sessionId!==original.sessionId))
+        throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
+      await drainCaptureWriters();current();
+      if(!publication){
+        publication={pending:false,prepared:false,succeeded:false,renamed:false,bytes,
+          directory:original.directory,metadata:original.metadata,sessionId:original.sessionId,
+          temporary:join(original.directory,'.'+name+'-'+randomUUID()+'.tmp')};
+        capturePublications.set(name,publication);capturePreparedRecords.set(name,publication);
+      }
+      if(capturePreparedRecords.get(name)!==publication)throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
+      const pathIdentity=async(path,identity,directory=false)=>{
+        current();const stat=await lstat(path);current();
+        if(stat.isSymbolicLink() || (directory?!stat.isDirectory():!stat.isFile())
+            || identity && (stat.dev!==identity.dev || stat.ino!==identity.ino || stat.uid!==identity.uid
+              || !directory && (stat.size!==identity.size || stat.nlink!==1 || (stat.mode&0o777)!==0o600)))
+          throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
+        return Object.freeze({dev:stat.dev,ino:stat.ino,size:stat.size,uid:stat.uid});
+      };
+      publication.directoryIdentity??=await pathIdentity(publication.directory,undefined,true);
+      const assertDestinationSlot=async()=>{
+        current();let existing;
+        try{existing=await lstat(join(publication.directory,name))}
+        catch(value){if(value?.code!=='ENOENT')throw value}
+        current();
+        // An unowned existing receipt is never replaced. A directory can only
+        // produce the kernel's file-to-directory refusal, without replacement.
+        if(existing && !existing.isDirectory())throw Error('LOGINOM_CAPTURE_PUBLICATION_EXISTS');
+      };
+      if(!publication.file)await assertDestinationSlot();
+      const persist=async(path,mode,write)=>{
         const file={fd:undefined,closeComplete:false};captureWriters.add(file);
+        if(write)publication.file=file;
         let phase=write?'file_open':'directory_open',primary;
         const failed=value=>{primary??={phase,value};rememberCapturePersistence(value,phase)};
         const callback=invoke=>{
-          assertCaptureEvidenceBinding();
-          captureIOAssert?.();
-          const operation={pending:true,phase};file.io=operation;let projection;
+          current();const operation={pending:true,phase};file.io=operation;let projection,callbackSettled=false;
           const completion=new Promise((resolve,reject)=>{
             try{projection=invoke((error,result)=>{
-              operation.pending=false;
-              if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve(result);
-            })}catch(value){reject(value)}
+              callbackSettled=true;
+              if(error!==null&&error!==undefined)reject(error);else resolve(result);
+            })}catch(value){if(callbackSettled)projection=Promise.reject(value);else reject(value)}
           });
-          return Promise.all([completion,projection]).then(([result])=>result);
+          const observe=promise=>Promise.resolve(promise).catch(value=>{
+            if(operation.primary)operation.secondary??={value};else operation.primary={value};
+            throw value;
+          });
+          const owned=[observe(completion),observe(projection)];
+          operation.settlement=Promise.allSettled(owned).then(results=>{
+            if(callbackSettled){operation.pending=false;operation.succeeded=results.every(r=>r.status==='fulfilled')}
+          });
+          return Promise.all(owned).then(async([result])=>{await operation.settlement;current();return result},value=>{throw operation.primary.value});
         };
         try{
-          await callback(done=>captureOpen(path,write?'w':'r',0o600,(error,fd)=>{
-            file.openComplete=true;
-            if(error===null||error===undefined)file.fd=fd;else captureWriters.delete(file);
-            done(error,fd);
+          await callback(done=>captureOpen(path,mode,0o600,(error,fd)=>{
+            file.openComplete=true;if(error===null||error===undefined)file.fd=fd;done(error,fd);
           }));
           if(write){phase='file_write';await callback(done=>captureWrite(file.fd,bytes,done))}
+          else{
+            phase='directory_identity';const stat=await callback(done=>captureFstat(file.fd,done));
+            if(!stat.isDirectory() || stat.dev!==publication.directoryIdentity.dev
+                || stat.ino!==publication.directoryIdentity.ino || stat.uid!==publication.directoryIdentity.uid)
+              throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
+          }
           phase=write?'file_sync':'directory_sync';await callback(done=>captureSync(file.fd,done));
-        }catch(value){
-          // No operation object means the guard refused before invoking open.
-          // A dispatched callback/projection remains retained, even without an FD.
-          if(!file.io)captureWriters.delete(file);
-          failed(value);
-        }
+          if(write){
+            phase='file_identity';const stat=await callback(done=>captureFstat(file.fd,done));
+            if(!stat.isFile() || stat.nlink!==1 || (stat.mode&0o777)!==0o600 || stat.size!==Buffer.byteLength(bytes))
+              throw Error('LOGINOM_CAPTURE_PUBLICATION_BINDING_CHANGED');
+            publication.identity=Object.freeze({dev:stat.dev,ino:stat.ino,size:stat.size,uid:stat.uid});
+          }
+        }catch(value){if(!file.io)captureWriters.delete(file);failed(value)}
         if(file.fd!==undefined){
           phase=write?'file_close':'directory_close';
           try{await closeCaptureWriter(file);captureWriters.delete(file)}
           catch(value){file.closeFailure??={value};failed(value)}
-        }
+        }else if(file.openComplete && file.io?.pending===false){captureWriters.delete(file)}
         if(primary)throw primary.value;
         if(!file.closeComplete)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
       };
-      await persist(join(session.directory,name),true);
-      await persist(session.directory,false);
-      if(captureWriters.size)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
+      if(!publication.prepared){
+        if(publication.file)throw capturePersistencePrimary?capturePersistencePrimary.value:Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
+        await persist(publication.temporary,captureConstants.O_WRONLY|captureConstants.O_CREAT|captureConstants.O_EXCL|captureConstants.O_NOFOLLOW,true);
+        publication.prepared=true;
+      }
+      current();await pathIdentity(publication.directory,publication.directoryIdentity,true);
+      if(!publication.succeeded){
+        if(publication.pending || publication.renamed){rememberCapturePersistence(Error('LOGINOM_CAPTURE_RENAME_UNKNOWN'),'rename');throw capturePersistencePrimary.value}
+        await pathIdentity(publication.temporary,publication.identity);
+        await assertDestinationSlot();
+        current();publication.pending=true;let projection,callbackSettled=false;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=captureRename(publication.temporary,join(publication.directory,name),error=>{
+            callbackSettled=true;
+            if(error===null||error===undefined){publication.renamed=true;resolve()}
+            else reject(error);
+          })}catch(value){if(callbackSettled)projection=Promise.reject(value);else reject(value)}
+        });
+        const observe=promise=>Promise.resolve(promise).catch(value=>{
+          if(publication.primary)publication.secondary??={value};else publication.primary={value};
+          rememberCapturePersistence(value,'rename');throw value;
+        });
+        const owned=[observe(completion),observe(projection)];
+        publication.settlement=Promise.allSettled(owned).then(results=>{
+          if(callbackSettled){
+            publication.pending=false;
+            publication.succeeded=results.every(result=>result.status==='fulfilled');
+          }
+        });
+        try{await Promise.all(owned)}catch(value){throw capturePersistencePrimary.value}
+        await publication.settlement;
+        if(!publication.succeeded)throw Error('LOGINOM_CAPTURE_RENAME_UNKNOWN');
+      }
+      current();await pathIdentity(join(publication.directory,name),publication.identity);
+      await pathIdentity(publication.directory,publication.directoryIdentity,true);
+      await persist(publication.directory,captureConstants.O_RDONLY|captureConstants.O_DIRECTORY|captureConstants.O_NOFOLLOW,false);
+      current();await pathIdentity(publication.directory,publication.directoryIdentity,true);
+      if(captureWriters.size || publication.pending)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
     }
     function assertCaptureEvidenceBinding() {
+      if(capturePersistenceOrigin.directory!==session.directory || capturePersistenceOrigin.metadata!==session.metadata
+          || capturePersistenceOrigin.sessionId!==session.metadata.sessionId)
+        throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
       if(captureEvidenceBinding && (captureEvidenceBinding.directory!==session.directory
           || captureEvidenceBinding.metadata!==session.metadata
           || captureEvidenceBinding.sessionId!==session.metadata.sessionId))
         throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
     }
     async function persistCapture() {
+      assertCaptureEvidenceBinding();
       const bytes=JSON.stringify(captureEvidence,null,2)+'\n';
       captureEvidenceBinding??=Object.freeze({evidence:captureEvidence,bytes,
         directory:session.directory,metadata:session.metadata,sessionId:session.metadata.sessionId});
@@ -825,7 +923,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           if (!registration) await writeCaptureEvidence('acceptance-capture-failure.json',JSON.stringify({binding,failed:true,
             rejection:shutdownRejection(error),effect_unknown:captureUnknown,
             checked_receipt_available:!!captureEvidence},null,2)+'\n');
-        }catch(persistence){session.metadata.capturePersistenceFailure=shutdownRejection(persistence)}
+        }catch(persistence){(captureEvidenceBinding?.metadata??capturePersistenceMetadata).capturePersistenceFailure=shutdownRejection(persistence)}
         throw error
       }
       finally { captureInFlight=undefined; if(!registration)captureIOAssert=undefined }
