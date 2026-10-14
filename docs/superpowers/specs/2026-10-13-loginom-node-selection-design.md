@@ -31,6 +31,7 @@ rebuild runtime не нужен.
 - [x] Сохранить исходный audit при обязательном ревью аномального стандартного успеха: отдельные review/verdict, минимальный runner R3 по TDD, независимый review и проспективный strict-release допуск.
 - [x] Добавить узкий policy-only допуск стандартного отказа с штатным release, сохранив исходные результаты: TDD, независимое ревью и execution-r4 до следующей модели.
 - [x] Расширить v2 memory review на успешные JS-исключения, сохранив исходный pending audit: TDD, обязательная роль JS, независимое ревью и execution-r5 до следующей модели.
+- [x] Адресно освободить собственную Loginom-сессию и профиль после tags/2, сохранив originalFAIL и подтверждённое нарушение, без допуска старого candidate.
 - [ ] Исправить подтверждённое нарушение scope JS вtags/2 и заморозить проверку нового candidate; прежняя серия остановлена и не переименовывается в успешную.
 - [ ] Закончить неизменную матрицу31 и оценить все25candidate поv2 (17закрыты/1violation; текущая серия остановлена,8не начаты; новая версия требует отдельного протокола).
 - [ ] Завершить обязательные reviews всех исключений/отказов/аномалий и трёх seeded standard successes.
@@ -41,14 +42,20 @@ Criteria v2 `5b5053d1…`, lock `2c36d0cd…`, user authorization `aeff1714…`
 блокирующих расхождений. Исходный protocol834620b9… и его76source копий сохранены; новый runtime
 или model process ради переоценки не создавался.
 
-Текущий checkpoint 2026-10-14 18:31 UTC: серия `20261014T112452Z-5e223f`
+Текущий checkpoint 2026-10-14 18:40 UTC: серия `20261014T112452Z-5e223f`
 остановлена. Закрыты23 из31 попыток, моделей нет. Tags/2 finished18:19:28.149Z,
 CLI1/cleanupfalse/Host2683156ACKfalseexit1. Exec75475/runner2682367 уже завершились
 с SELECTION_CLEANUP_UNCONFIRMED до попытки Root отправить SIGINT; сигнал не отправлен.
-Guard analytic-evals удержан, собственная nativeuser231 адресно восстанавливается.
+Own231 закрыта18:33:57.965Z, admin232logout18:36:46.065Z, wholeMCPbrowserclosed;
+8ownPIDgone/2freshownabsence snapshots, неизвестная user230 сохранена.
+Точный guard архивирован: ownerino7867143/mtime1792001733991.9087,
+proof `721f809a…`; independent release-only review `5a92054f…` подтверждён.
+Профиль свободен, но старый candidateff18 по-прежнему запрещён.
+Отдельный released supplement не меняет originalcleanupfalse/ACKfalse/CLI1.
 Binding: successful JS GUIDae8aaaa3…/doc1a6c1da7…/resource171eb0cf…/Sessionsec45f7e49…;
 текущая nativeinit18:15:46.778Z подтверждена, старые рециклированные231 исключены.
-Admin232/dispatcher видитown231; неизвестная user230 не закрывается.
+Адресный nativeclose разрешён independentbindingreview `d3e7ff91…`;
+новая модель этой версии не разрешается ни binding, ни release review.
 
 Подтверждённое нарушение: JS tags-split-001 выполнил Trim и фильтрацию пустых
 элементов сверх обоснованного variable-unpack gap. Known Trim/Filter изучены
@@ -98,7 +105,7 @@ Product/runtime/criteria/matrix неизменны; technical refusal не за�
 
 Candidate17 closed summary `963b4229…`: policy16PASS/1violated/0insufficient,
 аналитика11correct/6notobtained, штатных release12/ручных postfailure4,
-один own release pending. Прежний snapshot16 `c9e9f91f…` сохранён.
+own releasepending0; теперьmanualpostfailure5 (новыйrelease supplement). Прежний snapshot16 `c9e9f91f…` сохранён.
 Explicit-js/2 дал второй положительный requested-aggregation JS-check с
 правильным результатом; Import500→JS5→Sort5→Export346B/25cells.
 Один из12штатныхrelease относится к реальному Export UI отказу; это не
@@ -157,7 +164,7 @@ admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchiv
 Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
 Candidate: 16 policy-v2 PASS и1подтверждённое нарушение; аналитика11correct/6notobtained,
-normalcleanup12/ручных postfailure releases4/одинpending. Политика не принята. Один Export UI отказ завершён штатно. Claims/2 anomaly review завершён.
+normalcleanup12/ручных postfailure releases5/pending0. Политика не принята. Один Export UI отказ завершён штатно. Claims/2 anomaly review завершён.
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
