@@ -8,6 +8,24 @@ import { calibrate } from "../src/calibrate"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test("calibrate keeps explicit judge environment values out of saved config", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-secret-"))
+  const canary = "judge-explicit-env-canary"
+  try {
+    const config: EvalConfig = loadConfig(["--calibrate", "--only", "group-sum-qty"], {
+      EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge,
+    })
+    config.judge.env = { OPENAI_API_KEY: canary, CODEX_HOME: path.join(root, "private-judge") }
+    await mkdir(path.join(root, "corpus"))
+    const result = await calibrate(config, path.join(root, "corpus"))
+    expect(result.code).toBe(0)
+    const saved = await Bun.file(path.join(result.runDir, "config.json")).text()
+    expect(saved).not.toContain(canary)
+    expect(JSON.parse(saved).judge.env.OPENAI_API_KEY).toBe("<set>")
+    expect(config.judge.env.OPENAI_API_KEY).toBe(canary)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("calibrate uses the configured private judge home for version and execution", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-home-"))
   try {
