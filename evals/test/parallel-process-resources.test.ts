@@ -2,7 +2,8 @@ import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, readlink, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { collectHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
+import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
+import { assessResourceCoverage } from "../src/parallel-acceptance"
 import { superviseProcess } from "../src/process-supervisor"
 
 test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
@@ -29,6 +30,15 @@ test("resource sampling observes two admitted supervisors and retains B after dr
       expect(scope.owner).toEqual(owner)
       expect(scope.processes?.every(item => item.verified && item.rss_bytes! > 0 && item.cpu !== null)).toBe(true)
     }
+
+    const frame = { host: await sampleHostResources([root]), containers: null, processes: sample }
+    const expected = owners.map(owner => ({ ...owner, launcher: sample.scopes.find(scope => scope.owner.id === owner.id)!.launcher }))
+    const coverage = { samples: [frame], paths: [root], containers: [], owners: expected }
+    expect(assessResourceCoverage(coverage)).toEqual({ status: "passed", codes: [] })
+    expect(assessResourceCoverage({ ...coverage, samples: [{ ...frame, processes: null }] }))
+      .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] })
+    expect(assessResourceCoverage({ ...coverage, owners: [{ ...expected[0]!, launcher: { ...expected[0]!.launcher, starttime: "unobserved" } }] }))
+      .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] })
     // Public observations must not expose mutable identity records used by signaling.
     sample.scopes.find(scope => scope.owner.id === owners[0]!.id)!.processes![0]!.identity.starttime = "changed"
     expect((await sampleSupervisedResources()).scopes.find(scope => scope.owner.id === owners[0]!.id)?.processes?.every(item => item.verified)).toBe(true)
@@ -54,6 +64,11 @@ test("resource sampling observes two admitted supervisors and retains B after dr
     const after = await sampleSupervisedResources()
     expect(after.scopes.some(scope => scope.owner.id === owners[0]!.id)).toBe(false)
     expect(after.scopes.find(scope => scope.owner.id === owners[1]!.id)?.processes?.every(item => item.verified && item.rss_bytes! > 0)).toBe(true)
+    const afterFrame = { ...frame, processes: after }
+    expect(assessResourceCoverage({ ...coverage, samples: [afterFrame], owners: [expected[1]!] })).toEqual({ status: "passed", codes: [] })
+    expect(assessResourceCoverage({ ...coverage, samples: [afterFrame] }))
+      .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] })
+
   } finally {
     aborts.forEach(abort => abort.abort())
     await Promise.all(readers.map(async reader => { while (!(await reader.read()).done) {} }))
