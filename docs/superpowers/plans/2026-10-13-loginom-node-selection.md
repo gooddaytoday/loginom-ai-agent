@@ -1,13 +1,30 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты семь candidate,
-policy PASS во всех семи: шесть стандартных сценариев и явный запрос JS.
-Один итоговый расчёт правильный, шесть результатов не получены. Одна сессия
-завершена штатно, шесть адресно освобождены после отказа. Independent explicit1
-final release review `83ca1f67…`/readback `32855b4f…` одобрены. Actual public gate
-22:09:13.225Z разрешил TECHNICAL_FAILURE_RECORDED, originalattempt8f3c0b63… неизменен.
-Tags/1 запущен последовательным runner3309146/exec99417 в22:09:40.122Z после gate;
-один candidate активен,17ещё не начаты. Criteria/runtime/model/input прежние.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты восемь candidate,
+policy PASS во всех восьми: шесть стандартных, explicit-JS и gap tags.
+Один итоговый расчёт правильный, семь результатов не получены. Одна сессия
+завершена штатно, семь адресно освобождены после отказа. Собственных процессов
+нет, профиль свободен;17candidate ещё не начаты. Tags final release review и
+actual gate ожидаются до recovery/1; first9 и общая приёмка ещё не завершены.
+
+Tags/1 closed22:13:55.083Z: policy PASS sidecar `703d7a98…`, mandatory JS+failure
+review `e82a62ff…`;26messages/100parts/29tools/82events/1095runtime, nochildren.
+До JS проверены scalar Calculator/named-field Collapse возможности и обоснован
+именно переменный fanout. Standard Null Filter выполнен; единственный JSapply
+SUCCEEDED, raw dynamic source305B `3bb0d145…`/9строк выдаёт161rows=3+4+3+151,
+сохраняет пустые части и пробелы, безTrim/filter/count/sort/hardcoded150.
+Standard Calculator Trim(RawTag) попытался открывать upstream port, но остался
+AMBIGUOUS безexecution;same-operation reconcile/blocker, новыхapply/JS после
+этой ошибки нет. Нет полученных CSV/LGP/oracle; originalCLI1/cleanupfalse/
+policyincomplete остаются. Старый frozen functional checklist проJS trim описан
+как ограничение fixture, не разрешение новой policy; actualprompt не изменён.
+
+Own254closed22:16:38.630Z/admin255logout22:16:40.250Z/wholebrowserclosed22:16:41.446Z;
+9PIDgone/точный guard архивирован с inode/rawNS. Root независимо сверил
+подготовленную другим агентом привязку перед close;253сохранилась в двух UIreadbacks.
+250автоматически истекла сервером22:15:11.671Z до действияRoot и им не закрывалась.
+17original неизменны, rawsource+review дают19casefiles;26recovery.
+Descriptor `f07c9e9a…`; finalrelease review и actual gate ещё не подтверждены.
 
 Explicit-js/1 closed21:52:03.471Z, CLI1/cleanupfalse/Host3248443ACKfalse:
 policy PASS sidecar `3d6688ad…`, mandatory JS+failure review `0c89212f…`.
@@ -213,6 +230,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Подтвердить содержательное policy coverage всех шести стандартных сценариев по полным журналам, сохранив пять отказов и независимые оценки результата и release.
 - [x] Завершить минимальную analytical-failure коррекцию runner по TDD, независимое ревью и заморозить отдельную execution R2 после strict release, до следующей новой попытки.
 - [x] Положительно проверить явный запрос JavaScript по полному журналу и реальному динамическому коду, сохранив неуспешные analytics/runtime отдельно.
+- [x] Положительно проверить gap: обоснование доJS, raw variable fanout безTrim/filter/count/sort, стандартный Trim при блокере без новогоJS; сохранить весь журнал и три оценки.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
