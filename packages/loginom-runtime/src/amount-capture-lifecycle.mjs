@@ -20,14 +20,16 @@ export function retainAmountPreparation(retained,preparation,save) {
   || state.operation_id!==preparation.operation_id)fail('ORIGINAL_PREPARATION_UNAVAILABLE');
  const session=retained.session,metadata=session.metadata,handle=Object.freeze({});
  preparations.set(handle,{retained,preparation,save,preparationBytes:bytes(preparation),saveBytes:bytes(save),
-  metadata,directory:session.directory,sessionId:metadata.sessionId,binding,started:false,receipt:undefined});
+  metadata,directory:session.directory,sessionId:metadata.sessionId,binding,
+  owner:Object.freeze(Object.fromEntries(['id','account','origin','generation','chat','signal','deadline'].map(k=>[k,retained.owner[k]]))),started:false,receipt:undefined});
  assertAmountPreparation(handle,preparation,save);return handle;
 }
 export function assertAmountPreparation(handle,preparation,save,{closed=false}={}) {
  const p=preparations.get(handle);if(!p)fail('ORIGINAL_PREPARATION_UNAVAILABLE');
  const r=p.retained,s=r.state;
- if(r.owner.signal?.aborted)throw r.owner.signal.reason;
- if(!Number.isSafeInteger(r.owner.deadline) || Date.now()>=Math.min(r.owner.deadline,p.binding.expires))fail('ORIGINAL_CONTROL_EXPIRED');
+ if(p.owner.signal?.aborted)throw p.owner.signal.reason;
+ if(Object.keys(p.owner).some(k=>r.owner[k]!==p.owner[k]))fail('ORIGINAL_OWNER_CHANGED');
+ if(!Number.isSafeInteger(p.owner.deadline) || Date.now()>=Math.min(p.owner.deadline,p.binding.expires))fail('ORIGINAL_CONTROL_EXPIRED');
  if(!closed)assertCaptureOwner(r);
  if(r.binding!==p.binding || r.session.metadata!==p.metadata || r.session.directory!==p.directory
   || p.metadata.sessionId!==p.sessionId || s.captureRetained!==r || s.session!==r.session
