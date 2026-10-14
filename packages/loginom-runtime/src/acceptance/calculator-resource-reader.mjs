@@ -1,6 +1,16 @@
 // Private Calculator caller capability. Native references stay in their Page;
 // only the current session's bounded observations cross the handle boundary.
 export async function createCalculatorResourceReader(owner) {
+  const decodeFailure = value => {
+    if (value.kind === 'undefined') return undefined;
+    if (value.kind === 'primitive') return value.value;
+    if (value.kind === 'error') {
+      const error = new Error(value.message, value.cause ? {cause: decodeFailure(value.cause)} : undefined);
+      error.name = value.name;
+      return error;
+    }
+    return Error('LOGINOM_CALCULATOR_NATIVE_FAILURE_UNSERIALIZABLE');
+  };
   const binding = owner.readinessBinding;
   const assertOwner = () => {
     if (!binding || owner.closed || owner.id !== binding.id || owner.account !== binding.account
@@ -38,7 +48,19 @@ export async function createCalculatorResourceReader(owner) {
     async read({deadline = null} = {}) {
       if (readStarted) { if (readFailure) throw readFailure.value; throw Error('LOGINOM_CALCULATOR_READ_CONSUMED'); }
       readStarted = true;
-      try { return await start(() => handle.evaluate(async refs => {
+      try { return await start(async () => {
+        const result = await handle.evaluate(async refs => {
+        // Playwright does not preserve thrown undefined/falsy or Error.cause.
+        // Encode those inside the original realm; never export native proxies.
+        const encode = (value, depth = 0) => {
+          if (value === undefined) return {kind: 'undefined'};
+          if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return {kind: 'primitive', value};
+          if (depth < 4 && Object.prototype.toString.call(value) === '[object Error]')
+            return {kind: 'error', name: value.name, message: value.message,
+              ...(Object.hasOwn(value, 'cause') ? {cause: encode(value.cause, depth + 1)} : {})};
+          return {kind: 'unsupported'};
+        };
+        try {
         const same = () => {
           const marker = globalThis.__loginomStartupV1;
           const app = globalThis.bg?.app;
@@ -57,13 +79,19 @@ export async function createCalculatorResourceReader(owner) {
           throw new Error('LOGINOM_CALCULATOR_RESOURCE_FACT_UNKNOWN', {cause: running});
         const user = await refs.session.get_CurrentUser();
         if (!same()) throw Error('LOGINOM_CALCULATOR_NATIVE_IDENTITY_CHANGED');
+        if (!user || typeof user.get_Name !== 'function')
+          throw new Error('LOGINOM_CALCULATOR_NATIVE_USER_REFUSED', {cause: user});
         const name = await user.get_Name();
         if (!same() || name !== refs.account || refs.packages.Count !== count
             || refs.tree.HasRunningNodes() !== running) throw Error('LOGINOM_CALCULATOR_RESOURCE_CHANGED');
-        return {scope: 'current-owned-session', owner: refs.id, account: refs.account,
+        return {ok: true, value: {scope: 'current-owned-session', owner: refs.id, account: refs.account,
           package_count: count, running, observed_at: new Date().toISOString(),
-          historical_cleanup_verified: false, account_wide_safety_verified: false};
-      }), deadline); } catch (value) { readFailure = {value}; throw value; }
+          historical_cleanup_verified: false, account_wide_safety_verified: false}};
+        } catch (value) { return {ok: false, error: encode(value)}; }
+        });
+        if (result?.ok !== true) throw decodeFailure(result?.error ?? {kind: 'unsupported'});
+        return result.value;
+      }, deadline); } catch (value) { readFailure = {value}; throw value; }
     },
     assertSettled() {
       if (operation?.state === 'pending') throw Error('LOGINOM_CALCULATOR_READ_PENDING');

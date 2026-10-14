@@ -67,9 +67,13 @@ for (const error of [undefined, null, false, 0, '', Error('primary', {cause: 0})
   test(`raw native rejection ${String(error)} is retained without replay`, async () => {
     const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
     f.session.get_CurrentUser = async () => { f.events.push('reject'); throw error; };
+    let first;
     for (let i = 0; i < 2; i++) {
       const observed = await reader.read().then(() => ({ok: true}), value => ({ok: false, value}));
-      assert.equal(observed.ok, false); assert.equal(observed.value, error);
+      assert.equal(observed.ok, false);
+      if (error instanceof Error) { assert.equal(observed.value.message, error.message); assert.equal(observed.value.cause, error.cause); }
+      else assert.equal(observed.value, error);
+      if (i === 0) first = observed.value; else assert.equal(observed.value, first);
     }
     assert.equal(f.events.filter(x => x === 'reject').length, 1); await reader.dispose();
   });
