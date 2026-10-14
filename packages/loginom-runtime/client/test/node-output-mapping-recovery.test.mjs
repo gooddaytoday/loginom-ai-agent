@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {outputMappingOrigin,outputMappingState,verifyOutputMappingFinish,outputRecoveryBoundary,reconcileOutputMappingPhase,sameOutputRecovery} from '../lib/node-output-mapping-recovery.mjs';
 const node={document_id:'d',workflow_id:'w',node_id:'n'};
+const portCommit=()=>({verified:true,modified:true,observation:'after_output_port_done',package_saved:false,persisted_content_verified:false,node_context:{...node,verified:true,surface:'graph',locked:false}});
 const mapping=()=>({verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
  node_context:{...node,verified:true,output_port:{direction:'output',port:0,native_index:0,port_guid:'port',opening_operation_id:'open'}},
  source_fields:[{record_id:'s1',field_id:'4',index:0,name:'A',type:'real'}],target_fields:[{record_id:'t1',field_id:'4',index:0,name:'A',type:'real',data_kind:'Непрерывный',usage_type:3,source:{record_id:'s1',field_id:'4',name:'A'}}],rendered_indices:[0]});
@@ -36,14 +37,14 @@ test('a historical receipt must prove the original output Done and exact prepare
 });
 function operation(){return {id:'op',nodeApply:{node,signature:'sig',request:{contract_revision:'1.0.0',target:{type:'transform.calculator'}},phases:['source','workflow','target','input_mapping','open','configure','node_finish'].map(phase=>({phase})),pending:{phase:'output_mapping',receipt_id:'op:output_mapping',deadline:100},deadline:200,configure_deadline:100,execution:{status:'not_requested'},output:{status:'not_refreshed'},cleanup_complete:false},transportUncertain:true};}
 test('reconciliation accepts the phase only after durable proof, retaining original ID and no execution',async()=>{
- const op=operation();op.nodeApplyDrivers={recoverOutputMapping:async()=>({verified:true,cleanup_complete:true,finish:{settings_applied:true,execution_started:false},recovery:{verified:true}})};
+ const op=operation();op.nodeApplyDrivers={recoverOutputMapping:async()=>({verified:true,cleanup_complete:true,port_commit:portCommit(),finish:{settings_applied:true,execution_started:false},recovery:{verified:true}})};
  const events=[];await reconcileOutputMappingPhase({operation:op,now:()=>1,record:async e=>{events.push(e);return structuredClone(e);}});
  assert.equal(op.nodeApply.pending,null);assert.equal(op.nodeApply.execution.status,'not_requested');assert.equal(op.transportUncertain,false);assert.equal(events[0].receipt.receipt_id,'op:output_mapping');assert.equal(op.nodeApply.phases.at(-1).phase,'output_mapping');
  await assert.rejects(reconcileOutputMappingPhase({operation:op,now:()=>1}),/boundary/);
 });
 test('unproven mappings, interrupted probes, deadlines and failed journal writes keep the original pending',async()=>{
  for(const fault of ['mismatch','cleanup','execute','journal','deadline']){
-  const op=operation();let calls=0;op.nodeApplyDrivers={recoverOutputMapping:async()=>{calls++;if(fault==='mismatch')throw Error('mapping differs');return {verified:true,cleanup_complete:fault!=='cleanup',finish:{settings_applied:true,execution_started:fault==='execute'},recovery:{verified:true}};}};
+  const op=operation();let calls=0;op.nodeApplyDrivers={recoverOutputMapping:async()=>{calls++;if(fault==='mismatch')throw Error('mapping differs');return {verified:true,cleanup_complete:fault!=='cleanup',port_commit:portCommit(),finish:{settings_applied:true,execution_started:fault==='execute'},recovery:{verified:true}};}};
   await assert.rejects(reconcileOutputMappingPhase({operation:op,now:()=>fault==='deadline'?100:1,record:async e=>fault==='journal'?{}:e}));
   assert.equal(op.nodeApply.pending.receipt_id,'op:output_mapping');assert.equal(op.nodeApply.phases.length,7);assert.equal(op.transportUncertain,true);if(fault==='deadline')assert.equal(calls,0);
  }
@@ -59,7 +60,7 @@ test('prepared recovery proof survives the real redacted durable journal without
   const ack=await record(event);assert.ok(sameOutputRecovery(event,{phase:ack.phase,checkpoint:ack.checkpoint}));
   const persisted=JSON.parse((await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim());
   assert.equal(verifyOutputMappingFinish(persisted.checkpoint,finish()).operation_id,'op:n7');
-  const op=operation();op.nodeApplyDrivers={recoverOutputMapping:async()=>({verified:true,cleanup_complete:true,finish:{settings_applied:true,execution_started:false},recovery:{verified:true}})};
+  const op=operation();op.nodeApplyDrivers={recoverOutputMapping:async()=>({verified:true,cleanup_complete:true,port_commit:portCommit(),finish:{settings_applied:true,execution_started:false},recovery:{verified:true}})};
   await reconcileOutputMappingPhase({operation:op,now:()=>1,record});assert.equal(op.nodeApply.pending,null);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
@@ -69,4 +70,10 @@ test('output reconciliation also retains the configured formulas and input schem
  const c={verified:true,inventory_complete:true,mode:'expression',node_context:node,expressions:[{index:0,record_id:'1',expression_id:'0',name:'B',label:'B',type:'real',formula:'A*2',intermediate:false,replace:false,cached:false,description:'',selected:true}],input_fields:[{record_id:'2',name:'A',label:'A',type:'real',replaced:false}]};
  const expected=outputRecoveryCalculatorState(c,node),copy=structuredClone(c);copy.expressions[0].record_id='3';copy.expressions[0].selected=false;assert.deepEqual(outputRecoveryCalculatorState(copy,node),expected);
  for(const change of [x=>x.expressions[0].formula='A*3',x=>x.input_fields[0].type='string',x=>x.expressions[0].intermediate=true]){const wrong=structuredClone(c);change(wrong);assert.notDeepEqual(outputRecoveryCalculatorState(wrong,node),expected);}
+});
+
+for(const kind of ['false','missing','foreign'])test('reconciliation cannot bypass package modified proof '+kind,async()=>{
+ const op=operation(),proof=portCommit();if(kind==='false')proof.modified=false;if(kind==='foreign')proof.node_context.node_id='other';
+ op.nodeApplyDrivers={recoverOutputMapping:async()=>({verified:true,cleanup_complete:true,port_commit:kind==='missing'?undefined:proof,finish:{settings_applied:true,execution_started:false},recovery:{verified:true}})};
+ let writes=0;await assert.rejects(reconcileOutputMappingPhase({operation:op,now:()=>1,record:async e=>{writes++;return e}}),/modification not confirmed/);assert.equal(writes,0);assert.equal(op.nodeApply.pending.receipt_id,'op:output_mapping');assert.equal(op.transportUncertain,true);
 });

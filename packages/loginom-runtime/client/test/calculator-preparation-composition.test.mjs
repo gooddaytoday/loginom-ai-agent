@@ -53,6 +53,8 @@ async function fixture({kind='existing',canonical=true,fault=null}={}) {
  record.nodeTargetWorkflowNode=workflowNode;
  const requestBefore=record.request,crumbsBefore=plain(record.crumbs),bindingBefore=clone(binding);
  const operation={id:'composition-import',action:{action_key:'node.apply',revision:'1'},deadline:100000,nodeApply:{request:{target:{kind},finish:'done',parameters:{settings:{columns:[{name:'Region'}]}},mappings:[]}}};
+ // The real shell supplies the same request to driver factory and continuation.
+ operation.parameters=operation.nodeApply.request;
  const open=()=>{
   isOpen=true;controller.Node.data.node={ParentNode:nodeTree};controller.FController=Object.assign(new WizardModelComponentForm(),{FModelNode:nodeData});surface=[tab,wizardRoot];
   setCrumbs(canonical?opened:[...original,...opened.slice(-2)]);

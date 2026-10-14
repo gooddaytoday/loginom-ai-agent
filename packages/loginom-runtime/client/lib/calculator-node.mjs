@@ -10,6 +10,7 @@ import {configureCalculator} from './calculator-procedure.mjs';
 import {rejectUnchangedCalculatorDraft,verifiedCalculatorSyntaxFailure} from './calculator-request-refusal.mjs';
 import {calculatorConfigurationReadback} from './calculator-readback.mjs';
 import {calculatorParametersSchema} from './node-api.mjs';
+import {makeCalculatorPortCommitCode,verifyCalculatorPortCommit} from './calculator-port-commit.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
@@ -65,6 +66,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    channel??=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:4096,targetOrigin,targetBuild,
     signal:{throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}},preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
     wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});return channel;};
+  const readPortCommit=async ctx=>{
+   requireValue(now()<operation.deadline,'Calculator port commit deadline elapsed');
+   const proof=await execute(makeCalculatorPortCommitCode({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},targetOrigin,targetBuild));
+   await recordInput('node_output_mapping_package_state',{proof});
+   return verifyCalculatorPortCommit(proof,ctx.node);
+  };
   const finishWizard=async (mode,port=false,definition,recovery)=>{
    const verb=mode==='execute'?'execute_wizard':'finish_wizard',key=mode==='execute'?'btnExecute':'btnDone';
    // Complete definition paging leaves the grid on its last addressed page.
@@ -275,7 +282,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      mapping:outputMappingState(mapping,ctx.node),calculator:outputRecoveryCalculatorState(configured,ctx.node),
      value:structuredClone({native_mapping:mapping,definition,changes,source_identity_verified:true}),attempts:0};
     const finish=await finishWizard('done',true,definition,outputCheckpoint);
-    return verified({effect_possible:true,native_mapping:mapping,definition,changes,finish,source_identity_verified:true});
+    const port_commit=await readPortCommit(ctx);
+    return verified({effect_possible:true,native_mapping:mapping,definition,changes,finish,port_commit,source_identity_verified:true});
    },
    async finish(mode,ctx){enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');return finishWizard(mode);},
    async finishGraph(mode,ctx){
@@ -391,8 +399,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      await recordInput('node_output_mapping_recovery_checked',{observed,cancelled,calculator,expected:outputCheckpoint.mapping});
      requireValue(sameOutputRecovery(outputMappingState(observed,outputCheckpoint.node),outputCheckpoint.mapping),'Committed output mapping differs');
      requireValue(sameOutputRecovery(await graphForInput(),outputCheckpoint.graph),'Output graph changed during verification');
+     const port_commit=await readPortCommit({document_id:outputCheckpoint.node.document_id,workflow_ref:operation.nodeApply.request.workflow_ref,node:outputCheckpoint.node});
      outputCheckpoint.probe_verified=true;
      return verified({...structuredClone(outputCheckpoint.value),effect_possible:true,
+      port_commit,
       finish:verified({effect_possible:true,mode:'done',settings_applied:true,execution_started:false,node_context:cancelled.node_context}),
       recovery:{verified:true,finish_receipt_id:outputCheckpoint.finish_reference.id,observed_mapping:observed,calculator,probe_cancel:cancelled}});
     },
