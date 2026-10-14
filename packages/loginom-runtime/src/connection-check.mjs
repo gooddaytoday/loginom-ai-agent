@@ -403,9 +403,12 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     owner.readinessBinding=Object.freeze({id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page,deadline:owner.deadline,signal:owner.signal})
     await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
     const result=await loginPage(owner.page,candidate,owner)
-    if(calculatorResourceRead) await createCalculatorResourceReader(owner)
     const ready=await startupReadiness(owner,!owner.initialReadinessCompleted)
     if(!ready.authenticated)throw new Error('LOGINOM_INITIAL_READINESS_REFUSED',{cause:ready})
+    // The empty pre-initialization collection is not the settled package root.
+    // Capture once after native readiness, retaining the same owner/Page. Never
+    // repin an existing reader after a failed read or a later root replacement.
+    if(calculatorResourceRead) await createCalculatorResourceReader(owner)
     if(!keepOpen) {await owner.close();return result}
     return {...result,context:owner.context}
   } catch(error) {
