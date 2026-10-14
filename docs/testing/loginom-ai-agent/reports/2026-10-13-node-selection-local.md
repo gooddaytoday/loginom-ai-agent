@@ -1253,3 +1253,11 @@ Session `ses_ec813c7c4ffel3RV1nTZWRsmwf`, SHA attempt `260d6b1b…`,
 audit `e061eec9…`. Во всех девяти baseline oracle/расчёт PASS, policy PASS
 у шести. Root17410 активен и последовательно перешёл к `monthly-demand/2`;
 следующий слот — `risky-approved-claims/2`. Приёмка ещё не завершена.
+
+
+На 2026-10-14 01:15 UTC завершены 10/18 baseline, 0/25 candidate.
+`monthly-demand/2` прошёл oracle, полный расчёт и policy, JS-узлов 0;
+CLI/wrapper exit 0, cleanup true. Session `ses_ec80d497bffeCpBAzDR1JtjJ1u`,
+SHA attempt `a76ae1f3…`. Во всех десяти baseline oracle/расчёт PASS,
+policy PASS у семи. Root17410 продолжает очередь, следующий слот —
+`risky-approved-claims/2`. Полная серия и приёмка ещё не завершены.
