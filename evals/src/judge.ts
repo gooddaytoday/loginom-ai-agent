@@ -263,6 +263,7 @@ async function invoke(
     stdin: await Bun.file(path.join(input.outDir, "PROMPT.md")).text(),
     outDir: processDir,
     timeoutMs: input.judge.timeoutMs, signal: input.signal,
+    owner: { kind: "judge", id: input.outDir },
   })
   await Bun.write(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`), supervised.stdout)
   await Bun.write(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`), supervised.stderr)

@@ -337,6 +337,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     model: config.agent.model,
     variant: config.agent.variant,
     profileDir: config.dryRun ? undefined : config.profileDir,
+    slotId: input.slotId ?? "default",
     prompt,
     files,
     workdir,

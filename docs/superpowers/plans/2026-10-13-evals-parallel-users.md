@@ -503,7 +503,7 @@ expect(await Bun.file(foreignSentinel).text()).toBe("preserve")
 
 **Interfaces:** Existing `superviseProcess` получает доказанную информацию о других живых launcher контроллера; registry хранит `(pid,starttime,uid,executable identity)` и владение slot/admin, а не строки argv.
 
-- [ ] RED: одновременно запустить два настоящих supervisor с одним browser bundle; fixture B создаёт новые grandchildren без `--user-data-dir`, меняет process title и reparent. Cleanup A подтверждён, B жив и продолжает писать свой heartbeat; чужие процессы не сигналятся и не объявляются своими.
+- [x] RED: одновременно запустить два настоящих supervisor с одним browser bundle; fixture B создаёт новые grandchildren без `--user-data-dir`, меняет process title и reparent. Cleanup A подтверждён, B жив и продолжает писать свой heartbeat; чужие процессы не сигналятся и не объявляются своими.
 
 ```ts
 expect(a.processCleanup.status).toBe("confirmed")
@@ -512,14 +512,14 @@ expect(await Bun.file(bHeartbeat).text()).not.toBe(beforeCleanup)
 expect(a.processCleanup.processes.some(item => item.pid === bRootPid)).toBe(false)
 ```
 
-`a` — результат существующего `superviseProcess`; heartbeat/root PID принадлежат fixture и проверяются настоящим `/proc`, без monkeypatch. Третьим участником повторить этот сценарий с trusted admin browser.
+`a` — результат существующего `superviseProcess`; heartbeat/root PID принадлежат fixture и проверяются настоящим `/proc`, без monkeypatch. Первый helper RED устойчив 3/3: exact A-unknown = B-allowed/subreaper, B cleanup confirmed. Уточнение fixture: Bun process.title на хосте не меняет /proc; настоящий Node с тем же executable bundle доказал пустой cmdline. Node tracer на baseline supervisor RED (unknown helper), registry GREEN 1 PASS/10 assertions (13.81s); полный supervisor regression 22 PASS/109 assertions (111.42s), typecheck/diff PASS. Registry process-local и private: только superviseProcess публикует spawned launcher/allowed ancestry, каждый peer сверяется с fresh snapshot; owner slot/admin/judge — метаданные, не authority. Третий trusted admin и negative PID/unknown gates ещё открыты. Третьим участником повторить этот сценарий с trusted admin browser.
 
 - [ ] Запустить `bun test test/process-supervisor.test.ts -t "parallel"` (RED). Добавить минимальный registry известных launcher и их доказанных цепочек потомков; убрать только воспроизведённую ложную принадлежность. Непроверяемый PID остаётся unknown, argv/PGID/path не разрешают исключить процесс.
 - [ ] RED/GREEN: PID reuse, исчезновение parent между чтениями, unreadable `/proc`, новый descendant после scan, abort A во время работы B, административный reconnect. Сохранять порядок signals и возможность завершить cleanup внутри CLI до уничтожения namespace launcher.
 - [ ] Отдельно измерить задержку **между запланированным и фактическим запуском** proc observations и разрыв между scans под нагрузкой двух слотов; `observations.max_duration_ms` измеряет время самого scan и не заменяет это измерение.
 - [ ] Проверить `bun test test/process-supervisor.test.ts`, `bun typecheck`, затем real Chromium немодельный smoke. Если узкие исправления не доказывают границу, фиксировать процессный blocker live; ACL Loginom не использовать как объяснение безопасности процессов.
 - [ ] Настоящие Bun/PID fixtures остаются в unit `process-supervisor.test.ts`; bundled Chromium, bwrap и trusted admin scenario — в `process-supervisor-integration.test.ts`. Запустить его отдельно на этом хосте с receipt и доступным установленным prod runtime; shared OAuth не требуется.
-- [ ] Коммит `fix(evals): preserve process ownership across parallel supervisors`.
+- [x] Коммит `fix(evals): preserve process ownership across parallel supervisors`: первый registry tracer завершён; остальные gates задачи 6 выше сохраняют отдельные открытые checkbox.
 
 ### Задача 7. Потребить временный shared OAuth, сохранив независимую авторизацию судьи
 
@@ -782,4 +782,4 @@ EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/parallel/slots.json EVA
 14. Product worktree evals-oauth@04ff82be4d: five cherry-pick -x + independent installer fix; dependency lineage/diagnosis в contract.
 15. Evals full regression: 754 PASS/12 SKIP/3 FAIL/3715 assertions (787.37s). Два lifecycle failures: narrow 3/3 pairs PASS, root cause неизвестен; третья outdated report assertion исправлена: 11 infra-retry PASS/79 assertions (53.66s), typecheck PASS. Guards не ослаблены, full PASS не заявлен.
 16. Cold parallel module: 25 PASS/160 assertions (114.56s); 36 proof versions/31 paths/43 PID:starttime, live birth matches=0. Два historical lifecycle failures не воспроизведены; PID344630 не атрибутирован. Probe/collector завершены; safe logs600 /tmp/evals-parallel-cold-signal-msu69vi4.{events,proofs}.jsonl.
-17. Current eb85403ce4: installed schema/status N=2 bwrap4 PASS/29, receipt publicStatus/bubblewrapStatus=true, live=false. Writer creation RED3/3→GREEN c183a97e38, cold profile/supervisor95 PASS/315; mixed PID532038 не атрибутирован, narrow3/3 PASS. Private auth dirs700 подготовлены, auth files missing. Superseded own artifact/archive/checksum удалены после SHA/ownership checks; current artifact/installation и previous receipt сохранены. Далее Task6 registry; historical PROFILE_BUSY остаётся открыт.
+17. Current eb85403ce4: installed schema/status N=2 bwrap4 PASS/29, receipt publicStatus/bubblewrapStatus=true, live=false. Writer creation RED3/3→GREEN c183a97e38, cold profile/supervisor95 PASS/315; mixed PID532038 не атрибутирован, narrow3/3 PASS. Private auth dirs700 подготовлены, auth files missing. Superseded own artifact/archive/checksum удалены после SHA/ownership checks; current artifact/installation и previous receipt сохранены. Task6 private registry: Node baseline RED→GREEN1/10; full supervisor22 PASS/109, typecheck/diff PASS; negative unknown/admin/metrics gates открыты. Historical PROFILE_BUSY остаётся открыт.
