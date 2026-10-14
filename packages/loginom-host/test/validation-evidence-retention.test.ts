@@ -1,9 +1,15 @@
-import {beforeAll, afterAll, test, expect} from 'bun:test'
+import {beforeAll, afterAll, test, expect, mock} from 'bun:test'
+import {fork as nativeFork} from 'node:child_process'
 import {mkdtemp, mkdir, writeFile, readFile, readdir, symlink, rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {buildNodeHost} from '../script/build-node-host'
-import {launchNodeHost} from '../src/node-client'
+const ownedChildren: ReturnType<typeof nativeFork>[] = []
+const savedFork = nativeFork
+mock.module('node:child_process', () => ({fork: (...args: Parameters<typeof nativeFork>) => {
+  const child = savedFork(...args); ownedChildren.push(child); return child
+}}))
+const {launchNodeHost} = await import('../src/node-client')
 
 // Full host/service/supervisor/child IPC and real filesystem. The managed
 // runtime is a finite native-free double; no Page/login/logout is performed.
@@ -52,5 +58,15 @@ for (const mode of cases) test(`validation evidence remains unless close confirm
       expect(remaining.length).toBe(1)
       expect(JSON.parse(await readFile(join(chats,remaining[0],'original.json'),'utf8'))).toMatchObject({fixture:true,mode,cause:0,cleanup_complete:false})
     }
-  } finally {await host.close(); expect(await host.exited).toEqual({code:0,signal:null})}
+  } finally {
+    try {await host.close(); expect(await host.exited).toEqual({code:0,signal:null})}
+    catch (error) {
+      // A dead original runtime with unconfirmed cleanup must refuse outer ACK.
+      // Teardown kills only our finite native-free fixture host, never Loginom.
+      expect(['success','startup']).not.toContain(mode)
+      expect(host.alive).toBe(true)
+      const child = ownedChildren.at(-1)!; child.kill('SIGKILL')
+      expect((await host.exited).signal).toBe('SIGKILL')
+    }
+  }
 }, 15000)

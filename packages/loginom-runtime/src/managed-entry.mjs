@@ -425,18 +425,16 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code })
     if (message.operation === "start") {
       state.startupFailure=error
       if (state.startupOwner?.context) {
         state.browser=state.startupOwner.context
         state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
       }
-      // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
-      // close() retains a rejection so that the later close request reports cleanup failure.
-      setImmediate(() => {
-        void close().catch(() => undefined)
-      })
+      // The helper's awaited cleanup has settled or refused. Keep this original
+      // owner and let the supervising caller issue the single owned Close;
+      // an unobserved second close must not race the startup failure reply.
     }
+    send({ id: message.id, error: code })
   }
 }

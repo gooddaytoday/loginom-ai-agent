@@ -39,6 +39,15 @@ export async function createLoginomHost(options: {
   type CaptureBinding = NonNullable<Parameters<typeof supervise>[0]["acceptanceCapture"]>
   const captures = new Map<string, CaptureBinding>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
+  type ValidationAttempt = { directory: string; pending: Promise<Runtime>; runtime?: Runtime }
+  const validations = new Map<string, ValidationAttempt>()
+  const failedStarts = new Map<string, Runtime>()
+  async function finishValidation(chat: string, attempt: ValidationAttempt) {
+    try { attempt.runtime ??= await attempt.pending } catch (error) { if (!attempt.runtime) throw error }
+    await attempt.runtime.close()
+    await rm(attempt.directory, { recursive: true, force: true })
+    validations.delete(chat)
+  }
   function retain(
     generation: { children: Map<string, Promise<Runtime>> },
     chat: string,
@@ -59,6 +68,8 @@ export async function createLoginomHost(options: {
     return tracked
   }
   async function launch(connection: ActiveConnection, chat: string, validation = false, acceptanceCapture?: CaptureBinding) {
+    const startupKey = `${connection.generation}:${chat}`
+    if (failedStarts.has(startupKey)) throw Error("LOGINOM_RUNTIME_UNAVAILABLE")
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise({
       node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -76,21 +87,26 @@ export async function createLoginomHost(options: {
       actionManifestSha256: manifest.actionManifestSha256,
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
+    }).catch(error => {
+      if (!validation && error?.retainedRuntime) failedStarts.set(startupKey, error.retainedRuntime)
+      throw error
     })
   }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
       async check(connection) {
+        if (validations.size || failedStarts.size) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
         const chat = randomUUID()
-        const child = await launch(connection, chat, true)
-        await child.close()
-        // Startup/cleanup failure can leave original owner evidence here.
-        // A terminal validation request is not proof of successful cleanup.
-        await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
-          recursive: true,
-          force: true,
+        const attempt = { directory: join(root, "validation", "generations", String(connection.generation), "chats", chat),
+          pending: undefined as unknown as Promise<Runtime>, runtime: undefined as Runtime | undefined }
+        validations.set(chat, attempt)
+        attempt.pending = launch(connection, chat, true).catch(error => {
+          if (error?.retainedRuntime) attempt.runtime = error.retainedRuntime
+          throw error
         })
+        attempt.runtime = await attempt.pending
+        await finishValidation(chat, attempt)
       },
       async prepare(connection) {
         const child = await launch(connection, "readiness")
@@ -126,6 +142,17 @@ export async function createLoginomHost(options: {
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
+    async close() {
+      // A failed check is not part of active generations. Drain its exact
+      // original runtime before the host can acknowledge exit or replacement.
+      const results = await Promise.allSettled([
+        ...[...validations].map(([chat, attempt]) => finishValidation(chat, attempt)),
+        ...[...failedStarts].map(async ([key, runtime]) => { await runtime.close(); failedStarts.delete(key) }),
+      ])
+      const failure = results.find(result => result.status === "rejected")
+      if (failure?.status === "rejected") throw failure.reason
+      await service.close()
+    },
     api: {
       ...service.api,
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {
