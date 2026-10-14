@@ -1678,3 +1678,14 @@ Filter, который затем получил `SUCCEEDED`; это baseline ev
 candidate recovery PASS. Root97266 завершён, `.writer` отсутствовал перед
 запуском `campaign-roi-by-channel/1` (root29101). Следующий плановый слот —
 `first-last-touch/1`; итоговая приёмка ещё не завершена.
+
+
+На 2026-10-14 00:50 UTC завершены 6/18 baseline, 0/25 candidate.
+`campaign-roi-by-channel/1` прошёл oracle, полный расчёт и policy, JS-узлов 0;
+CLI/wrapper exit 0, cleanup подтверждён. Session `ses_ec82324e8ffe4370QyZIlzph7o`,
+SHA attempt `08df55f5…`, audit `49ba77dc…`. Root29101 завершён, `.writer`
+отсутствовал перед запуском `first-last-touch/1` (root82747). После него
+остаются 11 предусмотренных baseline повторов: sales/3, остальные пять
+сценариев/2–3. Candidate first9 разрешён только после всех 18 baseline.
+Все шесть завершённых попыток дали oracle и полный расчёт PASS;
+policy PASS у пяти, ABC/Pareto использовал два JS-узла. Приёмка ещё не завершена.
