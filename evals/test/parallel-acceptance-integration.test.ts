@@ -6,7 +6,7 @@ import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources, sampleServerFilesystems } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
 import { assessCgroupCoverage, assessResourceTimeline, checkResourceEvidence } from "../src/parallel-acceptance"
-import { freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { freezeResourceBudget, readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -56,7 +56,18 @@ test("server filesystem sampling binds private container storage and preserves i
       expect(rows[0].containers[0].storage?.epoch_stable).toBe(true)
       expect(rows[0].containers[0].storage?.filesystems[0].capacity.total_bytes).toBe(16 * 1024 * 1024)
       expect(JSON.stringify(rows)).not.toContain("storage-private-env-canary")
-      expect((await writeResourceSummary({ samplesFile: out, out: path.join(root, "summary.json") })).summary.samples).toBe(rows.length)
+      const current = await writeResourceSummary({ samplesFile: out, out: path.join(root, "summary.json") })
+      expect(current.summary.samples).toBe(rows.length)
+      expect(current.summary.metrics.find(series => series.scope === `container:${id}:${rows[0].containers[0].inspect.started_at}:filesystem:/workdir/UserStorage` && series.metric === "total_bytes"))
+        .toMatchObject({ observed: rows.length, missing: 0, min: 16 * 1024 * 1024, peak: 16 * 1024 * 1024 })
+      const historical = JSON.stringify({ ...current, summary: { ...current.summary,
+        metrics: current.summary.metrics.filter(series => !series.scope.includes(":filesystem:")) } })
+      await writeFile(path.join(root, "summary.json"), historical)
+      expect(await readResourceSummary({ file: path.join(root, "summary.json"), samplesFile: out, runId: "storage-frames", phase: "run" })).toEqual(current)
+      expect(await Bun.file(path.join(root, "summary.json")).text()).toBe(historical)
+      await writeFile(path.join(root, "summary.json"), JSON.stringify({ ...current, summary: { ...current.summary,
+        metrics: current.summary.metrics.map(series => series.scope.includes(":filesystem:") && series.metric === "total_bytes" ? { ...series, min: 1 } : series) } }))
+      await expect(readResourceSummary({ file: path.join(root, "summary.json"), samplesFile: out, runId: "storage-frames", phase: "run" })).rejects.toThrow("RESOURCE_SUMMARY_MISMATCH")
       const corrupted = path.join(root, "corrupted.jsonl"), rejected = path.join(root, "rejected-summary.json")
       const storage = rows[0].containers[0].storage
       await writeFile(corrupted, JSON.stringify({ ...rows[0], containers: [{ ...rows[0].containers[0], storage: { ...storage,

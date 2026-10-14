@@ -57,8 +57,15 @@ Host filesystem не подставляется. Primitive проверен на
 Periodic collector сохраняет independent storage snapshot в Server frame,
 Studio storage=null. Source schema проверяет metadata/capacity types и сохраняет
 nullable unknown; повреждённый storage не получает summary output. Sub-snapshot
-может наблюдать иной epoch, поэтому reducer/coverage обязаны сверять его identity
-с container frame до numeric credit. Этот semantic binding ещё требуется.
+может наблюдать иной epoch, поэтому shared serverStorageBinding сверяет ID,
+image/name/startedAt/PID/owner kind/nonce/purpose и оба stable running flags
+до numeric credit. Incomplete identity не считается matching.
+Reducer хранит separate container/epoch/filesystem series; coverage требует
+ровно один UserStorage и SessionBackup с полными byte/inode counts. Known
+mismatch даёт failed, unavailable/missing/duplicate roots — incomplete.
+Historical summary без новых derived filesystem series читается без изменения
+файла; returned result пересчитывается из raw source. Подмена present series
+отвергается. Full manifest/lifetime/live gates этим не квалифицируются.
 
 ## Конфигурация и граница режимов
 
