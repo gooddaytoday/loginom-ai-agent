@@ -455,3 +455,13 @@ Session `ses_ec7f82e21ffe0w2dxt3HwdHP5M`, SHA attempt `b0ac60e4…`,
 audit `73f42f65…`. Во всех 13 baseline oracle/расчёт PASS, policy PASS
 у девяти. Root17410 активен; текущий слот — `abc-pareto-groups/3`,
 далее monthly/3, claims/3, ROI/3, first-last/3. Приёмка ещё не завершена.
+
+
+На 2026-10-14 01:43 UTC завершены 14/18 baseline, 0/25 candidate.
+`abc-pareto-groups/3`: oracle/полный расчёт PASS, CLI exit 0, wrapper exit 1,
+cleanup true, два JS-узла и `JAVASCRIPT_NOT_ALLOWED`.
+Session `ses_ec7f48e58ffeP9ePIP2eZTP9vd`, SHA attempt `817532d9…`,
+audit `59dd4627…`. Все три ABC baseline прошли oracle/расчёт с двумя JS-узлами
+каждый. Во всех 14 baseline oracle/расчёт PASS, policy PASS у девяти.
+Root17410 активен; текущий слот — `monthly-demand/3`, далее claims/3,
+ROI/3 и first-last/3. Итоговая приёмка ещё не завершена.
