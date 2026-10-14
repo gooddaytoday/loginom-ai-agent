@@ -143,6 +143,17 @@ Fingerprint предназначен для immutable expected runner view в ma
 его значение само не доказывает global visibility и не подменяет quota null
 значением max. Namespace/inode constants не захардкожены.
 
+assessCgroupCoverage требует qualified global runner view из frozen manifest,
+canonical path и полный ordered ancestor chain. Missing evidence — incomplete,
+known wrong view — failed. CPU usage проверяется на каждом scope; active
+non-root cpu/memory controllers требуют соответствующие interfaces, явно
+inactive controller не превращает null в числовой0/max. Root-only applicability
+следует [kernel contract](https://docs.kernel.org/admin-guide/cgroup-v2.html#cpu)
+только после qualified global anchor. Contradictory availability/interfaces
+оставляют gate incomplete. Actual host/Docker/namespace + policies:77 PASS/544
+assertions, typecheck/diff PASS. Expected global anchor нельзя выбирать по
+непроверенному artifact; producer/frozen manifest/coordinator ещё не wired.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный

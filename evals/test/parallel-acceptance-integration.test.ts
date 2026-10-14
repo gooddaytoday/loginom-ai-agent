@@ -5,6 +5,7 @@ import { chmod, mkdtemp, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
+import { assessCgroupCoverage } from "../src/parallel-acceptance"
 import { writeResourceSummary } from "../src/parallel-resource-evidence"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
@@ -98,6 +99,8 @@ test("container resource sampler observes a labelled bounded disposable containe
     expect(Number(sample.cgroup?.cpu_max?.quota_usec) / Number(sample.cgroup?.cpu_max?.period_usec)).toBe(0.25)
     expect(sample.cgroup?.memory_events?.oom_kill).toBeGreaterThanOrEqual(0)
     expect(sample.cgroup?.cpu_throttling?.nr_throttled).toBeGreaterThanOrEqual(0)
+    const hostView = (await sampleCgroupResources()).view!
+    expect(assessCgroupCoverage({ groups: [sample.cgroup], view: hostView })).toEqual({ status: "passed", codes: [] })
     expect(JSON.stringify(sample)).not.toContain("collector-private-env-canary")
     expect(JSON.parse(sample.raw_stats!).cpu_stats.cpu_usage.total_usage).toBe(sample.cpu?.total_usage_ns)
     expect(sample.io === null ? sample.errors.includes("CONTAINER_IO_UNAVAILABLE") : sample.io.every(item => Number(item.bytes) >= 0)).toBe(true)
@@ -250,6 +253,7 @@ test.skipIf(!Bun.which("bwrap"))("cgroup sampler refuses a namespaced proc path 
   const parent = await readlink("/proc/self/ns/cgroup")
   const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
   const hierarchy = await stat("/sys/fs/cgroup"), local = await stat(path.join("/sys/fs/cgroup", group))
+  const expectedView = { namespace: parent, root: { device: hierarchy.dev, inode: hierarchy.ino } }
   const child = Bun.spawn([Bun.which("bwrap")!, "--unshare-cgroup", "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
     "--chdir", evalsRoot, process.execPath, "-e", `
 import { readlink } from "node:fs/promises"
@@ -280,6 +284,8 @@ console.log(JSON.stringify(await sampleCgroupResources()))
   expect(sample.view.root).toEqual({ device: local.dev, inode: local.ino })
   expect(sample.view.root).not.toEqual({ device: hierarchy.dev, inode: hierarchy.ino })
   expect(sample.view.namespace).not.toBe(parent)
+  expect(assessCgroupCoverage({ groups: [sample], view: expectedView })).toEqual({ status: "failed", codes: ["CGROUP_VIEW_MISMATCH"] })
+  expect(assessCgroupCoverage({ groups: [observed.sample], view: expectedView })).toEqual({ status: "failed", codes: ["CGROUP_VIEW_MISMATCH"] })
 
 })
 
