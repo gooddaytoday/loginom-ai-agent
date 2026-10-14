@@ -27,6 +27,7 @@ rebuild runtime не нужен.
 - [x] Зафиксировать отдельную версию критериев до следующего model dispatch, сохранить исходный протокол и получить независимое сравнение с прямым указанием пользователя.
 - [x] Добавить отдельные policy-v2 verdicts для первых девяти закрытых candidate без изменения старых аналитических/runtime результатов.
 - [x] Минимально изменить evaluator runner/release gate по TDD, сохранить исходные source seals и получить реальный strict-release допуск v2 до следующего нового model dispatch.
+- [x] Выполнить и описательно оценить все шесть baseline на итоговом matched runtime, сохранив четыре правильных результата и два технических отказа без повторов и без сравнительного порога приёмки.
 - [ ] Закончить неизменную матрицу31 и оценить оставшиеся16candidate поv2.
 - [ ] Завершить обязательные reviews всех исключений/отказов/аномалий и трёх seeded standard successes.
 - [ ] Подготовить итог с тремя независимыми оценками и решить приёмку политики по достаточности доказательств.
@@ -36,16 +37,22 @@ Criteria v2 `5b5053d1…`, lock `2c36d0cd…`, user authorization `aeff1714…`
 блокирующих расхождений. Исходный protocol834620b9… и его76source копий сохранены; новый runtime
 или model process ради переоценки не создавался.
 
-Текущий checkpoint 2026-10-14 15:56 UTC: серия `20261014T112452Z-5e223f`,
-общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены15 из31,
-закрыты14; baseline first-last-touch/1 безопасно выполняется, CLI2364287,
-dispatch15:53:32.765Z. RunnerPID2346840/exec45610; впереди16candidate.
-ROI/1 завершён15:53:32.592Z: oracle/calculationPASS, JS0, CLI2347693exit0,
-Host2347969ACK/exit0 и оба PIDgone; normalcleanuptrue. Audit `4d580da3…`,
-LGP `70a708cb…`, CSV `1d8460f2…`, autoadvance proof `82bcc882…`.
-Import→Group→Calculator→Sort→Export, следующие слоты без ручной паузы.
-Модельные процессы текущего профиля последовательны; baseline now5closed,
-аналитика4correct/1notobtained, normalcompletion4/manualpostfailure1.
+Текущий checkpoint 2026-10-14 16:11 UTC: серия `20261014T112452Z-5e223f`,
+общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Запущены16 из31,
+закрыты15; candidate Sales/2 безопасно выполняется, CLI2392797,
+dispatch16:10:48.751Z. Новый runnerPID2392222/exec59059; прежнийexec45610terminal.
+Впереди15candidate и текущийSales/2, все модельные процессы последовательны.
+Baseline6 закрыт и описательно оценён:4correct/2notobtained,
+normalcompletion4/technicalfailure2 с отдельными approved strict releases.
+ROI/1 oraclePASS/JS0/normalcleanuptrue автоматически перешёл кfirstlast;
+firstlast/1 завершён15:56:26.961Z с CLI1/HostACKfalse/cleanupfalse,
+AMBIGUOUS JS materialization_execute и неуспешным partial save, LGP/CSV нет.
+Native JS activation в серверном журнале есть, публичный output success не подтверждён.
+Own214 связан successful Import GUID, адресно закрыт16:03:33.193Z;
+admin215logout16:04:34.759Z/егоBrowserclosed/8PIDgone/точныйguardarchive16:07:13.581Z.
+Независимыйrelease review `6cfb41dd…` и actualgate `afc211b3…` разрешили next,
+сохранив technical-failed/policyfailed/calculationfalse. Соседние211/213 не закрывались.
+Ни один baseline отказ не повторён, четыре прежних correct результата не пересчитывались.
 
 Candidate: девять отдельных policy-v2 PASS; все шесть стандартных задач и три
 исключения содержательно покрыты. Исходная аналитика: пять успешных результатов,
@@ -53,11 +60,12 @@ Candidate: девять отдельных policy-v2 PASS; все шесть с�
 Baseline: sales/ABC/monthly дали правильный результат; claims — отказ на
 import configure/UI_SCAN_LIMIT до содержательных решений. Его policy-v2 —
 insufficient-evidence, JS0 не превращён в PASS. Оригинальные файлы и отказы сохранены.
-Отдельный descriptive baseline-v2 summary `43ca1ffe…`: policy2PASS/1violated/
-1insufficient, аналитика3correct/1notobtained, normalcompletion3/technicalfailure1.
-ABC использовал два JS-узла при верном расчёте; его нарушение в старом skill
-не является нарушением candidate и не задаёт порог приёмки. Новые sidecars
-ссылаются на исходные proofs, не переписывая audit/attempt/verdict.
+Итоговый descriptive baseline-v2 summary `ce274bef…`: policy3PASS/2violated/
+1insufficient, аналитика4correct/2notobtained, normalcompletion4/technicalfailure2.
+ABC использовал два JS-узла при верном расчёте; firstlast сделал один JS apply,
+но не получил подтверждённого результата. Нарушения старого skill не являются
+нарушениями candidate и не задают порог приёмки. Все прежние summaries/sidecars,
+audit/attempt/verdict сохранены; firstlast released supplement `fe72c9cf…` отдельный.
 
 Собственная user:209 автоматически закрыта15:03:04.387Z; два свежих снимка
 диспетчера подтвердили отсутствие user-сессий. Admin210 вышел, браузер закрыт,
