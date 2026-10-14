@@ -89,8 +89,9 @@ analytical-failed; исходные oraclefalse/calculationfalse/wrapper1 сох
 Отказы до получения результата и legacy/v1 не расширяются; oraclefalse не
 классифицируется как technical. Технические continuation guards не меняются.
 
-TDD в изолированной копии: standard и две JS-role положительные проверки через
-public API; отрицательные проверки чужого/отсутствующего review, нарушенной роли,
+TDD в изолированной копии: standard, recovery с подтверждённой стандартной
+ошибкой и две JS-role положительные проверки через public API; отрицательные
+проверки чужого/отсутствующего review, нарушенной роли и recoveryObserved,
 неполной истории и release blockers, legacy-v1 и неизменности original bytes.
 Готовую минимальную правку перенести только при отсутствии активного model CLI,
 проверить, сохранить прежний execution lock/source archive и заморозить новую
