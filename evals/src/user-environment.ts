@@ -182,7 +182,51 @@ export async function readServerSession(file: SlotFile, lease: SlotLease, secret
   if (source.id !== proofId || typeof source.path !== "string") throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
   const expected = await sessionFromProbe(file, lease, secretFile, source.path, observation.payload, observation.reply as AdminReply)
   if (JSON.stringify(entry) !== JSON.stringify(expected)) throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
-  return expected
+  const saved = await readLeaseReceipt(path.join(file.controller.stateDir, `session-${proofId}.closed.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  })
+  if (saved === undefined) return expected
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const closed = record(saved)
+  const closeSource = record(closed.source)
+  if (typeof closeSource.path !== "string") throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const closure = await sessionClosure(lease, expected, closeSource.path, closed.reply as AdminReply)
+  if (JSON.stringify(closed) !== JSON.stringify(closure)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  return { ...expected, state: "closed", close: closure.source }
+}
+
+export async function recordServerSessionClosed(file: SlotFile, lease: SlotLease, secretFile: string, proofId: string, commandFile: string, reply: AdminReply) {
+  const entry = await readServerSession(file, lease, secretFile, proofId)
+  const closure = await sessionClosure(lease, entry, commandFile, reply)
+  const target = path.join(file.controller.stateDir, `session-${proofId}.closed.json`)
+  const existing = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  })
+  if (existing && JSON.stringify(existing) !== JSON.stringify(closure)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  if (!existing) await writeLeaseReceipt(target, closure)
+  return readServerSession(file, lease, secretFile, proofId)
+}
+
+async function sessionClosure(lease: SlotLease, entry: Awaited<ReturnType<typeof sessionFromProbe>>, commandFile: string, reply: AdminReply) {
+  const data = record(reply.data)
+  if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    !path.isAbsolute(commandFile) || path.resolve(commandFile) !== commandFile || path.dirname(commandFile) !== path.dirname(entry.source.path) ||
+    path.basename(commandFile) !== `${reply.id}.json` || Object.keys(data).length !== 2 || data.closed !== true ||
+    !["observed_absent", "rpc_closed"].includes(String(data.disposition))) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const source = record(await readLeaseReceipt(commandFile))
+  if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
+    source.op !== "close-session" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify({ proofId: entry.source.id, session: entry.binding })).digest("hex") ||
+    source.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
+    typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
+    !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.settledAt) < Date.parse(source.at)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  return { version: 2, kind: "owned-server-session-close", slotId: lease.slot.id, identity: lease.identity,
+    preparationNonce: entry.preparationNonce, binding: entry.binding, source: { path: commandFile, id: reply.id,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") }, reply }
 }
 
 async function sessionFromProbe(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, payload: unknown, reply: AdminReply) {
