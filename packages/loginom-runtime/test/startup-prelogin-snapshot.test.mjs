@@ -27,7 +27,7 @@ async function fixture(primary,{blocked=false,dialogs=false,loginVisible=false}=
   const evidence=JSON.parse(await readFile(join(directory,'startup-cleanup.json'),'utf8'));
   assert.equal(evidence.native.unauthenticated,true);events.push('context-close')}};
  const require=()=>({chromium:{launchPersistentContext:async()=>context}});
- const {loginBrowser}=vm.runInNewContext(code+';({loginBrowser})',{require,mkdir,open,rename,unlink,constants,writeFile,readFile,createHash,runtimeModulePath:String(path),join,dirname,randomUUID,URL,process,Error,
+ const {loginBrowser}=vm.runInNewContext(code+';({loginBrowser})',{require,mkdir,open,rename,unlink,constants,writeFile,readFile,createHash,runtimeModulePath:String(path),join,dirname,randomUUID,URL,process,Error,setTimeout,clearTimeout,AbortController,
   browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>''});
  if(blocked)await mkdir(join(directory,'startup-cleanup.json'));
  let failure;try{await loginBrowser({profile:directory,browserPath:'/fixture',candidate:{url:'https://own.invalid/app/',username:'own',password:''},owner})}catch(e){failure=e}

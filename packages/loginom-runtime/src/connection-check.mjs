@@ -32,6 +32,41 @@ export function loginomAddress(value) {
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, owner) {
+  // Passive diagnostics only. These events never qualify login or cleanup,
+  // read application data, renew deadlines, or issue an extra Page request.
+  const trace=owner ? (owner.evidence??={}).login_ui={revision:1,source:'original_page_events',
+    owner_id:owner.id,phase:'navigation',events:[],dropped:0,authority:false} : undefined
+  const context=owner?.context,ownerId=owner?.id
+  const listeners=[]
+  const append=event=>{
+    if(!trace||trace.observation_closed)return
+    if(owner.page!==page||owner.context!==context||owner.id!==ownerId){trace.owner_changed=true;return}
+    if(trace.events.length>=32){trace.dropped++;return}
+    trace.events.push({...event,at:new Date().toISOString()})
+  }
+  const sameOrigin=url=>{try{return new URL(url).origin===new URL(candidate.url).origin}catch{return false}}
+  const listen=(name,read)=>{
+    if(!trace)return
+    try {
+      if(typeof page.on!=='function'||typeof page.off!=='function'){trace.events_available=false;return}
+      const listener=value=>{try{const event=read(value);if(event)append(event)}catch{trace.event_read_failed=true}}
+      listeners.push([name,listener]);page.on(name,listener);trace.events_available=true
+    }catch{trace.registration_failed=true}
+  }
+  try {
+    listen('domcontentloaded',()=>({kind:'domcontentloaded'}))
+    listen('load',()=>({kind:'load'}))
+    listen('pageerror',error=>({kind:'pageerror',name:['Error','TypeError','ReferenceError','SyntaxError','RangeError'].includes(error?.name)?error.name:'Other',
+      message_sha256:createHash('sha256').update(String(error?.message??'')).digest('hex')}))
+    const resourceType=request=>{const type=request.resourceType();return ['document','stylesheet','image','media','font','script','texttrack','xhr','fetch','eventsource','websocket','manifest','other'].includes(type)?type:'unknown'}
+    listen('response',response=>{
+      const type=resourceType(response.request()),status=response.status();
+      if(type!=='document'&&Number.isInteger(status)&&status<400)return
+      return {kind:'response',resource_type:type,same_origin:sameOrigin(response.url()),
+        status:Number.isInteger(status)&&status>=100&&status<=599?status:null}
+    })
+    listen('requestfailed',request=>({kind:'requestfailed',resource_type:resourceType(request),
+      same_origin:sameOrigin(request.url()),error_sha256:createHash('sha256').update(String(request.failure()?.errorText??'')).digest('hex')}))
   if(owner) owner.navigationStarted=true
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   if(owner) {
@@ -43,8 +78,10 @@ export async function loginPage(page, candidate, owner) {
   }
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
+  if(trace) trace.phase='waiting_entry'
   await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
   if (!(await avatar.isVisible())) {
+    if(trace) trace.phase='credentials'
     await field("edtUsername").locator("input").fill(candidate.username)
     const password = field("edtPassword").locator("input")
     // Loginom resolves password availability when username loses focus.
@@ -53,16 +90,23 @@ export async function loginPage(page, candidate, owner) {
     // Passwordless accounts may make an already empty field readonly after username lookup.
     if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
     if(owner) owner.loginSubmitted=true
+    if(trace) trace.phase='login_submitted'
     await field("btnLogin").click()
     await avatar.waitFor({ state: "visible", timeout: 30_000 }).catch(cause => {
       throw new Error("LOGINOM_LOGIN_REJECTED",{cause})
     })
   }
+  if(trace) trace.phase='identity_read'
   const identity = await page.evaluate(
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
   )
   if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+  if(trace) trace.phase='verified'
   return { authenticated: true }
+  } finally {
+    if(trace)trace.observation_closed=true
+    for(const [name,listener] of listeners) {try{page.off(name,listener)}catch{trace.detach_failed=true}}
+  }
 }
 
 export async function checkKnowledge(endpoint, apiKey, owner = {}) {
