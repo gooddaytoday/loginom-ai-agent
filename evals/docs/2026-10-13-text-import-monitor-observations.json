@@ -3821,6 +3821,191 @@
       },
       "new_tests_or_live_calls": 0,
       "prior_repair_source_artifacts_not_replayed_again": true
+    },
+    {
+      "checked_utc": "2026-10-13T23:53:01.237003+00:00",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "done",
+          "revision": 70,
+          "phase": "in_review",
+          "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "blocked",
+          "revision": 279,
+          "phase": "blocked",
+          "metadata_sha256": "0f89c075977cbeaca10b2b6377a82034025e1fc02950902328a663d3668ff930",
+          "active_queued": [
+            {
+              "id": "01a137ae-04d1-714e-9dd3-2b72b2b44faf",
+              "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+              "status": "running",
+              "started_at": "2026-10-14T02:52:22+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "in_progress",
+          "revision": 9,
+          "phase": "admission",
+          "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+          "active_queued": []
+        }
+      ],
+      "runtime": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "status": "online",
+        "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+        "last_seen_at": "2026-10-14T02:52:48+03:00"
+      },
+      "worker_settings": {
+        "Rich": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "fresh_LAB56_stage_comment": "01a136b2-3b9c-7a29-aa23-f364b13e54b9",
+      "fresh_LAB57_stage_comment": "01a137ae-04be-7698-8962-7646d3acfafb",
+      "new_stage_comments_or_evidence": [
+        "01a137a1-c169-7df5-9359-fc8e41eeaa73",
+        "01a137ae-04be-7698-8962-7646d3acfafb"
+      ],
+      "canonical_verification": "evals/docs/2026-10-13-text-import-ben-cleanup-blocker-verification.json",
+      "canonical_verification_sha256": "48d746a6419d9c2559d9a28e4f189afcfe1fc7c537b2954ec8289055c29a2bb7",
+      "LAB56_done_ACCEPT_cleanup_owner_sync_retained": true,
+      "LAB57_frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "official_stage_support": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+      "review_cycle": 2,
+      "reject_count": 1,
+      "Ben_safe_progress": {
+        "checked_utc": "2026-10-13T23:59:03.318462+00:00",
+        "task_id": "01a137ae-04d1-714e-9dd3-2b72b2b44faf",
+        "message_count": 62,
+        "last_seq": 62,
+        "safe_tail": [
+          {
+            "seq": 58,
+            "type": "tool_result",
+            "created_at": "2026-10-13T23:58:15.028596Z"
+          },
+          {
+            "seq": 59,
+            "type": "tool_use",
+            "created_at": "2026-10-13T23:58:57.997594Z"
+          },
+          {
+            "seq": 60,
+            "type": "tool_result",
+            "created_at": "2026-10-13T23:58:58.000236Z"
+          },
+          {
+            "seq": 61,
+            "type": "tool_use",
+            "created_at": "2026-10-13T23:58:58.156428Z"
+          },
+          {
+            "seq": 62,
+            "type": "tool_result",
+            "created_at": "2026-10-13T23:58:58.631388Z"
+          }
+        ],
+        "raw_contents_not_saved_or_printed": true
+      },
+      "independent_second_ACCEPT": "ABSENT",
+      "Ben_product_consumed": 6,
+      "Ben_cold_calls_launches_completed_ERROR": [
+        9,
+        9,
+        8,
+        1
+      ],
+      "whole_product_original_verdict": "ERROR, all six excluded from quality PASS/FAIL",
+      "actual_model_safe_projection_rows": 77,
+      "root_model_native_reference_product_cold_calls": 0,
+      "new_root_comments_dispatches_or_server_mutations": 0,
+      "all_eight_done": false,
+      "status": "NEW_BEN_CLEANUP_BLOCKER_VERIFIED_SINGLE_NONMODEL_PROPOSAL_PREPARATION_ACTIVE",
+      "registration_path_correction": "actual sibling retained/bound captured launcher; prior inspector wrong path",
+      "resource_state": "original Ben lease BUSY; genuine release/FREE absent",
+      "automation": {
+        "id": "lab-56-lab-63",
+        "status": "ACTIVE",
+        "every_minutes": 30,
+        "delete_only_after_all_eight_verified_done_ACCEPT_evidence_cleanup": true,
+        "saved_prompt_chars": 40370,
+        "saved_prompt_sha256": "ada4dcac50e01d4ee24ad988d4eb999cafefe6a0798b2a9c70bf7d641dc65eed",
+        "mutations": 1,
+        "normalized_exact_readback": true,
+        "other_fields_unchanged": true
+      },
+      "new_tests_or_live_calls": 0
     }
   ]
 }
