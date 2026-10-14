@@ -139,6 +139,62 @@ export async function stageUserActivation(file: SlotFile, lease: SlotLease, secr
   return intent
 }
 
+export async function recordUserConfiguration(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, payload: unknown, reply: AdminReply) {
+  if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
+  const configured = await configurationFromReply(file, lease, secretFile, commandFile, payload, reply)
+  if ((await readUserOwnership(file, lease, secretFile)).everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+  await readUserConfiguration(file, lease, secretFile)
+  await lease.assertHeld()
+  await writeLeaseReceipt(path.join(file.controller.stateDir, `configure-${lease.slot.id}.receipt.json`), configured)
+  return configured
+}
+
+export async function readUserConfiguration(file: SlotFile, lease: SlotLease, secretFile: string) {
+  await readUserPreparation(file, lease, secretFile)
+  const saved = await readLeaseReceipt(path.join(file.controller.stateDir, `configure-${lease.slot.id}.receipt.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+  })
+  if (saved === undefined) return undefined
+  const value = record(saved)
+  const source = record(value.source), observation = record(value.observation)
+  if (typeof source.path !== "string") throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+  const configured = await configurationFromReply(file, lease, secretFile, source.path, observation.payload, observation.reply as AdminReply)
+  if (JSON.stringify(value) !== JSON.stringify(configured)) throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+  return configured
+}
+
+async function configurationFromReply(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, payload: unknown, reply: AdminReply) {
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const owned = await readUserOwnership(file, lease, secretFile)
+  const request = record(payload), principal = record(request.owned)
+  const expected = { phase: "configure", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
+    desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: owned.objectId, name: owned.username,
+      userKind: 0, preparationNonce: prepared.nonce, secretHash: principal.secretHash } }
+  if (principal.secretHash !== null && principal.secretHash !== prepared.secretHash || Object.keys(request).length !== 7 || Object.keys(principal).length !== 5 ||
+    Object.entries(expected).some(([key, value]) => JSON.stringify(request[key]) !== JSON.stringify(value))) throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+  const data = record(reply.data), user = record(data.user)
+  const expectedUser = { objectId: owned.objectId, name: owned.username, userKind: 0, blocked: true, authMode: 1,
+    isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false, allowPublish: false }
+  if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    Object.keys(data).length !== 4 || typeof data.authModeChanged !== "boolean" || typeof data.passwordChanged !== "boolean" || data.secretHash !== prepared.secretHash ||
+    data.passwordChanged !== (data.authModeChanged || principal.secretHash !== prepared.secretHash) ||
+    Object.keys(user).length !== Object.keys(expectedUser).length || Object.entries(expectedUser).some(([key, value]) => user[key] !== value) ||
+    !path.isAbsolute(commandFile) || path.resolve(commandFile) !== commandFile || !commandFile.startsWith(file.controller.stateDir + path.sep) ||
+    path.basename(commandFile) !== `${reply.id}.json`) throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+  const source = record(await readLeaseReceipt(commandFile))
+  if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
+    source.op !== "reconcile-user" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(request)).digest("hex") ||
+    source.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
+    typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
+    !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.settledAt) < Date.parse(source.at)) throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  return { version: 2, kind: "owned-user-configuration", slotId: lease.slot.id, preparationNonce: prepared.nonce, identity: lease.identity,
+    userKey: owned.userKey, objectId: owned.objectId, secretHash: prepared.secretHash,
+    source: { path: commandFile, id: reply.id, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") }, observation: { payload: request, reply } }
+}
+
 export async function readUserActivation(file: SlotFile, lease: SlotLease, secretFile: string) {
   const prepared = await readUserPreparation(file, lease, secretFile)
   const owned = await readUserOwnership(file, lease, secretFile)
