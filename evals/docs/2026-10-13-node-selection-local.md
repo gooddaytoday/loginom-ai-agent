@@ -428,3 +428,12 @@ CLI/wrapper exit 0, cleanup true. Session `ses_ec80d497bffeCpBAzDR1JtjJ1u`,
 SHA attempt `a76ae1f3…`. Во всех десяти baseline oracle/расчёт PASS,
 policy PASS у семи. Root17410 продолжает очередь, следующий слот —
 `risky-approved-claims/2`. Полная серия и приёмка ещё не завершены.
+
+
+На 2026-10-14 01:23 UTC завершены 11/18 baseline, 0/25 candidate.
+`risky-approved-claims/2`: oracle/полный расчёт/policy PASS, JS-узлов 0,
+CLI/wrapper exit 0, cleanup true. Session `ses_ec805bdc6ffeJ43aeVqcT3HBbP`,
+SHA attempt `13ec8ec2…`, audit `efa96085…`.
+Во всех 11 baseline oracle/расчёт PASS, policy PASS у восьми. Root17410
+активен; текущий слот — `campaign-roi-by-channel/2`, далее first-last/2
+и пять третьих прогонов. Итоговая приёмка ещё не завершена.
