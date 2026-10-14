@@ -46,3 +46,8 @@ test('copied token and missing absolute caller deadline refuse',()=>control(asyn
  const token=retainTerminalPrepareInvocation(f.source,f.input,f.control);assert.throws(()=>invokeTerminalPrepareInvocation({...token}));
  assert.throws(()=>retainTerminalPrepareInvocation(f.source,f.input,{signal:f.control.signal}));assert.equal(f.preparation.receipts.size,0);
 }));
+test('original abort is first even when deadline descriptor is foreign',()=>control(async f=>{
+ let gets=0;f.controller.abort(false);Object.defineProperty(f.control,'deadline',{get(){gets++;return Date.now()+60000}});
+ let caught=false;try{retainTerminalPrepareInvocation(f.source,f.input,f.control)}catch(value){caught=true;assert.equal(value,false)}
+ assert(caught);assert.equal(gets,0);assert.equal(f.preparation.receipts.size,0);
+}));

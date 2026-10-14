@@ -22,8 +22,9 @@ function snapshot(object){
   };
 }
 export function retainTerminalPrepareInvocation(source,input,control){
-  const signal=data(control,'signal'),deadline=data(control,'deadline');
+  const signal=data(control,'signal');
   AbortSignal.prototype.throwIfAborted.call(signal);
+  const deadline=data(control,'deadline');
   if(!Number.isSafeInteger(deadline)||Date.now()>=deadline)refuse();
   const custody=data(source,'custody'),native=data(source,'native'),loaded=data(source,'loaded'),preparation=data(source,'preparation');
   // Absolute caller deadline is retained verbatim, never derived from timeout_ms.
