@@ -14,6 +14,7 @@ import time
 
 from artifacts import verify_build
 from supplement import DeliveryError, save
+from admission_delivery import private_child_delivery
 
 
 def digest(path):
@@ -252,11 +253,16 @@ def launch(args):
         env.update(PWD=spec['cwd'], LOGINOM_AI_AGENT_CLI_PROFILE=spec['profile'],
             LOGINOM_AI_AGENT_SHARED_AUTH_DIR=spec['shared_auth_dir'],
             LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false')
-        # No origin JSON/env authority is delivered to the unsupported reader.
-        # Do not kill a resource-owning CLI on timeout or retry on failure/UNKNOWN.
-        result = subprocess.run(decision.consume_birth(), cwd=spec['cwd'], env=env, stdin=subprocess.DEVNULL)
-        decision.exited(result.returncode)
-        return result.returncode
+        # Locator is discovery only. One live decision, one birth, one exact child.
+        # The fixed private bootstrap must refuse/exit ordinarily on channel loss.
+        with private_child_delivery(decision) as delivery:
+            argv = decision.consume_birth()
+            child = subprocess.Popen(argv, cwd=spec['cwd'], env=delivery.locator_env(env),
+                stdin=subprocess.DEVNULL, pass_fds=delivery.pass_fds)
+            delivery.bind_child(child)
+            returncode = delivery.settle_child(child)
+            decision.exited(returncode)
+            return returncode
 
 
 def main():
