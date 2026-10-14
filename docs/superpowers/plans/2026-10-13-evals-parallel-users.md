@@ -437,6 +437,8 @@ expect(() => selectOwnedSessions([owned, owned], [owned])).toThrow("SESSION_IDEN
 
 ### Задача 3. Идемпотентная подготовка и all-slot admission
 
+- [x] Parent readonly `inspectPolicy` возвращает fresh ServerIdentity и проверенные native sharedDirectories/principals; общее `inspect` продолжает требовать квалифицированную session identity. Общий observed-data writer сохраняет private evidence. RED missing method → GREEN на постоянной research pair:1 PASS/31 (7.14s), ACL содержит2 исходных Everyone grants, user mutations отсутствуют и admin processes подтверждённо завершены;52 codecs/slots/admin PASS/181 (2.17s), typecheck/diff PASS. Effective ACL/user provisioning/admission этим не квалифицируются.
+
 **Files:** Create `evals/src/user-environment.ts`, `evals/test/user-environment.test.ts`, `evals/test/user-environment-integration.test.ts`, `evals/script/parallel-env.ts`; Modify `evals/src/profile.ts`, `evals/src/preflight.ts`, `evals/test/profile.test.ts`, `evals/test/preflight.test.ts`.
 
 **Interfaces:** Produces `ReadyEnvironment`, `prepareEnvironment`, `verifyEnvironment`; script `prepare|verify|status`. Consumes admin adapter и slot leases. Публичная standalone-команда закрывает свой admin context; `run.ts` позднее использует те же шаги со своим context.
