@@ -11,17 +11,18 @@ import { prepareCalibrationCases } from "./calibration-cases"
 import { checkOracle } from "./oracle"
 import { reserveRunDirectory } from "./run-directory"
 
-export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration")) {
+export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration"), onRunDirectory?: (directory: string) => Promise<void>) {
   const controller = new AbortController()
   const removeSigint = installSigint(controller)
-  return calibrateBody(config, corpusDir, controller.signal).finally(removeSigint)
+  return calibrateBody(config, corpusDir, controller.signal, onRunDirectory).finally(removeSigint)
 }
 
-async function calibrateBody(config: EvalConfig, corpusDir: string, signal: AbortSignal) {
+async function calibrateBody(config: EvalConfig, corpusDir: string, signal: AbortSignal, onRunDirectory?: (directory: string) => Promise<void>) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   await preflight(config, parseArtifactSource("docker", config.loginom), signal)
   const judge = await judgeInfo(config, signal)
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(new Date())}-calibrate`)
+  await onRunDirectory?.(runDir)
   const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
   const judgeAttempt = createJudgeGate()
