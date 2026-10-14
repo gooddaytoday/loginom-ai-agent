@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { evaluationContractHash } from "../src/evaluation"
 import { analyzeComparison } from "../src/compare-analysis"
 import { main } from "../src/run"
@@ -10,6 +10,27 @@ import { rejudge } from "../src/rejudge"
 import type { RunSummary } from "../src/report"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("rejudge removes its SIGINT handler after success and failed result persistence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-signal-"))
+  const listeners = process.listeners("SIGINT")
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }
+  try {
+    const dry = await main(["--dry-run", "--only", "group-sum-qty"], env)
+    const runId = path.basename(dry.runDir!)
+    const config = loadConfig(["--judge-only", runId], env)
+    expect((await rejudge(config, runId)).code).toBe(0)
+    expect(process.listeners("SIGINT")).toEqual(listeners)
+    const result = path.join(dry.runDir!, "group-sum-qty", "1", "result.json")
+    await rm(result)
+    await mkdir(result)
+    await expect(rejudge(config, runId)).rejects.toThrow()
+    expect(process.listeners("SIGINT")).toEqual(listeners)
+  } finally {
+    process.listeners("SIGINT").filter(listener => !listeners.includes(listener)).forEach(listener => process.off("SIGINT", listener))
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
 
 test("rejudge uses the configured private judge home for version and execution", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-home-"))
