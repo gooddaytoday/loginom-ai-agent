@@ -40,6 +40,13 @@ export async function validateNodeRun(runDir: string, taskIds: string[], tasksDi
   catch (error) { return { verdict: "ERROR", code: 2, errors: [`validator: ${error instanceof Error ? error.message : String(error)}`], failures: [], attempts: [] } }
 }
 
+export function requireNodeEvidenceSlot(summary: RunSummary, slotId: string | undefined) {
+  const slots = summary.slots?.filter(slot => slot.id === slotId)
+  if (slots && slots.length !== 1 || !slots && (summary.config.parallel ?? 1) > 1)
+    throw Error("Unknown node evidence slot")
+  return slots?.[0]
+}
+
 async function validateRun(runDir: string, taskIds: string[], tasksDir: string) {
   const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
   const errors = [
@@ -65,6 +72,7 @@ async function validateRun(runDir: string, taskIds: string[], tasksDir: string) 
       errors.push(`${id}: unknown required ID: ${item.id}`)
   }
   for (const task of summary.tasks) for (const attempt of task.attempts) {
+    requireNodeEvidenceSlot(summary, attempt.slot_id)
     if (attempt.attempt !== 1 || !["completed", "failed", "timeout", "no_artifact", "infra_error", "harness_error", "interrupted"].includes(attempt.status))
       errors.push(`${task.id}: invalid attempt number/status`)
     const evidence = Bun.file(path.join(runDir, task.id, String(attempt.attempt), "cleanup.json"))
