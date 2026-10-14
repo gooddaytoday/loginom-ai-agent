@@ -85,6 +85,32 @@ test.each(["unknown", "incomplete", "unit", "missing-admission", "foreign-uid", 
   expect(validateCapturedLineage(proof,input.binding.acquiredAt).length).toBeGreaterThan(0)
 })
 
+test.each(["tsv-utf8", "tsv-utf16le", "csv-comma-utf8", "csv-pipe-multiline", "txt-comma-utf8"])("LAB57: genuine earlier confirmed capture %s remains valid", async name => {
+  const captures=JSON.parse(await readFile(new URL("./fixtures/lab57-cleanup-proposal/confirmed-captures.json",import.meta.url),"utf8"))
+  const input=await fixture()
+  expect(captures[name].status).toBe("confirmed")
+  expect(validateCapturedLineage(captures[name],input.binding.acquiredAt)).toEqual([])
+})
+
+test.each(["present", "reused", "unknown", "foreign-container", "mounted", "fd", "old-observation"])("LAB57: fresh guard %s cannot authorise a plan", async fault => {
+  const input=await fixture()
+  const fresh={containerId:input.binding.containerId,noMounts:true,queuesClear:true,allProfilesInspected:true,
+    sourceAndGuardPidsAbsent:true,relevantInspectionComplete:true,nativeAbsent:true,browsersAndDebuggersAbsent:true,profileFdsAbsent:true,
+    writerAbsent:true,foreignProfilesClean:true,storageExact:true,originalBindingUnchanged:true,observedAt:new Date().toISOString(),
+    passes:[{remaining:0,reused:0,unknown:0},{remaining:0,reused:0,unknown:0}]}
+  if(fault==="present") fresh.passes[0]!.remaining=1
+  if(fault==="reused") fresh.passes[0]!.reused=1
+  if(fault==="unknown") fresh.passes[0]!.unknown=1
+  if(fault==="foreign-container") fresh.containerId="foreign"
+  if(fault==="mounted") fresh.noMounts=false
+  if(fault==="fd") fresh.profileFdsAbsent=false
+  if(fault==="old-observation") fresh.observedAt="2000-01-01T00:00:00Z"
+  input.freshOperatorGuards=fresh
+  const result=prepareLab57CleanupProposal(input)
+  expect(result.missing).toContain("FRESH_OPERATOR_GUARDS_REQUIRED")
+  expect(result.applied).toBe(false)
+})
+
 test("LAB57: preparation reports every missing operator prerequisite without granting effects", async () => {
   const result = prepareLab57CleanupProposal(await fixture())
   expect(result.missing).toContain("SERVER_CESSATION_UNPROVEN")

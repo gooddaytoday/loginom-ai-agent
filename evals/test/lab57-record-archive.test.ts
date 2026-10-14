@@ -136,3 +136,19 @@ test("LAB57 proposal: a saved reservation cannot resume in another process after
     await expect(reserveRecordArchive(plan)).rejects.toThrow()
   } finally {await rm(plan.root,{recursive:true,force:true})}
 })
+
+test.each(["bytes", "inode", "symlink", "mode", "hardlink", "owner"])("LAB57 proposal: corrupted once %s refuses effects", async fault => {
+  const plan=await record()
+  try {
+    const reservation=await reserveRecordArchive(plan)
+    if(fault==="bytes") await writeFile(plan.once,"CHANGED")
+    if(fault==="inode") {const bytes=await readFile(plan.once);await rm(plan.once);await writeFile(plan.once,bytes,{mode:0o600})}
+    if(fault==="symlink") {await rm(plan.once);await symlink(plan.source,plan.once)}
+    if(fault==="mode") await chmod(plan.once,0o644)
+    if(fault==="hardlink") await link(plan.once,path.join(plan.root,"alias-once"))
+    if(fault==="owner") reservation.owner.starttime="changed"
+    await expect(archiveReservedRecord(reservation)).rejects.toThrow()
+    expect(await readFile(plan.source,"utf8")).toBe("1234567")
+    expect(await Bun.file(plan.destination).exists()).toBe(false)
+  } finally {await rm(plan.root,{recursive:true,force:true})}
+})

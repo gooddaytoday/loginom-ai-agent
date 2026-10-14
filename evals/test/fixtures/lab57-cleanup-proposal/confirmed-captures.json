@@ -1,0 +1,4207 @@
+{
+  "tsv-utf8": {
+    "status": "confirmed",
+    "error": null,
+    "processes": [
+      {
+        "pid": 2131148,
+        "starttime": "99188206",
+        "uid": 1000,
+        "parent": 2126565,
+        "group": 2131148,
+        "session": 2131148,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "device": 64512,
+        "inode": 3691103
+      },
+      {
+        "pid": 2131160,
+        "starttime": "99188208",
+        "uid": 1000,
+        "parent": 2131148,
+        "group": 2131148,
+        "session": 2131148,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2131161,
+        "starttime": "99188208",
+        "uid": 1000,
+        "parent": 2131160,
+        "group": 2131161,
+        "session": 2131161,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2131162,
+        "starttime": "99188209",
+        "uid": 1000,
+        "parent": 2131161,
+        "group": 2131161,
+        "session": 2131161,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+        "device": 64512,
+        "inode": 11967127
+      },
+      {
+        "pid": 2131177,
+        "starttime": "99188328",
+        "uid": 1000,
+        "parent": 2131162,
+        "group": 2131161,
+        "session": 2131161,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2131189,
+        "starttime": "99188337",
+        "uid": 1000,
+        "parent": 2131177,
+        "group": 2131161,
+        "session": 2131161,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2131202,
+        "starttime": "99188513",
+        "uid": 1000,
+        "parent": 2131189,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131204,
+        "starttime": "99188516",
+        "uid": 1000,
+        "parent": 2131161,
+        "group": 2131203,
+        "session": 2131203,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2131206,
+        "starttime": "99188516",
+        "uid": 1000,
+        "parent": 2131161,
+        "group": 2131205,
+        "session": 2131205,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2131210,
+        "starttime": "99188516",
+        "uid": 1000,
+        "parent": 2131202,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131211,
+        "starttime": "99188516",
+        "uid": 1000,
+        "parent": 2131202,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131257,
+        "starttime": "99188521",
+        "uid": 1000,
+        "parent": 2131202,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131213,
+        "starttime": "99188519",
+        "uid": 1000,
+        "parent": 2131211,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131235,
+        "starttime": "99188520",
+        "uid": 1000,
+        "parent": 2131210,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131258,
+        "starttime": "99188523",
+        "uid": 1000,
+        "parent": 2131213,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131288,
+        "starttime": "99188526",
+        "uid": 1000,
+        "parent": 2131213,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131297,
+        "starttime": "99188527",
+        "uid": 1000,
+        "parent": 2131213,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131298,
+        "starttime": "99188527",
+        "uid": 1000,
+        "parent": 2131213,
+        "group": 2131202,
+        "session": 2131202,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131347,
+        "starttime": "99189128",
+        "uid": 1000,
+        "parent": 2131177,
+        "group": 2131161,
+        "session": 2131161,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2131359,
+        "starttime": "99189300",
+        "uid": 1000,
+        "parent": 2131347,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131361,
+        "starttime": "99189303",
+        "uid": 1000,
+        "parent": 2131161,
+        "group": 2131360,
+        "session": 2131360,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2131363,
+        "starttime": "99189303",
+        "uid": 1000,
+        "parent": 2131161,
+        "group": 2131362,
+        "session": 2131362,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2131367,
+        "starttime": "99189303",
+        "uid": 1000,
+        "parent": 2131359,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131368,
+        "starttime": "99189304",
+        "uid": 1000,
+        "parent": 2131359,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131394,
+        "starttime": "99189307",
+        "uid": 1000,
+        "parent": 2131359,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131370,
+        "starttime": "99189306",
+        "uid": 1000,
+        "parent": 2131368,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131392,
+        "starttime": "99189307",
+        "uid": 1000,
+        "parent": 2131367,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131419,
+        "starttime": "99189309",
+        "uid": 1000,
+        "parent": 2131370,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131444,
+        "starttime": "99189312",
+        "uid": 1000,
+        "parent": 2131370,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131453,
+        "starttime": "99189314",
+        "uid": 1000,
+        "parent": 2131370,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2131454,
+        "starttime": "99189314",
+        "uid": 1000,
+        "parent": 2131370,
+        "group": 2131359,
+        "session": 2131359,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      }
+    ],
+    "runtimeDirectories": [
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/39556c0c-b8f3-4008-b8f6-f02450b29f03",
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/fdbb0f8b0f0061bb590e5624fd1742c7ca803bcc6fca83017c017f262a261168/attempts/5bc7aaee-3685-4cf7-afab-be8739db674b"
+    ],
+    "writer": {
+      "device": 64512,
+      "inode": 17956878,
+      "owner": "7375ba1b-5d27-43d1-95b0-eea7579f4ddc"
+    },
+    "capture_complete": true,
+    "observation_mode": "continuous",
+    "selectedCli": {
+      "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+      "device": 64512,
+      "inode": 11967127
+    },
+    "launcher": {
+      "kind": "linux_subreaper",
+      "pid": 2131148,
+      "cli_pid": 2131162,
+      "ready": true
+    },
+    "unknownProcesses": [],
+    "browserBindings": [
+      {
+        "process": {
+          "pid": 2131202,
+          "starttime": "99188513",
+          "uid": 1000,
+          "parent": 2131189,
+          "group": 2131202,
+          "session": 2131202,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/39556c0c-b8f3-4008-b8f6-f02450b29f03",
+        "observed_at": "2026-10-13T23:02:47.997Z"
+      },
+      {
+        "process": {
+          "pid": 2131359,
+          "starttime": "99189300",
+          "uid": 1000,
+          "parent": 2131347,
+          "group": 2131359,
+          "session": 2131359,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/fdbb0f8b0f0061bb590e5624fd1742c7ca803bcc6fca83017c017f262a261168/attempts/5bc7aaee-3685-4cf7-afab-be8739db674b",
+        "observed_at": "2026-10-13T23:02:55.871Z"
+      }
+    ],
+    "admissions": [
+      {
+        "pid": 2131148,
+        "starttime": "99188206",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131160,
+        "starttime": "99188208",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131161,
+        "starttime": "99188208",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131162,
+        "starttime": "99188209",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131177,
+        "starttime": "99188328",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131189,
+        "starttime": "99188337",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131202,
+        "starttime": "99188513",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131204,
+        "starttime": "99188516",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131206,
+        "starttime": "99188516",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131210,
+        "starttime": "99188516",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131211,
+        "starttime": "99188516",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131257,
+        "starttime": "99188521",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131213,
+        "starttime": "99188519",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131235,
+        "starttime": "99188520",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131258,
+        "starttime": "99188523",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131288,
+        "starttime": "99188526",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131297,
+        "starttime": "99188527",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131298,
+        "starttime": "99188527",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131347,
+        "starttime": "99189128",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131359,
+        "starttime": "99189300",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131361,
+        "starttime": "99189303",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131363,
+        "starttime": "99189303",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131367,
+        "starttime": "99189303",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131368,
+        "starttime": "99189304",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131394,
+        "starttime": "99189307",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131370,
+        "starttime": "99189306",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131392,
+        "starttime": "99189307",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131419,
+        "starttime": "99189309",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131444,
+        "starttime": "99189312",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131453,
+        "starttime": "99189314",
+        "status": "allowed"
+      },
+      {
+        "pid": 2131454,
+        "starttime": "99189314",
+        "status": "allowed"
+      }
+    ],
+    "origins": [
+      {
+        "pid": 2131148,
+        "starttime": "99188206",
+        "via": "launcher",
+        "parent_pid": null,
+        "parent_starttime": null,
+        "observed_at": "2026-10-13T23:02:44.920Z"
+      },
+      {
+        "pid": 2131160,
+        "starttime": "99188208",
+        "via": "parent",
+        "parent_pid": 2131148,
+        "parent_starttime": "99188206",
+        "observed_at": "2026-10-13T23:02:44.955Z"
+      },
+      {
+        "pid": 2131161,
+        "starttime": "99188208",
+        "via": "parent",
+        "parent_pid": 2131160,
+        "parent_starttime": "99188208",
+        "observed_at": "2026-10-13T23:02:44.955Z"
+      },
+      {
+        "pid": 2131162,
+        "starttime": "99188209",
+        "via": "cli",
+        "parent_pid": 2131161,
+        "parent_starttime": "99188208",
+        "observed_at": "2026-10-13T23:02:44.955Z"
+      },
+      {
+        "pid": 2131177,
+        "starttime": "99188328",
+        "via": "parent",
+        "parent_pid": 2131162,
+        "parent_starttime": "99188209",
+        "observed_at": "2026-10-13T23:02:46.149Z"
+      },
+      {
+        "pid": 2131189,
+        "starttime": "99188337",
+        "via": "parent",
+        "parent_pid": 2131177,
+        "parent_starttime": "99188328",
+        "observed_at": "2026-10-13T23:02:46.242Z"
+      },
+      {
+        "pid": 2131202,
+        "starttime": "99188513",
+        "via": "parent",
+        "parent_pid": 2131189,
+        "parent_starttime": "99188337",
+        "observed_at": "2026-10-13T23:02:47.997Z"
+      },
+      {
+        "pid": 2131204,
+        "starttime": "99188516",
+        "via": "subreaper",
+        "parent_pid": 2131161,
+        "parent_starttime": "99188208",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131206,
+        "starttime": "99188516",
+        "via": "subreaper",
+        "parent_pid": 2131161,
+        "parent_starttime": "99188208",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131210,
+        "starttime": "99188516",
+        "via": "parent",
+        "parent_pid": 2131202,
+        "parent_starttime": "99188513",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131211,
+        "starttime": "99188516",
+        "via": "parent",
+        "parent_pid": 2131202,
+        "parent_starttime": "99188513",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131257,
+        "starttime": "99188521",
+        "via": "parent",
+        "parent_pid": 2131202,
+        "parent_starttime": "99188513",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131213,
+        "starttime": "99188519",
+        "via": "parent",
+        "parent_pid": 2131211,
+        "parent_starttime": "99188516",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131235,
+        "starttime": "99188520",
+        "via": "parent",
+        "parent_pid": 2131210,
+        "parent_starttime": "99188516",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131258,
+        "starttime": "99188523",
+        "via": "parent",
+        "parent_pid": 2131213,
+        "parent_starttime": "99188519",
+        "observed_at": "2026-10-13T23:02:48.099Z"
+      },
+      {
+        "pid": 2131288,
+        "starttime": "99188526",
+        "via": "parent",
+        "parent_pid": 2131213,
+        "parent_starttime": "99188519",
+        "observed_at": "2026-10-13T23:02:48.202Z"
+      },
+      {
+        "pid": 2131297,
+        "starttime": "99188527",
+        "via": "parent",
+        "parent_pid": 2131213,
+        "parent_starttime": "99188519",
+        "observed_at": "2026-10-13T23:02:48.202Z"
+      },
+      {
+        "pid": 2131298,
+        "starttime": "99188527",
+        "via": "parent",
+        "parent_pid": 2131213,
+        "parent_starttime": "99188519",
+        "observed_at": "2026-10-13T23:02:48.202Z"
+      },
+      {
+        "pid": 2131347,
+        "starttime": "99189128",
+        "via": "parent",
+        "parent_pid": 2131177,
+        "parent_starttime": "99188328",
+        "observed_at": "2026-10-13T23:02:54.237Z"
+      },
+      {
+        "pid": 2131359,
+        "starttime": "99189300",
+        "via": "parent",
+        "parent_pid": 2131347,
+        "parent_starttime": "99189128",
+        "observed_at": "2026-10-13T23:02:55.871Z"
+      },
+      {
+        "pid": 2131361,
+        "starttime": "99189303",
+        "via": "subreaper",
+        "parent_pid": 2131161,
+        "parent_starttime": "99188208",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131363,
+        "starttime": "99189303",
+        "via": "subreaper",
+        "parent_pid": 2131161,
+        "parent_starttime": "99188208",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131367,
+        "starttime": "99189303",
+        "via": "parent",
+        "parent_pid": 2131359,
+        "parent_starttime": "99189300",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131368,
+        "starttime": "99189304",
+        "via": "parent",
+        "parent_pid": 2131359,
+        "parent_starttime": "99189300",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131394,
+        "starttime": "99189307",
+        "via": "parent",
+        "parent_pid": 2131359,
+        "parent_starttime": "99189300",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131370,
+        "starttime": "99189306",
+        "via": "parent",
+        "parent_pid": 2131368,
+        "parent_starttime": "99189304",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131392,
+        "starttime": "99189307",
+        "via": "parent",
+        "parent_pid": 2131367,
+        "parent_starttime": "99189303",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131419,
+        "starttime": "99189309",
+        "via": "parent",
+        "parent_pid": 2131370,
+        "parent_starttime": "99189306",
+        "observed_at": "2026-10-13T23:02:55.973Z"
+      },
+      {
+        "pid": 2131444,
+        "starttime": "99189312",
+        "via": "parent",
+        "parent_pid": 2131370,
+        "parent_starttime": "99189306",
+        "observed_at": "2026-10-13T23:02:56.076Z"
+      },
+      {
+        "pid": 2131453,
+        "starttime": "99189314",
+        "via": "parent",
+        "parent_pid": 2131370,
+        "parent_starttime": "99189306",
+        "observed_at": "2026-10-13T23:02:56.076Z"
+      },
+      {
+        "pid": 2131454,
+        "starttime": "99189314",
+        "via": "parent",
+        "parent_pid": 2131370,
+        "parent_starttime": "99189306",
+        "observed_at": "2026-10-13T23:02:56.076Z"
+      }
+    ],
+    "observations": {
+      "count": 2752,
+      "max_duration_ms": 16
+    },
+    "polling": [
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T23:02:44.934Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T23:02:47.997Z"
+      },
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T23:02:55.674Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T23:02:55.871Z"
+      }
+    ],
+    "verification": [
+      {
+        "observed_at": "2026-10-13T23:06:51.305Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-13T23:06:51.408Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "tsv-utf16le": {
+    "status": "confirmed",
+    "error": null,
+    "processes": [
+      {
+        "pid": 2129877,
+        "starttime": "99158121",
+        "uid": 1000,
+        "parent": 2126565,
+        "group": 2129877,
+        "session": 2129877,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "device": 64512,
+        "inode": 3691103
+      },
+      {
+        "pid": 2129889,
+        "starttime": "99158123",
+        "uid": 1000,
+        "parent": 2129877,
+        "group": 2129877,
+        "session": 2129877,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2129890,
+        "starttime": "99158123",
+        "uid": 1000,
+        "parent": 2129889,
+        "group": 2129890,
+        "session": 2129890,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2129891,
+        "starttime": "99158124",
+        "uid": 1000,
+        "parent": 2129890,
+        "group": 2129890,
+        "session": 2129890,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+        "device": 64512,
+        "inode": 11967127
+      },
+      {
+        "pid": 2129906,
+        "starttime": "99158245",
+        "uid": 1000,
+        "parent": 2129891,
+        "group": 2129890,
+        "session": 2129890,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2129918,
+        "starttime": "99158253",
+        "uid": 1000,
+        "parent": 2129906,
+        "group": 2129890,
+        "session": 2129890,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2129931,
+        "starttime": "99158429",
+        "uid": 1000,
+        "parent": 2129918,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129933,
+        "starttime": "99158432",
+        "uid": 1000,
+        "parent": 2129890,
+        "group": 2129932,
+        "session": 2129932,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2129935,
+        "starttime": "99158432",
+        "uid": 1000,
+        "parent": 2129890,
+        "group": 2129934,
+        "session": 2129934,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2129939,
+        "starttime": "99158433",
+        "uid": 1000,
+        "parent": 2129931,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129940,
+        "starttime": "99158433",
+        "uid": 1000,
+        "parent": 2129931,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129985,
+        "starttime": "99158438",
+        "uid": 1000,
+        "parent": 2129931,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129942,
+        "starttime": "99158436",
+        "uid": 1000,
+        "parent": 2129940,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129963,
+        "starttime": "99158437",
+        "uid": 1000,
+        "parent": 2129939,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129988,
+        "starttime": "99158440",
+        "uid": 1000,
+        "parent": 2129942,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130017,
+        "starttime": "99158443",
+        "uid": 1000,
+        "parent": 2129942,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130026,
+        "starttime": "99158444",
+        "uid": 1000,
+        "parent": 2129942,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130027,
+        "starttime": "99158444",
+        "uid": 1000,
+        "parent": 2129942,
+        "group": 2129931,
+        "session": 2129931,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130083,
+        "starttime": "99159072",
+        "uid": 1000,
+        "parent": 2129906,
+        "group": 2129890,
+        "session": 2129890,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2130095,
+        "starttime": "99159242",
+        "uid": 1000,
+        "parent": 2130083,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130097,
+        "starttime": "99159245",
+        "uid": 1000,
+        "parent": 2129890,
+        "group": 2130096,
+        "session": 2130096,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2130099,
+        "starttime": "99159245",
+        "uid": 1000,
+        "parent": 2129890,
+        "group": 2130098,
+        "session": 2130098,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2130103,
+        "starttime": "99159246",
+        "uid": 1000,
+        "parent": 2130095,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130104,
+        "starttime": "99159246",
+        "uid": 1000,
+        "parent": 2130095,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130129,
+        "starttime": "99159250",
+        "uid": 1000,
+        "parent": 2130095,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130106,
+        "starttime": "99159249",
+        "uid": 1000,
+        "parent": 2130104,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130127,
+        "starttime": "99159249",
+        "uid": 1000,
+        "parent": 2130103,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130153,
+        "starttime": "99159251",
+        "uid": 1000,
+        "parent": 2130106,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130181,
+        "starttime": "99159255",
+        "uid": 1000,
+        "parent": 2130106,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130190,
+        "starttime": "99159256",
+        "uid": 1000,
+        "parent": 2130106,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2130191,
+        "starttime": "99159256",
+        "uid": 1000,
+        "parent": 2130106,
+        "group": 2130095,
+        "session": 2130095,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      }
+    ],
+    "runtimeDirectories": [
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/9cdebcc7-5dd1-4115-aa58-c74645c52d94",
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/90e17ccb9c7d4cb438ff3c32ea706e06c147e826a63573c5d26f1706f58cc66c/attempts/71fbe52b-aeed-4037-91fb-fb21559bdb5d"
+    ],
+    "writer": {
+      "device": 64512,
+      "inode": 17956878,
+      "owner": "2ce3950e-7752-473f-8aea-b1580bba4c2f"
+    },
+    "capture_complete": true,
+    "observation_mode": "continuous",
+    "selectedCli": {
+      "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+      "device": 64512,
+      "inode": 11967127
+    },
+    "launcher": {
+      "kind": "linux_subreaper",
+      "pid": 2129877,
+      "cli_pid": 2129891,
+      "ready": true
+    },
+    "unknownProcesses": [],
+    "browserBindings": [
+      {
+        "process": {
+          "pid": 2129931,
+          "starttime": "99158429",
+          "uid": 1000,
+          "parent": 2129918,
+          "group": 2129931,
+          "session": 2129931,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/9cdebcc7-5dd1-4115-aa58-c74645c52d94",
+        "observed_at": "2026-10-13T22:57:47.159Z"
+      },
+      {
+        "process": {
+          "pid": 2130095,
+          "starttime": "99159242",
+          "uid": 1000,
+          "parent": 2130083,
+          "group": 2130095,
+          "session": 2130095,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/90e17ccb9c7d4cb438ff3c32ea706e06c147e826a63573c5d26f1706f58cc66c/attempts/71fbe52b-aeed-4037-91fb-fb21559bdb5d",
+        "observed_at": "2026-10-13T22:57:55.292Z"
+      }
+    ],
+    "admissions": [
+      {
+        "pid": 2129877,
+        "starttime": "99158121",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129889,
+        "starttime": "99158123",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129890,
+        "starttime": "99158123",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129891,
+        "starttime": "99158124",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129906,
+        "starttime": "99158245",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129918,
+        "starttime": "99158253",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129931,
+        "starttime": "99158429",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129933,
+        "starttime": "99158432",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129935,
+        "starttime": "99158432",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129939,
+        "starttime": "99158433",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129940,
+        "starttime": "99158433",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129985,
+        "starttime": "99158438",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129942,
+        "starttime": "99158436",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129963,
+        "starttime": "99158437",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129988,
+        "starttime": "99158440",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130017,
+        "starttime": "99158443",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130026,
+        "starttime": "99158444",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130027,
+        "starttime": "99158444",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130083,
+        "starttime": "99159072",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130095,
+        "starttime": "99159242",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130097,
+        "starttime": "99159245",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130099,
+        "starttime": "99159245",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130103,
+        "starttime": "99159246",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130104,
+        "starttime": "99159246",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130129,
+        "starttime": "99159250",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130106,
+        "starttime": "99159249",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130127,
+        "starttime": "99159249",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130153,
+        "starttime": "99159251",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130181,
+        "starttime": "99159255",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130190,
+        "starttime": "99159256",
+        "status": "allowed"
+      },
+      {
+        "pid": 2130191,
+        "starttime": "99159256",
+        "status": "allowed"
+      }
+    ],
+    "origins": [
+      {
+        "pid": 2129877,
+        "starttime": "99158121",
+        "via": "launcher",
+        "parent_pid": null,
+        "parent_starttime": null,
+        "observed_at": "2026-10-13T22:57:44.068Z"
+      },
+      {
+        "pid": 2129889,
+        "starttime": "99158123",
+        "via": "parent",
+        "parent_pid": 2129877,
+        "parent_starttime": "99158121",
+        "observed_at": "2026-10-13T22:57:44.102Z"
+      },
+      {
+        "pid": 2129890,
+        "starttime": "99158123",
+        "via": "parent",
+        "parent_pid": 2129889,
+        "parent_starttime": "99158123",
+        "observed_at": "2026-10-13T22:57:44.102Z"
+      },
+      {
+        "pid": 2129891,
+        "starttime": "99158124",
+        "via": "cli",
+        "parent_pid": 2129890,
+        "parent_starttime": "99158123",
+        "observed_at": "2026-10-13T22:57:44.102Z"
+      },
+      {
+        "pid": 2129906,
+        "starttime": "99158245",
+        "via": "parent",
+        "parent_pid": 2129891,
+        "parent_starttime": "99158124",
+        "observed_at": "2026-10-13T22:57:45.315Z"
+      },
+      {
+        "pid": 2129918,
+        "starttime": "99158253",
+        "via": "parent",
+        "parent_pid": 2129906,
+        "parent_starttime": "99158245",
+        "observed_at": "2026-10-13T22:57:45.399Z"
+      },
+      {
+        "pid": 2129931,
+        "starttime": "99158429",
+        "via": "parent",
+        "parent_pid": 2129918,
+        "parent_starttime": "99158253",
+        "observed_at": "2026-10-13T22:57:47.158Z"
+      },
+      {
+        "pid": 2129933,
+        "starttime": "99158432",
+        "via": "subreaper",
+        "parent_pid": 2129890,
+        "parent_starttime": "99158123",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129935,
+        "starttime": "99158432",
+        "via": "subreaper",
+        "parent_pid": 2129890,
+        "parent_starttime": "99158123",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129939,
+        "starttime": "99158433",
+        "via": "parent",
+        "parent_pid": 2129931,
+        "parent_starttime": "99158429",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129940,
+        "starttime": "99158433",
+        "via": "parent",
+        "parent_pid": 2129931,
+        "parent_starttime": "99158429",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129985,
+        "starttime": "99158438",
+        "via": "parent",
+        "parent_pid": 2129931,
+        "parent_starttime": "99158429",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129942,
+        "starttime": "99158436",
+        "via": "parent",
+        "parent_pid": 2129940,
+        "parent_starttime": "99158433",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129963,
+        "starttime": "99158437",
+        "via": "parent",
+        "parent_pid": 2129939,
+        "parent_starttime": "99158433",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2129988,
+        "starttime": "99158440",
+        "via": "parent",
+        "parent_pid": 2129942,
+        "parent_starttime": "99158436",
+        "observed_at": "2026-10-13T22:57:47.261Z"
+      },
+      {
+        "pid": 2130017,
+        "starttime": "99158443",
+        "via": "parent",
+        "parent_pid": 2129942,
+        "parent_starttime": "99158436",
+        "observed_at": "2026-10-13T22:57:47.365Z"
+      },
+      {
+        "pid": 2130026,
+        "starttime": "99158444",
+        "via": "parent",
+        "parent_pid": 2129942,
+        "parent_starttime": "99158436",
+        "observed_at": "2026-10-13T22:57:47.365Z"
+      },
+      {
+        "pid": 2130027,
+        "starttime": "99158444",
+        "via": "parent",
+        "parent_pid": 2129942,
+        "parent_starttime": "99158436",
+        "observed_at": "2026-10-13T22:57:47.365Z"
+      },
+      {
+        "pid": 2130083,
+        "starttime": "99159072",
+        "via": "parent",
+        "parent_pid": 2129906,
+        "parent_starttime": "99158245",
+        "observed_at": "2026-10-13T22:57:53.609Z"
+      },
+      {
+        "pid": 2130095,
+        "starttime": "99159242",
+        "via": "parent",
+        "parent_pid": 2130083,
+        "parent_starttime": "99159072",
+        "observed_at": "2026-10-13T22:57:55.291Z"
+      },
+      {
+        "pid": 2130097,
+        "starttime": "99159245",
+        "via": "subreaper",
+        "parent_pid": 2129890,
+        "parent_starttime": "99158123",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130099,
+        "starttime": "99159245",
+        "via": "subreaper",
+        "parent_pid": 2129890,
+        "parent_starttime": "99158123",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130103,
+        "starttime": "99159246",
+        "via": "parent",
+        "parent_pid": 2130095,
+        "parent_starttime": "99159242",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130104,
+        "starttime": "99159246",
+        "via": "parent",
+        "parent_pid": 2130095,
+        "parent_starttime": "99159242",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130129,
+        "starttime": "99159250",
+        "via": "parent",
+        "parent_pid": 2130095,
+        "parent_starttime": "99159242",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130106,
+        "starttime": "99159249",
+        "via": "parent",
+        "parent_pid": 2130104,
+        "parent_starttime": "99159246",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130127,
+        "starttime": "99159249",
+        "via": "parent",
+        "parent_pid": 2130103,
+        "parent_starttime": "99159246",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130153,
+        "starttime": "99159251",
+        "via": "parent",
+        "parent_pid": 2130106,
+        "parent_starttime": "99159249",
+        "observed_at": "2026-10-13T22:57:55.394Z"
+      },
+      {
+        "pid": 2130181,
+        "starttime": "99159255",
+        "via": "parent",
+        "parent_pid": 2130106,
+        "parent_starttime": "99159249",
+        "observed_at": "2026-10-13T22:57:55.497Z"
+      },
+      {
+        "pid": 2130190,
+        "starttime": "99159256",
+        "via": "parent",
+        "parent_pid": 2130106,
+        "parent_starttime": "99159249",
+        "observed_at": "2026-10-13T22:57:55.497Z"
+      },
+      {
+        "pid": 2130191,
+        "starttime": "99159256",
+        "via": "parent",
+        "parent_pid": 2130106,
+        "parent_starttime": "99159249",
+        "observed_at": "2026-10-13T22:57:55.497Z"
+      }
+    ],
+    "observations": {
+      "count": 3156,
+      "max_duration_ms": 21
+    },
+    "polling": [
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T22:57:44.082Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T22:57:47.159Z"
+      },
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T22:57:55.136Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T22:57:55.292Z"
+      }
+    ],
+    "verification": [
+      {
+        "observed_at": "2026-10-13T23:02:32.397Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-13T23:02:32.500Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "csv-comma-utf8": {
+    "status": "confirmed",
+    "error": null,
+    "processes": [
+      {
+        "pid": 2127478,
+        "starttime": "99116395",
+        "uid": 1000,
+        "parent": 2126565,
+        "group": 2127478,
+        "session": 2127478,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "device": 64512,
+        "inode": 3691103
+      },
+      {
+        "pid": 2127490,
+        "starttime": "99116397",
+        "uid": 1000,
+        "parent": 2127478,
+        "group": 2127478,
+        "session": 2127478,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2127491,
+        "starttime": "99116397",
+        "uid": 1000,
+        "parent": 2127490,
+        "group": 2127491,
+        "session": 2127491,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2127492,
+        "starttime": "99116398",
+        "uid": 1000,
+        "parent": 2127491,
+        "group": 2127491,
+        "session": 2127491,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+        "device": 64512,
+        "inode": 11967127
+      },
+      {
+        "pid": 2127507,
+        "starttime": "99116518",
+        "uid": 1000,
+        "parent": 2127492,
+        "group": 2127491,
+        "session": 2127491,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2127519,
+        "starttime": "99116527",
+        "uid": 1000,
+        "parent": 2127507,
+        "group": 2127491,
+        "session": 2127491,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2127532,
+        "starttime": "99116703",
+        "uid": 1000,
+        "parent": 2127519,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127534,
+        "starttime": "99116706",
+        "uid": 1000,
+        "parent": 2127491,
+        "group": 2127533,
+        "session": 2127533,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2127536,
+        "starttime": "99116706",
+        "uid": 1000,
+        "parent": 2127491,
+        "group": 2127535,
+        "session": 2127535,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2127540,
+        "starttime": "99116707",
+        "uid": 1000,
+        "parent": 2127532,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127541,
+        "starttime": "99116707",
+        "uid": 1000,
+        "parent": 2127532,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127587,
+        "starttime": "99116712",
+        "uid": 1000,
+        "parent": 2127532,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127543,
+        "starttime": "99116710",
+        "uid": 1000,
+        "parent": 2127541,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127565,
+        "starttime": "99116711",
+        "uid": 1000,
+        "parent": 2127540,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127596,
+        "starttime": "99116714",
+        "uid": 1000,
+        "parent": 2127543,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127617,
+        "starttime": "99116716",
+        "uid": 1000,
+        "parent": 2127543,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127626,
+        "starttime": "99116718",
+        "uid": 1000,
+        "parent": 2127543,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127627,
+        "starttime": "99116718",
+        "uid": 1000,
+        "parent": 2127543,
+        "group": 2127532,
+        "session": 2127532,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127684,
+        "starttime": "99117362",
+        "uid": 1000,
+        "parent": 2127507,
+        "group": 2127491,
+        "session": 2127491,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2127696,
+        "starttime": "99117532",
+        "uid": 1000,
+        "parent": 2127684,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127698,
+        "starttime": "99117535",
+        "uid": 1000,
+        "parent": 2127491,
+        "group": 2127697,
+        "session": 2127697,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2127700,
+        "starttime": "99117535",
+        "uid": 1000,
+        "parent": 2127491,
+        "group": 2127699,
+        "session": 2127699,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2127704,
+        "starttime": "99117536",
+        "uid": 1000,
+        "parent": 2127696,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127705,
+        "starttime": "99117536",
+        "uid": 1000,
+        "parent": 2127696,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127731,
+        "starttime": "99117540",
+        "uid": 1000,
+        "parent": 2127696,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127707,
+        "starttime": "99117539",
+        "uid": 1000,
+        "parent": 2127705,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127729,
+        "starttime": "99117540",
+        "uid": 1000,
+        "parent": 2127704,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127753,
+        "starttime": "99117541",
+        "uid": 1000,
+        "parent": 2127707,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127782,
+        "starttime": "99117544",
+        "uid": 1000,
+        "parent": 2127707,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127791,
+        "starttime": "99117545",
+        "uid": 1000,
+        "parent": 2127707,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2127792,
+        "starttime": "99117545",
+        "uid": 1000,
+        "parent": 2127707,
+        "group": 2127696,
+        "session": 2127696,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      }
+    ],
+    "runtimeDirectories": [
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/6d5681c7-a5c9-426b-ae50-13eef4f236cd",
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/59b60bcfad2e024f9787d93a5b6fb5eaaad7d5c8c47e94d688254bb7257f1526/attempts/2ff9df7d-5052-405f-b880-292b83c4f2e5"
+    ],
+    "writer": {
+      "device": 64512,
+      "inode": 17852688,
+      "owner": "b8fb0a77-e63c-4ebf-b867-ca98576c5b7a"
+    },
+    "capture_complete": true,
+    "observation_mode": "continuous",
+    "selectedCli": {
+      "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+      "device": 64512,
+      "inode": 11967127
+    },
+    "launcher": {
+      "kind": "linux_subreaper",
+      "pid": 2127478,
+      "cli_pid": 2127492,
+      "ready": true
+    },
+    "unknownProcesses": [],
+    "browserBindings": [
+      {
+        "process": {
+          "pid": 2127532,
+          "starttime": "99116703",
+          "uid": 1000,
+          "parent": 2127519,
+          "group": 2127532,
+          "session": 2127532,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/6d5681c7-a5c9-426b-ae50-13eef4f236cd",
+        "observed_at": "2026-10-13T22:50:49.899Z"
+      },
+      {
+        "process": {
+          "pid": 2127696,
+          "starttime": "99117532",
+          "uid": 1000,
+          "parent": 2127684,
+          "group": 2127696,
+          "session": 2127696,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/59b60bcfad2e024f9787d93a5b6fb5eaaad7d5c8c47e94d688254bb7257f1526/attempts/2ff9df7d-5052-405f-b880-292b83c4f2e5",
+        "observed_at": "2026-10-13T22:50:58.197Z"
+      }
+    ],
+    "admissions": [
+      {
+        "pid": 2127478,
+        "starttime": "99116395",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127490,
+        "starttime": "99116397",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127491,
+        "starttime": "99116397",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127492,
+        "starttime": "99116398",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127507,
+        "starttime": "99116518",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127519,
+        "starttime": "99116527",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127532,
+        "starttime": "99116703",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127534,
+        "starttime": "99116706",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127536,
+        "starttime": "99116706",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127540,
+        "starttime": "99116707",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127541,
+        "starttime": "99116707",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127587,
+        "starttime": "99116712",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127543,
+        "starttime": "99116710",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127565,
+        "starttime": "99116711",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127596,
+        "starttime": "99116714",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127617,
+        "starttime": "99116716",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127626,
+        "starttime": "99116718",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127627,
+        "starttime": "99116718",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127684,
+        "starttime": "99117362",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127696,
+        "starttime": "99117532",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127698,
+        "starttime": "99117535",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127700,
+        "starttime": "99117535",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127704,
+        "starttime": "99117536",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127705,
+        "starttime": "99117536",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127731,
+        "starttime": "99117540",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127707,
+        "starttime": "99117539",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127729,
+        "starttime": "99117540",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127753,
+        "starttime": "99117541",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127782,
+        "starttime": "99117544",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127791,
+        "starttime": "99117545",
+        "status": "allowed"
+      },
+      {
+        "pid": 2127792,
+        "starttime": "99117545",
+        "status": "allowed"
+      }
+    ],
+    "origins": [
+      {
+        "pid": 2127478,
+        "starttime": "99116395",
+        "via": "launcher",
+        "parent_pid": null,
+        "parent_starttime": null,
+        "observed_at": "2026-10-13T22:50:46.809Z"
+      },
+      {
+        "pid": 2127490,
+        "starttime": "99116397",
+        "via": "parent",
+        "parent_pid": 2127478,
+        "parent_starttime": "99116395",
+        "observed_at": "2026-10-13T22:50:46.844Z"
+      },
+      {
+        "pid": 2127491,
+        "starttime": "99116397",
+        "via": "parent",
+        "parent_pid": 2127490,
+        "parent_starttime": "99116397",
+        "observed_at": "2026-10-13T22:50:46.844Z"
+      },
+      {
+        "pid": 2127492,
+        "starttime": "99116398",
+        "via": "cli",
+        "parent_pid": 2127491,
+        "parent_starttime": "99116397",
+        "observed_at": "2026-10-13T22:50:46.844Z"
+      },
+      {
+        "pid": 2127507,
+        "starttime": "99116518",
+        "via": "parent",
+        "parent_pid": 2127492,
+        "parent_starttime": "99116398",
+        "observed_at": "2026-10-13T22:50:48.055Z"
+      },
+      {
+        "pid": 2127519,
+        "starttime": "99116527",
+        "via": "parent",
+        "parent_pid": 2127507,
+        "parent_starttime": "99116518",
+        "observed_at": "2026-10-13T22:50:48.137Z"
+      },
+      {
+        "pid": 2127532,
+        "starttime": "99116703",
+        "via": "parent",
+        "parent_pid": 2127519,
+        "parent_starttime": "99116527",
+        "observed_at": "2026-10-13T22:50:49.899Z"
+      },
+      {
+        "pid": 2127534,
+        "starttime": "99116706",
+        "via": "subreaper",
+        "parent_pid": 2127491,
+        "parent_starttime": "99116397",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127536,
+        "starttime": "99116706",
+        "via": "subreaper",
+        "parent_pid": 2127491,
+        "parent_starttime": "99116397",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127540,
+        "starttime": "99116707",
+        "via": "parent",
+        "parent_pid": 2127532,
+        "parent_starttime": "99116703",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127541,
+        "starttime": "99116707",
+        "via": "parent",
+        "parent_pid": 2127532,
+        "parent_starttime": "99116703",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127587,
+        "starttime": "99116712",
+        "via": "parent",
+        "parent_pid": 2127532,
+        "parent_starttime": "99116703",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127543,
+        "starttime": "99116710",
+        "via": "parent",
+        "parent_pid": 2127541,
+        "parent_starttime": "99116707",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127565,
+        "starttime": "99116711",
+        "via": "parent",
+        "parent_pid": 2127540,
+        "parent_starttime": "99116707",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127596,
+        "starttime": "99116714",
+        "via": "parent",
+        "parent_pid": 2127543,
+        "parent_starttime": "99116710",
+        "observed_at": "2026-10-13T22:50:50.003Z"
+      },
+      {
+        "pid": 2127617,
+        "starttime": "99116716",
+        "via": "parent",
+        "parent_pid": 2127543,
+        "parent_starttime": "99116710",
+        "observed_at": "2026-10-13T22:50:50.105Z"
+      },
+      {
+        "pid": 2127626,
+        "starttime": "99116718",
+        "via": "parent",
+        "parent_pid": 2127543,
+        "parent_starttime": "99116710",
+        "observed_at": "2026-10-13T22:50:50.105Z"
+      },
+      {
+        "pid": 2127627,
+        "starttime": "99116718",
+        "via": "parent",
+        "parent_pid": 2127543,
+        "parent_starttime": "99116710",
+        "observed_at": "2026-10-13T22:50:50.105Z"
+      },
+      {
+        "pid": 2127684,
+        "starttime": "99117362",
+        "via": "parent",
+        "parent_pid": 2127507,
+        "parent_starttime": "99116518",
+        "observed_at": "2026-10-13T22:50:56.574Z"
+      },
+      {
+        "pid": 2127696,
+        "starttime": "99117532",
+        "via": "parent",
+        "parent_pid": 2127684,
+        "parent_starttime": "99117362",
+        "observed_at": "2026-10-13T22:50:58.196Z"
+      },
+      {
+        "pid": 2127698,
+        "starttime": "99117535",
+        "via": "subreaper",
+        "parent_pid": 2127491,
+        "parent_starttime": "99116397",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127700,
+        "starttime": "99117535",
+        "via": "subreaper",
+        "parent_pid": 2127491,
+        "parent_starttime": "99116397",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127704,
+        "starttime": "99117536",
+        "via": "parent",
+        "parent_pid": 2127696,
+        "parent_starttime": "99117532",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127705,
+        "starttime": "99117536",
+        "via": "parent",
+        "parent_pid": 2127696,
+        "parent_starttime": "99117532",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127731,
+        "starttime": "99117540",
+        "via": "parent",
+        "parent_pid": 2127696,
+        "parent_starttime": "99117532",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127707,
+        "starttime": "99117539",
+        "via": "parent",
+        "parent_pid": 2127705,
+        "parent_starttime": "99117536",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127729,
+        "starttime": "99117540",
+        "via": "parent",
+        "parent_pid": 2127704,
+        "parent_starttime": "99117536",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127753,
+        "starttime": "99117541",
+        "via": "parent",
+        "parent_pid": 2127707,
+        "parent_starttime": "99117539",
+        "observed_at": "2026-10-13T22:50:58.299Z"
+      },
+      {
+        "pid": 2127782,
+        "starttime": "99117544",
+        "via": "parent",
+        "parent_pid": 2127707,
+        "parent_starttime": "99117539",
+        "observed_at": "2026-10-13T22:50:58.402Z"
+      },
+      {
+        "pid": 2127791,
+        "starttime": "99117545",
+        "via": "parent",
+        "parent_pid": 2127707,
+        "parent_starttime": "99117539",
+        "observed_at": "2026-10-13T22:50:58.402Z"
+      },
+      {
+        "pid": 2127792,
+        "starttime": "99117545",
+        "via": "parent",
+        "parent_pid": 2127707,
+        "parent_starttime": "99117539",
+        "observed_at": "2026-10-13T22:50:58.402Z"
+      }
+    ],
+    "observations": {
+      "count": 2333,
+      "max_duration_ms": 26
+    },
+    "polling": [
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T22:50:46.823Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T22:50:49.899Z"
+      },
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T22:50:58.001Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T22:50:58.197Z"
+      }
+    ],
+    "verification": [
+      {
+        "observed_at": "2026-10-13T22:54:09.597Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-13T22:54:09.700Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "csv-pipe-multiline": {
+    "status": "confirmed",
+    "error": null,
+    "processes": [
+      {
+        "pid": 2128694,
+        "starttime": "99137870",
+        "uid": 1000,
+        "parent": 2126565,
+        "group": 2128694,
+        "session": 2128694,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "device": 64512,
+        "inode": 3691103
+      },
+      {
+        "pid": 2128706,
+        "starttime": "99137872",
+        "uid": 1000,
+        "parent": 2128694,
+        "group": 2128694,
+        "session": 2128694,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2128707,
+        "starttime": "99137872",
+        "uid": 1000,
+        "parent": 2128706,
+        "group": 2128707,
+        "session": 2128707,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2128708,
+        "starttime": "99137872",
+        "uid": 1000,
+        "parent": 2128707,
+        "group": 2128707,
+        "session": 2128707,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+        "device": 64512,
+        "inode": 11967127
+      },
+      {
+        "pid": 2128723,
+        "starttime": "99137994",
+        "uid": 1000,
+        "parent": 2128708,
+        "group": 2128707,
+        "session": 2128707,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2128735,
+        "starttime": "99138003",
+        "uid": 1000,
+        "parent": 2128723,
+        "group": 2128707,
+        "session": 2128707,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2128748,
+        "starttime": "99138179",
+        "uid": 1000,
+        "parent": 2128735,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128750,
+        "starttime": "99138182",
+        "uid": 1000,
+        "parent": 2128707,
+        "group": 2128749,
+        "session": 2128749,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2128752,
+        "starttime": "99138182",
+        "uid": 1000,
+        "parent": 2128707,
+        "group": 2128751,
+        "session": 2128751,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2128756,
+        "starttime": "99138182",
+        "uid": 1000,
+        "parent": 2128748,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128757,
+        "starttime": "99138182",
+        "uid": 1000,
+        "parent": 2128748,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128803,
+        "starttime": "99138188",
+        "uid": 1000,
+        "parent": 2128748,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128759,
+        "starttime": "99138185",
+        "uid": 1000,
+        "parent": 2128757,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128781,
+        "starttime": "99138186",
+        "uid": 1000,
+        "parent": 2128756,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128808,
+        "starttime": "99138189",
+        "uid": 1000,
+        "parent": 2128759,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128833,
+        "starttime": "99138192",
+        "uid": 1000,
+        "parent": 2128759,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128842,
+        "starttime": "99138193",
+        "uid": 1000,
+        "parent": 2128759,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128843,
+        "starttime": "99138193",
+        "uid": 1000,
+        "parent": 2128759,
+        "group": 2128748,
+        "session": 2128748,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128896,
+        "starttime": "99138800",
+        "uid": 1000,
+        "parent": 2128723,
+        "group": 2128707,
+        "session": 2128707,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2128909,
+        "starttime": "99138969",
+        "uid": 1000,
+        "parent": 2128896,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128911,
+        "starttime": "99138972",
+        "uid": 1000,
+        "parent": 2128707,
+        "group": 2128910,
+        "session": 2128910,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2128913,
+        "starttime": "99138972",
+        "uid": 1000,
+        "parent": 2128707,
+        "group": 2128912,
+        "session": 2128912,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2128917,
+        "starttime": "99138972",
+        "uid": 1000,
+        "parent": 2128909,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128918,
+        "starttime": "99138973",
+        "uid": 1000,
+        "parent": 2128909,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128942,
+        "starttime": "99138977",
+        "uid": 1000,
+        "parent": 2128909,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128920,
+        "starttime": "99138975",
+        "uid": 1000,
+        "parent": 2128918,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128940,
+        "starttime": "99138976",
+        "uid": 1000,
+        "parent": 2128917,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128972,
+        "starttime": "99138978",
+        "uid": 1000,
+        "parent": 2128920,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2128994,
+        "starttime": "99138981",
+        "uid": 1000,
+        "parent": 2128920,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129003,
+        "starttime": "99138983",
+        "uid": 1000,
+        "parent": 2128920,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2129004,
+        "starttime": "99138983",
+        "uid": 1000,
+        "parent": 2128920,
+        "group": 2128909,
+        "session": 2128909,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      }
+    ],
+    "runtimeDirectories": [
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/c2f40d02-fefd-416a-acb5-0ef78fb5df52",
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/8dcce7f16268274e6894f369459f5824811f1892d88c04779a5b52b6dc2ecb82/attempts/fb37d96f-d0f2-4cc4-8f19-33bf41472495"
+    ],
+    "writer": {
+      "device": 64512,
+      "inode": 17956878,
+      "owner": "117f8163-f125-4b77-b0c8-b49f14f088c3"
+    },
+    "capture_complete": true,
+    "observation_mode": "continuous",
+    "selectedCli": {
+      "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+      "device": 64512,
+      "inode": 11967127
+    },
+    "launcher": {
+      "kind": "linux_subreaper",
+      "pid": 2128694,
+      "cli_pid": 2128708,
+      "ready": true
+    },
+    "unknownProcesses": [],
+    "browserBindings": [
+      {
+        "process": {
+          "pid": 2128748,
+          "starttime": "99138179",
+          "uid": 1000,
+          "parent": 2128735,
+          "group": 2128748,
+          "session": 2128748,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/c2f40d02-fefd-416a-acb5-0ef78fb5df52",
+        "observed_at": "2026-10-13T22:54:24.653Z"
+      },
+      {
+        "process": {
+          "pid": 2128909,
+          "starttime": "99138969",
+          "uid": 1000,
+          "parent": 2128896,
+          "group": 2128909,
+          "session": 2128909,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/8dcce7f16268274e6894f369459f5824811f1892d88c04779a5b52b6dc2ecb82/attempts/fb37d96f-d0f2-4cc4-8f19-33bf41472495",
+        "observed_at": "2026-10-13T22:54:32.561Z"
+      }
+    ],
+    "admissions": [
+      {
+        "pid": 2128694,
+        "starttime": "99137870",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128706,
+        "starttime": "99137872",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128707,
+        "starttime": "99137872",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128708,
+        "starttime": "99137872",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128723,
+        "starttime": "99137994",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128735,
+        "starttime": "99138003",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128748,
+        "starttime": "99138179",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128750,
+        "starttime": "99138182",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128752,
+        "starttime": "99138182",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128756,
+        "starttime": "99138182",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128757,
+        "starttime": "99138182",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128803,
+        "starttime": "99138188",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128759,
+        "starttime": "99138185",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128781,
+        "starttime": "99138186",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128808,
+        "starttime": "99138189",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128833,
+        "starttime": "99138192",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128842,
+        "starttime": "99138193",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128843,
+        "starttime": "99138193",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128896,
+        "starttime": "99138800",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128909,
+        "starttime": "99138969",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128911,
+        "starttime": "99138972",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128913,
+        "starttime": "99138972",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128917,
+        "starttime": "99138972",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128918,
+        "starttime": "99138973",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128942,
+        "starttime": "99138977",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128920,
+        "starttime": "99138975",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128940,
+        "starttime": "99138976",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128972,
+        "starttime": "99138978",
+        "status": "allowed"
+      },
+      {
+        "pid": 2128994,
+        "starttime": "99138981",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129003,
+        "starttime": "99138983",
+        "status": "allowed"
+      },
+      {
+        "pid": 2129004,
+        "starttime": "99138983",
+        "status": "allowed"
+      }
+    ],
+    "origins": [
+      {
+        "pid": 2128694,
+        "starttime": "99137870",
+        "via": "launcher",
+        "parent_pid": null,
+        "parent_starttime": null,
+        "observed_at": "2026-10-13T22:54:21.557Z"
+      },
+      {
+        "pid": 2128706,
+        "starttime": "99137872",
+        "via": "parent",
+        "parent_pid": 2128694,
+        "parent_starttime": "99137870",
+        "observed_at": "2026-10-13T22:54:21.592Z"
+      },
+      {
+        "pid": 2128707,
+        "starttime": "99137872",
+        "via": "parent",
+        "parent_pid": 2128706,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:21.592Z"
+      },
+      {
+        "pid": 2128708,
+        "starttime": "99137872",
+        "via": "cli",
+        "parent_pid": 2128707,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:21.593Z"
+      },
+      {
+        "pid": 2128723,
+        "starttime": "99137994",
+        "via": "parent",
+        "parent_pid": 2128708,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:22.807Z"
+      },
+      {
+        "pid": 2128735,
+        "starttime": "99138003",
+        "via": "parent",
+        "parent_pid": 2128723,
+        "parent_starttime": "99137994",
+        "observed_at": "2026-10-13T22:54:22.889Z"
+      },
+      {
+        "pid": 2128748,
+        "starttime": "99138179",
+        "via": "parent",
+        "parent_pid": 2128735,
+        "parent_starttime": "99138003",
+        "observed_at": "2026-10-13T22:54:24.653Z"
+      },
+      {
+        "pid": 2128750,
+        "starttime": "99138182",
+        "via": "subreaper",
+        "parent_pid": 2128707,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128752,
+        "starttime": "99138182",
+        "via": "subreaper",
+        "parent_pid": 2128707,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128756,
+        "starttime": "99138182",
+        "via": "parent",
+        "parent_pid": 2128748,
+        "parent_starttime": "99138179",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128757,
+        "starttime": "99138182",
+        "via": "parent",
+        "parent_pid": 2128748,
+        "parent_starttime": "99138179",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128803,
+        "starttime": "99138188",
+        "via": "parent",
+        "parent_pid": 2128748,
+        "parent_starttime": "99138179",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128759,
+        "starttime": "99138185",
+        "via": "parent",
+        "parent_pid": 2128757,
+        "parent_starttime": "99138182",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128781,
+        "starttime": "99138186",
+        "via": "parent",
+        "parent_pid": 2128756,
+        "parent_starttime": "99138182",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128808,
+        "starttime": "99138189",
+        "via": "parent",
+        "parent_pid": 2128759,
+        "parent_starttime": "99138185",
+        "observed_at": "2026-10-13T22:54:24.756Z"
+      },
+      {
+        "pid": 2128833,
+        "starttime": "99138192",
+        "via": "parent",
+        "parent_pid": 2128759,
+        "parent_starttime": "99138185",
+        "observed_at": "2026-10-13T22:54:24.859Z"
+      },
+      {
+        "pid": 2128842,
+        "starttime": "99138193",
+        "via": "parent",
+        "parent_pid": 2128759,
+        "parent_starttime": "99138185",
+        "observed_at": "2026-10-13T22:54:24.859Z"
+      },
+      {
+        "pid": 2128843,
+        "starttime": "99138193",
+        "via": "parent",
+        "parent_pid": 2128759,
+        "parent_starttime": "99138185",
+        "observed_at": "2026-10-13T22:54:24.859Z"
+      },
+      {
+        "pid": 2128896,
+        "starttime": "99138800",
+        "via": "parent",
+        "parent_pid": 2128723,
+        "parent_starttime": "99137994",
+        "observed_at": "2026-10-13T22:54:30.913Z"
+      },
+      {
+        "pid": 2128909,
+        "starttime": "99138969",
+        "via": "parent",
+        "parent_pid": 2128896,
+        "parent_starttime": "99138800",
+        "observed_at": "2026-10-13T22:54:32.561Z"
+      },
+      {
+        "pid": 2128911,
+        "starttime": "99138972",
+        "via": "subreaper",
+        "parent_pid": 2128707,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128913,
+        "starttime": "99138972",
+        "via": "subreaper",
+        "parent_pid": 2128707,
+        "parent_starttime": "99137872",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128917,
+        "starttime": "99138972",
+        "via": "parent",
+        "parent_pid": 2128909,
+        "parent_starttime": "99138969",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128918,
+        "starttime": "99138973",
+        "via": "parent",
+        "parent_pid": 2128909,
+        "parent_starttime": "99138969",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128942,
+        "starttime": "99138977",
+        "via": "parent",
+        "parent_pid": 2128909,
+        "parent_starttime": "99138969",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128920,
+        "starttime": "99138975",
+        "via": "parent",
+        "parent_pid": 2128918,
+        "parent_starttime": "99138973",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128940,
+        "starttime": "99138976",
+        "via": "parent",
+        "parent_pid": 2128917,
+        "parent_starttime": "99138972",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128972,
+        "starttime": "99138978",
+        "via": "parent",
+        "parent_pid": 2128920,
+        "parent_starttime": "99138975",
+        "observed_at": "2026-10-13T22:54:32.663Z"
+      },
+      {
+        "pid": 2128994,
+        "starttime": "99138981",
+        "via": "parent",
+        "parent_pid": 2128920,
+        "parent_starttime": "99138975",
+        "observed_at": "2026-10-13T22:54:32.766Z"
+      },
+      {
+        "pid": 2129003,
+        "starttime": "99138983",
+        "via": "parent",
+        "parent_pid": 2128920,
+        "parent_starttime": "99138975",
+        "observed_at": "2026-10-13T22:54:32.766Z"
+      },
+      {
+        "pid": 2129004,
+        "starttime": "99138983",
+        "via": "parent",
+        "parent_pid": 2128920,
+        "parent_starttime": "99138975",
+        "observed_at": "2026-10-13T22:54:32.766Z"
+      }
+    ],
+    "observations": {
+      "count": 2216,
+      "max_duration_ms": 23
+    },
+    "polling": [
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T22:54:21.572Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T22:54:24.653Z"
+      },
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T22:54:32.343Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T22:54:32.561Z"
+      }
+    ],
+    "verification": [
+      {
+        "observed_at": "2026-10-13T22:57:31.958Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-13T22:57:32.062Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "txt-comma-utf8": {
+    "status": "confirmed",
+    "error": null,
+    "processes": [
+      {
+        "pid": 2132361,
+        "starttime": "99214037",
+        "uid": 1000,
+        "parent": 2126565,
+        "group": 2132361,
+        "session": 2132361,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "device": 64512,
+        "inode": 3691103
+      },
+      {
+        "pid": 2132373,
+        "starttime": "99214040",
+        "uid": 1000,
+        "parent": 2132361,
+        "group": 2132361,
+        "session": 2132361,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2132374,
+        "starttime": "99214040",
+        "uid": 1000,
+        "parent": 2132373,
+        "group": 2132374,
+        "session": 2132374,
+        "executable": "/usr/local/libexec/loginom-evals/bwrap",
+        "device": 64512,
+        "inode": 6293126
+      },
+      {
+        "pid": 2132375,
+        "starttime": "99214040",
+        "uid": 1000,
+        "parent": 2132374,
+        "group": 2132374,
+        "session": 2132374,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+        "device": 64512,
+        "inode": 11967127
+      },
+      {
+        "pid": 2132390,
+        "starttime": "99214160",
+        "uid": 1000,
+        "parent": 2132375,
+        "group": 2132374,
+        "session": 2132374,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2132402,
+        "starttime": "99214168",
+        "uid": 1000,
+        "parent": 2132390,
+        "group": 2132374,
+        "session": 2132374,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2132417,
+        "starttime": "99214343",
+        "uid": 1000,
+        "parent": 2132402,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132419,
+        "starttime": "99214346",
+        "uid": 1000,
+        "parent": 2132374,
+        "group": 2132418,
+        "session": 2132418,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2132421,
+        "starttime": "99214346",
+        "uid": 1000,
+        "parent": 2132374,
+        "group": 2132420,
+        "session": 2132420,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2132425,
+        "starttime": "99214347",
+        "uid": 1000,
+        "parent": 2132417,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132426,
+        "starttime": "99214347",
+        "uid": 1000,
+        "parent": 2132417,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132471,
+        "starttime": "99214352",
+        "uid": 1000,
+        "parent": 2132417,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132428,
+        "starttime": "99214349",
+        "uid": 1000,
+        "parent": 2132426,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132449,
+        "starttime": "99214350",
+        "uid": 1000,
+        "parent": 2132425,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132479,
+        "starttime": "99214353",
+        "uid": 1000,
+        "parent": 2132428,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132502,
+        "starttime": "99214356",
+        "uid": 1000,
+        "parent": 2132428,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132511,
+        "starttime": "99214358",
+        "uid": 1000,
+        "parent": 2132428,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132512,
+        "starttime": "99214358",
+        "uid": 1000,
+        "parent": 2132428,
+        "group": 2132417,
+        "session": 2132417,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132562,
+        "starttime": "99214969",
+        "uid": 1000,
+        "parent": 2132390,
+        "group": 2132374,
+        "session": 2132374,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/bin/node",
+        "device": 64512,
+        "inode": 3840497
+      },
+      {
+        "pid": 2132574,
+        "starttime": "99215140",
+        "uid": 1000,
+        "parent": 2132562,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132576,
+        "starttime": "99215142",
+        "uid": 1000,
+        "parent": 2132374,
+        "group": 2132575,
+        "session": 2132575,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2132578,
+        "starttime": "99215143",
+        "uid": 1000,
+        "parent": 2132374,
+        "group": 2132577,
+        "session": 2132577,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome_crashpad_handler",
+        "device": 64512,
+        "inode": 3840516
+      },
+      {
+        "pid": 2132582,
+        "starttime": "99215143",
+        "uid": 1000,
+        "parent": 2132574,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132583,
+        "starttime": "99215143",
+        "uid": 1000,
+        "parent": 2132574,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132608,
+        "starttime": "99215147",
+        "uid": 1000,
+        "parent": 2132574,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132585,
+        "starttime": "99215146",
+        "uid": 1000,
+        "parent": 2132583,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132606,
+        "starttime": "99215147",
+        "uid": 1000,
+        "parent": 2132582,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132634,
+        "starttime": "99215148",
+        "uid": 1000,
+        "parent": 2132585,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132659,
+        "starttime": "99215151",
+        "uid": 1000,
+        "parent": 2132585,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132668,
+        "starttime": "99215153",
+        "uid": 1000,
+        "parent": 2132585,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      },
+      {
+        "pid": 2132669,
+        "starttime": "99215153",
+        "uid": 1000,
+        "parent": 2132585,
+        "group": 2132574,
+        "session": 2132574,
+        "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+        "device": 64512,
+        "inode": 3840573
+      }
+    ],
+    "runtimeDirectories": [
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/51d345ed-2e06-4717-b607-a68af9eba099",
+      "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/5eea29f963c8e038d75cd5f994dadff2030f3e0f3316de4b5c75ec7c916d6131/attempts/3c90a276-2a73-429b-ba54-86333300e902"
+    ],
+    "writer": {
+      "device": 64512,
+      "inode": 17956878,
+      "owner": "d6463071-23d4-431b-8e63-8520c8f863f3"
+    },
+    "capture_complete": true,
+    "observation_mode": "continuous",
+    "selectedCli": {
+      "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/bin/loginom-ai-agent-cli",
+      "device": 64512,
+      "inode": 11967127
+    },
+    "launcher": {
+      "kind": "linux_subreaper",
+      "pid": 2132361,
+      "cli_pid": 2132375,
+      "ready": true
+    },
+    "unknownProcesses": [],
+    "browserBindings": [
+      {
+        "process": {
+          "pid": 2132417,
+          "starttime": "99214343",
+          "uid": 1000,
+          "parent": 2132402,
+          "group": 2132417,
+          "session": 2132417,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/readiness/attempts/51d345ed-2e06-4717-b607-a68af9eba099",
+        "observed_at": "2026-10-13T23:07:06.303Z"
+      },
+      {
+        "process": {
+          "pid": 2132574,
+          "starttime": "99215140",
+          "uid": 1000,
+          "parent": 2132562,
+          "group": 2132574,
+          "session": 2132574,
+          "executable": "/home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+          "device": 64512,
+          "inode": 3840573
+        },
+        "runtimeDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile/loginom/runtime/generations/1/chats/5eea29f963c8e038d75cd5f994dadff2030f3e0f3316de4b5c75ec7c916d6131/attempts/3c90a276-2a73-429b-ba54-86333300e902",
+        "observed_at": "2026-10-13T23:07:14.264Z"
+      }
+    ],
+    "admissions": [
+      {
+        "pid": 2132361,
+        "starttime": "99214037",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132373,
+        "starttime": "99214040",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132374,
+        "starttime": "99214040",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132375,
+        "starttime": "99214040",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132390,
+        "starttime": "99214160",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132402,
+        "starttime": "99214168",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132417,
+        "starttime": "99214343",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132419,
+        "starttime": "99214346",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132421,
+        "starttime": "99214346",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132425,
+        "starttime": "99214347",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132426,
+        "starttime": "99214347",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132471,
+        "starttime": "99214352",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132428,
+        "starttime": "99214349",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132449,
+        "starttime": "99214350",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132479,
+        "starttime": "99214353",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132502,
+        "starttime": "99214356",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132511,
+        "starttime": "99214358",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132512,
+        "starttime": "99214358",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132562,
+        "starttime": "99214969",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132574,
+        "starttime": "99215140",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132576,
+        "starttime": "99215142",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132578,
+        "starttime": "99215143",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132582,
+        "starttime": "99215143",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132583,
+        "starttime": "99215143",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132608,
+        "starttime": "99215147",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132585,
+        "starttime": "99215146",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132606,
+        "starttime": "99215147",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132634,
+        "starttime": "99215148",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132659,
+        "starttime": "99215151",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132668,
+        "starttime": "99215153",
+        "status": "allowed"
+      },
+      {
+        "pid": 2132669,
+        "starttime": "99215153",
+        "status": "allowed"
+      }
+    ],
+    "origins": [
+      {
+        "pid": 2132361,
+        "starttime": "99214037",
+        "via": "launcher",
+        "parent_pid": null,
+        "parent_starttime": null,
+        "observed_at": "2026-10-13T23:07:03.235Z"
+      },
+      {
+        "pid": 2132373,
+        "starttime": "99214040",
+        "via": "parent",
+        "parent_pid": 2132361,
+        "parent_starttime": "99214037",
+        "observed_at": "2026-10-13T23:07:03.271Z"
+      },
+      {
+        "pid": 2132374,
+        "starttime": "99214040",
+        "via": "parent",
+        "parent_pid": 2132373,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:03.271Z"
+      },
+      {
+        "pid": 2132375,
+        "starttime": "99214040",
+        "via": "cli",
+        "parent_pid": 2132374,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:03.271Z"
+      },
+      {
+        "pid": 2132390,
+        "starttime": "99214160",
+        "via": "parent",
+        "parent_pid": 2132375,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:04.462Z"
+      },
+      {
+        "pid": 2132402,
+        "starttime": "99214168",
+        "via": "parent",
+        "parent_pid": 2132390,
+        "parent_starttime": "99214160",
+        "observed_at": "2026-10-13T23:07:04.545Z"
+      },
+      {
+        "pid": 2132417,
+        "starttime": "99214343",
+        "via": "parent",
+        "parent_pid": 2132402,
+        "parent_starttime": "99214168",
+        "observed_at": "2026-10-13T23:07:06.302Z"
+      },
+      {
+        "pid": 2132419,
+        "starttime": "99214346",
+        "via": "subreaper",
+        "parent_pid": 2132374,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132421,
+        "starttime": "99214346",
+        "via": "subreaper",
+        "parent_pid": 2132374,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132425,
+        "starttime": "99214347",
+        "via": "parent",
+        "parent_pid": 2132417,
+        "parent_starttime": "99214343",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132426,
+        "starttime": "99214347",
+        "via": "parent",
+        "parent_pid": 2132417,
+        "parent_starttime": "99214343",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132471,
+        "starttime": "99214352",
+        "via": "parent",
+        "parent_pid": 2132417,
+        "parent_starttime": "99214343",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132428,
+        "starttime": "99214349",
+        "via": "parent",
+        "parent_pid": 2132426,
+        "parent_starttime": "99214347",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132449,
+        "starttime": "99214350",
+        "via": "parent",
+        "parent_pid": 2132425,
+        "parent_starttime": "99214347",
+        "observed_at": "2026-10-13T23:07:06.405Z"
+      },
+      {
+        "pid": 2132479,
+        "starttime": "99214353",
+        "via": "parent",
+        "parent_pid": 2132428,
+        "parent_starttime": "99214349",
+        "observed_at": "2026-10-13T23:07:06.406Z"
+      },
+      {
+        "pid": 2132502,
+        "starttime": "99214356",
+        "via": "parent",
+        "parent_pid": 2132428,
+        "parent_starttime": "99214349",
+        "observed_at": "2026-10-13T23:07:06.508Z"
+      },
+      {
+        "pid": 2132511,
+        "starttime": "99214358",
+        "via": "parent",
+        "parent_pid": 2132428,
+        "parent_starttime": "99214349",
+        "observed_at": "2026-10-13T23:07:06.508Z"
+      },
+      {
+        "pid": 2132512,
+        "starttime": "99214358",
+        "via": "parent",
+        "parent_pid": 2132428,
+        "parent_starttime": "99214349",
+        "observed_at": "2026-10-13T23:07:06.508Z"
+      },
+      {
+        "pid": 2132562,
+        "starttime": "99214969",
+        "via": "parent",
+        "parent_pid": 2132390,
+        "parent_starttime": "99214160",
+        "observed_at": "2026-10-13T23:07:12.565Z"
+      },
+      {
+        "pid": 2132574,
+        "starttime": "99215140",
+        "via": "parent",
+        "parent_pid": 2132562,
+        "parent_starttime": "99214969",
+        "observed_at": "2026-10-13T23:07:14.264Z"
+      },
+      {
+        "pid": 2132576,
+        "starttime": "99215142",
+        "via": "subreaper",
+        "parent_pid": 2132374,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:14.366Z"
+      },
+      {
+        "pid": 2132578,
+        "starttime": "99215143",
+        "via": "subreaper",
+        "parent_pid": 2132374,
+        "parent_starttime": "99214040",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132582,
+        "starttime": "99215143",
+        "via": "parent",
+        "parent_pid": 2132574,
+        "parent_starttime": "99215140",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132583,
+        "starttime": "99215143",
+        "via": "parent",
+        "parent_pid": 2132574,
+        "parent_starttime": "99215140",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132608,
+        "starttime": "99215147",
+        "via": "parent",
+        "parent_pid": 2132574,
+        "parent_starttime": "99215140",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132585,
+        "starttime": "99215146",
+        "via": "parent",
+        "parent_pid": 2132583,
+        "parent_starttime": "99215143",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132606,
+        "starttime": "99215147",
+        "via": "parent",
+        "parent_pid": 2132582,
+        "parent_starttime": "99215143",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132634,
+        "starttime": "99215148",
+        "via": "parent",
+        "parent_pid": 2132585,
+        "parent_starttime": "99215146",
+        "observed_at": "2026-10-13T23:07:14.367Z"
+      },
+      {
+        "pid": 2132659,
+        "starttime": "99215151",
+        "via": "parent",
+        "parent_pid": 2132585,
+        "parent_starttime": "99215146",
+        "observed_at": "2026-10-13T23:07:14.470Z"
+      },
+      {
+        "pid": 2132668,
+        "starttime": "99215153",
+        "via": "parent",
+        "parent_pid": 2132585,
+        "parent_starttime": "99215146",
+        "observed_at": "2026-10-13T23:07:14.470Z"
+      },
+      {
+        "pid": 2132669,
+        "starttime": "99215153",
+        "via": "parent",
+        "parent_pid": 2132585,
+        "parent_starttime": "99215146",
+        "observed_at": "2026-10-13T23:07:14.470Z"
+      }
+    ],
+    "observations": {
+      "count": 3026,
+      "max_duration_ms": 21
+    },
+    "polling": [
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T23:07:03.250Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T23:07:06.303Z"
+      },
+      {
+        "interval_ms": 10,
+        "observed_at": "2026-10-13T23:07:14.099Z"
+      },
+      {
+        "interval_ms": 100,
+        "observed_at": "2026-10-13T23:07:14.264Z"
+      }
+    ],
+    "verification": [
+      {
+        "observed_at": "2026-10-13T23:11:38.540Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-13T23:11:38.643Z",
+        "owned_remaining": 0
+      }
+    ]
+  }
+}
