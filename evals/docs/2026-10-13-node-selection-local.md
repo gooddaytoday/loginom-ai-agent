@@ -1250,3 +1250,26 @@ This is own selection with no link/mapping edit; actual disappearance and final
 Save/CSV/graph/cleanup still need proof. Independent design review pending;
 Product/payload unchanged, Root idle/model0. Any Product change requires a new
 matched pair and all native gates/full18+25; current050544 no model slots run.
+
+
+На 2026-10-14 06:31 UTC independent design review Approved:
+`73fc70b052396effa7ba096db837e55c0bec73591160b168af0e17a68c87d3c7`.
+Label branch обоснован actual758 и existing checkedHandle/epoch guard.
+До click удерживать exact label/port/owner fingerprint; после него fresh native
+GUID rebind, без старого DOM ref/epoch. Один click — максимум один физический
+жест; существующие no-effect pre-gesture refresh допускаются. Эффективность
+очистки tooltip ещё не доказана. Shared BODY-first helper не используется;
+unknown tooltip owner/trigger не переопределяется.
+
+050544 остановлен ДО model admission: `series-stop.json`
+SHA `362d5569ab85f295bb0f22effbd74271765194b389b83211951036d4acd01138`.
+Models0, no candidate/baseline attempts; остановка обусловлена required common
+runtime fix, не заявленным policy violation. Source1e577… был неизменён при stop,
+все own Host/admin закрыты/.writerabsent, raw/payload/pins preserved. Старые
+JS/Join/schema native PASS не переносятся на новый runtime. Новый source commit
+требует новой matched пары, всех ordinary native gates и полного18+25.
+
+Worker реализует approved LABEL branch через TDD, только text-export-node.mjs
+и focused test; raw/oldfixtures/pins/docs не меняет. Root owns canonical docs,
+checks/commits; independent source review до commit/live. Stage TDD label
+и его review/checks пока открыты, model acceptance не начиналась.
