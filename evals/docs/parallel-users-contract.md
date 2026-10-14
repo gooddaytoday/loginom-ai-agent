@@ -22,6 +22,8 @@ min/peak/delta и missing/reset counts; исходные frames сохраняю
 Readonly receipt verification получает expected source path/run/phase от
 controller, сверяет private source bytes/SHA и пересчитывает summary;
 изменённый receipt не выбирает произвольный source и не изменяет raw evidence.
+readResourceEvidence возвращает receipt и validated raw samples из одного
+проверенного чтения; readResourceSummary сохраняет прежний формат ответа.
 Temporal policy требует ordered samples с неизменным interval и monotonic elapsed,
 без missed intervals или whole gaps; observed timestamps охватывают dispatch до
 подтверждённого cleanup. Неизвестные clocks или неполное окно дают incomplete.
