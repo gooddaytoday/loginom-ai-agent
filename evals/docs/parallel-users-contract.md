@@ -549,3 +549,10 @@ held lease. Подтверждённая LocalAuth/safe design конфигур�
 source journal SHA; повтор использует её secret hash, затем проверяет native
 read-back. Первая установка без password write не считается подтверждённой.
 Это configure phase; positive parent lifecycle и общий admission ещё открыты.
+
+Parent административные мутации требуют переданный held server resource lease
+с ключом полного container ID и точной ServerIdentity; recovery-only server
+ownership разрешает cleanup close, но запрещает user provisioning. Readonly
+inspect не требует этого допуска. `reconcileOwnedAcl` получает свежий snapshot,
+проверяет сохранение сторонних grants и возвращает canonical hash/source proof;
+это staged ACL, ещё не effective-access или readiness gate.
