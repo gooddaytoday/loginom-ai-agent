@@ -1,13 +1,33 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты десять candidate,
-policy PASS во всех десяти. Один итоговый расчёт правильный, девять результатов
-не получены. Одна сессия завершена штатно, девять адресно освобождены после отказа.
-Перед продолжением все процессы Sales/2 завершены и профиль освобождён;
-finalrelease review `eb7016dd…`/readback `ee9c94eb…` и actual gate22:49:28.650Z
-разрешили technical-failed при неизменном originalattempt8bbe250b….
-ABC/Pareto/2 начат следующим последовательным runner;15candidate остаются,
-включая текущую попытку. Criteria/runtime/model/input прежние, без пересборки.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты одиннадцать
+candidate, policy PASS во всех одиннадцати. Один итоговый расчёт правильный,
+десять результатов не получены. Одна сессия завершена штатно, десять адресно
+освобождены после отказа. Полная приёмка25candidate и финальная seeded выборка
+ещё не завершены. Осталось14 candidate, включая текущий Monthly-demand/2.
+Sequential runner3573775/exec21013 продолжил серию23:19:56.541928Z; следующий
+модельный CLI запускается только после проверки предыдущих закрытых слотов.
+Criteria/runtime/model/input прежние, без пересборки.
+
+ABC/Pareto/2 closed23:05:51.032Z: policy PASS `46c50f47…`, mandatory failure
+review `6c2c1c7a…`;36messages/134parts/40tools/113events/4329runtime,
+JS0/nochildren. Std Import200→SortRevenueDESC/itemIDASC→Calculator cumulative→
+GroupSUM annualRevenue/count→InnerJoin total to200rows SUCCEEDED. Первый Join
+отказал до native UI: NOT_APPLIED/effectfalse/cleanuptrue/0nativeevents;
+исправленная новая операция case_sensitive=true успешно выполнена по retry receipt.
+Общая выручка получена через GroupSUM+Join; выполнения StatSum не утверждаем.
+Следующий стандартный Calculator share/classification: AMBIGUOUS,
+WIZARD_OPEN_NOT_CONFIRMED доexecute. Same-operation inspect/cancel/recover/resume
+и честный блокер, новыхapply/JS после ошибки нет. CSV/LGP/oracle не получены;
+original CLI1/cleanupfalse и runtime mismatch сохранены.
+Own263closed23:10:43.518Z/admin264logout23:10:45.137Z/browserclosed23:10:46.340Z;
+9actualPIDgone, точный guard архивирован23:17:15.256119Z с inode/rawNS/nonce
+без изменений. Unknown262 сохранён в двух UI readbacks. Root независимо проверил
+scope доclose;17original неизменны, mandatory review даёт18casefiles/26recovery.
+Descriptor `ef0f02d5…`; independent finalrelease review `2dfded07…`/readback
+`9533ff9d…` approved. Actual gate23:19:43.519Z разрешил technical-failed;
+originalattempt `b58b4c19…` неизменен. Перед review Root закрепил17original
+файлов0400 с проверкой SHA до и после; содержимое не менялось.
 
 Sales-by-category/2 closed22:40:57.751Z: policy PASS `03a4a477…`, mandatory
 failure review `4a252108…`;30messages/119parts/32tools/95events/2042runtime,
