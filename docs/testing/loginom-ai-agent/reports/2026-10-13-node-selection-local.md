@@ -2648,3 +2648,20 @@ Started7/closed6/accepted4/technicalfailed2/notstarted24/baseline0. Всеexcept
 требуютmachine+manualreview; followingtags/recovery и вся31matrix ещёобязательны.
 Reportamendment007/3ce588fa… подготовленпараллельно, сохраняетrecoverychronology.
 Main31/сравнение/полнаяприёмка open; новыхstandardnodefixes/diagnosticloopsнет.
+
+Checkpoint 2026-10-14 13:26 UTC — explicitJS/1 machinePASS/manualreviewpending.
+Attemptfinished13:23:42.052Z/CLI2029431exit0/normalcleanuptrue/wrapper2(reviewpending),
+Session ses_ec56f7346ffeJ6vqFRxuwxRb4o/docf056495b…/Dock8669d2bb…;
+LGP9b5b1d46…/oracleba7e5d7f…/500transactions→5categories. Auditcomplete
+policy/calculation/oracle/history/runtime/identity/graph/exporttrue/failures[],
+JSnodes1/calls1/success1/reviewpending, historyAnomalyfalse. NativeJSaggregate
+aggregate-category-js-1 node5c3c8890… SUCCEEDED; standardSort+ExportSUCCEEDED,
+Saveconfirmed. ЭтоактуальноеживоепокрытиесвязкиJS→Sort наrestoredruntime.
+Host2029735ACKtrue/exit0/noSignal/noError, actualCLIHostabsent/.writerabsent
+подтвержденыRoot13:26:10.537. Runner88693terminalexit2 MANUAL_REVIEW_REQUIRED.
+Originalaudit0400saved slot/selection-audit-before-manual-review.json;
+independentreview ownsbranch_base: genuine requested-aggregation/код/LGP/25ячеек/
+receipt-linkedidentities, безподставныхрезультатов. Доreview+Rootgateaccepted4.
+Reportготовитсяпараллельно, безповторногоoracle/model/native/tests.
+Started7/closed7/accepted4/technicalfailed2/pendingreview1/notstarted24/baseline0;
+full31/compare/fullacceptanceopen. Runtime/source/pins/lock/skill/model/inputs unchanged.

@@ -1,13 +1,14 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint 2026-10-14 13:20 UTC: matched пара112452/runtime659588…,
-разрешённые исправления d3cd4e46f9/713targetedPASS. Приняты firstlast/sales/monthly/claims/1.
-ABC/1 и ROI/1 technical-failed сохранены; own releases независимо подтверждены.
-ROI descriptor45b246…/reviewb7bcbbe3… approved; Rootpuregateadvance сохраняет
-policyincomplete/calculationfalse/JS0/noLGP. Samefrozen31resume4/exec88693 реально
-начал explicit-js/1: CLI2029431start13:18:30.928Z, Session ses_ec56f7346ffeJ6vqFRxuwxRb4o.
-Started7/closed6/accepted4/technicalfailed2/notstarted24/baseline0.
-Полная приёмка открыта; повторы admittedslots запрещены, старые outcomes исторические.
+Текущий checkpoint 2026-10-14 13:26 UTC: matched пара112452/runtime659588….
+Принятыfirstlast/sales/monthly/claims/1; ABC/ROI technical-failed сохранены/releaseapproved.
+Explicit-js/1 завершён13:23:42.052Z: machinepolicy/oracle/calculation/graph/exportPASS,
+JSnodes1/calls1/success1, штатноезакрытие/HostACKexit0/ownPIDgone/.writerabsent.
+Граф Import→JSaggregation→standardSort→Export далживуюпроверкуJS→Sort;
+обязательное independent JS-code/role/semantic review pending, acceptedпока4.
+Runnerexec88693 terminalexit2; доreview+puregate новыйmodelнепускается.
+Started7/closed7/accepted4/technicalfailed2/pendingreview1/notstarted24/baseline0.
+Полнаяприёмкаopen; admittedslotsнеповторяются, старыеoutcomesисторические.
 
 
 Историческое состояние на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
@@ -2712,3 +2713,20 @@ Started7/closed6/accepted4/technicalfailed2/notstarted24/baseline0. Всеexcept
 требуютmachine+manualreview; followingtags/recovery и вся31matrix ещёобязательны.
 Reportamendment007/3ce588fa… подготовленпараллельно, сохраняетrecoverychronology.
 Main31/сравнение/полнаяприёмка open; новыхstandardnodefixes/diagnosticloopsнет.
+
+Checkpoint 2026-10-14 13:26 UTC — explicitJS/1 machinePASS/manualreviewpending.
+Attemptfinished13:23:42.052Z/CLI2029431exit0/normalcleanuptrue/wrapper2(reviewpending),
+Session ses_ec56f7346ffeJ6vqFRxuwxRb4o/docf056495b…/Dock8669d2bb…;
+LGP9b5b1d46…/oracleba7e5d7f…/500transactions→5categories. Auditcomplete
+policy/calculation/oracle/history/runtime/identity/graph/exporttrue/failures[],
+JSnodes1/calls1/success1/reviewpending, historyAnomalyfalse. NativeJSaggregate
+aggregate-category-js-1 node5c3c8890… SUCCEEDED; standardSort+ExportSUCCEEDED,
+Saveconfirmed. ЭтоактуальноеживоепокрытиесвязкиJS→Sort наrestoredruntime.
+Host2029735ACKtrue/exit0/noSignal/noError, actualCLIHostabsent/.writerabsent
+подтвержденыRoot13:26:10.537. Runner88693terminalexit2 MANUAL_REVIEW_REQUIRED.
+Originalaudit0400saved slot/selection-audit-before-manual-review.json;
+independentreview ownsbranch_base: genuine requested-aggregation/код/LGP/25ячеек/
+receipt-linkedidentities, безподставныхрезультатов. Доreview+Rootgateaccepted4.
+Reportготовитсяпараллельно, безповторногоoracle/model/native/tests.
+Started7/closed7/accepted4/technicalfailed2/pendingreview1/notstarted24/baseline0;
+full31/compare/fullacceptanceopen. Runtime/source/pins/lock/skill/model/inputs unchanged.
