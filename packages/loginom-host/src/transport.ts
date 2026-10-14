@@ -148,7 +148,15 @@ function requests(port: Port) {
       control?.signal.addEventListener("abort", abort, {once: true})
       if (control?.signal.aborted) { cancel(control.signal.reason); return }
       try { dispatched = true; port.postMessage({id, method, input:wireInput, ...(control ? {deadline: control.deadline} : {})}) }
-      catch (error) { if (control) settle(id, true, error); close() }
+      catch (error) {
+        // Owned send is a rejected await event even without controlled input.
+        // Record it before terminal closure can introduce HOST_CLOSED instead.
+        if(owned){
+          if(owned.primary)owned.secondary??={value:error};else owned.primary={value:error};
+          settle(id,true,owned.primary.value);
+        }else if(control)settle(id,true,error);
+        close();
+      }
     })
   }
   return { request: (method: string, input: unknown, timeout = 180_000) => send(method, input, timeout),
