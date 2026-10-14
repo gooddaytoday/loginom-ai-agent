@@ -51,3 +51,12 @@ Business cwd содержит только task и входные файлы, б
 Обвязка сверяет доказательства и привязки; она не создаёт resource authority и не доказывает истинность заявлений reviewer. Пустой список исправлений допустим только если действительно нет необходимых исправлений. После композиции LAB-73 обязательно оценить canonical-array guard против исходной потери дополнительных keys.
 
 Перед spawn всё проверяется повторно под локальной блокировкой profile. Действующий владелец обеспечивает неизменность кандидата и входов на время использования (штатные artifact pins/use сохраняются); это не файловая песочница и не защита от злонамеренной подмены после spawn. Evidence не добавляется к argv/attachments; Multica token и прочие служебные переменные не наследуются. CLI получает только business task и inputs, назначенный profile и сетевое окружение. Общий OAuth сохраняется через явный существующий `shared_auth_dir` из настроек сквада; копировать credentials по карточкам нельзя. CLI profile должен быть уже инициализирован (`cli-profile.json`) и свободен от `.writer`; marker сверяется с channel кандидата. Обвязка не отменяет 7200-секундный предел, штатный wait и same-owner cleanup; не убивает удерживающий ресурсы процесс по собственному таймеру.
+
+Новый original-origin producer требует private hash-pinned
+`requirements.business_execution_seconds` (integer1..7200). Абсолютный bound
+рождается единожды в исходном launch decision под durable claim, до spawn;
+checked_at остаётся лишь свежестью evidence. Исторические receipts не меняются.
+Producer проверяет тот же original claim/input/bound перед spawn, без retry/remint.
+Private RunCommand reader пока UNAVAILABLE: origin не передаётся в argv/env/model
+и не считается SDK authority. Exact private receiving prerequisite и offline
+границы описаны в `admission-origin.md`.

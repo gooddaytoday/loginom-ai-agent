@@ -90,3 +90,9 @@ workflow after independent review; changing this checkout does not install it.
 Legacy read-only adoption scans every descriptor-bound original comment, including originals without a standalone Handoff-ID header. Multiple original IDs refuse as ambiguous. A supplied Handoff-ID/Source-SHA/Action header must agree with the descriptor action and may not contain duplicate fields; explicit --existing-comment does not override it. Receiver release results may repeat descriptors only with verified linkage to the selected original run. Full body/wrapper fingerprints, sender/issue/source-task proof and UNKNOWN/no-rePOST guards remain mandatory; historic receipts are not migrated.
 
 Canonical and legacy selection validate raw supplied Handoff-ID/Source-SHA/Action counts and complete values before branching. Malformed duplicate fields cannot be hidden by valid-value matching; they refuse without selecting metadata or changing the prepared fingerprint.
+
+Original admitted execution producer: `admission-origin.md` defines the once-only
+claim/birth contract and current unsupported RunCommand private reader seam.
+`test_admission_origin.OriginTest` checks real offline claim/FS/process boundaries
+without CLI/model spawn. New producer source does not install itself or qualify
+SDK/native origin; receiving requires separately reviewed authoritative pins.
