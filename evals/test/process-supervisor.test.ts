@@ -318,6 +318,26 @@ test("parallel supervisors preserve a live sibling's reparented browser heartbea
   } finally { abort.abort(); await Promise.all([pendingA, pendingB]) }
 }, 40_000)
 
+test("parallel observation evidence records delayed starts separately from scan duration", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-observation-delay-"))
+  const ready = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  const runs = ready.map(signal => superviseProcess({ cmd: [process.execPath, "-e", "console.log('ready'); await Bun.sleep(1000)"],
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 3_000,
+    stdout: new WritableStream<Uint8Array>({ write(chunk) { if (new TextDecoder().decode(chunk).includes("ready")) signal.resolve() } }) }))
+  try {
+    await Promise.all(ready.map(signal => signal.promise))
+    await Bun.sleep(150)
+    const until = performance.now() + 400
+    // Stall the real controller event loop while both native children are live.
+    while (performance.now() < until) {}
+    for (const run of await Promise.all(runs)) {
+      expect(run.processCleanup.status).toBe("confirmed")
+      expect(run.processCleanup.observations?.max_start_delay_ms).toBeGreaterThanOrEqual(100)
+      expect(run.processCleanup.observations?.max_gap_ms).toBeGreaterThanOrEqual(300)
+    }
+  } finally { await Promise.all(runs); await rm(root, { recursive: true }) }
+}, 10_000)
+
 test("supervisor: происхождение без точного browser profile не разрешает сигнал браузеру", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-bundle-"))

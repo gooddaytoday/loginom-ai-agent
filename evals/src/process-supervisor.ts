@@ -26,7 +26,7 @@ export type ProcessCleanup = {
   observation_mode?: "continuous" | "unit_after_exit" | "writer_release_settlement"
   verification?: { observed_at: string; owned_remaining: number }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
-  observations?: { count: number; max_duration_ms: number }
+  observations?: { count: number; max_duration_ms: number; max_start_delay_ms?: number; max_gap_ms?: number }
   polling?: { interval_ms: number; observed_at: string }[]
   settlement?: { started_at: string; source_processes: number; passes: { observed_at: string; inspected: number; owned_remaining: number; native_remaining: number }[] }
   admissions?: { pid: number; starttime: string; status: ProcessEntry["admission"] }[]
@@ -639,13 +639,24 @@ export async function superviseProcess(input: {
   // Trusted fixtures intentionally make their own /proc unreadable. The private
   // live subreaper receipt retains the boundary until strict shutdown scans.
   let unitActive = input.observationMode === "unit_after_exit"
-  const checkedScan = () => {
+  let lastObservation: number | undefined
+  const checkedScan = (scheduledAt = performance.now()) => {
     let confirmed = false
     scanning = scanning.then(async () => {
       const started = Date.now()
-      try { await readReceipt(); if (!unitActive) await scan(); confirmed = true }
+      cleanup.observations ??= { count: 0, max_duration_ms: 0, max_start_delay_ms: 0, max_gap_ms: 0 }
+      try {
+        await readReceipt()
+        if (!unitActive) {
+          const actual = performance.now()
+          cleanup.observations.max_start_delay_ms = Math.max(cleanup.observations.max_start_delay_ms ?? 0, actual - scheduledAt)
+          cleanup.observations.max_gap_ms = Math.max(cleanup.observations.max_gap_ms ?? 0, lastObservation === undefined ? 0 : actual - lastObservation)
+          lastObservation = actual
+          await scan()
+        }
+        confirmed = true
+      }
       finally {
-        cleanup.observations ??= { count: 0, max_duration_ms: 0 }
         cleanup.observations.count++
         cleanup.observations.max_duration_ms = Math.max(cleanup.observations.max_duration_ms, Date.now() - started)
       }
@@ -657,10 +668,10 @@ export async function superviseProcess(input: {
   // the admission window faster; do not enqueue stale scans when /proc is slow.
   let pollPending = false, nextPoll = 0
   const poll = setInterval(() => {
-    if (stopped || pollPending || Date.now() < nextPoll) return
+    if (stopped || pollPending || performance.now() < nextPoll) return
     pollPending = true
-    const started = Date.now()
-    void checkedScan().finally(() => {
+    const started = performance.now()
+    void checkedScan(nextPoll || started).finally(() => {
       const fast = ![...ledger.values()].some((entry) => entry.origin?.via === "cli") ||
         browser && (!cleanup.browserBindings?.length || cleanup.runtimeDirectories.some((directory) =>
           !cleanup.browserBindings?.some((binding) => binding.runtimeDirectory === directory)) || cleanup.unknownProcesses?.length)
