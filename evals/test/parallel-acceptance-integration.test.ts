@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdtemp, readlink, rm, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
@@ -245,3 +245,64 @@ console.log(JSON.stringify(await sampleCgroupResources()))
     expect(sample.cpu_usage.usage_usec).toBeGreaterThan(0)
   } finally { await chmod(file, 0o600); await rm(root, { recursive: true, force: true }) }
 })
+
+test.skipIf(!Bun.which("bwrap"))("cgroup sampler refuses a namespaced proc path whose inherited sysfs view belongs to another scope", async () => {
+  const parent = await readlink("/proc/self/ns/cgroup")
+  const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+  const child = Bun.spawn([Bun.which("bwrap")!, "--unshare-cgroup", "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
+    "--chdir", evalsRoot, process.execPath, "-e", `
+import { readlink } from "node:fs/promises"
+import { sampleCgroupResources } from ${JSON.stringify(path.join(evalsRoot, "src/parallel-resources.ts"))}
+console.log(JSON.stringify({ namespace: await readlink("/proc/self/ns/cgroup"), proc: await Bun.file("/proc/self/cgroup").text(), sample: await sampleCgroupResources() }))
+`], { env: { PATH: process.env.PATH! }, stdout: "pipe", stderr: "pipe" })
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+  const observed = JSON.parse(stdout)
+  expect(observed.namespace).not.toBe(parent)
+  expect(observed.proc.trim()).toBe("0::/")
+  expect(observed.sample.path).toBeNull()
+  expect(observed.sample.cpu_usage).toBeNull()
+  expect(observed.sample.ancestors).toBeNull()
+  expect(observed.sample.errors).toContain("CGROUP_MEMBERSHIP_UNVERIFIED")
+  const aligned = Bun.spawn([Bun.which("bwrap")!, "--unshare-cgroup", "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
+    "--ro-bind", path.join("/sys/fs/cgroup", group), "/sys/fs/cgroup", "--chdir", evalsRoot, process.execPath, "-e", `
+import { sampleCgroupResources } from ${JSON.stringify(path.join(evalsRoot, "src/parallel-resources.ts"))}
+console.log(JSON.stringify(await sampleCgroupResources()))
+`], { env: { PATH: process.env.PATH! }, stdout: "pipe", stderr: "pipe" })
+  const [alignedOut, alignedError, alignedCode] = await Promise.all([new Response(aligned.stdout).text(), new Response(aligned.stderr).text(), aligned.exited])
+  expect({ code: alignedCode, stderr: alignedError }).toEqual({ code: 0, stderr: "" })
+  const sample = JSON.parse(alignedOut)
+  expect(sample.path).toBe("/")
+  expect(sample.cpu_usage.usage_usec).toBeGreaterThan(0)
+  expect(sample.errors).not.toContain("CGROUP_MEMBERSHIP_UNVERIFIED")
+
+})
+
+test.skipIf(!Bun.which("bwrap"))("cgroup sampler refuses an owned process that exits while its counter read is blocked", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-cgroup-exit-"))
+  const fifo = path.join(root, "blocked-counter")
+  try {
+    const created = Bun.spawn(["mkfifo", "-m", "600", fifo], { env: { PATH: process.env.PATH! }, stdout: "pipe", stderr: "pipe" })
+    expect(await created.exited).toBe(0)
+    const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+    const child = Bun.spawn([Bun.which("bwrap")!, "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
+      "--ro-bind", fifo, path.join("/sys/fs/cgroup", group, "cpu.stat"), "--chdir", evalsRoot, process.execPath, "-e", `
+import { writeFile } from "node:fs/promises"
+import { sampleCgroupResources } from ${JSON.stringify(path.join(evalsRoot, "src/parallel-resources.ts"))}
+const owned = Bun.spawn([process.execPath, "-e", "await Bun.sleep(750)"], { env: { PATH: "/usr/bin:/bin" }, stdout: "ignore", stderr: "ignore" })
+const pending = sampleCgroupResources(owned.pid)
+await owned.exited
+// The private FIFO delays sampling until the real child is reaped; these values must be refused.
+await writeFile(${JSON.stringify(fifo)}, "usage_usec 10\\nuser_usec 5\\nsystem_usec 5\\n")
+console.log(JSON.stringify(await pending))
+`], { env: { PATH: process.env.PATH! }, stdout: "pipe", stderr: "pipe" })
+    const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]).finally(() => clearTimeout(timer))
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    const sample = JSON.parse(stdout)
+    expect(sample.path).toBeNull()
+    expect(sample.cpu_usage).toBeNull()
+    expect(sample.ancestors).toBeNull()
+    expect(sample.errors).toContain("CGROUP_MEMBERSHIP_UNVERIFIED")
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 10000)
