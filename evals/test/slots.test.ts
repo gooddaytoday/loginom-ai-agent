@@ -3,6 +3,7 @@ import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease, loadSlots, parseSlots } from "../src/slots"
+import { globalLockRoot } from "../src/lease"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
@@ -28,6 +29,15 @@ test("slots: two different users share one server", async () => {
   const item = await fixture()
   try {
     expect(parseSlots(item.value, 2).slots.map(slot => slot.username)).toEqual(["eval-a", "eval-b"])
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("slots: profile roots cannot expose permanent global guards", async () => {
+  const item = await fixture()
+  try {
+    for (const profileDir of [globalLockRoot, path.dirname(globalLockRoot), path.join(globalLockRoot, "profile")])
+      await expect(() => parseSlots({ ...item.value, slots: item.value.slots.map((slot, index) =>
+        index === 0 ? { ...slot, profileDir } : slot) }, 2)).toThrow("SLOT_PATH_OVERLAP")
   } finally { await rm(item.root, { recursive: true, force: true }) }
 })
 
