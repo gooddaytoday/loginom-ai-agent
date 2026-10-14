@@ -4,8 +4,20 @@
 policy PASS во всех девяти: шесть стандартных, explicit-JS, gap и recovery.
 Один итоговый расчёт правильный, восемь результатов не получены. Одна сессия
 завершена штатно, восемь адресно освобождены после отказа. Сейчас собственных
-процессов нет, профиль свободен;16candidate ещё не начаты. Для recovery ожидаются
-независимый final release review и actual gate; first9 допуск ещё не заявлен.
+процессы были завершены перед продолжением, профиль был свободен. Independent
+recovery release review `38048716…`/readback `91d8a205…` одобрены; actual public
+gate22:32:27.046Z разрешил technical-failed, originalattempt598e1481… неизменен.
+First9 core summary `522c2589…` связывает64existinghash refs,9вердиктов и8mandatory
+reviews; чистота runtime/admission и successful recovery не утверждаются.
+
+Runner3427800/exec30452 продолжил серию22:34:19.022Z: шесть baseline references
+учтены22:34:26.001–22:34:27.853Z без новых baseline процессов; snapshot
+`baseline-reference-consumption.json` (`26aa9cac…`) сохраняет точные ledger records.
+Исходы baseline:4correct/2notobtained,4normal/2manual, policy3PASS/2violation/
+1insufficient. Эти baseline policyviolation не переносятся в candidate и не
+скрываются. Одно наблюдение каждой задачи не доказывает повторяемость старого skill.
+Sales-by-category/2 активен: dispatch22:34:28.147Z/CLI3428412 с22:34:36.343Z;
+один candidate активен,15ещё не начаты. Full25/finalseeded3 ещё не завершены.
 
 Recovery/1 closed22:24:30.652Z: policy PASS sidecar `1690878c…`, mandatory
 failure/anomaly review `db95a803…`;21messages/84parts/23tools/67events/949runtime,
@@ -23,7 +35,9 @@ Own257closed22:27:07.141Z/admin258logout22:27:09.590Z/wholebrowserclosed22:27:10
 9PIDgone/точный guard архивирован с inode/rawNS.253и256сохранены вдвухUIreadbacks.
 Root независимо проверил подготовленную другим агентом nativeпривязку доclose.
 17original неизменны, mandatoryreview даёт18casefiles;26recovery.
-Descriptor `e866aed9…`; finalrelease review и actual gate пока не завершены.
+Descriptor `e866aed9…`; finalrelease review `38048716…`/readback `91d8a205…`
+и actual public gate22:32:27.046Z завершены. Identity модели/skill подтверждена;
+runtime/admission mismatch сохранён. Дополнительная sourceправка не понадобилась.
 
 Tags/1 closed22:13:55.083Z: policy PASS sidecar `703d7a98…`, mandatory JS+failure
 review `e82a62ff…`;26messages/100parts/29tools/82events/1095runtime, nochildren.
@@ -252,6 +266,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Положительно проверить явный запрос JavaScript по полному журналу и реальному динамическому коду, сохранив неуспешные analytics/runtime отдельно.
 - [x] Положительно проверить gap: обоснование доJS, raw variable fanout безTrim/filter/count/sort, стандартный Trim при блокере без новогоJS; сохранить весь журнал и три оценки.
 - [x] Проверить policy recovery: фактическая ошибка стандартного Calculator, стандартное исправление либо честный блокер, JS0 во всём журнале; функциональное восстановление и runtime anomaly оценить отдельно.
+- [x] Завершить первую девятку поv2:9policyPASS, обязательные8failure/JS/recovery/anomaly reviews и strict own release, сохранив1correct/8notobtained и runtime ограничения.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
