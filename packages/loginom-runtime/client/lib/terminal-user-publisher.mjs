@@ -12,7 +12,7 @@ function installOriginalUserPublisher(origin) {
   const digest=root.crypto?.subtle?.digest?.bind(root.crypto.subtle),Encoder=root.TextEncoder;
   const key='__loginomOriginalUserPublisherV1';
   if(descriptor(root,key))return; // Never replace a previous/foreign publisher.
-  let sample,failure,checks=[],sealed=false;
+  let sample,acquisition,failure,checks=[],sealed=false;
   const unavailable=()=>{throw Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE')};
   const remember=error=>{failure??={value:error}};
   const data=(object,name)=>{
@@ -31,6 +31,7 @@ function installOriginalUserPublisher(origin) {
     });return d.value;
   };
   const guard=()=>{
+    if(acquisition?.failed)throw acquisition.error;
     if(sample?.failed)throw sample.error; // Raw first rejection wins secondary drift.
     if(failure)throw failure.value;
     const currentDocument=descriptor(root,'document');
@@ -40,16 +41,18 @@ function installOriginalUserPublisher(origin) {
     for(const check of checks)check();
   };
   const inspect=()=>{
-    guard();if(!sample||!sample.settled||!sample.sourceVerified)unavailable();
+    guard();if(!sample||!sample.settled||!sample.sourceVerified
+      ||(acquisition&&(!acquisition.settled||!acquisition.sourceVerified||acquisition.user!==sample.user)))unavailable();
     return Object.freeze({document:originalDocument,receiver:sample.receiver,user:sample.user,
       task:sample.task,originalSet:sample.originalSet,originalInit:sample.originalInit,
-      bindings:sample.bindings,nativeReceiversQualified:false});
+      bindings:sample.bindings,acquisition:acquisition?Object.freeze({receiver:acquisition.receiver,
+        task:acquisition.task,user:acquisition.user,session:acquisition.session,originalGet:acquisition.originalGet,
+        rpcCompletionVerified:false}):undefined,nativeReceiversQualified:false});
   };
   define(root,key,{value:Object.freeze({inspect})});
+  const hash=async fn=>{if(!digest||!Encoder)unavailable();return Array.from(new Uint8Array(await digest('SHA-256',new Encoder().encode(apply(toString,fn,[])))))
+      .map(v=>v.toString(16).padStart(2,'0')).join('');};
   const qualify=async(set,init)=>{
-    if(!digest||!Encoder)unavailable();
-    const hash=async fn=>Array.from(new Uint8Array(await digest('SHA-256',new Encoder().encode(apply(toString,fn,[])))))
-      .map(v=>v.toString(16).padStart(2,'0')).join('');
     guard();const setHash=await hash(set);guard();const initHash=await hash(init);guard();
     if(setHash!=='8c5017296d0882c1c2ea8f988bad53b1b5986617c52f44554268c1db95fb6960'
       ||initHash!=='71c16608ccef7aab74903231c36cf3e0a28f90a5bf5a8005fe9fba52fcde88e1')unavailable();
@@ -70,7 +73,7 @@ function installOriginalUserPublisher(origin) {
           sample={receiver:this,user,originalSet,originalInit,settled:false,failed:false,sourceVerified:false,
             bindings:Object.freeze({bg,app,current,User,ObjectProxy,proxyPrototype,transport,identity,
               awaiter:hold(root,'__awaiter'),selectAsync:hold(bg,'selectAsync'),objectEquals:hold(bg,'ObjectEquals')})};
-          if(this!==current)unavailable();guard();
+          if(this!==current||(acquisition&&(!acquisition.settled||acquisition.user!==user)))unavailable();guard();
         }catch(error){remember(error)}
       }
       let task;
@@ -90,6 +93,47 @@ function installOriginalUserPublisher(origin) {
     define(current,'Set',{...d,value:retainedSet});
     hold(current,'Set');hold(root,'bg');hold(bg,'app');hold(app,'CurrentUser');
   };
+  const bindAcquisition=(app,Connection)=>{
+    const proto=data(Connection,'prototype'),d=descriptor(proto,'GetCurrentUser');
+    if(!d||!('value'in d)||typeof d.value!=='function'||!d.writable)unavailable();
+    const originalGet=d.value;
+    function retainedGetCurrentUser(){
+      if(acquisition)remember(Error('TERMINAL_USER_ACQUISITION_REENTERED'));
+      else try{
+        const receiverChain=[];let member=this;while(member&&member!==proto){receiverChain.push(member);member=prototype(member)}
+        if(member!==proto)unavailable();receiverChain.push(proto);
+        checks.push(()=>{let value=this;for(const original of receiverChain){if(value!==original)unavailable();value=prototype(value)}});
+        hold(this,'GetCurrentUser');
+        const session=hold(this,'FSession');hold(session,'$S');
+        const readerChain=[];let readerOwner,reader;for(let p=session;p;p=prototype(p)){
+          readerChain.push(p);reader=descriptor(p,'CurrentUser');if(reader){readerOwner=p;break}
+        }
+        if(!reader)unavailable();
+        checks.push(()=>{let p=session;for(const expected of readerChain){
+          if(p!==expected)unavailable();if(descriptor(p,'CurrentUser'))break;p=prototype(p)}
+          const now=descriptor(p,'CurrentUser');if(p!==readerOwner||!now
+            ||Reflect.ownKeys(reader).some(k=>now[k]!==reader[k]))unavailable();
+        });
+        acquisition={receiver:this,session,originalGet,settled:false,failed:false,sourceVerified:false};
+        hold(app,'ServerConnection');hold(Connection,'prototype');hold(proto,'GetCurrentUser');
+        hold(root,'__awaiter');guard();
+      }catch(error){remember(error)}
+      let task;try{task=apply(originalGet,this,arguments)}catch(error){
+        if(acquisition&&!acquisition.started){acquisition.failed=true;acquisition.error=error;acquisition.settled=true}throw error;
+      }
+      if(acquisition&&!acquisition.started){
+        acquisition.started=true;acquisition.task=task;
+        try{apply(then,task,[user=>{acquisition.user=user;acquisition.settled=true;try{guard()}catch(error){remember(error)}},
+          error=>{acquisition.failed=true;acquisition.error=error;acquisition.settled=true}]);
+          (async()=>{guard();const value=await hash(originalGet);guard();
+            if(value!=='b2145693ef7b07b2542bb413a8ec4453334a159055a9b85456915f8d2268ebb0')unavailable();
+            acquisition.sourceVerified=true;})().catch(remember);
+        }catch(error){remember(error)}
+      }
+      return task;
+    }
+    define(proto,'GetCurrentUser',{...d,value:retainedGetCurrentUser});
+  };
   const arm=(object,name,next)=>{
     const existing=descriptor(object,name);
     if(existing){if(!('value'in existing))unavailable();next(existing.value);return}
@@ -101,6 +145,8 @@ function installOriginalUserPublisher(origin) {
   };
   try{arm(root,'bg',bg=>arm(bg,'app',app=>{
     if(descriptor(app,'CurrentUser'))unavailable(); // Late installation cannot recover Set's argument.
+    if(descriptor(app,'ServerConnection'))unavailable();
+    arm(app,'ServerConnection',Connection=>bindAcquisition(app,Connection));
     arm(app,'CurrentUser',current=>bind(bg,app,current));
   }))}catch(error){remember(error)}
 }

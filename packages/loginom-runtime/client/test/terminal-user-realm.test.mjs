@@ -1,11 +1,15 @@
 import test from 'node:test';import assert from 'node:assert/strict';import{readFile}from'node:fs/promises';
 import{runInContext}from'node:vm';import{webcrypto,createHash}from'node:crypto';
 import{setup}from'./terminal-provider-boundary-fixture.mjs';
+import{parse}from'../../../loginom-host/node_modules/acorn/dist/acorn.mjs';
+const serverSource=await readFile(process.env.TERMINAL_SERVER_SOURCE,'utf8');
+assert.equal(createHash('sha256').update(serverSource).digest('hex'),'4c8203aa04050c45f55f2dfec76ef65d93b056a9cbe092419a9bbea821e0c5a6');
+let getSource;function walk(n){if(!n||typeof n!=='object')return;if(n.type==='AssignmentExpression'&&serverSource.slice(n.left.start,n.left.end)==='ServerConnection.prototype.GetCurrentUser')getSource=serverSource.slice(n.right.start,n.right.end);for(const v of Object.values(n)){if(Array.isArray(v))v.forEach(walk);else if(v&&typeof v==='object')walk(v)}}walk(parse(serverSource,{ecmaVersion:'latest'}));
 const {terminalUserPublisherScript}=await import(process.env.TERMINAL_USER_PUBLISHER_MODULE??new URL('../lib/terminal-user-publisher.mjs',import.meta.url));
 const {retainTerminalPrepareInvocation,invokeTerminalPrepareInvocation}=await import(process.env.TERMINAL_INVOCATION_MODULE??new URL('../lib/terminal-prepare-invocation.mjs',import.meta.url));
 const source=await readFile(process.env.TERMINAL_USER_SOURCE,'utf8');
 assert.equal(createHash('sha256').update(source).digest('hex'),'884660d99890c59fa5a54f2b245255df98b8aff20a5106c1c2fdaa33723888ea');
-async function control(fn){const f=await setup(60000,'retain-only');try{
+async function control(fn,withAcquisition=false){const f=await setup(60000,'retain-only');try{
  Object.assign(f.page.context,{crypto:webcrypto,TextEncoder,Debug:{assert:assert.ok},__awaiter(self,a,b,generator){
   const it=generator.call(self);return new Promise((resolve,reject)=>{const step=(key,value)=>{let r;try{r=it[key](value)}catch(e){reject(e);return}
    if(r.done)resolve(r.value);else Promise.resolve(r.value).then(v=>step('next',v),e=>step('throw',e))};step('next')});
@@ -14,11 +18,18 @@ async function control(fn){const f=await setup(60000,'retain-only');try{
  Object.setPrototypeOf(f.receivers.currentUser,f.native.definitions.ObjectProxyPrototype);
  runInContext(terminalUserPublisherScript('http://loginom.example/app'),f.page.context);
  runInContext(source,f.page.context);
+ let acquisitionTask,acquisitionReceiver;
+ if(withAcquisition){
+  runInContext('function Connection(){};Connection.prototype.GetCurrentUser=('+getSource+');bg.app.ServerConnection=Connection;',f.page.context);
+  acquisitionReceiver=new f.page.context.bg.app.ServerConnection();
+  acquisitionReceiver.FSession={$S:f.native.session,CurrentUser:f.receivers.currentUser};
+  acquisitionTask=acquisitionReceiver.GetCurrentUser();assert.equal(await acquisitionTask,f.receivers.currentUser);
+ }
  const task=f.page.context.bg.app.CurrentUser.Set(f.receivers.currentUser);await task;
  await new Promise(r=>setTimeout(r,20));
  const input={loginomUrl:'http://loginom.example/app?testable=true',compatibility:{profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'},platform:'darwin',sessionId:'own-session',operationId:'own-prepare'};
  const start=()=>invokeTerminalPrepareInvocation(retainTerminalPrepareInvocation({custody:f.custody,native:f.receivers,loaded:f.loaded,preparation:f.preparation},input,{signal:f.controller.signal,deadline:f.custody.deadline}));
- await fn(f,start,task);
+ await fn(f,start,task,{task:acquisitionTask,receiver:acquisitionReceiver});
  }finally{await f.native.drain();await f.native.cleanup()}}
 test('fixed user publisher → realm backing capture → packet → readonly private component',()=>control(async(f,start,task)=>{
  const result=await start(),realm=f.preparation.terminalOriginalRealm;
@@ -46,3 +57,16 @@ test('foreign publisher data function refuses before calling it',async()=>{
   assert.equal(calls,0);assert.equal(f.native.calls.length,0);assert.equal(f.page.events.includes('create_draft'),false);
  }finally{await f.native.drain();await f.native.cleanup()}
 });
+
+test('original acquisition → Set → workspace → packet retains exact earlier Promise and receiver',()=>control(async(f,start,task,acquisition)=>{
+ const result=await start(),realm=f.preparation.terminalOriginalRealm;
+ assert.equal(realm.userAcquisitionTask,acquisition.task);assert.equal(realm.userAcquisitionReceiver,acquisition.receiver);
+ assert.equal(realm.userAcquisitionSession,acquisition.receiver.FSession);assert.equal(realm.userTask,task);assert.notEqual(task,acquisition.task);
+ for(const k of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'])assert.equal(result.facts[k],false);
+},true));
+test('acquisition reader replacement after packet refuses getter0 without next dispatch',()=>control(async(f,start,task,acquisition)=>{
+ const result=await start(),calls=f.native.calls.length;let gets=0;
+ Object.defineProperty(acquisition.receiver.FSession,'CurrentUser',{get(){gets++;return f.receivers.currentUser}});
+ const {terminalPacketArguments}=await import(process.env.TERMINAL_PACKET_ROOT?new URL('file://'+process.env.TERMINAL_PACKET_ROOT+'/terminal-original-packet.mjs'):new URL('../lib/terminal-original-packet.mjs',import.meta.url));
+ assert.throws(()=>terminalPacketArguments(result.packet),/UNAVAILABLE/);assert.equal(gets,0);assert.equal(f.native.calls.length,calls);
+},true));

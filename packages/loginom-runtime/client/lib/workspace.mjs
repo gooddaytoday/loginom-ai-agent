@@ -85,6 +85,14 @@ export async function prepareWorkspace(page, options, terminal) {
         Object.assign(bindings,{userPublisher,userPublisherInspect,user:receiptRef(userReceipt,'user'),
           userTask:receiptRef(userReceipt,'task'),userReceiver:receiptRef(userReceipt,'receiver'),
           originalUserSet:receiptRef(userReceipt,'originalSet'),originalUserInit:receiptRef(userReceipt,'originalInit')});
+        const acquisition=receiptRef(userReceipt,'acquisition');
+        if(acquisition){
+          if(receiptRef(acquisition,'user')!==bindings.user
+            ||ref(receiptRef(acquisition,'session'),'$S')!==nativeSession)throw Error('TERMINAL_REALM_USER_ACQUISITION');
+          Object.assign(bindings,{userAcquisitionReceiver:receiptRef(acquisition,'receiver'),
+            userAcquisitionTask:receiptRef(acquisition,'task'),userAcquisitionSession:receiptRef(acquisition,'session'),
+            originalUserGet:receiptRef(acquisition,'originalGet')});
+        }
       }
       const descriptor=Object.getOwnPropertyDescriptor(state,'terminalOriginalRealm');
       if(descriptor&&!('value' in descriptor))throw Error('TERMINAL_REALM_ACCESSOR');

@@ -191,6 +191,13 @@ export function bindTerminalCreationPacket(initial,preparation,receipt) {
           ||data(held,'task')!==data(realm,'userTask')||data(held,'receiver')!==data(realm,'userReceiver')
           ||data(held,'originalSet')!==data(realm,'originalUserSet')
           ||data(held,'originalInit')!==data(realm,'originalUserInit'))fail('NATIVE_REPLACED');
+        if(Object.hasOwn(realm,'userAcquisitionTask')){const acquisition=data(held,'acquisition');
+          if(!acquisition||data(acquisition,'task')!==data(realm,'userAcquisitionTask')
+            ||data(acquisition,'receiver')!==data(realm,'userAcquisitionReceiver')
+            ||data(acquisition,'session')!==data(realm,'userAcquisitionSession')
+            ||data(acquisition,'originalGet')!==data(realm,'originalUserGet')
+            ||data(acquisition,'user')!==start.nativeRefs.currentUser)fail('NATIVE_REPLACED');
+        }
       }
       for(const slot of data(realm,'slots')){
         let effective=slot.object;for(const member of slot.chain){

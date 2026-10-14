@@ -1,0 +1,12 @@
+[
+  {
+    "url": "https://app.loginom.ai/app/bg/js/bg.model.js",
+    "bytes": 749000,
+    "sha256": "d3ab87a3aca82985d41a8b9d4b3502c9d8d662204c67c07fb3ff2156d802407a"
+  },
+  {
+    "url": "https://app.loginom.ai/app/bg/js/bg.model.rpc.js",
+    "bytes": 5094119,
+    "sha256": "53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f"
+  }
+]
