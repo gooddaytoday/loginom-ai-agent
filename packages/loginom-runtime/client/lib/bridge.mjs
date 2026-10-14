@@ -1,3 +1,5 @@
+import {assertAmountCaptureProxy,beginAmountCaptureProxy,rejectAmountCaptureAwait} from '../../src/amount-capture-proxy.mjs';
+import {captureControlledAmount,captureAmount} from '../../src/acceptance/amount-import-type-v1.mjs';
 import {assertCaptureOwner,capturePublication,assertCapturePublication,freezeCaptureResult} from '../../src/retained-capture.mjs';
 import {captureImportPreconfig,validateCaptureResult} from '../../src/acceptance/import-preconfig-adapter-v1.mjs';
 import {captureData} from '../../src/retained-capture.mjs';
@@ -143,7 +145,7 @@ function shutdownRejection(value) {
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture, authenticatedReadiness } = {}) {
   const importAdmission=acceptanceCapture ? Object.freeze({binding:acceptanceCapture.binding,registration:acceptanceCapture.registration,
-    retained:acceptanceCapture.retained,harness:acceptanceCapture.harness}) : undefined;
+    retained:acceptanceCapture.retained,harness:acceptanceCapture.harness,amountControl:acceptanceCapture.amountControl}) : undefined;
   if(acceptanceCapture?.binding?.harness==='field-parameters-preservation-v1'&&config.mode!=='executor-replay')throw Error('LOGINOM_FP_EXECUTOR_REQUIRED');
   const prepareLender=originalPrepareLenderForSession(session);
   const lenderObserved=work=>prepareLender ? prepareLender.observed(work) : work();
@@ -702,9 +704,13 @@ export async function createBridge(config, session, { browserTransport: managedB
         throw Error('IMPORT_ORIGINAL_PROVIDER_CREATION_PACKET_UNAVAILABLE');
       }
       const node=registration ? actionRuntime.retainCaptureNode(captureNodeOperation) : undefined;
+      const amount=binding.harness==='amount-import-type-v1' && acceptanceCapture.amountControl;
+      if(binding.harness==='amount-import-type-v1' && (!amount || amount!==importAdmission.amountControl
+          || acceptanceCapture.harness!==captureAmount))throw Error('LOGINOM_AMOUNT_CAPTURE_PROXY_UNAVAILABLE');
       const preparedAtCapture=session.metadata.workspacePreparation;
       const preparedBytes=registration?JSON.stringify(preparedAtCapture):undefined;
       const assertBound = () => {
+        if(amount)assertAmountCaptureProxy(amount,binding,signal);
         if (registration) {
           signal?.throwIfAborted();
           if(!signal || registration.mode!=='readonly' || typeof registration.validate!=='function'
@@ -751,7 +757,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           return {draft:freshDraft,cleanupComplete:false,draftRetained:true,stoppedBeforeDone:true};
         }
         const publication=registration ? capturePublication(retained,node,identity) : undefined;
-        const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution,
+        const amountGrant=amount?beginAmountCaptureProxy(amount,binding,signal):undefined;
+        const ownedBrowser=amount?{callTool:async(...args)=>{assertBound();let result;try{result=await browser.callTool(...args)}catch(value){throw rejectAmountCaptureAwait(amount,value)}assertBound();return result;}}:browser;
+        const ownedRecord=amount?async value=>{assertBound();let result;try{result=await recordExecution(value)}catch(rejected){throw rejectAmountCaptureAwait(amount,rejected)}assertBound();return result;}:recordExecution;
+        const receipt=await (amount?captureControlledAmount:acceptanceCapture.harness)({binding, identity, browser:ownedBrowser, record:ownedRecord,
+          ...(amount?{control:amountGrant}:{}),
           ...(registration?{retained,runtime:actionRuntime,session,node,publication,signal,deadline:node.deadline}: {})});
         assertBound();
         if (registration) {
@@ -773,7 +783,9 @@ export async function createBridge(config, session, { browserTransport: managedB
           throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
         captureEvidence={binding,identity,receipt};
         captureUnknown=false;
+        if(amount)captureIOAssert=assertBound;
         await persistCapture();
+        if(amount)assertBound();
         captureUnknown=false;
         return receipt;
       });

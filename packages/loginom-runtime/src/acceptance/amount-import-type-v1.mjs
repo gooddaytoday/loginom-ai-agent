@@ -1,3 +1,4 @@
+import {assertAmountControl,beginAmountControl} from './amount-caller-control.mjs';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {makeWorkspaceUiCode,workspaceUiCapability} from '../../client/lib/workspace-ui.mjs';
@@ -56,6 +57,15 @@ export function checkAmountState(state,owner) {
 }
 
 export async function captureAmount({binding,identity,browser,record}) {
+ return captureAmountInternal({binding,identity,browser,record});
+}
+export async function captureControlledAmount({binding,identity,browser,record,control}) {
+ const original=beginAmountControl(control,binding);
+ const check=()=>assertAmountControl(control,binding);
+ return captureAmountInternal({binding,identity,browser,record,caller:{...original,check}});
+}
+async function captureAmountInternal({binding,identity,browser,record,caller}) {
+ caller?.check();
  need(binding?.revision===1&&binding.harness==='amount-import-type-v1','BINDING');
  need(['owner','run','lease','chat','account','session','admission'].every(k=>typeof binding[k]==='string'&&binding[k])
   &&binding.lease===binding.owner+':'+binding.run&&Number.isSafeInteger(binding.generation)&&binding.generation>0
@@ -63,12 +73,16 @@ export async function captureAmount({binding,identity,browser,record}) {
  need(identity?.session_id===binding.session&&identity.account===binding.account&&identity.package_path===binding.packagePath
   &&['document_id','tab_tid','loginom_build'].every(k=>typeof identity[k]==='string'&&identity[k]),'IDENTITY');
  need(typeof browser?.callTool==='function'&&typeof record==='function','TRANSPORT');
- const deadline=Math.min(binding.expires,Date.now()+120000);
+ const deadline=caller?caller.deadline:Math.min(binding.expires,Date.now()+120000);
+ const checkControl=()=>{caller?.check();need(Date.now()<deadline,'DEADLINE');};
+ const originalRecord=record;
+ record=async value=>{checkControl();const result=await originalRecord(value);checkControl();return result;};
  const execute=async code=>{
-  need(Date.now()<deadline,'DEADLINE');
+  checkControl();
   const wrapped=`async page=>({status:'SUCCEEDED',action_key:'acceptance.capture.read',action_revision:'1',phase:'read',effect_possible:false,trace:[],error:null,output:{value:await (${code})(page)}})`;
-  return parseCapabilityResult(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:wrapped}},undefined,
-   {timeout:Math.max(1,deadline-Date.now())})).output.value;
+  const result=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:wrapped}},undefined,
+   {timeout:Math.max(1,deadline-Date.now())});
+  checkControl();return parseCapabilityResult(result).output.value;
  };
  // Discover only the CURRENT native node; no graph selection, import, editor
  // opening or replay is authorized. The normal reader rechecks native ancestry.
@@ -89,9 +103,9 @@ export async function captureAmount({binding,identity,browser,record}) {
  const channel=createNodeProcedure({operation,execute,record,targetOrigin:bootstrap.origin,targetBuild:identity.loginom_build,
   preparedNodeContext,maxSteps:24,wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{
    receipt_namespace:binding.session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
- const current=()=>need(Date.now()<deadline&&binding.owner===owner.owner&&binding.run===owner.run
+ const current=()=>{checkControl();need(Date.now()<deadline&&binding.owner===owner.owner&&binding.run===owner.run
   &&binding.lease===owner.lease&&binding.generation===owner.generation&&binding.chat===owner.chat
-  &&identity.document_id===owner.document_id&&identity.account===owner.account&&identity.session_id===owner.session_id,'OWNER_CHANGED');
+  &&identity.document_id===owner.document_id&&identity.account===owner.account&&identity.session_id===owner.session_id,'OWNER_CHANGED');};
  const observe=async()=>{
   current();
   // The ordinary bound definition scan intentionally omits this grid subtree.

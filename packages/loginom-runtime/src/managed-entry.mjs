@@ -1,3 +1,4 @@
+import {retainAmountCaptureProxy} from './amount-capture-proxy.mjs'
 import {retainCaptureOwner,bindCaptureRuntime,assertCaptureOwner} from './retained-capture.mjs'
 import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
 import {retainFPManagedStartup,retainAmountManagedStartup} from "./fp-managed-startup.mjs"
@@ -451,8 +452,10 @@ async function handle(message) {
         const binding=Object.freeze({...acceptanceCapture,session:session.metadata.sessionId});
         state.captureStartupBinding=originalStartup;
         state.captureRetained=retainCaptureOwner(state,binding,captureResource);
-        retainedAcceptance={binding,harness:captureHarness,retained:state.captureRetained};
+        retainedAcceptance={binding,harness:captureHarness,retained:state.captureRetained,
+          ...(amountStartup?{amountControl:retainAmountCaptureProxy(state,state.captureRetained)}:{})};
       }
+      state.amountCaptureProxy=retainedAcceptance?.amountControl;
       state.bridge = await observed(createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture:retainedAcceptance }))
@@ -528,7 +531,8 @@ async function handle(message) {
         throw Error("LOGINOM_REQUEST_INVALID")
       try {
         if(state.captureRetained)assertCaptureOwner(state.captureRetained);
-        const result = await state.bridge.captureAcceptance();
+        const result = await state.bridge.captureAcceptance(state.amountCaptureProxy
+          ? {signal:state.startupOwner.signal} : undefined);
         if(state.captureRetained)assertCaptureOwner(state.captureRetained)
         send({id:message.id,result})
       } catch (rejected) {
