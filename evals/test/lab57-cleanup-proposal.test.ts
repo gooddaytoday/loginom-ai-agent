@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { readFile } from "node:fs/promises"
-import { prepareLab57CleanupProposal } from "../src/lab57-cleanup-proposal"
+import { prepareLab57CleanupProposal, validateCapturedLineage } from "../src/lab57-cleanup-proposal"
 
 async function fixture() {
   return JSON.parse(await readFile(new URL("./fixtures/lab57-cleanup-proposal/input.json", import.meta.url), "utf8"))
@@ -13,6 +13,70 @@ test("LAB57: a current legacy guard birth cannot substitute for captured admissi
   expect(result.applied).toBe(false)
   expect(result.readiness).toBe("NOT_READY")
   expect(result.missing).toContain("LEGACY_GUARD_PARENT_BIRTH_UNCAPTURED")
+})
+
+test.each([
+  ["issue", "foreign"], ["role", "rich"], ["phase", "unit"], ["sha", "c26"], ["acquiredAt", "later"],
+  ["device", 1], ["inode", 1], ["containerId", "foreign"], ["endpoint", "http://foreign/"],
+  ["raw_owner_sha256", "changed"], ["raw_config_sha256", "changed"], ["configSha256", "changed"],
+])("LAB57: refuses changed binding %s", async (field, replacement) => {
+  const input = await fixture()
+  input.binding[field] = replacement
+  expect(prepareLab57CleanupProposal(input).missing).toContain("ORIGINAL_LEASE_BINDING_CHANGED")
+})
+
+test.each(["summary.json", "code-verdict.json", "txt-semicolon-cp1251-decimal/1/cleanup.json", "txt-semicolon-cp1251-decimal/1/result.json", "txt-semicolon-cp1251-decimal/1/run.json"])("LAB57: refuses changed source bytes %s", async file => {
+  const input = await fixture()
+  input.source[file] += " "
+  expect(prepareLab57CleanupProposal(input).missing).toContain(`SOURCE_BYTES_CHANGED:${file}`)
+})
+
+test.each(["path", "device", "inode", "uid", "mode", "size", "sha256"])("LAB57: refuses changed registration %s", async field => {
+  const input = await fixture()
+  input.registration[field] = "changed"
+  expect(prepareLab57CleanupProposal(input).missing).toContain("REGISTRATION_BINDING_CHANGED")
+})
+
+test.each(["path", "device", "inode", "uid", "mode"])("LAB57: refuses changed guard %s", async field => {
+  const input = await fixture()
+  input.guard[field] = "changed"
+  expect(prepareLab57CleanupProposal(input).missing).toContain("LEGACY_GUARD_BINDING_CHANGED")
+})
+
+test("LAB57: refusing foreign storage and a synthesized harness admission", async () => {
+  const input = await fixture()
+  input.storage.push({path:"/workdir/UserStorage/user/foreign.csv",identity:"foreign",sha256:"foreign"})
+  input.guardAdmission = {kind:"reconstructed",status:"confirmed"}
+  const result = prepareLab57CleanupProposal(input)
+  expect(result.missing).toContain("FOREIGN_OR_CHANGED_STORAGE")
+  expect(result.missing).toContain("SYNTHESIZED_HARNESS_ADMISSION_REFUSED")
+})
+
+test("LAB57: complete original capture remains valid, separate from current absence", async () => {
+  const input = await fixture()
+  const proof = JSON.parse(input.source["txt-semicolon-cp1251-decimal/1/cleanup.json"]).processes
+  expect(validateCapturedLineage(proof,input.binding.acquiredAt)).toEqual([])
+  const valid = structuredClone(proof)
+  valid.status="confirmed"; valid.error=null
+  expect(validateCapturedLineage(valid,input.binding.acquiredAt)).toEqual([])
+  expect(proof.origins.find((x: {via:string})=>x.via==="launcher").parent_starttime).toBeNull()
+})
+
+test.each(["unknown", "incomplete", "unit", "missing-admission", "foreign-uid", "missing-origin", "cycle", "zero-pass", "old-pass", "missing-cli", "duplicate-root"])("LAB57: source lineage refuses %s", async mutation => {
+  const input = await fixture()
+  const proof = JSON.parse(input.source["txt-semicolon-cp1251-decimal/1/cleanup.json"]).processes
+  if(mutation==="unknown") proof.unknownProcesses.push(proof.processes[0])
+  if(mutation==="incomplete") proof.capture_complete=false
+  if(mutation==="unit") proof.observation_mode="unit_after_exit"
+  if(mutation==="missing-admission") proof.admissions.pop()
+  if(mutation==="foreign-uid") proof.processes[0].uid=-1
+  if(mutation==="missing-origin") proof.origins.pop()
+  if(mutation==="cycle") { proof.origins[1].parent_pid=proof.origins[1].pid;proof.origins[1].parent_starttime=proof.origins[1].starttime }
+  if(mutation==="zero-pass") proof.verification[0].owned_remaining=1
+  if(mutation==="old-pass") proof.verification[0].observed_at="2000-01-01T00:00:00Z"
+  if(mutation==="missing-cli") proof.selectedCli.inode++
+  if(mutation==="duplicate-root") proof.processes.push(proof.processes[0])
+  expect(validateCapturedLineage(proof,input.binding.acquiredAt).length).toBeGreaterThan(0)
 })
 
 test("LAB57: preparation reports every missing operator prerequisite without granting effects", async () => {
