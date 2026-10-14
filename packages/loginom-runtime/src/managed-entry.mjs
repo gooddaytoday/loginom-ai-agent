@@ -1,3 +1,4 @@
+import {retainAmountCaptureProxy} from './amount-capture-proxy.mjs'
 import {retainAmountManagedStartup} from "./fp-managed-startup.mjs"
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
@@ -339,7 +340,7 @@ async function handle(message) {
       if(state.controlledStartup && (authenticated?.context!==state.startupOwner.context || !state.startupOwner.page
           || authenticated.context.pages().length!==1 || authenticated.context.pages()[0]!==state.startupOwner.page))throw Error("LOGINOM_STARTUP_OWNER_CHANGED")
       state.browser = authenticated.context
-      if(captureRegistration)state.captureStartupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,
+      if(captureRegistration || (amountStartup && acceptanceCapture))state.captureStartupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,
         account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,
         page:state.startupOwner.page,generation:input.generation,chat:input.chat})
       state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:input.generation,chat:input.chat})
@@ -414,12 +415,13 @@ async function handle(message) {
       await observed(state.browserServer.connect(browserServerTransport))
       state.controlledStartup?.guard();assertStartup();
       const captureBinding=acceptanceCapture ? Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}) : undefined
-      const retained=captureRegistration ? retainCaptureOwner(state,captureBinding,captureResource) : undefined
+      const retained=(captureRegistration || (amountStartup && acceptanceCapture)) ? retainCaptureOwner(state,captureBinding,captureResource) : undefined
       state.captureRetained=retained
+      state.amountCaptureProxy=(amountStartup && acceptanceCapture)?retainAmountCaptureProxy(state,retained):undefined
       state.bridge = await observed(createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture: acceptanceCapture ? { binding:captureBinding, harness:captureHarness,
-          registration:captureRegistration, retained } : undefined }))
+          registration:captureRegistration, retained, amountControl:state.amountCaptureProxy } : undefined }))
       state.controlledStartup?.guard();assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })

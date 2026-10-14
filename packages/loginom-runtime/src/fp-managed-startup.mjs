@@ -1,12 +1,16 @@
 import {validateStartInput} from './start-input.mjs'
 import {decodePreReadyRejection} from './qualified-pre-ready.mjs'
 
+const amountManagedStartups=new WeakMap();
+
 // IPC carries the original accepted startup tuple, never an AbortSignal or
 // readiness grant. Reuse the managed startup's one original controller.
 // Closed wrappers retain their own packet; neither purpose aliases the other.
 export function retainAmountManagedStartup(message,input,state,controller) {
   validateStartInput(input)
-  return retainManagedStartup(message,input,state,controller,'amountStartup')
+  const retained=retainManagedStartup(message,input,state,controller,'amountStartup');
+  amountManagedStartups.set(retained,{state,input,controller,tuple:input.amountStartup});
+  return retained
 }
 
 function retainManagedStartup(message,input,state,controller,key) {
@@ -62,4 +66,16 @@ function retainManagedStartup(message,input,state,controller,key) {
     accept(){guard();accepted=true},
     settle(){pending=false;clearTimeout(timer);if(state.startupController===controller)state.startupController=undefined},
   }
+}
+
+// Private branded reader; startup JSON or a copied handle cannot provide this ABI.
+export function assertAmountManagedStartup(retained,state) {
+  const record=amountManagedStartups.get(retained);
+  if(!record || record.state!==state || state.controlledStartup!==retained)
+    throw Error('LOGINOM_AMOUNT_MANAGED_PROVIDER_UNAVAILABLE');
+  retained.guard();
+  const tuple=record.tuple;
+  if(record.input.amountStartup!==tuple || !tuple.binding || tuple.purpose!=='amount-import-type-v1')
+    throw Error('LOGINOM_AMOUNT_MANAGED_PROVIDER_UNAVAILABLE');
+  return {signal:record.controller.signal,deadline:tuple.deadline,operation:tuple.operation,request:tuple.request,binding:tuple.binding};
 }

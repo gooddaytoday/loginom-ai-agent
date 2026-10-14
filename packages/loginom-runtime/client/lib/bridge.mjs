@@ -1,3 +1,5 @@
+import {assertAmountCaptureProxy,beginAmountCaptureProxy,rejectAmountCaptureAwait} from '../../src/amount-capture-proxy.mjs';
+import {captureControlledAmount,captureAmount} from '../../src/acceptance/amount-import-type-v1.mjs';
 import { assertCaptureOwner, capturePublication, assertCapturePublication, freezeCaptureResult } from '../../src/retained-capture.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -137,6 +139,7 @@ function shutdownRejection(value) {
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture, authenticatedReadiness } = {}) {
+  const amountAdmission=acceptanceCapture?.binding?.harness==='amount-import-type-v1'?Object.freeze({binding:acceptanceCapture.binding,harness:acceptanceCapture.harness,amountControl:acceptanceCapture.amountControl}):undefined;
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -521,9 +524,10 @@ export async function createBridge(config, session, { browserTransport: managedB
     function rememberCapturePersistence(value,phase) {
         capturePersistencePrimary??={phase,value};
         capturePersistenceFailures.push({phase,rejection:shutdownRejection(value)});
-        session.metadata.capturePersistencePrimary??={phase:capturePersistencePrimary.phase,
+        const metadata=captureEvidenceBinding?.metadata??session.metadata;
+        metadata.capturePersistencePrimary??={phase:capturePersistencePrimary.phase,
           rejection:shutdownRejection(capturePersistencePrimary.value)};
-        session.metadata.capturePersistenceFailures=capturePersistenceFailures;
+        metadata.capturePersistenceFailures=capturePersistenceFailures;
     }
     async function drainCaptureWriters() {
       if([...capturePublications.values()].some(publication=>publication.pending)){
@@ -548,6 +552,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         let phase=write?'file_open':'directory_open',primary;
         const failed=value=>{primary??={phase,value};rememberCapturePersistence(value,phase)};
         const callback=invoke=>{
+          assertCaptureEvidenceBinding();
           captureIOAssert?.();
           const operation={pending:true,phase};file.io=operation;let projection;
           const completion=new Promise((resolve,reject)=>{
@@ -602,17 +607,26 @@ export async function createBridge(config, session, { browserTransport: managedB
       await persist(session.directory,captureConstants.O_RDONLY|captureConstants.O_DIRECTORY|captureConstants.O_NOFOLLOW,false);
       if(captureWriters.size)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
     }
+    function assertCaptureEvidenceBinding() {
+      if(captureEvidenceBinding && (captureEvidenceBinding.directory!==session.directory
+          || captureEvidenceBinding.metadata!==session.metadata
+          || captureEvidenceBinding.sessionId!==session.metadata.sessionId))
+        throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+    }
     async function persistCapture() {
       const bytes=JSON.stringify(captureEvidence,null,2)+'\n';
       captureEvidenceBinding??=Object.freeze({evidence:captureEvidence,bytes,
-        directory:session.directory,sessionId:session.metadata.sessionId});
+        directory:session.directory,metadata:session.metadata,sessionId:session.metadata.sessionId});
       if(captureEvidenceBinding.evidence!==captureEvidence || captureEvidenceBinding.bytes!==bytes
           || captureEvidenceBinding.directory!==session.directory
           || captureEvidenceBinding.sessionId!==session.metadata.sessionId)
         throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+      assertCaptureEvidenceBinding();
       await drainCaptureWriters();
+      assertCaptureEvidenceBinding();
       if(!captureReceiptWritten){
         await writeCaptureEvidence('acceptance-capture.json',captureEvidenceBinding.bytes);
+        assertCaptureEvidenceBinding();
         captureReceiptWritten=true;
       }
       if(!captureJournalWritten){
@@ -620,6 +634,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         try{await recordExecution({event:'acceptance_capture',...captureEvidence})}
         catch(value){rememberCapturePersistence(value,'journal');throw value}
         captureJournalWritten=true;
+        assertCaptureEvidenceBinding();
       }
     }
     async function captureAcceptance({signal} = {}) {
@@ -628,10 +643,14 @@ export async function createBridge(config, session, { browserTransport: managedB
         throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
       const registration=acceptanceCapture.registration;
       const retained=acceptanceCapture.retained;
+      const amount=binding.harness==='amount-import-type-v1' && acceptanceCapture.amountControl;
+      if(binding.harness==='amount-import-type-v1' && (!amount || amount!==amountAdmission?.amountControl
+          || binding!==amountAdmission.binding || acceptanceCapture.harness!==captureAmount || acceptanceCapture.harness!==amountAdmission.harness))throw Error('LOGINOM_AMOUNT_CAPTURE_PROXY_UNAVAILABLE');
       const node=registration ? actionRuntime.retainCaptureNode(captureNodeOperation) : undefined;
       const preparedAtCapture=session.metadata.workspacePreparation;
       const preparedBytes=registration?JSON.stringify(preparedAtCapture):undefined;
       const assertBound = () => {
+        if(amount)assertAmountCaptureProxy(amount,binding,signal);
         if (registration) {
           signal?.throwIfAborted();
           if(!signal || registration.mode!=='readonly' || typeof registration.validate!=='function'
@@ -667,7 +686,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         // It is never supplied by IPC, the tool catalogue or the model.
         captureUnknown=true;
         const publication=registration ? capturePublication(retained,node,identity) : undefined;
-        const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution,
+        const amountGrant=amount?beginAmountCaptureProxy(amount,binding,signal):undefined;
+        const ownedBrowser=amount?{callTool:async(...args)=>{assertBound();let result;try{result=await browser.callTool(...args)}catch(value){throw rejectAmountCaptureAwait(amount,value)}assertBound();return result;}}:browser;
+        const ownedRecord=amount?async value=>{assertBound();let result;try{result=await recordExecution(value)}catch(rejected){throw rejectAmountCaptureAwait(amount,rejected)}assertBound();return result;}:recordExecution;
+        const receipt=await (amount?captureControlledAmount:acceptanceCapture.harness)({binding, identity, browser:ownedBrowser, record:ownedRecord,
+          ...(amount?{control:amountGrant}:{}),
           ...(registration?{retained,runtime:actionRuntime,session,node,publication,signal,deadline:node.deadline}: {})});
         assertBound();
         if (registration) {
@@ -689,7 +712,9 @@ export async function createBridge(config, session, { browserTransport: managedB
           throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
         captureEvidence={binding,identity,receipt};
         captureUnknown=false;
+        if(amount)captureIOAssert=assertBound;
         await persistCapture();
+        if(amount)assertBound();
         captureUnknown=false;
         return receipt;
       });
@@ -827,7 +852,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (acceptanceCapture?.registration && captureConsumed) {
         // Only evidence repair is possible here. A read never permits teardown.
         if(captureEvidence && captureRejected && !captureUnknown)
-          return persistCapture().then(()=>{throw captureRejection});
+          return persistCapture().then(()=>{throw captureRejection},value=>{rememberCapturePersistence(value,'readonly_evidence_repair');throw captureRejection});
         return Promise.reject(captureRejected?captureRejection:Error('LOGINOM_CAPTURE_DIAGNOSTIC_RETAINED'));
       }
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
