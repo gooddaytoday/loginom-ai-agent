@@ -500,6 +500,8 @@ expect(await Bun.file(foreignSentinel).text()).toBe("preserve")
 
 ### Задача 6. Два supervisor и доверенный административный browser
 
+- [x] Подзадача 6/8: supervisor снимает SIGINT grace timer после подтверждённого выхода команды; полный 30s grace для живой команды сохранён. Отдельный actual subprocess RED: inner cleanup confirmed, но orphan Bun.sleep удерживает host до outer timeout10s; GREEN1 PASS/5 assertions (2.35s). Полный supervisor26 PASS/143 assertions (133.47s), typecheck/diff PASS. Калибровочный tracer отдельно подтвердил исходный симптом STABLE3/3: отчёт готов, host не завершён к20s; collector report600 /tmp/evals-calibrate-sigint-signal-olg1sne8.json. Это таймер ожидания, правила process identity/admission/signaling не менялись.
+
 - [x] Подзадача 6/7 (2026-10-14): writerIdentity различает начальное окно mkdir(.writer)→owner write и release после уже наблюдённого owner. Real-FS RED STABLE 3/3 через public API (owner опубликован через 40ms); GREEN возвращает точную device/inode/nonce без удаления guard. Persistent ownerless guard и symlink остаются отказами. 3 target tests PASS/5 assertions, cold profile/supervisor 95 PASS/315 assertions (139.26s), typecheck/diff PASS. Mixed run с одновременным native smoke дал 94 PASS/1 FAIL (linuxProfileOwners PID532038); narrow cold 3/3 PASS, PID не атрибутирован, причинность bwrap не доказана. Registry/foreign-process proof остаётся открытым.
 
 **Files:** Modify `evals/src/process-supervisor.ts`, `evals/src/process-launcher.ts`, `evals/test/process-supervisor.test.ts`, `evals/fixtures/fake-cli.ts`; Create `evals/test/process-supervisor-integration.test.ts`.
