@@ -4,7 +4,7 @@ import path from "node:path"
 import { EvalFailure } from "./fail"
 
 export async function collectHostResources(input: {
-  paths: string[]; out: string; intervalMs: number; runId: string; phase: "before" | "run" | "after"; signal: AbortSignal
+  paths: string[]; out: string; intervalMs: number; runId: string | null; phase: "before" | "run" | "after" | null; signal: AbortSignal
 }) {
   if (!Number.isSafeInteger(input.intervalMs) || input.intervalMs <= 0) throw new EvalFailure("RESOURCE_INTERVAL", 2)
   const directory = path.dirname(input.out)
