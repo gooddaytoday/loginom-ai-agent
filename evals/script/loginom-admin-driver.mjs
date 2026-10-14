@@ -202,7 +202,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             console.info("ADMIN_USER_STAGE_CONFIGURE")
             if (authModeChanged) { applied = true; console.info("ADMIN_USER_WRITE_AUTHMODE"); await user.set_AuthMode(bg.TBGDeductorUserAuthMode.uamLocal) }
             if (passwordChanged) { applied = true; console.info("ADMIN_USER_WRITE_PASSWORD"); await user.SetPassword(password) }
-            for (const [name, value] of [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false]]) {
+            for (const [name, value] of [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]) {
               if (await user[name] === value) continue
               applied = true
               await user["set_" + name](value)
@@ -213,10 +213,11 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           const observed = { objectId: (await bg.ProxyObjectsHelper.GetObjectId(user)).toString(), name: await user.Name,
             userKind: await user.UserKind, blocked: await user.Blocked, ...(phase === "configure" ? { authMode: await user.AuthMode,
               isAdmin: await user.IsAdmin, isDesigner: await user.IsDesigner, isViewer: await user.IsViewer,
-              useGlobalFileStorage: await user.UseGlobalFileStorage, schedulerFullAccess: await user.SchedulerFullAccess } : {}) }
+              useGlobalFileStorage: await user.UseGlobalFileStorage, schedulerFullAccess: await user.SchedulerFullAccess, allowPublish: await user.AllowPublish } : {}) }
           if (observed.name !== username || observed.userKind !== 0 || observed.blocked !== true) throw Error("readback")
           if (phase === "configure" && (observed.authMode !== bg.TBGDeductorUserAuthMode.uamLocal || observed.isAdmin !== false ||
-            observed.isDesigner !== true || observed.isViewer !== false || observed.useGlobalFileStorage !== false || observed.schedulerFullAccess !== false)) throw Error("readback")
+            observed.isDesigner !== true || observed.isViewer !== false || observed.useGlobalFileStorage !== false ||
+            observed.schedulerFullAccess !== false || observed.allowPublish !== false)) throw Error("readback")
           return { outcome: "confirmed", data: phase === "configure" ? { authModeChanged, passwordChanged, secretHash, user: observed } : { created: !owned, user: observed } }
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
