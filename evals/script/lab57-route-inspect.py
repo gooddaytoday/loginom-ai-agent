@@ -72,13 +72,10 @@ for p in profiles:
             if f.is_symlink() or f.is_file() and str(f.relative_to(p)) not in retained:markers.append(str(f))
 agents=json.loads(command(['/usr/local/bin/multica','agent','list','--output','json']))
 assert isinstance(agents,list) and len(agents)>=8
-pending=[]
-for agent in agents:
-    tasks=queue_pages.all_tasks(agent['id'])
-    pending.extend({'agent':agent['id'],'task':t['id'],'status':t['status']} for t in tasks if t['status'] in ['queued','pending','running','retrying','scheduled'] and t['id']!=followup)
+queues=queue_pages.collect_queues(agents,followup)
 container=cfg['container']['id']; c=json.loads(command(['/usr/bin/docker','inspect',container]))[0]
 names=command(['/usr/bin/docker','exec',container,'find','/workdir/UserStorage','/workdir/SessionBackup','-mindepth','1','-type','f']).splitlines()
 storage=[{'path':n,'identity':command(['/usr/bin/docker','exec',container,'stat','-c','%d:%i:%s:%f',n]).strip(),'sha256':command(['/usr/bin/docker','exec',container,'sha256sum','--',n]).split()[0]} for n in names]
 assert time.monotonic()-started<15,'Fresh admission observation exceeded15s; STOP'
-print(json.dumps({'passes':passes,'profiles':len(profiles),'foreignMarkers':markers,'pendingWorkers':pending,'queuesChecked':len(agents),
+print(json.dumps({'passes':passes,'profiles':len(profiles),'foreignMarkers':markers,**queues,
     'checkedAt':int(time.time()*1000),'container':{'id':c['Id'],'startedAt':c['State']['StartedAt'],'running':c['State']['Running'],'mounts':c['Mounts']},'storage':storage}))

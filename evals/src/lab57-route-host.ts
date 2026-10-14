@@ -158,7 +158,7 @@ export async function assertRouteEffect(ctx:RouteContext,stage:string,proofRoot?
   await verifyRouteOwner(ctx)
   const state=JSON.parse(await routeCommand("/usr/bin/python3",[ctx.sourceRoot+"/evals/script/lab57-route-inspect.py",
     String(ctx.controller.pid),ctx.controller.starttime,ctx.admission.followupTask,String(ctx.csvRemoved),String(ctx.historyArchived)],proofRoot)) as FreshRouteState
-  validateFreshRouteState(state,ctx.csvRemoved)
+  validateFreshRouteState(state,ctx.csvRemoved,ctx.admission.followupTask)
   const settings={"runtime.env":"59688b0dada5410421c8915196e450ccba9ecb89c054a09dcf9e72790215f93d",
     "roles/ben/eval.env":"e7da58da34e2b798e98e343e32dc445376b7651daff1d56ef93092263fbcf9bf",
     "roles/ben/agent-work/lab57-eb1-independent/overrides.env":"179c481169bb03c31c158ce1db8b6bd827e821a910699fbe2c0bc763383fc4b8"}
