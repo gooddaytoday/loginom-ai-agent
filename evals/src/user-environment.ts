@@ -160,6 +160,89 @@ function userActivationIntent(prepared: Awaited<ReturnType<typeof readUserPrepar
     secretHash: prepared.secretHash, ownerSource: owned.source.sha256, state: "planned" }
 }
 
+export async function recordServerSession(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, payload: unknown, reply: AdminReply) {
+  const entry = await sessionFromProbe(file, lease, secretFile, commandFile, payload, reply)
+  const target = path.join(file.controller.stateDir, `session-${reply.id}.json`)
+  const existing = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+  })
+  if (existing && JSON.stringify(existing) !== JSON.stringify(entry)) throw new EvalFailure("SESSION_IDENTITY_CHANGED", 2)
+  await lease.assertHeld()
+  if (!existing) await writeLeaseReceipt(target, entry)
+  return entry
+}
+
+export async function readServerSession(file: SlotFile, lease: SlotLease, secretFile: string, proofId: string) {
+  await lease.assertHeld()
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(proofId)) throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+  const entry = record(await readLeaseReceipt(path.join(file.controller.stateDir, `session-${proofId}.json`)))
+  const source = record(entry.source)
+  const observation = record(entry.observation)
+  if (source.id !== proofId || typeof source.path !== "string") throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+  const expected = await sessionFromProbe(file, lease, secretFile, source.path, observation.payload, observation.reply as AdminReply)
+  if (JSON.stringify(entry) !== JSON.stringify(expected)) throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+  return expected
+}
+
+async function sessionFromProbe(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, payload: unknown, reply: AdminReply) {
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const owned = await readUserOwnership(file, lease, secretFile)
+  if (!await readUserActivation(file, lease, secretFile)) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
+  const request = record(payload)
+  const owner = record(request.owned)
+  const data = record(reply.data)
+  const current = record(data.ownSession)
+  const binding = record(data.binding)
+  if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    !path.isAbsolute(commandFile) || path.resolve(commandFile) !== commandFile || !commandFile.startsWith(file.controller.stateDir + path.sep) ||
+    path.basename(commandFile) !== `${reply.id}.json` || Object.keys(request).length !== 8 ||
+    !["session-probe", "session-crash-probe"].includes(String(request.phase)) || JSON.stringify(request.slot) !== JSON.stringify(lease.slot) ||
+    request.secretFile !== secretFile || request.preparationNonce !== prepared.nonce || request.desiredHash !== prepared.desiredHash ||
+    request.secretHash !== prepared.secretHash || Object.keys(owner).length !== 5 || owner.objectId !== owned.objectId ||
+    owner.name !== owned.username || owner.userKind !== 0 || owner.preparationNonce !== prepared.nonce || owner.secretHash !== prepared.secretHash ||
+    !Array.isArray(request.expectedPolicy) || Object.keys(data).length !== 8 || data.sessionIdentityQualified !== false ||
+    Object.keys(current).length !== 6 || typeof current.guid !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(current.guid) ||
+    typeof current.objectId !== "string" || !current.objectId || current.userObjectId !== owned.objectId || current.username !== owned.username ||
+    current.isAdmin !== false || current.isDesigner !== true || Object.keys(binding).length !== 6 ||
+    typeof binding.remoteKey !== "string" || !binding.remoteKey || binding.userKey !== owned.userKey || binding.username !== owned.username ||
+    binding.serverEpoch !== lease.identity.serverEpoch || typeof binding.name !== "string" || !binding.name.startsWith(owned.username + ":") ||
+    !/^[1-9]\d*$/.test(binding.name.slice(owned.username.length + 1)) || typeof binding.createdAt !== "string" || !Number.isFinite(Date.parse(binding.createdAt)))
+    throw new EvalFailure("SESSION_IDENTITY_CHANGED", 2)
+  const rows = [data.baseline, data.opened, data.withPackage, data.afterPackage, data.afterDisconnect]
+  if (rows.some(list => !Array.isArray(list) || list.some(value => {
+    const row = record(value)
+    return Object.keys(row).length !== 5 || typeof row.objectId !== "string" || !row.objectId || typeof row.name !== "string" || !row.name ||
+      typeof row.createdAt !== "string" || !Number.isFinite(Date.parse(row.createdAt)) || typeof row.pendingDisconnect !== "boolean" ||
+      !Number.isSafeInteger(row.packageCount) || Number(row.packageCount) < 0
+  }))) throw new EvalFailure("SESSION_IDENTITY_CHANGED", 2)
+  const baseline = data.baseline as Record<string, unknown>[]
+  const opened = data.opened as Record<string, unknown>[]
+  const created = opened.filter(row => !baseline.some(old => old.objectId === row.objectId))
+  if (created.length !== 1 || created[0]!.objectId !== binding.remoteKey || created[0]!.name !== binding.name ||
+    created[0]!.createdAt !== binding.createdAt || created[0]!.packageCount !== 0 ||
+    [data.withPackage, data.afterPackage].some((list, index) => {
+      const matches = (list as Record<string, unknown>[]).filter(row => row.objectId === binding.remoteKey)
+      return matches.length !== 1 || matches[0]!.name !== binding.name || matches[0]!.createdAt !== binding.createdAt || matches[0]!.packageCount !== (index === 0 ? 1 : 0)
+    })) throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
+  const source = record(await readLeaseReceipt(commandFile))
+  if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
+    source.op !== "reconcile-user" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(payload)).digest("hex") ||
+    source.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
+    typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
+    !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.settledAt) < Date.parse(source.at)) throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+  const origin = record(await readLeaseReceipt(lease.receipt))
+  if (origin.version !== 2 || origin.state !== "retained" || origin.token !== lease.token ||
+    JSON.stringify(origin.slot) !== JSON.stringify(lease.slot) || JSON.stringify(origin.identity) !== JSON.stringify(lease.identity) ||
+    typeof origin.commandId !== "string" || !origin.commandId) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
+  const entry = { version: 2, kind: "owned-server-session", slotId: lease.slot.id, identity: lease.identity, preparationNonce: prepared.nonce,
+    actor: { kind: "management", runId: origin.commandId, attemptId: null }, binding, sessionGuid: current.guid, state: "observed",
+    source: { path: commandFile, id: reply.id, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") },
+    observation: { payload: request, reply } }
+  return entry
+}
+
 async function ownershipFromCreation(file: SlotFile, lease: SlotLease, prepared: Awaited<ReturnType<typeof readUserPreparation>>, commandFile: string, reply: AdminReply) {
   const data = record(reply.data)
   const user = record(data.user)

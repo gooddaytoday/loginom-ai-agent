@@ -27,7 +27,7 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
-import { claimUserOwnership, readUserOwnership, readUserPreparation } from "./user-environment"
+import { claimUserOwnership, readUserActivation, readUserOwnership, readUserPreparation, recordServerSession } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
@@ -38,6 +38,7 @@ export type AdminConnection = {
   identity: ServerIdentity
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
   createBlockedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof readUserOwnership>>>
+  observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
@@ -162,6 +163,24 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         data.user.name !== owned.username || data.user.userKind !== 0 || data.user.blocked !== true)
         throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
       return readUserOwnership(file, lease, secretFile)
+    },
+    async observeOwnedSession(lease, secretFile, policy) {
+      const prepared = await readUserPreparation(file, lease, secretFile)
+      const owned = await readUserOwnership(file, lease, secretFile)
+      const activation = await readUserActivation(file, lease, secretFile)
+      if (!activation) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
+      if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      const payload = { phase: "session-probe", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
+        desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: owned.objectId, name: owned.username,
+          userKind: owned.userKind, preparationNonce: owned.preparationNonce, secretHash: prepared.secretHash }, expectedPolicy: structuredClone(policy) }
+      const reply = await request("reconcile-user", payload, async () => {
+        if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared) ||
+          JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned) ||
+          JSON.stringify(await readUserActivation(file, lease, secretFile)) !== JSON.stringify(activation))
+          throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
+      })
+      requireAdminReply(reply)
+      return recordServerSession(file, lease, secretFile, path.join(directory, "commands", `${reply.id}.json`), payload, reply)
     },
     async closeSession(session) {
       const data = requireAdminReply(await request("close-session", { session }))

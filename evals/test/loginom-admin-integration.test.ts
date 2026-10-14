@@ -197,6 +197,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
     try {
       await lease.close()
       await expect(connection.createBlockedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
+      await expect(connection.observeOwnedSession(lease, path.join(root, "never-read.json"), [])).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.reconcileUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
     } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
   } finally { await connection.dispose() }
