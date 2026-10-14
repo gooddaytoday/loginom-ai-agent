@@ -137,6 +137,7 @@ export async function runAgent(input: {
   timeoutMs: number
   outDir: string
   profileDir?: string
+  slotId?: string
   signal?: AbortSignal
 }) {
   const args = [
@@ -169,6 +170,7 @@ export async function runAgent(input: {
     env: boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }, sandbox: boundary?.cmd,
     profileDir: input.profileDir, outDir: input.outDir,
     timeoutMs: input.timeoutMs, signal: input.signal,
+    owner: { kind: "slot", id: input.slotId ?? input.profileDir ?? input.workdir },
   }).catch((error: unknown) => {
     if (boundary) throw new SandboxFailure("не удалось запустить или проверить процессы границы")
     throw error

@@ -271,6 +271,53 @@ test("supervisor: собственный detached browser закрыт, неиз
   } finally { unknown.kill("SIGKILL"); await exited }
 }, 20_000)
 
+test("parallel supervisors preserve a live sibling's reparented browser heartbeat", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-browser-"))
+  const bundle = path.join(root, "bundle")
+  const a = path.join(root, "a"), b = path.join(root, "b")
+  await Promise.all([mkdir(bundle), mkdir(a), mkdir(b)])
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  const script = path.join(root, "browser.mjs")
+  await cp(path.join(evalsRoot, "fixtures/fake-browser.ts"), script)
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const abort = new AbortController()
+  const commandA = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: a })
+  const pendingA = runAgent({ command: { ...commandA, env: { ...commandA.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(a, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "1500" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: a, outDir: a, profileDir: a, timeoutMs: 30_000 })
+  for (let wait = 0; wait < 200 && !await Bun.file(path.join(a, "browser.pid")).exists(); wait++) await Bun.sleep(10)
+  await Bun.sleep(250)
+  const commandB = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: b })
+  const heartbeat = path.join(b, "heartbeat")
+  const pendingB = runAgent({ command: { ...commandB, env: { ...commandB.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(b, "browser.pid"), EVAL_FAKE_BROWSER_HELPER_PID_FILE: path.join(b, "helper.pid"),
+    EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_BROWSER_CLEAR_TITLE: "1", EVAL_FAKE_BROWSER_HEARTBEAT: heartbeat, EVAL_FAKE_EXIT_DELAY_MS: "20000" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: b, outDir: b, profileDir: b,
+    timeoutMs: 30_000, signal: abort.signal })
+  try {
+    for (let wait = 0; wait < 200 && !await Bun.file(heartbeat).exists(); wait++) await Bun.sleep(10)
+    const before = await Bun.file(heartbeat).text()
+    const helper = Number(await Bun.file(path.join(b, "helper.pid")).text())
+    const birth = (await readFile(`/proc/${helper}/stat`, "utf8")).split(") ")[1]!.split(" ")[19]
+    const finishedA = await pendingA
+    expect(finishedA.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedA.processCleanup.processes.some(entry => entry.pid === helper)).toBe(false)
+    expect(await Bun.file(heartbeat).text()).not.toBe(before)
+    const current = (await readFile(`/proc/${helper}/stat`, "utf8")).split(") ")[1]!.split(" ")
+    expect(current[19]).toBe(birth)
+    expect(["Z", "X"]).not.toContain(current[0])
+    expect((await readFile(`/proc/${helper}/cmdline`, "utf8")).replaceAll("\0", "")).toBe("")
+    expect(finishedA.processCleanup.peerProcesses?.find(entry => entry.process.pid === helper)).toMatchObject({
+      process: { starttime: birth }, owner: { kind: "slot", id: b } })
+    abort.abort()
+    const finishedB = await pendingB
+    expect(finishedB.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedB.processCleanup.processes.find(entry => entry.pid === helper)?.starttime).toBe(birth)
+    expect(finishedB.processCleanup.origins?.find(entry => entry.pid === helper)?.via).toBe("subreaper")
+    await rm(root, { recursive: true })
+  } finally { abort.abort(); await Promise.all([pendingA, pendingB]) }
+}, 40_000)
+
 test("supervisor: происхождение без точного browser profile не разрешает сигнал браузеру", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-bundle-"))
