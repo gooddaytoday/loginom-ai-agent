@@ -433,3 +433,14 @@ marker с `../` и Python-enabled refusal, восстановление исхо
 typecheck/diff PASS. Это infrastructure/config guard; server-run fence,
 protected user inventory publication и effective ACL/idle proof остаются
 обязательными отдельными границами перед полным prepare/admission.
+
+Wire activate phase принимает exact owner/credential hash и полный expected
+shared-directory snapshot. До снятия Blocked проверяет local auth, design
+flags, запрет publish/admin/global storage/scheduler и отсутствие всех shared
+grants; policy drift/unknown не получает mutation. После setter проверяет
+account identity/Blocked=false и policy снова. Повтор не вызывает setter.
+Это ограниченная capability для немодельного research probe; parent ready
+reconcile/prepare/dispatch пока не вызывает её. Effective negative ACL, physical
+root marker и session/backup lifecycle остаются открытыми. Native disposable
+fixture: activation/reuse PASS, existing Everyone и missing configured secret
+SHA отказали;43 assertions/21.69s, typecheck/diff PASS.

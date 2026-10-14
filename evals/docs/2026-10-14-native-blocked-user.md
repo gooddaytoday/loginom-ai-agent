@@ -72,3 +72,11 @@ Studio (UserForm.js:95). На native disposable account read-back false, repeat
 allowPublish в observed user; GREEN:60 admin/native/codec/preflight PASS/229
 assertions (60.90s), typecheck/diff PASS. Activation и effective access этим
 не подтверждены.
+
+Wire activate реализован после configure/ACL. RED ADMIN_CAPABILITY_UNSUPPORTED
+→ GREEN actual Blocked=false и repeated activated=false. До setter требуется
+полное совпадение shared policy без grants и safe account flags/auth/SHA; после
+setter — exact native identity и повторная policy проверка. Everyone policy и
+missing configured SHA отказали до активации. Target1 PASS/43 assertions
+(21.69s), typecheck/diff PASS. Пара после confirmed native dispose/process proof
+удалена. Admission/effective ACL/session close этим не квалифицированы.
