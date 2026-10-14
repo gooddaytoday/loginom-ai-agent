@@ -46,6 +46,23 @@ class ChronologyTests(unittest.TestCase):
         layout = [{'direction': 'output', 'port': 0, 'fields': [{'source': {'kind': 'configured_field', 'name': 'B_Replace'}}]}]
         self.assertTrue(self.matches([self.call({'output_mode': 'add'}, mappings=layout, exact=True)]))
 
+    def test_identity_names_preserve_mode_only_proof(self):
+        layout = [{'direction': 'output', 'port': 0, 'fields': [
+            {'source': {'kind': 'configured_field', 'name': 'B_Replace'},
+             'name': 'B_Replace', 'label': 'B Замена'}]}]
+        self.assertTrue(self.matches([self.call({'output_mode': 'add'}, mappings=layout, exact=True)]))
+        self.assertTrue(self.matches([self.call({'output_mode': 'add'}), self.call(mappings=layout, exact=True)]))
+        for field in [
+            {**layout[0]['fields'][0], 'name': 'renamed'},
+            {**layout[0]['fields'][0], 'name': None},
+            {**layout[0]['fields'][0], 'used': False},
+            {**layout[0]['fields'][0], 'source': {'kind': 'input_field', 'name': 'B_Replace'}},
+        ]:
+            with self.subTest(field=field):
+                changed = [{**layout[0], 'fields': [field]}]
+                self.assertFalse(self.matches([self.call({'output_mode': 'add'}, mappings=changed, exact=True)]))
+                self.assertFalse(self.matches([self.call({'output_mode': 'add'}), self.call(mappings=changed, exact=True)]))
+
     def test_initial_input_mapping(self):
         initial = self.call({'output_mode': 'add'}, mappings=[{'direction': 'input', 'port': 0, 'fields': []}])
         self.assertFalse(self.matches([initial, self.call(exact=True)]))

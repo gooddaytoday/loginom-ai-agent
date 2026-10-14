@@ -45,10 +45,11 @@ def label_only_mappings(mappings):
         isinstance(m, dict) and set(m) <= {'direction', 'port', 'autosync', 'fields'}
         and m.get('direction') == 'output' and m.get('port') == 0
         and isinstance(m.get('fields'), list) and all(
-            isinstance(f, dict) and set(f) <= {'source', 'label'}
+            isinstance(f, dict) and set(f) <= {'source', 'name', 'label'}
             and ('label' not in f or isinstance(f['label'], str)) and isinstance(f.get('source'), dict)
             and set(f['source']) == {'kind', 'name'}
             and f['source']['kind'] == 'configured_field'
+            and ('name' not in f or f['name'] == f['source']['name'])
             for f in m['fields']) for m in mappings)
 
 
