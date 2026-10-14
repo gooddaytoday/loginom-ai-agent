@@ -91,6 +91,13 @@ memory/swap limits/counters каждого scope. Это чтение приме
 load/OOM не приписывается отдельному slot. Actual proc/sysfs и private ancestor
 quota mask: 29 resource tests PASS/251 assertions (16.11s), typecheck/diff PASS.
 
+Container sample дополнительно содержит epoch_stable и cgroup host PID. Repeat
+selected inspect после stats/cgroup требует прежние started_at/running/PID/image/
+name/owner labels; unverified epoch и неверный pair nonce не разрешают использовать
+cgroup как bound scope. Actual bounded container: kernel memory.max64MiB,
+CPU quota ratio0.25, OOM/throttling counters; 29 resource tests PASS/259 assertions
+(17.24s), typecheck/diff PASS. Это Docker resource epoch, не Loginom serverEpoch.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —
