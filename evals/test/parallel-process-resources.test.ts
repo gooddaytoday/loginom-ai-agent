@@ -7,6 +7,43 @@ import { assessProcessResourceTimeline, assessResourceCoverage, checkResourceEvi
 import { freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { superviseProcess } from "../src/process-supervisor"
 
+test("resource evidence covers the actual persisted launcher lifetime from dispatch to exit", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-full-lifetime-"))
+  const samplesFile = path.join(root, "samples.jsonl"), abort = new AbortController()
+  const budget = await freezeResourceBudget({ out: path.join(root, "budget.json"), runId: "full-lifetime",
+    bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })
+  const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "full-lifetime", phase: "run",
+    signal: abort.signal, processes: sampleSupervisedResources })
+  let confirmed = false
+  try {
+    const deadline = Date.now() + 10000
+    while (!await Bun.file(samplesFile).exists() || !(await Bun.file(samplesFile).text()).includes("\n")) {
+      if (Date.now() > deadline) throw Error("Lifetime baseline frame did not arrive")
+      await Bun.sleep(10)
+    }
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "judge", id: "full-lifetime" } })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(confirmed).toBe(true)
+    const lifetime = (await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime
+    expect(lifetime).toEqual(run.processCleanup.lifetime)
+    while ((await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line)).at(-1).host.observed_at < lifetime.finished_at) {
+      if (Date.now() > deadline) throw Error("Lifetime final bracket frame did not arrive")
+      await Bun.sleep(10)
+    }
+    abort.abort()
+    await collecting
+    const file = path.join(root, "summary.json")
+    await writeResourceSummary({ samplesFile, out: file })
+    const samples = (await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line))
+    const owner = { ...lifetime.owner, launcher: lifetime.launcher }
+    expect(await checkResourceEvidence({ file, samplesFile, runId: "full-lifetime", startedAt: lifetime.started_at, finishedAt: lifetime.finished_at,
+      coverage: { paths: [root], containers: [], owners: [owner] },
+      processWindows: [{ ...owner, startedAt: lifetime.started_at, finishedAt: lifetime.finished_at }],
+      view: samples[0].host.collector_cgroup.view, budget: budget.source })).toMatchObject({ status: "passed", codes: [] })
+  } finally { abort.abort(); await collecting; if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 15000)
+
 test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-owned-"))
   const owners = [{ kind: "slot" as const, id: crypto.randomUUID() }, { kind: "judge" as const, id: crypto.randomUUID() }]
