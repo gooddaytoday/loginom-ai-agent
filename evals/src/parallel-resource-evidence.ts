@@ -92,6 +92,8 @@ function validCgroupResources(value: unknown): boolean {
   if (value === null || value === undefined) return true
   if (typeof value !== "object" || Array.isArray(value)) return false
   const group = resourceObject(value), quota = resourceObject(group.cpu_max)
+  if (group.controllers !== null && group.controllers !== undefined && (!Array.isArray(group.controllers) ||
+    group.controllers.some(value => typeof value !== "string" || !value.trim()))) return false
   if (group.path !== null && group.path !== undefined && (typeof group.path !== "string" || !path.posix.isAbsolute(group.path) || path.posix.normalize(group.path) !== group.path)) return false
   if (!validResourceNumbers(group.cpu_usage, ["usage_usec", "user_usec", "system_usec"]) ||
     !validResourceNumbers(group.cpu_throttling, ["nr_periods", "nr_throttled", "throttled_usec"]) ||

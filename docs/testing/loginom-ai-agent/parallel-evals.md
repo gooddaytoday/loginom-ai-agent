@@ -114,6 +114,17 @@ Actual A/B supervisor controls показывают независимость B
 и mandatory frozen requirements ещё должны быть проверены. Диагностические
 empty requirements не предоставляют live qualification.
 
+Cgroup samples/ancestors содержат observed controllers list. Unreadable
+cgroup.controllers даёт null+diagnostic; старые quota/throttling null
+не подменяются0/max. Текущий runner leaf имеет memory+pids, /user.slice
+имеетcpu и cpu.max=max100000; root limit files отсутствуют.
+[Kernel CPU contract](https://docs.kernel.org/admin-guide/cgroup-v2.html#cpu)
+описывает постоянные usage fields, дополнительные local CFS stats при
+включённом controller и non-root cpu.max. Это read-only metadata;
+applicability и привязка view к hierarchy ещё требуют qualification.
+Actual sysfs/private EACCES namespace + resource/Docker/policy regression:
+69 PASS/490 assertions, typecheck/diff PASS. Controls/limits не менялись.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный

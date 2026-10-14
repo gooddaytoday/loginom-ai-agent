@@ -158,13 +158,14 @@ export async function sampleCgroupResources(pid = process.pid) {
 }
 
 async function readCgroupResources(group?: string) {
-  const files = group ? await Promise.all(["cpu.stat", "memory.events", "memory.current", "memory.max", "memory.swap.current", "memory.swap.max", "cpu.max"]
+  const files = group ? await Promise.all(["cpu.stat", "memory.events", "memory.current", "memory.max", "memory.swap.current", "memory.swap.max", "cpu.max", "cgroup.controllers"]
     .map(name => readFile(path.join("/sys/fs/cgroup", group, name), "utf8").catch(() => undefined))) : []
   const cpu = cgroupCounters(files[0])
   const events = cgroupCounters(files[1])
   const quota = files[6]?.trim().split(/\s+/)
   const sample = {
     path: group ?? null,
+    controllers: files[7] !== undefined ? files[7].trim().split(/\s+/).filter(Boolean) : null,
     cpu_max: quota?.length === 2 && (quota[0] === "max" || (cgroupNumber(quota[0]) ?? 0) > 0) && (cgroupNumber(quota[1]) ?? 0) > 0
       ? { quota_usec: quota[0] === "max" ? "max" as const : cgroupNumber(quota[0])!, period_usec: cgroupNumber(quota[1])! } : null,
     cpu_usage: ["usage_usec", "user_usec", "system_usec"].every(key => Number.isSafeInteger(cpu.get(key)))

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
@@ -222,3 +222,26 @@ console.log(JSON.stringify(await sampleCgroupResources()))
   expect(ancestor.errors).toContain("CGROUP_CPU_MAX_UNAVAILABLE")
   expect(sample.memory_current_bytes).toBeGreaterThan(0)
 }, 10_000)
+
+
+test.skipIf(!Bun.which("bwrap"))("cgroup sampler keeps unreadable controller availability unknown in its private namespace", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-cgroup-controllers-"))
+  const file = path.join(root, "unreadable")
+  try {
+    await writeFile(file, "cpu memory", { mode: 0o600 })
+    await chmod(file, 0o000)
+    const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+    const child = Bun.spawn([Bun.which("bwrap")!, "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
+      "--ro-bind", file, path.join("/sys/fs/cgroup", group, "cgroup.controllers"), "--chdir", evalsRoot, process.execPath, "-e", `
+import { sampleCgroupResources } from ${JSON.stringify(path.join(evalsRoot, "src/parallel-resources.ts"))}
+console.log(JSON.stringify(await sampleCgroupResources()))
+`], { env: { PATH: process.env.PATH! }, stdout: "pipe", stderr: "pipe" })
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    const sample = JSON.parse(stdout)
+    expect(sample.path).toBe(group)
+    expect(sample.controllers).toBeNull()
+    expect(sample.errors).toContain("CGROUP_CONTROLLERS_UNAVAILABLE")
+    expect(sample.cpu_usage.usage_usec).toBeGreaterThan(0)
+  } finally { await chmod(file, 0o600); await rm(root, { recursive: true, force: true }) }
+})
