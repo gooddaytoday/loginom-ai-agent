@@ -60,9 +60,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       process.stderr.write("ADMIN_INIT_STAGE_BROWSER\n")
       context = await chromium.launchPersistentContext(payload.profileDir, { executablePath: browser, headless: true, timeout: remaining(request) })
       page = context.pages()[0] ?? await context.newPage()
-      page.on("console", message => {
-        if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK)|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
-      })
+      page.on("console", traceConsole)
       page.setDefaultTimeout(remaining(request))
       process.stderr.write("ADMIN_INIT_STAGE_NAVIGATION\n")
       await page.goto(url.href, { timeout: remaining(request) })
@@ -139,7 +137,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           if (retained.some(row => row.name !== binding.session.name || row.createdAt !== binding.session.createdAt))
             return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } }
           if (retained.length) {
-            // Only the fixed probe can attest its one empty package after closing its writer context.
+            // Only fixed probes attest one package created without execution after closing the writer context.
             if (retained[0].packageCount !== 0 && (binding.retainedPackageCount !== 1 || retained[0].packageCount !== 1) || retained[0].pendingDisconnect !== true)
               return { outcome: "not_applied", data: { code: "SESSION_NOT_IDLE" } }
             applied = true
@@ -167,8 +165,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!payload || Object.keys(payload).length !== (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -177,7 +175,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
           payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+      if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
         Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
@@ -212,8 +210,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
           const flags = [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]
-          if (owned && !["activate", "session-probe", "session-crash-probe", "session-package-crash-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
-          if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe"].includes(phase)) {
+          if (owned && !["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(phase)) {
             stage = "ACL"
             console.info("ADMIN_USER_STAGE_ACL")
             const snapshot = async () => {
@@ -245,7 +243,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const before = await snapshot()
             if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
-            if (["activate", "session-probe", "session-crash-probe", "session-package-crash-probe"].includes(phase)) {
+            if (["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(phase)) {
               const safePolicy = async () => owned.secretHash === secretHash && await user.AuthMode === bg.TBGDeductorUserAuthMode.uamLocal &&
                 (await Promise.all(flags.map(async ([name, value]) => await user[name] === value))).every(Boolean)
               if (before.some(directory => directory.permissions.length) || !await safePolicy())
@@ -308,7 +306,13 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
         password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null }))
-      if (["session-probe", "session-crash-probe", "session-package-crash-probe"].includes(payload.phase) && result.outcome === "confirmed") {
+      if (["session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe"].includes(payload.phase) && result.outcome === "confirmed") {
+        const retainedPackage = ["session-package-crash-probe", "session-backup-probe"].includes(payload.phase)
+        const storageRoots = payload.phase === "session-backup-probe" ? await bounded(request, page.evaluate(async () => {
+          const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+          const settings = await session.Settings
+          return { userStorage: await settings.UserStorageDirectory, sessionBackup: await settings.SessionBackupDirectory, keepAliveMs: await settings.SessionKeepAlive }
+        })) : null
         const snapshot = () => bounded(request, page.evaluate(async () => {
           const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
           const manager = await (await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)).GetSessionsManager()
@@ -327,6 +331,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         const observed = await (async () => {
           try {
             const probePage = await probeContext.newPage()
+            probePage.on("console", traceConsole)
             await probePage.goto(page.url(), { timeout: remaining(request) })
             const login = probePage.locator('input[placeholder="Логин"]')
             const password = probePage.locator('input[placeholder="Пароль"]')
@@ -340,6 +345,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             await password.blur()
             await submit.click()
             await probePage.waitForFunction(() => typeof bg !== "undefined" && Boolean(bg.app?.Application?.FInstance?.FServerConnection?.ServerContainer?.Session), null, { timeout: remaining(request) })
+            // MainForm initializes the design user's autosave setting after publishing Session.
+            if (payload.phase === "session-backup-probe") await probePage.waitForFunction(() =>
+              typeof bg.markdown?.Markdown?.OnLoadAllowedLinkURLs === "function", null, { timeout: remaining(request) })
             process.stderr.write("ADMIN_USER_PROBE_STAGE_SESSION\n")
             const ownSession = await bounded(request, probePage.evaluate(async () => {
               const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
@@ -356,7 +364,48 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               (await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session).CreatePackage()))
             try {
               const withPackage = await snapshot()
-              if (payload.phase !== "session-package-crash-probe") {
+              const backup = payload.phase === "session-backup-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
+                const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+                const manager = await session.SessionBackupManager
+                const snapshot = async () => {
+                  const list = await manager.GetSessionsList()
+                  const rows = []
+                  try {
+                    for (let index = 0; index < await list.Count; index++) {
+                      const row = await list.getItem(index)
+                      rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), packageCount: await row.PackageCount,
+                        startTime: (await row.StartTime).toISOString(), backupTime: (await row.BackupTime).toISOString() })
+                    }
+                  } finally { await ReleaseObject(list, true) }
+                  return rows
+                }
+                const before = await snapshot()
+                console.info("ADMIN_USER_STAGE_BACKUP_BASELINE")
+                const unit = await (await item.ModelUnits).AddDefault()
+                await unit.set_DisplayName("Backup probe")
+                await session.SavePackageAs(item, "backup-probe.lgp")
+                await item.set_BinaryCmpUniqValues(!await item.BinaryCmpUniqValues)
+                const modified = await session.IsPackageModified(item)
+                console.info("ADMIN_USER_STAGE_BACKUP_MODIFIED")
+                await session.set_PackageAutoSavePeriod(5000)
+                const periodMs = await session.PackageAutoSavePeriod
+                console.info("ADMIN_USER_STAGE_BACKUP_PERIOD")
+                if (periodMs !== 5000) return { periodMs, modified, before, after: await snapshot(), nonemptyObserved: false, reason: "policy_mismatch" }
+                console.info("ADMIN_USER_STAGE_BACKUP_WAIT")
+                const until = Math.min(deadline - 200, Date.now() + 2 * periodMs)
+                while (Date.now() < until) {
+                  const observedPeriodMs = await session.PackageAutoSavePeriod
+                  if (observedPeriodMs !== periodMs) {
+                    console.info("ADMIN_USER_STAGE_BACKUP_DRIFT")
+                    return { periodMs, observedPeriodMs, modified, before, after: await snapshot(), nonemptyObserved: false, reason: "period_drift" }
+                  }
+                  const after = await snapshot()
+                  if (after.some(row => row.packageCount > 0)) return { periodMs, modified, before, after, nonemptyObserved: true }
+                  await new Promise(resolve => setTimeout(resolve, Math.min(periodMs / 4, until - Date.now())))
+                }
+                return { periodMs, modified, before, after: await snapshot(), nonemptyObserved: false, reason: "not_observed" }
+              }, { item: handle, deadline: request.deadline })) : null
+              if (!retainedPackage) {
                 process.stderr.write("ADMIN_USER_PROBE_STAGE_CLOSE\n")
                 await bounded(request, probePage.evaluate(async item => {
                   const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
@@ -366,20 +415,20 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               const afterPackage = await snapshot()
               // Interrupt only this owned renderer's orderly logout; the native server/RPC remains real.
               if (payload.phase !== "session-probe") await probePage.evaluate(() => { window.onpagehide = null })
-              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false }
+              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false, ...(backup ? { backup, storageRoots } : {}) }
             } finally { await handle.dispose() }
           } finally { await probeContext.close() }
         })()
         const candidates = observed.opened.filter(row => !observed.baseline.some(previous => previous.objectId === row.objectId) &&
           row.name.startsWith(credentials.username + ":") && /^[1-9]\d*$/.test(row.name.slice(credentials.username.length + 1)) && row.packageCount === 0 &&
           observed.withPackage.some(item => item.objectId === row.objectId && item.name === row.name && item.createdAt === row.createdAt && item.packageCount === 1) &&
-          observed.afterPackage.some(item => item.objectId === row.objectId && item.name === row.name && item.createdAt === row.createdAt && item.packageCount === (payload.phase === "session-package-crash-probe" ? 1 : 0)))
+          observed.afterPackage.some(item => item.objectId === row.objectId && item.name === row.name && item.createdAt === row.createdAt && item.packageCount === (retainedPackage ? 1 : 0)))
         if (candidates.length !== 1) throw Error("SESSION_IDENTITY_UNSUPPORTED")
         const binding = { remoteKey: candidates[0].objectId,
           userKey: createHash("sha256").update(JSON.stringify({ generation: payload.preparationNonce, name: credentials.username, userKind: 0 })).digest("hex"),
           username: credentials.username, serverEpoch: identity.serverEpoch, name: candidates[0].name, createdAt: candidates[0].createdAt }
         sessionBindings.set(request.id, { session: binding, userObjectId: payload.owned.objectId,
-          retainedPackageCount: payload.phase === "session-package-crash-probe" ? 1 : 0 })
+          retainedPackageCount: retainedPackage ? 1 : 0 })
         respond(id, "confirmed", { ...observed, afterDisconnect: await snapshot(), binding })
         continue
       }
@@ -452,6 +501,10 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
   }
 }
 await context?.close().catch(() => { process.stderr.write("ADMIN_DISPOSE_UNKNOWN\n"); process.exitCode = 2 })
+
+function traceConsole(message) {
+  if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK|BACKUP_(BASELINE|MODIFIED|PERIOD|WAIT|DRIFT))|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
+}
 
 function respond(id, outcome, data) {
   const frame = JSON.stringify({ v: 1, id, outcome, data })

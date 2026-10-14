@@ -53,7 +53,10 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
 }, 90_000)
 
-liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", async () => {
+liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
+liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
+
+async function nativeUserCapability(mode: "sessions" | "backup") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -84,7 +87,7 @@ liveIntegration("native user capability: creates one blocked account and refuses
       timeoutMs: 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
     const channel = createJournaledAdminChannel(output.readable, input.writable, journal)
     const request = async (op: AdminOperation, payload: unknown) => {
-      expect(await readServerIdentity(file)).toEqual(pair.identity)
+      if (op !== "dispose") expect(await readServerIdentity(file)).toEqual(pair.identity)
       return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: pair.identity, deadline: Date.now() + 30_000, payload })
     }
     let complete = false
@@ -131,6 +134,41 @@ liveIntegration("native user capability: creates one blocked account and refuses
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
       expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: false,
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
+      if (mode === "backup") {
+        const backupProbe = await request("reconcile-user", { ...activation, phase: "session-backup-probe" })
+        await writeLeaseReceipt(path.join(evidence, "session-backup-reply.json"), backupProbe)
+        const files = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", pair.identity.containerId,
+          "find", file.server.backupRoot, file.server.storageRoot, "-maxdepth", "4", "-printf", "%P\\0%y\\0%s\\0"], { stdout: "pipe", stderr: "pipe" })
+        await writeLeaseReceipt(path.join(evidence, "session-backup-storage.json"), { identity: pair.identity, exitCode: await files.exited,
+          stdout: await new Response(files.stdout).text(), stderr: await new Response(files.stderr).text() })
+        expect(backupProbe.outcome).toBe("confirmed")
+        const backupData = backupProbe.data as typeof observed & { backup: { periodMs: number; modified: boolean;
+          before: { objectId: string; packageCount: number }[]; after: { objectId: string; packageCount: number; startTime: string; backupTime: string }[] } }
+        await writeLeaseReceipt(path.join(evidence, "session-backup-probe.json"), { version: 1, identity: pair.identity, ...backupData })
+        expect(backupData.backup).toMatchObject({ periodMs: 5000, before: [] })
+        const autosave = path.join(evidence, "backup-probe.lgp.autosave")
+        const artifact = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "cp",
+          `${pair.identity.containerId}:${file.server.storageRoot}/${credentials.username}/backup-probe.lgp.autosave`, autosave], { stdout: "pipe", stderr: "pipe" })
+        expect(await artifact.exited).toBe(0)
+        const bytes = await Bun.file(autosave).bytes()
+        expect(bytes.length).toBeGreaterThan(0)
+        await writeLeaseReceipt(path.join(evidence, "autosave-evidence.json"), { identity: pair.identity, username: credentials.username,
+          sessionGuid: backupData.ownSession.guid, periodMs: backupData.backup.periodMs, bytes: bytes.length,
+          sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"), sessionBackupQualified: false })
+        const stop = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "stop", "--time", "10", pair.identity.containerId], { stdout: "pipe", stderr: "pipe" })
+        expect(await stop.exited).toBe(0)
+        const backupDir = path.join(evidence, "server-shutdown-backup")
+        await mkdir(backupDir, { mode: 0o700 })
+        const copy = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "cp", `${pair.identity.containerId}:${file.server.backupRoot}/.`, backupDir], { stdout: "pipe", stderr: "pipe" })
+        expect(await copy.exited).toBe(0)
+        const backups = await readdir(backupDir)
+        await writeLeaseReceipt(path.join(evidence, "server-shutdown-backup.json"), { identity: pair.identity, entries: backups })
+        // This controlled recipe produces autosave; empty SessionBackup is not a disabled-policy proof.
+        expect(backupData.backup.after).toHaveLength(0)
+        expect(backups).toHaveLength(0)
+        complete = true
+        return
+      }
       const probe = await request("reconcile-user", { ...activation, phase: "session-probe" })
       expect(probe.outcome).toBe("confirmed")
       const observed = probe.data as { ownSession: { guid: string; objectId: string; userObjectId: string; username: string; isAdmin: boolean; isDesigner: boolean };
@@ -192,6 +230,8 @@ liveIntegration("native user capability: creates one blocked account and refuses
       if (disposed?.outcome !== "confirmed") abort.abort()
       await channel.end().catch(() => abort.abort())
       const run = await pending
+      await writeLeaseReceipt(path.join(evidence, "native-driver-result.json"), { exitCode: run.exitCode, stderr: run.stderr,
+        processCleanup: run.processCleanup, timedOut: run.timedOut, interrupted: run.interrupted })
       await channel.close().catch(() => undefined)
       expect(run.processCleanup.status).toBe("confirmed")
       expect(run.processCleanup.capture_complete).toBe(true)
@@ -204,7 +244,7 @@ liveIntegration("native user capability: creates one blocked account and refuses
       }
     }
   } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
-}, 120_000)
+}
 
 liveIntegration("trusted bridge: configured research admin login reads the role and disposes its native browser", async () => {
   const file = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
