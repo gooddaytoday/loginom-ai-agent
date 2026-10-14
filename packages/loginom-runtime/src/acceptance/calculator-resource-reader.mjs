@@ -11,7 +11,7 @@ export async function createCalculatorResourceReader(owner) {
     if (binding.signal?.aborted) throw binding.signal.reason;
   };
   assertOwner();
-  let operation, disposed = false, handle, readStarted = false, readFailure;
+  let operation, disposed = false, handle, readStarted = false, readFailure, disposeStarted = false, disposeFailure;
   const start = async (fn, deadline = null) => {
     assertOwner();
     if (deadline != null && (!Number.isSafeInteger(deadline) || Date.now() >= deadline))
@@ -70,12 +70,16 @@ export async function createCalculatorResourceReader(owner) {
     },
     async dispose() {
       reader.assertSettled();
-      if (disposed) return;
       assertOwner();
+      if (disposed) return;
+      if (disposeStarted) throw disposeFailure?.value;
+      disposeStarted = true;
       // Disposal participates in the same custody guard; no second disposal
       // or native cleanup may overtake an unresolved original callback.
-      await start(async () => { if (handle) await handle.dispose(); });
-      disposed = true;
+      try {
+        await start(async () => { if (handle) await handle.dispose(); });
+        disposed = true;
+      } catch (value) { disposeFailure = {value}; throw value; }
     },
   });
   if (owner.calculatorResourceReader) throw Error('LOGINOM_CALCULATOR_READER_ALREADY_BOUND');

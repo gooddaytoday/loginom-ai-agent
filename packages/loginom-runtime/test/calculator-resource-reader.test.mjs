@@ -20,13 +20,13 @@ function fixture() {
   const evaluate = (fn, arg) => { realm.arg = arg; return vm.runInContext(`(${fn.toString()})(arg)`, realm); };
   const page = {isClosed: () => false, async evaluateHandle(fn, arg) {
     events.push('retain'); const refs = await evaluate(fn, arg);
-    return {evaluate: fn => evaluate(fn, refs), async dispose() { events.push('dispose'); }};
+    return {evaluate: fn => evaluate(fn, refs), async dispose() { events.push('dispose'); if ('disposeError' in page) throw page.disposeError; }};
   }};
   const context = {pages: () => [page]}, controller = new AbortController();
   const owner = {id: 'owner', account: 'own', origin: 'https://own.invalid', page, context,
     deadline: null, signal: controller.signal};
   owner.readinessBinding = Object.freeze({...owner});
-  return {owner, controller, connection, session, user, tree, packages, globals, events};
+  return {owner, page, controller, connection, session, user, tree, packages, globals, events};
 }
 test('same Page opaque refs produce only bounded current-session facts', async () => {
   const f = fixture(), reader = await createCalculatorResourceReader(f.owner);
@@ -112,3 +112,12 @@ test('expired capture deadline refuses before native read', async () => {
   await assert.rejects(reader.read({deadline: Date.now() - 1}), /READ_DEADLINE/);
   assert.deepEqual(f.events, ['retain']); await reader.dispose();
 });
+for (const error of [undefined, null, false, 0, '', Error('dispose', {cause: 0})])
+  test(`handle disposal rejection ${String(error)} does not replay`, async () => {
+    const f = fixture(), reader = await createCalculatorResourceReader(f.owner); f.page.disposeError = error;
+    for (let i = 0; i < 2; i++) {
+      const result = await reader.dispose().then(() => ({ok: true}), value => ({ok: false, value}));
+      assert.equal(result.ok, false); assert.equal(result.value, error);
+    }
+    assert.equal(f.events.filter(x => x === 'dispose').length, 1);
+  });
