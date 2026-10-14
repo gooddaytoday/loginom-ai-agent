@@ -59,7 +59,9 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 const {createBridge}=await import('../../lib/bridge.mjs');
 
 
-const scenarios=(process.env.CALCULATOR_CAPTURE_CASES?.split(',')??['success','no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved','cancel-missing','cancel-applied','identity-after','receipt-write','falsy-false','falsy-zero','falsy-empty','falsy-null','falsy-undefined','resource-error','resource-falsy','resource-foreign','resource-count','resource-running']);
+const scenarios=(process.env.CALCULATOR_CAPTURE_CASES?.split(',')??['success','no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved','cancel-missing','cancel-applied','identity-after','receipt-write','falsy-false','falsy-zero','falsy-empty','falsy-null','falsy-undefined','resource-error','resource-falsy','resource-foreign','resource-count','resource-running',
+ 'confirmed-refusal-error','confirmed-refusal-undefined','confirmed-refusal-null','confirmed-refusal-false','confirmed-refusal-zero','confirmed-refusal-empty',
+ 'confirmed-refusal-drift','foreign-cancel-node','foreign-cancel-owner','foreign-cancel-flag']);
 for(const scenario of scenarios)test('private capture transaction: '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'capture-bridge-'));
  const f=current={scenario,events:[],busy:false,saves:0};
