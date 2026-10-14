@@ -2782,3 +2782,33 @@ Actual3args/31unique identities/9→6→16, все сохранённые prompt
 его результат и independent auto-next review ещё ожидаются. Join/schema outcomes
 050544 остаются историческими и дают confidence только для byte-identical
 зависимостей; не засчитываются как fresh outcome064745.
+
+
+Checkpoint 2026-10-14 07:51 UTC — последовательный auto-next готов.
+Добавлены только `evals/script/run-node-selection-series.ts` и
+`evals/test/node-selection-series.test.ts`; Runtime и single-attempt runner не
+менялись. Driver исполняет фиксированные9→6→16, пишет dispatch до однократного
+вызова runner, не повторяет начатый слот при re-entry. Следующий standard допускают
+authoritative audit и exact own saved-package cleanup/resource/terminal/Host
+close, временная привязка, отсутствие собственных PID и .writer. Неизвестный
+receipt, ошибка или нарушение блокируют продолжение; JS/recovery/anomalies
+останавливаются для review закрытых артефактов. Baseline JS учитывается как
+policy failure старого skill, а не как PASS. Отдельный final review остаётся.
+Независимый review выявил проверку auditor source только при старте; исправление
+RED→GREEN добавило small evaluator closure в проверку перед каждым следующим
+слотом. Новый payload/build и повтор full runtime checks не нужны.
+Author119/119PASS/285expect, typecheck0; peer повторил только найденный regression
+(1PASS). Final script SHA `5002026ee66b27083e6851fb419bc2ea5c4b9d047de289a07b92199e162ac9e4`,
+test SHA `7b52c22f3ba5572ee3166ed03143d8f5b846c1e0d7e832aa5db9daa3b835c5f4`.
+Author `series-driver-development/verification-review-fix.json` SHA
+`3577ff3f7756d90ad9c37a1b3ccd15936974534aa2e3e447d8d02d258b12412d`;
+peer `series-auto-next-proof/independent-review.json` SHA
+`ed066c06ab2f4e687f890cb876918d84c64286e4d4079e26444c8d2b7e8b2738`.
+Host receipt не содержит chatID: attribution требует эксклюзивного профиля,
+единственной новой квитанции и её времени внутри собственной попытки.
+Модельная серия пока не начиналась; activation — только через новый immutable
+ready:true lock, не изменяющий исходные ready:false optimized/43-slot файлы.
+
+- [x] Реализовать и независимо проверить thin sequential auto-next поверх
+  существующего runner: 9→6→16, exact own closure, policy-stop, review pauses,
+  source seals перед dispatch и запрет повторного запуска начатого слота.
