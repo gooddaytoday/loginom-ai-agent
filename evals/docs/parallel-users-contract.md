@@ -444,3 +444,13 @@ reconcile/prepare/dispatch пока не вызывает её. Effective negati
 root marker и session/backup lifecycle остаются открытыми. Native disposable
 fixture: activation/reuse PASS, existing Everyone и missing configured secret
 SHA отказали;43 assertions/21.69s, typecheck/diff PASS.
+
+Fixed wire session-probe допущен только для exact active configured account и
+проверенной пустой shared policy. Отдельный context того же supervised native
+browser логинится как design user, читает CurrentUser/Session.Guid/proxy ID,
+создаёт/закрывает ровно один пакет штатными RPC; admin manager snapshots
+сохраняют before/opened/withPackage/afterPackage. В native fixture единственная
+новая row удержала objectId/Name/CreateTime при Count 0→1→0. Whitelist
+наблюдения сохранены private; qualification=false до negative close/reconnect
+и durable ledger. Общий inspect/parent close не выдают authority по этому
+research observation автоматически.
