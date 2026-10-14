@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
+import { writeResourceSummary } from "../src/parallel-resource-evidence"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -121,6 +122,19 @@ test("container resource sampler observes a labelled bounded disposable containe
       expect(rows[0].containers[0].role).toBe("server")
       expect(rows[0].containers[0].container_id).toBe(id)
       expect(rows.every(row => row.containers[0].memory.current_bytes > 0 && row.containers[0].inspect.memory_bytes === 67108864)).toBe(true)
+
+      expect((await writeResourceSummary({ samplesFile: out, out: path.join(root, "control-summary.json") })).summary.samples).toBe(rows.length)
+      for (const [index, change] of [{ epoch_stable: "true" },
+        { memory: { current_bytes: "malformed-counter-canary", limit_bytes: 67108864 } },
+        { io: [{ major: 8, minor: 0, op: "Write", bytes: "malformed-counter-canary" }] },
+        { inspect: { ...rows[0].containers[0].inspect, running: "true" } },
+        { inspect: { ...rows[0].containers[0].inspect, pid: "malformed-counter-canary" } },
+        { inspect: { ...rows[0].containers[0].inspect, memory_bytes: "malformed-counter-canary" } }].entries()) {
+        const samplesFile = path.join(root, `malformed-${index}.jsonl`), summary = path.join(root, `malformed-${index}.json`)
+        await writeFile(samplesFile, JSON.stringify({ ...rows[0], containers: [{ ...rows[0].containers[0], ...change }] }) + "\n", { mode: 0o600 })
+        await expect(writeResourceSummary({ samplesFile, out: summary })).rejects.toThrow("RESOURCE_SAMPLES_INVALID")
+        expect(await Bun.file(summary).exists()).toBe(false)
+      }
       const rejected = path.join(root, "wrong-owner.jsonl")
       const abortWrong = new AbortController()
       const wrong = collectHostResources({ paths: [root], out: rejected, intervalMs: 50, runId: "docker-smoke", phase: "run", signal: abortWrong.signal,

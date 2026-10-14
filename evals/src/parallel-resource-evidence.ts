@@ -61,7 +61,7 @@ function resourceReceipt(file: string, bytes: Buffer) {
     if (!bytes.length || bytes.at(-1) !== 10) throw new EvalFailure("RESOURCE_SAMPLES_INVALID", 2)
     const samples = bytes.toString("utf8").trimEnd().split("\n").map(line => JSON.parse(line)) as
       (Parameters<typeof summarizeResourceSamples>[0][number] & { version: number; run_id: string | null; phase: "before" | "run" | "after" | null; interval_ms: number; duration_ms: number })[]
-    if (samples.some((sample, index) => !validHostResources(sample.host) || sample.version !== 1 || sample.sequence !== index + 1 ||
+    if (samples.some((sample, index) => !validHostResources(sample.host) || !validProcessResources(sample.processes) || !validContainerResources(sample.containers) || sample.version !== 1 || sample.sequence !== index + 1 ||
       !Number.isFinite(sample.elapsed_ms) || sample.elapsed_ms < 0 || index > 0 && sample.elapsed_ms < samples[index - 1]!.elapsed_ms ||
       !Number.isSafeInteger(sample.missed_intervals) || sample.missed_intervals < 0 ||
       !Number.isSafeInteger(sample.interval_ms) || sample.interval_ms < 1 || !Number.isFinite(sample.duration_ms) || sample.duration_ms < 0 ||
@@ -76,6 +76,7 @@ function resourceReceipt(file: string, bytes: Buffer) {
 
 function validHostResources(value: unknown) {
   const host = resourceObject(value), cpu = resourceObject(host.cpu), memory = resourceObject(host.memory)
+  if (!validCgroupResources(host.collector_cgroup)) return false
   if (host.cpu !== null && (!Array.isArray(cpu.ticks) || cpu.ticks.length < 8 ||
     !cpu.ticks.every(value => Number.isSafeInteger(value) && Number(value) >= 0))) return false
   if (host.memory !== null && !["available_bytes", "total_bytes", "swap_free_bytes", "swap_total_bytes"]
@@ -85,6 +86,82 @@ function validHostResources(value: unknown) {
     return typeof file.path === "string" && (file.capacity === null || ["available_bytes", "total_bytes", "available_inodes", "total_inodes"]
       .every(key => Number.isSafeInteger(capacity[key]) && Number(capacity[key]) >= 0))
   })
+}
+
+function validCgroupResources(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value !== "object" || Array.isArray(value)) return false
+  const group = resourceObject(value), quota = resourceObject(group.cpu_max)
+  if (group.path !== null && group.path !== undefined && (typeof group.path !== "string" || !path.posix.isAbsolute(group.path) || path.posix.normalize(group.path) !== group.path)) return false
+  if (!validResourceNumbers(group.cpu_usage, ["usage_usec", "user_usec", "system_usec"]) ||
+    !validResourceNumbers(group.cpu_throttling, ["nr_periods", "nr_throttled", "throttled_usec"]) ||
+    !validResourceNumbers(group.memory_events, ["oom", "oom_kill"])) return false
+  if (["memory_current_bytes", "swap_current_bytes"].some(key => group[key] !== null && group[key] !== undefined &&
+    (!Number.isSafeInteger(group[key]) || Number(group[key]) < 0))) return false
+  if (["memory_limit_bytes", "swap_limit_bytes"].some(key => group[key] !== null && group[key] !== undefined && group[key] !== "max" &&
+    (!Number.isSafeInteger(group[key]) || Number(group[key]) < 0))) return false
+  if (group.cpu_max !== null && group.cpu_max !== undefined &&
+    (quota.quota_usec !== "max" && (!Number.isSafeInteger(quota.quota_usec) || Number(quota.quota_usec) < 1) ||
+      !Number.isSafeInteger(quota.period_usec) || Number(quota.period_usec) < 1)) return false
+  return group.ancestors === null || group.ancestors === undefined || Array.isArray(group.ancestors) && group.ancestors.every(validCgroupResources)
+}
+
+function validProcessResources(value: unknown) {
+  if (value === null || value === undefined) return true
+  const producer = resourceObject(value)
+  if (!Number.isSafeInteger(producer.producer_pid) || Number(producer.producer_pid) < 1 || !Array.isArray(producer.scopes)) return false
+  return producer.scopes.every(value => {
+    const scope = resourceObject(value), owner = resourceObject(scope.owner)
+    if (!["command", "slot", "admin", "judge"].includes(String(owner.kind)) || typeof owner.id !== "string" || !owner.id ||
+      !["observed", "unavailable"].includes(String(scope.status))) return false
+    if (scope.status === "unavailable") return scope.processes === null
+    if (!Array.isArray(scope.processes)) return false
+    return scope.processes.every(value => {
+      const process = resourceObject(value), identity = resourceObject(process.identity)
+      return typeof process.verified === "boolean" && typeof identity.starttime === "string" && /^\d+$/.test(identity.starttime) &&
+        typeof identity.executable === "string" && path.isAbsolute(identity.executable) &&
+        ["pid", "group", "session"].every(key => Number.isSafeInteger(identity[key]) && Number(identity[key]) >= 1) &&
+        ["uid", "parent", "device", "inode"].every(key => Number.isSafeInteger(identity[key]) && Number(identity[key]) >= 0) &&
+        (process.rss_bytes === null || Number.isSafeInteger(process.rss_bytes) && Number(process.rss_bytes) >= 0) &&
+        validResourceNumbers(process.cpu, ["user_ticks", "system_ticks"]) && validCgroupResources(process.cgroup)
+    })
+  })
+}
+
+function validResourceNumbers(value: unknown, keys: string[]) {
+  if (value === null || value === undefined) return true
+  const counters = resourceObject(value)
+  return keys.every(key => Number.isSafeInteger(counters[key]) && Number(counters[key]) >= 0)
+}
+
+function validContainerResources(value: unknown) {
+  if (value === null || value === undefined) return true
+  if (!Array.isArray(value)) return false
+  return value.every(value => {
+    const container = resourceObject(value), inspect = resourceObject(container.inspect)
+    if (typeof container.container_id !== "string" || !/^[0-9a-f]{64}$/.test(container.container_id) ||
+      typeof container.epoch_stable !== "boolean" || container.role !== undefined && !["server", "studio"].includes(String(container.role))) return false
+    if (container.inspect !== null && container.inspect !== undefined && (inspect.id !== container.container_id || typeof inspect.image !== "string" ||
+      typeof inspect.name !== "string" || typeof inspect.started_at !== "string" || typeof inspect.running !== "boolean" || typeof inspect.oom_killed !== "boolean")) return false
+    if (container.inspect !== null && container.inspect !== undefined && (!validContainerCounters(inspect, ["pid", "memory_bytes", "nano_cpus", "cpu_period"]) ||
+      ["memory_swap_bytes", "cpu_quota", "pids_limit"].some(key => inspect[key] !== null && inspect[key] !== undefined &&
+        (!Number.isSafeInteger(inspect[key]) || Number(inspect[key]) < -1)))) return false
+    if (!validContainerCounters(container.cpu, ["total_usage_ns", "system_cpu_usage_ns", "online_cpus"]) ||
+      !validContainerCounters(container.memory, ["current_bytes", "limit_bytes"]) || !validContainerCounters(container.pids, ["current"]) ||
+      !validCgroupResources(container.cgroup)) return false
+    if (container.raw_stats !== null && container.raw_stats !== undefined && typeof container.raw_stats !== "string") return false
+    return container.io === null || container.io === undefined || Array.isArray(container.io) && container.io.every(value => {
+      const entry = resourceObject(value)
+      return typeof entry.op === "string" && ["major", "minor", "bytes"].every(key => Number.isInteger(entry[key]) && Number(entry[key]) >= 0)
+    })
+  })
+}
+
+function validContainerCounters(value: unknown, keys: string[]) {
+  if (value === null || value === undefined) return true
+  const counters = resourceObject(value)
+  // API projections may exceed safe integers; raw_stats retains the original bytes.
+  return keys.every(key => counters[key] === null || Number.isInteger(counters[key]) && Number(counters[key]) >= 0)
 }
 
 function resourceObject(value: unknown): Record<string, unknown> {

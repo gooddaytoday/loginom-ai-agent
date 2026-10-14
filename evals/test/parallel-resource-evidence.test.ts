@@ -2,8 +2,9 @@ import { expect, test } from "bun:test"
 import { appendFile, chmod, link, mkdtemp, rm, stat, symlink, unlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { collectHostResources, sampleHostResources } from "../src/parallel-resources"
+import { collectHostResources, sampleHostResources, sampleSupervisedResources } from "../src/parallel-resources"
 import { readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { superviseProcess } from "../src/process-supervisor"
 import { readLeaseReceipt } from "../src/lease"
 
 test("resource evidence persists the actual sampler summary privately and binds the unchanged JSONL bytes", async () => {
@@ -134,3 +135,63 @@ test("resource receipt read-back refuses another run, phase or modified summary 
     await expect(readResourceSummary({ ...request, runId: "another-run" })).rejects.toThrow("RESOURCE_RECEIPT_CONTEXT_MISMATCH")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("resource evidence refuses malformed cgroup counters instead of silently reducing them to missing values", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-cgroup-schema-"))
+  const samplesFile = path.join(root, "samples.jsonl")
+  try {
+    const host = await sampleHostResources([root])
+    const frame = { version: 1, sequence: 1, elapsed_ms: 0, missed_intervals: 0, duration_ms: 1, interval_ms: 1000,
+      run_id: "cgroup-schema", phase: "before", host, containers: null, processes: null }
+    await writeFile(samplesFile, JSON.stringify(frame) + "\n", { mode: 0o600 })
+    expect((await writeResourceSummary({ samplesFile, out: path.join(root, "control.json") })).summary.samples).toBe(1)
+    for (const [index, change] of [{ memory_current_bytes: "malformed-counter-canary" },
+      { memory_events: { oom: "malformed-counter-canary", oom_kill: 0 } },
+      { cpu_max: { quota_usec: 1000, period_usec: "malformed-counter-canary" } }].entries()) {
+      const out = path.join(root, `invalid-${index}.json`)
+      await writeFile(samplesFile, JSON.stringify({ ...frame, host: { ...host, collector_cgroup: { ...host.collector_cgroup, ...change } } }) + "\n")
+      await expect(writeResourceSummary({ samplesFile, out })).rejects.toThrow("RESOURCE_SAMPLES_INVALID")
+      expect(await Bun.file(out).exists()).toBe(false)
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("resource evidence validates actual admitted process counters and rejects malformed observation flags", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-process-schema-"))
+  const owner = { kind: "command" as const, id: crypto.randomUUID() }
+  const abort = new AbortController(), ready = Promise.withResolvers<void>()
+  const pending = superviseProcess({ cmd: [process.execPath, "-e", "console.log('ready'); await Bun.sleep(10000)"], cwd: root,
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, timeoutMs: 12000, signal: abort.signal, owner,
+    stdout: new WritableStream<Uint8Array>({ write() { ready.resolve() } }),
+  })
+  try {
+    await Promise.race([ready.promise, pending.then(() => { throw Error("Process schema child exited before readiness") })])
+    const deadline = Date.now() + 5000
+    let observed = await sampleSupervisedResources()
+    while (!observed.scopes.some(scope => scope.owner.id === owner.id && scope.status === "observed" && scope.processes?.length)) {
+      if (Date.now() > deadline) throw Error("Process schema scope did not arrive")
+      await Bun.sleep(10)
+      observed = await sampleSupervisedResources()
+    }
+    const scope = observed.scopes.find(scope => scope.owner.id === owner.id)!
+    const frame = { version: 1, sequence: 1, elapsed_ms: 0, missed_intervals: 0, duration_ms: 1, interval_ms: 1000,
+      run_id: "process-schema", phase: "run", host: await sampleHostResources([root]), containers: null,
+      processes: { ...observed, scopes: [scope] } }
+    const samplesFile = path.join(root, "samples.jsonl")
+    await writeFile(samplesFile, JSON.stringify(frame) + "\n", { mode: 0o600 })
+    expect((await writeResourceSummary({ samplesFile, out: path.join(root, "control.json") })).summary.samples).toBe(1)
+    for (const [index, change] of [{ rss_bytes: "malformed-counter-canary" },
+      { cpu: { user_ticks: "malformed-counter-canary", system_ticks: 0 } }, { verified: "true" }].entries()) {
+      const out = path.join(root, `invalid-${index}.json`)
+      const processes = scope.processes!.map((process, index) => index ? process : { ...process, ...change })
+      await writeFile(samplesFile, JSON.stringify({ ...frame, processes: { ...observed, scopes: [{ ...scope, processes }] } }) + "\n")
+      await expect(writeResourceSummary({ samplesFile, out })).rejects.toThrow("RESOURCE_SAMPLES_INVALID")
+      expect(await Bun.file(out).exists()).toBe(false)
+    }
+  } finally {
+    abort.abort()
+    const run = await pending
+    if (run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete) await rm(root, { recursive: true, force: true })
+  }
+}, 20000)
