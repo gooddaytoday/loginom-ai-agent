@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { chmod, mkdtemp, readlink, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdtemp, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { collectHostResources, sampleCgroupResources, sampleContainerResources } from "../src/parallel-resources"
 import { pairImages } from "../src/parallel-pair"
@@ -249,6 +249,7 @@ console.log(JSON.stringify(await sampleCgroupResources()))
 test.skipIf(!Bun.which("bwrap"))("cgroup sampler refuses a namespaced proc path whose inherited sysfs view belongs to another scope", async () => {
   const parent = await readlink("/proc/self/ns/cgroup")
   const group = (await Bun.file("/proc/self/cgroup").text()).split("\n").find(line => line.startsWith("0::"))!.slice(3)
+  const hierarchy = await stat("/sys/fs/cgroup"), local = await stat(path.join("/sys/fs/cgroup", group))
   const child = Bun.spawn([Bun.which("bwrap")!, "--unshare-cgroup", "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
     "--chdir", evalsRoot, process.execPath, "-e", `
 import { readlink } from "node:fs/promises"
@@ -264,6 +265,7 @@ console.log(JSON.stringify({ namespace: await readlink("/proc/self/ns/cgroup"), 
   expect(observed.sample.cpu_usage).toBeNull()
   expect(observed.sample.ancestors).toBeNull()
   expect(observed.sample.errors).toContain("CGROUP_MEMBERSHIP_UNVERIFIED")
+  expect(observed.sample.view).toEqual({ namespace: observed.namespace, root: { device: hierarchy.dev, inode: hierarchy.ino } })
   const aligned = Bun.spawn([Bun.which("bwrap")!, "--unshare-cgroup", "--unshare-pid", "--unshare-net", "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev",
     "--ro-bind", path.join("/sys/fs/cgroup", group), "/sys/fs/cgroup", "--chdir", evalsRoot, process.execPath, "-e", `
 import { sampleCgroupResources } from ${JSON.stringify(path.join(evalsRoot, "src/parallel-resources.ts"))}
@@ -275,6 +277,9 @@ console.log(JSON.stringify(await sampleCgroupResources()))
   expect(sample.path).toBe("/")
   expect(sample.cpu_usage.usage_usec).toBeGreaterThan(0)
   expect(sample.errors).not.toContain("CGROUP_MEMBERSHIP_UNVERIFIED")
+  expect(sample.view.root).toEqual({ device: local.dev, inode: local.ino })
+  expect(sample.view.root).not.toEqual({ device: hierarchy.dev, inode: hierarchy.ino })
+  expect(sample.view.namespace).not.toBe(parent)
 
 })
 
