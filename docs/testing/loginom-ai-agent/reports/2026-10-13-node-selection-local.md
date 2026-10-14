@@ -1519,3 +1519,28 @@ server binding и адресное Root recovery этой новой собст�
 inventory получен, сессии ещё не закрыты. Next candidate claims/1 не запускался.
 Candidate остаётся 3/25 (два полных PASS, один incomplete), baseline 18/18.
 Firstwave нечистая, повторы закрыты, итоговая приёмка не завершена.
+
+
+На 2026-10-14 03:39 UTC native diagnostic v1 полностью проверен offline:
+independent live review `8aec753b…` подтвердил 3557 journal rows одной
+session/runtime/actionManifest, 61 public receipts, четыре runtime journals
+и все 68 raw references. Sole failed conjunct — masks.length; источник
+второй маски по этим данным ещё не доказан.
+
+Адресное recovery этой диагностики завершено: strict binding `cf3dcf03…`
+подтвердил `user:150`, init 03:24:21.547Z и четыре native GUID. Root через MCP
+86234 закрыл только 150, logout admin:151 и bridge exit 0. Independent
+postrecovery review `3100e4ca…` подтвердил server close 03:36:37.536Z,
+logout 03:36:47.698Z, завершение own PID 794091, отсутствие `.writer`,
+неизменность raw 68, source 4456, acceptance source 74, pins 10 и runtime
+288 каждого payload. Изменения профиля/guard не требовались.
+
+Original diagnostic `307e1272…` сохраняет cleanup/logout/shutdown false;
+recovery записано отдельно. Candidate ABC/1 `2f048e06…` остаётся failed.
+Профиль свободен; следующих model slots пока нет. Приоритет — уточнить
+владельца второй маски отдельной private v2 trace, сохранив v1 неизменной,
+затем решить необходимость минимальной runtime-правки. Если общая правка
+потребуется, прежняя matched-серия останется исключённой из итоговой приёмки,
+а новая потребует всех прежних 18+25 gates. Skill по технической ошибке
+не меняется; JS fallback не разрешён. Первая волна 3/9, candidate 3/25,
+полная приёмка не завершена.
