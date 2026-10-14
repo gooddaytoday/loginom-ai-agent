@@ -22,6 +22,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     command: config.judge.command,
     model: config.judge.model,
     reasoning: config.judge.reasoning,
+    env: config.judge.env,
     timeoutMs: config.judgeTimeoutMs,
     passThreshold: config.passThreshold,
   }
