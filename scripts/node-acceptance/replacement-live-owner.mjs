@@ -8,7 +8,9 @@ export function retainReplacementOwner(options, owner) {
  const session=dir=>({context,execute,directory:dir,identity:pinned,makeCleanupCode});
  owner.recover=async()=>{
   if(owner.closed)throw Error('DIAGNOSTIC_CONTEXT_ALREADY_CLOSED');
-  if(options.runtime?.hasUnsettledWork())throw Error('DIAGNOSTIC_PENDING_OPERATION_PRESERVED');
+  if(owner.context!==context||owner.page!==page||owner.execute!==execute)throw Error('DIAGNOSTIC_OWNER_CHANGED');
+  // Resource teardown is separate from business-operation settlement.
+  // The original bound native cleanup still rejects foreign, running or dirty packages.
   const value=await withDiagnosticSession(session(directory+'/recovery'),async({bindPrepared})=>bindPrepared(owner.prepared));
   owner.closed=true;return value;
  };
@@ -22,7 +24,7 @@ export async function runReplacementDiagnostic(options, owner, scenario) {
  const {context,execute,directory,identity,makeCleanupCode}=options;
  const session=dir=>({context,execute,directory:dir,identity:{...identity,diagnosticDiscard:false},makeCleanupCode});
  try {
-  owner.value=await withDiagnosticSession(session(directory),async({bindPrepared})=>scenario({bindPrepared:async prepared=>{
+  owner.value=await withDiagnosticSession({...session(directory),cleanupOnFailure:true,onContextClosed:()=>{owner.closed=true}},async({bindPrepared})=>scenario({bindPrepared:async prepared=>{
    owner.prepared=prepared;return bindPrepared(prepared);
   },owner}));
   owner.closed=true;

@@ -94,3 +94,8 @@ for (const rejectedValue of [null, undefined, false, 0, '']) {
   } finally { await rm(directory, { recursive: true, force: true }) }
  })
 }
+
+for(const original of [Error('first',{cause:Error('native cause')}),undefined,null,false,0,''])test('authorized failure cleanup preserves first '+String(original),async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'diagnostic-failure-close-'));let closed=false,rejected=false,actual;
+ try{try{await withDiagnosticSession({directory,identity,makeCleanupCode:makePackageCleanupCode,cleanupOnFailure:true,execute:async()=>receipt,context:{close:async()=>{assert.equal(JSON.parse(await readFile(join(directory,'cleanup.json'))).confirmed,true);closed=true;}}},async({bindPrepared})=>{await bindPrepared(prepared);throw original;});}catch(e){rejected=true;actual=e;}assert.equal(rejected,true);assert.equal(actual,original);assert.equal(closed,true);}finally{await rm(directory,{recursive:true,force:true});}
+});

@@ -3,14 +3,14 @@ import { join } from 'node:path'
 
 // The caller retains ownership of the original context on every refusal.
 // A profile or a replacement login cannot recover its in-memory native bindings.
-export async function withDiagnosticSession({ context, execute, directory, identity, makeCleanupCode }, run) {
+export async function withDiagnosticSession({ context, execute, directory, identity, makeCleanupCode, cleanupOnFailure = false, onContextClosed }, run) {
   const { sessionId, account, packagePath, loginomUrl, loginomBuild } = identity
   const persist = async (name, value) => {
     const file = join(directory, name)
     await writeFile(file + '.tmp', JSON.stringify(value, null, 2) + '\n', { mode: 0o600 })
     await rename(file + '.tmp', file)
   }
-  let prepared, bound = false, failed = false, failure, value, receipt = null, confirmed = false
+  let prepared, bound = false, failed = false, failure, value, receipt = null, confirmed = false, durable = false
   try {
     await mkdir(directory, { recursive: true, mode: 0o700 })
     makeCleanupCode({ ...identity, documentId: 'preflight', tabTid: 'preflight' })
@@ -27,21 +27,25 @@ export async function withDiagnosticSession({ context, execute, directory, ident
       return prepared
     } })
   } catch (error) { failed = true; failure = error }
-  if (bound && !failed) {
+  if (bound && (!failed || cleanupOnFailure)) {
     try {
       receipt = await execute(makeCleanupCode({ ...identity, sessionId, account, packagePath, loginomUrl, loginomBuild,
         documentId: prepared.document_id, tabTid: prepared.workflow_ref.tab_tid }))
       confirmed = receipt?.status === 'SUCCEEDED' && receipt.package_closed === true && receipt.logged_out === true
         && receipt.session_id === sessionId && receipt.document_id === prepared.document_id
         && receipt.account === account && receipt.package_path === packagePath
-    } catch (error) { failed = true; failure = Error('DIAGNOSTIC_CLEANUP_UNCONFIRMED', { cause: error }) }
+    } catch (error) { if (!failed) { failed = true; failure = Error('DIAGNOSTIC_CLEANUP_UNCONFIRMED', { cause: error }) } }
   }
   try {
     // Evidence must be durable before browser exit; raw errors may contain credentials.
-    await persist('cleanup.json', { confirmed, receipt, browser_retained: !confirmed || failed })
+    await persist('cleanup.json', { confirmed, receipt, browser_retained: true })
+    durable = true
   } catch (error) { if (!failed) { failed = true; failure = error } }
   if (!confirmed && !failed) { failed = true; failure = Error('DIAGNOSTIC_CLEANUP_UNCONFIRMED') }
+  if (confirmed && durable) {
+    try { await context.close(); onContextClosed?.(); await persist('cleanup.json', { confirmed, receipt, browser_retained: false }) }
+    catch (error) { if (!failed) { failed = true; failure = error } }
+  }
   if (failed) throw failure
-  await context.close()
   return value
 }
