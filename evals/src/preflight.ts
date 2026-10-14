@@ -150,7 +150,7 @@ export async function verifyAdminRuntime(binary: string) {
     if (!canonical.startsWith(installation + path.sep)) throw new EvalFailure("ADMIN_RUNTIME_PATH", 2)
     const hash = new Bun.CryptoHasher("sha256")
     const info = await lstat(file)
-    if ((!info.isFile() && !info.isSymbolicLink()) || (info.mode & 0o777) !== entry.mode ||
+    if ((!info.isFile() && !info.isSymbolicLink()) || (info.mode & 0o7777) !== entry.mode ||
       (info.isSymbolicLink() ? await readlink(file) : undefined) !== entry.link) throw new EvalFailure("ADMIN_RUNTIME_MODE", 2)
     if (info.isSymbolicLink() && (await stat(file)).isDirectory()) hash.update(await readlink(file))
     else for await (const chunk of Bun.file(file).stream()) hash.update(chunk)
@@ -195,7 +195,7 @@ function runtimeObject(value: unknown): value is Record<string, unknown> {
 function runtimeEntries(value: unknown, modes: boolean) {
   if (!Array.isArray(value) || !value.length || value.some(entry => !runtimeObject(entry) || typeof entry.path !== "string" ||
     typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
-    (modes && (typeof entry.mode !== "number" || !Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777)) ||
+    (modes && (typeof entry.mode !== "number" || !Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o7777)) ||
     (entry.link !== undefined && typeof entry.link !== "string"))) throw new EvalFailure("ADMIN_RUNTIME_INVALID", 2)
   const entries = value as { path: string; sha256: string; mode?: number; link?: string }[]
   if (new Set(entries.map(entry => entry.path)).size !== entries.length || entries.some(entry => !runtimePath(entry.path)))
