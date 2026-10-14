@@ -98,6 +98,16 @@ cgroup как bound scope. Actual bounded container: kernel memory.max64MiB,
 CPU quota ratio0.25, OOM/throttling counters; 29 resource tests PASS/259 assertions
 (17.24s), typecheck/diff PASS. Это Docker resource epoch, не Loginom serverEpoch.
 
+Durable smoke для harness5c9f312333:
+`/home/kiselev/.local/state/loginom-evals/parallel/evidence/resource-proof-cSHgaZ/receipt.json`
+(0600, SHA25602fda2c109ed6e49a64360b9201b0c6bab065ef67cb1c9e432ead9a108529a52).
+Сохранены before/after host snapshots, self process sample, bounded pinned Server
+image shell sample и run.jsonl:3 actual frames/1000ms, missed0. Контейнер удалён
+после exact ID/image/nonce check; fresh absence и hashes/private metadata всех5
+evidence files проверены. Scope nonmodel-bounded-container-and-self-only,
+liveQualified=false; Studio/Loginom/browser/judge/licence/model/budgets/acceptance
+остаются вне этого proof. Текущий self cgroup разделён с приложением.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —
