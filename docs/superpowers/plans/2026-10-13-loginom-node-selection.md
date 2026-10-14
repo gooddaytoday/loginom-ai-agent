@@ -1637,3 +1637,10 @@ Rootseriesadmission411b35ae… активировал current-run233119, oldpoin
 0400. Новый denominator18baseline+25candidate/first9+16repeats, старые outcomes
 не переносились; все прежние policy/math/review gates и предел2коррекций сохраняются.
 Ordinary source/build/native prerequisite закрыт отдельно; полные43 ещёне выполнены.
+
+Fresh baseline233119 sales-by-category/1 completed CLI0/wrapper0/cleanuptrue:
+policy/oracle/calculation/history/identity/graph/export PASS, JS0; attempta01a1c0e…/
+audit8a6ea80e…/Session ses_ec847ba38ffeWd3bMWkvwHlctf,327s. Model responses
+получены, прежнийOAuth401 не повторился. Baseline completed1/18/candidate0/25;
+sales/2 сейчасactive root98489, следующийплановыйcase ABC/Pareto1. Все18baseline
+обязательны доcandidatefirst9; baseline semanticmanualreview не добавляется.
