@@ -1,6 +1,17 @@
 # Блокеры parallel evals
 
-## Bootstrap administrator — открыт, 2026-10-13
+## Bootstrap administrator — внешний вход получен, live qualification открыта
+
+Обновление 2026-10-14 16:23 UTC: оба **фактически настроенных** файла
+`parallel/secrets/loginom-admin.json` и `research/secrets/loginom-admin.json`
+присутствуют. `loadSlots` + private receipt reader + schema validation PASS:
+regular current-UID0600, два непустых string-поля username/password без NUL.
+Содержимое не выводилось и не копировалось. Выбранные container names свободны,
+постоянный pair journal отсутствует; следующим шагом создаётся research pair.
+Отсутствие admin file больше не блокирует factory, но действующий Loginom login,
+роль администратора/лицензия и browser/RPC readiness ещё требуют проверки.
+
+Историческое состояние на 2026-10-13:
 
 Постоянные конфиги созданы в `/home/kiselev/.local/state/loginom-evals/parallel/slots.json`
 и `/home/kiselev/.local/state/loginom-evals/research/slots.json` (private regular 0600).
@@ -36,7 +47,15 @@ disposable pair: 3 tests/17 assertions, init not_applied, dispose confirmed и
 continuous process absence proof. Это позволяет продолжать независимый код,
 но не снимает bootstrap blocker и не доказывает browser/admin readiness.
 
-## Model и judge OAuth — внешний вход, открыт 2026-10-14
+## Model и judge OAuth — файлы появились, live qualification открыта
+
+Обновление 2026-10-14 16:23 UTC: configured model-oauth/auth.json и
+judge-codex/auth.json присутствуют как regular current-UID0600. Проверены только
+metadata, auth bytes не читались; действующий вход, сроки/refresh и реальные
+model/judge calls ещё не квалифицированы. Отсутствие файлов больше не считается
+актуальным blocker; прежние наблюдения и onboarding инструкции сохранены ниже.
+
+Историческое состояние:
 
 После успешной установки shared-oauth candidate metadata-only проверка обнаружила отсутствие `parallel/model-oauth/auth.json`, `parallel/judge-codex/auth.json` и `parallel/onboarding/profile`. Путь установленного candidate и hashes закреплены в private `/home/kiselev/.local/state/loginom-evals/parallel/candidate-receipt.json`. Source/manifest/capability qualification PASS; это не действующая авторизация.
 

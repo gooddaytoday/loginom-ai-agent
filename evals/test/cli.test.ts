@@ -4,10 +4,54 @@ import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { agentCommand, failureKind, parseEvents, runAgent } from "../src/cli"
+import { assessParallelLimits } from "../src/parallel-acceptance"
 import { evalsRoot, loadConfig } from "../src/config"
 
 const fixture = (name: string) => Bun.file(path.join(evalsRoot, "fixtures", name)).text()
 const fakeCommand = () => agentCommand(loadConfig(["--dry-run"], {}))
+
+test("parseEvents retains an explicit provider HTTP 429 without claiming complete transport coverage", () => {
+  const parsed = parseEvents([
+    { type: "error", error: { name: "APIError", data: { statusCode: 429, message: "provider-private-canary", responseBody: "private-response-canary" } } },
+    { type: "text", part: { text: "completed after retry" } },
+    { type: "step_finish", part: { cost: 0.5 } },
+  ].map(event => JSON.stringify(event)).join("\n"))
+  expect(parsed.limitEvidence).toEqual({ coverage: { provider: "unavailable", dock: "unavailable", judge: "unavailable" },
+    events: [{ source: "provider", kind: "http", status: 429 }] })
+  expect(assessParallelLimits(parsed.limitEvidence)).toMatchObject({ status: "failed", codes: expect.arrayContaining(["PROVIDER_HTTP_429"]) })
+  expect(JSON.stringify(parsed.limitEvidence)).not.toContain("canary")
+  expect({ cost: parsed.cost, finalText: parsed.finalText, errors: parsed.errors }).toEqual({ cost: 0.5,
+    finalText: "completed after retry", errors: ["APIError"] })
+})
+
+test("provider limit evidence keeps absent, textual and malformed observations incomplete", () => {
+  for (const events of [[], [{ type: "text", part: { text: "APIError status 429" } }],
+    [{ type: "error", error: { name: "CLI_TOOL_FAILED", data: { statusCode: 429 } } }],
+    [{ type: "error", error: { name: "APIError", data: { statusCode: "429" } } }]]) {
+    const parsed = parseEvents(events.map(event => JSON.stringify(event)).join("\n"))
+    expect(parsed.limitEvidence.events).toEqual([])
+    expect(assessParallelLimits(parsed.limitEvidence).status).toBe("incomplete")
+  }
+})
+
+test("runAgent persists provider limit metadata from the actual supervised JSON stream", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-provider-limit-"))
+  let confirmed = false
+  try {
+    const events = [{ type: "error", error: { name: "APIError", data: { statusCode: 429, message: "fixture-http-limit" } } },
+      { type: "text", part: { text: "done" } }]
+    const run = await runAgent({ command: { ...fakeCommand(), cmd: [process.execPath, "-e",
+      `for(const event of ${JSON.stringify(events)})console.log(JSON.stringify(event));await Bun.sleep(100)`],
+      env: { PATH: process.env.PATH ?? "", HOME: root } }, taskId: "fixture-limit", model: "fake/fake-model",
+      prompt: "fixture", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect({ confirmed, exitCode: run.exitCode, finalText: run.finalText }).toEqual({ confirmed: true, exitCode: 0, finalText: "done" })
+    expect(run.limitEvidence.events).toEqual([{ source: "provider", kind: "http", status: 429 }])
+    expect((await Bun.file(path.join(root, "run.json")).json()).limitEvidence).toEqual(run.limitEvidence)
+    expect((await Bun.file(path.join(root, "events.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))).toEqual(events)
+    expect(assessParallelLimits(run.limitEvidence).status).toBe("failed")
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
 
 test("parseEvents: квитанция сохранения читается из последовательности JSON-документов", () => {
   const output = '{"output":{"package_ref":{"path":"/user/eval-run-task-1.lgp"}}}\n{"status":"ok"}\n{"trace":{"note":"literal } and \\\" quote"}}'
