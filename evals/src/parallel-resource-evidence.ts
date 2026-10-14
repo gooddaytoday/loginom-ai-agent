@@ -4,6 +4,8 @@ import path from "node:path"
 import { EvalFailure } from "./fail"
 import { globalLockRoot } from "./lease"
 import { loadResourceSlots } from "./slots"
+import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
+import type { ProcessOwner } from "./process-supervisor"
 import type { SlotDefinition } from "./slots"
 import type { checkResourceEvidence } from "./parallel-acceptance"
 import { summarizeResourceSamples } from "./parallel-resource-summary"
@@ -15,6 +17,23 @@ export async function writeResourceSummary(input: { samplesFile: string; out: st
   const receipt = resourceEvidence(input.samplesFile, await readResourceSource(input.samplesFile)).receipt
   await writeResourceDocument(input.out, receipt)
   return receipt
+}
+
+export async function readResourceProcessWindows(sources: { file: string; sha256: string; owner: ProcessOwner; producerPid: number }[]) {
+  const { readLeaseReceipt } = await import("./lease")
+  if (new Set(sources.map(source => source.file)).size !== sources.length) throw new EvalFailure("RESOURCE_PROCESS_PROOF_INVALID", 2)
+  return Promise.all(sources.map(async source => {
+    await assertResourceDirectory(source.file)
+    if (path.basename(source.file) !== "process-cleanup.json" || !/^[0-9a-f]{64}$/.test(source.sha256))
+      throw new EvalFailure("RESOURCE_PROCESS_PROOF_INVALID", 2)
+    const proof = await readLeaseReceipt(source.file)
+    if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== source.sha256)
+      throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+    const qualified = qualifyClosedProcessEvidence(proof, source)
+    if (!qualified) throw new EvalFailure("RESOURCE_PROCESS_PROOF_UNCONFIRMED", 2)
+    return { kind: qualified.owner.kind, id: qualified.owner.id, producerPid: source.producerPid,
+      launcher: qualified.launcher, startedAt: qualified.startedAt, finishedAt: qualified.finishedAt }
+  }))
 }
 
 type ResourceManifest = {

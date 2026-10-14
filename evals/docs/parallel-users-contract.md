@@ -80,6 +80,16 @@ Historical summary без новых derived filesystem series читается 
 файла; returned result пересчитывается из raw source. Подмена present series
 отвергается. Full manifest/lifetime/live gates этим не квалифицируются.
 
+readResourceProcessWindows получает captured private source references и
+возвращает dispatch→exit windows после semantic SHA/owner/producer/continuous
+closed-proof qualification. Общий validator используется и judge inventory;
+launcher.ready=false отвергается. Coordinator с processProofs использует эти
+окна, проверяет producer PID в каждом active frame и сохраняет source references.
+С frozen manifest требуется native proof каждого выбранного slot ID; отсутствие
+proof B при N=2 даёт incomplete. Это минимум выбранных slots, полный inventory
+всех attempts/admin/management/judge actors требует runtime journal integration.
+Readonly qualification не выдаёт signal/delete/recovery grants.
+
 Resource scope manifest фиксируется через freezeResourceManifest до dispatch:
 первые N canonical slots, все controller/profile/work/history paths, обе
 container role/ID/image/epoch/ownership identities, cgroup view, cadence1000ms и

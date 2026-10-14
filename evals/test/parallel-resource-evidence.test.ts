@@ -56,6 +56,9 @@ test("resource manifest freezes all selected slot paths and both container gener
       view: frozen.manifest.view, budget: budget.source, manifest: frozen.source }
     expect((await checkResourceEvidence(input)).checks.coverage)
       .toEqual({ status: "incomplete", codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] })
+    expect((await checkResourceEvidence(input)).checks.processTimeline)
+      .toEqual({ status: "incomplete", codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] })
+
 
     view.root.inode = 99
     containers[0]!.name = "changed"

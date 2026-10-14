@@ -1,10 +1,11 @@
 import type { ServerIdentity } from "./slots"
+import type { readResourceProcessWindows } from "./parallel-resource-evidence"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
 import { serverStorageBinding } from "./parallel-resource-storage"
 
-type ResourceOwner = { kind: string; id: string; launcher: { pid: number; starttime: string } }
+type ResourceOwner = { kind: string; id: string; producerPid?: number; launcher: { pid: number; starttime: string } }
 
 export function assessProcessResourceTimeline(input: { samples: readonly unknown[]; intervalMs: number; owners: (ResourceOwner & { startedAt: string; finishedAt: string })[] }) {
   const checks = input.owners.map(owner => {
@@ -28,11 +29,13 @@ export async function checkResourceEvidence(input: {
   processWindows: Parameters<typeof assessProcessResourceTimeline>[0]["owners"]
   view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: { file: string; sha256: string } | null
   manifest?: { file: string; sha256: string }
+  processProofs?: Parameters<typeof readResourceProcessWindows>[0]
 }) {
-  const { readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
+  const { readResourceProcessWindows, readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
   const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
   const manifest = input.manifest ? await readFrozenResourceManifest({ ...input.manifest, runId: input.runId, startedAt: input.startedAt }) : null
   const coverage = { ...input.coverage, ...(manifest?.coverage ?? {}) }
+  const processWindows = input.processProofs ? await readResourceProcessWindows(input.processProofs) : input.processWindows
   const budgetSource = manifest?.budget ?? input.budget
   const budget = budgetSource ? await readFrozenResourceBudget({ ...budgetSource, runId: input.runId, startedAt: input.startedAt }) : null
   const groups = evidence.samples.flatMap(value => {
@@ -47,11 +50,14 @@ export async function checkResourceEvidence(input: {
   const checks = {
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
     coverage: assessResourceCoverage({ ...coverage, samples: evidence.samples }),
-    processTimeline: input.processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
-      input.processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
+    processTimeline: manifest && (!input.processProofs || manifest.slots.some(slot =>
+      !processWindows.some(window => window.kind === "slot" && window.id === slot.id)))
+      ? { status: "incomplete" as const, codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] }
+      : processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
+      processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
         window.launcher.pid === owner.launcher.pid && window.launcher.starttime === owner.launcher.starttime).length === 1) &&
       new Set(input.coverage.owners.map(owner => JSON.stringify([owner.kind, owner.id, owner.launcher.pid, owner.launcher.starttime]))).size === input.coverage.owners.length
-      ? assessProcessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, owners: input.processWindows })
+      ? assessProcessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, owners: processWindows })
       : { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] },
     cgroups: assessCgroupCoverage({ groups, view: manifest?.view ?? input.view }),
     budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget, summary: evidence.receipt.summary }),
@@ -59,7 +65,8 @@ export async function checkResourceEvidence(input: {
   }
   const results = Object.values(checks)
   return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
-    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: budgetSource, ...(input.manifest ? { manifest_source: input.manifest } : {}) }
+    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: budgetSource, ...(input.manifest ? { manifest_source: input.manifest } : {}),
+    ...(input.processProofs ? { process_sources: input.processProofs } : {}) }
 }
 
 export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {
@@ -267,7 +274,7 @@ function resourceNumbersObserved(value: unknown, keys: string[]) {
 
 function processOwnerObserved(value: unknown, owner: ResourceOwner) {
   const producer = acceptanceObject(acceptanceObject(value).processes)
-  return Array.isArray(producer.scopes) && producer.scopes.some(value => {
+  return (owner.producerPid === undefined || producer.producer_pid === owner.producerPid) && Array.isArray(producer.scopes) && producer.scopes.some(value => {
     const scope = acceptanceObject(value), observed = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
     if (observed.kind !== owner.kind || observed.id !== owner.id || launcher.pid !== owner.launcher.pid || launcher.starttime !== owner.launcher.starttime ||
       scope.status !== "observed" || !Array.isArray(scope.processes) || !scope.processes.length) return false
