@@ -25,6 +25,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       draftRetained?: boolean
       preReadyHeld?: boolean
       amountHeld?:boolean
+      acquiredServiceOwner?:ReturnType<typeof service.retainAcquiredServiceOwner>
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
@@ -90,7 +91,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         await service.retireRuntime(chat)
         service.resetRestarts(chat)
         try { service.bindCapture?.(owner, input.run, chat, lease) } catch (error) { lease.release(); throw error }
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false })
+        let acquiredServiceOwner:ReturnType<typeof service.retainAcquiredServiceOwner>|undefined
+        try {
+          acquiredServiceOwner = !service.captureBinding(chat)
+            ? service.retainAcquiredServiceOwner?.(owner,input.run,chat,lease) : undefined
+        } catch(error) {lease.release();throw error}
+        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false, acquiredServiceOwner })
         reply({ id: data.id, result: { generation: lease.generation } })
           return
         }
@@ -394,6 +400,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   })
   port.start()
   return {
+    retainedAcquiredServiceOwner(id:string) {
+      const run=runs.get(id)
+      if(state.closed || !run || run.released || !run.acquiredServiceOwner)
+        throw Error('ORIGINAL_UNION_ACQUIRED_PROVIDER_UNAVAILABLE')
+      if(run.calls || run.dispatching || run.active.size || run.captureRefused || run.preReadyHeld || run.amountHeld)
+        throw Error('LOGINOM_RECOVERY_REQUIRED')
+      return service.assertAcquiredServiceOwner(run.acquiredServiceOwner,owner,id,run.chat,run.lease)
+    },
     async close() {
       await stop()
     },
