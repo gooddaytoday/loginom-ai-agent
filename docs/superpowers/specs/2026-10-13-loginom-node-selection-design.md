@@ -2206,7 +2206,7 @@ Design receipt `calculator-open-design-review.json` SHA
 обязательные boundaries совпадают с каноническим source; findings0. Пользовательская
 автономия блокеров/параллельного исполнения сохраняется; Root владеет только live.
 
-- [ ] Реализовать private evidence-preservation через TDD в новом diagnostic
+- [x] Реализовать private evidence-preservation через TDD в новом diagnostic
   каталоге. Первый behavioural RED выполняет canonical serialized workspace UI
   fixture: refusal frame отличается от позднего catch frame; прежний код теряет
   первый. GREEN сохраняет bounded первый frame отдельно при неизменных status,
@@ -2234,3 +2234,10 @@ Design receipt `calculator-open-design-review.json` SHA
   новой matched baseline/candidate пары и prospectively sealed31fresh modelslots.
 
 Каждое `[ ]`→`[x]` — отдельный описательный commit с синхронными plan/spec updates.
+
+
+Private capture TDD завершён: 8focusedPASS; source/predicate/gesture/evaluate
+counts сохраняются. Ранний отказ и latecatch разделены; incoming discriminator,
+source/frame/anchor drift, bounds/unknown и success-no-fake-refusal проверены.
+Это evidence-preservation, не Product correction и не доказанный actualmask.
+Authorverification SHA `dd7cd896979d90a516be13435642c9c977ca5e21ac908f1aa9b0dcd9bd22508c`.
