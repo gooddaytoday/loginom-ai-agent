@@ -1788,3 +1788,22 @@ binds17original+14sealedrecovery; preparedByRoot/technicalfailure, безPASSи�
 Finalindependentrelease review pending, затемpuregate→explicit-js/1 еслиapproved.
 Started6/closed6/accepted4/technicalfailed2/notstarted25/baseline0. Source/pins/lock/skill/
 model/runtime/inputs unchanged. Main31/сравнение/полнаяприёмка всёещёopen.
+
+Checkpoint 2026-10-14 13:20 UTC — ROI releaseapproved; explicit-js/1 running.
+Wx0400review b7bcbbe3c40423f4f2343df0e8c2e4115a2e31e8a4ed94818fc599ea07b5d84d
+bindsdescriptor45b246…; readbackf9309a22… подтвердил17original+14recovery400,
+latestown192init/2GUIDs/close13:10:36.888, ownadmin193logout13:11:22.629/loginUI,
+8actualPIDgone/Nodeexactguardarchive/.writerabsent. SavedUIпослеsecondrefresh
+подтверждаетownabsence; count2operator-attested, отдельногоfirstrefreshsnapshotнет.
+Logdeltaавтотаймаутuser18713:06:14.560 предшествуетadmininit, неRootaction;
+соседние189/191 неизменны. FailedACKfalse/exit1 и noLGP/CSV outcomes preserved.
+Rootactualpuregate: advance/TECHNICAL_FAILURE_RECORDED/technical-failed,
+policyincomplete/calculationfalse/JS calls0/JS nodesunknown;0400gate saved.
+Same lock834620…/runtime659588…/model+variant/pins/inputs/source, resume4exec88693/
+runner2028835 started13:18:18.436Z. LedgerROIrecheck13:18:20.011Z retainsfailedoutcome.
+Explicit-js/1 admitted13:18:20.020Z/CLI2029431start13:18:30.928Z,
+Session ses_ec56f7346ffeJ6vqFRxuwxRb4o/PIDalive. Прошлые6моделейнеповторялись.
+Started7/closed6/accepted4/technicalfailed2/notstarted24/baseline0. Всеexceptions
+требуютmachine+manualreview; followingtags/recovery и вся31matrix ещёобязательны.
+Reportamendment007/3ce588fa… подготовленпараллельно, сохраняетrecoverychronology.
+Main31/сравнение/полнаяприёмка open; новыхstandardnodefixes/diagnosticloopsнет.
