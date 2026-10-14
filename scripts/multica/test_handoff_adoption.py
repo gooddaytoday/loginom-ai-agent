@@ -129,3 +129,21 @@ class AdoptionIdentityTest(unittest.TestCase):
         self.comments[-1]['content'] += '\nArtifact-handoff: ' + json.dumps([{'handoff': key, 'sha': 'a' * 40}])
         self.runs[-1]['trigger_comment_id'] = RELEASE
         self.assertNotEqual(self.client(existing=COMMENT).returncode, 0); self.assertEqual(self.posts, 0)
+
+    def test_canonical_malformed_duplicate_fields_refuse_before_selection(self):
+        for field, value in [('Source-SHA', 'c' * 39), ('Handoff-ID', 'D' * 64),
+                             ('Action', ''), ('Source-SHA', 'a' * 40)]:
+            with self.subTest(field=field, value=value):
+                self.original()
+                body = self.comments[0]['content'].replace('\n\n', f'\n{field}: {value}\n\n', 1)
+                self.comments[0]['content'] = body
+                (self.root / 'message').write_text(body)
+                # Each control owns its synthetic prepared receipt; preserve it.
+                (self.root / 'receipt').unlink(missing_ok=True)
+                result = self.client(existing=COMMENT)
+                self.assertNotEqual(result.returncode, 0)
+                receipt = json.loads((self.root / 'receipt').read_text())
+                self.assertEqual(receipt['state'], 'prepared')
+                self.assertNotIn('comment', receipt)
+                self.assertNotIn('source_sha', receipt)
+                self.assertEqual(self.posts, 0)

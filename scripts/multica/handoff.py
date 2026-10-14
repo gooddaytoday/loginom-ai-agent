@@ -153,21 +153,25 @@ def select_assignment(comments, runs, existing, text, key, issue, agent, sha, sc
             raise DeliveryError('Legacy descriptor identity is ambiguous')
         if descriptor_bound:
             descriptor_comments.append(comment)
+        # Count supplied fields before choosing canonical/legacy identity. A
+        # malformed duplicate must not disappear from a valid-value regex.
+        if key in markers or descriptor_bound or comment == existing:
+            for field, expected in (('Handoff-ID', key), ('Source-SHA', sha), ('Action', scope)):
+                supplied = re.findall(r'^' + field + r':(.*)$', header, re.M)
+                if any(not value.startswith(' ') for value in supplied):
+                    raise DeliveryError('Action identity conflicts; reconcile existing assignments')
+                values = [value[1:] for value in supplied]
+                if field == 'Handoff-ID':
+                    values = [value[1:-1] if value.startswith('`') and value.endswith('`') else value
+                              for value in values]
+                if values and values != [expected]:
+                    raise DeliveryError('Action identity conflicts; reconcile existing assignments')
         if key in markers and (action_header or not release_marker):
             if (markers != [key] or re.findall(r'^Source-SHA: ([0-9a-f]{40})$', header, re.M) != [sha]
                     or re.findall(r'^Action: (.+)$', header, re.M) != [scope]):
                 raise DeliveryError('Action identity conflicts; reconcile existing assignments')
             assignments.append(comment)
         elif descriptor_bound:
-            # Legacy descriptors bind the action only when every supplied header
-            # agrees. A foreign canonical header cannot be bypassed by adoption.
-            for field, expected in (('Handoff-ID', key), ('Source-SHA', sha), ('Action', scope)):
-                values = re.findall(r'^' + field + r': (.*)$', header, re.M)
-                if field == 'Handoff-ID':
-                    values = [value[1:-1] if value.startswith('`') and value.endswith('`') else value
-                              for value in values]
-                if values and values != [expected]:
-                    raise DeliveryError('Action identity conflicts; reconcile existing assignments')
             receiver = [r for r in runs if r.get('id') == comment.get('source_task_id')]
             if (release_marker and comment.get('author_id') == agent and len(receiver) == 1
                     and receiver[0].get('agent_id') == agent):
