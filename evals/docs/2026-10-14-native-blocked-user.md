@@ -33,3 +33,21 @@ reservations после close; factory отказала PAIR_RETAINED_INCIDENT. 
 не обходится и не удаляется вручную. Его recovery/доказанное unused release
 записаны в blockers. Текущий native capability test проверяет публичный wire
 protocol без slot admission и не доказывает общий standalone lifecycle.
+
+Следующая TDD phase configure: неподдержанная phase дала not_applied RED;
+реализация после readonly inspect зависла в CONFIGURE (unknown/ADMIN_DEADLINE).
+Immediate disposal требуется также всем readonly enumerators inspect: иначе
+следующая mutation того же context может ждать оставшийся read lock.
+
+Configure принимает только supplied owner для already blocked account,
+переключает AuthMode на uamLocal=1 при необходимости, устанавливает пароль при
+смене режима/credential SHA, выставляет минимальные design flags и проверяет
+их getters. Blocked остаётся true. Повтор unchanged local account не вызывает
+AuthMode/password setters. Native call-site telemetry фиксирует ровно один
+AUTHMODE и один PASSWORD write на два configure вызова; никакие секретные
+байты в telemetry не входят. Target1 PASS/26 (23.42s), combined58 PASS/203
+(60.93s), typecheck/diff PASS. Evidence native-user-68d8f04b-e65e-4165-a553-6f5af422a8d8
+confirmed/capture true/final00. Unknown prior configure в native-user-03387245...
+сохранён и не объявлен успехом. Protected parent manifest и подтверждение idle
+для повторной подготовки ранее activated account ещё не реализованы;
+blocked flag сам по себе не является доказательством отсутствия старых sessions.
