@@ -95,20 +95,21 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
     if (request.op === "inspect") {
       dispatched = true
-      const rows = await bounded(request, page.evaluate(async () => {
-        const session = bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+      const observation = await bounded(request, page.evaluate(async () => {
+        const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
         const scoped = await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)
         const manager = await scoped.GetSessionsManager()
         await manager.UpdateSessionInfos()
         const rows = []
         for (let index = 0; index < await manager.Count; index++) {
           const row = await manager.SessionInfo(index)
-          rows.push({ name: await row.Name, createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect,
+          rows.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name, createdAt: await row.CreateTime, pendingDisconnect: await row.PendingDisconnect,
             packageCount: await row.Count, activeOperations: null })
         }
-        return rows
+        return { sessions: rows, ownSession: { guid: String(await session.Guid),
+          objectId: (await bg.ProxyObjectsHelper.GetObjectId(session)).toString() } }
       }))
-      respond(id, "confirmed", { identity, rawSessions: rows, sessionIdentityQualified: false })
+      respond(id, "confirmed", { identity, rawSessions: observation.sessions, ownSession: observation.ownSession, sessionIdentityQualified: false })
       continue
     }
     // Name/CreateTime and package Count are not yet qualified ownership/operation proofs.

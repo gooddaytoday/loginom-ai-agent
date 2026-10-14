@@ -325,3 +325,12 @@ run.json вместе с прежними исходными полями. По�
 known event; assessParallelLimits возвращает failed. Headless JSON не даёт полной
 transport/retry visibility, coverage остаётся unavailable и без события даёт
 incomplete. Этот producer не доказывает отсутствие hidden limits.
+
+
+Native admin inspect сохраняет private session-observations.json при
+qualification=false: exact ServerIdentity, собственный Session GUID/proxy ID,
+managed row IDs, pendingDisconnect/packageCount, observed creation time либо
+null. Whitelist исключает дополнительные поля. GetObjectId вызывается после
+await Session; cached ID не считается обязательным prior state. Прямого
+GUID/proxy↔managed-ID соответствия пока нет; public inspect сохраняет отказ
+SESSION_IDENTITY_UNSUPPORTED. Observations не выдаёт close/delete authority.
