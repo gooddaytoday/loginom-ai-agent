@@ -1711,3 +1711,15 @@ firstwave6/9 нечистая. Явные JS/tags/recovery и повторы э�
 полных18baseline+25candidate на новой сборке. Старые попытки сохраняются
 исключёнными из итоговой приёмки; их нельзя заменять, переносить или повторно
 считать. Политика skill и критерии приёмки unchanged; задача не завершена.
+
+
+На 2026-10-14 04:50 UTC final independent recovery158 review PASS:
+`a82224430bbc21ee95d92bf9fd3ed6b0b4e324d336006057e732ef82e6b2279b`.
+Source .writer absent; архив сохраняет nonce/owner bytes/device/inodes7628891/7628892,
+mode и mtime; directory ctime ожидаемо изменён rename. Fresh server log
+подтверждает собственные closure158/logout159 без новых incarnations; own CLI/
+chat/profile/currentpayload managed processes absent. Original attempt284f…
+и raw16 (145parts/39messages), source74, pins10×0400, runtime288×2 и working288
+unchanged. Операционное восстановление завершено отдельно от failed scenario;
+CLI1/wrapper3/cleanupfalse/incomplete остаются исходным результатом.
+Можно начать TDD исправление input0 clipping; общая приёмка остаётся открытой.
