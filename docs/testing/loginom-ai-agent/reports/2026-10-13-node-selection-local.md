@@ -1838,3 +1838,31 @@ candidate9→clean gate→baseline18→candidate16, comparative PASS тольк�
 Independent pair/pins review начат отдельно от автора сборок. Private reader
 fixes и ordinary bound native gates ещё впереди; stage сборки+live не закрыт.
 Полная модельная приёмка ещё не начата на этой паре; цель остаётся активной.
+
+
+На 2026-10-14 05:24 UTC independent static pair/matrix/pins review PASS:
+pair `2c103f2b9113e84d4e642dd5f9548b80a1537c1c77059d4a6af3818e1b5b5d65`,
+matrix `b364ed2c364d83d091ec595f212e616ad8ba6a8e3970055c9ad3c798077b1773`,
+pins `28b0d108f0ae2443871e310ec5de03a38630c0202d730adb631bed1acc6dcd0d`.
+Обе5726-entry manifest,288runtime и14701source фактически сверены;
+отличаются только2skill+3metadata. Payload/task/model/variant/seed unchanged.
+
+Обнаруженные семь prompt hash mismatch относились к FOUR-arg diagnostic
+buildAgentPrompt в metadata; actual runner использует THREE-arg. Сохранены
+initial frozen matrix/lock/provenance и mismatch evidence, отдельно создана
+corrected matrix SHA
+`f6f1171a516b7895dc4ac308af875080ce92a9f09a3eccb3f8d0af03003c1774`;
+независимо подтверждены43/43 actual prompt hashes (36 прежних unchanged).
+Эффективный lock теперь только acceptance-lock-corrected.json:
+`5be90328908ea793e4b75bb61adcaf54975e24ba85bab1729f611c32013a1875`.
+Corrected provenance `cfb90d433652186f14a7b65f3dc0f3e6d027bd19d2ba337a980a3d978fb1ae24`;
+metadata amendment `e854b2091cb15a9ceddf7ea6b3d603ae4d632e910e0dd5fccd1c3d4564640642`.
+Оригинальные pins/payload/исходники/задачи/runner не менялись; это metadata
+correction до первой модели, не новый runtime/pair и не перенос исходов.
+
+Все ordinary proof для нового runtime prepared ready:false. Clipped Export
+reader findings закрыты private TDD (9tests/38expect/typecheck0); independent
+bound approval ожидается. JS/Join/schema подготовлены другим автором,
+25tests/3typecheck0; их independently принимает другой reviewer, чтобы автор
+не принимал собственный proof. Model/native live0, current-run historical233119;
+полная приёмка и stage сборки+live остаются открытыми.
