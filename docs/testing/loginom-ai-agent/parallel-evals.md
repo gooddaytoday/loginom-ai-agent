@@ -95,6 +95,15 @@ policy/Docker/namespace:63 PASS/429 assertions, typecheck/diff PASS.
 Component schema/mandatory scope coverage и frozen manifest/coordinator
 остаются следующими gates.
 
+Component decoder дополнительно проверяет dtype cgroup counters/quota,
+process identity/RSS/CPU/verified и container epoch/inspect/counters/I/O.
+Строка вместо boolean/numeric counter даёт отказ до summary output; null
+остаётся неизвестным. Docker unsafe integer projections сохраняются вместе
+с raw_stats, reducer не превращает их в точные числа. Actual host, admitted
+Bun child и bounded Docker controls:65 tests PASS/456 assertions, typecheck
+PASS. Coverage, applicable ancestor/controller fields и manifest binding
+проверяются отдельно; malformed данные не считаются отсутствующими samples.
+
 JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
 sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
 поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
