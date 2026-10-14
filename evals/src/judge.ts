@@ -235,6 +235,7 @@ export function judgedFields(judged: Judged) {
       oracle_error: judged.oracle_error,
     }
   return {
+    ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true } : {}),
     score: null,
     structural_score: null,
     pass: "oracle_pass" in judged && judged.oracle_pass === false ? false : null,
