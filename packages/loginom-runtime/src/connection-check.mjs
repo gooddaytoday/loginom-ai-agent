@@ -64,6 +64,44 @@ export async function loginPage(page, candidate, owner) {
   return { authenticated: true }
 }
 
+// Validation closes immediately after login. Avatar/Connected alone do not
+// prove native package-cache readiness. This cap is new observational policy,
+// never an unavailable upstream/original Amount deadline.
+export async function awaitOwnLoginReadiness(page,owner) {
+  const started=Date.now(),cap=10000;
+  const remaining=Number.isSafeInteger(owner.deadline)?Math.min(cap,owner.deadline-started):cap;
+  if(remaining<=0)throw Error('LOGINOM_LOGIN_READINESS_EXPIRED');
+  owner.evidence.login_readiness={started_at:new Date(started).toISOString(),cap_ms:cap,
+    upstream_deadline_available:Number.isSafeInteger(owner.deadline),upstream_deadline:owner.deadline??null};
+  const ready=o=>{
+    const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
+    if(own?.document!==document||own.id!==o.id||own.account!==o.account||location.origin!==o.origin)throw Error('LOGINOM_LOGIN_READINESS_IDENTITY_CHANGED');
+    if(!m||m.FServerConnection?.Connected!==true)return false;
+    if(app.Version!=='7.4.2'||m.FServerConnection.UserName!==o.account)throw Error('LOGINOM_LOGIN_READINESS_IDENTITY_CHANGED');
+    if(!m.FPackagesParentNode||m.PackageNodes?.Count!==0||typeof m.HasRunningNodes!=='function')return false;
+    const running=m.HasRunningNodes,connection=m.FServerConnection,parent=m.FPackagesParentNode,packages=m.PackageNodes;
+    const idle=running.call(m)===false;
+    if(globalThis.__loginomStartupV1!==own||own.document!==document||own.id!==o.id||own.account!==o.account
+      ||globalThis.bg?.app!==app||app.Application?.FInstance?.FMainForm?.FMapTree!==m
+      ||m.FServerConnection!==connection||connection.UserName!==o.account||connection.Connected!==true
+      ||m.FPackagesParentNode!==parent||m.PackageNodes!==packages||packages.Count!==0||m.HasRunningNodes!==running)
+      throw Error('LOGINOM_LOGIN_READINESS_IDENTITY_CHANGED');
+    return idle;
+  };
+  const expected={id:owner.id,account:owner.account,origin:owner.origin};
+  const handle=await page.waitForFunction(ready,expected,{timeout:remaining});
+  try {
+    if(Number.isSafeInteger(owner.deadline)&&Date.now()>=owner.deadline)throw Error('LOGINOM_LOGIN_READINESS_EXPIRED');
+    // Same operands are read afresh after await, never inferred from its handle.
+    if(await page.evaluate(ready,expected)!==true)throw Error('LOGINOM_LOGIN_READINESS_CHANGED');
+  } catch(primary) {
+    try {await handle.dispose()}catch(secondary){owner.evidence.login_readiness.secondary_rejection=startupRejection(secondary)}
+    throw primary;
+  }
+  await handle.dispose();
+  owner.evidence.login_readiness.completed_at=new Date().toISOString();
+}
+
 export async function checkKnowledge(endpoint, apiKey, owner = {}) {
   const { Client } = require('@modelcontextprotocol/sdk/client/index.js')
   const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js')
@@ -327,7 +365,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
     await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
     const result=await loginPage(owner.page,candidate,owner)
-    if(!keepOpen) {await owner.close();return result}
+    if(!keepOpen) {await awaitOwnLoginReadiness(owner.page,owner);await owner.close();return result}
     return {...result,context:owner.context}
   } catch(error) {
     owner.primaryFailure=error
