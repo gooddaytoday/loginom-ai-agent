@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {loginomHostPort as sourcePort} from '../../../src/host-port';
 import {readFile}from'node:fs/promises';import * as crypto from'node:crypto';
 let loginomHostPort=sourcePort;
-if(process.argv[2]){const code=await readFile(process.argv[2],'utf8');const a=code.indexOf('// src/errors.ts'),b=code.indexOf('// src/host-port.ts'),c=code.indexOf('\n// ',b+1);assert(a>=0&&b>a&&c>b);const body=code.slice(a,c),names=[...new Set(body.match(/\b(?:randomUUID|createHash)\d*(?=\()/g)??[])];loginomHostPort=Function(...names,body+';return loginomHostPort;')(...names.map(n=>(crypto as any)[n.replace(/\d+$/,'')]))}
+if(process.argv[2]){const code=await readFile(process.argv[2],'utf8');const a=code.indexOf('// src/errors.ts'),b=code.indexOf('// src/host-port.ts',a),c=code.indexOf('\n// ',b+1);assert(a>=0&&b>a&&c>b);const body=code.slice(a,c),names=[...new Set(body.match(/\b(?:randomUUID|createHash)\d*(?=\()/g)??[])];loginomHostPort=Function(...names,body+';return loginomHostPort;')(...names.map(n=>(crypto as any)[n.replace(/\d+$/,'')]))}
 const rows:any[]=[];
 for(const mode of ['canonical','foreign-operation','foreign-deadline','prepare-reply-refused','capture-reply-refused','generation-drift','abort-at-capture','pending-no-repeat']){
  const controller=new AbortController(),deadline=Date.now()+60000,replies:any[]=[],leases:any[]=[];let listener:any,rtCalls=0,prepares=0,captures=0,closes=0,owner:any,release:any;
