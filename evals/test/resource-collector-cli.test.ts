@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { evalsRoot } from "../src/config"
-import { writeLeaseReceipt } from "../src/lease"
+import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
@@ -35,6 +35,12 @@ test("resource collector CLI observes private slots and drains on SIGINT under i
     const rows = (await Bun.file(out).text()).trim().split("\n").map(line => JSON.parse(line))
     expect(rows.length).toBeGreaterThanOrEqual(3)
     expect(JSON.parse(run.stdout).samples).toBe(rows.length)
+    const summaryFile = `${out}.summary.json`
+    expect(JSON.parse(run.stdout).summary_file).toBe(summaryFile)
+    expect(await readLeaseReceipt(summaryFile)).toMatchObject({ version: 1, kind: "resource-summary", run_id: "run-1", phase: "before",
+      source: { file: out, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(out).bytes()).digest("hex") },
+      summary: { samples: rows.length },
+    })
     expect(rows.every(row => row.run_id === "run-1" && row.phase === "before")).toBe(true)
     expect(rows.every(row => row.containers === null)).toBe(true)
     expect(rows.every(row => row.processes === null)).toBe(true)
