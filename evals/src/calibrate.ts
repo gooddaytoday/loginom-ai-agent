@@ -4,7 +4,7 @@ import type { EvalConfig } from "./config"
 import { loadTasks, rubricHash } from "./task"
 import { parseArtifactSource, unzip } from "./artifact"
 import { preflight } from "./preflight"
-import { judgeInfo, judgeTask, type JudgeSettings } from "./judge"
+import { createJudgeGate, judgeInfo, type JudgeSettings } from "./judge"
 import { describe, redact, stamp } from "./run"
 import { evalsRoot } from "./config"
 import { prepareCalibrationCases } from "./calibration-cases"
@@ -18,6 +18,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(new Date())}-calibrate`)
   const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
+  const judgeAttempt = createJudgeGate()
   const settings: JudgeSettings = {
     command: config.judge.command,
     model: config.judge.model,
@@ -69,7 +70,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
       if (kind === "positive" && task.oracle)
         await cp(path.join(task.dir, task.oracle), path.join(artifactDir, "results", "calibration.result.csv"))
       const oracle = kind === "positive" && task.oracle ? await checkOracle(task, artifactDir) : { passed: null, error: null }
-      const judged = await judgeTask({
+      const judged = await judgeAttempt({
         task,
         artifactDir,
         prompt: task.prompt,
@@ -90,7 +91,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     }
   }
   for (const entry of cases.prepared) {
-    const judged = await judgeTask({
+    const judged = await judgeAttempt({
       task: entry.task, artifactDir: entry.artifactDir, prompt: entry.task.prompt,
       outDir: path.join(path.dirname(entry.artifactDir), "judge"), judge: settings,
       checklist: entry.task.checklist.filter((item) => !item.requiresRun),

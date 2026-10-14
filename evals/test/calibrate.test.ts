@@ -8,6 +8,30 @@ import { calibrate } from "../src/calibrate"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test("calibrate stops spawning judges after unconfirmed process cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-uncertain-"))
+  const trace = path.join(root, "judge.jsonl")
+  const config = loadConfig(["--calibrate", "--only", "group-sum-qty,calc-data-double"], {
+    EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --gate-log ${trace} --delay-ms 500`,
+  })
+  await mkdir(path.join(root, "corpus"))
+  const pending = calibrate(config, path.join(root, "corpus"))
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(trace).exists(); wait++) await Bun.sleep(10)
+    const started = JSON.parse((await Bun.file(trace).text()).trim().split("\n")[0]!) as { dir: string }
+    await mkdir(path.join(path.dirname(started.dir), "judge-processes-1", "process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await pending
+    expect(result.code).toBe(1)
+    const saved = await Bun.file(path.join(result.runDir, "calibration.json")).json() as { rows: { error: string | null }[] }
+    expect(saved.rows).toHaveLength(4)
+    expect(saved.rows[0]!.error).toContain("Judge process cleanup unconfirmed")
+    const rows = (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.filter(row => row.kind === "start")).toHaveLength(1)
+    expect(saved.rows.slice(1).every(row => row.error?.includes("Judge gate blocked"))).toBe(true)
+  } finally { await pending; await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("calibrate keeps explicit judge environment values out of saved config", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-calibrate-secret-"))
   const canary = "judge-explicit-env-canary"

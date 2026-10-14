@@ -12,6 +12,23 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test("judge-only stops spawning judges after unconfirmed process cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-uncertain-"))
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --gate-log ${path.join(root, "judge.jsonl")}` }
+  try {
+    const run = await main(["--dry-run", "--only", "group-sum-qty", "--repeat", "2"], env)
+    await mkdir(path.join(run.runDir!, "group-sum-qty", "1", "judge-processes-1", "process-cleanup.json"), { recursive: true, mode: 0o700 })
+    expect((await main(["--judge-only", path.basename(run.runDir!)], env)).code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts.map(attempt => attempt.judge_cleanup_unconfirmed)).toEqual([true, true])
+    expect(summary.tasks[0]!.attempts.map(attempt => attempt.judge_attempts)).toEqual([1, 0])
+    expect(summary.metrics.completed).toBe(2)
+    const rows = (await Bun.file(path.join(root, "judge.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("judge-only reads a legacy summary without adding slot fields or changing quality denominators", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-legacy-slots-"))
   const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }
