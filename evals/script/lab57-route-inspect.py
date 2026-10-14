@@ -1,5 +1,8 @@
 """Read-only fresh collection for the exact closed incident; never an admission by itself."""
-import pathlib,subprocess,json,os,time,stat,hashlib,sys
+import pathlib,subprocess,json,os,time,stat,hashlib,sys,importlib.util
+module_spec=importlib.util.spec_from_file_location("queues",pathlib.Path(__file__).with_name("lab57-queue-pages.py"))
+queue_pages=importlib.util.module_from_spec(module_spec);module_spec.loader.exec_module(queue_pages)
+started=time.monotonic()
 R=pathlib.Path('/home/user/.local/share/loginom-evals-runtime')
 P=R/'roles/ben/eval-profile'
 CFG=R/'roles/ben/agent-work/lab57-eb1-independent/node-eval-ops.json'
@@ -71,11 +74,11 @@ agents=json.loads(command(['/usr/local/bin/multica','agent','list','--output','j
 assert isinstance(agents,list) and len(agents)>=8
 pending=[]
 for agent in agents:
-    tasks=json.loads(command(['/usr/local/bin/multica','agent','tasks',agent['id'],'--limit','200','--output','json']))
-    assert isinstance(tasks,list) and len(tasks)<200,'Incomplete queue inventory'
+    tasks=queue_pages.all_tasks(agent['id'])
     pending.extend({'agent':agent['id'],'task':t['id'],'status':t['status']} for t in tasks if t['status'] in ['queued','pending','running','retrying','scheduled'] and t['id']!=followup)
 container=cfg['container']['id']; c=json.loads(command(['/usr/bin/docker','inspect',container]))[0]
 names=command(['/usr/bin/docker','exec',container,'find','/workdir/UserStorage','/workdir/SessionBackup','-mindepth','1','-type','f']).splitlines()
 storage=[{'path':n,'identity':command(['/usr/bin/docker','exec',container,'stat','-c','%d:%i:%s:%f',n]).strip(),'sha256':command(['/usr/bin/docker','exec',container,'sha256sum','--',n]).split()[0]} for n in names]
+assert time.monotonic()-started<15,'Fresh admission observation exceeded15s; STOP'
 print(json.dumps({'passes':passes,'profiles':len(profiles),'foreignMarkers':markers,'pendingWorkers':pending,'queuesChecked':len(agents),
     'checkedAt':int(time.time()*1000),'container':{'id':c['Id'],'startedAt':c['State']['StartedAt'],'running':c['State']['Running'],'mounts':c['Mounts']},'storage':storage}))
