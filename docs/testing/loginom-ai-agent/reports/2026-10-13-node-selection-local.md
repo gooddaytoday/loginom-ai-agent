@@ -2183,3 +2183,33 @@ modeladmission закрыт доreview/nativeExport/auto-driver exactcleanup pro
 Byte-identical Join/schema dependencies дают carried confidence050544,
 не новый064745 PASS; freshExport/JSdownstream required. CLIprofile sequential,
 standard machine gates synсhronous; closedartifacts/report review parallel.
+
+
+Checkpoint 2026-10-14 07:44 UTC — итоговый Export live gate подтверждён.
+Новая серия `20261014T064745Z-367f4b`, runtime `21fcca85…`, Product source
+`c5930ed689`: ordinary Import→Sort→Export без LLM действительно воспроизвёл
+clipping (bottom804 при viewport800). Один own scroll0→82 и один guarded own
+label click открыли native input0; mapping подтверждён. CSV27bytes точно равен
+oracle; сохранённый пакет содержит3native nodes/2directed links/noJS. Root
+Tool29560 terminalexit0; exact own package closed, logouttrue/noDiscard,
+HostACKtrue/exit0/noSignal/noError, PID отсутствует и .writer отсутствует.
+Результат `native-export-input-reveal-minimal-proof/run/result.json`
+SHA `9d69a60568a661204720fb2ba91605dda89499f54b3543926ea9627707e715cf`;
+независимое чтение948journal rows/CSV/LGP/receipts/закрытия —
+`native-export-input-reveal-minimal-proof/independent-live-review.json`
+SHA `1f437200b0fee528863a700dea49118adb45fa725c972ebdbe16454a8c0f6e62`.
+Две ошибки подготовки offline parser-входа исправлены без повторного native
+прогона; исходные run evidence не изменялись. Девять отдельных hit points не
+эмитируются: unchanged ordinary guard/open прошёл; tooltip owner не заявляется.
+
+Независимая проверка optimized31 завершена до моделей0:
+`optimization-independent-review.json`
+SHA `43d2662aa7b7c4f070895ee449869f807a6fc49b43f714898f5a5e88c10a40e0`.
+Actual3args/31unique identities/9→6→16, все сохранённые prompts/paths совпадают;
+семь новых optimized files0400, исходные43metadata сохранены. Candidate меняет
+только firstWave order, baseline только attempts=[1]; resource/model/input/oracle
+прежние. Нового model admission ещё нет. Fresh ordinary JS downstream запущен
+один раз после Root source review4455source/36fixtures/20protected files;
+его результат и independent auto-next review ещё ожидаются. Join/schema outcomes
+050544 остаются историческими и дают confidence только для byte-identical
+зависимостей; не засчитываются как fresh outcome064745.
