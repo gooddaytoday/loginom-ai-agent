@@ -1,11 +1,11 @@
 // Register before linking the managed implementation. Exact channel objects only.
-const pending=[];let receive,draining=false;
+let first,last,receive,draining=false;
 function drain(){
  if(!receive||draining||process.connected===false)return;
  draining=true;
- try{while(pending.length&&process.connected!==false)receive(pending.shift())}finally{draining=false}
+ try{while(first&&process.connected!==false){const item=first;first=item.next;if(!first)last=undefined;receive(item.message)}}finally{draining=false}
 }
-process.on('message',message=>{pending.push(message);drain()});
+process.on('message',message=>{const item={message,next:undefined};if(last)last.next=item;else first=item;last=item;drain()});
 // Fixed module, never selected by input. Original handler creates its own task/control.
 const implementation=await import('./managed-session.mjs');
 receive=implementation.receiveManagedMessage;

@@ -1,7 +1,7 @@
 Managed IPC boot boundary
 
 Continues bounded7f36a88e. managed-entry.mjs has no static imports. It registers
-one listener, then dynamically imports the fixed managed-session.mjs body. Early
+one listener and private linked records (no ambient Array queue readers), then dynamically imports the fixed managed-session.mjs body. Early
 messages are stored as the exact channel objects, never cloned/reconstructed.
 Once the body is available, the original handler receives each object once in
 FIFO order, including messages arriving reentrantly while draining. No new opcode,
