@@ -3072,7 +3072,7 @@ rewriter suite не повторяются. Независимый design/source
 
 - [x] После independent design review минимально реализовать и проверить внешний
   pacing gate по TDD; новый immutable binding и independent source review.
-- [ ] Root выполнить один paced private native run, сохранить actual timing,
+- [x] Root выполнить один paced private native run, сохранить actual timing,
   same-frame capture/no-repro/unknown и exact own close.
 - [ ] Независимо прочитать закрытый результат и определить следующий шаг только
   по фактическим данным, сохранив исходный failed slot и условия приёмки31.
@@ -3087,3 +3087,24 @@ independent source review SHA `831fb8ec460d4ff599b3da68f8ffde828d5a1da690672bc18
 Readyfalse0400 binding SHA `7228e6f484f87d107bbfb310c69252702a108903053c2e25a11e72efddbfbd87`.
 Раннее пробуждение таймера fail-closed до target; не вводить дополнительное
 ожидание/повтор для подгонки результата. Root activation/one live остаются отдельно.
+
+Checkpoint 2026-10-14 09:48 UTC — paced private запуск закрыт, отказ не воспроизведён.
+Root31151 terminal0. Все6standard requests SUCCEEDED; one target/noearlySave,
+Save после target success, prethrow0. Внешний idle5031.161708ms, фактический
+Join completed09:44:46.993 → target prepared09:44:52.049 =5056ms (не5029).
+Result native-calculator-open-paced-diagnostic/run/result.json SHA
+`fa7991698ec1e5667eb9346398d7896acba165371d2485a1d7658d963c277eec`.
+Own session8790350c…/doc01be2ced…/package CalcOpen-972538d7… закрыты,
+logouttrue/noDiscard, Host1496283 ACKexit0/noSignal/noError; PID и .writer отсутствуют.
+Root conservation подтвердил source4456/fixture3/protected2181 без изменений,
+включая original16/effective74/previous closed private2064. Product не исправлялся.
+
+Интервал проверен как один фактор; прежний отказ и причина остаются unknown.
+Третий private diagnostic и model retry автоматически не разрешены. Текущая
+серия31 остаётся stopped: model started1/technicalfailed1/notstarted30/baseline0;
+оба private NO-REPRO не являются успешной приёмкой или заменой failed slot.
+Parallel current progress readback SHA
+`7cb9659dd26161dcd22b9b885c5fa0f90e74a984d4a7146ddd703aa9c2ca1b33`
+подтвердил frozen до first dispatch31=6+25, все25candidate coverage/order,
+completed gates/build/tests без rerun и ограниченность baseline comparison.
+85мин экономии — оценка12плановых модельных процессов, без диагностики/отказов.

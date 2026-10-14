@@ -2336,3 +2336,24 @@ prethrow captures0. Наблюдённое штатное ожидание own w
 успешной диагностической попытки, не характеристика прежнего failed frame.
 Приёмка31 по-прежнему открыта: started1/failed1/notstarted30, baseline0;
 старая версия на другом runtime остаётся историей. Тесты и модели не повторялись.
+
+Checkpoint 2026-10-14 09:48 UTC — paced private запуск закрыт, отказ не воспроизведён.
+Root31151 terminal0. Все6standard requests SUCCEEDED; one target/noearlySave,
+Save после target success, prethrow0. Внешний idle5031.161708ms, фактический
+Join completed09:44:46.993 → target prepared09:44:52.049 =5056ms (не5029).
+Result native-calculator-open-paced-diagnostic/run/result.json SHA
+`fa7991698ec1e5667eb9346398d7896acba165371d2485a1d7658d963c277eec`.
+Own session8790350c…/doc01be2ced…/package CalcOpen-972538d7… закрыты,
+logouttrue/noDiscard, Host1496283 ACKexit0/noSignal/noError; PID и .writer отсутствуют.
+Root conservation подтвердил source4456/fixture3/protected2181 без изменений,
+включая original16/effective74/previous closed private2064. Product не исправлялся.
+
+Интервал проверен как один фактор; прежний отказ и причина остаются unknown.
+Третий private diagnostic и model retry автоматически не разрешены. Текущая
+серия31 остаётся stopped: model started1/technicalfailed1/notstarted30/baseline0;
+оба private NO-REPRO не являются успешной приёмкой или заменой failed slot.
+Parallel current progress readback SHA
+`7cb9659dd26161dcd22b9b885c5fa0f90e74a984d4a7146ddd703aa9c2ca1b33`
+подтвердил frozen до first dispatch31=6+25, все25candidate coverage/order,
+completed gates/build/tests без rerun и ограниченность baseline comparison.
+85мин экономии — оценка12плановых модельных процессов, без диагностики/отказов.
