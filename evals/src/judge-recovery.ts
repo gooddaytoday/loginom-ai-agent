@@ -1,7 +1,7 @@
 import path from "node:path"
 import { lstat, mkdtemp, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { globalLockRoot, readLeaseReceipt, recoverResourceLease, writeLeaseReceipt } from "./lease"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, writeLeaseReceipt } from "./lease"
 import { loadJudgeEnvironment } from "./slots"
 import { readJudgeProcessInventory } from "./judge-process-evidence"
 
@@ -15,7 +15,10 @@ export async function recoverOfflineJudge(input: { slotsFile: string; journal: s
   if (original.version !== 2 || original.kind !== "offline-judge-command" || typeof original.commandId !== "string" || !original.commandId ||
     original.processInventory !== path.join(root, "processes.json")) throw new EvalFailure("JUDGE_RECOVERY_JOURNAL_INVALID", 2)
   const key = `judge:${environment.codexHome}`, incidentToken = input.incidentToken ?? input.token
-  const completed = recoveryObject(original.recovery), reference = recoveryObject(completed.proof), released = recoveryObject(completed.released)
+  const persisted = recoveryObject(original.recovery)
+  const completed = persisted.status === "released" ? persisted : await releasedRecoveryMarker({ key, incidentToken, journal: input.journal,
+    commandId: original.commandId, stateDir: environment.stateDir, token: input.token, revision: input.revision }, lockRoot)
+  const reference = recoveryObject(completed.proof), released = recoveryObject(completed.released)
   if (completed.status === "released") {
     if (typeof released.token !== "string" || !released.token || !Number.isSafeInteger(released.revision) || Number(released.revision) < 1 ||
       completed.key !== key || completed.incidentToken !== incidentToken || typeof completed.journal !== "string" ||
@@ -29,6 +32,10 @@ export async function recoverOfflineJudge(input: { slotsFile: string; journal: s
       proof.key !== key || proof.incidentToken !== incidentToken || proof.incidentJournal !== input.journal || proof.commandId !== original.commandId ||
       proof.token !== released.token || proof.revision !== released.revision)
       throw new EvalFailure("JUDGE_RECOVERY_PROOF_INVALID", 2)
+    if (persisted.status !== "released") {
+      await writeLeaseReceipt(input.journal, { ...original, state: "recovered", recovery: completed })
+      await writeLeaseReceipt(completed.journal, { ...recoveryObject(await readLeaseReceipt(completed.journal)), state: "released", proof: reference.path })
+    }
     return { status: "already_released" as const, journal: completed.journal, proof: reference.path }
   }
   const directory = await mkdtemp(path.join(environment.stateDir, "judge-recovery-")), journal = path.join(directory, "journal.json")
@@ -79,4 +86,22 @@ export async function recoverOfflineJudge(input: { slotsFile: string; journal: s
 
 function recoveryObject(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+async function releasedRecoveryMarker(input: { key: string; incidentToken: string; journal: string; commandId: string; stateDir: string; token: string; revision: number }, lockRoot: string): Promise<Record<string, unknown>> {
+  const reservation = await readResourceReservation({ key: input.key, lockRoot })
+  if (!reservation || reservation.state !== "released") return {}
+  const incident = reservation.lineage.find(entry => entry.token === input.incidentToken && entry.journal === input.journal && entry.commandId === input.commandId)
+  if (!incident || ![{ token: reservation.token, revision: reservation.revision }, ...reservation.lineage]
+    .some(entry => entry.token === input.token && entry.revision === input.revision)) return {}
+  if (path.dirname(path.dirname(reservation.journal)) !== input.stateDir || !path.basename(path.dirname(reservation.journal)).startsWith("judge-recovery-"))
+    throw new EvalFailure("JUDGE_RECOVERY_PROOF_INVALID", 2)
+  const journal = recoveryObject(await readLeaseReceipt(reservation.journal))
+  if (journal.kind !== "offline-judge-recovery" || journal.commandId !== reservation.commandId ||
+    journal.incidentToken !== input.incidentToken || journal.incidentJournal !== input.journal)
+    throw new EvalFailure("JUDGE_RECOVERY_PROOF_INVALID", 2)
+  return { status: "released", key: input.key, incidentToken: input.incidentToken, journal: reservation.journal,
+    previous: { token: reservation.lineage.at(-1)!.token, revision: reservation.lineage.at(-1)!.revision },
+    incident: { token: incident.token, revision: incident.revision },
+    released: { token: reservation.token, revision: reservation.revision }, proof: reservation.releaseEvidence }
 }
