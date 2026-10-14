@@ -88,7 +88,28 @@ runner2945739/exec13648 с19:54:30.413Z, sources/criteria/protocol прежни�
 24candidate slots оставались до стартаfirst-last. Baseline6references неизменны;
 новая серия не заменяет originalFAIL и не запускает ABC retry.
 
-### Перспективная коррекция gate для настоящего аналитического FAIL
+### Замороженная execution revision R2 перед explicit-js/1
+
+Минимальная TDD-коррекция controller завершена в `9fa74b46da`: полностью
+собранный аналитический FAIL может продолжаться по policy-v2 при положительном
+policy/review и strict normal release. Поддержаны standard, recovery, explicit-JS
+и gap с проверкой разрешённой роли; исходные false и analytical-failed сохраняются.
+Incomplete collection, legacy-v1 и технические release guards не расширены.
+Root проверил37PASS/551assertions/typecheck0 после переноса двух файлов.
+Independent source review `0d95b00b…` и prospective admission `815dc652…` одобрены.
+Изолированные RED→GREEN доказательства и32 копии сохранены; live неверного CSV
+для этой ветки пока не наблюдалось, TDD не выдаётся за такой live-прогон.
+
+До следующей новой модели активирован отдельный readonly
+`policy-v2-execution-lock-r2.json`, SHA
+`97cad99c5d9528169f8f55daa6418fc5e0dfbe3f820d98a29196b5d562f8cbe1`.
+Исходный executiona48cfaf7, protocolf71e0c50, archive dad5e372 и criteria5b5053d1
+не изменены. Первые шесть attempt/verdict сохраняют прежнюю привязку; новая
+revision применяется только после их завершения и освобождения профиля.
+Skill/runtime/model/inputs/oracles неизменны, runtime не пересобран.
+Порядок C9→B6references→C16 и31позиция сохранены;19новых candidate остаются.
+
+### История проспективной коррекции gate для аналитического FAIL
 
 Readonly-разбор выявил остаточный блокер evaluator: policy PASS с полностью
 полученным неверным CSV (oraclefalse/calculationfalse/wrapper1) не допускается
@@ -164,6 +185,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
 - [x] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
 - [x] Подтвердить содержательное policy coverage всех шести стандартных сценариев по полным журналам, сохранив пять отказов и независимые оценки результата и release.
+- [x] Завершить минимальную analytical-failure коррекцию runner по TDD, независимое ревью и заморозить отдельную execution R2 после strict release, до следующей новой попытки.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
