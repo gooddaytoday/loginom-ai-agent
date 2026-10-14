@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
+import { acquireSlotLease, finalizeReleasedSlot, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
 import { globalLockRoot, readLeaseReceipt, readResourceReservation } from "../src/lease"
 import { stageUserPreparation } from "../src/user-environment"
 
@@ -182,6 +182,67 @@ test("SlotLease: release needs confirmed cleanup bound to this slot token and se
     const next = await acquireSlotLease(file, file.slots[0]!, identity, path.join(item.root, "locks"))
     expect(next.token).not.toBe(lease.token)
     await next.close()
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("SlotLease: released resource proofs finish a missing composite tombstone without new ownership", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  const lease = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+  try {
+    const original = await readLeaseReceipt(lease.receipt) as { resources: { receipt: string }[] }
+    const cleanup = path.join(item.root, "cleanup.json")
+    // Data-only cleanup codec fixture; these assertions do not qualify native server cleanup.
+    await writeFile(cleanup, JSON.stringify({ status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
+      processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true, nextAdmissionAllowed: true }), { mode: 0o600 })
+    await lease.release(cleanup)
+    const before = await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))
+    // Reconstruct the reachable state between resource releases and the final composite write.
+    await writeFile(lease.receipt, JSON.stringify(original), { mode: 0o600 })
+    const admission = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+      .then(next => ({ lease: next, error: null }), (error: unknown) => ({ lease: null, error }))
+    await admission.lease?.close()
+    expect(admission.error instanceof Error ? admission.error.message : null).toBe("RECOVERY_FINALIZATION_REQUIRED")
+    expect(await finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).toMatchObject({ status: "released", cleanupReceipt: cleanup })
+    expect(await readLeaseReceipt(lease.receipt)).toMatchObject({ state: "released", cleanupReceipt: cleanup })
+    expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+    expect(await finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).toMatchObject({ status: "already_released" })
+    const originalCleanup = await Bun.file(cleanup).text()
+    await writeFile(cleanup, JSON.stringify({ ...JSON.parse(originalCleanup), changed: true }), { mode: 0o600 })
+    await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
+    await expect(acquireSlotLease(file, file.slots[0]!, identity, lockRoot)).rejects.toThrow("RECOVERY_FINALIZATION_REQUIRED")
+    expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+    await writeFile(cleanup, originalCleanup, { mode: 0o600 })
+    const next = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+    try {
+      await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("BUSY")
+      await next.assertHeld()
+    } finally { await next.close() }
+    await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("SlotLease: release I/O failure preserves a partial reservation and finalization refuses it", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  const lease = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+  try {
+    const original = await readLeaseReceipt(lease.receipt) as { resources: { key: string; receipt: string }[] }
+    const cleanup = path.join(item.root, "cleanup.json")
+    // Data-only cleanup; the real filesystem fault interrupts the actual release implementation.
+    await writeFile(cleanup, JSON.stringify({ status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
+      processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true, nextAdmissionAllowed: true }), { mode: 0o600 })
+    await mkdir(`${lease.receipt}.${new Bun.CryptoHasher("sha256").update(original.resources[1]!.key).digest("hex")}.released.json`, { mode: 0o700 })
+    await expect(lease.release(cleanup)).rejects.toThrow()
+    await lease.close()
+    expect((await readResourceReservation({ key: original.resources[0]!.key, lockRoot }))?.state).toBe("released")
+    expect((await readResourceReservation({ key: original.resources[1]!.key, lockRoot }))?.state).toBe("retained")
+    const before = await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))
+    await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, lease.receipt, lockRoot)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
+    expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+    expect(await readLeaseReceipt(lease.receipt)).toMatchObject({ state: "retained" })
   } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
 })
 

@@ -574,3 +574,11 @@ authority remain unqualified.
 чтение сообщает `snapshotChanged`; `admission:not_verified` сохраняется даже
 при recorded pair phase ready. Status не читает credentials, не создаёт output
 и не принимает --out/--incident. Live readiness остаётся отдельным gate.
+
+Новый slot-resource-release proof связывает composite locator и semantic SHA
+cleanup source. Следующий normal acquire проверяет composite released под guard;
+missing tombstone даёт RECOVERY_FINALIZATION_REQUIRED. finalizeReleasedSlot
+берёт оба resource guards, сверяет уже released reservations/proofs и дописывает
+только composite tombstone без ownership CAS или нового permission на cleanup.
+Source drift/foreign run/partial released+retained state сохраняются и запрещают
+finalization. Полная partial recovery и native cleanup producer ещё открыты.

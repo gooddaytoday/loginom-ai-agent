@@ -25,8 +25,8 @@ export type Reservation = {
 
 type ResourceRequest = { key: string; lockRoot: string; journal: string; commandId: string; identity?: ServerIdentity }
 
-export function acquireResourceLease(input: ResourceRequest) {
-  return acquireResource(input)
+export function acquireResourceLease(input: ResourceRequest, admit?: (previous: Reservation | undefined) => Promise<void>) {
+  return acquireResource(input, undefined, admit)
 }
 
 export async function readResourceReservation(input: { key: string; lockRoot?: string }) {
@@ -66,31 +66,7 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
   await requireLockRoot(input.lockRoot)
   await readLeaseReceipt(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
   const key = new Bun.CryptoHasher("sha256").update(input.key).digest("hex")
-  const guardFile = path.join(input.lockRoot, `${key}.guard`)
-  const { dlopen } = await import("bun:ffi")
-  const library = dlopen("libc.so.6", { flock: { args: ["i32", "i32"], returns: "i32" } })
-  const handle = await open(guardFile, constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW, 0o600).catch(() => {
-    library.close()
-    throw new EvalFailure("LEASE_GUARD_CHANGED", 2)
-  })
-  const guard = await handle.stat()
-  const checkGuard = async () => {
-    const current = await lstat(guardFile).catch(() => { throw new EvalFailure("LEASE_GUARD_CHANGED", 2) })
-    if (!current.isFile() || current.isSymbolicLink() || current.nlink !== 1 || current.uid !== process.getuid?.() ||
-      (current.mode & 0o777) !== 0o600 || current.dev !== guard.dev || current.ino !== guard.ino)
-      throw new EvalFailure("LEASE_GUARD_CHANGED", 2)
-  }
-  if (library.symbols.flock(handle.fd, 2 | 4) !== 0) {
-    await handle.close()
-    library.close()
-    throw new EvalFailure("BUSY", 2)
-  }
-  let closed = false
-  const close = async () => {
-    if (closed) return
-    closed = true
-    try { await handle.close() } finally { library.close() }
-  }
+  const guard = await resourceGuard(input.key, input.lockRoot)
   try {
     const receipt = path.join(input.lockRoot, `${key}.reservation.json`)
     const previous = await readReservation(receipt, input.key)
@@ -123,26 +99,67 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
       owner: { bootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(), pid: process.pid,
         starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]!, uid: process.getuid!() },
     }
-    await checkGuard()
+    await guard.checkGuard()
     await writeLeaseReceipt(receipt, reservation)
-    return { reservation, receipt, guardFile, close, async assertHeld() {
-      if (closed) throw new EvalFailure("LEASE_NOT_HELD", 2)
-      await checkGuard()
+    return { reservation, receipt, guardFile: guard.guardFile, close: guard.close, async assertHeld() {
+      if (guard.closed) throw new EvalFailure("LEASE_NOT_HELD", 2)
+      await guard.checkGuard()
       if (JSON.stringify(await readReservation(receipt, input.key)) !== JSON.stringify(reservation))
         throw new EvalFailure("LEASE_NOT_HELD", 2)
     }, async release(proof: string) {
-      await checkGuard()
+      await guard.checkGuard()
       const evidence = await readLeaseReceipt(proof).catch(() => { throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2) })
       const current = await readReservation(receipt, input.key)
-      if (closed || !jsonObject(evidence) || evidence.version !== 2 || evidence.status !== "confirmed" || evidence.key !== reservation.key ||
+      if (guard.closed || !jsonObject(evidence) || evidence.version !== 2 || evidence.status !== "confirmed" || evidence.key !== reservation.key ||
         evidence.token !== reservation.token || evidence.revision !== reservation.revision || current?.token !== reservation.token || current?.revision !== reservation.revision ||
         JSON.stringify(current) !== JSON.stringify(reservation) ||
         (reservation.identity && evidence.serverEpoch !== reservation.identity.serverEpoch))
         throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2)
       await writeLeaseReceipt(receipt, { ...reservation, state: "released", releaseEvidence: { path: proof, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(evidence)).digest("hex") } })
-      await close()
+      await guard.close()
     } }
-  } catch (error) { await close(); throw error }
+  } catch (error) { await guard.close(); throw error }
+}
+
+export async function withResourceReservationGuards<T>(keys: string[], lockRoot: string, use: (rows: { key: string; reservation: Reservation | undefined }[]) => Promise<T>) {
+  if (!keys.length || new Set(keys).size !== keys.length) throw new EvalFailure("LEASE_KEYS_INVALID", 2)
+  const guards = [] as Awaited<ReturnType<typeof resourceGuard>>[]
+  try {
+    for (const key of [...keys].sort()) guards.push(await resourceGuard(key, lockRoot))
+    const result = await use(await Promise.all(keys.map(async key => ({ key, reservation: await readResourceReservation({ key, lockRoot }) }))))
+    await Promise.all(guards.map(guard => guard.checkGuard()))
+    return result
+  } finally { await Promise.all(guards.map(guard => guard.close())) }
+}
+
+async function resourceGuard(key: string, lockRoot: string) {
+  await requireLockRoot(lockRoot)
+  const guardFile = path.join(lockRoot, `${new Bun.CryptoHasher("sha256").update(key).digest("hex")}.guard`)
+  const { dlopen } = await import("bun:ffi")
+  const library = dlopen("libc.so.6", { flock: { args: ["i32", "i32"], returns: "i32" } })
+  const handle = await open(guardFile, constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW, 0o600).catch(() => {
+    library.close()
+    throw new EvalFailure("LEASE_GUARD_CHANGED", 2)
+  })
+  const guard = await handle.stat()
+  const checkGuard = async () => {
+    const current = await lstat(guardFile).catch(() => { throw new EvalFailure("LEASE_GUARD_CHANGED", 2) })
+    if (!current.isFile() || current.isSymbolicLink() || current.nlink !== 1 || current.uid !== process.getuid?.() ||
+      (current.mode & 0o777) !== 0o600 || current.dev !== guard.dev || current.ino !== guard.ino)
+      throw new EvalFailure("LEASE_GUARD_CHANGED", 2)
+  }
+  if (library.symbols.flock(handle.fd, 2 | 4) !== 0) {
+    await handle.close()
+    library.close()
+    throw new EvalFailure("BUSY", 2)
+  }
+  let closed = false
+  const close = async () => {
+    if (closed) return
+    closed = true
+    try { await handle.close() } finally { library.close() }
+  }
+  return { guardFile, checkGuard, close, get closed() { return closed } }
 }
 
 export async function writeLeaseReceipt(file: string, value: object) {
