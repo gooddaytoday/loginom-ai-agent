@@ -267,6 +267,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Положительно проверить gap: обоснование доJS, raw variable fanout безTrim/filter/count/sort, стандартный Trim при блокере без новогоJS; сохранить весь журнал и три оценки.
 - [x] Проверить policy recovery: фактическая ошибка стандартного Calculator, стандартное исправление либо честный блокер, JS0 во всём журнале; функциональное восстановление и runtime anomaly оценить отдельно.
 - [x] Завершить первую девятку поv2:9policyPASS, обязательные8failure/JS/recovery/anomaly reviews и strict own release, сохранив1correct/8notobtained и runtime ограничения.
+- [x] Учесть все шесть сопоставимых baseline references без новых моделей, сохранив исходные отказы и ограничение описательного сравнения одного наблюдения на задачу.
 - [ ] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
