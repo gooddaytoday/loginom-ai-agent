@@ -185,6 +185,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   // Managed model runs derive teardown authority from guarded preparation and a
   // settled save on this bridge, never from a caller-supplied cleanup path.
   const managedCleanup = userProfile && config.mode === 'executor-replay';
+  let amountPrepareAttempted=false, amountPreparedResult;
   let managedSave, amountSaveOutcome, amountSavePreparation, amountSavePreparationBytes, amountPreparation, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
   const cleanupWriters = new Set();
@@ -764,6 +765,55 @@ export async function createBridge(config, session, { browserTransport: managedB
         assertCaptureEvidenceBinding();
       }
     }
+    async function prepareAmount({signal}={}) {
+      const binding=amountAdmission?.binding,retained=acceptanceCapture?.retained,client=retained?.runtime?.client;
+      const guard=()=>{
+        if(!binding || !client || amountAdmission.amountControl!==acceptanceCapture.amountControl || shutdownStarted || cleanupRefused || captureConsumed)
+          throw Error('LOGINOM_AMOUNT_PREPARATION_UNAVAILABLE');
+        assertAmountCaptureProxy(amountAdmission.amountControl,binding,signal);
+        if(clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
+          throw Error('LOGINOM_AMOUNT_PREPARATION_UNAVAILABLE');
+      };
+      guard();
+      if(amountPrepareAttempted)throw Error('LOGINOM_AMOUNT_PREPARATION_CONSUMED');
+      amountPrepareAttempted=true;
+      const owned=async work=>{
+        guard();let value;
+        try{value=await work()}catch(reason){
+          try{guard()}catch(primary){retained.state.controlledStartup.propagate(primary)}
+          throw retained.state.controlledStartup.reject(reason);
+        }
+        guard();return value;
+      };
+      const options=()=>({signal,timeout:Math.max(1,Math.min(binding.expires,retained.owner.deadline)-Date.now())});
+      await owned(()=>client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:binding.packagePath,
+        operation_id:'amount-prepare:'+binding.admission}},undefined,options()));
+      requirePreparedWorkspace(session.metadata);
+      const prepared=session.metadata.workspacePreparation?.state;
+      if(prepared?.package_ref?.path!==binding.packagePath || prepared.loginom_account!==binding.account
+          || !prepared.workflow_ref?.workflow_id || !Array.isArray(prepared.workflow_ref.navigation_path))
+        throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_UNAVAILABLE');
+      // Do not checkpoint historical/foreign dirty work: the original native
+      // reader checks exact Page/session/package, inventory and running state.
+      const expected={sessionId:binding.session,documentId:prepared.document_id,account:binding.account,
+        packagePath:binding.packagePath,tabTid:prepared.workflow_ref.tab_tid,loginomUrl:config.loginomUrl,
+        loginomBuild:session.metadata.targetIdentity.loginom_build};
+      const response=await owned(()=>browserGate(()=>browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(expected)}},undefined,options())));
+      const state=parseSavedPackageState(response,expected);
+      if(state.modified!==false)throw Error('LOGINOM_AMOUNT_DIRTY_PACKAGE_REFUSED');
+      await owned(()=>client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',
+        parameters:{path:binding.packagePath,conflict_policy:'replace'},operation_id:'amount-save:'+binding.admission}},undefined,options()));
+      if(session.metadata.workspacePreparation!==amountSavePreparation || JSON.stringify(amountSavePreparation)!==amountSavePreparationBytes)
+        throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_CHANGED');
+      amountPreparation=retainAmountPreparation(retained,amountSavePreparation,amountSaveOutcome);
+      amountPreparedResult=Object.freeze({preparationComplete:true,session_id:binding.session,
+        preparation_operation_id:amountSavePreparation.operation_id,save_operation_id:amountSaveOutcome.operation_id});
+      return amountPreparedResult;
+    }
+    function assertAmountPrepared(result) {
+      if(result!==amountPreparedResult)throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_UNAVAILABLE');
+      assertAmountPreparation(amountPreparation,session.metadata.workspacePreparation,amountSaveOutcome);return true;
+    }
     async function captureAcceptance({signal} = {}) {
       const binding = acceptanceCapture?.binding;
       if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
@@ -808,7 +858,8 @@ export async function createBridge(config, session, { browserTransport: managedB
       if(amount){
         if(preparedAtCapture!==amountSavePreparation || JSON.stringify(preparedAtCapture)!==amountSavePreparationBytes)
           throw Error('LOGINOM_AMOUNT_ORIGINAL_PREPARATION_CHANGED');
-        amountPreparation=retainAmountPreparation(retained,preparedAtCapture,amountSaveOutcome);
+        if(!amountPreparation)amountPreparation=retainAmountPreparation(retained,preparedAtCapture,amountSaveOutcome);
+        else assertAmountPreparation(amountPreparation,preparedAtCapture,amountSaveOutcome);
         beginAmountCompletion(amountPreparation,preparedAtCapture,amountSaveOutcome);
       }
       captureConsumed=true;
@@ -1142,7 +1193,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       });
       return closing;
     }
-    return {server,catalog,captureAcceptance,
+    return {server,catalog,captureAcceptance,prepareAmount,assertAmountPrepared,
       assertAmountCompletion:result=>assertAmountCompletion(amountPreparation,result,session.metadata.workspacePreparation,amountSaveOutcome),
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,

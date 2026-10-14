@@ -144,9 +144,9 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     clearTimeout(request.timer)
     request.dispose?.()
     if(request.fp && "rejection" in message) {
-      try {request.reject(startup!.receive(rejection(message.rejection),"rejectionOrigin" in message?message.rejectionOrigin:undefined,
-        "secondaryRejection" in message?{value:rejection(message.secondaryRejection)}:undefined))}
-      catch(error){request.reject(startup!.reject(error))}
+      try {const received=startup!.receive(rejection(message.rejection),"rejectionOrigin" in message?message.rejectionOrigin:undefined,
+        "secondaryRejection" in message?{value:rejection(message.secondaryRejection)}:undefined);request.reject(request.primary?request.primary.value:received)}
+      catch(error){const rejected=startup!.reject(error);request.reject(request.primary?request.primary.value:rejected)}
       return
     }
     if (request.primary) {request.reject(request.primary.value);return}
@@ -168,6 +168,12 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
   }
   function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}) {
+    const amountCall=operation==="acceptance.prepare" || operation==="acceptance.capture";
+    if(amountCall && startup?.harness==='amount-import-type-v1'){
+      guard();if(!startup.binding || control?.signal!==startup.signal || control.deadline!==startup.deadline || value!==undefined)
+        return Promise.reject(Error('LOGINOM_HANDSHAKE_INVALID'));
+    }
+
     if(control) {
       control.signal.throwIfAborted()
       if(!Number.isSafeInteger(control.deadline) || Date.now()>=control.deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
@@ -179,9 +185,9 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       const deadline=control?.deadline??Date.now()+timeout
       const cancel = (reason: unknown) => {
         if(!pending.has(id)) return
-        if(startup && operation==="start") {
-          const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason}
-          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:"startup",requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
+        if(startup && (operation==="start" || amountCall)) {
+          const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason};startup.receive(reason,"control")
+          if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:amountCall?"amount":"startup",...(amountCall?{method:operation}:{}),requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
             ...(startup.harness==='amount-import-type-v1'?{operation:startup.operation,request:startup.request}:{}),
             ...(startup.phase?{bindingPhase:startup.phase,captureBinding:startup.binding}:{}),rejection:encodeReadRejection(current.primary.value)}})
           return
@@ -193,9 +199,9 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       }
       const abort = () => cancel(control!.signal.reason)
       const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
-      pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      pending.set(id, { resolve, reject, timer, ...(startup && (operation==="start" || amountCall)?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
-      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => { if (error) fail() })
+      child.send({ id, operation, input: value, ...(operation === "start" || amountCall ? { deadline:control?.deadline??deadline } : {}) }, (error) => { if (error) fail() })
       if(control?.signal.aborted)abort()
     })
   }

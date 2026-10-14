@@ -1,0 +1,17 @@
+import assert from'node:assert/strict';import{readFile,writeFile,mkdir}from'node:fs/promises';import{resolve,join}from'node:path';import{pathToFileURL}from'node:url';
+const[root,out,fixturePath]=process.argv.slice(2),load=p=>import(pathToFileURL(resolve(root,p)));await mkdir(out,{recursive:true});
+const{retainAmountManagedStartup,assertAmountManagedStartup}=await load('src/fp-managed-startup.mjs'),{retainCaptureOwner,bindCaptureRuntime,assertCaptureOwner}=await load('src/retained-capture.mjs'),{retainAmountCaptureProxy}=await load('src/amount-capture-proxy.mjs');
+const fixtureText=await readFile(fixturePath,'utf8'),fixture=Function('retainAmountManagedStartup','retainCaptureOwner','bindCaptureRuntime','retainAmountCaptureProxy',fixtureText.slice(fixtureText.indexOf('function fixture('),fixtureText.indexOf('const rows=[];'))+'return fixture;')(retainAmountManagedStartup,retainCaptureOwner,bindCaptureRuntime,retainAmountCaptureProxy);
+const text=await readFile(join(root,'src/managed-entry.mjs'),'utf8');const a=text.indexOf('    if (message.operation === "acceptance.capture"'),b=text.indexOf('    if (message.operation === "admit")',a);assert(a>=0&&b>a);
+const run=Object.getPrototypeOf(async function(){}).constructor('state','message','assertAmountManagedStartup','assertCaptureOwner','send','closeRejection','AbortController',text.slice(a,b)),rows=[];
+for(const mode of ['canonical','cancel-false','cancel-undefined','foreign-cancel']){
+ const f=fixture(),replies=[];let calls=0;f.state.amountCaptureProxy=f.proxy;f.state.captureRetained=f.retained;
+ f.state.bridge.prepareAmount=async({signal})=>{calls++;assert.equal(signal,f.controller.signal);const value={phase:'amount',method:'acceptance.prepare',requestId:'prepare-message',startupRequestId:f.input.amountStartup.requestId,authorization:f.input.amountStartup.authorization,operation:f.input.amountStartup.operation,request:f.input.amountStartup.request,deadline:f.input.amountStartup.deadline,harness:'amount-import-type-v1',bindingPhase:'capture',captureBinding:{...f.input.amountStartup.binding},rejection:{kind:'value',value:mode==='cancel-undefined'?null:false,is_undefined:mode==='cancel-undefined'}};if(mode==='foreign-cancel')value.requestId='foreign';if(mode!=='canonical'){assert.equal(f.startup.cancel(value),mode!=='foreign-cancel');f.startup.guard()}return {preparationComplete:true}};
+ f.state.bridge.assertAmountPrepared=()=>true;
+ const encode=v=>v instanceof Error?{kind:'Error',name:v.name,message:v.message}:{kind:'value',value:v===undefined?null:v,is_undefined:v===undefined};
+ await run(f.state,{id:'prepare-message',operation:'acceptance.prepare',deadline:f.input.amountStartup.deadline},assertAmountManagedStartup,assertCaptureOwner,v=>replies.push(v),encode,AbortController);
+ assert.equal(calls,1);assert.equal(replies.length,1);assert.equal(f.state.controller,undefined);assert.equal(f.state.amountCall,undefined);
+ if(mode.startsWith('cancel-')){assert.equal(replies[0].result.refused,true);assert.equal(replies[0].rejection.is_undefined,mode==='cancel-undefined');assert.equal(replies[0].rejection.value,mode==='cancel-undefined'?null:false)}else assert.equal(replies[0].result.preparationComplete,true);
+ rows.push({mode,pass:true,originalChildSignal:true});
+}
+await writeFile(join(out,'results.json'),JSON.stringify({pass:rows.length,rows,limits:'Actual startup/retainer/proxy and literal managed branch; bridge/native/MCP replies are doubles. No full embedded factory/native proof.'},null,2));console.log(rows.length);

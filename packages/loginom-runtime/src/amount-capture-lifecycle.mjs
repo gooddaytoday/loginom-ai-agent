@@ -27,6 +27,7 @@ export function retainAmountPreparation(retained,preparation,save) {
 export function assertAmountPreparation(handle,preparation,save,{closed=false}={}) {
  const p=preparations.get(handle);if(!p)fail('ORIGINAL_PREPARATION_UNAVAILABLE');
  const r=p.retained,s=r.state;
+ s.controlledStartup?.guard();
  if(p.owner.signal?.aborted)throw p.owner.signal.reason;
  if(Object.keys(p.owner).some(k=>r.owner[k]!==p.owner[k]))fail('ORIGINAL_OWNER_CHANGED');
  if(!Number.isSafeInteger(p.owner.deadline) || Date.now()>=Math.min(p.owner.deadline,p.binding.expires))fail('ORIGINAL_CONTROL_EXPIRED');

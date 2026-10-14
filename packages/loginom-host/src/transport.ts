@@ -24,6 +24,9 @@ export function privateAmountTransport(port: Port, receive:(value:unknown,origin
     },
     acquire(input:{run:string;session:string;amountControl:{authorization:string;operation:string;request:string}},control:AmountControl) {
       return client.amountControlled("acquire",input,control,{phase:"acquired",run:input.run,...input.amountControl,deadline:control.deadline},receive);
+    },
+    dispatch(method:"acceptance.prepare"|"acceptance.capture",input:{run:string;authorization:string;operation:string;request:string},control:AmountControl) {
+      return client.amountControlled(method,input,control,{phase:"dispatch",method,...input,deadline:control.deadline},receive);
     }}
 }
 function encode(value: unknown): unknown {
@@ -76,11 +79,12 @@ function requests(port: Port) {
       let dispatched = false, cancelled=false
       function cancel(value: unknown) {
         if (!pending.has(id) || cancelled && !state.closed) return
+        if(receive && dispatched && !state.closed){receive(value,"control");cancelled=true;}
         if (control && dispatched) {
           try { port.postMessage({ id: randomUUID(), method: "readonly.preReady.cancel",
-            input: { ...(cancellation ?? input as object), requestId: id, rejection: encode(value) } }) } catch { /* Original refusal remains primary. */ }
+            input: { ...(cancellation ?? input as object), requestId: id, rejection: encode(value) } }) } catch (secondary) { if(receive)receive(secondary,"await") }
         }
-        if(receive && dispatched && !state.closed){receive(value,"control");cancelled=true;return}
+        if(receive && dispatched && !state.closed)return
         settle(id, true, receive?receive(value,"await"):value)
       }
       const abort = () => cancel(control!.signal.reason)
@@ -89,11 +93,11 @@ function requests(port: Port) {
       control?.signal.addEventListener("abort", abort, {once: true})
       if (control?.signal.aborted) { cancel(control.signal.reason); return }
       try { dispatched = true; port.postMessage({id, method, input, ...(control ? {deadline: control.deadline} : {})}) }
-      catch (error) { if (control) settle(id, true, error); close() }
+      catch (error) { if (control) settle(id, true, receive?receive(error,"await"):error); close() }
     })
   }
   return { request: (method: string, input: unknown, timeout = 180_000) => send(method, input, timeout),
     startControlled: (input: unknown, control:Control, cancellation:object) => send("start", input, 0, control, cancellation),
-    amountControlled:(method:"start"|"acquire",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
+    amountControlled:(method:"start"|"acquire"|"acceptance.prepare"|"acceptance.capture",input:unknown,control:Control,cancellation:object,receive:(value:unknown,origin:unknown,secondary?:{value:unknown})=>unknown)=>send(method,input,0,control,cancellation,receive),
     controlled: (input: {run:string;authorization:string}, control:Control) => send("readonly.preReady", input, 0, control), close }
 }

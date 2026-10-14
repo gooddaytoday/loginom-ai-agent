@@ -54,6 +54,16 @@ function retainManagedStartup(message,input,state,controller,key) {
     reject(value){if(!primary)primary={value,origin:"await"};else secondary??={value};return primary.value},
     propagate(value){primary??={value,origin:"guard"};return primary.value},
     cancel(value){
+      if(key==='amountStartup' && value?.phase==='amount') {
+        if(!accepted || pending || !state.amountCall || value.requestId!==state.amountCall.id
+          || value.method!==state.amountCall.method || state.controller!==controller
+          || value.startupRequestId!==fixed.requestId || value.authorization!==fixed.authorization
+          || value.operation!==fixed.operation || value.request!==fixed.request || value.deadline!==fixed.deadline
+          || value.harness!=='amount-import-type-v1' || value.bindingPhase!=='capture'
+          || !value.captureBinding || Object.keys(value.captureBinding).sort().join(',')!==Object.keys(originalBinding??{}).sort().join(',')
+          || Object.keys(originalBinding??{}).some(k=>value.captureBinding[k]!==originalBinding[k]))return false;
+        if(primary)return false;guard();refuse(decodePreReadyRejection(value.rejection));return true;
+      }
       if(!pending || value?.phase!=='startup' || value.requestId!==id || value.startupRequestId!==fixed.requestId
           || value.authorization!==fixed.authorization || value.harness!==(fixed.harness??fixed.purpose) || value.deadline!==fixed.deadline
           || (key==='amountStartup' && (value.operation!==fixed.operation || value.request!==fixed.request)))return false

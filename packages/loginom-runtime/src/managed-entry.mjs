@@ -459,14 +459,19 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
-    if (message.operation === "acceptance.capture") {
+    if (message.operation === "acceptance.capture" || message.operation === "acceptance.prepare") {
+      const preparing=message.operation==="acceptance.prepare"
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
       const amount=!!state.amountCaptureProxy
+      if(preparing&&!amount)throw Error("LOGINOM_REQUEST_INVALID")
       const controller = amount ? assertAmountManagedStartup(state.controlledStartup,state).controller : new AbortController()
+      if(amount){const original=assertAmountManagedStartup(state.controlledStartup,state);
+        if(message.deadline!==original.deadline)throw Error("LOGINOM_REQUEST_INVALID");
+        state.amountCall={id:message.id,method:message.operation};}
       state.controller = controller
       try {
-        const result = await state.bridge.captureAcceptance({signal:controller.signal})
+        const result = await (preparing?state.bridge.prepareAmount:state.bridge.captureAcceptance)({signal:controller.signal})
         if(result?.diagnosticRead===true) {
           if(!state.captureRetained || state.controller!==controller
               || Date.now()>=result.receipt.publication.deadline)
@@ -474,15 +479,18 @@ async function handle(message) {
           assertCaptureOwner(state.captureRetained)
           controller.signal.throwIfAborted()
         }
-        if(amount)state.bridge.assertAmountCompletion(result)
+        if(amount){if(preparing)state.bridge.assertAmountPrepared(result);else state.bridge.assertAmountCompletion(result)}
         send({id:message.id,result})
       } catch (rejected) {
-        send({id:message.id,result:{cleanupComplete:false,refused:true,
+        if(amount)state.controlledStartup.propagate(rejected)
+        send({id:message.id,...(amount?{rejection:closeRejection(rejected),rejectionOrigin:state.controlledStartup.rejectionOrigin,
+          ...(state.controlledStartup.secondary?{secondaryRejection:closeRejection(state.controlledStartup.secondary.value)}:{})}:{}),result:{cleanupComplete:false,refused:true,
           rejectedIsUndefined:rejected === undefined,
           rejected:rejected instanceof Error ? {name:rejected.name,message:rejected.message,
             ...(Object.hasOwn(rejected,"cause")?{cause:closeRejection(rejected.cause)}:{})} : rejected}})
       } finally {
         state.controller = undefined
+        state.amountCall=undefined
       }
       return
     }
