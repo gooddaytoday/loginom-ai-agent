@@ -1,0 +1,40 @@
+{
+  "format": "LAB57-UNKNOWN-STATUS-OWNER-STOP-HANDOFF-v1",
+  "checked_utc": "2026-10-14T08:13:35.402665+00:00",
+  "owner_comment": "01a13978-4fd8-7b60-9f3e-693fd1f2ce5c",
+  "parent": "01a13970-d9f2-7020-b297-be9380cf80cd",
+  "marker": "LAB57-964-UNKNOWN-STATUS-OWNER-STOP-20261014",
+  "body_parent_oneEvalermention_readback": "VERIFIED",
+  "canonical_verification_sha256": "b2dda559a09014b51ab95a7735b07a30c646d7abd0d8aaec441855bf5b32d68d",
+  "publication": "5ddfd34fb6",
+  "intended_delivery": "Text-only supported steering to current Evaler task; no attachment",
+  "actual_race": {
+    "pre_read": "2026-10-14T08:11:40.507861Z; exact Evaler01a13966-2acb running/can_supplement:true/task-supplement-v1",
+    "old_task_completed": "2026-10-14T11:12:02+03:00",
+    "comment_created": "2026-10-14T11:12:28+03:00",
+    "supplement_receipt": "ABSENT; old task ended26s before comment; ordinary queued followup observed; not claimed as successful steering",
+    "new_Evaler_ACK_task": "01a13978-5001-74bb-a47d-eee39c9041a3",
+    "no_repost_no_new_Ben_or_Rich_dispatch_by_coordinator": true
+  },
+  "existing_repair": {
+    "Evaler_handoff": "01a13977-b6a3-7659-9649-1570f590e7b0",
+    "parent_Rich_REJECT": "01a13970-d9f2-7020-b297-be9380cf80cd",
+    "Ben_task": "01a13977-b6c6-747a-8f7d-55cb0829cff4",
+    "status": "running",
+    "started_at": "2026-10-14T11:12:02+03:00",
+    "scope_attachment": "01a13977-b66b-726b-be35-1ccf70357b3e",
+    "zip_bytes": 17578,
+    "zip_sha256": "d418bd398af440af7eff1505c82670fe6e405bc43a70e12bc242c6d12565e8ba",
+    "manifest_sha256": "6841c96f7053479cf216048148b9c2c9783036ef7ad5d5ca16053021cf096946",
+    "payloads": 6,
+    "CRC_regular_paths_bytes_hashes_verified": true,
+    "scope": "Explicit supported pending/proven terminal in collector+replay, unknown/missing/malformed STOP before partition; saved RichRED plus CLI/Node negatives/terminalpositive; new immutable independently reviewed source before effects",
+    "same_review_cycle2_case_reject_count1": true,
+    "source_only": true
+  },
+  "exact964_admission": "HELD/SOURCE_REJECT; existing01a13966 conditionalSTOP fired; MUST_NOT_INSTALL",
+  "credentials_mas_scope_owner_policy_original_owned_cleanup_authority": "RETAINED; no human/time/globalmas-idle gate",
+  "root_new_live_tests_model_resource_profile_recovery_once_mutations": 0,
+  "actual_cleanup_RELEASED_FREE_case_ACCEPT": "ABSENT; budgets/oldERROR unchanged; new SOURCE defect charge0",
+  "automation": "DELETED_BY_USER/OFF"
+}

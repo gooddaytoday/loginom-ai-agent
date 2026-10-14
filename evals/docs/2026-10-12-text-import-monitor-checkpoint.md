@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Fresh full8 07:53:52UTC14Oct: LAB56 done72; LAB58–63 backlog10/admission/no runs. LAB57 partial08:08:11UTC in_progress359/frozeneb1/review2/reject1; only Evaler owner-coordination01a13966-2acb running after Rich SOURCE_REJECT.
+- Fresh full8 07:53:52UTC14Oct: LAB56 done72; LAB58–63 backlog10/admission/no runs. LAB57 followup08:13:35UTC has one Ben status SOURCE repair01a13977-b6c6 running11:12:02+03 + Evaler ownerSTOP ACK01a13978-5001 queued; frozeneb1/review2/reject1.
 - Automation lab-56-lab-63 удалена владельцем и не восстанавливается. Текущая работа продолжена отдельным прямым поручением владельца; это не новый recurring monitor.
 - Direct human14Oct supplies Loginom administrator admin/admin for dedicated eval-tests; explicitly allows this exact test pair in Git docs. Canonical evals/AGENTS.md section committed/pushed125507f837/SHA6d4bffa4…2aa6; SSH/Multica/model/production secrets excluded.
 - Human confirms runtime mas24aa980b-b8c3-43e2-b087-bad8f79c9517 disjoint from originaleval-tests a5fa993f. Its active/queued do notblock; globalidle requirement superseded for exactmas only. No foreign tasks/processes/leases/hosts/messages interference.
@@ -9,7 +9,7 @@
 - Rich SOURCE_REJECT01a13970-d9f2 parent01a13961-f7bb exact964: unsupported UNKNOWN/null-runtime and future_active/conflicting-original bypass queue partition; two concrete Python→productionNode fixture falseELIGIBLE, actual live occurrence notclaimed.
 - Rich ZIP132984/fea976e6…6b43b/manifest81058ebf…af22/100payload CRC/regularpaths/hashes/receipt equality verified; independentbuild sameead31/5genuine captures/2savedfalseadmissions checked; no unchanged suite/rootreproduction repeat.
 - Root prior75PASS/113expects/code-diff proofs preserved but lacked unknown-status coverage. SOURCE_REJECT now CONFIRMED; source/op admission964 conditional STOP activated, MUST_NOT_INSTALL. Earlier canonical receipts immutable; no live effects.
-- Existing Evaler handles minimal immutable collector+replay explicit supported pending/proven terminal sets; unknown/missing/malformed status STOP + CLI/Node negatives/terminalpositives. New exact source gate before any install/effect; no duplicate reviewer/worker, no human/time gate.
+- Evaler STOP/repair01a13977-b6a3 parentRichREJECT already dispatched only Ben01a13977-b6c6. ZIP17578/d418bd39…e8ba/manifest6841c96f…6946/6payload verified. New exact source independent gate before any install/effects; no duplicate sourceworker/human/time gate.
 - OriginalBen task01a1375d/acquired22:28:17.228/eb1/configd204/dev64512inode17837096 lastprovenBUSY; fullregistration/legacyguard/CSV/pendinghistory retained. No owner/token/configrebind/oldABANDONEDreuse/uncertainretry.
 - Future original commonlease+heldoperationguard+oneoriginalunspent recovery+wx0600file/parentfsynconce BEFOREfirst native/profile/resourceeffect; coherent originalDBWALSHM/runtime/session snapshot first.
 - Immediately fresh scoped queues/ALL6actualCFG/processancestry/absence/FD/debugger/exactcontainer/nobindmounts/storage/pins/rawowner/config/registration/guard; exactd6 process.execPath AND /proc/self/exe path/bytes/dev/inode/SHA beforeEVERYeffect.
@@ -17,4 +17,4 @@
 - Fresh separate genuine attestation/completion/ordinaryRELEASED/FREE and independentfinalcases/validator/attestationACCEPT required. LAB57done/LAB58 only verified gates; all8donefalse.
 - Benproduct6/6 spent/originalwholeERROR/code2/all6qualityEXCLUDED/no repeats/77Luna-high5archives+1pending/billedUNKNOWN/SHMSTOP; Rich4PASS2qualityFAIL0ERROR/refs1/1/2/1/1/3/product1each/cold11/10/8/cleanupcontinuations2; Bencold9/9/8+ERROR1.
 - Repeats3/10remaining7/admission3/3/wrapper1/1/recovery0/1 lastproved preserved/noresetprecharge; lowerwriterUNKNOWN/missingparent-harnessproofs/wrongprofile history retained. Coordinator native/model/recovery/resource mutations0.
-- Canonical mas-unknown-status-reject-verification.json supersedes exact964 admission; policy743/owner125 credentials+mas scope retained. Next source repair→independentexactadmission→ownedcleanup→caseACCEPT; automationOFF; actualdone57 absent.
+- Canonical mas-unknown-status-reject-verification.json b2dda559…d68d + owner-stop-handoff.json: owner01a13978 body/parent/oneEvalermention verified; attemptedsteer raced oldtask completion26s earlier, actualordinaryACKqueue notsteer. Next repairedSOURCE→ownedcleanup→caseACCEPT; automationOFF.
