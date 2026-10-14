@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage } from "../src/parallel-acceptance"
-import { sampleHostResources } from "../src/parallel-resources"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage } from "../src/parallel-acceptance"
+import { sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
 import os from "node:os"
+import { readlink, stat } from "node:fs/promises"
 import { summarizeResourceSamples } from "../src/parallel-resource-summary"
 
 test("parallel acceptance fails on an intermediate rate limit even when the measured retry succeeds", () => {
@@ -271,4 +272,65 @@ test("resource coverage binds both container roles to the exact prepared epochs 
   for (const change of [{ started_at: "changed" }, { image: "changed" }, { owner_nonce: "changed" }])
     expect(assessResourceCoverage({ ...request, samples: [{ ...sample, containers: [{ ...containers[0], inspect: { ...containers[0]!.inspect, ...change } }, containers[1]] }] }))
       .toEqual({ status: "failed", codes: ["CONTAINER_RESOURCE_IDENTITY_MISMATCH"] })
+})
+
+
+test("cgroup coverage requires scopes and the qualified expected runner hierarchy view", async () => {
+  const group = await sampleCgroupResources()
+  const root = await stat("/sys/fs/cgroup")
+  const view = { namespace: await readlink("/proc/self/ns/cgroup"), root: { device: root.dev, inode: root.ino } }
+  expect(assessCgroupCoverage({ groups: [group], view })).toEqual({ status: "passed", codes: [] })
+  expect(assessCgroupCoverage({ groups: [], view })).toEqual({ status: "incomplete", codes: ["CGROUP_RESOURCE_COVERAGE_INCOMPLETE"] })
+  expect(assessCgroupCoverage({ groups: [null], view })).toEqual({ status: "incomplete", codes: ["CGROUP_RESOURCE_COVERAGE_INCOMPLETE"] })
+  expect(assessCgroupCoverage({ groups: [{ ...group, view: null }], view })).toEqual({ status: "incomplete", codes: ["CGROUP_VIEW_UNAVAILABLE"] })
+  expect(assessCgroupCoverage({ groups: [group], view: { ...view, root: { ...view.root, inode: view.root.inode + 1 } } }))
+    .toEqual({ status: "failed", codes: ["CGROUP_VIEW_MISMATCH"] })
+  expect(assessCgroupCoverage({ groups: [group], view: { ...view, namespace: "cgroup:[0]" } }))
+    .toEqual({ status: "failed", codes: ["CGROUP_VIEW_MISMATCH"] })
+})
+
+test("cgroup coverage requires a bound canonical path and the complete ordered ancestor chain", async () => {
+  const group = await sampleCgroupResources()
+  const view = group.view!
+  for (const change of [{ path: null }, { path: "/receipt/../leaf" }, { ancestors: null },
+    { path: "/receipt/leaf", ancestors: [] },
+    { path: "/receipt/leaf", ancestors: [{ ...group, path: "/wrong" }, { ...group, path: "/" }] },
+  ]) expect(assessCgroupCoverage({ groups: [{ ...group, ...change }], view }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_HIERARCHY_UNVERIFIED"] })
+})
+
+test("cgroup coverage requires applicable controller data without inventing counters for disabled local controllers", async () => {
+  const group = await sampleCgroupResources()
+  const view = group.view!
+  for (const change of [{ controllers: null }, { cpu_usage: null },
+    { controllers: ["cpu", "memory"], cpu_max: null },
+    { controllers: ["cpu", "memory"], cpu_throttling: null },
+    { controllers: ["memory"], memory_events: null }, { controllers: ["memory"], memory_limit_bytes: null },
+    { controllers: ["memory"], swap_current_bytes: null },
+  ]) expect(assessCgroupCoverage({ groups: [{ ...group, ...change }], view }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_COUNTERS_INCOMPLETE"] })
+  const disabled = { ...group, controllers: [], cpu_max: null, cpu_throttling: null, memory_current_bytes: null,
+    memory_limit_bytes: null, swap_current_bytes: null, swap_limit_bytes: null, memory_events: null }
+  const before = JSON.stringify(disabled)
+  expect(assessCgroupCoverage({ groups: [disabled], view })).toEqual({ status: "passed", codes: [] })
+  expect(JSON.stringify(disabled)).toBe(before)
+  expect(assessCgroupCoverage({ groups: [{ ...group, ancestors: group.ancestors!.map((ancestor, index) => index ? ancestor : { ...ancestor, cpu_usage: null }) }], view }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_COUNTERS_INCOMPLETE"] })
+})
+
+test("cgroup coverage refuses controller metadata that contradicts observed local interfaces", async () => {
+  const group = await sampleCgroupResources()
+  const view = group.view!
+  expect(assessCgroupCoverage({ groups: [{ ...group, controllers: [], cpu_max: { quota_usec: "max", period_usec: 100000 } }], view }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_CONTROLLER_STATE_INCONSISTENT"] })
+  expect(assessCgroupCoverage({ groups: [{ ...group, controllers: [] }], view }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_CONTROLLER_STATE_INCONSISTENT"] })
+})
+
+test("a known cgroup view mismatch remains failed alongside unavailable scope evidence", async () => {
+  const group = await sampleCgroupResources()
+  const view = group.view!
+  const wrong = { ...group, view: { ...view, namespace: "cgroup:[0]" } }
+  for (const missing of [null, { ...group, view: null }]) expect(assessCgroupCoverage({ groups: [missing, wrong], view }))
+    .toEqual({ status: "failed", codes: ["CGROUP_VIEW_MISMATCH"] })
 })

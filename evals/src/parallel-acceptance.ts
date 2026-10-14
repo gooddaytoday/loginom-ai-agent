@@ -1,5 +1,45 @@
 import type { ServerIdentity } from "./slots"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
+import path from "node:path"
+
+// The expected view must be qualified outside actor namespaces and fixed in the manifest.
+export function assessCgroupCoverage(input: { groups: readonly unknown[]; view: { namespace: string; root: { device: number; inode: number } } }) {
+  if (!input.groups.length)
+    return { status: "incomplete" as const, codes: ["CGROUP_RESOURCE_COVERAGE_INCOMPLETE"] }
+  const groups = input.groups.map(acceptanceObject)
+  if (groups.some(group => {
+    if (!group.view) return false
+    const view = acceptanceObject(group.view), root = acceptanceObject(view.root)
+    return view.namespace !== input.view.namespace || root.device !== input.view.root.device || root.inode !== input.view.root.inode
+  })) return { status: "failed" as const, codes: ["CGROUP_VIEW_MISMATCH"] }
+  if (input.groups.some(value => value === null || value === undefined)) return { status: "incomplete" as const, codes: ["CGROUP_RESOURCE_COVERAGE_INCOMPLETE"] }
+  if (groups.some(group => !group.view)) return { status: "incomplete" as const, codes: ["CGROUP_VIEW_UNAVAILABLE"] }
+  if (groups.some(group => {
+    if (typeof group.path !== "string" || !path.posix.isAbsolute(group.path) || path.posix.normalize(group.path) !== group.path || !Array.isArray(group.ancestors)) return true
+    const expected = group.path.split("/").filter(Boolean).map((_, index, parts) => "/" + parts.slice(0, -index - 1).join("/"))
+    return group.ancestors.length !== expected.length || group.ancestors.some((value, index) => acceptanceObject(value).path !== expected[index])
+  })) return { status: "incomplete" as const, codes: ["CGROUP_HIERARCHY_UNVERIFIED"] }
+  const scopes = groups.flatMap(group => [group, ...(group.ancestors as unknown[]).map(acceptanceObject)])
+  if (scopes.some(scope => scope.path !== "/" && Array.isArray(scope.controllers) && (
+    !scope.controllers.includes("cpu") && [scope.cpu_max, scope.cpu_throttling].some(value => value !== null && value !== undefined) ||
+    !scope.controllers.includes("memory") && [scope.memory_current_bytes, scope.memory_limit_bytes, scope.swap_current_bytes, scope.swap_limit_bytes, scope.memory_events]
+      .some(value => value !== null && value !== undefined)))) return { status: "incomplete" as const, codes: ["CGROUP_CONTROLLER_STATE_INCONSISTENT"] }
+  if (scopes.some(scope => {
+    if (!Array.isArray(scope.controllers) || !resourceNumbersObserved(scope.cpu_usage, ["usage_usec", "user_usec", "system_usec"])) return true
+    // The expected global view above makes / the hierarchy root, whose limit interfaces are non-root only.
+    if (scope.path === "/") return false
+    if (scope.controllers.includes("cpu")) {
+      const quota = acceptanceObject(scope.cpu_max)
+      if (quota.quota_usec !== "max" && (!Number.isSafeInteger(quota.quota_usec) || Number(quota.quota_usec) < 1) ||
+        !Number.isSafeInteger(quota.period_usec) || Number(quota.period_usec) < 1 ||
+        !resourceNumbersObserved(scope.cpu_throttling, ["nr_periods", "nr_throttled", "throttled_usec"])) return true
+    }
+    return scope.controllers.includes("memory") && (!resourceNumbersObserved(scope, ["memory_current_bytes", "swap_current_bytes"]) ||
+      !resourceNumbersObserved(scope.memory_events, ["oom", "oom_kill"]) || ["memory_limit_bytes", "swap_limit_bytes"].some(key =>
+        scope[key] !== "max" && (!Number.isSafeInteger(scope[key]) || Number(scope[key]) < 0)))
+  })) return { status: "incomplete" as const, codes: ["CGROUP_COUNTERS_INCOMPLETE"] }
+  return { status: "passed" as const, codes: [] }
+}
 
 export function assessResourceCoverage(input: {
   samples: readonly unknown[]; paths: string[]
