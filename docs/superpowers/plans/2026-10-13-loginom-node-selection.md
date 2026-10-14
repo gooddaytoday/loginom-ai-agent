@@ -3248,8 +3248,10 @@ input_mapping до execution. Нет CSV/Save/LGP; normalcleanupfalse/HostACKfal
 После разрешённого восстановления нужна новая matched пара и новый prospective
 lock до firstmodel. Старые failure, pins, drafts и review остаются неизменными.
 
-- [ ] Восстановить15разрешённых runtime/test путей exact15e2f43c5d, включая
-  JS→Group/Sort helper и его hook; сохранить Variant/base и чужие файлы.
+- [x] Восстановить15разрешённых runtime/test путей exact15e2f43c5d, включая
+  JS→Group/Sort helper и его hook; Variant/base и чужие файлы сохранены.
+  Existing Export regression RED→GREEN; targeted15suites713PASS/0FAIL/0SKIP,
+  собственные процессы завершены. Полная live-приёмка этим не подтверждается.
 - [ ] Независимо проверить разрешённый diff и targeted restoration regressions;
   сохранённый failure/ownrelease оформить в отчёте, восстановление — обычным commit.
 

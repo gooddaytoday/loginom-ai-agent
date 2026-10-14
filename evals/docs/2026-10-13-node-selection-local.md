@@ -1579,3 +1579,14 @@ loginUI/pageclosed/Host1661655gone/.writerabsent. RecoveryfinalSHA
 независимый recovery review pending. Исходный отказ не становитсяPASS.
 Восстановление15путей exact15e выполняется с targeted RED→GREEN; Variant2base.
 Нужны новый финальныйsource, matchedbuild и prospective31seal до моделей.
+
+Checkpoint 2026-10-14 — разрешённое восстановление15paths exact15e завершено.
+Targeted713PASS/0FAIL/0SKIP,164.95s; existingExportRED→GREEN, typecheck package
+не предусмотрен (mjs). VerificationSHA89fac0c0d2023a03553e125a698b024b00500c566f1a64d52a457547092b1bea.
+581прочихclientfiles/32raw/evidence/payloads unchanged; PID1683584gone.
+Helper javascript-output-preview.mjs и Group/Sort hook восстановлены; стандартные
+Import/Join/Export/Calculator/Group/Sort fixes возвращены по явному разрешению.
+Ownrelease105540 независимо verifiedSHA87060dc1f255ada5fe4520338342dd44d87dc56a100c99e5c4b6ae852f12e647:
+exactGUID→user177/latestinit→close/admin178logout/UI/Hostgone/nowriter, original
+nativefailure/normalcleanupfalse preserved. Новыйsource и31matched admission
+готовятся; modelslots0 на обоих новых подготовленныхruntime.
