@@ -3,9 +3,32 @@ import { appendFile, chmod, link, mkdtemp, rm, stat, symlink, unlink, writeFile 
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleSupervisedResources } from "../src/parallel-resources"
-import { readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { readResourceEvidence, readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { superviseProcess } from "../src/process-supervisor"
 import { readLeaseReceipt } from "../src/lease"
+
+test("resource evidence returns the validated raw observations with their verified receipt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-verified-samples-"))
+  const samplesFile = path.join(root, "samples.jsonl"), out = path.join(root, "summary.json")
+  try {
+    const samples = await Promise.all([0, 1].map(async index => ({ version: 1, sequence: index + 1, elapsed_ms: index * 1000,
+      missed_intervals: 0, duration_ms: 1, interval_ms: 1000, run_id: "verified-samples", phase: "run" as const,
+      host: await sampleHostResources([root]), containers: null, processes: null })))
+    const bytes = samples.map(sample => JSON.stringify(sample) + "\n").join("")
+    await writeFile(samplesFile, bytes, { mode: 0o600 })
+    const receipt = await writeResourceSummary({ samplesFile, out })
+    const request = { file: out, samplesFile, runId: "verified-samples", phase: "run" as const }
+    const evidence = await readResourceEvidence(request)
+    expect(evidence).toEqual({ receipt, samples })
+    expect(evidence.receipt.source.sha256).toBe(new Bun.CryptoHasher("sha256").update(bytes).digest("hex"))
+    evidence.samples[0]!.sequence = 99
+    expect(await Bun.file(samplesFile).text()).toBe(bytes)
+    expect((await readResourceEvidence(request)).samples).toEqual(samples)
+    await appendFile(samplesFile, "\n")
+    await expect(readResourceEvidence(request)).rejects.toThrow("RESOURCE_SOURCE_HASH_MISMATCH")
+    expect(await readLeaseReceipt(out)).toEqual(receipt)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("resource evidence persists the actual sampler summary privately and binds the unchanged JSONL bytes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-summary-"))

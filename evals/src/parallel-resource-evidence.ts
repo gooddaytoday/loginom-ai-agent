@@ -6,7 +6,7 @@ import { summarizeResourceSamples } from "./parallel-resource-summary"
 
 export async function writeResourceSummary(input: { samplesFile: string; out: string }) {
   await assertResourceDirectory(input.out)
-  const receipt = resourceReceipt(input.samplesFile, await readResourceSource(input.samplesFile))
+  const receipt = resourceEvidence(input.samplesFile, await readResourceSource(input.samplesFile)).receipt
   const output = await open(input.out, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
     .catch(() => { throw new EvalFailure("RESOURCE_OUTPUT_PRIVATE", 2) })
   try { await output.writeFile(JSON.stringify(receipt) + "\n"); await output.sync() }
@@ -16,7 +16,11 @@ export async function writeResourceSummary(input: { samplesFile: string; out: st
   return receipt
 }
 
-export async function readResourceSummary(input: { file: string; samplesFile: string; runId: string | null; phase: "before" | "run" | "after" | null }) {
+export async function readResourceSummary(input: Parameters<typeof readResourceEvidence>[0]) {
+  return (await readResourceEvidence(input)).receipt
+}
+
+export async function readResourceEvidence(input: { file: string; samplesFile: string; runId: string | null; phase: "before" | "run" | "after" | null }) {
   await assertResourceDirectory(input.file)
   const { readLeaseReceipt } = await import("./lease")
   const saved = resourceObject(await readLeaseReceipt(input.file).catch(() => { throw new EvalFailure("RESOURCE_RECEIPT_INVALID", 2) }))
@@ -26,10 +30,10 @@ export async function readResourceSummary(input: { file: string; samplesFile: st
   if (source.file !== input.samplesFile) throw new EvalFailure("RESOURCE_SOURCE_PATH_MISMATCH", 2)
   const bytes = await readResourceSource(input.samplesFile)
   if (new Bun.CryptoHasher("sha256").update(bytes).digest("hex") !== source.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
-  const expected = resourceReceipt(source.file, bytes)
-  if (saved.run_id !== input.runId || expected.run_id !== input.runId || saved.phase !== input.phase || expected.phase !== input.phase)
+  const expected = resourceEvidence(source.file, bytes)
+  if (saved.run_id !== input.runId || expected.receipt.run_id !== input.runId || saved.phase !== input.phase || expected.receipt.phase !== input.phase)
     throw new EvalFailure("RESOURCE_RECEIPT_CONTEXT_MISMATCH", 2)
-  if (JSON.stringify(saved.summary) !== JSON.stringify(expected.summary)) throw new EvalFailure("RESOURCE_SUMMARY_MISMATCH", 2)
+  if (JSON.stringify(saved.summary) !== JSON.stringify(expected.receipt.summary)) throw new EvalFailure("RESOURCE_SUMMARY_MISMATCH", 2)
   return expected
 }
 
@@ -56,7 +60,7 @@ async function readResourceSource(file: string) {
   } finally { await source.close() }
 }
 
-function resourceReceipt(file: string, bytes: Buffer) {
+function resourceEvidence(file: string, bytes: Buffer) {
   try {
     if (!bytes.length || bytes.at(-1) !== 10) throw new EvalFailure("RESOURCE_SAMPLES_INVALID", 2)
     const samples = bytes.toString("utf8").trimEnd().split("\n").map(line => JSON.parse(line)) as
@@ -68,9 +72,9 @@ function resourceReceipt(file: string, bytes: Buffer) {
       sample.run_id !== null && typeof sample.run_id !== "string" || ![null, "before", "run", "after"].includes(sample.phase) ||
       sample.run_id !== samples[0]!.run_id || sample.phase !== samples[0]!.phase || sample.interval_ms !== samples[0]!.interval_ms))
       throw new EvalFailure("RESOURCE_SAMPLES_INVALID", 2)
-    return { version: 1, kind: "resource-summary", run_id: samples[0]!.run_id, phase: samples[0]!.phase,
+    return { samples, receipt: { version: 1, kind: "resource-summary", run_id: samples[0]!.run_id, phase: samples[0]!.phase,
       source: { file, sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") },
-      summary: summarizeResourceSamples(samples) }
+      summary: summarizeResourceSamples(samples) } }
   } catch { throw new EvalFailure("RESOURCE_SAMPLES_INVALID", 2) }
 }
 
