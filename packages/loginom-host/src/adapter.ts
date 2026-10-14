@@ -41,7 +41,8 @@ export async function acquire(session: string) {
         void connection.request("interrupt", { run }).catch(() => undefined)
       }
       try {
-        if (queue.released || signal?.aborted) throw new Error("LOGINOM_RUN_ABORTED")
+        if (signal?.aborted) throw signal.reason
+        if (queue.released) throw new Error("LOGINOM_RUN_ABORTED")
         signal?.addEventListener("abort", abort, { once: true })
         return await connection.request("call", { run, name, args, userMessage })
       } finally {

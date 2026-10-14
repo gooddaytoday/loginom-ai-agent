@@ -94,6 +94,80 @@ const layer = Layer.mergeAll(
 
 const it = testEffect(layer)
 
+// The model, runtime reply and lease are doubles. SDK, SessionTools, adapter,
+// HostPort and MessageChannel execute their actual production implementations.
+it.effect("Row Filter SDK reaches the production host path", () =>
+  Effect.gen(function* () {
+    const { MessageChannel } = yield* Effect.promise(() => import("node:worker_threads"))
+    const { LoginomHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-host/adapter"))
+    const { loginomHostPort } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-host/host-port"))
+    const { streamText } = yield* Effect.promise(() => import("ai"))
+    const { MockLanguageModelV3 } = yield* Effect.promise(() => import("ai/test"))
+    const pair = new MessageChannel()
+    const port = (raw: typeof pair.port1) => ({
+      postMessage: (value: unknown) => raw.postMessage(value),
+      on(event: "message" | "close", listener: (event: any) => void) {
+        raw.on(event, event === "message" ? (data) => listener({ data }) : listener)
+      },
+      start: () => raw.start(),
+    })
+    const requests: any[] = [], journal = new Set<string>()
+    let released = 0
+    const server = loginomHostPort(port(pair.port2) as never, {
+      recoveries: new Map(),
+      acquire: () => ({ generation: 7, release: () => released++, holdRecovery() {}, reconciled() {} }),
+      async retireRuntime() {}, resetRestarts() {}, markRuntimeStale() {},
+      journal: {
+        pending: () => [...journal],
+        async begin() { journal.add("original-journal"); return "original-journal" },
+        async settle(id: string) { journal.delete(id) },
+      },
+      async runtime() { return { async request(method: string, input: any) {
+        if (method === "list") return { tools: [{ name: "dock_node_apply", inputSchema: { type: "object", properties: {} } }] }
+        requests.push(input)
+        return { recoveryPending: false, result: { content: [{ type: "text", text: "Runtime fixture; native=false" }] } }
+      } } },
+    } as never)
+    LoginomHost.connect(port(pair.port1) as never)
+    const loginom = yield* Effect.promise(() => LoginomHost.acquire(sessionID))
+    try {
+      const userID = MessageID.ascending()
+      const tools = yield* SessionTools.resolve({ agent, model, loginom,
+        session: { id: sessionID, permission: [] } as unknown as Session.Info,
+        processor: { message: { id: messageID } as never,
+          updateToolCall: () => Effect.void as never, completeToolCall: () => Effect.void },
+        bypassAgentCheck: false, promptOps: {} as never,
+        messages: [{ info: { id: userID, role: "user" }, parts: [] } as never],
+      })
+      const request = { operation_id: "original-filter", target: { type: "transform.filter_data" },
+        parameters: { groups: [[{ field: { kind: "input_field", name: "Amount" }, type: "real", operator: "not_null" }]] } }
+      const output = streamText({ model: new MockLanguageModelV3({ doStream: async () => ({
+        stream: new ReadableStream({ start(c) {
+          c.enqueue({ type: "tool-call", toolCallId: "row-filter-sdk", toolName: "loginom_dock_node_apply", input: JSON.stringify(request) })
+          c.enqueue({ type: "finish", finishReason: { unified: "tool-calls", raw: "tool-calls" }, usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } } })
+          c.close()
+        } }), warnings: [],
+      }) }), prompt: "offline Row Filter transport control", tools })
+      yield* Effect.promise(async () => { for await (const chunk of output.fullStream) if (chunk.type === "error") throw chunk.error })
+      expect(requests).toEqual([{ name: "dock_node_apply", arguments: request }])
+      expect(journal.size).toBe(0)
+      for (const reason of [undefined, 0, false, null, "", new Error("abort", { cause: false })]) {
+        const controller = new AbortController(); controller.abort(reason)
+        const result = yield* Effect.promise(() => loginom!.call("dock_node_apply", request, userID, controller.signal)
+          .then(() => ({ ok: true }), (error) => ({ ok: false, error })))
+        expect(result).toEqual({ ok: false, error: controller.signal.reason })
+      }
+      expect(requests).toHaveLength(1)
+    } finally {
+      yield* Effect.promise(() => loginom!.release())
+      LoginomHost.disconnect()
+      yield* Effect.promise(() => server.close())
+      pair.port1.close(); pair.port2.close()
+    }
+    expect(released).toBe(1)
+  }),
+)
+
 it.effect("preserves running tool start time across metadata updates", () =>
   Effect.gen(function* () {
     const state: SessionV1.ToolPart = {
