@@ -1042,6 +1042,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
        ||source.phase!=='verified'||source.tab!==bound.tab||source.packageNode!==bound.packageNode
        ||source.request!==bound.sourceRequest||source.workflowId!==bound.workflowId||JSON.stringify(source.crumbs)!==bound.crumbs
        ||source.tab.getAttribute('data-tid')!==o.previous.tab_tid)throw Error('Original Save As binding changed');
+      if(globalThis.bg!==bound.bg||app!==bound.app||app.Application!==bound.application
+       ||app.Application.FInstance!==bound.instance||app.Application.FInstance.FMainForm!==bound.main
+       ||bound.main.FMapTree!==bound.map||bound.map.FServerConnection!==bound.connection
+       ||bound.connection.Session!==bound.session||!bound.session||bound.connection.Connected!==true
+       ||bound.connection.UserName!==bound.account)throw Error('Original Save As owner chain changed');
       const request=JSON.parse(source.request);
       if(source.tab.isConnected||!source.workflowId||!request.session)throw Error('Original saved preparation changed');
       const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
@@ -1090,7 +1095,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if(!source.tab.isConnected||!source.tab.classList.contains('x-tab-active'))throw Error('Original Save As tab changed');
       prep.saveBindings??=new Map();if(prep.saveBindings.has(o.operation))throw Error('Save As binding consumed');
       prep.saveBindings.set(o.operation,{prep,receipts:prep.receipts,sourceOperation,source,tab:source.tab,packageNode:source.packageNode,
-       sourceRequest:source.request,workflowId:source.workflowId,crumbs:JSON.stringify(source.crumbs),consumed:false});
+       sourceRequest:source.request,workflowId:source.workflowId,crumbs:JSON.stringify(source.crumbs),consumed:false,
+       bg:globalThis.bg,app:globalThis.bg?.app,application:globalThis.bg?.app?.Application,
+       instance:globalThis.bg?.app?.Application?.FInstance,main:globalThis.bg?.app?.Application?.FInstance?.FMainForm,
+       map:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree,
+       connection:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection,
+       session:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.Session,
+       account:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName});
     },{previous:before.workflow_ref,operation:task.operation_id});
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
