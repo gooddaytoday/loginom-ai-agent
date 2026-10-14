@@ -2270,3 +2270,43 @@ probe explicitLogoutfalse не повышается доtrue.
 readyfalse artifacts сохранены; новое правило не применяется к старым попыткам.
 На момент seal live acceptance model slots ещё0; итоговая приёмка31 и manual
 reviews остаются открытыми. Первый planned ABC проверит actual auto-next lifecycle.
+
+
+Checkpoint 2026-10-14 08:24 UTC — первая planned model попытка закрыта отказом.
+Effective31 protocol SHA `07703626…` закреплён до first dispatch; ABC/1
+`ses_ec697939effeRuzLucKmyqYLaK` исполнялся07:55:03.983→08:02:41.533UTC.
+Модель/variant — frozen `openai/gpt-6-sol-fast`/medium. Five standard native
+operations SUCCEEDED. Первый Join request.validate отказал из-за отсутствия
+case_sensitive; corrected Join SUCCEEDED. Следующий Calculator abc-class-01
+(node87755053…) вернул AMBIGUOUS/open/WIZARD_OPEN_NOT_CONFIRMED до execution.
+CLI1/wrapper3, normal cleanupfalse; Save/package/CSV/oracle/audit/closure отсутствуют.
+JS apply calls0, saved JS nodes неизвестны; policyincomplete, не PASS. Вызовы
+inspect/resume/recover/cancel не подтвердили завершение исходной операции.
+Runner автоматически halt, не допустил второго слота и не заменил failed attempt.
+Planned31=6+25, started1 technicalfailure1, fullcalc successes0, notstarted30.
+Immutable `series-stop.json` SHA
+`e4876b16a02cd65f80af91321534290907b8ede3c0691f93739bb92fd30b5dc4`.
+
+Own recovery завершён отдельно от model outcome. Пять точных native GUID в
+server app.log связали user:172/latestInit07:55:19.648; fresh dispatcher row и
+exact confirmation закрыли только её (server08:15:58.735). Два refresh подтвердили
+absence, соседняя user:171 осталась. Own admin:173 logout08:18:20.440 подтверждён
+server log и видимой login form; Playwright MCP page закрыта. CLI1293811 и
+Host1294389 отсутствуют. Только собственный .writer с nonce586f6bb7… и исходными
+inode7629293/7643038 архивирован в `.writer-recovered-node-selection-20261014T064745Z-367f4b-user172`.
+История/evidence/pins/payload сохранены; discarded only own unsaved failed draft,
+normal cleanupfalse исходного attempt не повышен доtrue. Recovery `final.json`
+SHA `7919a2bc178521873b872cebea5309d69f1bf4d8a07f561d535bd99288f59c0f`;
+post-recovery CLI status/check0, Helpready/Browserverified/.writerabsent, modelCalls0.
+
+Независимый closed readback SHA `7ce3f6f2…`; forensic diagnosis SHA
+`d2970bd91e5602e51f2a00e979cafafa83ac1e6f30b153070823ec13b2c61488`.
+Доказан один адресованный begin_wizard click и native waits; catch workspace-ui
+4162–4167 заменяет отказавший frame новым readUi. Поздний frame уже соответствует
+own wizard, masks/dialogs0, поэтому конкретный false conjunct/foreign mask/задержка
+не доказаны; stable/flaky неизвестно. Full/focused PASS и short Export/JS gates
+не отменяются и без нового изменения не повторяются. Сопоставимого baseline
+для новой серии0; сравнительный вывод ещё невозможен. Ожидаемая экономия85мин
+относится к плановым12процессам, не включает непредвиденную диагностику/отказы.
+Если подтверждённая правка меняет final runtime, нужна новая prospectively frozen
+matched пара и31fresh slots; этот started failure остаётся историческим.
