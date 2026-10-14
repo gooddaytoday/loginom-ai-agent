@@ -241,6 +241,9 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       journals.push({ source, path: path.relative(attempt.directory, destination), sha256: await hashFile(destination) })
     }
     await Bun.write(path.join(attempt.directory, "runtime-journals.json"), JSON.stringify(journals, null, 2) + "\n")
+    // A terminal CLI permits copying its own complete local tool history even
+    // when cleanup failed. This does not admit a Host or touch server artifacts.
+    const completeParts = await copySelectionToolOutputs(snapshot.parts, plan.pins.profile, attempt.directory)
     // A terminated CLI permits read-only diagnostics even if host cleanup remains unconfirmed.
     // Block before moving a model slot or accessing Loginom artifacts.
     if (!result.cleanupConfirmed) throw Error("SELECTION_CLEANUP_UNCONFIRMED")
@@ -251,7 +254,6 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
       throw Error("SELECTION_AUTH_REFRESH_FAILED")
     }
     if (result.modelStarted === null) throw Error("SELECTION_DISPATCH_UNCONFIRMED")
-    const completeParts = await fullToolOutputs(snapshot.parts, plan.pins.profile, attempt.directory)
     const receipts = readSelectionAttemptReceipts(completeParts)
     if (receipts.failures.length) result.collectionFailures.push(...receipts.failures)
     const saves = receipts.calls.filter((call) => call.tool === "loginom_dock_action_run" && successful(call) &&
@@ -390,7 +392,7 @@ async function command(argv: string[]) {
   return output
 }
 
-async function fullToolOutputs(parts: Record<string, unknown>[], profile: string, directory: string) {
+export async function copySelectionToolOutputs(parts: Record<string, unknown>[], profile: string, directory: string) {
   const outputs: { partID: string; source: string; path: string; sha256: string }[] = []
   const complete = await Promise.all(parts.map(async (part) => {
     if (part.type !== "tool" || typeof part.tool !== "string" || !part.tool.startsWith("loginom_") ||
@@ -402,7 +404,8 @@ async function fullToolOutputs(parts: Record<string, unknown>[], profile: string
     await mkdir(path.dirname(local), { recursive: true, mode: 0o700 })
     await cp(source, local)
     outputs.push({ partID: String(part.id), source, path: path.relative(directory, local), sha256: await hashFile(local) })
-    return { ...part, state: { ...part.state, output: await Bun.file(local).text() } }
+    return { ...part, state: { ...part.state, [part.state.status === "error" ? "error" : "output"]: await Bun.file(local).text(),
+      metadata: { ...part.state.metadata, truncated: false } } }
   }))
   await Bun.write(path.join(directory, "tool-outputs.json"), JSON.stringify(outputs, null, 2) + "\n")
   return complete

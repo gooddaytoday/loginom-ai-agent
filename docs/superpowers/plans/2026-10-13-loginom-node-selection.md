@@ -3199,8 +3199,11 @@ Clientgenerate без publicProtocol/HttpApi изменения.
   проверить назначение shared изменений и зафиксировать ограничения.
 - [ ] Независимо проверить итоговый scope diff и необходимые changed-code/JS
   проверки; rollback сохранить обычным описательным commit.
-- [ ] По TDD добавить отдельный technical continuation/recovery/history path
-  в eval, без ослабления success path и без изменения failed outcomes.
+- [x] По TDD добавить отдельный technical continuation/recovery/history path
+  в eval, без ослабления success path и без изменения failed outcomes. Проверено:
+  44PASS/144assertions, typecheck0 и независимый source review revision2;
+  оба реальных cleanup receipts строго связаны с filename/policy/own Save.
+  Live-подтверждение нового протокола остаётся частью новой серии.
 - [ ] Собрать новую matched пару; до firstmodel freeze31/rules/source/ownership
   pins и независимый readback. Старые results не переносятся.
 - [ ] Выполнить все31исходных слотов последовательно; success auto-next,

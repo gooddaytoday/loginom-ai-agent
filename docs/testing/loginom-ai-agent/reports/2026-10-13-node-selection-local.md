@@ -2372,3 +2372,15 @@ Core/Host отменён: сохранены JS source/context, reply budgets, n
 и необходимая eval-инфраструктура. Прямые standard handlers продолжают rollback
 к38ee. Финальный scope review и проверки обновлённого source ещё не завершены.
 Новых live/model запусков после уточнения нет; прежние31locks/results не меняются.
+
+Checkpoint 2026-10-14 — техническое продолжение реализовано по TDD.
+Три изменённых eval suite:44PASS/144assertions, typecheck0. Revision2 source
+review проверил все6source hashes и saved logs; поддерживаются ровно один
+package-cleanup.json безpolicy или saved-package-cleanup.json с
+last_confirmed_own_save. Actual source/copy/Save/session/document/account/path/
+operation/time/Host/resource/terminal и свежий PID/profile release обязательны.
+JS-policy violation останавливает; technicalfailure остаётся failed. Старые
+locks/outcomes не изменены. Новый31-slot lock требует technicalContinuationVersion1;
+первая9 исполняется и освобождается передbaseline6, functionalPASS не обязателен.
+Live нового протокола пока не запускался. Verificationrevision2SHA
+`d38ec9ae49a6a78ce265881a0b4b340e9defdf6142b5270c7e4660ccfa1875ea`.

@@ -130,7 +130,7 @@ test("a real single-runner preflight failure is dispatched once, preserved and n
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("copyout binds the actual prepare, Save, ended runtime and phase pins before sealing closure", async () => {
+test.each(["package-cleanup.json", "saved-package-cleanup.json"])("copyout binds the actual %s receipt to prepare, Save, runtime and phase pins", async (cleanupFile) => {
   const root = await mkdtemp(path.join(tmpdir(), "selection-close-"))
   try {
     const plan = selectionAttempt({ runID: "test-1", phase: "candidate", resultsRoot: path.join(root, "results"),
@@ -166,7 +166,8 @@ test("copyout binds the actual prepare, Save, ended runtime and phase pins befor
     const host = Bun.spawn([process.execPath, "-e", ""], { stdout: "ignore", stderr: "ignore" })
     await host.exited
     await Bun.write(path.join(plan.directory, "cli.pid"), String(cli.pid) + "\n")
-    await write(path.join(path.dirname(source), "saved-package-cleanup.json"), { ...value.packageCleanup, package_path: plan.packagePath })
+    await write(path.join(path.dirname(source), cleanupFile), { ...value.packageCleanup, package_path: plan.packagePath,
+      policy: cleanupFile === "saved-package-cleanup.json" ? "last_confirmed_own_save" : undefined })
     for (const [name, rows] of [["resource-close.jsonl", value.resourceClose], ["terminal-close.jsonl", value.terminalClose]] as const)
       await Bun.write(path.join(path.dirname(source), name), rows.map((row) => JSON.stringify(row)).join("\n") + "\n")
     await write(path.join(plan.pins.profile, `loginom/runtime/runtime-close-${host.pid}-aaaa.json`), { ...value.hostClose[0], pid: host.pid })
@@ -202,15 +203,19 @@ test("the frozen 9 → 6 → 16 schedule preserves all slots and rejects duplica
     candidateFirst9: [...tasks, "explicit-js", "tags", "recovery"].map((task) => ({ phase: "candidate", task, attempt: 1 })),
     baseline6: tasks.map((task) => ({ phase: "baseline", task, attempt: 1 })),
     candidateRemaining16: [2, 3].flatMap((attempt) => [...tasks, "explicit-js", "tags"].map((task) => ({ phase: "candidate", task, attempt }))),
-    cleanFirst9RequiredBeforeBaseline: true, noStartedAttemptReplacement: true,
+    completedFirst9RequiredBeforeBaseline: true, technicalFailuresRemainFailed: true,
+    strictReleaseBeforeNext: true, trustedHistoryBeforeContinuation: true, noStartedAttemptReplacement: true,
     comparativePassRequiresBothPhasesComplete: true, policyViolationStopsDigestImmediately: true,
   }
-  const lock = { plannedModelSlots: 31, plannedBaselineSlots: 6, plannedCandidateSlots: 25, executionSchedule: schedule }
+  const lock = { technicalContinuationVersion: 1, plannedModelSlots: 31, plannedBaselineSlots: 6, plannedCandidateSlots: 25, executionSchedule: schedule }
   const slots = selectionSeriesSlots(lock)
   expect(slots).toHaveLength(31)
   expect(slots[8]).toEqual({ phase: "candidate", task: "recovery", attempt: 1 })
   expect(slots[9]?.phase).toBe("baseline")
   expect(slots[15]?.phase).toBe("candidate")
+  expect(() => selectionSeriesSlots({ ...lock, technicalContinuationVersion: undefined })).toThrow("SERIES_SCHEDULE_INVALID")
+  expect(() => selectionSeriesSlots({ ...lock, executionSchedule: { ...schedule, completedFirst9RequiredBeforeBaseline: false } }))
+    .toThrow("SERIES_SCHEDULE_INVALID")
   expect(() => selectionSeriesSlots({ ...lock, executionSchedule: { ...schedule,
     candidateRemaining16: [schedule.candidateFirst9[0], ...schedule.candidateRemaining16.slice(1)] } })).toThrow("SERIES_SLOT_INVALID")
 })

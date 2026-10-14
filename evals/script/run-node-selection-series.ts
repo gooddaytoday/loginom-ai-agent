@@ -6,6 +6,7 @@ import { inspectSelection, inspectSelectionReview, readSelectionReceipt } from "
 import type { SelectionMode } from "../src/node-selection"
 import { readSelectionSnapshot, runSelectionAttempt, selectionAttempt } from "./run-node-selection-attempt"
 import { buildAgentPrompt, loadTasks } from "../src/task"
+import { assessTechnicalContinuation, selectionPackageCleanup } from "../src/node-selection-continuation"
 
 export async function verifySeriesInputs(inputs: ReadonlyMap<string, string>) {
   for (const [file, expected] of inputs) if (await hash(file) !== expected) throw Error("SERIES_INPUT_CHANGED")
@@ -59,7 +60,9 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
     const count = Object.values(pinned.tasks).reduce((sum, task) => sum + task.attempts.length, 0)
     if (count !== (phase === "baseline" ? 6 : 25)) throw Error("SERIES_PINNED_SLOTS_MISMATCH")
   }
-  for (const required of ["evals/script/run-node-selection-series.ts", "evals/test/node-selection-series.test.ts"])
+  for (const required of ["evals/script/run-node-selection-series.ts", "evals/script/run-node-selection-attempt.ts",
+    "evals/src/node-selection-continuation.ts", "evals/src/node-selection.ts", "evals/test/node-selection-series.test.ts",
+    "evals/test/node-selection-continuation.test.ts"])
     if (!digest(lock.files[required])) throw Error("SERIES_SOURCE_NOT_SEALED")
   // Recheck this small evaluator closure before every slot: the auditor is a
   // fresh subprocess. The thousands of immutable payload files are not rehashed.
@@ -79,7 +82,7 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
       const existing = await exists(path.join(directory, `${item.plan.pins.phase}-${item.plan.taskID}-${item.plan.number}`, "dispatch.json"))
       if (!existing && dispatched >= limit) return { status: "paused-limit", next: slots[index], dispatched }
       if (!existing) dispatched++
-      const result = await runSeriesSlot(item.file, item.plan.taskID, item.plan.number, lock.auditVersion, item.revision)
+      const result = await runSeriesSlot(item.file, item.plan.taskID, item.plan.number, lock.auditVersion, item.revision, true)
       const auditFile = path.join(item.plan.directory, "selection-audit.json")
       await appendFile(path.join(directory, "ledger.jsonl"), JSON.stringify({ recordedAt: new Date().toISOString(), lockSha256: expectedHash,
         slot: slots[index], rechecked: existing, ...result, auditSha256: await exists(auditFile) ? await hash(auditFile) : null }) + "\n", { mode: 0o600 })
@@ -91,10 +94,11 @@ export async function runSelectionSeries(lockFile: string, expectedHash: string,
 }
 
 export function selectionSeriesSlots(lock: unknown): { phase: string; task: string; attempt: number }[] {
-  if (!record(lock) || !record(lock.executionSchedule) || lock.plannedModelSlots !== 31
+  if (!record(lock) || lock.technicalContinuationVersion !== 1 || !record(lock.executionSchedule) || lock.plannedModelSlots !== 31
     || lock.plannedBaselineSlots !== 6 || lock.plannedCandidateSlots !== 25) throw Error("SERIES_SCHEDULE_INVALID")
   const schedule = lock.executionSchedule
-  if (!["cleanFirst9RequiredBeforeBaseline", "noStartedAttemptReplacement", "comparativePassRequiresBothPhasesComplete", "policyViolationStopsDigestImmediately"]
+  if (!["completedFirst9RequiredBeforeBaseline", "technicalFailuresRemainFailed", "strictReleaseBeforeNext", "trustedHistoryBeforeContinuation",
+    "noStartedAttemptReplacement", "comparativePassRequiresBothPhasesComplete", "policyViolationStopsDigestImmediately"]
     .every((key) => schedule[key] === true)) throw Error("SERIES_SCHEDULE_INVALID")
   const slots = [["candidateFirst9", 9, "candidate"], ["baseline6", 6, "baseline"], ["candidateRemaining16", 16, "candidate"]]
     .flatMap(([key, count, phase]) => {
@@ -111,11 +115,13 @@ export function selectionSeriesSlots(lock: unknown): { phase: string; task: stri
   return slots
 }
 
-export async function runSeriesSlot(pinsFile: string, taskID: string, number: number, auditVersion: string, runtimeRevision?: string) {
+export async function runSeriesSlot(pinsFile: string, taskID: string, number: number, auditVersion: string, runtimeRevision?: string, technicalContinuation = false) {
   const plan = selectionAttempt(await Bun.file(pinsFile).json() as unknown, taskID, number)
   const directory = path.join(plan.pins.resultsRoot, "series", `${plan.pins.phase}-${taskID}-${number}`)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   if (await exists(path.join(directory, "dispatch.json"))) {
+    if (technicalContinuation && await exists(path.join(directory, "technical-continuation.json")))
+      return assessTechnicalContinuation(plan, directory, pinsFile, auditVersion, runtimeRevision)
     if (!await exists(path.join(directory, "closure.json"))) return { decision: "halt", reason: "SLOT_ALREADY_DISPATCHED" }
     return assessCollected(plan, directory, auditVersion, runtimeRevision)
   }
@@ -217,7 +223,8 @@ export async function collectSeriesSlot(plan: ReturnType<typeof selectionAttempt
   if (!saves.length) throw Error("CLOSE_SAVE_UNBOUND")
   const save = saves.at(-1)!
   const copied: Record<string, string> = {}
-  for (const name of ["saved-package-cleanup.json", "resource-close.jsonl", "terminal-close.jsonl"]) {
+  const cleanup = await selectionPackageCleanup(path.dirname(source))
+  for (const name of [cleanup.name, "resource-close.jsonl", "terminal-close.jsonl"]) {
     const from = await ownFile(path.dirname(source), name)
     const target = path.join(directory, name)
     await writeFile(target, await Bun.file(from).bytes(), { mode: 0o600, flag: "wx" })
@@ -279,10 +286,12 @@ async function assessCollected(plan: ReturnType<typeof selectionAttempt>, direct
   for (const pid of [closure.cliPid, record(host) ? host.pid : undefined]) {
     if (typeof pid === "number" && Number.isSafeInteger(pid) && pid > 0 && !await exists(`/proc/${pid}`)) deadPids.push(pid)
   }
+  const cleanup = await selectionPackageCleanup(directory)
+  if (!digest(closure.copied[cleanup.name])) return { decision: "halt", reason: "CLOSE_COPY_CHANGED" }
   return inspectSeriesTransition({ ...closure,
     attempt: await Bun.file(path.join(plan.directory, "attempt.json")).json(),
     audit,
-    packageCleanup: await Bun.file(path.join(directory, "saved-package-cleanup.json")).json(),
+    packageCleanup: cleanup.cleanup,
     resourceClose: await jsonLines(path.join(directory, "resource-close.jsonl")), terminalClose: await jsonLines(path.join(directory, "terminal-close.jsonl")),
     hostClose: [host], deadPids, writerAbsent: !await exists(path.join(plan.pins.profile, ".writer")),
   })
@@ -367,7 +376,7 @@ export function inspectSeriesTransition(input: unknown): { decision: "advance" |
   if (!record(cleanup) || cleanup.version !== 1 || cleanup.status !== "SUCCEEDED" || cleanup.reason !== null
     || cleanup.session_id !== input.resourceSessionID || cleanup.document_id !== input.documentID || cleanup.account !== input.account
     || cleanup.package_path !== input.packagePath || cleanup.save_operation_id !== input.saveOperationID
-    || cleanup.policy !== "last_confirmed_own_save" || cleanup.package_closed !== true || cleanup.logged_out !== true
+    || cleanup.policy !== undefined && cleanup.policy !== "last_confirmed_own_save" || cleanup.package_closed !== true || cleanup.logged_out !== true
     || cleanup.unsaved_changes_discarded !== false || cleanup.packages_before !== 1 || cleanup.packages_after !== 0
     || !orderedTimes(attempt.cliStartedAt, cleanup.started_at, cleanup.completed_at, attempt.cliFinishedAt)) return stop("PACKAGE_CLOSE_UNCONFIRMED")
   const resource = input.resourceClose

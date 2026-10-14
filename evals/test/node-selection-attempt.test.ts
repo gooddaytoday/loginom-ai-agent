@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { readSelectionAttemptReceipts, readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
+import { copySelectionToolOutputs, readSelectionAttemptReceipts, readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -42,6 +42,24 @@ test("a confirmed cancellation preserves exit 130 when evidence is incomplete", 
 test("unconfirmed cleanup remains a series blocker after secondary collection failure or cancellation", () => {
   expect(selectionExitCode({ exitCode: 2, cliExitCode: 1, timedOut: false, cleanupConfirmed: false })).toBe(3)
   expect(selectionExitCode({ exitCode: 2, cliExitCode: 130, timedOut: false, cleanupConfirmed: false })).toBe(3)
+})
+
+test("terminal collection preserves the full failed tool field before any cleanup admission", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-terminal-output-"))
+  try {
+    const profile = path.join(root, "profile"), directory = path.join(root, "attempt")
+    const source = path.join(profile, "tool-output/own.txt")
+    await Bun.write(source, "NODE_APPLY_STOPPED: own complete failure")
+    const original = { id: "own-part", type: "tool", tool: "loginom_dock_node_apply", state: { status: "error",
+      input: { target: { type: "transform.calculator" } }, error: "truncated",
+      metadata: { truncated: true, outputPath: source } } }
+    const parts = await copySelectionToolOutputs([original], profile, directory)
+    expect(parts[0]).toMatchObject({ state: { error: "NODE_APPLY_STOPPED: own complete failure", metadata: { truncated: false } } })
+    expect(original.state.error).toBe("truncated")
+    const manifest = await Bun.file(path.join(directory, "tool-outputs.json")).json()
+    expect(manifest).toHaveLength(1)
+    expect(await Bun.file(path.join(directory, manifest[0].path)).text()).toBe("NODE_APPLY_STOPPED: own complete failure")
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test("reserving an existing slot refuses a rerun and preserves its evidence", async () => {
