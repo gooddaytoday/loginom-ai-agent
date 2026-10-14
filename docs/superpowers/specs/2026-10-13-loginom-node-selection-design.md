@@ -1,12 +1,13 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint 2026-10-14: по последним разрешениям владельца восстановлены
-ранее выполненные исправления Import, Join, Export, Calculator, Group и Sort,
-а также javascript-output-preview и его hook. Commitd3cd4e46f9;15paths exact15e,
-targeted713PASS/0FAIL/0SKIP и независимый scope reviewPASS. Общая JS инфраструктура
-сохранена. Пара105540 историческая доmodels0: её shortExportfailure и verified
-ownrelease сохранены. Следующий этап — новая matched пара, prospective31lock
-и локальная live-серия; полная приёмка пока не завершена.
+Текущий checkpoint 2026-10-14 11:42 UTC: разрешённые исправления восстановлены
+(d3cd4e46f9,713targetedPASS). Итоговая matched пара112452 собрана изfdc4ac455e,
+независимо проверена, runtime659588… одинаковый. Fresh ordinary clipped
+Import→Sort→Export прошёл: точныйCSV27B, сохранённыйLGP3nodes/2links/noJS,
+logout/HostACKexit0/PIDgone/.writerabsent. Effective31lock0400 закреплён
+до моделей0,76sourcefiles и4independent admission proofs. Следующий шаг —
+ABC/1 новой candidate9→reviewreleased→baseline6→candidate16 серии.
+Полная приёмка ещё открыта; старые outcomes исторические, не перенесены.
 
 
 Историческое состояние на 2026-10-14 11:05 UTC: обработчики стандартных узлов возвращены
@@ -2464,8 +2465,10 @@ Clientgenerate без publicProtocol/HttpApi изменения.
   44PASS/144assertions, typecheck0 и независимый source review revision2;
   оба реальных cleanup receipts строго связаны с filename/policy/own Save.
   Live-подтверждение нового протокола остаётся частью новой серии.
-- [ ] Собрать новую matched пару; до firstmodel freeze31/rules/source/ownership
-  pins и независимый readback. Старые results не переносятся.
+- [x] Собрать новую matched пару112452 изfdc4ac455e; до firstmodel закреплены
+  immutable31/rules/76source/ownership pins и независимые pair/protocol/native
+  readbacks. Runtime659588… общий; clippedExportCSV/LGP/strictownclose прошли
+  свежий live без модели. Старые results не перенесены; models0 при freeze.
 - [ ] Выполнить все31исходных слотов последовательно; success auto-next,
   technical после verified release продолжает; policy violation останавливает.
 - [ ] При blockedcoverage заранее закрепить обоснованную alternative с oracle,

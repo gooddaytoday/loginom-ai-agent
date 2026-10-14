@@ -1598,3 +1598,17 @@ difference,59JSmodules/21CoreHostRuntimeAgent exact15e;581protected/32raw/
 usercorrections unchanged. Targeted713PASS. Эти условия заменяют прежнее
 требование127standardfiles exactbase; новый scope — явный whitelist владельца.
 Новая matched сборка и31freshmodel slots открыты, старые failures не переносятся.
+
+Checkpoint 2026-10-14 — окончательная новая серия112452 допущена до моделей0.
+Обаbuild/verify0 изsourcefdc4ac455e; physicalpair55b08f…+protocol389662…
++nativeadmission4b5ced…+closednative938407… independentlyPASS. Runtime288/
+659588afcc23fded2a44915d062afaf58646239d0a8c01b3222fa272bbb717dc одинаковый.
+Fresh ordinary inputclipping804>800,scroll0→82/oneownlabelclick/nativeinputmapping,
+CSV27B exactoracle,LGP3native/2linked/noJS,Save/logoutexplicit/noDiscard,
+Host1734174ACKexit0/noSignal/noError/PIDgone/.writerabsent. ResultSHA
+57ae1f3efa2e5b4a4dd2345dfcd4b2d2c30d50172c1ee0ecfe078f44e47eadf4.
+Effective31lock0400 +rootreadback закреплены доfirstdispatch,76current evaluator/task
+source hashes; старыеfailed/native/modeloutcomes не перенесены. Main31:
+18standard/3explicit/3tags/1recovery candidate +baseline6singlepercase,
+firstABC/firstlast; technicalfailure remainsfailed +strictrelease permitsnext,
+confirmedcandidateJSviolation stops. Fullacceptancependingactual31outputs.
