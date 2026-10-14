@@ -598,3 +598,38 @@ Describe/Calculator formulas/source refs и произвольные aliases н�
 Новый helper/source не создавался; общий build/skill/pins unchanged.
 После cleanfirst3 нужен адресный archive9ихcopiedfiles передследующимchunk3.
 Полная приёмка ещё не завершена.
+
+
+На 2026-10-14 03:09 UTC candidate завершил 2/25 слотов (первая волна 2/9).
+`sales-by-category/1` остаётся полным PASS. `abc-pareto-groups/1`, Session
+`ses_ec7b3d89fffeuHWc7SGKou3bao`, завершён CLI 1 / wrapper 3 / cleanup false /
+incomplete; oracle отсутствует, полного расчёта нет. Исходный SHA attempt
+`2f048e06af106c17263fcff9ce2b97b2d8ead4d0c311444e39250c9bc6d07fb2` сохранён.
+JS-попыток не наблюдалось, но без сохранённого графа это не policy PASS.
+Root 56096 остановился exit 1; месячный спрос в этой очереди не запускался.
+
+Отказ `calc-share-1`: `NODE_APPLY_STOPPED` с причиной
+`WIZARD_OPEN_NOT_CONFIRMED`. Последующий снимок показывает нужный Calculator
+`98530181-7349-4b26-a343-e7ac5ad82974` и правильный breadcrumb, но получен новым
+`readUi()` после ошибки; точное состояние провалившегося предиката отсутствует.
+Конфигурация формулы ещё не начиналась. Протокол не умеет продолжить unresolved
+фазу open; inspect/resume/recover/cancel не восстановили её. Причину нельзя
+приписать параметрам модели или объявить доказанным общим runtime-дефектом.
+
+Адресное recovery выполнено отдельно от failed outcome. Strict binding
+`e794705a…` подтвердил собственный `user:146`, init 02:44:52.092Z и четыре native
+GUID. Root через Playwright MCP закрыл только эту сессию, вышел из admin:147 и
+завершил bridge 11663 exit 0. Независимый postclosure review `3800ac5c…` подтвердил
+server close 03:05:10.044Z, logout 03:05:24.132Z, завершение своих процессов и
+неизменность raw 16, source 74, pins 10 и обоих payload runtime 288.
+Guard с nonce `0fdc8b00-5d1e-448f-9b8a-8278dc2fdc5f` перенесён целиком в
+`.writer-recovered-node-selection-20261013T233119Z-4699a5-user146` после сверки
+inode и bytes; receipt `4cc274c5…`. Финальный независимый postarchive review ожидается.
+
+Решение владельца выполнения: после этого review закончить оставшиеся первые
+слоты только для диагностики, в frozen порядке monthly → claims → ROI →
+first-last → explicit-js → tags → recovery. Первая волна уже нечистая: повторы
+2/3 закрыты, ABC/1 не заменяется, полная приёмка не достигнута. При доказанном
+нарушении policy дальнейшие слоты этого digest останавливаются. Параллельно
+готовится отдельный deterministic native diagnostic без LLM для exact open
+predicate; до воспроизведения product/runtime/skill/pins не меняются.
