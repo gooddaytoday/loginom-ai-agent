@@ -754,3 +754,27 @@ candidate slots (sales/monthly/claims, девять файлов), с прежн
 pre/postconditions и обратной картой; во время active CLI файлы не переносятся.
 Candidate completed 3/25, firstwave 3/9 нечистая, повторы закрыты;
 полная приёмка не завершена.
+
+
+На 2026-10-14 04:05 UTC `risky-approved-claims/1` завершён полным PASS:
+Session `ses_ec770db5bffeqJU4QzDZwcPh7p`, CLI/wrapper 0, cleanup true,
+oracle/policy/calculation PASS, JS nodes/calls 0. SHA attempt
+`cd7cc72d40f5a703ab7f382ab90f501d3e477a9a0a3e01ddea6891f7f0d57f14`,
+audit `27b07d0a59a02d6703e3237e0c043045734410c7464d5d222aeb4d528759a58f`.
+Машинный audit подтвердил полную историю, runtime settlement, export identity
+и связность графа. Root 78243 завершён exit 0; CLI около 381 секунды.
+
+В observed history `filter-approved-high-1` отклонён до эффекта:
+REQUEST_REJECTED / Unsupported node label (подпись содержит >), cleanup true.
+Модель исправила подпись и с NEW operation ID `filter-approved-high-2`
+успешно применила тот же стандартный Filter. JS fallback не использован;
+это естественная ошибка настройки, отдельно от явного recovery fixture.
+
+Candidate completed 4/25 (firstwave 4/9): три полных PASS и ABC/1 incomplete.
+Baseline остаётся 18/18, 17 oracle/расчёт PASS, 11 policy PASS. Общие build,
+skill и pins unchanged; повторы 2/3 закрыты, полная приёмка не достигнута.
+Перед frozen next ROI/1 Root ждёт exact own archive девяти copied файлов
+sales/monthly/claims с independent review; активных Root CLI/native/admin нет.
+Read-only preparation6 `d8feff37…` сохранена (prior archive108/protected254);
+отдельный final9plan готовится после claims terminal. Active/failed/unowned
+файлы не переносятся, полная inverse map обязательна.
