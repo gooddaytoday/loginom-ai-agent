@@ -152,7 +152,7 @@ export async function runClosedNativeWorker(ctx:RouteContext) {
     f.Items.edtUsername.setValue(account);f.Items.edtPassword.setValue(password);return {status:'OWN_LOGIN_FIELDS_SET'}},${JSON.stringify(admin)})`)
   await call(`async page=>{await page.evaluate(()=>{const a=window.bg?.app?.Application?.FInstance,f=a?.FLogin?.FLogin;
     if(!f||!f.Items.btnLogin.isVisible()||f.Items.btnLogin.isDisabled())throw Error('OWN_LOGIN_GESTURE_UNCONFIRMED');f.btnLoginHandler();});
-    await page.waitForFunction(()=>window.bg?.app?.Application?.FInstance?.FServerConnection?.Connected===true,{timeout:120000});return {status:'OWN_LOGIN_OBSERVED'}}`)
+    await page.waitForFunction(()=>window.bg?.app?.Application?.FInstance?.FServerConnection?.Connected===true,undefined,{timeout:60000});return {status:'OWN_LOGIN_OBSERVED'}}`)
   const inventory=await observeDispatcher(async request=>{await gate();return mcp.callTool(request)})
   const observer=inventory.sessions.find(s=>s.key===inventory.observer)!
   if(observer.name.split(":")[0]!==admin.account||observer.packages.length)throw Error("OWN_DIAGNOSTIC_BINDING_UNCONFIRMED")
