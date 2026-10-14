@@ -13,7 +13,7 @@ type OwnedRejection = {primary?:{value:unknown};secondary?:{value:unknown};reque
 export function transport(port:Port){const client=requests(port);return{request:client.request,close:client.close}}
 // No owner authority is created here. The genuine factory caller retains it.
 export function privateNodeHostTransport(port:Port){
- const client=requests(port);return{request:client.request,close:client.close,requestOwnedAcquire:client.ownedAcquire}
+ const client=requests(port);return{request:client.request,close:client.close,requestOwnedAcquire:client.ownedAcquire,requestOwnedCall:client.ownedCall}
 }
 function encode(value:unknown):unknown{
  if(value instanceof Error)return{kind:'Error',name:value.name,message:value.message,...('cause'in value?{cause:encode(value.cause)}:{})}
@@ -90,5 +90,5 @@ function requests(port:Port){
   })
  }
  return{request:(method:string,input:unknown,timeout=180_000)=>send(method,input,timeout),
-  ownedAcquire:(input:{run:string;session?:string;receiverPurpose:'union-acquired-service-v1';receiverPhase?:'current'},owned:OwnedRejection,control?:Control)=>send('acquire',input,180_000,control,undefined,undefined,true,owned),close}
+  ownedAcquire:(input:{run:string;session?:string;receiverPurpose:'union-acquired-service-v1';receiverPhase?:'current'},owned:OwnedRejection,control?:Control)=>send('acquire',input,180_000,control,undefined,undefined,true,owned),ownedCall:(input:unknown,owned:OwnedRejection,control:Control)=>send('call',input,180_000,control,undefined,undefined,true,owned),close}
 }

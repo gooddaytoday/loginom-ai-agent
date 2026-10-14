@@ -1,4 +1,4 @@
-import { receivePrivateAdmission } from "./private-admission.mjs"
+import { receivePrivateAdmission, adoptCurrentAdmission } from "./private-admission.mjs"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Product, productChannel } from "@loginom-ai-agent/product"
@@ -17,11 +17,18 @@ const capabilities = () =>
     typeof LOGINOM_AI_AGENT_LIBC === "string" ? LOGINOM_AI_AGENT_LIBC : undefined,
   )
 
-export async function standalone(
+export function standalone(
   args: string[],
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
 ) {
+  const command = args.filter((value) => !["--headless", "--no-headless"].includes(value))[0]
+  if (command === "run") return withStandaloneCancellation(() => executeStandalone(args, execute))
+  return executeStandalone(args, execute)
+}
+
+async function executeStandalone(args: string[], execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>) {
   await receivePrivateAdmission()
+  adoptCurrentAdmission()
   const options = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
   if (args.length === 1 && args[0] === "--capabilities") {
     process.stdout.write(JSON.stringify({ capabilities: capabilities() }) + "\n")
@@ -43,7 +50,7 @@ export async function standalone(
     return
   }
   if (
-    ["run", "providers", "auth", "models"].includes(
+    ["providers", "auth", "models"].includes(
       options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
     )
   )

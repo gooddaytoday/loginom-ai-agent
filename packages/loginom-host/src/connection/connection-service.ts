@@ -25,6 +25,7 @@ export async function connectionService(
     pending?: ActiveConnection
     phase: Loginom.View["state"]
     applying?: Promise<void>
+    checking?: Promise<void>
     failure?: string
     writing?: boolean
     closing?: boolean
@@ -35,6 +36,7 @@ export async function connectionService(
     { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
+  const leaseHandles = new WeakMap<object, {run:string; current():void; snapshot:Record<string,unknown>}>()
   state.active = await store.read().catch(() => {
     state.phase = "recoverable-error"
     return undefined
@@ -231,7 +233,9 @@ export async function connectionService(
         apiKey,
         password,
       }
-      await runtime.check(record).catch((error: unknown) => {
+      const checking = runtime.check(record)
+      state.checking = checking
+      await checking.catch((error: unknown) => {
         const code =
           error instanceof Error &&
           [
@@ -245,7 +249,7 @@ export async function connectionService(
             ? error.message
             : "LOGINOM_CONNECTION_CHECK_FAILED"
         throw new Error(code)
-      })
+      }).finally(() => { if (state.checking === checking) state.checking = undefined })
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (candidate.revision !== state.revision || state.applying || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
@@ -303,11 +307,19 @@ export async function connectionService(
   progress()
   return {
     api,
+    assertLease(value: object, run: string) {
+      const original=leaseHandles.get(value)
+      if(!original || original.run!==run
+          || Object.keys(original.snapshot).some(key=>{const d=Object.getOwnPropertyDescriptor(value,key);return !d || !Object.hasOwn(d,'value') || d.value!==original.snapshot[key]}))
+        throw Error('LOGINOM_GENERATION_UNAVAILABLE')
+      original.current()
+    },
     acquire(run: string) {
       if (
         state.closing ||
         state.pending ||
         state.writing ||
+        state.checking ||
         recovery?.pending().length ||
         state.failure === "LOGINOM_STORE_READ_FAILED" ||
         state.phase !== "ready" ||
@@ -317,8 +329,14 @@ export async function connectionService(
         return
       const lease = { generation: state.active.generation, recovery: false, active: true }
       leases.set(run, lease)
-      return {
+      const handle = {
         generation: lease.generation,
+        assertCurrent() {
+          if (leases.get(run) !== lease || !lease.active || lease.recovery
+              || state.closing || state.pending || state.writing || state.checking
+              || state.phase !== 'ready' || state.active?.generation !== lease.generation)
+            throw Error('LOGINOM_GENERATION_UNAVAILABLE')
+        },
         // Uncertain effects outlive the model drain. Only reconciliation releases recovery.
         holdRecovery() {
           if (leases.get(run) === lease) lease.recovery = true
@@ -338,6 +356,8 @@ export async function connectionService(
           progress()
         },
       }
+      leaseHandles.set(handle,{run,current:handle.assertCurrent,snapshot:{...handle}})
+      return handle
     },
     async settled() {
       while (state.applying) await state.applying

@@ -54,7 +54,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     root: paths.loginom,
     headless,
     environment: process.env,
-    strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+    strictRecovery: true,
   })
   const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
   try {

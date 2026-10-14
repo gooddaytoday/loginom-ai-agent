@@ -136,7 +136,7 @@ const live: Layer.Layer<
               toolCallId: _requestID,
               messages: input.messages,
               ...(input.originalContext ? { experimental_context: assertSDKContext(input.originalContext) } : {}),
-          abortSignal: input.abort,
+              abortSignal: input.abort,
             })
             const output = typeof result === "string" ? result : (result?.output ?? JSON.stringify(result))
             return {
@@ -281,6 +281,7 @@ const live: Layer.Layer<
       return {
         type: "ai-sdk" as const,
         result: streamText({
+          ...(input.originalContext ? { experimental_context: assertSDKContext(input.originalContext) } : {}),
           onError(error) {
             bridge.fork(
               Effect.logError("stream error", {

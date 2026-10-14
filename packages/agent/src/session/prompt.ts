@@ -1104,7 +1104,7 @@ const layer = Layer.effect(
         const loginomStatus: { failure?: string } = {}
         const loginom = yield* Effect.acquireRelease(
           Effect.promise(() =>
-            LoginomHost.acquire(sessionID).catch((error) => {
+            LoginomHost.acquire(sessionID, originalContext).catch((error) => {
               loginomStatus.failure = "acquire: " + hostError(error)
               return undefined
             }),
@@ -1258,6 +1258,7 @@ const layer = Layer.effect(
             const promptOps = yield* ops()
 
             const tools = yield* SessionTools.resolve({
+              originalContext,
               loginom,
               loginomStatus,
               agent,

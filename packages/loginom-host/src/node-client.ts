@@ -18,7 +18,7 @@ type NodeHostInput = {
 // Private original factory-channel registry. Projected IPC scalars are not an
 // owner capability: acquisition/currentness must complete on this same channel.
 type ParentRoot={port:Port;input:NodeHostInput;snapshot:NodeHostInput;alive():boolean;
- request:ReturnType<typeof privateNodeHostTransport>["requestOwnedAcquire"];methods:Readonly<Port>;environment:string;runs:Map<string,ParentAcquisition>}
+ request:ReturnType<typeof privateNodeHostTransport>["requestOwnedAcquire"];call:ReturnType<typeof privateNodeHostTransport>["requestOwnedCall"];methods:Readonly<Port>;environment:string;runs:Map<string,ParentAcquisition>}
 type ParentAcquisition={root:ParentRoot;run:string;session:string;phase:"pending"|"acquired"|"disposed"|"refused";
  value?:Readonly<{owner:string;run:string;lease:string;generation:number;chat:string;account:string}>;
  primary?:{value:unknown};secondary?:{value:unknown};checking?:boolean;capability:object;requestId?:string;pending?:boolean;control?:{signal:AbortSignal;deadline:number};signal?:AbortSignal;deadline?:number}
@@ -75,6 +75,13 @@ export async function acquireOriginalNodeHostOwner(port:Port,run:string,session:
   return {capability,generation:p.value.generation}
  }catch(value){p.primary??={value};p.phase='refused';throw p.primary.value}
 }
+export function retainedOriginalNodeHostOwner(capability:object) {
+ const p=parentAcquisitions.get(capability)
+ if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ guardParent(p)
+ if(p.phase!=='acquired' || !p.value)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ return p.value
+}
 export async function assertOriginalNodeHostOwner(capability:object) {
  const p=parentAcquisitions.get(capability)
  if(!p || p.capability!==capability)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
@@ -95,6 +102,12 @@ export function refuseOriginalUnionCreation(capability:object):never {
  guardParent(p)
  if(p.phase!=='acquired')throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
  throw Error('UNION_ORIGINAL_SDK_CREATION_UNAVAILABLE')
+}
+export function callOriginalNodeHostOwner(capability:object,input:{name:string;args:unknown;userMessage:string},control:{signal:AbortSignal;deadline:number}) {
+ const p=parentAcquisitions.get(capability)
+ if(!p || p.capability!==capability || p.phase!=='acquired')throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+ guardParent(p)
+ return p.root.call({run:p.run,...input,receiverPurpose:'row-filter-sdk-v1',deadline:control.deadline},p,control)
 }
 export function disposeOriginalNodeHostOwner(capability:object) {
  const p=parentAcquisitions.get(capability)
@@ -139,7 +152,7 @@ export async function launchNodeHost(input:NodeHostInput) {
         if(error){
           const packet=value as any,root=originalParentPorts.get(port),owned=root?.runs.get(packet.input?.run);
           const id=packet.method==='readonly.preReady.cancel'?packet.input?.requestId:packet.id;
-          if(owned?.pending&&owned.requestId===id&&packet.input?.receiverPurpose==='union-acquired-service-v1'){
+          if(owned?.pending&&owned.requestId===id&&['union-acquired-service-v1','row-filter-sdk-v1'].includes(packet.input?.receiverPurpose)){
             if(owned.primary)owned.secondary??={value:error};else owned.primary={value:error};
           }
           closePort();
@@ -195,7 +208,7 @@ export async function launchNodeHost(input:NodeHostInput) {
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   }
   if(input.strictRecovery===true&&input.entry===join(input.resources,"host/node-host.mjs")&&input.node===join(input.resources,"bin",process.platform==="win32"?"node.exe":"node"))
-    originalParentPorts.set(port,{port,input,snapshot:originalInput,alive:()=>!state.closed&&child.connected,request:client.requestOwnedAcquire,methods:Object.freeze({...port}),environment:JSON.stringify(environment),runs:new Map()})
+    originalParentPorts.set(port,{port,input,snapshot:originalInput,alive:()=>!state.closed&&child.connected,request:client.requestOwnedAcquire,call:client.requestOwnedCall,methods:Object.freeze({...port}),environment:JSON.stringify(environment),runs:new Map()})
   return {
     port,
     exited,

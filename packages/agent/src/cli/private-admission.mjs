@@ -1,3 +1,4 @@
+import {currentExecutionOrigin,assertExecutionOrigin,adoptExecutionOrigin,sealExecutionOrigin} from './execution-origin.mjs'
 import {openSync,readSync,closeSync,fstatSync,readFileSync,constants} from 'node:fs'
 import {connect} from 'node:net'
 import {randomBytes,createHash,createHmac,timingSafeEqual} from 'node:crypto'
@@ -8,6 +9,7 @@ const descriptors=Object.getOwnPropertyDescriptors
 const aborted=Object.getOwnPropertyDescriptor(AbortSignal.prototype,'aborted').get
 const reason=Object.getOwnPropertyDescriptor(AbortSignal.prototype,'reason').get
 let begun=false, originalPromise, admitted, creation
+const executionCreations=new WeakMap(), argumentCreations=new WeakMap()
 function error(code){return Error('LOGINOM_PRIVATE_ADMISSION_'+code)}
 function parse(text){
  let i=0
@@ -103,24 +105,35 @@ export function receivePrivateAdmission(argv=process.argv){
    await send({mac:mac('response',t)});const g=await read();guard();fields(g,['stage','mac']);if(g.stage!=='grant')throw error('STAGE');match(g.mac,'grant',t)
    await send({mac:mac('ack',t)});const a=await read();guard();fields(a,['stage','mac']);if(a.stage!=='accepted')throw error('STAGE');match(a.mac,'accepted',t)
    if(buffer.length)throw error('REPLAY');finished=true
-   admitted={deadline,argv:argvRef,argvCheck:()=>{argvCheck();kernelCheck()},exec};socket.end()
+   adoptExecutionOrigin(BigInt(born),deadline)
+   admitted={born:BigInt(born),deadline,argv:argvRef,argvCheck:()=>{argvCheck();kernelCheck()},exec};socket.end()
   }catch(e){if(!first||!Object.is(first.value,e))remember(e);throw first.value}finally{clearTimeout(timer);key.fill(0);socket.destroy();socket.once('close',()=>{socket.removeListener('error',fail);socket.removeListener('end',eof)})}
  })()
  return originalPromise
 }
 function guardCreation(r,args,signal){
  try{
-  if(r.args!==args||r.signal!==signal||r.origin!==admitted||process.argv!==r.origin.argv||process.execPath!==r.origin.exec)throw error('CREATION')
+  if(r.args!==args||r.signal!==signal||(r.origin.execution ? executionCreations.get(r.origin.execution)!==r : r.origin!==admitted)||process.argv!==r.origin.argv||process.execPath!==r.origin.exec)throw error('CREATION')
   r.origin.argvCheck();if(r.check)r.check()
  }catch(e){r.secondary.push({value:e});throw e}
  if(r.first)throw r.first.value
- try{if(aborted.call(signal))throw reason.call(signal);if(BigInt(Date.now())*1000000n>=r.origin.deadline)throw error('EXPIRED')}
+ try{if(aborted.call(signal))throw reason.call(signal);if(r.origin.execution)assertExecutionOrigin(r.origin.execution);if(BigInt(Date.now())*1000000n>=r.origin.deadline)throw error('EXPIRED')}
  catch(e){r.first={value:e};throw e}
 }
 export function retainRunCommandCreation(args,signal){
- if(!admitted)return
- if(creation){guardCreation(creation,args,signal);return creation.token}
- const token=Object.freeze({}),r={origin:admitted,args,signal,token,secondary:[]};creation=r;scopes.set(token,r)
+ const execution=currentExecutionOrigin()
+ const known=argumentCreations.get(args)
+ if(known){guardCreation(known,args,signal===undefined?known.signal:signal);return known.token}
+ if(!execution&&!admitted)return
+ if(execution){assertExecutionOrigin(execution);if(execution.signal!==signal)throw error('CREATION')}
+ const old=execution?executionCreations.get(execution):creation
+ if(old){guardCreation(old,args,signal);return old.token}
+ if(execution)sealExecutionOrigin(execution)
+ const origin=execution?Object.freeze({execution,deadline:admitted&&admitted.deadline<execution.deadline?admitted.deadline:execution.deadline,
+   argv:process.argv,argvCheck:admitted?.argvCheck??snapshot(process.argv),exec:process.execPath}):admitted
+ const token=Object.freeze({}),r={origin,args,signal,token,secondary:[]}
+ if(execution)executionCreations.set(execution,r);else creation=r
+ scopes.set(token,r);argumentCreations.set(args,r)
  try{r.check=snapshot(args)}catch(e){r.first={value:e};throw e}
  guardCreation(r,args,signal);return token
 }
@@ -159,9 +172,25 @@ export function retainSDKInvocation(request,options){
  const id=d.toolCallId?.value;if(typeof id!=='string'||!id)throw error('SDK')
  let calls=sdkCalls.get(d.experimental_context.value);if(!calls){calls=new Map();sdkCalls.set(d.experimental_context.value,calls)}
  const existing=calls.get(id);if(existing&&(existing.request!==request||existing.options!==options))throw error('SDK')
- const token=Object.freeze({}),r={token,request,options,context:d.experimental_context.value,check:snapshot({request,options})};invocations.set(options,r);calls.set(id,r)
+ const token=Object.freeze({}),r={token,root:s.root,request,options,context:d.experimental_context.value,check:snapshot({request,options})};invocations.set(options,r);calls.set(id,r)
  // Raw SDK signal is qualified by its native intrinsic, never RunCommand signal.
  const signal=d.abortSignal?.value;try{if(!signal)throw error('SDK_SIGNAL');if(aborted.call(signal))throw reason.call(signal)}catch(e){r.first={value:e};throw e}
  return token
 }
-export function assertSDKInvocation(token,request,options){const r=invocations.get(options);if(!r||r.token!==token||r.request!==request)throw error('UNOWNED');assertSDKContext(r.context);r.check();if(r.first)throw r.first.value;const signal=options.abortSignal;if(aborted.call(signal))throw reason.call(signal);return {deadline:scopes.get(creation.token).origin.deadline,runCommandSignal:creation.signal,sdkSignal:signal}}
+export function assertSDKInvocation(token,request,options){const r=invocations.get(options);if(!r||r.token!==token||r.request!==request)throw error('UNOWNED');assertSDKContext(r.context);r.check();if(r.first)throw r.first.value;const signal=options.abortSignal;if(aborted.call(signal))throw reason.call(signal);return {origin:r.root.token,deadline:r.root.origin.deadline,runCommandSignal:r.root.signal,sdkSignal:signal}}
+
+export function currentRunCommandControl(){
+ const execution=currentExecutionOrigin(),r=execution&&executionCreations.get(execution)
+ if(!r)return
+ guardCreation(r,r.args,r.signal)
+ return {origin:r.token,signal:r.signal,deadline:r.origin.deadline}
+}
+
+export function originalPromptControl(context){
+ const s=sdkContexts.get(context)
+ if(!s)throw error('UNOWNED')
+ guardCreation(s.root,s.root.args,s.root.signal)
+ return {origin:s.root.token,signal:s.root.signal,deadline:s.root.origin.deadline}
+}
+
+export function adoptCurrentAdmission(){if(admitted)adoptExecutionOrigin(admitted.born,admitted.deadline)}

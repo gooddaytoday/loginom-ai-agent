@@ -9,4 +9,10 @@ export function relayPromptInput<T extends object>(source: object, target: T): T
 export function promptSDKContext(input: object): object | undefined
 export function assertSDKContext(token: object): object
 export function retainSDKInvocation(request: unknown, options: object): object | undefined
-export function assertSDKInvocation(token: object, request: unknown, options: object): {deadline: bigint, runCommandSignal: AbortSignal, sdkSignal: AbortSignal}
+export function assertSDKInvocation(token: object, request: unknown, options: object): {origin: object, deadline: bigint, runCommandSignal: AbortSignal, sdkSignal: AbortSignal}
+
+export function currentRunCommandControl(): {origin: object; signal: AbortSignal; deadline: bigint} | undefined
+
+export function originalPromptControl(context: object): {origin: object; signal: AbortSignal; deadline: bigint}
+
+export function adoptCurrentAdmission(): void
