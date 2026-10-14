@@ -171,10 +171,13 @@ export async function createBridge(config, session, { browserTransport: managedB
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
+        if(replacementCapture)assertCaptureOwner(acceptanceCapture.retained);
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
         } }, undefined, options);
-        return parseCapabilityResult(response);
+        const result=parseCapabilityResult(response);
+        if(replacementCapture)assertCaptureOwner(acceptanceCapture.retained);
+        return result;
       } });
     }
     const groups = selectToolGroups(config.mode ?? 'classic', {
