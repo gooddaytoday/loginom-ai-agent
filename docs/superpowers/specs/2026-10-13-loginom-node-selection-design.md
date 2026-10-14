@@ -1326,3 +1326,19 @@ recovery записано отдельно. Candidate ABC/1 `2f048e06…` ост
 а новая потребует всех прежних 18+25 gates. Skill по технической ошибке
 не меняется; JS fallback не разрешён. Первая волна 3/9, candidate 3/25,
 полная приёмка не завершена.
+
+
+На 2026-10-14 03:45 UTC private mask diagnostic v2 запущен Root 26816
+после independent static approval `b8c5ae24…`: семь тестов PASS, 4458 source
+hashes и 79 V1 originals совпали. Дополнительно закрыты два RED→GREEN finding:
+nonboolean cached value не выводится, cached foreign DOM getter не вызывается.
+V2 capture выполняется в том же исходном evaluate; temporary field удаляется
+до исходного guard/public snapshot. Повторных чтений/кликов/IPC не добавлено.
+Пять исходных apply inputs, driver, managed entry и replay совпадают с V1.
+Verification `e11dbb6e…`, reviewed binding `5c4eac75…` сохранён; Root изменил
+только ready/status, active binding `9ae3a3a8…`. Каталог
+`abc-wizard-mask-diagnostic` отделён от неизменного V1.
+Live input доставлен, импорт выполняется. Model calls 0; no early Save,
+Product/skill/payload/pins unchanged. Native diagnostic не является acceptance.
+Следующие модели не запускались; candidate 3/25, firstwave 3/9 нечистая,
+повторы и итоговая приёмка остаются незавершёнными.
