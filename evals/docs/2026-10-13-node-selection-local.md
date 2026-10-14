@@ -355,3 +355,12 @@ wrapper exit 1, oracle и полным расчётом PASS, cleanup подтв
 После завершения root85644 и проверки отсутствия `.writer` запущен
 `monthly-demand/1` (root2256). Следующий плановый слот —
 `risky-approved-claims/1`. Полная серия и приёмка ещё не завершены.
+
+
+На 2026-10-14 00:35 UTC `monthly-demand/1` завершился успешно:
+CLI/wrapper exit 0, oracle, полный расчёт и policy PASS, JS-узлов 0,
+cleanup подтверждён. Session `ses_ec83209c8ffe7IlsZil6VEzyop`,
+SHA attempt `ead66583…`, audit `0d683b46…`. Завершены 4/18 baseline,
+0/25 candidate. После завершения root2256 и проверки отсутствия `.writer`
+запущен `risky-approved-claims/1` (root97266); далее планируется
+`campaign-roi-by-channel/1`. Итоговая приёмка остаётся незавершённой.
