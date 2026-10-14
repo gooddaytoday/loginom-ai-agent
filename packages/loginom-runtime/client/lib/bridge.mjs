@@ -1132,6 +1132,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       shutdownStarted = true;
       let shutdownPrimary;
       closing ??= (async () => {
+        // Background submission returns before its original worker settles.
+        // shutdownStarted fences new calls. Recheck custody and the unchanged
+        // unsettled/cleanup guards after draining the already claimed work.
+        await actionRuntime?.drainActiveWork?.();
+        assertShutdownBound();
         shutdownStage='native_cleanup';
         let shutdownCleanup;
         if (config.acceptanceCleanupPackage || managedCleanup) {

@@ -9,5 +9,6 @@ test('product cleanup preserves the bridge shutdown contract',async()=>{
   try{result=await promisify(execFile)(process.execPath,['--experimental-test-module-mocks','--test-reporter=tap','--test',fileURLToPath(new URL('./support/product-cleanup-bridge.mjs',import.meta.url))],{env,timeout:30000});}
   catch(error){assert.fail(String(error.stdout)+'\n'+String(error.stderr));}
   assert.match(result.stdout,/ok 11 - guarded pending close retries only after the same owner operation settles/);
-  assert.match(result.stdout,/pass 11/);assert.match(result.stdout,/fail 0/);
+  assert.match(result.stdout,/ok 14 - bridge original drain: metadata-drift/);
+  assert.match(result.stdout,/pass 14/);assert.match(result.stdout,/fail 0/);
 });

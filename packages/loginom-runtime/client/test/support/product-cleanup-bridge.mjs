@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import * as executor from '../../lib/executor.mjs';
+import {createNodeOperationRunner} from '../../lib/node-operation-runner.mjs';
 import * as catalog from '../../lib/action-catalog.mjs';
 import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
@@ -49,7 +50,7 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
   const f=current;return {tools:[],describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
-    hasActiveWork:()=>!!f.busy,hasUnsettledWork:()=>!!f.unknown,
+    drainActiveWork:async()=>{await f.drain?.();},hasActiveWork:()=>!!f.busy,hasUnsettledWork:()=>!!f.unknown,
     run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',cleanup_complete:f.scenario!=='unconfirmed-save',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path},save_completed:f.scenario!=='unconfirmed-save'}};},
   };
 }}});
@@ -120,4 +121,39 @@ test('guarded pending close retries only after the same owner operation settles'
  f.busy=false;const result=await bridge.close();assert.equal(result.cleanup_complete,true);assert.equal(result.native_logout_confirmed,true);assert.equal(f.events.filter(x=>x==='package-cleanup').length,1);assert.equal(f.events.filter(x=>x==='browser-close').length,1);assert.strictEqual(await bridge.close(),result);
  const receipt=JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8'));assert.equal(receipt.status,'SUCCEEDED');assert.equal(receipt.account,'test-2');assert.equal(receipt.package_path,path);assert.equal(receipt.document_id,'own-doc');assert.equal(receipt.session_id,'own-session');assert.equal(receipt.save_operation_id,'own-save');assert.equal(receipt.unsaved_changes_discarded,false);assert.deepEqual(session.metadata.workspacePreparation,owner);assert.equal(f.saves,1);assert.equal(f.events.filter(x=>x==='release-uploads').length,1);assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
  }finally{await client?.close();await rm(directory,{recursive:true,force:true})}
+});
+
+
+for(const drainCase of ['success','ambiguity','metadata-drift'])test('bridge original drain: '+drainCase,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'managed-original-drain-'));
+ const f=current={scenario:'managed-drain',events:[],busy:false,saves:0};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads')}}};
+ let bridge,client,release,calls=0;
+ try{
+  bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,ownedPackageCleanupAccount:'test-2'},session);
+  client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
+  assert.notEqual((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}})).isError,true);
+  const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,run:async(_request,{signal})=>{
+   calls++;f.busy=true;f.unknown=true;await new Promise(r=>{release=r});assert.equal(signal.aborted,false);
+   f.busy=false;f.unknown=drainCase==='ambiguity';return {status:f.unknown?'AMBIGUOUS':'SUCCEEDED',cleanup_complete:!f.unknown};
+  }});
+  runner.start({operation_id:'original'});f.drain=()=>runner.drain();
+  const close=bridge.close();assert.strictEqual(bridge.close(),close);
+  await Promise.resolve();assert.equal(f.events.includes('package-cleanup'),false);assert.equal(calls,1);
+  if(drainCase==='metadata-drift')session.metadata={...session.metadata,sessionId:'foreign'};
+  release();
+  if(drainCase==='metadata-drift'){
+   await assert.rejects(close,/LOGINOM_/);
+   assert.equal(f.events.includes('package-cleanup'),false);assert.equal(f.events.includes('browser-close'),false);return;
+  }
+  const receipt=await close;
+  if(drainCase==='ambiguity'){
+   assert.equal(receipt.browser_transport_closed,false);assert.equal(f.events.includes('package-cleanup'),false);
+   assert.equal(f.events.includes('browser-close'),false);assert.equal(bridge.hasUnsettledWork(),true);return;
+  }
+  assert.equal(receipt.cleanup_complete,true);assert.equal(receipt.native_logout_confirmed,true);
+  assert.equal(calls,1);assert.equal(f.saves,1);assert.equal(f.events.filter(e=>e==='package-cleanup').length,1);
+  assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
+ }finally{release?.();await client?.close();await rm(directory,{recursive:true,force:true})}
 });

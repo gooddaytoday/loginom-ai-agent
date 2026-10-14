@@ -2610,6 +2610,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(operation?.importPreconfigHandle!==node)throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
       node.assertCurrent();return true;
     },
+    drainActiveWork:()=>nodeJobs.drain(),
     hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),

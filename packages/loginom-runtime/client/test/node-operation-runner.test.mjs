@@ -56,3 +56,17 @@ test('ID-only resume does not duplicate a running or completed worker',async()=>
  assert.equal(runner.start({operation_id:'one'},{resume:true}).attempt,1);assert.equal(count,1);
  release();const done=await runner.wait('one');assert.deepEqual(runner.start({operation_id:'one'},{resume:true}),done);assert.equal(count,1);
 });
+
+
+test('lifecycle drain waits original work without cancel/replay and retains ambiguity',async()=>{
+ let release,calls=0;
+ const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,
+  run:async(_request,{signal})=>{calls++;await new Promise(r=>{release=r});assert.equal(signal.aborted,false);return {status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false};}});
+ runner.start({operation_id:'original-drain'});
+ let completed=false;const drain=runner.drain().then(()=>{completed=true});
+ await Promise.resolve();assert.equal(completed,false);assert.equal(calls,1);
+ release();await drain;
+ assert.equal(runner.status('original-drain').state,'settled');assert.equal(runner.unsettled,true);
+ assert.equal(runner.status('original-drain').cancel_requested,false);assert.equal(calls,1);
+ await runner.drain();assert.equal(calls,1);assert.equal(runner.unsettled,true);
+});

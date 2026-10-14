@@ -57,6 +57,9 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    return launch(request,signature,1,false);
   },
   status(id){return snapshot(find(id));},
+  // Private lifecycle drain: await only already claimed original workers.
+  // Settlement does not clear AMBIGUOUS or grant cleanup authority.
+  async drain(){await Promise.allSettled([...jobs.values()].filter(job=>job.state==='running').map(job=>job.completion));},
   async wait(id,{timeoutMs=1000,signal}={}) {
    const job=find(id);
    if(!Number.isInteger(timeoutMs)||timeoutMs<0||timeoutMs>60000)throw Error('Node wait timeout must be 0..60000 ms');
