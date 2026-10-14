@@ -8,6 +8,7 @@ export function retainReplacementOwner(options, owner) {
  const session=dir=>({context,execute,directory:dir,identity:pinned,makeCleanupCode});
  owner.recover=async()=>{
   if(owner.closed)throw Error('DIAGNOSTIC_CONTEXT_ALREADY_CLOSED');
+  if(owner.started&&owner.failed!==true)throw Error('DIAGNOSTIC_SCENARIO_STILL_RUNNING');
   if(owner.context!==context||owner.page!==page||owner.execute!==execute)throw Error('DIAGNOSTIC_OWNER_CHANGED');
   // Resource teardown is separate from business-operation settlement.
   // The original bound native cleanup still rejects foreign, running or dirty packages.
