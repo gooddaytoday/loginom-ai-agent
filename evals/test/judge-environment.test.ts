@@ -7,7 +7,60 @@ import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { runOfflineJudge } from "../src/judge-environment"
 import { main } from "../src/run"
+import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("offline calibration releases its home after SIGINT only with confirmed judge cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-sigint-"))
+  let cleanupConfirmed = true
+  try {
+    const fixture = await parallelFixture(root)
+    const file = path.join(root, "slots.json")
+    const trace = path.join(root, "judge.jsonl")
+    const resultFile = path.join(root, "result.json")
+    const script = path.join(root, "interrupt.ts")
+    const env = { EVAL_SLOTS_FILE: file, EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+      EVAL_JUDGE_COMMAND: `bun ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --gate-log ${trace} --delay-ms 1500` }
+    await writeLeaseReceipt(file, fixture.slots)
+    await mkdir(path.join(root, "supervision"))
+    await Bun.write(script, `import { runOfflineJudge } from ${JSON.stringify(path.join(evalsRoot, "src/judge-environment.ts"))}
+import { loadConfig } from ${JSON.stringify(path.join(evalsRoot, "src/config.ts"))}
+const pending = runOfflineJudge(loadConfig(["--calibrate","--only","group-sum-qty"],${JSON.stringify(env)}),${JSON.stringify(fixture.lockRoot)})
+const deadline = Date.now() + 10000
+while (!await Bun.file(${JSON.stringify(trace)}).exists() && Date.now() < deadline) await Bun.sleep(10)
+if (!await Bun.file(${JSON.stringify(trace)}).exists()) throw Error("Judge did not start")
+process.kill(process.pid,"SIGINT")
+await Bun.write(${JSON.stringify(resultFile)},JSON.stringify(await pending))
+`)
+    cleanupConfirmed = false
+    const run = await superviseProcess({ cmd: [process.execPath, script], cwd: root,
+      env: { PATH: process.env.PATH!, HOME: root }, timeoutMs: 20_000, outDir: path.join(root, "supervision") })
+    cleanupConfirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.exitCode).toBe(0)
+    const result = await Bun.file(resultFile).json()
+    expect(result).toMatchObject({ code: 1, judgeCleanupConfirmed: true })
+    const saved = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(saved.interrupted).toBe(true)
+    expect(saved.rows).toHaveLength(1)
+    const reservations = await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: fixture.lockRoot, absolute: true }))
+    const first = await Bun.file(reservations[0]!).json()
+    expect(first.state).toBe("released")
+    expect((await Bun.file(first.journal).json()).state).toBe("released")
+    const proof = await Bun.file(first.releaseEvidence.path).json()
+    expect(proof).toMatchObject({ status: "confirmed", key: first.key, token: first.token, revision: first.revision })
+    const calls = (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(calls.filter(call => call.kind === "start")).toHaveLength(1)
+    cleanupConfirmed = false
+    const next = await runOfflineJudge(loadConfig(["--calibrate", "--only", "group-sum-qty"], env), fixture.lockRoot)
+    cleanupConfirmed = next.judgeCleanupConfirmed
+    expect(next).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    const second = await Bun.file(reservations[0]!).json()
+    expect(second.state).toBe("released")
+    expect(second.token).not.toBe(first.token)
+    expect(second.revision).toBe(first.revision + 1)
+  } finally { if (cleanupConfirmed) await rm(root, { recursive: true, force: true }) }
+}, 45_000)
 
 test("offline proof persistence exception quarantines the journal and preserves completed output", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-proof-error-"))
