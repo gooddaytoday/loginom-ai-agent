@@ -1,14 +1,14 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint 2026-10-14 12:40 UTC: разрешённые исправления восстановлены
+Текущий checkpoint 2026-10-14 12:47 UTC: разрешённые исправления восстановлены
 (d3cd4e46f9, 713 targeted PASS). Итоговая matched пара112452/runtime659588…;
 обычный живой Import→Sort→Export прошёл до модельной серии.
 ABC/1 technical-failed сохранён; own release независимо подтверждён.
-First-last-touch/1 и sales-by-category/1 приняты, JS calls/nodes0, oracle/graph/close PASS.
-Sales принят автоматически12:36:04.913Z; тот же frozen31 sequential runner
-без ручной паузы начал monthly-demand/1, CLI1945851 started12:36:14.690Z,
-Session ses_ec5962735ffeyM1A97EXc2G6y6, сейчас выполняется стандартныйDate/time.
-Started4/closed3/technicalfailed1/accepted2/notstarted27/baseline0.
+First-last-touch/1, sales-by-category/1 и monthly-demand/1 приняты: JS0,
+oracle/graph/export/identity/close PASS. Sales и monthly приняты автоматически.
+Same frozen31 sequential runner без ручной паузы начал risky-approved-claims/1,
+CLI1967137 started12:45:53.007Z, Session ses_ec58d52b0ffesM1zyvCNz7sATr.
+Started5/closed4/technicalfailed1/accepted3/notstarted26/baseline0.
 Полная приёмка открыта; повторы admittedslots запрещены, старые outcomes исторические.
 
 
@@ -3378,3 +3378,17 @@ Sameexec36709 автоматически начал monthly-demand/1, CLI1945851
 Reportamendment003/e2edbba1… подготовлен параллельно; oracle/модель не повторялись.
 Started4/closed3/accepted2/technicalfailed1/notstarted27/baseline0; сравнительный
 вывод и полная приёмка пока невозможны. Runtime/skill/source/pins/lock неизменны.
+
+Checkpoint 2026-10-14 12:47 UTC — monthly/1 принят автоматически, claims/1 running.
+Monthly finished12:45:43.761Z, CLI1945851exit0/normalcleanuptrue/Host1946051ACKexit0/
+noError/noSignal. Audit7b2da041… complete, failures[], policy/calculation/oracle/
+history/runtime/identity/graph/export PASS,0JS, historyAnomalyfalse/reviewnotrequired.
+LGP128b7d80…/oracle16e62d64…; graph использует standard Import Date/time Group
+Reform Sort Export. Ledger12:45:44.026Zadvance, следующие mandatorygates прошли.
+Sameexec36709 автоматически admitted risky-approved-claims/1 started12:45:44.032Z,
+CLI1967137 started12:45:53.007Z, Session ses_ec58d52b0ffesM1zyvCNz7sATr;
+PIDalive подтверждён. Source/runtime/skill/lock/pins/model/inputs неизменны.
+Started5/closed4/accepted3/technicalfailed1/notstarted26/baseline0; полный25candidate
+и6baseline всё ещё обязательны. Main31 task остаётся незавершённой.
+Закрытыеreport amendments готовятся параллельно без повторных oracle/live/model/tests.
+ТехническийABCотказ/denominator сохранён; полнаяприёмка и сравнение не утверждаются.
