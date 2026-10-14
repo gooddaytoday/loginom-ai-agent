@@ -1505,3 +1505,21 @@ chat/profile/currentpayload managed processes absent. Original attempt284f…
 unchanged. Операционное восстановление завершено отдельно от failed scenario;
 CLI1/wrapper3/cleanupfalse/incomplete остаются исходным результатом.
 Можно начать TDD исправление input0 clipping; общая приёмка остаётся открытой.
+
+
+На 2026-10-14 04:53 UTC независимый review продолжения Export clipping
+подтвердил scope, actual factory seam, сохранность guarded scroll/native GUID/
+девяти hit checks и новую matched18+25. Блокеров нет. Уточнение плана принято:
+existing negative guards могут сразу проходить, обязательный RED — actual
+post-Link clipped input0 на старом factory; новые behavior/guards вводятся TDD.
+Product implementation ведётся отдельно, source review/checks/live ещё впереди.
+
+Подготовка сборки read-only: Bun1.3.14 revision0d9b296af, Node24.19 SHA
+bc17c508… и Chromium1246 SHA1e0652a3… совпали с pins. Нужны clean detached
+checkout нового общего commit, baseline verify до восстановления двух старых
+skill-файлов, затем clean candidate build/verify, новые фактические closures
+и ordinary native gates. Старые payload/current-run/profile не менялись.
+Историческая series-stop SHA
+`2dce56a9a7fe0f80179399be3aa9615067dfccc8ab6fb3813a74da25e9a921d7`
+независимо сверена:24original attempt hashes/24unique Sessions,18baseline+
+6candidate,4candidate selection-audit complete PASS,2incomplete,19unstarted.
