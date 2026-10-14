@@ -243,3 +243,11 @@ test("resource sampling records an unavailable filesystem as unknown while retai
     expect(await readdir(root)).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("cgroup sampler records observed controller availability at the leaf and each ancestor", async () => {
+  const sample = await sampleCgroupResources()
+  for (const group of [sample, ...(sample.ancestors ?? [])]) {
+    const source = await Bun.file(path.join("/sys/fs/cgroup", group.path!, "cgroup.controllers")).text().catch(() => null)
+    expect(group.controllers).toEqual(source === null ? null : source.trim().split(/\s+/).filter(Boolean))
+  }
+})
