@@ -3,9 +3,50 @@ import { appendFile, chmod, link, mkdtemp, rm, stat, symlink, unlink, writeFile 
 import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleSupervisedResources } from "../src/parallel-resources"
-import { readResourceEvidence, readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { freezeResourceBudget, readFrozenResourceBudget, readResourceEvidence, readResourceSummary, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { superviseProcess } from "../src/process-supervisor"
 import { readLeaseReceipt } from "../src/lease"
+
+test("resource budget freezes private thresholds before dispatch and verifies their original bytes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-frozen-budget-")), file = path.join(root, "budget.json")
+  try {
+    const bounds = [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }]
+    const frozen = await freezeResourceBudget({ out: file, runId: "frozen-budget", bounds })
+    expect(frozen.budget).toMatchObject({ version: 1, kind: "parallel-resource-budget", run_id: "frozen-budget", bounds })
+    const bytes = await Bun.file(file).text(), inode = (await stat(file)).ino
+    expect(frozen.source).toEqual({ file, sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") })
+    expect((await stat(file)).mode & 0o777).toBe(0o600)
+    while (Date.now() <= Date.parse(frozen.budget.fixed_at)) await Bun.sleep(1)
+    const request = { file, sha256: frozen.source.sha256, runId: "frozen-budget", startedAt: new Date().toISOString() }
+    expect(await readFrozenResourceBudget(request)).toEqual(frozen.budget)
+    bounds[0]!.minimum = 2
+    expect(frozen.budget.bounds[0]!.minimum).toBe(1)
+    await expect(readFrozenResourceBudget({ ...request, runId: "another-run" })).rejects.toThrow("RESOURCE_BUDGET_RUN_MISMATCH")
+    await expect(readFrozenResourceBudget({ ...request, startedAt: frozen.budget.fixed_at })).rejects.toThrow("RESOURCE_BUDGET_NOT_FIXED_BEFORE_RUN")
+    await expect(readFrozenResourceBudget({ ...request, startedAt: "unverified" })).rejects.toThrow("RESOURCE_BUDGET_TIME_UNVERIFIED")
+    await expect(freezeResourceBudget({ out: file, runId: "frozen-budget", bounds })).rejects.toThrow("RESOURCE_OUTPUT_PRIVATE")
+    expect(await Bun.file(file).text()).toBe(bytes)
+    expect((await stat(file)).ino).toBe(inode)
+    await writeFile(file, JSON.stringify({ ...frozen.budget, bounds: [{ ...bounds[0], minimum: 0 }] }) + "\n")
+    await expect(readFrozenResourceBudget(request)).rejects.toThrow("RESOURCE_SOURCE_HASH_MISMATCH")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("resource budget refuses invalid bounds and unsafe output before persisting thresholds", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-invalid-budget-")), file = path.join(root, "budget.json")
+  try {
+    for (const bounds of [[], [{ scope: "host", metric: "memory.available_bytes", minimum: null, maximum: null }],
+      [{ scope: "host", metric: "memory.available_bytes", minimum: 2, maximum: 1 }],
+      [{ scope: "host", metric: "memory.available_bytes", minimum: NaN, maximum: null }]]) {
+      await expect(freezeResourceBudget({ out: file, runId: "invalid-budget", bounds })).rejects.toThrow("RESOURCE_BUDGET_INVALID")
+      expect(await Bun.file(file).exists()).toBe(false)
+    }
+    await chmod(root, 0o755)
+    await expect(freezeResourceBudget({ out: file, runId: "invalid-budget",
+      bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })).rejects.toThrow("RESOURCE_OUTPUT_PRIVATE")
+    expect(await Bun.file(file).exists()).toBe(false)
+  } finally { await chmod(root, 0o700); await rm(root, { recursive: true, force: true }) }
+})
 
 test("resource evidence returns the validated raw observations with their verified receipt", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-verified-samples-"))

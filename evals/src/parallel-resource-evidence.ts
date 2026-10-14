@@ -3,17 +3,48 @@ import { lstat, open, realpath } from "node:fs/promises"
 import path from "node:path"
 import { EvalFailure } from "./fail"
 import { summarizeResourceSamples } from "./parallel-resource-summary"
+import { validResourceBound } from "./parallel-resource-budget"
+import type { ResourceBound } from "./parallel-resource-budget"
 
 export async function writeResourceSummary(input: { samplesFile: string; out: string }) {
   await assertResourceDirectory(input.out)
   const receipt = resourceEvidence(input.samplesFile, await readResourceSource(input.samplesFile)).receipt
-  const output = await open(input.out, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
-    .catch(() => { throw new EvalFailure("RESOURCE_OUTPUT_PRIVATE", 2) })
-  try { await output.writeFile(JSON.stringify(receipt) + "\n"); await output.sync() }
-  finally { await output.close() }
-  const directory = await open(path.dirname(input.out), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
-  try { await directory.sync() } finally { await directory.close() }
+  await writeResourceDocument(input.out, receipt)
   return receipt
+}
+
+export async function freezeResourceBudget(input: { out: string; runId: string; bounds: readonly ResourceBound[] }) {
+  await assertResourceDirectory(input.out)
+  if (typeof input.runId !== "string" || !input.runId.trim() || !Array.isArray(input.bounds) || !input.bounds.length || !input.bounds.every(validResourceBound))
+    throw new EvalFailure("RESOURCE_BUDGET_INVALID", 2)
+  const budget = { version: 1, kind: "parallel-resource-budget", run_id: input.runId, fixed_at: new Date().toISOString(),
+    bounds: input.bounds.map(bound => ({ scope: bound.scope, metric: bound.metric, minimum: bound.minimum, maximum: bound.maximum })) }
+  await writeResourceDocument(input.out, budget)
+  return { budget, source: { file: input.out, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(budget) + "\n").digest("hex") } }
+}
+
+export async function readFrozenResourceBudget(input: { file: string; sha256: string; runId: string; startedAt: string }) {
+  const bytes = await readResourceSource(input.file)
+  if (new Bun.CryptoHasher("sha256").update(bytes).digest("hex") !== input.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+  const saved = resourceObject(await new Response(bytes).json()
+    .catch(() => { throw new EvalFailure("RESOURCE_BUDGET_INVALID", 2) }))
+  if (saved.version !== 1 || saved.kind !== "parallel-resource-budget" || typeof saved.run_id !== "string" || !saved.run_id.trim() ||
+    typeof saved.fixed_at !== "string" || !Array.isArray(saved.bounds) || !saved.bounds.length || !saved.bounds.every(validResourceBound))
+    throw new EvalFailure("RESOURCE_BUDGET_INVALID", 2)
+  if (saved.run_id !== input.runId) throw new EvalFailure("RESOURCE_BUDGET_RUN_MISMATCH", 2)
+  const fixed = Date.parse(saved.fixed_at), started = Date.parse(input.startedAt)
+  if (!Number.isFinite(fixed) || !Number.isFinite(started)) throw new EvalFailure("RESOURCE_BUDGET_TIME_UNVERIFIED", 2)
+  if (fixed >= started) throw new EvalFailure("RESOURCE_BUDGET_NOT_FIXED_BEFORE_RUN", 2)
+  return { version: 1, kind: "parallel-resource-budget", run_id: saved.run_id, fixed_at: saved.fixed_at, bounds: saved.bounds.filter(validResourceBound) }
+}
+
+async function writeResourceDocument(file: string, value: object) {
+  const output = await open(file, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
+    .catch(() => { throw new EvalFailure("RESOURCE_OUTPUT_PRIVATE", 2) })
+  try { await output.writeFile(JSON.stringify(value) + "\n"); await output.sync() }
+  finally { await output.close() }
+  const directory = await open(path.dirname(file), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+  try { await directory.sync() } finally { await directory.close() }
 }
 
 export async function readResourceSummary(input: Parameters<typeof readResourceEvidence>[0]) {

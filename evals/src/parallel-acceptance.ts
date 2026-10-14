@@ -1,15 +1,17 @@
 import type { ServerIdentity } from "./slots"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
+import { validResourceBound } from "./parallel-resource-budget"
 
 // Checks the caller's declared resource scopes; full live admission also requires the frozen manifest and other gates.
 export async function checkResourceEvidence(input: {
   file: string; samplesFile: string; runId: string; startedAt: string; finishedAt: string
   coverage: Omit<Parameters<typeof assessResourceCoverage>[0], "samples">
-  view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: unknown
+  view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: { file: string; sha256: string } | null
 }) {
-  const { readResourceEvidence } = await import("./parallel-resource-evidence")
+  const { readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
   const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
+  const budget = input.budget ? await readFrozenResourceBudget({ ...input.budget, runId: input.runId, startedAt: input.startedAt }) : null
   const groups = evidence.samples.flatMap(value => {
     const sample = acceptanceObject(value), host = acceptanceObject(sample.host), processes = acceptanceObject(sample.processes)
     return [host.collector_cgroup,
@@ -23,12 +25,12 @@ export async function checkResourceEvidence(input: {
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
     coverage: assessResourceCoverage({ ...input.coverage, samples: evidence.samples }),
     cgroups: assessCgroupCoverage({ groups, view: input.view }),
-    budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget: input.budget, summary: evidence.receipt.summary }),
+    budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget, summary: evidence.receipt.summary }),
     incidents: assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
   }
   const results = Object.values(checks)
   return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
-    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source }
+    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: input.budget }
 }
 
 export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {
@@ -232,13 +234,6 @@ export function assessParallelLimits(input: unknown) {
   if (!Array.isArray(receipt.events)) incomplete.push("LIMIT_EVENTS_MISSING")
   if (events.some(event => !validLimitEvent(event))) incomplete.push("LIMIT_EVENT_INVALID")
   return { status: codes.length ? "failed" as const : incomplete.length ? "incomplete" as const : "passed" as const, codes: [...codes, ...incomplete] }
-}
-
-function validResourceBound(value: unknown) {
-  const bound = acceptanceObject(value)
-  return typeof bound.scope === "string" && Boolean(bound.scope.trim()) && typeof bound.metric === "string" && Boolean(bound.metric.trim()) &&
-    [bound.minimum, bound.maximum].every(value => value === null || typeof value === "number" && Number.isFinite(value) && value >= 0) &&
-    (bound.minimum !== null || bound.maximum !== null) && (bound.minimum === null || bound.maximum === null || Number(bound.minimum) <= Number(bound.maximum))
 }
 
 function resourceNumbersObserved(value: unknown, keys: string[]) {
