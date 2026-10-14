@@ -712,10 +712,18 @@ inspect после response-budget refusal). Standard group-001 останови
   Pinned Node24.19 fullupstream3830tests/3820PASS/0FAIL/10SKIP/exit0,
   rootverificationc67cde34… . Эта sourcecompletion не закрывает ordinarynative
   или18+25; исходный diagnosticfailure468c4235…/cleanupfalse сохранён.
-- [ ] Собрать новую matched baseline/candidate пару с этой общей runtime-правкой,
+- [x] Собрать новую matched baseline/candidate пару с этой общей runtime-правкой,
   прежними version/model/fixtures/seed/двумя skill версиями. Native без LLM
   подтвердить JS→Group и JS→newSort→Export, сохранённый пакет/выход/cleanup,
   generic JS gestures remain denied и обе hidden Join роли на новой сборке.
+  Итоговая пара233119 source41101/runtimebf2fd06b… independently pair130d7d7f…/
+  pins791829db… Approved. OrdinaryJS507286da…/reviewc2376fff… PASS:
+  Group/directSort/CSV/5nodes4links/fullJSpreserved/genericdeny/cleanup/logout/ACK0.
+  OrdinaryJoin8cc5a138…/review7c59cfeb… PASS: оба native input-role opening/context,
+  freshoracle/3nodes2linksnoJS/Save/cleanup/logout/ACK0. Historical rawhiddenDOM
+  supporting evidence указан отдельно; новый rawcapture/standalone reread не
+  заявляются. Fresh actual15schemas+16prepare samebuild verified f958175b…/
+  aec86a27… . Seriesadmission411b35ae…/current-run233119, модельных попыток пока0.
   Новая пара203142 static/pins Approved, модели ещё0. Первый privateJoin exit1
   до import0: extra initial emptySave вернул workflow_continuations:[], поэтому
   shortworkflowId остался stalePackage1. Actualpackageclose/logout/ACKexit0
@@ -1617,3 +1625,15 @@ Freshschema probe67472exit0/15standard schemas,0c2166c3… result; actualprepare
 изordinaryJS связан в gap prerequisitef958175b… разныхSession той же immutable
 сборки. ProbeexplicitLogout=false сохранён, не подменяется ACK; gapreviewpending.
 Current-run192418 остаётся stopped доordinarygates; полные18+25 не запускались.
+
+Все ordinarynative prerequisites завершены независимо: Join root22971exit0/
+result8cc5a138…/review7c59cfeb… подтверждает оба native roleopening/context,
+fresh[[1,5,15],[1,10,15]], saved3nodes2linksnoJS, actual ownclose/logout/ACKexit0.
+Standalone postSaveinputreread/newrawhiddenDOM capture не заявлены; прошлое
+hiddenDOM evidence только supporting. JSgate independentlyc2376fff… PASS.
+Fresh gap prerequisite independentlyaec86a27… Approved на actual15schemas+
+16prepare/31cachekeys той же immutable233119; probeexplicitLogout=false остаётся.
+Rootseriesadmission411b35ae… активировал current-run233119, oldpointer сохранён
+0400. Новый denominator18baseline+25candidate/first9+16repeats, старые outcomes
+не переносились; все прежние policy/math/review gates и предел2коррекций сохраняются.
+Ordinary source/build/native prerequisite закрыт отдельно; полные43 ещёне выполнены.

@@ -1155,3 +1155,15 @@ Freshschema probe67472exit0/15standard schemas,0c2166c3… result; actualprepare
 изordinaryJS связан в gap prerequisitef958175b… разныхSession той же immutable
 сборки. ProbeexplicitLogout=false сохранён, не подменяется ACK; gapreviewpending.
 Current-run192418 остаётся stopped доordinarygates; полные18+25 не запускались.
+
+Все ordinarynative prerequisites завершены независимо: Join root22971exit0/
+result8cc5a138…/review7c59cfeb… подтверждает оба native roleopening/context,
+fresh[[1,5,15],[1,10,15]], saved3nodes2linksnoJS, actual ownclose/logout/ACKexit0.
+Standalone postSaveinputreread/newrawhiddenDOM capture не заявлены; прошлое
+hiddenDOM evidence только supporting. JSgate independentlyc2376fff… PASS.
+Fresh gap prerequisite independentlyaec86a27… Approved на actual15schemas+
+16prepare/31cachekeys той же immutable233119; probeexplicitLogout=false остаётся.
+Rootseriesadmission411b35ae… активировал current-run233119, oldpointer сохранён
+0400. Новый denominator18baseline+25candidate/first9+16repeats, старые outcomes
+не переносились; все прежние policy/math/review gates и предел2коррекций сохраняются.
+Ordinary source/build/native prerequisite закрыт отдельно; полные43 ещёне выполнены.
