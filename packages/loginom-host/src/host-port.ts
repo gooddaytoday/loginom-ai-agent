@@ -67,6 +67,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     )
       return
     const requestId = data.id
+    const method = data.method
     const input = "input" in data ? data.input : undefined
     if (!input || typeof input !== "object" || !("run" in input) || typeof input.run !== "string") {
       reply({ id: requestId, error: "LOGINOM_HOST_REQUEST_FAILED" })
@@ -74,7 +75,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     }
     const originalRunId = input.run
     try {
-      if (data.method === "acquire") {
+      if (method === "acquire") {
         if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(originalRunId))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
@@ -95,7 +96,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       const run = runs.get(originalRunId)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
       if (run.readonlyRuntime) {
-        if (data.method!=='call' || !readonlyCall(input) || run.calls || run.dispatching
+        if (method!=='call' || !readonlyCall(input) || run.calls || run.dispatching
             || service.journal.pending().length) throw Error("LOGINOM_RECOVERY_REQUIRED")
         run.calls++
         try {
@@ -109,7 +110,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (run.captureRefused) {
-        if (data.method !== "call" || !("name" in input) || typeof input.name !== "string"
+        if (method !== "call" || !("name" in input) || typeof input.name !== "string"
             || !["dock_diagnostics", "dock_workspace_observe", "dock_operation_inspect", "dock_node_status"].includes(input.name)
             || run.calls || run.dispatching) throw Error("LOGINOM_RECOVERY_REQUIRED")
         // Same retained runtime, read-only diagnosis. Never reconcile the capture
@@ -123,7 +124,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         } finally { run.calls-- }
         return
       }
-      if (data.method === "acceptance.capture") {
+      if (method === "acceptance.capture") {
         if (Object.keys(input).sort().join(",") !== "authorization,run"
             || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, originalRunId, run.chat, run.lease) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
@@ -160,8 +161,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (run.captured && run.calls) throw Error("LOGINOM_CALL_BUSY")
-      if (run.captured && ["call", "admit"].includes(data.method)) throw Error("LOGINOM_RECOVERY_REQUIRED")
-      if (data.method === "release") {
+      if (run.captured && ["call", "admit"].includes(method)) throw Error("LOGINOM_RECOVERY_REQUIRED")
+      if (method === "release") {
         run.released = true
         if (!run.calls) {
           await release(originalRunId, run)
@@ -169,19 +170,19 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         reply({ id: requestId, result: true })
         return
       }
-      if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
+      if (method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
       // Refuse competing calls before durable admission. The active call keeps its
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
-      if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
-      if (data.method === "call") run.dispatching = true
+      if (method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
+      if (method === "call") run.dispatching = true
       run.calls++
       try {
-        if (data.method === "tools") {
+        if (method === "tools") {
           const runtime = await service.runtime(run.lease.generation, "readiness")
           reply({ id: requestId, result: await runtime.request("list") })
           return
         }
-        if (data.method === "admit") {
+        if (method === "admit") {
           const runtime = await service.runtime(run.lease.generation, run.chat)
           if (
             !("userMessage" in input) ||
@@ -202,14 +203,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           })
           return
         }
-        if (data.method === "interrupt") {
+        if (method === "interrupt") {
           const runtime = await service.runtime(run.lease.generation, run.chat)
           await runtime.request("interrupt")
           reply({ id: requestId, result: true })
           return
         }
         if (
-          data.method !== "call" ||
+          method !== "call" ||
           !("name" in input) ||
           typeof input.name !== "string" ||
           !("userMessage" in input) ||
@@ -292,7 +293,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
-        if (data.method === "call") run.dispatching = false
+        if (method === "call") run.dispatching = false
         run.calls--
         if (run.released && !run.calls) {
           await release(originalRunId, run)
