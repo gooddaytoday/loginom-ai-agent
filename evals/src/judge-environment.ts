@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdtemp } from "node:fs/promises"
+import { lstat, mkdtemp } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
 import { acquireJudgeLease, globalLockRoot, writeLeaseReceipt } from "./lease"
@@ -11,9 +11,16 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
   if (!config.slotsFile || (config.judgeOnly === undefined && !config.calibrate))
     throw new EvalFailure("OFFLINE_JUDGE_MODE", 2)
   const environment = await loadJudgeEnvironment(config.slotsFile)
-  const auth = path.join(environment.codexHome, "auth.json")
-  if (path.basename(config.judge.command[0] ?? "") === "codex" && !await Bun.file(auth).exists())
-    throw new EvalFailure(`Нет входа Codex: отсутствует ${auth}. Выполните: codex login`, 2)
+  if (path.basename(config.judge.command[0] ?? "") === "codex") {
+    const auth = path.join(environment.codexHome, "auth.json")
+    const info = await lstat(auth).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw new EvalFailure("JUDGE_AUTH_PRIVATE", 2)
+    })
+    if (!info) throw new EvalFailure(`Нет входа Codex: отсутствует ${auth}. Выполните: codex login`, 2)
+    if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600)
+      throw new EvalFailure("JUDGE_AUTH_PRIVATE", 2)
+  }
   const directory = await mkdtemp(path.join(environment.stateDir, "judge-command-"))
   const commandId = crypto.randomUUID()
   const journal = path.join(directory, "journal.json")
