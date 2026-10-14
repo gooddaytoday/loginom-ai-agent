@@ -266,7 +266,23 @@ export async function createLoginomHost(options: {
       if (phase.lease!==lease || phase.binding.owner!==owner || phase.binding.run!==run || phase.binding.chat!==chat)
         throw Error('LOGINOM_HANDSHAKE_INVALID')
     },
-    authorizeCapture(authorization: unknown) {
+    async amountCaptureContext(owner:string,run:string,chat:string,lease:NonNullable<ReturnType<typeof service.acquire>>) {
+      const phase=captureStarts.get(chat),amount=getAmountHostStartup(originalOptions);
+      if(!phase || !amount || !amount.accepted || amount.pending || phase.binding.harness!=='amount-import-type-v1')throw Error('ORIGINAL_BOUND_TUPLE_PROVIDER_UNAVAILABLE');
+      const current=generations.get(lease.generation),original=current?.children.get(chat);
+      const assert=()=>{phase.guard();guardOwners();if(phase.lease!==lease || phase.binding.owner!==owner || phase.binding.run!==run || phase.binding.chat!==chat)throw Error('LOGINOM_HANDSHAKE_INVALID')};
+      assert();
+      if(!current || !original || lost.has(chat) || stale.has(chat))throw Error('LOGINOM_RUNTIME_UNAVAILABLE');
+      const runtime=await original;
+      assert();
+      if(generations.get(lease.generation)!==current || current.children.get(chat)!==original)throw Error('LOGINOM_HANDSHAKE_INVALID');
+      const ready=runtime.ready as any,capture=runtime.captureAmount,request=runtime.request,exited=runtime.exited;
+      const guard=()=>{assert();if(current.children.get(chat)!==original||lost.has(chat)||stale.has(chat)
+        || runtime.ready!==ready || runtime.captureAmount!==capture || runtime.request!==request || runtime.exited!==exited
+        || ready?.protocol!==1 || ready.ready!==true || ready.generation!==lease.generation || ready.chat!==chat)throw Error('LOGINOM_RUNTIME_UNAVAILABLE')};
+      guard();return Object.freeze({runtime,binding:phase.binding,startup:amount,guard});
+    },
+    authorizeCapture(authorization: unknown, _owner?:string, _run?:string, _chat?:string, _lease?:NonNullable<ReturnType<typeof service.acquire>>) {
       return !!options.acceptanceCapture && authorization === options.acceptanceCapture.authorization
     },
     bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {

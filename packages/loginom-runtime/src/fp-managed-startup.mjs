@@ -2,6 +2,7 @@ import {validateStartInput} from './start-input.mjs'
 import {decodePreReadyRejection} from './qualified-pre-ready.mjs'
 
 const amountManagedStartups=new WeakMap();
+const amountManagedCaptures=new WeakMap();
 
 // IPC carries the original accepted startup tuple, never an AbortSignal or
 // readiness grant. Reuse the managed startup's one original controller.
@@ -67,6 +68,7 @@ function retainManagedStartup(message,input,state,controller,key) {
       if(primary)return false
       guard();refuse(decodePreReadyRejection(value.rejection));return true
     },
+    ...(key==="amountStartup"?{cancelCapture(value){if(pending || !accepted || primary)return false;guard();refuse(value);return true}}:{}),
     accept(){guard();accepted=true},
     settle(){pending=false;clearTimeout(timer);if(state.startupController===controller)state.startupController=undefined},
   }
@@ -82,4 +84,35 @@ export function assertAmountManagedStartup(retained,state) {
   if(record.input.amountStartup!==tuple || !tuple.binding || tuple.purpose!=='amount-import-type-v1')
     throw Error('LOGINOM_AMOUNT_MANAGED_PROVIDER_UNAVAILABLE');
   return {signal:record.controller.signal,deadline:tuple.deadline,operation:tuple.operation,request:tuple.request,binding:tuple.binding};
+}
+
+// Fixed input-less capture on the already retained managed channel only.
+export function retainAmountManagedCapture(retained,state,message) {
+ const record=amountManagedStartups.get(retained),original=assertAmountManagedStartup(retained,state),frame=message.amountCapture;
+ const fields=['revision','purpose','outerRequestId','captureRequestId','managedRequestId','startupRequestId','authorization','operation','request','deadline','binding'];
+ if(!record || !retained.accepted || retained.pending || !frame || message.input!==undefined
+  || Object.keys(frame).sort().join(',')!==fields.sort().join(',') || frame.revision!==1 || frame.purpose!=='amount-import-type-v1'
+  || frame.managedRequestId!==message.id || frame.captureRequestId!==frame.outerRequestId
+  || ![frame.managedRequestId,frame.outerRequestId].every(v=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v))
+  || frame.startupRequestId!==record.tuple.requestId || frame.authorization!==record.tuple.authorization
+  || frame.operation!==original.operation || frame.request!==original.request || frame.deadline!==original.deadline
+  || !frame.binding || Object.keys(frame.binding).sort().join(',')!==Object.keys(original.binding).sort().join(',')
+  || Object.keys(original.binding).some(k=>frame.binding[k]!==original.binding[k]))throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
+ if(amountManagedCaptures.has(retained))throw Error('LOGINOM_AMOUNT_CAPTURE_CONSUMED');
+ const originalFrameBinding=frame.binding,snapshot=Object.freeze({...frame,binding:Object.freeze({...frame.binding})});let pending=true,cancelled=false;
+ const guard=()=>{
+  assertAmountManagedStartup(retained,state);
+  if(state.amountCaptureRequest!==handle || message.amountCapture!==frame || message.id!==snapshot.managedRequestId
+    || message.input!==undefined || frame.binding!==originalFrameBinding || Object.keys(frame).sort().join(',')!==Object.keys(snapshot).sort().join(',') || Object.keys(snapshot).some(k=>k==='binding'?Object.keys(snapshot.binding).some(b=>frame.binding[b]!==snapshot.binding[b]):frame[k]!==snapshot[k]))throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_CHANGED');
+ };
+ const handle=Object.freeze({frame:snapshot,signal:original.signal,guard,
+  get pending(){return pending},
+  cancel(input){
+   if(!pending || cancelled || !input || Object.keys(input).sort().join(',')!=='amountCapture,phase,rejection,requestId'
+    || input.phase!=='amount-capture' || input.requestId!==snapshot.managedRequestId || !input.amountCapture
+    || JSON.stringify(input.amountCapture)!==JSON.stringify(snapshot))return false;
+   guard();cancelled=true;return retained.cancelCapture(decodePreReadyRejection(input.rejection));
+  },settle(){pending=false}
+ });
+ amountManagedCaptures.set(retained,handle);state.amountCaptureRequest=handle;guard();return handle;
 }

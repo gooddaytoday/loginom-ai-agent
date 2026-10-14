@@ -94,6 +94,9 @@ export type AmountStartupControl = Omit<FPStartupControl, 'harness'> & {
   harness:'amount-import-type-v1'; operation:string; request:string
 }
 type ClosedStartupControl = FPStartupControl | AmountStartupControl
+type AmountCaptureFrame={revision:1;purpose:'amount-import-type-v1';outerRequestId:string;captureRequestId:string;managedRequestId:string;
+ startupRequestId:string;authorization:string;operation:string;request:string;deadline:number;binding:NonNullable<Launch['acceptanceCapture']>}
+
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
 export async function supervise(input: Launch, startup?:ClosedStartupControl) {
   startup?.guard()
@@ -121,7 +124,7 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; primary?:{value:unknown} }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void; fp?:boolean; amount?:AmountCaptureFrame; cancelled?:boolean; primary?:{value:unknown} }
   >()
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
@@ -142,10 +145,18 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
+    if(request.amount){
+      const receipt='amountCaptureReceipt' in message?message.amountCaptureReceipt as any:undefined;
+      if(!receipt || Object.keys(receipt).sort().join(',')!=='acknowledged,cleanupSettled,evidenceSettled,frame,settled'
+        || receipt.settled!==true || receipt.evidenceSettled!==false || receipt.cleanupSettled!==false || receipt.acknowledged!==false
+        || JSON.stringify(receipt.frame)!==JSON.stringify(request.amount)){
+        request.primary??={value:startup!.reject(Error('LOGINOM_AMOUNT_CAPTURE_RECEIPT_UNKNOWN'))};return;
+      }
+    }
     pending.delete(message.id)
     clearTimeout(request.timer)
     request.dispose?.()
-    if(request.fp && "rejection" in message) {
+    if((request.fp || request.amount) && "rejection" in message) {
       try {request.reject(startup!.receive(rejection(message.rejection),"rejectionOrigin" in message?message.rejectionOrigin:undefined,
         "secondaryRejection" in message?{value:rejection(message.secondaryRejection)}:undefined))}
       catch(error){request.reject(startup!.reject(error))}
@@ -169,7 +180,8 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
     return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
   }
-  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}) {
+  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}, amountOuterId?:string) {
+    if(operation==='acceptance.capture' && startup?.harness==='amount-import-type-v1' && !amountOuterId)throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
     if(control) {
       control.signal.throwIfAborted()
       if(!Number.isSafeInteger(control.deadline) || Date.now()>=control.deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
@@ -177,10 +189,21 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     }
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
+    const amountFrame:AmountCaptureFrame|undefined=amountOuterId && startup?.harness==='amount-import-type-v1' && startup.phase==='capture' && startup.binding
+      ? Object.freeze({revision:1,purpose:'amount-import-type-v1',outerRequestId:amountOuterId,captureRequestId:amountOuterId,managedRequestId:id,
+        startupRequestId:startup.requestId,authorization:startup.authorization,operation:startup.operation,request:startup.request,
+        deadline:startup.deadline,binding:startup.binding}):undefined;
+    if(amountOuterId && !amountFrame)throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
     return new Promise<unknown>((resolve, reject) => {
       const deadline=control?.deadline??Date.now()+timeout
       const cancel = (reason: unknown) => {
         if(!pending.has(id)) return
+        if(amountFrame){
+          const current=pending.get(id)!;if(current.cancelled)return;current.cancelled=true;
+          current.primary??={value:startup!.receive(reason,'control')};
+          if(child.connected)child.send({id:randomUUID(),operation:'readonly.preReady.cancel',input:{phase:'amount-capture',requestId:id,amountCapture:amountFrame,rejection:encodeReadRejection(current.primary.value)}});
+          return;
+        }
         if(startup && operation==="start") {
           const current=pending.get(id)!;if(current.primary)return;current.primary={value:reason}
           if(child.connected) child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{phase:"startup",requestId:id,startupRequestId:startup.requestId,authorization:startup.authorization,harness:startup.harness,deadline:startup.deadline,
@@ -195,9 +218,9 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
       }
       const abort = () => cancel(control!.signal.reason)
       const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
-      pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      pending.set(id, { resolve, reject, timer, ...(startup && operation==="start"?{fp:true}:{}),...(amountFrame?{amount:amountFrame}:{}), dispose:()=>control?.signal.removeEventListener("abort",abort) })
       control?.signal.addEventListener("abort",abort,{once:true})
-      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => { if (error) fail() })
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}),...(amountFrame?{amountCapture:amountFrame}:{}) }, (error) => { if (error) fail() })
       if(control?.signal.aborted)abort()
     })
   }
@@ -242,7 +265,15 @@ export async function supervise(input: Launch, startup?:ClosedStartupControl) {
     if(reply?.readonlyPreReady!==true)throw rejection(reply?.rejection)
     return reply.result
   }
-  const runtime = { ready: undefined as unknown, request, readPreReady, close, exited }
+  let amountCaptureClaimed=false;
+  async function captureAmount(outerRequestId:string){
+    guard();
+    if(!startup || startup.harness!=='amount-import-type-v1' || startup.phase!=='capture' || !startup.binding
+      || !/^[a-f0-9-]{36}$/.test(outerRequestId))throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
+    if(amountCaptureClaimed)throw Error('LOGINOM_RECOVERY_REQUIRED');amountCaptureClaimed=true;
+    return request('acceptance.capture',undefined,0,{signal:startup.signal,deadline:startup.deadline},outerRequestId);
+  }
+  const runtime = { ready: undefined as unknown, request, readPreReady, close, exited, captureAmount }
   startup?.retain(runtime)
   async function failedStart(error: unknown): Promise<never> {
     if(startup) throw startup.reject(error)

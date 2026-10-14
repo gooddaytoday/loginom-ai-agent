@@ -1,7 +1,7 @@
-import {retainAmountCaptureProxy} from './amount-capture-proxy.mjs'
+import {retainAmountCaptureProxy,assertAmountCaptureProxy} from './amount-capture-proxy.mjs'
 import {retainCaptureOwner,bindCaptureRuntime,assertCaptureOwner} from './retained-capture.mjs'
 import {retainOriginalPrepareStartup} from './original-prepare-lender.mjs'
-import {retainFPManagedStartup,retainAmountManagedStartup} from "./fp-managed-startup.mjs"
+import {retainFPManagedStartup,retainAmountManagedStartup,retainAmountManagedCapture} from "./fp-managed-startup.mjs"
 import {decodePreReadyRejection} from "./qualified-pre-ready.mjs"
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
@@ -505,6 +505,10 @@ async function handle(message) {
       send({id:message.id,result:{interrupted:true}})
       return
     }
+    if(message.operation==='readonly.preReady.cancel' && message.input?.phase==='amount-capture'){
+      if(!state.amountCaptureRequest?.cancel(message.input))throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
+      send({id:message.id,result:false});return;
+    }
     if (message.operation === "readonly.preReady.cancel") {
       const pending=preReadyRequests.get(message.input?.requestId);
       if(!pending)throw Error("LOGINOM_PRE_READY_READ_REFUSED");
@@ -526,6 +530,21 @@ async function handle(message) {
       return;
     }
 
+    if(message.operation==='acceptance.capture' && state.amountCaptureProxy){
+      const controlled=state.controlledStartup;
+      const invocation=retainAmountManagedCapture(controlled,state,message);
+      const receipt=()=>({frame:invocation.frame,settled:true,evidenceSettled:false,cleanupSettled:false,acknowledged:false});
+      try{
+        invocation.guard();assertAmountCaptureProxy(state.amountCaptureProxy,state.captureRetained.binding,invocation.signal);
+        const result=await state.bridge.captureAcceptance({signal:invocation.signal});
+        invocation.guard();assertAmountCaptureProxy(state.amountCaptureProxy,state.captureRetained.binding,invocation.signal);
+        // Capture receipt is not the missing native-cleanup completion channel.
+        send({id:message.id,result,amountCaptureReceipt:receipt()});
+      }catch(value){send({id:message.id,rejection:closeRejection(controlled.propagate(value)),rejectionOrigin:controlled.rejectionOrigin,
+        ...(controlled.secondary?{secondaryRejection:closeRejection(controlled.secondary.value)}:{}),amountCaptureReceipt:receipt()})}
+      finally{invocation.settle()}
+      return;
+    }
     if (message.operation === "acceptance.capture") {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")

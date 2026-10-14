@@ -32,6 +32,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   const pending = new Set<Promise<void>>()
   let amountClaimed=false
   const amountAcquires=new Map<string,{run:string;startup:NonNullable<ReturnType<typeof service.amountStartupControl>>}>()
+  const amountCaptures=new Map<string,{run:string;startup:NonNullable<ReturnType<typeof service.amountStartupControl>>;cancelled:boolean}>()
   const reads = new Map<string, {run: NonNullable<ReturnType<typeof runs.get>>; controller: AbortController; authorization: string}>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
@@ -88,6 +89,15 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             || !("operation" in input) || input.operation!==active.startup.tuple.operation || !("request" in input) || input.request!==active.startup.tuple.request
             || !("deadline" in input) || input.deadline!==active.startup.control.deadline || !("rejection" in input))throw Error("LOGINOM_METHOD_INVALID");
         active.startup.abortAcquired(decodeReadRejection(input.rejection));reply({id:data.id,result:false});return;
+      }
+      if(data.method==='readonly.preReady.cancel' && 'phase' in input && input.phase==='capture'){
+        const active='requestId' in input&&typeof input.requestId==='string'?amountCaptures.get(input.requestId):undefined;
+        if(!active || active.cancelled || Object.keys(input).sort().join(',')!=='authorization,captureRequestId,deadline,operation,phase,rejection,request,requestId,run'
+          || input.run!==active.run || !('captureRequestId' in input) || input.captureRequestId!==('requestId' in input?input.requestId:undefined)
+          || !('authorization' in input) || input.authorization!==active.startup.tuple.authorization
+          || !('operation' in input) || input.operation!==active.startup.tuple.operation || !('request' in input) || input.request!==active.startup.tuple.request
+          || !('deadline' in input) || input.deadline!==active.startup.control.deadline || !('rejection' in input))throw Error('LOGINOM_METHOD_INVALID');
+        active.cancelled=true;active.startup.abortAcquired(decodeReadRejection(input.rejection));reply({id:data.id,result:false});return;
       }
       if (data.method === "acquire") {
         const receiver='receiverPurpose' in input
@@ -215,7 +225,29 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (data.method === "acceptance.capture") {
-        if(run.amountHeld)throw Error("LOGINOM_AMOUNT_CAPTURE_PROXY_UNAVAILABLE")
+        if(run.amountHeld){
+          const amount=service.amountStartupControl?.(),control='amountControl' in input?input.amountControl as any:undefined;
+          if(!amount || !amount.accepted || amount.pending || run.captured || run.calls || run.dispatching || run.active.size || service.journal.pending().length
+            || Object.keys(input).sort().join(',')!=='amountControl,authorization,captureRequestId,run' || !('authorization' in input) || input.authorization!==amount.tuple.authorization || !service.authorizeCapture(input.authorization,owner,input.run,run.chat,run.lease)
+            || !('captureRequestId' in input) || input.captureRequestId!==data.id || !/^[a-f0-9-]{36}$/.test(data.id)
+            || !control || Object.keys(control).sort().join(',')!=='authorization,operation,request' || control.authorization!==amount.tuple.authorization
+            || control.operation!==amount.tuple.operation || control.request!==amount.tuple.request || !('deadline' in data) || data.deadline!==amount.control.deadline)throw Error('LOGINOM_AMOUNT_CAPTURE_FRAME_REFUSED');
+          amount.guard();service.assertCapture(owner,input.run,run.chat,run.lease);
+          amountRequest=true;run.captured=true;run.dispatching=true;run.calls++;amountCaptures.set(data.id,{run:input.run,startup:amount,cancelled:false});
+          const owned=async<T>(work:()=>Promise<T>)=>{try{return await work()}catch(value){throw amount.forward(amount.reject(value))}};
+          let journalId:string|undefined;
+          try{
+            const original=await service.amountCaptureContext(owner,input.run,run.chat,run.lease);original.guard();
+            journalId=await owned(()=>service.journal.begin(run.chat,run.lease.generation));run.active.add(journalId);original.guard();
+            await original.runtime.captureAmount(data.id);original.guard();
+            // This cut has no original native cleanup-completion provider.
+            throw Error('LOGINOM_AMOUNT_PHYSICAL_SETTLEMENT_UNAVAILABLE');
+          }catch(value){
+            run.captureRefused=true;run.lease.holdRecovery();service.recoveries.set(run.chat,run.lease);
+            if(journalId)await owned(()=>service.journal.settle(journalId!,false));
+            throw amount.forward(amount.propagate(value));
+          }finally{amountCaptures.delete(data.id);run.calls--;run.dispatching=false}
+        }
         if (Object.keys(input).sort().join(",") !== "authorization,run"
             || !("authorization" in input) || !service.authorizeCapture?.(input.authorization) || run.captured)
           throw Error("LOGINOM_METHOD_INVALID")
@@ -387,7 +419,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
     } catch (error) {
       const amount=service.amountStartupControl?.();
-      if(amount && amountRequest && data.method==="acquire")reply({id:data.id,rejection:encodeAmountRejection(amount.propagate(error)),rejectionOrigin:amount.rejectionOrigin,
+      if(amount && amountRequest && (data.method==="acquire" || data.method==="acceptance.capture"))reply({id:data.id,rejection:encodeAmountRejection(amount.propagate(error)),rejectionOrigin:amount.rejectionOrigin,
         ...(amount.secondary?{secondaryRejection:encodeAmountRejection(amount.secondary.value)}:{})});
       else reply(receiverRequest?{id:data.id,error:hostError(error),rejection:encodeReadRejection(error)}:{ id: data.id, error: hostError(error) })
     }
