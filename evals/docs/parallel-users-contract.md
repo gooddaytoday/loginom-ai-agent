@@ -369,3 +369,13 @@ directories и по одному grant Everyone/UserKind=2. Read-only enumeratio
 подтверждает write semantics, возможность Delete/Add, удаление этих grants или
 effective isolation. До допуска design user нужны scoped mutation/read-back
 под guards и реальные negative access tests. Session qualification остаётся false.
+
+User mutation принимает SlotLease, не отдельный SlotDefinition. До command intent
+readUserPreparation проверяет held guards, configured slot/canonical credential
+path, durable staged nonce/endpoint/identity и credential SHA; secret не
+создаётся и не восстанавливается reader. После ожидания очереди проверка
+повторяется перед dispatch; изменение staged metadata запрещает RPC. Payload
+связывает slot, private credential path, preparation nonce и desired/secret SHA.
+Закрытый lease в actual native bridge даёт LEASE_NOT_HELD без reconcile-user
+в journal. Это preflight gate; реальный account create/update/ACL/unblock и
+неизменность секретных байтов внутри driver перед mutation ещё требуют реализации.

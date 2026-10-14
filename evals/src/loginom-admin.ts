@@ -19,7 +19,7 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
   })
 }
 import { EvalFailure } from "./fail"
-import type { ServerIdentity, SlotDefinition, SlotFile } from "./slots"
+import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, mkdir, mkdtemp, open, readdir, realpath } from "node:fs/promises"
@@ -27,6 +27,7 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
+import { readUserPreparation } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
@@ -36,7 +37,7 @@ const frameLimit = 1024 * 1024
 export type AdminConnection = {
   identity: ServerIdentity
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
-  reconcileUser(slot: SlotDefinition, secretFile: string): Promise<{ userKey: string; aclHash: string }>
+  reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
 }
@@ -73,9 +74,10 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   void pending.catch(() => { stopInput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)); stopOutput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)) })
   const channel = createJournaledAdminChannel(output.readable, input.writable, path.join(directory, "commands"))
   let sequence = Promise.resolve()
-  const request = (op: AdminOperation, payload: unknown) => {
+  const request = (op: AdminOperation, payload: unknown, beforeSend?: () => Promise<void>) => {
     const result = sequence.then(async () => {
       if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      await beforeSend?.()
       return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + 30_000, payload })
     })
     sequence = result.then(() => undefined, () => undefined)
@@ -120,8 +122,14 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (!jsonObject(data) || data.sessionIdentityQualified !== true || !Array.isArray(data.sessions)) throw new EvalFailure("SESSION_IDENTITY_UNSUPPORTED", 2)
       return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
     },
-    async reconcileUser(slot, secretFile) {
-      const data = requireAdminReply(await request("reconcile-user", { slot, secretFile }))
+    async reconcileUser(lease, secretFile) {
+      const prepared = await readUserPreparation(file, lease, secretFile)
+      if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      const data = requireAdminReply(await request("reconcile-user", { slot: lease.slot, secretFile,
+        preparationNonce: prepared.nonce, desiredHash: prepared.desiredHash, secretHash: prepared.secretHash }, async () => {
+        if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared))
+          throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
+      }))
       if (!jsonObject(data) || typeof data.userKey !== "string" || typeof data.aclHash !== "string") throw new EvalFailure("ADMIN_PROTOCOL", 2)
       return { userKey: data.userKey, aclHash: data.aclHash }
     },
