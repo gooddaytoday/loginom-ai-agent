@@ -1390,7 +1390,7 @@ CLI0/wrapper1/cleanuptrue, JS1 и `JAVASCRIPT_NOT_ALLOWED`;
 SHA attempt `63eb7bdf…`, audit `241cb302…`. Root23200 завершён exit0.
 В17полных baseline-аудитах JS-узлов9: ABC3×2 и first-last3×1;
 failedclaims3 остаётся CLI1/wrapper3/cleanupfalse/incomplete без замены.
-Фактическая baseline-хронология отличается от исходного рекомендуемого
+Фактическая baseline-хронология отличается от заданного в исходном плане
 порядка Task3: sales/2 выполнен сразу после sales/1, sales/3 — перед остальными
 attempt2. Это отклонение сохраняется в ledger;18уникальных слотов/аналитические
 входы/model/pins/фазы и последовательное использование профиля не изменялись.
@@ -1404,3 +1404,30 @@ ROI3+firstlast3 own inputs/savedLGP/CSV, existingarchive102→108,
 freshroot519→predicted513, fullinversemap. Независимый review ещё ожидается,
 перенос этих6файлов ещё не выполнен; candidate0/25, новыхпроцессовнет.
 Полная приёмка остаётся незавершённой.
+
+
+На 2026-10-14 02:46 UTC финальный baseline ledger `7db572d8…` независимо подтверждён:
+18unique started/finished,17machine/oracle/расчёт PASS,11policy PASS,
+6FAIL и1incomplete,JSnodes9/calls10/successful9;330assistant model/variant messages,
+18parentless/childfree snapshots,54runtime files,74source/10inputs и оба288runtime.
+Incremental6перенос послеreview `0e70093b…` завершён: receipt `f0d2a18a…`,
+513root/108archive измерены; postmove review `c9135a0d…` подтверждает все108bytes/
+inodes/sourceabsence/обратнуюкарту и неизменность231evidence/pins/source/runtime.
+
+Candidate first3 запущены root56096 в закреплённом порядке
+sales/1→ABC/1→monthly/1; следующий слот начинается только при CLI/wrapper0,
+cleanup/modelStarted/finishedAt/policy/oracle/fullcalculation PASS, иначе очередьSTOP.
+`sales-by-category/1` завершён: Session `ses_ec7b8c849ffeWvjumDgTnvsJCs`,
+CLI/wrapper0,cleanuptrue,policy/oracle/расчёт PASS,JS0;
+SHA attempt `28e2d1d6…`, audit `bd4b399d…`.
+Candidate completed1/25 (firstwave1/9); сейчас ABC/1,Session `ses_ec7b3d89fffeuHWc7SGKou3bao`.
+Read-only ранний наблюдатель использует существующий frozen `inspectSelection`
+на complete own-session tool_use parts в standardcases: canonical
+`target.type=programming.javascript` означает `JAVASCRIPT_NOT_ALLOWED`
+независимо от completed/error и output.running; при таком доказательстве root
+прерывает own supervisor черезSIGINT и не запускает оставшиеся digest slots.
+Describe/Calculator formulas/source refs и произвольные aliases не выдаются за
+такое доказательство; финальный полный аудит остаётся обязательным.
+Новый helper/source не создавался; общий build/skill/pins unchanged.
+После cleanfirst3 нужен адресный archive9ихcopiedfiles передследующимchunk3.
+Полная приёмка ещё не завершена.
