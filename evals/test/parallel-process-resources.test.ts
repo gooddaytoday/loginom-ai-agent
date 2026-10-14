@@ -4,7 +4,9 @@ import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
 import { assessProcessResourceTimeline, assessResourceCoverage, checkResourceEvidence } from "../src/parallel-acceptance"
-import { freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { freezeResourceManifest, readResourceProcessWindows, freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { parallelFixture } from "./helpers/parallel-fixture"
+import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 
 test("resource evidence covers the actual persisted launcher lifetime from dispatch to exit", async () => {
@@ -12,6 +14,15 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
   const samplesFile = path.join(root, "samples.jsonl"), abort = new AbortController()
   const budget = await freezeResourceBudget({ out: path.join(root, "budget.json"), runId: "full-lifetime",
     bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })
+  const fixture = await parallelFixture(root), slotsFile = path.join(root, "slots.json")
+  await writeLeaseReceipt(slotsFile, fixture.slots)
+  const view = (await sampleHostResources([root])).collector_cgroup.view
+  if (!view) throw Error("Fixture cgroup view unavailable")
+  const containers = ["server", "studio"].map((role, index) => ({ role: role as "server" | "studio", id: String(index + 1).repeat(64),
+    image: "sha256:" + String(index + 3).repeat(64), startedAt: "2026-10-14T10:00:00.000Z", name: fixture.slots.server[role === "server" ? "container" : "studioContainer"],
+    nonce: crypto.randomUUID(), purpose: "research" }))
+  const manifests = await Promise.all([1, 2].map(parallel => freezeResourceManifest({ out: path.join(root, `manifest-${parallel}.json`),
+    runId: "full-lifetime", slotsFile, parallel, containers, view, budget: budget.source })))
   const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "full-lifetime", phase: "run",
     signal: abort.signal, processes: sampleSupervisedResources })
   let confirmed = false
@@ -22,11 +33,17 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       await Bun.sleep(10)
     }
     const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
-      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "judge", id: "full-lifetime" } })
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "slot", id: "a" } })
     confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
     expect(confirmed).toBe(true)
     const lifetime = (await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime
     expect(lifetime).toEqual(run.processCleanup.lifetime)
+    const proofFile = path.join(root, "process-cleanup.json")
+    const source = { file: proofFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await Bun.file(proofFile).json())).digest("hex"),
+      producerPid: process.pid, owner: lifetime.owner }
+    expect(await readResourceProcessWindows([source])).toEqual([{ kind: lifetime.owner.kind, id: lifetime.owner.id,
+      producerPid: process.pid, launcher: lifetime.launcher, startedAt: lifetime.started_at, finishedAt: lifetime.finished_at }])
+
     while ((await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line)).at(-1).host.observed_at < lifetime.finished_at) {
       if (Date.now() > deadline) throw Error("Lifetime final bracket frame did not arrive")
       await Bun.sleep(10)
@@ -37,10 +54,27 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     await writeResourceSummary({ samplesFile, out: file })
     const samples = (await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line))
     const owner = { ...lifetime.owner, launcher: lifetime.launcher }
-    expect(await checkResourceEvidence({ file, samplesFile, runId: "full-lifetime", startedAt: lifetime.started_at, finishedAt: lifetime.finished_at,
+    const request = { file, samplesFile, runId: "full-lifetime", startedAt: lifetime.started_at, finishedAt: lifetime.finished_at,
       coverage: { paths: [root], containers: [], owners: [owner] },
-      processWindows: [{ ...owner, startedAt: lifetime.started_at, finishedAt: lifetime.finished_at }],
-      view: samples[0].host.collector_cgroup.view, budget: budget.source })).toMatchObject({ status: "passed", codes: [] })
+      processWindows: [{ ...owner, startedAt: "unverified", finishedAt: lifetime.finished_at }], processProofs: [source],
+      view: samples[0].host.collector_cgroup.view, budget: budget.source }
+    expect(await checkResourceEvidence(request)).toMatchObject({ status: "passed", codes: [] })
+    expect((await checkResourceEvidence({ ...request, manifest: manifests[0]!.source })).checks.processTimeline)
+      .toEqual({ status: "passed", codes: [] })
+    expect((await checkResourceEvidence({ ...request, manifest: manifests[1]!.source })).checks.processTimeline)
+      .toEqual({ status: "incomplete", codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] })
+    await expect(readResourceProcessWindows([{ ...source, producerPid: process.pid + 1 }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
+    await expect(readResourceProcessWindows([{ ...source, owner: { ...source.owner, id: "foreign-owner" } }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
+    await expect(readResourceProcessWindows([{ ...source, sha256: "0".repeat(64) }])).rejects.toThrow("RESOURCE_SOURCE_HASH_MISMATCH")
+    await expect(readResourceProcessWindows([source, source])).rejects.toThrow("RESOURCE_PROCESS_PROOF_INVALID")
+    const savedProof = await Bun.file(proofFile).json()
+    const unready = { ...savedProof, launcher: { ...savedProof.launcher, ready: false } }
+    await writeLeaseReceipt(proofFile, unready)
+    await expect(readResourceProcessWindows([{ ...source,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(unready)).digest("hex") }]))
+      .rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
+    await writeLeaseReceipt(proofFile, savedProof)
+
   } finally { abort.abort(); await collecting; if (confirmed) await rm(root, { recursive: true, force: true }) }
 }, 15000)
 
