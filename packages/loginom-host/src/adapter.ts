@@ -9,7 +9,7 @@ import { transport, type Port } from "./transport"
 type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }>; audit?: { authorization: string; phase: "ordinary" | "capture" } }
 const state: { connection?: ReturnType<typeof transport>; owner?: Owner; control?: ReturnType<typeof retainOriginalRunControl> } = {}
 export function connect(port: Port, owner?: Owner, originalControl?: object) {
-  const control = originalControl ? retainOriginalRunControl(originalControl) : undefined
+  const control = originalControl ? retainOriginalRunControl(originalControl, owner, port) : undefined
   if (control && !owner) throw Error("LOGINOM_ORIGINAL_OWNER_UNAVAILABLE")
   state.connection?.close()
   state.connection = transport(port)

@@ -1,5 +1,5 @@
 // Private fixed standalone producer/SDK consumer binding. Never serialized authority.
-const originals = new WeakMap<object, { signal: AbortSignal; deadline: number }>()
+const originals = new WeakMap<object, { signal: AbortSignal; deadline: number; owner?: object; port?: object }>()
 const throwIfAborted = AbortSignal.prototype.throwIfAborted
 export function mintOriginalRunControl(signal: AbortSignal, deadline: number) {
   throwIfAborted.call(signal)
@@ -8,7 +8,7 @@ export function mintOriginalRunControl(signal: AbortSignal, deadline: number) {
   originals.set(control, { signal, deadline })
   return control
 }
-export function retainOriginalRunControl(control: object) {
+export function retainOriginalRunControl(control: object, owner?: object, port?: object) {
   const original = originals.get(control)
   if (!original) throw Error("LOGINOM_ORIGINAL_RUN_UNAVAILABLE")
   const guard = () => {
@@ -17,6 +17,11 @@ export function retainOriginalRunControl(control: object) {
     if (Date.now() >= original.deadline) throw Error("LOGINOM_ORIGINAL_RUN_EXPIRED")
   }
   guard()
+  if (owner) {
+    if (original.owner && (original.owner !== owner || original.port !== port)) throw Error("LOGINOM_ORIGINAL_OWNER_CHANGED")
+    original.owner = owner
+    original.port = port
+  }
   return { signal: original.signal, deadline: original.deadline, guard }
 }
 

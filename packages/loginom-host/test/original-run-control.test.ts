@@ -34,3 +34,4 @@ test('fixed standaloneRun connect statement binds actual root producer to the pr
   expect(await lease!.call('dock_prepare',{typed:{action:'prepare'}},'same-message')).toEqual({same:true})
  },true)}finally{f.close()}
 })
+for(const kind of ['copy-owner','foreign-port'])test('same original control cannot bind '+kind,()=>{const f=fixture(),o=original();try{adapter.connect(f.port,o.owner,o.control);expect(()=>adapter.connect(kind==='foreign-port'?{...f.port}:f.port,kind==='copy-owner'?{...o.owner}:o.owner,o.control)).toThrow('LOGINOM_ORIGINAL_OWNER_CHANGED');expect(retainOriginalRunControl(o.control).signal).toBe(o.controller.signal)}finally{f.close()}})
