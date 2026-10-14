@@ -386,3 +386,20 @@ SHA attempt `08df55f5…`, audit `49ba77dc…`. Root29101 завершён, `.wr
 сценариев/2–3. Candidate first9 разрешён только после всех 18 baseline.
 Все шесть завершённых попыток дали oracle и полный расчёт PASS;
 policy PASS у пяти, ABC/Pareto использовал два JS-узла. Приёмка ещё не завершена.
+
+
+На 2026-10-14 00:54 UTC завершены 7/18 baseline, 0/25 candidate.
+`first-last-touch/1` прошёл oracle и полный расчёт, CLI exit 0, wrapper exit 1,
+cleanup подтверждён; один JS-узел дал `JAVASCRIPT_NOT_ALLOWED`.
+Session `ses_ec81ccd64ffeAxnGWvlWW7Q8rB`, SHA attempt `5d97c4d8…`,
+audit `8ca3380d…`. Во всех семи завершённых baseline oracle/расчёт PASS;
+policy PASS у пяти, JS встретился в ABC/Pareto и first/last touch.
+Root82747 завершён, `.writer` отсутствовал, оставшиеся 11 слотов и их root logs
+не существовали. Root17410 последовательно запускает отдельные процессы
+проверенного `run-node-selection-attempt.ts`: sales/3; ABC/2; monthly/2;
+claims/2; ROI/2; first-last/2; ABC/3; monthly/3; claims/3; ROI/3; first-last/3.
+Каждый следующий процесс допускается только после CLI exit 0, modelStarted,
+finishedAt, cleanup true, отсутствия blocker/collection failures/timeout и
+wrapper exit 0 или 1. Baseline policy failure остаётся измерением; техническая
+аномалия останавливает очередь для разбора. Candidate в очередь не включён.
+Текущий слот — sales/3; полная серия и итоговая приёмка ещё не завершены.
