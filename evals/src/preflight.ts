@@ -18,13 +18,13 @@ export type Environment = {
   loginom: { imageDigest: string | null } | null
 }
 
-export async function preflight(config: EvalConfig, source: ArtifactSource): Promise<Environment> {
+export async function preflight(config: EvalConfig, source: ArtifactSource, signal?: AbortSignal): Promise<Environment> {
   const environment: Environment = { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
   if (config.dryRun) {
     await requireFixtures()
     return environment
   }
-  if (!config.skipJudge) environment.codex = await codexInfo(config.judge)
+  if (!config.skipJudge) environment.codex = await codexInfo(config.judge, signal)
   // --judge-only и --calibrate не запускают агента: Loginom, docker, Dock и bundle не нужны.
   if (config.judgeOnly !== undefined || config.calibrate) return environment
   if (config.agent.cliMode === "source")
@@ -223,9 +223,9 @@ export async function gitInfo() {
   return { sha: sha.text().trim(), dirty: status.text().trim().length > 0 }
 }
 
-async function codexInfo(judge: Pick<JudgeSettings, "command" | "env">) {
+async function codexInfo(judge: Pick<JudgeSettings, "command" | "env">, signal?: AbortSignal) {
   const env = judgeEnvironment(judge.env)
-  const version = await judgeVersion({ command: judge.command, env })
+  const version = await judgeVersion({ command: judge.command, env }, signal)
   if (version.exitCode !== 0)
     throw new EvalFailure(`Судья недоступен: ${judge.command.join(" ")} --version → код ${version.exitCode}`, 2)
   const home = env.CODEX_HOME ?? path.join(os.homedir(), ".codex")

@@ -10,6 +10,19 @@ import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test("preflight: a cancelled admission does not start the judge version probe", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-cancelled-"))
+  try {
+    const probe = path.join(root, "version.json")
+    const config = loadConfig(["--judge-only", "fixture"], { JUDGE_MODEL: "fake",
+      EVAL_JUDGE_COMMAND: `${fakeJudge} --version-home-file ${probe}` })
+    const abort = new AbortController()
+    abort.abort()
+    await expect(preflight(config, parseArtifactSource("docker", config.loginom), abort.signal)).rejects.toThrow("JUDGE_VERSION_UNCONFIRMED")
+    expect(await Bun.file(probe).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("preflight: parent auth cannot admit an empty explicit judge home", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-home-"))
   try {
