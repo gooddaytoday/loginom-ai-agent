@@ -1,0 +1,352 @@
+{
+  "format": 1,
+  "checked_utc": "2026-10-14T05:32:11.500334+00:00",
+  "scope": "LAB57 original Ben cleanup only; final SOURCE verification, no live adoption or case ACCEPT",
+  "policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+  "source_sha": "e46bdc9003354cf4e58fb0899c4ba3b39152a1f0",
+  "source_base": "dba983f404d205488ff29c9e3e493b78927f4889",
+  "immediate_parent": "3813d0a35d7397a03753acb15395257311b15c20",
+  "active_support_sha": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+  "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+  "review_cycle": 2,
+  "reject_count": 1,
+  "worker_report": {
+    "id": "01a138c3-dda8-7cb1-97eb-04739e69b751",
+    "parent": "01a1385e-7729-7a63-b906-e07c0e1fa138",
+    "created_utc": "2026-10-14T04:55:22Z",
+    "status": "READY_SOURCE_FOR_OPERATOR / NOT_APPLIED / VERDICT_BEN BLOCKED"
+  },
+  "root_archive_verification": {
+    "archive_bytes": 5029546,
+    "archive_sha256": "f8f404bc787dfbe5876acb47265ee6aa14fa564591ba2f89a3d21677a4b6afab",
+    "manifest_sha256": "a0bd840ff598501d7985173523606ec7bef749cfd41cff3e1c68c4b454ad9b28",
+    "payload_count": 1110,
+    "CRC_all_passed": true,
+    "safe_unique_regular_paths": true,
+    "payload_hashes_all_passed": true,
+    "embedded_external_manifest_equal": true,
+    "source_stage_only_not_actual_cleanup": true
+  },
+  "root_source_verification": {
+    "source_sha": "e46bdc9003354cf4e58fb0899c4ba3b39152a1f0",
+    "dba_ancestor": true,
+    "active0fd_ancestor": true,
+    "immediate_parent": "3813d0a35d7397a03753acb15395257311b15c20",
+    "manifest_entries_verified": 834,
+    "source_git_blobs_verified": 833,
+    "built_non_git_entry": [
+      "lab57-owned-route.mjs"
+    ],
+    "unchanged_dba_eval_files": 805,
+    "changes": [
+      "A\tevals/docs/evaler/lab57-owned-route-admission.schema.json",
+      "A\tevals/docs/evaler/lab57-owned-route-source.md",
+      "A\tevals/script/lab57-history-rows.py",
+      "A\tevals/script/lab57-owned-route.ts",
+      "A\tevals/script/lab57-queue-pages.py",
+      "A\tevals/script/lab57-route-helper.ts",
+      "A\tevals/script/lab57-route-inspect.py",
+      "M\tevals/src/cli.ts",
+      "A\tevals/src/lab57-closed-route.ts",
+      "M\tevals/src/lab57-dispatcher-host.ts",
+      "M\tevals/src/lab57-guard-provenance.ts",
+      "A\tevals/src/lab57-native-capture.ts",
+      "A\tevals/src/lab57-native-permit.ts",
+      "A\tevals/src/lab57-node-identity.ts",
+      "A\tevals/src/lab57-recovery-attestation.ts",
+      "A\tevals/src/lab57-route-admission.ts",
+      "A\tevals/src/lab57-route-host.ts",
+      "M\tevals/src/node-eval-ops.ts",
+      "M\tevals/src/profile.ts",
+      "A\tevals/test/fixtures/lab57-cleanup-proposal/protected-originals.json",
+      "A\tevals/test/lab57-closed-route.test.ts",
+      "A\tevals/test/lab57-history-guard.test.ts",
+      "A\tevals/test/lab57-history-rows.test.ts",
+      "A\tevals/test/lab57-native-capture.test.ts",
+      "A\tevals/test/lab57-native-permit.test.ts",
+      "A\tevals/test/lab57-node-identity.test.ts",
+      "A\tevals/test/lab57-queue-pages.test.ts",
+      "A\tevals/test/lab57-route-admission.test.ts"
+    ],
+    "parent_diffs_exact_with_delivered_abbrev9": true,
+    "first_local_diff_header_mismatch": "Local git selected abbrev10; delivered patch uses abbrev9. Explicit abbreviation resolves exact bytes; source/Git blobs were equal; no native or release retry.",
+    "source_manifest_sha256": "6e598726d5bbc85dfe977c5af1773fe8c872bf6612018a6db563aa70057eefd3",
+    "bundle_sha256": "11984fcadaef85632b297ada6b965e55b9ae04c6d9f2372b52ddd7860f0f06e7",
+    "executable_sha256": "b6befb924f17f4059612bf3a7ff4be3f0a2a3b57b498cb2a02cfe324ed7d8eae"
+  },
+  "saved_worker_validation": {
+    "source_tests": {
+      "closed_route": {
+        "pass": 274,
+        "fail": 0
+      },
+      "ordinary_regression": {
+        "pass": 13,
+        "skip": 1,
+        "fail": 0
+      },
+      "typecheck": "PASS"
+    },
+    "genuine_process_proofs_verified": 35,
+    "continuous": 5,
+    "unit_after_exit": 30,
+    "RED_errors_retained": 16,
+    "all_capture_complete_confirmed_error_null_zero_owned_twice": true,
+    "actual_test_output_counts": {
+      "earlier_final_source_tests_18": {
+        "pass": 273,
+        "fail": 0,
+        "files": 12,
+        "expects": 489
+      },
+      "final_queues_green_21_exact_source": {
+        "pass": 274,
+        "fail": 0,
+        "files": 13,
+        "expects": 492
+      },
+      "queues_red_20_retained": {
+        "pass": 273,
+        "fail": 1,
+        "files": 13
+      },
+      "final_independent_Evaler_exact_source_full_check": {
+        "pass": 287,
+        "fail": 0,
+        "files": 14,
+        "expects": 508
+      },
+      "ordinary_worker_and_Evaler": {
+        "pass": 13,
+        "skip": 1,
+        "fail": 0,
+        "expects": 50
+      },
+      "saved_output_counts_checked_by_root": true
+    }
+  },
+  "root_targeted_validation": {
+    "new_files": [
+      "lab57-node-identity.test.ts",
+      "lab57-native-permit.test.ts",
+      "lab57-route-admission.test.ts",
+      "lab57-closed-route.test.ts",
+      "lab57-history-guard.test.ts",
+      "lab57-history-rows.test.ts",
+      "lab57-native-capture.test.ts",
+      "lab57-queue-pages.test.ts"
+    ],
+    "first_result": {
+      "pass": 63,
+      "fail": 1,
+      "expect_calls": 138,
+      "exit": 1,
+      "namespace_uid": 1001
+    },
+    "UID_diagnosis_and_narrow_recheck": {
+      "checked_utc": "2026-10-14T05:20:08.539145+00:00",
+      "exit": 0,
+      "test_file": "lab57-native-capture.test.ts",
+      "namespace_uid": 1000,
+      "initial_local_host_uid": 1001,
+      "original_fixture_uid": 1000,
+      "source_fixture_checks_unchanged": true,
+      "diagnosis": "First root run63PASS1FAIL: positive original capture rejected at process.getuid UID1001 vs frozen fixture1000. Narrow namespace UID1000 rerun preserves actual file/kernel checks and wrong UID negative; no global mock or fixture mutation. Original first failure retained.",
+      "boundary": "bwrap unshare-all/read-only source/clearenv/tmpfs/no real profiles/auth/storage/CLI/native/Docker/network",
+      "root_model_native_recovery_resource_effects": 0
+    },
+    "capture_file_recheck": {
+      "pass": 15,
+      "fail": 0,
+      "expect_calls": 15,
+      "exit": 0
+    },
+    "verified_unique_new_tests": 64,
+    "verified_unique_expect_calls": 138,
+    "initial_wrong_UID_masked_capture_negatives_rechecked_under_original_UID1000": true,
+    "unchanged_old_90_42_78_full_suites_not_repeated": true,
+    "source_fixture_unchanged": true
+  },
+  "independent_Evaler": {
+    "report_id": "01a138d5-7561-7199-b4e1-ef92ef88b749",
+    "parent": "01a138c3-dda8-7cb1-97eb-04739e69b751",
+    "created_utc": "2026-10-14T05:14:35Z",
+    "decision": "SOURCE_ACCEPTED / OPERATOR_NOT_READY",
+    "archive_bytes": 34112,
+    "archive_sha256": "6573496072d8a9e9128333b3c2153d72229a7c0d005c4caafe42c26f0af0ac53",
+    "root_review_payload_verification": {
+      "payload_count": 21,
+      "manifest_sha256": "83119f439b8b2096d1a322e65574ee53a0d9d2a23a11d2635fcd4fdaaa366306",
+      "ZIP_sha256": "6573496072d8a9e9128333b3c2153d72229a7c0d005c4caafe42c26f0af0ac53",
+      "all_hashes_paths_types_CRC_verified": true,
+      "two_independent_saved_process_captures_verified": true,
+      "review_SOURCE_ACCEPTED_only_not_cleanup_ACCEPT": true
+    },
+    "independent_source_tests": {
+      "pass": 287,
+      "fail": 0,
+      "assertions": 508,
+      "files": 14,
+      "new_independent_tests": 13
+    },
+    "ordinary_regression": {
+      "pass": 13,
+      "skip": 1,
+      "fail": 0,
+      "assertions": 50
+    },
+    "rebuilt_executable_byte_equal": true,
+    "two_genuine_continuous_captures": {
+      "processes": [
+        19,
+        3
+      ],
+      "confirmed": true,
+      "two_zero_owned_passes_each": true
+    },
+    "root_did_not_repeat_independent_Evaler_full_suite": true
+  },
+  "source_code_review": [
+    "Exact fixed original common owner/config/acquisition/stand inode and private operation guard; no acquire/transfer/rebinding/old ABANDONED reuse.",
+    "Actual process.execPath and /proc kernel executable path/bytes/dev/inode/SHA and concrete one-use permits at connector/effects; no-op and forged permits rejected. Bun helper requires live original Node controller and concrete collector.",
+    "Original recovery reservation and distinct private wx0600 once with file/parent fsync precede new diagnostic/profile/native effects; spent on unknown/error/crash; source delivery cannot self-admit.",
+    "Coherent copied original DB/WAL/SHM/history bytes before any profile change; normal private-copy SQL audits actual77 Luna/high body hashes; original DB never SQL-opened by root.",
+    "Actual full stable vendor inventory/original run-journal-package bytes, bounded original readonly single-target closure or complete authoritative scope absence; ACK alone no cessation.",
+    "Exact own empty self observer/logout, real continuous process provenance/raw proof and two zero passes precede official supported recovery/history; no model/product rerun.",
+    "Whole exact registration/guard no-replace preservation and sole owned CSV cleanup; strict incident-specific attestation before ordinary completion release/FREE; generic writer-error eligibility not widened.",
+    "Five modified source files plus23 tracked additions;833 exact Git blobs and one manifested generated executable. Legacy profile calls keep existing default behavior; source supervisor/lease unmodified.",
+    "Current code explicitly refuses all agents pending tasks, including another runtime; changing that guard requires separate evidence and source decision. No queue filtering approved here."
+  ],
+  "operator_prerequisites": {
+    "status": "NOT_READY",
+    "last_independent_full_queue_observation": {
+      "checked_utc": "2026-10-14T05:05:33.903895+00:00",
+      "agents": 12,
+      "records": 2005,
+      "pagination_complete": true,
+      "other_pending_count": 7,
+      "other_pending_runtime_ids": [
+        "24aa980b-b8c3-43e2-b087-bad8f79c9517"
+      ]
+    },
+    "runtime_metadata_observed": {
+      "original": {
+        "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "daemon": "01a11562-4949-78b7-9ddf-15a69d670749",
+        "device_label": "eval-tests"
+      },
+      "pending_jobs": {
+        "id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "daemon": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+        "device_label": "mas"
+      },
+      "distinct_runtime_or_daemon_label_alone_is_not_resource_nonoverlap_proof": true
+    },
+    "administrator_readonly_observation": {
+      "checked_utc": "2026-10-14T05:28:57.914804+00:00",
+      "target": "authorized eval-tests host / exact original container",
+      "action": "read only configured container administrator credential field presence",
+      "raw_env_saved_or_printed": false,
+      "credential_or_role_mutations": 0,
+      "native_model_recovery_calls": 0,
+      "exit": 0,
+      "configured_administrator_fields": [],
+      "finding": "NO_EXPLICIT_ADMINISTRATOR_CREDENTIAL_FIELDS_IN_EXACT_CONTAINER_ENV",
+      "own_ssh_session_closed": true
+    },
+    "local_private_config_explicit_LOGINOM_ADMIN_fields": "No matching explicit fields; not a claim that no trusted administrator route exists in other approved original-service configuration",
+    "actual_trusted_administrator_role_Name_inventory_target_cessation": "UNOBSERVED",
+    "private_final_operator_admission": "NOT_CREATED",
+    "no_pin_install_or_once_reservation_in_this_turn": true
+  },
+  "owner_decision": {
+    "source": "ACCEPT_EXACT_e46_FOR_ORIGINAL_CLOSED_ROUTE_SOURCE_ONLY",
+    "independent_final_source_gate": "FULFILLED by actual root/Evaler code/diff/TDD/evidence review",
+    "operator": "HOLD_NOT_READY; readonly prerequisite diagnosis now authorized; no human approval/time gate",
+    "next": "Evaler diagnoses actual resource overlap of other-runtime queues and locates documented existing trusted administrator route within original service only; do not silently skip all-queues guard, cancel foreign tasks, guess credentials, change roles/accounts/credentials or install/execute. Provide concrete evidence and scoped operational option for delegated coordinator decision."
+  },
+  "original_incident": {
+    "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "owner_task": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "acquired_at": "2026-10-13T22:28:17.228Z",
+    "config_sha": "d20475fc9ef2e273b6098943c810886f5f2af580bd76ba82d739022594f84981",
+    "stand_device_inode": [
+      64512,
+      17837096
+    ],
+    "last_proven_stand": "BUSY",
+    "registration_guard_CSV_and_pending_history_retained": true,
+    "ordinary_RELEASED_FREE": "ABSENT",
+    "independent_case_ACCEPT": "ABSENT",
+    "original_product": "ERROR/code2/all6qualityEXCLUDED",
+    "lower_writer_cause": "UNKNOWN",
+    "missing_original_parent_capture_harness_admission": "NOT_PRESENT; no synthesis",
+    "historical_SHM_index_read_STOP_and_wrong_profile_list": "PRESERVED"
+  },
+  "ledgers": {
+    "references": [
+      1,
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "reference_case_budget": 3,
+    "rich_product_initial": 6,
+    "rich_quality": {
+      "pass": 4,
+      "fail": 2,
+      "error": 0
+    },
+    "ben_product_consumed": 6,
+    "ben_product_budget": 6,
+    "rich_cold": [
+      11,
+      10,
+      8
+    ],
+    "ben_cold": [
+      9,
+      9,
+      8
+    ],
+    "ben_cold_error": 1,
+    "repeats_consumed": 3,
+    "repeats_budget": 10,
+    "admission_consumed": 3,
+    "admission_budget": 3,
+    "wrapper_consumed": 1,
+    "wrapper_budget": 1,
+    "recovery_consumed": 0,
+    "recovery_budget": 1,
+    "continuations": 2
+  },
+  "model_history": {
+    "Ben_assistant_rows": 77,
+    "Ben_model": "openai/gpt-6-luna/high",
+    "official_history": "5 archives plus1 pending",
+    "original_private_DB_SQL_opened_by_root": false,
+    "billed_cost": "UNKNOWN",
+    "root_new_model_product_reference_cold_recovery_native_calls": 0
+  },
+  "root_effects": {
+    "new_isolated_tests_unique": 64,
+    "source_install": 0,
+    "pin_change": 0,
+    "native_browser_login_management": 0,
+    "scenario_model_product_reference_cold": 0,
+    "recovery_reservation": 0,
+    "resource_profile_credentials_role_mutations": 0,
+    "original_server_session_mutations": 0,
+    "readonly_exact_container_admin_field_observation": 1,
+    "own_SSH_session_closed": true
+  },
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "every_minutes": 30,
+    "all_eight_done": false,
+    "delete_only_after_all_eight_actual_done_ACCEPT_evidence_cleanup": true
+  }
+}
