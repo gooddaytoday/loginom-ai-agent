@@ -1393,3 +1393,22 @@ sales/monthly/claims с independent review; активных Root CLI/native/adm
 Read-only preparation6 `d8feff37…` сохранена (prior archive108/protected254);
 отдельный final9plan готовится после claims terminal. Active/failed/unowned
 файлы не переносятся, полная inverse map обязательна.
+
+
+На 2026-10-14 04:13 UTC exact own archive трёх успешных candidate slots
+sales/monthly/claims завершён. Final9 plan `8bf57641…` и independent approval
+`e3393cf0…` сохранены без изменения readyForMove. Root operator 25780 повторил
+проверки own receipt/local bytes, inode/mode/mtime/ctime/SHA, target absence,
+idle profile и terminal CLI, protected268, prior108 и excluded6 до переноса.
+Девять точных файлов перемещены `mv -n` на том же device68 в существующий own
+archive; intent и полная inverse map записаны до переноса. Ничего не удалено.
+Receipt `6b97846b8465655d3754d93dbc03afbd887074d679a7a2f64e8ea5b2392518b2`:
+root526→517, archive108→117. New targets сохраняют bytes/SHA/inode/mode/mtime;
+original paths absent; prior108, excluded6, protected268 и остальные root names
+unchanged. Перед будущим reopen/reproduction обязательна точная обратная
+реставрация соответствующих LGP и входов. Independent postmove ещё ожидается.
+
+Следующий frozen candidate slot — ROI/1 после этого review. Root CLI/native/
+admin отсутствуют; Product/skill/build/pins unchanged. Candidate completed4/25
+(три полных PASS, ABC/1 incomplete), firstwave4/9 нечистая. Baseline18/18:
+17oracle/расчёт PASS,11policy PASS. Повторы закрыты, итоговая приёмка не завершена.
