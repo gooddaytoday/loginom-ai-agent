@@ -22,22 +22,30 @@ original attempt/audit. Runtime неизменен; исходные76source fil
 архиве. Минимальное execution-v2 изменение касается четырёх evaluator files;
 rebuild runtime не нужен.
 
-Текущий checkpoint 2026-10-14 17:34 UTC: серия `20261014T112452Z-5e223f`,
+Текущий checkpoint 2026-10-14 17:56 UTC: серия `20261014T112452Z-5e223f`,
 общий runtime `659588…`, сборка из `fdc4ac455e` неизменна. Закрыта21 из31 попыток;
-активных моделей нет. Exec52487 завершён1/ATTEMPT_NOT_COMPLETE после first-last-touch/2.
-CLI2540012/Host2540474gone, ACKtrue/exit0/cleanuptrue, собственный guard отсутствует.
-Отказ Export UI / Canvas outline control unavailable не дал CSV; частичный LGP
-сохранён. Исходные wrapper2/analyticsfalse/policyincomplete не изменены.
-Отдельный policy-v2 verdict `979df7d7…` и обязательное failure/anomaly review
-`04bd0a4d…` подтвердили достаточную полную историю и правильный выбор узлов.
-Initial catalog и повторный cachedprepare связаны с тем же Session/skill;
-18 admitted native operations settled. Исходные identity/runtimeSettled false
-не переписаны. Результат не получен; неправильный расчёт не утверждается.
-Own normal-release readback `f9719307…`:42исходных файла/hash сохранены.
-Перед следующим explicit-js/2 нужен execution-r4 допуск штатно освобождённой
-неуспешной попытки; контракт `2026-10-14-node-selection-policy-v2-normal-release-failure.md`
-закреплён до нового dispatch. Предыдущие R3 sources readonly, index `d949fb8d…`.
-Product/runtime/criteria/matrix неизменны. Моделей и browser recovery пока не требуется.
+запущены22. R4 runner PID2626846/exec78963 продолжен17:55:57.111Z;
+следующий слот explicit-js/2. Его guard и процессы принадлежат текущей попытке;
+при активном CLI никакой другой model process этого профиля не допускается.
+
+Узкий policy-only путь для first-last-touch/2 выполнен по TDD, commit355ba8d075,
+64 focused PASS/342assertions/typecheck0. Independent source review `ff97a114…`
+и execution review `734a399b…` одобрили source/pins/criteria/21closed/nextslot.
+Проспективный immutable execution-lock-r4 `8ac5b47f…` зафиксирован до новой модели.
+Actual readonly gate `8972d773…` разрешил POLICY_V2_FAILURE_RECORDED, сохранив
+failed/incomplete/calculationfalse/oraclefalse/JS0;46старых файлов неизменны.
+Эквивалентный gate повторно не запускался. Предыдущие R3 sources readonly,
+index `d949fb8d…`; runtime, matrix31, inputs и model прежние, handlers не менялись.
+
+First-last-touch/2 finished17:28:06.768Z: Export UI отказ не дал CSV, частичный
+LGP сохранён. CLI2540012/Host2540474gone/ACK0/packageclosed/logout/cleanuptrue;
+собственный guard отсутствовал перед nextdispatch. Policy sidecar `979df7d7…`
+и обязательное failure/anomaly review `04bd0a4d…` подтвердили содержательную
+полную историю,18settlednativeoperations и initialcatalog→samecachedprepare.
+Исходные identity/runtimeSettled/graph/export false не подменены. Result-not-obtained
+не объявлен incorrect calculation или functional PASS. Own release readback
+`f9719307…` сохранил42original SHA; admin recovery не потребовался.
+Product/runtime/criteria/matrix неизменны; technical refusal не заменён повтором.
 
 Candidate15 closed summary `4ca0a944…`: policy15PASS/0violated/0insufficient,
 аналитика10correct/5notobtained, штатных release11/ручных postfailure4.
