@@ -104,6 +104,30 @@ export async function destroyPair(file: SlotFile, options: PairOptions) {
   return usePair(file, options, "destroy")
 }
 
+export async function verifyParallelPair(file: SlotFile, expected: ServerIdentity) {
+  const root = await lstat(file.controller.stateDir)
+  if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
+    await realpath(file.controller.stateDir) !== file.controller.stateDir) throw new EvalFailure("PAIR_PRIVATE_DIRECTORY", 2)
+  const source = path.join(file.controller.stateDir, "pair.json")
+  const journal = await readLeaseReceipt(source).catch(() => { throw new EvalFailure("PAIR_OWNERSHIP", 2) }) as PairJournal
+  if (!journal || typeof journal !== "object" || Array.isArray(journal) || Object.keys(journal).length !== 9 ||
+    journal.version !== 2 || journal.kind !== "pair-provision" || !ownerNonce.test(journal.nonce) ||
+    !["acceptance", "research"].includes(journal.purpose) || journal.phase !== "ready" || journal.intent ||
+    !ownerNonce.test(journal.daemonId) || JSON.stringify(journal.server) !== JSON.stringify(file.server) ||
+    JSON.stringify(journal.images) !== JSON.stringify(pairImages) || !journal.resources || Object.keys(journal.resources).length !== 3 ||
+    Object.values(journal.resources).some(id => !/^[a-f0-9]{64}$/.test(id))) throw new EvalFailure("PAIR_OWNERSHIP", 2)
+  planPair(file.server, journal.purpose, journal.nonce)
+  if ((await dockerText(["info", "--format", "{{.ID}}"])).trim() !== journal.daemonId) throw new EvalFailure("PAIR_DOCKER_DAEMON", 2)
+  for (const role of ["network", "server", "studio"] as const) {
+    const name = role === "network" ? file.server.network : role === "server" ? file.server.container : file.server.studioContainer
+    reconcilePairResource(name, journal.purpose, journal.nonce, await inspectNamed(role === "network" ? "network" : "container", name), journal.resources[role])
+  }
+  const current = await verifyPair(file, journal)
+  if (JSON.stringify(current) !== JSON.stringify(expected)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+  if (JSON.stringify(await readLeaseReceipt(source)) !== JSON.stringify(journal)) throw new EvalFailure("PAIR_JOURNAL_CHANGED", 2)
+  return current
+}
+
 async function usePair(file: SlotFile, options: PairOptions, action: "create" | "destroy") {
   await privateDirectory(file.controller.stateDir)
   await privateDirectory(options.out)
@@ -308,8 +332,13 @@ async function verifyPair(file: SlotFile, journal: PairJournal) {
   const studio = await inspectContainer(journal.resources.studio!)
   verifyTopology(file, journal, server, studio)
   const marker = JSON.parse(await dockerText(["exec", server.Id, "cat", "/workdir/.loginom-evals-isolated.json"])) as ReturnType<typeof usersMarker>
-  if (marker.kind !== "loginom-evals-users" || marker.version !== 2 || marker.container_id !== server.Id || marker.owner_nonce !== journal.nonce ||
-    JSON.stringify(marker.roots) !== JSON.stringify(usersMarker(server.Id, journal.nonce).roots)) throw new EvalFailure("PAIR_MARKER", 2)
+  if (!marker || typeof marker !== "object" || Array.isArray(marker) || Object.keys(marker).length !== 6 ||
+    marker.kind !== "loginom-evals-users" || marker.version !== 2 || marker.container_id !== server.Id || marker.owner_nonce !== journal.nonce ||
+    JSON.stringify(marker.roots) !== JSON.stringify(usersMarker(server.Id, journal.nonce).roots) || !Array.isArray(marker.inventory) ||
+    marker.inventory.some(row => !row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).length !== 3 ||
+      typeof row.username !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(row.username) ||
+      row.storage_dir !== `/workdir/UserStorage/${row.username}` || typeof row.owner_nonce !== "string" || !ownerNonce.test(row.owner_nonce)) ||
+    new Set(marker.inventory.map(row => row.username)).size !== marker.inventory.length) throw new EvalFailure("PAIR_MARKER", 2)
   const components = await dockerText(["exec", server.Id, "cat", "/workdir/Components.cfg"])
   await verifyPython(components)
   const deadline = Date.now() + 30_000

@@ -25,7 +25,7 @@ import { constants } from "node:fs"
 import { lstat, mkdir, mkdtemp, open, readdir, realpath } from "node:fs/promises"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
-import { readServerIdentity } from "./parallel-pair"
+import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 import { claimUserOwnership, readUserOwnership, readUserPreparation } from "./user-environment"
 
@@ -78,6 +78,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   const request = (op: AdminOperation, payload: unknown, beforeSend?: () => Promise<void>) => {
     const result = sequence.then(async () => {
       if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      if (op === "reconcile-user") await verifyParallelPair(file, identity)
       await beforeSend?.()
       return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + 30_000, payload })
     })
