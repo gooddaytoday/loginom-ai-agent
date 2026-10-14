@@ -8,5 +8,5 @@ export function admitPromptInput<T extends object>(source: object, input: T): T
 export function relayPromptInput<T extends object>(source: object, target: T): T
 export function promptSDKContext(input: object): object | undefined
 export function assertSDKContext(token: object): object
-export function retainSDKInvocation(request: object, options: object): object | undefined
-export function assertSDKInvocation(token: object, request: object, options: object): {deadline: bigint, runCommandSignal: AbortSignal, sdkSignal: AbortSignal}
+export function retainSDKInvocation(request: unknown, options: object): object | undefined
+export function assertSDKInvocation(token: object, request: unknown, options: object): {deadline: bigint, runCommandSignal: AbortSignal, sdkSignal: AbortSignal}
