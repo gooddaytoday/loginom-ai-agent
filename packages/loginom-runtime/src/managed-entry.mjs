@@ -298,6 +298,10 @@ function close() {
       }
       state.controller?.abort()
       for (const [name,handle] of [["client",state.client],["browser_server",state.browserServer],["browser_context",state.browser]]) {
+        // Validation already closed its original context and acquired no client
+        // or browser server. Do not run six durable publications for absent
+        // handles. Retained/attempted releases still follow their original path.
+        if (handle===undefined && !state.release[name] && !state.release[name+"_attempted"]) continue
         stage=name
         if (!state.release[name]) {
           if (state.release[name+"_attempted"]) throw state.release[name+"_failure"]
