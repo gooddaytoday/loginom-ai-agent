@@ -1,0 +1,47 @@
+{
+  "checked_utc": "2026-10-14T07:02:05.743395+00:00",
+  "owner_comment": "01a13932-b536-79dc-b904-3c1f60ca10dc",
+  "parent": "01a1392b-7965-7d4a-a2b7-b0f50c30b0d3",
+  "marker": "LAB57-HUMAN-ADMIN-MAS-SCOPE-20261014-125507f837",
+  "body_sha256": "378877e28b3f978ecd55f637cf028e123e0731466efe7c016a4e82639cf90f81",
+  "body_equal_after_terminal_newline_normalization": true,
+  "one_routed_Evaler_mention": true,
+  "attachments": [
+    {
+      "id": "01a13932-b1a6-735a-acf1-47aca9ec4dbd",
+      "file": "AGENTS.md",
+      "bytes": 9790,
+      "sha256": "6d4bffa49f577674164547451ca0dbb2426a7756b1c247af105bcf40486d2aa6",
+      "exact_local_Git_document_byte_readback_verified": true
+    },
+    {
+      "id": "01a13932-b34d-78f9-8597-5ea111f7fb6b",
+      "file": "2026-10-14-text-import-owner-admin-runtime-amendment.json",
+      "bytes": 3434,
+      "sha256": "e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3",
+      "exact_local_Git_document_byte_readback_verified": true
+    }
+  ],
+  "published_docs_commit": "125507f837",
+  "branch": "input-name-fix",
+  "initial_steer_plan_race": "existing readonly Evaler task completed report01a1392b at06:48:32UTC before immediate prepost; fresh active0, so ordinary routed reply under that existing report starts one next coordinator task; no in-flight task interrupted or duplicated",
+  "only_current_Evaler_task": {
+    "id": "01a13932-b55b-7a17-b77c-44078c0f9b5c",
+    "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "status": "running",
+    "started_at": "2026-10-14T09:56:27+03:00",
+    "trigger_comment_id": "01a13932-b536-79dc-b904-3c1f60ca10dc"
+  },
+  "no_Ben_Rich_duplicate_third_review": true,
+  "prior_producer_diagnosis": {
+    "report": "01a1392b-7965-7d4a-a2b7-b0f50c30b0d3",
+    "archive_sha256": "88618e846b478aada62ed6259fa5474914b9ead964cc2f28eb60ed35d4a77c26",
+    "manifest_sha256": "545fbe2a226b02441e2c57872f32b1317caecb90462d7ad079a1bd6b7e78f5ac",
+    "8_payload_CRC_types_paths_bytes_hashes_verified": true,
+    "findings_retained_as_history_and_search_superseded_by_human_credentials": true
+  },
+  "scientific_allowances_history_once_recovery_criteria": "unchanged",
+  "native_login_product_reference_cold_recovery_resource_mutations_by_coordinator": 0,
+  "current_next_step": "minimal exact-mas scoped immutable guard derivative/TDD/negatives/independent clean source admission, then original-owned cleanup and independent case ACCEPT",
+  "automation": "remains deleted/disabled by human instruction; no re-creation"
+}

@@ -2292,6 +2292,138 @@
         "stop_receipt": "evals/docs/2026-10-14-text-import-monitor-automation-stop-receipt.json",
         "stop_receipt_sha256": "2398a948bb3b28852adfbd64052749696104217800666f6676cbe1d5972c3fdd"
       }
+    },
+    {
+      "checked_utc": "2026-10-14T07:25:03.234829+00:00",
+      "trigger": "DIRECT_HUMAN_ADMIN_MAS_AMENDMENT; recurring automation remains deleted",
+      "cards": [
+        {
+          "identifier": "LAB-56",
+          "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+          "status": "done",
+          "revision": 72,
+          "phase": "in_review",
+          "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+          "review_cycle": 2,
+          "reject_count": 0,
+          "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-57",
+          "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+          "status": "in_progress",
+          "revision": 345,
+          "phase": "ben",
+          "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+          "review_cycle": 2,
+          "reject_count": 1,
+          "metadata_sha256": "2e6b88c974748d0009f10996608e8d7713a88c88e4cea74a9d6f08d589f75e9f",
+          "active_queued": [
+            {
+              "id": "01a1393d-4903-7125-a22c-1d9808eb7a27",
+              "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+              "status": "running",
+              "started_at": "2026-10-14T10:09:15+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-58",
+          "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-59",
+          "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-60",
+          "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-61",
+          "id": "01a1214b-4adc-75df-97df-2917732a449a",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-62",
+          "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+          "active_queued": []
+        },
+        {
+          "identifier": "LAB-63",
+          "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+          "status": "backlog",
+          "revision": 10,
+          "phase": "admission",
+          "frozen_sha": null,
+          "review_cycle": 0,
+          "reject_count": 0,
+          "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+          "active_queued": []
+        }
+      ],
+      "worker_settings": {
+        "Evaler": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "Ben": {
+          "model": "gpt-6.1-sol",
+          "thinking_level": "xhigh",
+          "max_concurrent_tasks": 1,
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "canonical_verification": "evals/docs/2026-10-14-text-import-owner-admin-runtime-ack-verification.json",
+      "canonical_verification_sha256": "6b55ea6e613fa1b8f053f036871783a477d273b13b762ae7fde1ba7c7c83ce50",
+      "owner_relay": "01a13932-b536-79dc-b904-3c1f60ca10dc",
+      "Evaler_ack_and_source_handoff": "01a1393d-48db-7594-b5ce-0b18ec503ab9",
+      "source_stage": "One Ben SOURCE task01a1393d-4903 running; minimal runtime-bound derivative; no install/live admission yet",
+      "root_new_tests_native_model_recovery_resource_profile_mutations": 0,
+      "LAB57_actual_cleanup_RELEASED_FREE_independent_ACCEPT": "ABSENT",
+      "all_eight_done": false,
+      "automation": "DELETED_BY_USER; do not recreate"
     }
   ]
 }
