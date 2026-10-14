@@ -40,8 +40,9 @@ export async function collectHostResources(input: {
 }
 
 export async function sampleHostResources(paths: string[]) {
-  const [cpu, memory] = await Promise.all([
+  const [cpu, memory, collectorCgroup] = await Promise.all([
     readFile("/proc/stat", "utf8").catch(() => undefined), readFile("/proc/meminfo", "utf8").catch(() => undefined),
+    sampleCgroupResources(),
   ])
   const ticks = cpu?.split("\n")[0]!.trim().split(/\s+/).slice(1).map(Number)
   const hostCpu = ticks && /^cpu\s+/.test(cpu ?? "") && ticks.length >= 8 && ticks.every(value => Number.isSafeInteger(value) && value >= 0)
@@ -60,8 +61,44 @@ export async function sampleHostResources(paths: string[]) {
     observed_at: new Date().toISOString(),
     cpu: hostCpu,
     memory: hostMemory,
+    collector_cgroup: collectorCgroup,
     filesystems,
     errors: [...(hostCpu ? [] : ["HOST_CPU_UNAVAILABLE"]), ...(hostMemory ? [] : ["HOST_MEMORY_UNAVAILABLE"]),
       ...filesystems.flatMap(file => file.error ? [file.error] : [])],
   }
+}
+
+export async function sampleCgroupResources() {
+  const group = (await readFile("/proc/self/cgroup", "utf8").catch(() => undefined))
+    ?.split("\n").find(line => line.startsWith("0::"))?.slice(3)
+  const files = group ? await Promise.all(["cpu.stat", "memory.events", "memory.current", "memory.max", "memory.swap.current", "memory.swap.max"]
+    .map(name => readFile(path.join("/sys/fs/cgroup", group, name), "utf8").catch(() => undefined))) : []
+  const cpu = cgroupCounters(files[0])
+  const events = cgroupCounters(files[1])
+  const sample = {
+    path: group ?? null,
+    cpu_usage: ["usage_usec", "user_usec", "system_usec"].every(key => Number.isSafeInteger(cpu.get(key)))
+      ? { usage_usec: cpu.get("usage_usec")!, user_usec: cpu.get("user_usec")!, system_usec: cpu.get("system_usec")! } : null,
+    cpu_throttling: ["nr_periods", "nr_throttled", "throttled_usec"].every(key => Number.isSafeInteger(cpu.get(key)))
+      ? { nr_periods: cpu.get("nr_periods")!, nr_throttled: cpu.get("nr_throttled")!, throttled_usec: cpu.get("throttled_usec")! } : null,
+    memory_events: ["oom", "oom_kill"].every(key => Number.isSafeInteger(events.get(key)))
+      ? { oom: events.get("oom")!, oom_kill: events.get("oom_kill")! } : null,
+    memory_current_bytes: cgroupNumber(files[2]),
+    memory_limit_bytes: files[3]?.trim() === "max" ? "max" : cgroupNumber(files[3]),
+    swap_current_bytes: cgroupNumber(files[4]),
+    swap_limit_bytes: files[5]?.trim() === "max" ? "max" : cgroupNumber(files[5]),
+  }
+  return { ...sample, errors: Object.entries(sample).flatMap(([key, value]) => value === null ? [`CGROUP_${key.toUpperCase()}_UNAVAILABLE`] : []) }
+}
+
+function cgroupCounters(value?: string) {
+  return new Map([...(value ?? "").matchAll(/^(\S+)\s+(\d+)$/gm)].flatMap(match => {
+    const parsed = cgroupNumber(match[2])
+    return parsed === null ? [] : [[match[1]!, parsed] as const]
+  }))
+}
+
+function cgroupNumber(value?: string) {
+  if (!value || !/^\d+$/.test(value.trim()) || !Number.isSafeInteger(Number(value))) return null
+  return Number(value)
 }

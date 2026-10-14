@@ -47,8 +47,16 @@ env -i PATH="$PATH" bun run script/sample-parallel-resources.ts --config /home/k
 Output parent должен уже быть canonical private0700; existing evidence не
 перезаписывается. SIGINT/SIGTERM завершает запись и закрывает collector. Labels
 обозначают заявленный контекст, без flags остаются null и не доказывают связь с
-измеренным run. Docker/process/cgroup counters, controller binding и итоговая
+измеренным run. Docker/owned-process counters, cgroups выбранных owners, controller binding и итоговая
 resource/licence acceptance ещё не реализованы; этот CLI не выдаёт readiness.
+
+JSONL дополнительно содержит host.collector_cgroup: фактический unified cgroup
+sampler, CPU usage/throttling, OOM counters и memory/swap current/max. Недоступные
+поля остаются null с отдельной диагностикой; explicit "max" означает прочитанный
+unlimited limit. Текущий app cgroup общий с другими процессами приложения и не
+заменяет counters/limits выбранных Server/Studio/CLI owners или их ancestors.
+Host/CLI/private namespace qualification: 18 tests/111 assertions PASS,
+typecheck/diff PASS; чужие cgroups и настройки лимитов не изменялись.
 
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
