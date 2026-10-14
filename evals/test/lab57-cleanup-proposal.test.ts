@@ -21,3 +21,9 @@ test("LAB57: preparation reports every missing operator prerequisite without gra
   expect(result.missing).toContain("FRESH_OPERATOR_GUARDS_REQUIRED")
   expect(result.applied).toBe(false)
 })
+
+test("LAB57: changing the original owner refuses the addressed proposal", async () => {
+  const input = await fixture()
+  input.binding.task = "another-task"
+  expect(prepareLab57CleanupProposal(input).missing).toContain("ORIGINAL_LEASE_BINDING_CHANGED")
+})
