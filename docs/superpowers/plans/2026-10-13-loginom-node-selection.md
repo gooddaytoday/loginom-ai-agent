@@ -1777,3 +1777,24 @@ SHA attempt `5cb62388…`, audit `727c8d9e…`.
 Все три monthly baseline успешны без JS. Во всех 15 baseline oracle/расчёт
 PASS, policy PASS у десяти. Root17410 активен; текущий слот —
 `risky-approved-claims/3`, далее ROI/3 и first-last/3. Приёмка ещё не завершена.
+
+
+На 2026-10-14 02:03 UTC очередь root17410 остановлена на технической аномалии
+`risky-approved-claims/3`: Session `ses_ec7e51480ffevfxBR9hkm10mSb`,
+CLI exit 1, wrapper exit 3, cleanup false,
+`SELECTION_CLEANUP_UNCONFIRMED`, SHA attempt `596780a5…`.
+Начатый слот сохранён в denominator: завершены 16/18 baseline,
+15 oracle/полных расчётов PASS, 10 policy PASS; ROI/3 и first-last/3 не запускались.
+Экспорт реально выполнился, но чтение файла остановилось с
+`NODE_APPLY_STOPPED: Export file search scroll budget exhausted`:
+12 успешных прокруток достигли top12000, max_top14089, целевой файл не найден.
+Полного Save нет; Package1 остался несохранённым, full calculation PASS
+этого слота не заявляется. CLI649907 умер; `.writer` намеренно сохранён.
+Независимая read-only проверка связала user137/init01:50:59.405Z с пятью
+фактическими native GUID этой попытки; fresh admin inventory видит эту же
+сессию с CreateTime01:50AM (UI точность до минуты, не soleidentity).
+Root PlaywrightMCP84741/admin138 открыт для адресного recovery user137;
+user132/134/136 и остальные сессии не трогались. Проверка exact receipt-owned
+allowlist уже скопированных файлов идёт параллельно; source/runtime не менялись.
+До подтверждённого закрытия own-сессии и адресного guard recovery следующие
+модельные попытки запрещены. Исходный failed outcome не заменяется.
