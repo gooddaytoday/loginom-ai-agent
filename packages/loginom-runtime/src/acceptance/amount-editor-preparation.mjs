@@ -1,5 +1,5 @@
 import {openImportColumnEditor} from '../../client/lib/text-import-procedure.mjs';
-const refuse=field=>{const error=new Error('LOGINOM_AMOUNT_EDITOR_PREPARATION_UNAVAILABLE');error.missingProvider=field;throw error;};
+const refuse=field=>{const error=new Error('LOGINOM_AMOUNT_EDITOR_PREPARATION_UNAVAILABLE',{cause:{missing_provider:field,phase:'editor_preparation',mutation_authority:false}});error.missingProvider=field;throw error;};
 function original(state,owner){
  const n=state?.prepared_node_context,w=state?.wizard;
  if(n?.verified!==true||n.surface!=='wizard'||['document_id','workflow_id','node_id'].some(k=>n[k]!==owner[k]))refuse('same_page_prepared_native_node');
