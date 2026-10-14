@@ -526,7 +526,7 @@ export function redact(config: EvalConfig) {
     loginom: { ...config.loginom, password: config.loginom.password ? "<set>" : "<unset>" },
     dock: { ...config.dock, apiKey: config.dock.apiKey ? "<set>" : "<unset>" },
     agent: { ...config.agent, provider: config.agent.provider ? { ...config.agent.provider, apiKey: "<set>" } : undefined },
-    judge: { ...config.judge, env: config.judge.env && Object.fromEntries(
+    judge: { ...config.judge, processEvidence: undefined, env: config.judge.env && Object.fromEntries(
       Object.entries(config.judge.env).map(([key, value]) => [key, value ? "<set>" : "<unset>"]),
     ) },
   }
