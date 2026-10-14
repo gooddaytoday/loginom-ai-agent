@@ -149,7 +149,9 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      // Native browser teardown and its durable receipt can exceed five seconds.
+      // Leave five seconds for exit and room inside the outer host's 30-second close.
+      const reply = await request("close", undefined, 20_000).catch(() => undefined)
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
