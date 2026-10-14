@@ -74,6 +74,24 @@ test("resource sampling observes its actual unified cgroup without inventing una
   expect(JSON.stringify(sample)).not.toContain("NaN")
 })
 
+test("cgroup sampling records every applicable ancestor and its observed CPU quota without inventing missing limits", async () => {
+  const sample = await sampleCgroupResources()
+  expect(sample.ancestors).not.toBeNull()
+  if (sample.path === "/") { expect(sample.ancestors).toEqual([]); return }
+  expect(sample.ancestors![0]?.path).toBe(path.dirname(sample.path!))
+  expect(sample.ancestors!.at(-1)?.path).toBe("/")
+  for (const [index, ancestor] of sample.ancestors!.entries()) {
+    expect(ancestor.path).toBe(path.dirname(index ? sample.ancestors![index - 1]!.path! : sample.path!))
+    const raw = await Bun.file(path.join("/sys/fs/cgroup", ancestor.path!, "cpu.max")).text().catch(() => null)
+    if (raw === null) {
+      expect(ancestor.cpu_max).toBeNull()
+      expect(ancestor.errors).toContain("CGROUP_CPU_MAX_UNAVAILABLE")
+      continue
+    }
+    expect(`${ancestor.cpu_max?.quota_usec} ${ancestor.cpu_max?.period_usec}`).toBe(raw.trim())
+  }
+})
+
 test("resource configuration reads private metadata without admin credentials or prepared profiles", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-config-"))
   try {
