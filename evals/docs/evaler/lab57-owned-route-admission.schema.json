@@ -1,13 +1,121 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "type":"object","additionalProperties":false,
-  "required":["version","operation","decision","sourceSha","sourceManifestSha","executableSha","followupTask","administratorFile","administratorSha","historyInventory","canonicalVerificationSha"],
-  "properties":{
-    "version":{"const":1},"operation":{"const":"LAB57-closed-owned-v1"},"decision":{"const":"FINAL_OPERATOR_ADMITTED"},
-    "sourceSha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
-    "sourceManifestSha":{"type":"string","pattern":"^[0-9a-f]{64}$"},"executableSha":{"type":"string","pattern":"^[0-9a-f]{64}$"},
-    "followupTask":{"type":"string","format":"uuid"},"administratorFile":{"type":"string","pattern":"^/"},
-    "administratorSha":{"type":"string","pattern":"^[0-9a-f]{64}$"},"historyInventory":{"type":"string","pattern":"^/"},
-    "canonicalVerificationSha":{"const":"d0a88e88421acc203fb7917050e4b7bbfe00bd59345d6f717a3b0c2af27faa35"}
-  }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "operation",
+    "decision",
+    "sourceSha",
+    "sourceManifestSha",
+    "executableSha",
+    "followupTask",
+    "administratorFile",
+    "administratorSha",
+    "historyInventory",
+    "canonicalVerificationSha",
+    "observerBindingSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "operation": {
+      "const": "LAB57-closed-owned-v1"
+    },
+    "decision": {
+      "const": "FINAL_OPERATOR_ADMITTED"
+    },
+    "sourceSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sourceManifestSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "executableSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "followupTask": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "administratorFile": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "administratorSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "historyInventory": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "canonicalVerificationSha": {
+      "const": "d0a88e88421acc203fb7917050e4b7bbfe00bd59345d6f717a3b0c2af27faa35"
+    },
+    "observerBindingSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "thread",
+        "member",
+        "takeoverComment",
+        "handoverSha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "codex-coordinator"
+        },
+        "thread": {
+          "const": "01a120d5-a234-7481-b7ac-e68bbacc5f6d"
+        },
+        "member": {
+          "const": "vs.kartamyshev"
+        },
+        "takeoverComment": {
+          "const": "01a139d3-c44d-798e-98af-2c76f66a3756"
+        },
+        "handoverSha256": {
+          "const": "fb0507f2b1ca03eb84f653b5e6df83185157d5b321efcca06be182c0ea0d5148"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "actor"
+      ],
+      "properties": {
+        "followupTask": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "actor"
+        ]
+      },
+      "properties": {
+        "followupTask": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  ]
 }

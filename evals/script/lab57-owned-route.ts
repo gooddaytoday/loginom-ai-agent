@@ -5,7 +5,7 @@ import type {RouteContext} from "../src/lab57-route-host"
 try {
   const args=closedRouteArguments(process.argv.slice(2))
   if(args.command==="plan")console.log(JSON.stringify({status:"SOURCE_ONLY_NOT_APPLIED",steps:closedRoutePlan,nativeReady:false,cleanup:"UNCONFIRMED",sourceStageRecoveryEffects:0}))
-  if(args.command==="execute")console.log(JSON.stringify(await executeClosedRoute(args.file!)))
+  if(args.command==="execute")console.log(JSON.stringify(await executeClosedRoute(args.file!,args.proofRoot!)))
   if(["worker","admit-helper"].includes(args.command)){
     if(!args.file!.startsWith(routeStand+"/lab57-context-")||!args.file!.endsWith(".json"))throw Error("CLOSED_CONTEXT_PATH_REQUIRED")
     const ctx=await routePrivateJson<RouteContext>(args.file!)

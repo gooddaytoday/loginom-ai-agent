@@ -8,8 +8,8 @@ export type FreshRouteState={passes:{originalPids:unknown[];foreignNative:unknow
 export const ownedCsv=Object.freeze({path:"/workdir/UserStorage/user/cc6187e46829a5fa768f09eeb024367d745628a1d10f46f26a0ec5543f76c997-0-semicolon_cp1251_decimal.txt",
   identity:"58:1179775:150:81a4",sha256:"94821af546f6454601f5338d6fe32b8bf7a85bf7208b34df2bc522e55e2ab4dd"})
 export const originalContainerStartedAt="2026-10-07T09:05:53.309342637Z"
-export function validateFreshRouteState(s:FreshRouteState,csvRemoved:boolean,followup:string) {
-  const ledger=inspectQueueInventory(s?.queueInventory,followup)
+export function validateFreshRouteState(s:FreshRouteState,csvRemoved:boolean,followup:string|null,mode:"ben-task"|"codex-coordinator"="ben-task") {
+  const ledger=inspectQueueInventory(s?.queueInventory,followup,mode)
   if(queueDigest(s.queueLedger)!==queueDigest(ledger)||queueDigest(s.pendingWorkers)!==queueDigest(ledger.blocked)
     ||s.queuesChecked!==ledger.rosterCount)throw Error("QUEUE_LEDGER_REFUSED")
   if(!s || !Array.isArray(s.passes) || s.passes.length!==2 || s.passes.some(p=>

@@ -1,4 +1,5 @@
 import path from "node:path"
+import {verifyOperatorContinuity} from "./lab57-root-actor"
 import {lstat,readFile,open} from "node:fs/promises"
 import {createHash} from "node:crypto"
 import {routeRoot,routeStand,routeProfile,routeRun,routeNode,routeConfig,routeDigest,routePrivateJson,verifyRouteSources,verifyControllerNode} from "./lab57-route-host"
@@ -24,14 +25,17 @@ export async function verifyLab57Recovery(config:NodeOpsConfig,lease:NodeStandLe
   const a=await routePrivateJson<ClosedSettlement&{context:RouteContext;files:{path:string;sha256:string}[]}>(receipt.attestation)
   verifyClosedSettlement(a)
   const ctx=a.context
+  verifyOperatorContinuity(a.operator,ctx.admission)
   if(!ctx.once||ctx.once.path!==routeStand+"/lab57-closed.once.json"||await routeDigest(ctx.once.path)!==ctx.once.sha256
     ||ctx.csvRemoved!==true||ctx.historyArchived!==true||ctx.sourceRoot!==routeRoot+"/support/evalrunner-"+a.sourceSha
     ||ctx.admission.sourceSha!==a.sourceSha||process.argv[1]!==ctx.sourceRoot+"/evals/script/node-eval-ops.ts")throw Error("LAB57_SOURCE_LIFECYCLE_UNKNOWN")
   await verifyRouteSources(ctx.admission,ctx.sourceRoot)
   await verifyControllerNode(ctx)
   if(await routeDigest(routeStand+"/owner.json")!==lab57CleanupScope.raw_owner_sha256||await routeDigest(routeConfig)!==lab57CleanupScope.raw_config_sha256)throw Error("LAB57_ORIGINAL_OWNER_CHANGED")
-  const once=await routePrivateJson<{reservation:{receipt:string;device:number;inode:number;sha256:string;initialBytes:string};sourceSha:string;sourceManifestSha:string;
+  const once=await routePrivateJson<{operator:unknown;observerBindingSha256:string;reservation:{receipt:string;device:number;inode:number;sha256:string;initialBytes:string};sourceSha:string;sourceManifestSha:string;
     acquiredAt:string;controller:RouteContext["controller"];operation:RouteContext["operation"]}>(ctx.once.path)
+  verifyOperatorContinuity(once.operator,ctx.admission)
+  if(once.observerBindingSha256!==ctx.admission.observerBindingSha256)throw Error("LAB57_ORIGINAL_ONCE_CHANGED")
   const stat=await lstat(ctx.once.path,{bigint:true}),rstat=await lstat(completion.receipt)
   const key=createHash("sha256").update(`${lease.token}:${lease.issue}:${lease.task}:${lease.acquiredAt}`).digest("hex")
   if(Number(stat.dev)!==ctx.once.device||Number(stat.ino)!==ctx.once.inode||String(stat.mtimeNs)!==ctx.once.mtimeNs||String(stat.ctimeNs)!==ctx.once.ctimeNs

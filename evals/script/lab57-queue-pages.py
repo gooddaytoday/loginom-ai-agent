@@ -45,8 +45,9 @@ ORIGINAL='a5fa993f-2903-4997-a832-955ffbb1203c'
 BEN='99804e93-d241-45f2-872d-8a1e16ec7f3d'
 AMENDMENT='e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3'
 
-def collect_queues(agents,followup):
-    assert re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',followup) and followup!='01a1375d-ce4a-7c35-a3a3-94cf64a8b589','Original owner cannot be followup'
+def collect_queues(agents,followup,mode="ben-task"):
+    assert mode in ['ben-task','codex-coordinator'],'Unknown controller mode'
+    assert (isinstance(followup,str) and re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',followup) and followup!='01a1375d-ce4a-7c35-a3a3-94cf64a8b589') if mode=='ben-task' else followup is None,'Controller binding required'
     assert isinstance(agents,list) and len(agents)>=8,'Queue roster incomplete'
     roster=[{k:a.get(k) for k in ['id','runtime_id']} for a in agents]
     assert len({a['id'] for a in roster})==len(roster),'Queue roster duplicate'
@@ -62,11 +63,12 @@ def collect_queues(agents,followup):
                 row={'task':t['id'],'agent':t['agent_id'],'status':t['status'],'taskRuntime':t['runtime_id'],
                      'agentRuntime':agent['runtime_id'],'rosterAgent':agent['id']}
                 bound=t['agent_id']==agent['id']
-                if t['id']==followup and bound and agent['id']==BEN and t['status']=='running' and t['runtime_id']==ORIGINAL and agent['runtime_id']==ORIGINAL:
+                if mode=='ben-task' and t['id']==followup and bound and agent['id']==BEN and t['status']=='running' and t['runtime_id']==ORIGINAL and agent['runtime_id']==ORIGINAL:
                     row['reason']='EXACT_BEN_CONTROLLER';controller.append(row);continue
-                if t['id'] not in [followup,'01a1375d-ce4a-7c35-a3a3-94cf64a8b589'] and bound and t['runtime_id']==MAS and agent['runtime_id']==MAS:
+                if not (mode=='codex-coordinator' and agent['id']==BEN) and t['id'] not in [followup,'01a1375d-ce4a-7c35-a3a3-94cf64a8b589'] and bound and t['runtime_id']==MAS and agent['runtime_id']==MAS:
                     row.update(reason='OWNER_ATTESTED_EXACT_MAS',ownerAmendmentSha256=AMENDMENT);excluded.append(row);continue
                 row['reason']='UNEXEMPTED_OR_UNBOUND_PENDING';blocked.append(row)
+    assert len(controller)==(1 if mode=='ben-task' else 0),'Controller inventory mismatch'
     ledger={'version':1,'ownerAmendmentSha256':AMENDMENT,'inventorySha256':digest(inventory),'rosterCount':len(roster),
             'pageCount':pages,'recordCount':records,'pendingCount':len(excluded)+len(blocked)+len(controller),
             'excluded':excluded,'blocked':blocked,'controller':controller}

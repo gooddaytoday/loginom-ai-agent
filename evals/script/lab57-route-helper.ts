@@ -111,7 +111,7 @@ const result=await (async()=>{
     if(!ctx.csvRemoved||!ctx.historyArchived)throw Error("CLOSED_SEQUENCE_INCOMPLETE")
     const native=await nativeEvidence(),history=await routePrivateJson<import("../src/lab57-closed-route").ClosedSettlement["history"] & {historyArchive:string}>(root+"/history.json")
     const guard=await routePrivateJson<{status:string}>(root+"/archive-guard.json"),csv=await routePrivateJson<{status:string}>(root+"/storage.json")
-    const attestation={operation:"LAB57-closed-owned-v1" as const,sourceSha:ctx.admission.sourceSha,originalOutcome:"ERROR" as const,quality:"EXCLUDED" as const,...native,
+    const attestation={operator:ctx.admission.actor??{kind:"ben-task" as const,task:ctx.admission.followupTask!},operation:"LAB57-closed-owned-v1" as const,sourceSha:ctx.admission.sourceSha,originalOutcome:"ERROR" as const,quality:"EXCLUDED" as const,...native,
       process:{...native.process,observation_mode:native.process.observation_mode!,error:native.process.error!,unknownProcesses:native.process.unknownProcesses!,verification:native.process.verification!},history,guard,csv}
     verifyClosedSettlement(attestation)
     const proof=await writeRouteRecord(root,"attestation.json",{...attestation,context:ctx,files:await proofFiles(root)})

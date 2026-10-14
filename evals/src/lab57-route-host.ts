@@ -1,7 +1,14 @@
 import path from "node:path"
+import {writePrivateRecord} from "./lab57-private-record"
+import {safeException} from "./lab57-preonce-diagnostics"
+import {verifyRootActor,verifyOperatorContinuity} from "./lab57-root-actor"
+import type {RouteActor} from "./lab57-root-actor"
+import {verifyFdProof} from "./lab57-fd-observer"
+import {queueDigest} from "./lab57-queue-scope"
+import type {FdProof,FdRequest} from "./lab57-fd-observer"
 import {constants,createReadStream} from "node:fs"
 import {lstat,open,readFile,readdir,readlink,realpath} from "node:fs/promises"
-import {createHash} from "node:crypto"
+import {createHash,randomBytes} from "node:crypto"
 import {execFile} from "node:child_process"
 import {promisify} from "node:util"
 import protectedOriginals from "../test/fixtures/lab57-cleanup-proposal/protected-originals.json"
@@ -21,10 +28,10 @@ export const routeRun=routeRoot+"/roles/ben/results/lab57-eb1-independent/202610
 export const routeNode={path:routeCli+"/resources/loginom/bin/node",device:64512,inode:3840497,bytes:125989464,
   sha256:"bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"}
 export type RouteAdmission={version:1;operation:"LAB57-closed-owned-v1";decision:"FINAL_OPERATOR_ADMITTED";sourceSha:string;
-  sourceManifestSha:string;executableSha:string;followupTask:string;administratorFile:string;administratorSha:string;
+  sourceManifestSha:string;executableSha:string;followupTask:string|null;actor?:RouteActor;observerBindingSha256:string;administratorFile:string;administratorSha:string;
   historyInventory:string;canonicalVerificationSha:string}
 export type RouteContext={admission:RouteAdmission;sourceRoot:string;operation:{device:number;inode:number};once?:{path:string;sha256:string;device:number;inode:number;mtimeNs:string;ctimeNs:string};
-  controller:{pid:number;starttime:string};moves:Record<string,string>;csvRemoved:boolean;historyArchived:boolean}
+  diagnosticsRoot:string;controller:{pid:number;starttime:string};moves:Record<string,string>;csvRemoved:boolean;historyArchived:boolean}
 export async function routeDigest(file:string) {
   const before=await lstat(file,{bigint:true}),hash=createHash("sha256")
   if(before.isSymbolicLink()||!before.isFile())throw Error("SOURCE_FILE_TYPE_CHANGED")
@@ -43,23 +50,19 @@ export async function routePrivateJson<T>(file:string):Promise<T> {
     return JSON.parse(await h.readFile("utf8")) as T
   } finally {await h.close()}
 }
-export async function writeRouteRecord(root:string,name:string,value:unknown) {
-  if(!/^[a-z0-9.-]+$/.test(name) || await realpath(root)!==root)throw Error("PRIVATE_RECORD_PATH")
-  const dir=await lstat(root)
-  if(!dir.isDirectory()||dir.uid!==process.getuid!()||(dir.mode&0o777)!==0o700)throw Error("PRIVATE_RECORD_ROOT")
-  const parent=await open(root,constants.O_DIRECTORY|constants.O_RDONLY|constants.O_NOFOLLOW)
-  try {const p=await parent.stat();if(p.dev!==dir.dev||p.ino!==dir.ino)throw Error("PRIVATE_RECORD_RACE")
-    const h=await open(`/proc/self/fd/${parent.fd}/${name}`,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600)
-    try {await h.writeFile(JSON.stringify(value,null,2)+"\n");await h.sync()}finally{await h.close()}
-    await parent.sync();const after=await lstat(root);if(after.dev!==dir.dev||after.ino!==dir.ino)throw Error("PRIVATE_RECORD_RACE")
-  } finally {await parent.close()}
-  return path.join(root,name)
-}
+export const writeRouteRecord=writePrivateRecord
 export async function routeCommand(cmd:string,args:string[],diagnostics?:string,timeoutMs=120000) {
   try {return (await promisify(execFile)(cmd,args,{encoding:"utf8",maxBuffer:128*1024*1024,timeout:timeoutMs,
     env:{PATH:"/usr/local/bin:/usr/bin:/bin",TMPDIR:"/tmp",HOME:"/home/user"}})).stdout}
-  catch(error){if(diagnostics)await writeRouteRecord(diagnostics,`command-cause-${crypto.randomUUID()}.json`,
-    {command:path.basename(cmd),cause:String(error),stderr:(error as {stderr?:string}).stderr});throw Error("OWNED_COMMAND_FAILED")}
+  catch(error){
+    const e=error as {stderr?:string},trace=e.stderr?.match(/(?:^|\n)(PermissionError|FileNotFoundError|ProcessLookupError|TimeoutError|AssertionError|RuntimeError):(?: \[Errno (\d+)\])?/)
+    let lower:unknown=error
+    const marker=e.stderr?.split("\n").find(line=>line.startsWith("LAB57_FD_REFUSAL "))
+    if(marker)try {const d=JSON.parse(marker.slice("LAB57_FD_REFUSAL ".length));lower={name:d.name,code:d.code,message:d.gate,cause:error}}catch{/* retain unclassified command error */}
+    const cause=trace?Object.assign(new Error("REDACTED_MESSAGE"),{name:trace[1],code:trace[2]==="13"?"EACCES":trace[2]==="2"?"ENOENT":trace[2]?Number(trace[2]):null,cause:lower}):lower
+    if(diagnostics)await writeRouteRecord(diagnostics,`command-cause-${crypto.randomUUID()}.json`,{command:path.basename(cmd),exception:safeException(cause)})
+    throw Error("OWNED_COMMAND_FAILED",{cause})
+  }
 }
 async function verifyPin(root:string,name:string,expected:string) {
   const directory=await lstat(root)
@@ -73,9 +76,10 @@ async function verifyPin(root:string,name:string,expected:string) {
 }
 export async function verifyRouteSources(a:RouteAdmission,sourceRoot:string) {
   if(a.version!==1||a.operation!=="LAB57-closed-owned-v1"||a.decision!=="FINAL_OPERATOR_ADMITTED"||!/^[0-9a-f]{40}$/.test(a.sourceSha)
-    || !/^[0-9a-f]{64}$/.test(a.sourceManifestSha)||!/^[0-9a-f]{64}$/.test(a.executableSha)|| !/^[0-9a-f-]{36}$/.test(a.followupTask)
+    || !/^[0-9a-f]{64}$/.test(a.sourceManifestSha)||!/^[0-9a-f]{64}$/.test(a.executableSha)|| (a.actor?a.followupTask!==null:typeof a.followupTask!=="string"||!/^[0-9a-f-]{36}$/.test(a.followupTask))|| !/^[0-9a-f]{64}$/.test(a.observerBindingSha256)
     || a.canonicalVerificationSha!=="d0a88e88421acc203fb7917050e4b7bbfe00bd59345d6f717a3b0c2af27faa35"
     || sourceRoot!==routeRoot+"/support/evalrunner-"+a.sourceSha)throw Error("FINAL_SOURCE_ADMISSION_REQUIRED")
+  if(a.actor)verifyRootActor(a.actor,await readFile(sourceRoot+"/evals/docs/evaler/lab57-root-handover.json"))
   await verifyPin(sourceRoot,"manifest.json",a.sourceManifestSha)
   const source=JSON.parse(await readFile(sourceRoot+"/manifest.json","utf8")) as {sourceCommit:string;sourceDirty:boolean}
   if(source.sourceCommit!==a.sourceSha||source.sourceDirty!==false||await routeDigest(sourceRoot+"/lab57-owned-route.mjs")!==a.executableSha)throw Error("FINAL_SOURCE_PIN_CHANGED")
@@ -108,7 +112,9 @@ export async function verifyRouteOwner(ctx:RouteContext) {
   if(Object.keys(lease).some(k=>lease[k]!==current[k]))throw Error("ORIGINAL_LEASE_HANDLE_CHANGED")
   if(ctx.once){const identity=await lstat(ctx.once.path,{bigint:true});if(identity.isSymbolicLink()||identity.nlink!==1n||Number(identity.dev)!==ctx.once.device||Number(identity.ino)!==ctx.once.inode
     ||String(identity.mtimeNs)!==ctx.once.mtimeNs||String(identity.ctimeNs)!==ctx.once.ctimeNs||await routeDigest(ctx.once.path)!==ctx.once.sha256)throw Error("ORIGINAL_ONCE_CHANGED")
-    const once=await routePrivateJson<{controller:RouteContext["controller"];operation:RouteContext["operation"];sourceSha:string;sourceManifestSha:string;administratorSha:string;admissionSha:string}>(ctx.once.path)
+    const once=await routePrivateJson<{operator:unknown;observerBindingSha256:string;controller:RouteContext["controller"];operation:RouteContext["operation"];sourceSha:string;sourceManifestSha:string;administratorSha:string;admissionSha:string}>(ctx.once.path)
+    verifyOperatorContinuity(once.operator,ctx.admission)
+    if(once.observerBindingSha256!==ctx.admission.observerBindingSha256)throw Error("ORIGINAL_ONCE_BINDING_CHANGED")
     const command=(await readFile(`/proc/${ctx.controller.pid}/cmdline`,"utf8")).split("\0")
     if(JSON.stringify(once.controller)!==JSON.stringify(ctx.controller)||JSON.stringify(once.operation)!==JSON.stringify(ctx.operation)
       ||once.sourceSha!==ctx.admission.sourceSha||once.sourceManifestSha!==ctx.admission.sourceManifestSha||once.administratorSha!==ctx.admission.administratorSha
@@ -147,6 +153,7 @@ export async function verifyControllerNode(ctx:RouteContext) {
 }
 /** Concrete fresh collection. A caller-supplied boolean/callback never grants live admission. */
 export async function assertRouteEffect(ctx:RouteContext,stage:string,proofRoot?:string) {
+  if(process.getuid!()!==1000||process.geteuid!()!==1000)throw Error("CLOSED_CALLER_UID_CHANGED")
   if(process.versions.node!=="24.19.0")throw Error("BUNDLED_NODE_REQUIRED")
   await verifyRouteSources(ctx.admission,ctx.sourceRoot)
   await verifyControllerNode(ctx)
@@ -156,9 +163,20 @@ export async function assertRouteEffect(ctx:RouteContext,stage:string,proofRoot?
     if(uid!==process.getuid!())throw Error("CLOSED_CALLER_UID_CHANGED")
     current=Number(raw.slice(raw.lastIndexOf(")")+2).split(" ")[1]);if(current<=1)throw Error("CLOSED_CALLER_ANCESTRY_CHANGED")}
   await verifyRouteOwner(ctx)
+  const binding=await verifyFdObserverBinding(ctx),nonce=randomBytes(32).toString("hex")
   const state=JSON.parse(await routeCommand("/usr/bin/python3",[ctx.sourceRoot+"/evals/script/lab57-route-inspect.py",
-    String(ctx.controller.pid),ctx.controller.starttime,ctx.admission.followupTask,String(ctx.csvRemoved),String(ctx.historyArchived)],proofRoot)) as FreshRouteState
-  validateFreshRouteState(state,ctx.csvRemoved,ctx.admission.followupTask)
+    String(ctx.controller.pid),ctx.controller.starttime,ctx.admission.followupTask??"root",String(ctx.csvRemoved),String(ctx.historyArchived),
+    ctx.admission.actor?"codex-coordinator":"ben-task",ctx.admission.sourceSha,ctx.admission.observerBindingSha256,nonce],proofRoot??ctx.diagnosticsRoot)) as FreshRouteState&{fdProof:FdProof}
+  const cfg=await routePrivateJson<{roles:Record<string,{referenceProfile?:string;evalProfile:string}>}>(routeConfig)
+  const profiles=Object.values(cfg.roles).flatMap(r=>[...(r.referenceProfile?[r.referenceProfile]:[]),r.evalProfile])
+  const namespaces=Object.fromEntries(await Promise.all(["pid","mnt","user"].map(async k=>[k,await readlink(`/proc/self/ns/${k}`)]))) as FdRequest["namespaces"]
+  const expected:FdRequest={version:1,nonce,sourceSha:ctx.admission.sourceSha,ownerSha256:lab57CleanupScope.raw_owner_sha256,uid:1000,
+    controller:{pid:ctx.controller.pid,birth:ctx.controller.starttime},requester:state.fdProof?.report?.request?.requester,node:routeNode,profiles,originalPids:binding.originalPids,namespaces}
+  const passes=verifyFdProof(state.fdProof,expected,binding.publicKeyPem)
+  if(JSON.stringify(state.passes)!==JSON.stringify(passes))throw Error("FD_OBSERVER_REFUSED")
+  await writeRouteRecord(proofRoot??ctx.diagnosticsRoot,`fresh-guard-${crypto.randomUUID()}.json`,{stage,actor:ctx.admission.actor??{kind:"ben-task",task:ctx.admission.followupTask},
+    ownerTask:lab57CleanupScope.task,state,status:"OBSERVED_NOT_YET_ADMITTED"})
+  validateFreshRouteState(state,ctx.csvRemoved,ctx.admission.followupTask,ctx.admission.actor?"codex-coordinator":"ben-task")
   const settings={"runtime.env":"59688b0dada5410421c8915196e450ccba9ecb89c054a09dcf9e72790215f93d",
     "roles/ben/eval.env":"e7da58da34e2b798e98e343e32dc445376b7651daff1d56ef93092263fbcf9bf",
     "roles/ben/agent-work/lab57-eb1-independent/overrides.env":"179c481169bb03c31c158ce1db8b6bd827e821a910699fbe2c0bc763383fc4b8"}
@@ -169,4 +187,24 @@ export async function assertRouteEffect(ctx:RouteContext,stage:string,proofRoot?
   if(proofRoot)await writeRouteRecord(proofRoot,`admission-${crypto.randomUUID()}.json`,{version:1,stage,node,sourceSha:ctx.admission.sourceSha,
     ownerTask:lab57CleanupScope.task,acquiredAt:lab57CleanupScope.acquiredAt,state,at:new Date().toISOString(),originalOutcome:"ERROR"})
   return verifyNodeIdentity(routeNode)
+}
+
+type ObserverBinding={version:1;sourceSha:string;scriptSha256:string;ownerSha256:string;uid:1000;node:typeof routeNode;profiles:string[];originalPids:number[];namespaces:FdRequest["namespaces"];publicKeyPem:string}
+async function rootFile(file:string,mode:number) {
+ if(await realpath(file)!==file)throw Error("FD_OBSERVER_REFUSED")
+ for(let p=path.dirname(file);;p=path.dirname(p)){const s=await lstat(p);if(!s.isDirectory()||s.uid!==0||(s.mode&0o022)!==0)throw Error("FD_OBSERVER_REFUSED");if(p==="/")break}
+ const s=await lstat(file);if(!s.isFile()||s.nlink!==1||s.uid!==0||(s.mode&0o777)!==mode)throw Error("FD_OBSERVER_REFUSED")
+ return routeDigest(file)
+}
+async function verifyFdObserverBinding(ctx:RouteContext):Promise<ObserverBinding> {
+ const root="/var/lib/loginom-evals/fd-observer/"+ctx.admission.sourceSha,file=root+"/binding.json"
+ if(await rootFile(file,0o444)!==ctx.admission.observerBindingSha256)throw Error("FD_OBSERVER_REFUSED")
+ const binding=JSON.parse(await readFile(file,"utf8")) as ObserverBinding
+ const original=JSON.parse(await readFile(routeRun+"/txt-semicolon-cp1251-decimal/1/cleanup.json","utf8")) as {processes:{processes:{pid:number}[]}}
+ const oldPids=[...new Set([...original.processes.processes.map(p=>p.pid),2126565])].sort((a,b)=>a-b)
+ if(binding.version!==1||binding.sourceSha!==ctx.admission.sourceSha||binding.uid!==1000||binding.ownerSha256!==lab57CleanupScope.raw_owner_sha256
+  ||queueDigest(binding.node)!==queueDigest(routeNode)||!Array.isArray(binding.originalPids)||queueDigest(binding.originalPids)!==queueDigest(oldPids)||!binding.publicKeyPem
+  ||await rootFile(root+"/lab57-fd-observer.py",0o555)!==binding.scriptSha256
+  ||await routeDigest(ctx.sourceRoot+"/evals/script/lab57-fd-observer.py")!==binding.scriptSha256)throw Error("FD_OBSERVER_REFUSED")
+ return binding
 }

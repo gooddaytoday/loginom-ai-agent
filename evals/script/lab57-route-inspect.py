@@ -7,7 +7,10 @@ R=pathlib.Path('/home/user/.local/share/loginom-evals-runtime')
 P=R/'roles/ben/eval-profile'
 CFG=R/'roles/ben/agent-work/lab57-eb1-independent/node-eval-ops.json'
 RUN=R/'roles/ben/results/lab57-eb1-independent/20261013-225027-eb1c2b0da'
-controller,controller_birth,followup,csv_removed,archived=sys.argv[1:]
+controller,controller_birth,followup,csv_removed,archived,mode,source_sha,binding_sha,nonce=sys.argv[1:]
+assert os.getuid()==1000 and os.geteuid()==1000
+assert mode in ["ben-task","codex-coordinator"]
+if mode=="codex-coordinator":assert followup=="root";followup=None
 controller=int(controller)
 def command(args): return subprocess.check_output(args,timeout=120,text=True)
 def birth(proc):
@@ -24,41 +27,6 @@ cfg=json.loads(CFG.read_bytes());profiles=[pathlib.Path(r[k]) for r in cfg['role
 assert len(set(profiles))==6
 original=json.loads((RUN/'txt-semicolon-cp1251-decimal/1/cleanup.json').read_bytes())['processes']
 old_ids={p['pid'] for p in original['processes']}|{2126565}
-passes=[]
-for _ in range(2):
-    processes={};denied=[];foreign=[];fds=[]
-    for proc in pathlib.Path('/proc').iterdir():
-        if not proc.name.isdigit(): continue
-        try:
-            processes[int(proc.name)]=birth(proc)
-        except (FileNotFoundError,ProcessLookupError): pass
-        except PermissionError: denied.append({'pid':int(proc.name),'kind':'process-stat'})
-    assert controller in processes and processes[controller]['birth']==controller_birth
-    # A complete proc ancestry snapshot precedes UID/FD/browser admission.
-    native_sockets=set()
-    for pid,identity in processes.items():
-        proc=pathlib.Path('/proc')/str(pid)
-        try:
-            if identity['state'] in ['Z','X']:continue
-            name=(proc/'comm').read_text().strip()
-            native=name.startswith(('chrome','chromium','loginom-ai-','bwrap'))
-            if native and not owned(pid,processes):foreign.append({'pid':pid,'birth':identity['birth'],'name':name})
-            if proc.stat().st_uid==os.getuid() or native:
-                for fd in (proc/'fd').iterdir():
-                    try:
-                        target=os.readlink(fd)
-                        if any(str(p) in target for p in profiles):fds.append({'pid':pid,'target':target})
-                        if native and target.startswith('socket:['):native_sockets.add(target[8:-1])
-                    except (FileNotFoundError,ProcessLookupError):pass
-        except (FileNotFoundError,ProcessLookupError):pass
-        except PermissionError:denied.append({'pid':pid,'kind':'UID-FD-native'})
-    # Own Chromium must retain a pipe debugger. Any native listening socket is unsafe.
-    for table in ['tcp','tcp6']:
-        for line in (pathlib.Path('/proc/net')/table).read_text().splitlines()[1:]:
-            row=line.split()
-            if row[3]=='0A' and row[9] in native_sockets:denied.append({'kind':'native-debug-listener','inode':row[9]})
-    passes.append({'originalPids':sorted(old_ids&processes.keys()),'foreignNative':foreign,'denied':denied,'profileFds':fds})
-    time.sleep(.12)
 retained={'cli-profile.json','data/auth.json','config/loginom-ai-agent.json','config/loginom-ai-agent.jsonc','config/config.json','config/.gitignore','loginom/connection/connection.json','cache/models.json','state/model.json'}
 markers=[]
 for p in profiles:
@@ -72,10 +40,26 @@ for p in profiles:
             if f.is_symlink() or f.is_file() and str(f.relative_to(p)) not in retained:markers.append(str(f))
 agents=json.loads(command(['/usr/local/bin/multica','agent','list','--output','json']))
 assert isinstance(agents,list) and len(agents)>=8
-queues=queue_pages.collect_queues(agents,followup)
+queues=queue_pages.collect_queues(agents,followup,mode)
 container=cfg['container']['id']; c=json.loads(command(['/usr/bin/docker','inspect',container]))[0]
 names=command(['/usr/bin/docker','exec',container,'find','/workdir/UserStorage','/workdir/SessionBackup','-mindepth','1','-type','f']).splitlines()
 storage=[{'path':n,'identity':command(['/usr/bin/docker','exec',container,'stat','-c','%d:%i:%s:%f',n]).strip(),'sha256':command(['/usr/bin/docker','exec',container,'sha256sum','--',n]).split()[0]} for n in names]
+root=pathlib.Path('/var/lib/loginom-evals/fd-observer')/source_sha
+binding=json.loads((root/'binding.json').read_bytes())
+assert hashlib.sha256((root/'binding.json').read_bytes()).hexdigest()==binding_sha
+request={'version':1,'nonce':nonce,'sourceSha':source_sha,'ownerSha256':'7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64','uid':1000,
+ 'controller':{'pid':controller,'birth':controller_birth},'requester':{'pid':os.getpid(),'birth':birth(pathlib.Path('/proc')/str(os.getpid()))['birth']},
+ 'node':binding['node'],'profiles':[str(p) for p in profiles],'originalPids':sorted(old_ids),
+ 'namespaces':{k:os.readlink('/proc/self/ns/'+k) for k in ['pid','mnt','user']}}
+response=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(root/'lab57-fd-observer.py'),'--request-stdin'],input=json.dumps(request),capture_output=True,text=True,timeout=15)
+if response.returncode:
+ try:exception=json.loads(response.stdout)['exception']
+ except Exception:raise RuntimeError('FD_OBSERVER_UNCLASSIFIED')
+ print('LAB57_FD_REFUSAL '+json.dumps(exception),file=sys.stderr)
+ if exception['name']=='PermissionError':raise PermissionError(exception.get('code') or 13,'FD_OBSERVER_REFUSED')
+ if exception['name']=='FileNotFoundError':raise FileNotFoundError(exception.get('code') or 2,'FD_OBSERVER_REFUSED')
+ raise RuntimeError('FD_OBSERVER_REFUSED')
+proof=json.loads(response.stdout)
 assert time.monotonic()-started<15,'Fresh admission observation exceeded15s; STOP'
-print(json.dumps({'passes':passes,'profiles':len(profiles),'foreignMarkers':markers,**queues,
-    'checkedAt':int(time.time()*1000),'container':{'id':c['Id'],'startedAt':c['State']['StartedAt'],'running':c['State']['Running'],'mounts':c['Mounts']},'storage':storage}))
+print(json.dumps({'passes':proof['report']['passes'],'fdProof':proof,'profiles':len(profiles),'foreignMarkers':markers,**queues,
+ 'checkedAt':int(time.time()*1000),'container':{'id':c['Id'],'startedAt':c['State']['StartedAt'],'running':c['State']['Running'],'mounts':c['Mounts']},'storage':storage}))

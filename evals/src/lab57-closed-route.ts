@@ -1,4 +1,6 @@
 import path from "node:path"
+import {privateDiagnosticRun} from "./lab57-preonce-diagnostics"
+import {rootAuthority,verifyEntryActor,operatorRecord} from "./lab57-root-actor"
 import {constants} from "node:fs"
 import {mkdir,lstat,open,readFile,readdir,realpath,rmdir,copyFile,chmod} from "node:fs/promises"
 import {pathToFileURL} from "node:url"
@@ -14,8 +16,9 @@ import type {RouteAdmission,RouteContext} from "./lab57-route-host"
 
 export function closedRouteArguments(args:string[]) {
   if(args.length===1&&args[0]==="plan")return {command:"plan" as const,file:null}
-  if(args.length!==2||!["execute","worker","admit-helper"].includes(args[0]!)||!args[1]!.startsWith("/")||args[1]!.includes("\0"))throw Error("CLOSED_ROUTE_ARGUMENTS")
-  return {command:args[0] as "execute"|"worker"|"admit-helper",file:args[1]!}
+  if(args.length===3&&args[0]==="execute"&&args.slice(1).every(s=>s.startsWith("/")&&!s.includes("\0")))return {command:"execute" as const,file:args[1]!,proofRoot:args[2]!}
+  if(args.length!==2||!["worker","admit-helper"].includes(args[0]!)||!args[1]!.startsWith("/")||args[1]!.includes("\0"))throw Error("CLOSED_ROUTE_ARGUMENTS")
+  return {command:args[0] as "worker"|"admit-helper",file:args[1]!}
 }
 
 export const closedRoutePlan=["Independent final source/pin admission (no self adoption)","Original common owner/held operation guard and fresh full admission",
@@ -37,30 +40,42 @@ async function helper(ctx:RouteContext,stage:string) {
 }
 
 /** Entry owns the operation guard; no acquire, transfer, retry, resumed once or caller-provided admission callback. */
-export async function executeClosedRoute(admissionFile:string) {
+export async function executeClosedRoute(admissionFile:string,proofRoot:string) {
+  const prefix=routeRoot+"/roles/ben/agent-work/lab57-preonce/"
+  if(!proofRoot.startsWith(prefix)||!/^[a-z0-9-]+$/.test(proofRoot.slice(prefix.length))||process.getuid!()!==1000||process.geteuid!()!==1000)throw Error("PRIVATE_DIAGNOSTICS_REQUIRED")
+  const sourceSha=process.argv[1]?.match(/\/evalrunner-([0-9a-f]{40})\/lab57-owned-route\.mjs$/)?.[1]??"UNVERIFIED"
+  return privateDiagnosticRun(proofRoot,{issue:dispatcherScope.issue,sourceSha,ownerTask:dispatcherScope.ownerTask,controller:{pid:process.pid,birth:await routeBirth(process.pid)}},async enter=>{
+    await enter("private-admission")
+    return executeClosedRouteInner(admissionFile,proofRoot,enter)
+  })
+}
+async function executeClosedRouteInner(admissionFile:string,proofRoot:string,enter:(stage:string)=>Promise<void>) {
   const a=await routePrivateJson<RouteAdmission>(admissionFile),sourceRoot=routeRoot+"/support/evalrunner-"+a.sourceSha
-  if(process.argv[1]!==sourceRoot+"/lab57-owned-route.mjs"||process.env.MULTICA_TASK_ID!==a.followupTask)throw Error("ADMITTED_SOURCE_OWNER_TASK_REQUIRED")
+  if(process.argv[1]!==sourceRoot+"/lab57-owned-route.mjs")throw Error("ADMITTED_SOURCE_OWNER_TASK_REQUIRED")
+  verifyEntryActor(a,a.actor?await readFile(sourceRoot+"/evals/docs/evaler/lab57-root-handover.json"):new Uint8Array(),process.env.MULTICA_TASK_ID,process.getuid!())
+  await enter("sources-and-administrator")
   await verifyRouteSources(a,sourceRoot)
   const admin=await routePrivateJson<{account:string;password:string}>(a.administratorFile)
   if(!/^[a-zA-Z0-9_.-]+$/.test(admin.account)||admin.account.toLowerCase()==="user"||typeof admin.password!=="string"
     ||await routeDigest(a.administratorFile)!==a.administratorSha)throw Error("EXISTING_TRUSTED_ADMINISTRATOR_ROUTE_REQUIRED")
   if(await routeDigest(a.historyInventory)!=="c40d6b1bfe6742a5d9b8ca695cb3e7c31754765f8f21e44ce488af034b4f38b0")throw Error("ORIGINAL_HISTORY_BINDING_REQUIRED")
   // Creating this common guard is a lifecycle exclusion, never a new resource admission or lease.
-  await verifyNodeIdentity(routeNode);await mkdir(routeStand+"/operation",{mode:0o700})
+  await enter("original-operation-guard");await verifyNodeIdentity(routeNode);await mkdir(routeStand+"/operation",{mode:0o700})
   const operation=await lstat(routeStand+"/operation")
-  const ctx:RouteContext={admission:a,sourceRoot,operation:{device:operation.dev,inode:operation.ino},controller:{pid:process.pid,starttime:await routeBirth(process.pid)},
+  const ctx:RouteContext={admission:a,sourceRoot,diagnosticsRoot:proofRoot,operation:{device:operation.dev,inode:operation.ino},controller:{pid:process.pid,starttime:await routeBirth(process.pid)},
     moves:{},csvRemoved:false,historyArchived:false}
   try {
-    await assertRouteEffect(ctx,"original-reservation")
+    await enter("fresh-guard");await assertRouteEffect(ctx,"original-reservation")
     // Check overall once absence BEFORE reserving the unspent original helper recovery.
     await lstat(routeStand+"/lab57-closed.once.json").then(()=>{throw Error("ORIGINAL_ONCE_ALREADY_SPENT")},e=>{if(e.code!=="ENOENT")throw e})
-    const reservation=await helper(ctx,"reserve")
-    const once=await writeRouteRecord(routeStand,"lab57-closed.once.json",{version:1,status:"CONSUMED_BEFORE_EFFECT",controller:ctx.controller,operation:ctx.operation,
+    await enter("original-reservation");const reservation=await helper(ctx,"reserve")
+    await enter("overall-once");const once=await writeRouteRecord(routeStand,"lab57-closed.once.json",{version:1,status:"CONSUMED_BEFORE_EFFECT",controller:ctx.controller,operation:ctx.operation,
+      operator:operatorRecord(a),observerBindingSha256:a.observerBindingSha256,
       issue:dispatcherScope.issue,ownerTask:dispatcherScope.ownerTask,frozen:dispatcherScope.frozen,sourceSha:a.sourceSha,sourceManifestSha:a.sourceManifestSha,reservation,
       administratorSha:a.administratorSha,admissionSha:await routeDigest(admissionFile),acquiredAt:"2026-10-13T22:28:17.228Z"})
     const onceInfo=await lstat(once,{bigint:true})
     ctx.once={path:once,sha256:await routeDigest(once),device:Number(onceInfo.dev),inode:Number(onceInfo.ino),mtimeNs:String(onceInfo.mtimeNs),ctimeNs:String(onceInfo.ctimeNs)}
-    await assertRouteEffect(ctx,"private-diagnostic-root")
+    await enter("after-once");await assertRouteEffect(ctx,"private-diagnostic-root")
     await mkdir(routeStand+"/lab57-closed",{mode:0o700})
     await writeRouteRecord(routeStand+"/lab57-closed","source-admission.json",a)
     await snapshotClosedHistory(ctx)
@@ -190,11 +205,12 @@ async function syncSnapshotDirectories(root:string):Promise<void> {
   const f=await open(root,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);try{await f.sync()}finally{await f.close()}
 }
 
-export type ClosedSettlement={operation:"LAB57-closed-owned-v1";originalOutcome:"ERROR";quality:"EXCLUDED";sourceSha:string;
+export type ClosedSettlement={operator?:import("./lab57-root-actor").RouteActor|{kind:"ben-task";task:string};operation:"LAB57-closed-owned-v1";originalOutcome:"ERROR";quality:"EXCLUDED";sourceSha:string;
   cessation:{status:string;ownerTask:string;originalOutcome:string;cleanup:string};logout:{status:string;observerKey:string;account:string;document:string;emptyPackages:boolean};
   process:{status:string;observation_mode:string;capture_complete:boolean;error:string|null;unknownProcesses:unknown[];verification:{owned_remaining:number;observed_at:string}[]};
   history:{status:string;assistantRows:number;model:string;originalRowsPreserved:boolean;coherentSnapshot:boolean};guard:{status:string};csv:{status:string}}
 export function verifyClosedSettlement(s:ClosedSettlement) {
+  if(s.operator&&s.operator.kind==="codex-coordinator"&&Object.entries(rootAuthority).some(([k,v])=>(s.operator as Record<string,unknown>)[k]!==v))throw Error("GENUINE_CLOSED_SETTLEMENT_REQUIRED")
   if(s.operation!=="LAB57-closed-owned-v1"||s.originalOutcome!=="ERROR"||s.quality!=="EXCLUDED"||!/^[0-9a-f]{40}$/.test(s.sourceSha)
     ||s.cessation?.status!=="SERVER_OWNERSHIP_SCOPE_CEASED"||s.cessation.ownerTask!=="01a1375d-ce4a-7c35-a3a3-94cf64a8b589"||s.cessation.originalOutcome!=="ERROR"||s.cessation.cleanup!=="UNCONFIRMED"
     ||s.logout?.status!=="OWN_DIAGNOSTIC_LOGGED_OUT"||!s.logout.observerKey||!s.logout.account||s.logout.account.toLowerCase()==="user"||s.logout.document!=="NOT_PRESENT_UNPREPARED_OBSERVER"||s.logout.emptyPackages!==true

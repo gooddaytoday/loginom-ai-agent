@@ -22,9 +22,9 @@ function cursor(value:unknown) {
   return parts.length===2&&uuid.test(parts[1]!)&&/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/.test(parts[0]!)&&Number.isFinite(Date.parse(parts[0]!))
 }
 /** Replay complete, safe concrete CLI observations. Neither labels nor filtered arrays grant admission. */
-export function inspectQueueInventory(inventory:QueueInventory,followup:string) {
+export function inspectQueueInventory(inventory:QueueInventory,followup:string|null,mode:"ben-task"|"codex-coordinator"="ben-task") {
   const fail=()=>{throw Error("QUEUE_INVENTORY_REFUSED")}
-  if(!uuid.test(followup)||followup===masQueueScope.originalOwner||!inventory||!Array.isArray(inventory.roster)||inventory.roster.length<8||!Array.isArray(inventory.agents)
+  if(!["ben-task","codex-coordinator"].includes(mode)||(mode==="ben-task"?typeof followup!=="string"||!uuid.test(followup)||followup===masQueueScope.originalOwner:followup!==null)||!inventory||!Array.isArray(inventory.roster)||inventory.roster.length<8||!Array.isArray(inventory.agents)
     ||inventory.agents.length!==inventory.roster.length||new Set(inventory.roster.map(a=>a?.id)).size!==inventory.roster.length)fail()
   const seen=new Set<string>(),excluded:Record<string,unknown>[]=[],blocked:Record<string,unknown>[]=[],controller:Record<string,unknown>[]=[]
   let pageCount=0,recordCount=0
@@ -44,18 +44,18 @@ export function inspectQueueInventory(inventory:QueueInventory,followup:string) 
         if(terminal.has(task.status))continue
         const row:Record<string,unknown>={task:task.id,agent:task.agent_id,status:task.status,taskRuntime:task.runtime_id,agentRuntime:agent.runtime_id,rosterAgent:agent.id}
         const bound=task.agent_id===agent.id
-        if(task.id===followup&&bound&&agent.id===masQueueScope.ben&&task.status==="running"&&task.runtime_id===masQueueScope.original&&agent.runtime_id===masQueueScope.original){
+        if(mode==="ben-task"&&task.id===followup&&bound&&agent.id===masQueueScope.ben&&task.status==="running"&&task.runtime_id===masQueueScope.original&&agent.runtime_id===masQueueScope.original){
           controller.push({...row,reason:"EXACT_BEN_CONTROLLER"});continue
         }
         // The original controller UUID can never be hidden as mas after a conflicting rebind.
-        if(task.id!==followup&&task.id!==masQueueScope.originalOwner&&bound&&task.runtime_id===masQueueScope.mas&&agent.runtime_id===masQueueScope.mas){
+        if(!(mode==="codex-coordinator"&&agent.id===masQueueScope.ben)&&task.id!==followup&&task.id!==masQueueScope.originalOwner&&bound&&task.runtime_id===masQueueScope.mas&&agent.runtime_id===masQueueScope.mas){
           excluded.push({...row,reason:"OWNER_ATTESTED_EXACT_MAS",ownerAmendmentSha256:masQueueScope.ownerAmendmentSha256});continue
         }
         blocked.push({...row,reason:"UNEXEMPTED_OR_UNBOUND_PENDING"})
       }
     }
   }
-  if(controller.length!==1)fail()
+  if(controller.length!==(mode==="ben-task"?1:0))fail()
   return {version:1,ownerAmendmentSha256:masQueueScope.ownerAmendmentSha256,inventorySha256:queueDigest(inventory),rosterCount:inventory.roster.length,
     pageCount,recordCount,pendingCount:excluded.length+blocked.length+controller.length,excluded,blocked,controller}
 }
