@@ -75,6 +75,14 @@ images и synthetic private journal, healthy wrong-nonce control и env canary:
 24 PASS/185 assertions (16.24s), typecheck/diff PASS. Container limits и чужие
 ресурсы не менялись; все test containers удалены после exact ownership checks.
 
+sampleProcessResources({identity,owner}) читает только proc stat/status/executable
+metadata и cgroup. RSS хранится в bytes, CPU — в raw ticks. Birth, UID, executable
+device/inode/path, PGID/SID и cgroup path сверяются повторно; changed/exited process
+оставляет counters unknown. Owner label — вход trusted caller, этот primitive не
+доказывает admission/ancestry и не сигналит процесс. Его подключение к periodic
+runtime producer ещё требуется. С остальным sampling: 27 PASS/228 assertions
+(17.58s), typecheck/diff PASS; model/Loginom calls не выполнялись.
+
 Архив history/БД/WAL/SHM/inputs с hashes предшествует server close/readback.
 Удаляются только свои файлы и доказанные backups после closure proof;
 restart сервера для слота и широкая очистка запрещены. Admission failure —
