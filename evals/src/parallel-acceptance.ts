@@ -4,6 +4,23 @@ import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
 import { serverStorageBinding } from "./parallel-resource-storage"
 
+type ResourceOwner = { kind: string; id: string; launcher: { pid: number; starttime: string } }
+
+export function assessProcessResourceTimeline(input: { samples: readonly unknown[]; intervalMs: number; owners: (ResourceOwner & { startedAt: string; finishedAt: string })[] }) {
+  const checks = input.owners.map(owner => {
+    const timeline = assessResourceTimeline({ samples: input.samples, intervalMs: input.intervalMs, startedAt: owner.startedAt, finishedAt: owner.finishedAt })
+    if (timeline.status !== "passed") return timeline
+    const active = input.samples.filter(value => {
+      const time = Date.parse(String(acceptanceObject(acceptanceObject(value).host).observed_at))
+      return time >= Date.parse(owner.startedAt) && time <= Date.parse(owner.finishedAt)
+    })
+    return active.length && active.every(sample => processOwnerObserved(sample, owner))
+      ? { status: "passed" as const, codes: [] } : { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] }
+  })
+  return { status: checks.some(check => check.status === "failed") ? "failed" as const : checks.some(check => check.status === "incomplete") ? "incomplete" as const : "passed" as const,
+    codes: [...new Set(checks.flatMap(check => check.codes))] }
+}
+
 // Checks the caller's declared resource scopes; full live admission also requires the frozen manifest and other gates.
 export async function checkResourceEvidence(input: {
   file: string; samplesFile: string; runId: string; startedAt: string; finishedAt: string
@@ -114,7 +131,7 @@ export function assessCgroupCoverage(input: { groups: readonly unknown[]; view: 
 export function assessResourceCoverage(input: {
   samples: readonly unknown[]; paths: string[]
   containers: { role: "server" | "studio"; id: string; image: string; startedAt: string; name: string; nonce: string; purpose: string }[]
-  owners: { kind: string; id: string; launcher: { pid: number; starttime: string } }[]
+  owners: ResourceOwner[]
 }) {
   if (!input.samples.length) return { status: "incomplete" as const, codes: ["RESOURCE_SAMPLES_MISSING"] }
   if (input.samples.some(value => {
@@ -153,21 +170,8 @@ export function assessResourceCoverage(input: {
   if (containers.some(entry => entry.storageMismatch)) return { status: "failed" as const, codes: ["SERVER_STORAGE_IDENTITY_MISMATCH"] }
   if (containers.some(entry => entry.missing)) return { status: "incomplete" as const, codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] }
   if (containers.some(entry => entry.storageMissing)) return { status: "incomplete" as const, codes: ["SERVER_FILESYSTEM_COVERAGE_INCOMPLETE"] }
-  if (input.owners.some(owner => !input.samples.some(value => {
-    const producer = acceptanceObject(acceptanceObject(value).processes)
-    return Array.isArray(producer.scopes) && producer.scopes.some(value => {
-      const scope = acceptanceObject(value), observed = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
-      if (observed.kind !== owner.kind || observed.id !== owner.id || launcher.pid !== owner.launcher.pid || launcher.starttime !== owner.launcher.starttime ||
-        scope.status !== "observed" || !Array.isArray(scope.processes) || !scope.processes.length) return false
-      return scope.processes.every(value => {
-        const process = acceptanceObject(value)
-        return process.verified === true && resourceNumbersObserved(process, ["rss_bytes"]) && resourceNumbersObserved(process.cpu, ["user_ticks", "system_ticks"])
-      }) && scope.processes.some(value => {
-        const identity = acceptanceObject(acceptanceObject(value).identity)
-        return identity.pid === owner.launcher.pid && identity.starttime === owner.launcher.starttime
-      })
-    })
-  }))) return { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] }
+  if (input.owners.some(owner => !input.samples.some(sample => processOwnerObserved(sample, owner))))
+    return { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] }
   return { status: "passed" as const, codes: [] }
 }
 
@@ -248,6 +252,22 @@ export function assessParallelLimits(input: unknown) {
 function resourceNumbersObserved(value: unknown, keys: string[]) {
   const counters = acceptanceObject(value)
   return keys.every(key => Number.isSafeInteger(counters[key]) && Number(counters[key]) >= 0)
+}
+
+function processOwnerObserved(value: unknown, owner: ResourceOwner) {
+  const producer = acceptanceObject(acceptanceObject(value).processes)
+  return Array.isArray(producer.scopes) && producer.scopes.some(value => {
+    const scope = acceptanceObject(value), observed = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
+    if (observed.kind !== owner.kind || observed.id !== owner.id || launcher.pid !== owner.launcher.pid || launcher.starttime !== owner.launcher.starttime ||
+      scope.status !== "observed" || !Array.isArray(scope.processes) || !scope.processes.length) return false
+    return scope.processes.every(value => {
+      const process = acceptanceObject(value)
+      return process.verified === true && resourceNumbersObserved(process, ["rss_bytes"]) && resourceNumbersObserved(process.cpu, ["user_ticks", "system_ticks"])
+    }) && scope.processes.some(value => {
+      const identity = acceptanceObject(acceptanceObject(value).identity)
+      return identity.pid === owner.launcher.pid && identity.starttime === owner.launcher.starttime
+    })
+  })
 }
 
 function validLimitEvent(value: unknown) {

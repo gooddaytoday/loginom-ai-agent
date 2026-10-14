@@ -1,9 +1,36 @@
 import { expect, test } from "bun:test"
-import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline, assessResourceIncidents } from "../src/parallel-acceptance"
+import { assessParallelLicence, assessParallelLimits, assessResourceBudget, assessResourceCoverage, assessCgroupCoverage, assessResourceTimeline, assessResourceIncidents, assessProcessResourceTimeline } from "../src/parallel-acceptance"
 import { sampleCgroupResources, sampleHostResources } from "../src/parallel-resources"
 import os from "node:os"
 import { readlink, stat } from "node:fs/promises"
 import { summarizeResourceSamples } from "../src/parallel-resource-summary"
+
+test("process resource coverage observes every frame inside the admitted owner lifetime", () => {
+  const owner = { kind: "slot", id: "actor-a", launcher: { pid: 12, starttime: "123" },
+    startedAt: "2026-10-14T10:00:00.500Z", finishedAt: "2026-10-14T10:00:02.500Z" }
+  const scope = { owner: { kind: owner.kind, id: owner.id }, launcher: owner.launcher, status: "observed",
+    processes: [{ identity: owner.launcher, verified: true, rss_bytes: 100, cpu: { user_ticks: 1, system_ticks: 1 } }] }
+  const samples = [0, 1000, 2000, 3000].map((elapsed, index) => ({ sequence: index + 1, elapsed_ms: elapsed, interval_ms: 1000, missed_intervals: 0,
+    host: { observed_at: new Date(Date.parse("2026-10-14T10:00:00.000Z") + elapsed).toISOString() },
+    processes: { scopes: elapsed > 0 && elapsed < 3000 ? [scope] : [] },
+  }))
+  expect(assessProcessResourceTimeline({ samples, owners: [owner], intervalMs: 1000 })).toEqual({ status: "passed", codes: [] })
+  expect(assessProcessResourceTimeline({ samples: samples.map((sample, index) => index === 2 ? { ...sample, processes: { scopes: [] } } : sample), owners: [owner], intervalMs: 1000 }))
+    .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] })
+  for (const change of [{ status: "unavailable" }, { processes: [] },
+    { launcher: { ...owner.launcher, starttime: "456" } }, { owner: { kind: owner.kind, id: "another-owner" } },
+    { processes: [{ ...scope.processes[0], verified: false }] }, { processes: [{ ...scope.processes[0], rss_bytes: null }] }])
+    expect(assessProcessResourceTimeline({ samples: samples.map((sample, index) => index === 2 ? { ...sample, processes: { scopes: [{ ...scope, ...change }] } } : sample), owners: [owner], intervalMs: 1000 }))
+      .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] })
+  expect(assessProcessResourceTimeline({ samples, owners: [{ ...owner, startedAt: "2026-10-14T10:00:01.100Z", finishedAt: "2026-10-14T10:00:01.900Z" }], intervalMs: 1000 }))
+    .toEqual({ status: "incomplete", codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] })
+  expect(assessProcessResourceTimeline({ samples: samples.map((sample, index) => index === 2 ? { ...sample, processes: { scopes: [] } } : sample),
+    owners: [{ ...owner, finishedAt: "2026-10-14T10:00:01.500Z" }], intervalMs: 1000 })).toEqual({ status: "passed", codes: [] })
+  expect(assessProcessResourceTimeline({ samples, owners: [{ ...owner, startedAt: "unverified" }], intervalMs: 1000 }))
+    .toEqual({ status: "incomplete", codes: ["RESOURCE_TIME_UNVERIFIED"] })
+  expect(assessProcessResourceTimeline({ samples, owners: [{ ...owner, finishedAt: "2026-10-14T09:59:00.000Z" }], intervalMs: 1000 }))
+    .toEqual({ status: "failed", codes: ["RESOURCE_EXECUTION_WINDOW_INVALID"] })
+})
 
 test("resource incidents reject new OOM counters while preserving unchanged historical counts", () => {
   for (const [oom, oomKill, status] of [[5, 2, "passed"], [6, 2, "failed"], [5, 3, "failed"]] as const) {
