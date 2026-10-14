@@ -465,3 +465,12 @@ audit `59dd4627…`. Все три ABC baseline прошли oracle/расчёт
 каждый. Во всех 14 baseline oracle/расчёт PASS, policy PASS у девяти.
 Root17410 активен; текущий слот — `monthly-demand/3`, далее claims/3,
 ROI/3 и first-last/3. Итоговая приёмка ещё не завершена.
+
+
+На 2026-10-14 01:51 UTC завершены 15/18 baseline, 0/25 candidate.
+`monthly-demand/3`: oracle/полный расчёт/policy PASS, JS-узлов 0,
+CLI/wrapper exit 0, cleanup true. Session `ses_ec7ec4d32ffe1AENYSp2CqOFv4`,
+SHA attempt `5cb62388…`, audit `727c8d9e…`.
+Все три monthly baseline успешны без JS. Во всех 15 baseline oracle/расчёт
+PASS, policy PASS у десяти. Root17410 активен; текущий слот —
+`risky-approved-claims/3`, далее ROI/3 и first-last/3. Приёмка ещё не завершена.
