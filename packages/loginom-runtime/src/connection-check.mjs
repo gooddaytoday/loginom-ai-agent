@@ -158,7 +158,7 @@ async function startupFingerprint(path) {
   try {const bytes=await readFile(path);return {available:true,size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}}
   catch(error){return {available:false,rejection:startupRejection(error)}}
 }
-async function startupEvidence(owner) {
+async function startupEvidence(owner, validate) {
   // The producer owns durability. A collector syncing a later copy cannot
   // authorize this owner's context exit. Retry only storage/confirmed results.
   owner.evidencePendingClose??=[];
@@ -169,6 +169,7 @@ async function startupEvidence(owner) {
   let file,directory,created=false,phase='open',failed=false,primary;
   const closeFailures=[];
   try {
+    validate?.();
     file=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
     created=true;phase='write';
     await file.writeFile(JSON.stringify(owner.evidence,null,2)+'\n');
@@ -180,7 +181,7 @@ async function startupEvidence(owner) {
   }
   if(!failed) {
     try {
-      phase='rename';await rename(temporary,join(owner.directory,'startup-cleanup.json'));created=false;
+      phase='rename';validate?.();await rename(temporary,join(owner.directory,'startup-cleanup.json'));created=false;
       phase='directory_open';directory=await open(owner.directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
       phase='directory_sync';await directory.sync();
     }catch(error){failed=true;primary=error}
@@ -367,6 +368,8 @@ function startupOwner(owner, profile, candidate) {
 }
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, owner = {} }) {
   startupOwner(owner,profile,candidate)
+  const original=keepOpen?{id:owner.id,account:owner.account,origin:owner.origin,close:owner.close}:null
+  let snapshot=false
   owner.deadline??=null // No upstream absolute deadline is supplied by the existing start contract.
   owner.artifacts??={node:await startupFingerprint(process.execPath),browser:await startupFingerprint(browserPath),runtime:await startupFingerprint(runtimeModulePath),resource_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../resource-manifest.json')),cli_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../../../cli-manifest.json')),foreground_caller:{available:false,reason:'NOT_SUPPLIED_BY_START_CONTRACT'}}
   try {
@@ -400,15 +403,31 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       ],
       viewport: launch.viewport,
     })
+    if(original)original.context=owner.context
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
+    if(original)original.page=owner.page
     await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
     owner.staticLoader=await createStartupStaticLoader(owner.page,owner.context,owner,
       Math.min(Date.now()+60_000,Number.isSafeInteger(owner.deadline)?owner.deadline:Infinity))
     owner.evidence.startup_static_loader=owner.staticLoader.evidence
     const result=await loginPage(owner.page,candidate,owner)
     if(!keepOpen) {await owner.close();return result}
-    return {...result,context:owner.context}
+    snapshot=true
+    const validate=()=>{
+      if(['id','account','origin','context','page'].some(key=>owner[key]!==original[key]))
+        throw Error('LOGINOM_STARTUP_OWNER_CHANGED')
+    }
+    validate()
+    await startupEvidence(owner,validate)
+    validate()
+    return {...result,context:original.context}
   } catch(error) {
+    if(snapshot) {
+      owner.primaryFailure=error
+      owner.evidence.primary_rejection=startupRejection(error)
+      try {await original.close.call(owner)} catch(cleanupFailure) {owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:cleanupFailure}
+      throw error
+    }
     try {await owner.staticLoader?.stop()}catch(secondary){owner.evidence.static_loader_secondary=startupRejection(secondary)}
     owner.startupDiagnostics?.stop()
     owner.primaryFailure=error
