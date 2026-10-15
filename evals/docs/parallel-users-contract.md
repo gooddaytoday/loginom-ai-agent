@@ -1767,9 +1767,11 @@ whose semantic hash is frozen in the command, and an immutable native observatio
 after all recorded local lifetimes. It derives every setup/check ownership ledger
 through the existing qualifier, including the narrow interrupted-check case.
 Readonly outcomes require successful non-interrupted/non-timeout completion.
-Every historical/current same-user row must match an exact known remote ID, Name,
-CreateTime and zero package count; a closed ledger cannot account for a current
-row. Duplicate IDs or remote bindings refuse accounting. User matching follows
+Every historical same-user row must match its exact causal proxy ID, Name,
+CreateTime and zero package count. Fresh rows use a unique Name/CreateTime tuple
+under the qualified owned user and current server epoch; proxy IDs may differ
+across admin contexts. Closed ledgers cannot account for current rows. Duplicate
+IDs, remote bindings or identity tuples refuse accounting. User matching follows
 the existing case-insensitive Loginom guard and catches a bare username as well
 as username:sequence. Peer users remain outside this slot's ownership.
 
@@ -1874,8 +1876,8 @@ Managed-row proxy IDs differ across admin contexts for the same exact Name and
 CreateTime. The native account and epoch remain bound. Use the qualified full
 identity tuple across contexts; require stable proxy IDs within one observation
 context. Historical causal/source guards must remain intact. Fresh accounting
-currently still requires the historical remoteKey and needs a separate native
-reconnect/finalizer test and fix; proxy IDs are not an immutable Session identity.
+now uses the unique qualified tuple; the historical causal proxy/source guards
+remain strict. Proxy IDs are not an immutable Session identity.
 
 Native1/78 PASS82.84s; typecheck/diff PASS. Private600
 native-user-06b1d620-2a59-40c4-a818-78ba0fe81140/peer-survival.json
@@ -1901,4 +1903,39 @@ CLI refusal. The existing held fence, epoch/runtime verification and serialized
 register-before-spawn inventory remain mandatory. Public real-fs pre-runtime
 RED received SEALED before the missing-runtime check; GREEN1/9 and full admin
 24/87 PASS8.91s, typecheck/diff PASS. This test grants no native connection or
-registration qualification; actual sequential admin handoff remains pending.
+registration qualification by itself; the native handoff below qualifies that path.
+
+
+Sequential native management reconnect (2026-10-15)
+
+A fresh independently supervised admin starts after the first admin's confirmed
+closure and before inventory sealing. Actual setup and a completed check supply
+two causal ledgers. Both fresh proxy IDs differ while qualified user/epoch/Name/
+CreateTime remain equal. The collector accepts those unique tuples and refuses
+an extra unknown row, nonzero package count and a duplicated tuple. Historical
+IDs and source hashes remain mandatory. The finalizer archives, targets both
+owned sessions, confirms fresh absence, then closes the replacement admin; both
+continuous closures remain in the final inventory. The terminal receipt grants
+neither storage deletion nor next admission; the leases remain held in the test.
+
+Native RED MANAGEMENT_SESSION_UNKNOWN218.39s → GREEN1/38 assertions145.30s.
+Private600 native-cli-sessions-59b958c6-adfe-44e7-9b32-f4f5ef7949e4/finalizer.json
+links terminal SHA25632005ebddb881422099d6c6bd4b02882fd62ecbafc8a386d3110aed323255eb5.
+The audit passed145 checks across15 artifacts and read-back: frozen source hashes,
+full native owner/epoch bindings, changed proxies, exact adopted close authority,
+archive-before-close, sequential admin lifetimes and exact pair/network/root
+absence. Docker network disconnect/destroy events independently link both exact
+container IDs to the deleted network; successful same-daemon listings confirm
+absence. Post-run source hashes/mtimes are recorded separately; no missing
+controller journal is synthesized.
+
+Related39/262 PASS66.19s uses runner --timeout30000 for durable filesystem tests;
+its unchanged assertions/fsync passed beyond the old5s budget (6.6/10.8s). The
+subsequent admin suite passed24/87 in8.91s, typecheck/diff PASS. The read-back test
+now gives its new RPC a fresh absolute deadline. Production20/30/60s deadlines
+are unchanged. Reconnect isolates completed setup/check; readonly/cancellation
+remain separate cases. Additional CLI continuation after an admin handoff is not
+qualified by this end-of-management test; historical cross-context accounting
+remains a separate gate. ARCHIVE_TOPOLOGY after an actually interrupted check and
+the retained writer/proc incidents remain open. SessionBackup, scoped storage
+cleanup/release and full model/judge admission are still unqualified.
