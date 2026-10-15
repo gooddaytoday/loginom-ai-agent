@@ -1710,6 +1710,11 @@ closure, session identity, archive, deletion or release by itself. Legacy
 source readers remain compatible; future finalization must independently
 validate every registered source and refuse unknown sessions.
 
+The `test` and `test:unit` scripts use a30s default runner budget for real durable
+filesystem transactions. Their assertions, production operation deadlines and
+longer native test budgets remain unchanged; direct `bun test` needs an explicit
+`--timeout 30000` for the same default. This does not qualify live admission.
+
 `sealManagementProcessInventory` seals one normal slot under its held server and
 slot leases, serialized with producer registration. Its private sidecar binds
 the exact inventory SHA and command/epoch/token/profile. A live producer refuses
