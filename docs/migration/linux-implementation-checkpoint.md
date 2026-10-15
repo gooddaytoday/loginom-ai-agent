@@ -1,5 +1,17 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-15 — подготовка release candidate v0.2.0
+
+Источник: `loginom`, базовый SHA `ceb03932504e8295c9ae7669ee8cadb7c3128f94`.
+По запросу владельца версия поднята до `0.2.0` в root/Desktop manifests и lock.
+Frozen install PASS; packaging/static tests:13 PASS,2 native macOS SKIP.
+Локальный Node24.19.0 сверён с SHA256 product pin; первый запуск тестов без
+закреплённого Node/runtime dependencies не прошёл, после подготовки среды PASS.
+Следующий шаг: новый annotated tag `v0.2.0`, полный release CI, сверка assets
+и публикация GitHub pre-release по текущему поручению владельца.
+Новая installed/live приёмка не выполнялась; исторические результаты на0.2.0
+не переносятся. Существующие теги и пользовательская установка не меняются.
+
 ## 2026-10-09 — подтверждённое закрытие Host и отмена браузерной проверки
 
 `docs-no-browser`: исправлены три замечания к `42cf2d27b` через TDD.

@@ -527,7 +527,7 @@
     },
     "packages/desktop": {
       "name": "@loginom-ai-agent/desktop",
-      "version": "0.1.17",
+      "version": "0.2.0",
       "dependencies": {
         "@zip.js/zip.js": "2.7.62",
         "drizzle-orm": "catalog:",
