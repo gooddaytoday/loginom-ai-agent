@@ -195,9 +195,16 @@ async function handle(message) {
     try {
       // dock_node_wait may legitimately wait 60 seconds. Leave room for its receipt
       // before the supervisor's 120-second deadline, instead of the SDK's 60-second default.
-      const result = await state.client.callTool(message.input, undefined, {
+      const save = message.input?.name==='dock_action_run'
+        && ['package.save_as','package.save_checkpoint'].includes(message.input.arguments?.action_key);
+      if(save && message.deadline!==undefined && (!Number.isSafeInteger(message.deadline) || message.deadline<=Date.now()))
+        throw Error('LOGINOM_RUNTIME_TIMEOUT');
+      const deadline = save && message.deadline!==undefined ? Math.min(message.deadline,Date.now()+105000) : undefined;
+      const input = deadline===undefined ? message.input : {...message.input,
+        _meta:{...message.input._meta,loginomDeadline:deadline}};
+      const result = await state.client.callTool(input, undefined, {
         signal: controller.signal,
-        timeout: 105_000,
+        timeout: deadline===undefined ? 105_000 : Math.max(1,deadline-Date.now()),
       })
       send({ id: message.id, result: {
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),

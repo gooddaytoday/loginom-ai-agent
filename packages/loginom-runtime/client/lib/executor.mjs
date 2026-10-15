@@ -1417,8 +1417,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
       ...(operation.action.effect?.destination_policy==='session_storage'?{storage_binding:getStorageBinding()}:{}),
-      ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms } : {}),
-    }), { timeout: operation.action.timeout_ms + 5000, ...options });
+      ...receipt, ...(operation.parentDeadline!==undefined?{deadline_at:operation.deadline}:
+        mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms } : {}),
+    }), operation.parentDeadline!==undefined?{...options,timeout:
+      Math.max(1,Math.min(options.timeout??operation.action.timeout_ms+5000,operation.deadline-now()))}
+      :{timeout:operation.action.timeout_ms+5000,...options});
     assertActionOutcome(outcome);
     if (outcome.action_key !== operation.action.action_key || outcome.action_revision !== operation.action.revision) {
       throw new Error('Dock capability outcome identity does not match the pinned action');
@@ -2349,9 +2352,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(operation.outcome);
       }finally{running=false;}
     },
-    async run(actionKey, parameters, { signal, operationId } = {}) {
+    async run(actionKey, parameters, { signal, operationId, deadline } = {}) {
       signal?.throwIfAborted();
       const action = find(actionKey);
+      // Internal parent bound only; public action parameters/DTO stay unchanged.
+      if(deadline!==undefined&&!Number.isSafeInteger(deadline))throw Error('Invalid parent action deadline');
+      const bounded=deadline!==undefined,childDeadline=bounded?Math.min(deadline,now()+action.timeout_ms):undefined;
+      const assertBound=()=>{signal?.throwIfAborted();if(bounded&&now()>=childDeadline)throw Error('Action deadline exceeded')};
+      if(bounded)assertBound();
       validateActionParameters(action.input_schema, parameters);
       if (operationId !== undefined && (typeof operationId !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(operationId))) {
         throw new Error('operation_id must be a stable identifier with at most 128 characters');
@@ -2381,25 +2389,29 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(previous.outcome);
         }
         const operation = { id: operationId ?? randomUUID(), action, signature, parameters: structuredClone(parameters) };
+        if(bounded){operation.parentDeadline=deadline;operation.deadline=childDeadline}
+        if(bounded)assertBound();
         let prepared;
         try { prepared = await invoke(operation, 'prepare', { signal }); }
-        catch (error) { return failed(operation, 'PREFLIGHT_FAILED', String(error?.message ?? error).slice(0, 1000), 'FAILED'); }
+        catch (error) { if(bounded)throw error;return failed(operation, 'PREFLIGHT_FAILED', String(error?.message ?? error).slice(0, 1000), 'FAILED'); }
+        if(bounded)assertBound();
         if (prepared.status !== 'NOT_APPLIED' || prepared.phase !== 'prepared' || !prepared.checkpoint?.workflow_ref) return prepared;
         operation.checkpoint = prepared.checkpoint;
         signal?.throwIfAborted();
-        operation.deadline = now() + action.timeout_ms;
+        if(!bounded)operation.deadline = now() + action.timeout_ms;
         await remember(operation, 'prepared');
-        signal?.throwIfAborted();
+        assertBound();
         operations.set(operation.id, operation);
         pending = operation;
         observations.clear();
-        let outcome;
+        let outcome,applyFailed=false,applyFailure;
         try {
           // Keep the browser gate until the bounded mutation reports completion,
           // even when its caller cancels. Cancellation never frees a live action.
           outcome = await invoke(operation, 'apply', { stopSignal: signal });
         } catch (error) {
           operation.transportUncertain = true;
+          applyFailed=true;applyFailure=error;
           outcome = failed(operation, 'BROWSER_CALL_UNCERTAIN', String(error?.message ?? error).slice(0, 1000));
         }
         operation.outcome = outcome;
@@ -2407,9 +2419,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try { await remember(operation, 'completed', outcome); }
         catch (error) {
           operation.outcome = failed(operation, 'EVIDENCE_WRITE_FAILED', String(error?.message ?? error).slice(0, 1000));
+          if(bounded)throw applyFailed?applyFailure:error;
           return operation.outcome;
         }
         if (outcome.status !== 'AMBIGUOUS' && operation.cleanupConfirmed) pending = null;
+        if(bounded){signal?.throwIfAborted();if(applyFailed)throw applyFailure}
         return outcome;
       } finally { running = false; }
     },

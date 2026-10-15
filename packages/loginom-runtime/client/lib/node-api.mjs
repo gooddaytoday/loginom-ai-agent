@@ -122,7 +122,7 @@ export const nodeApiTools=Object.freeze([
  tool('dock_node_stop','Request native stop only for an identified server execution currently awaited by this node operation. Poll the same worker for confirmed outcome.',operation),
 ]);
 export const deliveryApiTools=Object.freeze([
- tool('dock_artifact_deliver','Candidate delivery of an authorized artifact to its grant destination, including path conflict policy and byte verification. Retain operation_id after timeout or uncertainty; never reupload with a replacement ID.',delivery),
+ tool('dock_artifact_deliver','Candidate delivery of an authorized artifact to its grant destination, including path conflict policy and byte verification. budget_ms covers the entire storage navigation, upload and verification, not one browser call; allow several minutes within the remaining caller budget for a new delivery. Resume cannot extend the original deadline. Retain operation_id after timeout or uncertainty; never reupload with a replacement ID.',delivery),
  tool('dock_artifact_delivery_status','Read the retained delivery job without browser calls. A failed tool wait does not prove transfer termination.',operation,true),
  tool('dock_artifact_delivery_resume','Explicitly resume the SAME known delivery job after inspecting status. Uses the original upload receipt; never repeats an unresolved download. Requires the original live runtime and unchanged grant.',resumeDelivery),
 ]);

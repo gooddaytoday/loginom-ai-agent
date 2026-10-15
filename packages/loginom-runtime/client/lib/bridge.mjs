@@ -204,7 +204,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           finally { queue.close(); }
         }
         session.metadata.archiveActive = archive?.active === true;
-        const connection = request.params.arguments?.checkConnections === false ? null : await diagnoseConnection(config);
+        const connection = request.params.arguments?.checkConnections === false ? null : await diagnoseConnection(config,{headless:session.metadata.browserWindowMode==='headless'});
         return { content: [{ type: 'text', text: JSON.stringify({
         ...session.metadata, endpoint: config.endpoint, loginomUrl: config.loginomUrl, toolCatalogSha256: catalog.sha256,
         remoteTools: remoteTools.length, browserTools: browserTools.length,
@@ -341,7 +341,9 @@ export async function createBridge(config, session, { browserTransport: managedB
                     observationId:args.observation_id,operationId:args.operation_id,signal:extra.signal})
                   : request.params.name === 'dock_ui_action' ? await actionRuntime.uiAct(args.action,
                     { observationId: args.observation_id, operationId: args.operation_id, recoveryOperationId: args.recovery_operation_id, signal: extra.signal })
-                    : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId: args.operation_id });
+                    : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId: args.operation_id,
+                      ...(['package.save_as','package.save_checkpoint'].includes(args.action_key) && request.params._meta?.loginomDeadline!==undefined
+                        ? {deadline:request.params._meta.loginomDeadline}: {}) });
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);

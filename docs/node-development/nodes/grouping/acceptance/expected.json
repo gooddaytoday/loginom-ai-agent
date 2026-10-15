@@ -1,13 +1,4 @@
 {
-  "package_path": "{{PACKAGE_PATH}}",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.group_data"
-    }
-  ],
   "outputs": [
     {
       "output_node_type": "transform.group_data",

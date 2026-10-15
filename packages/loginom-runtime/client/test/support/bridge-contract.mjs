@@ -1,6 +1,6 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { tmpdir } from 'node:os';
@@ -17,7 +17,7 @@ import { actions, selectors, build, Page, nodeParameters } from './executor-fixt
 // no localhost listener, real browser, credentials or model is involved.
 test('MCP application refusals remain typed normal content and the same connection can create a node afterwards', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-bridge-contract-'));
-  const page = new Page(); let browserCalls = 0;
+  const page = new Page(); page.url=()=> 'about:blank'; let browserCalls = 0;
   const compatibility = { profile_id: 'unit-macos-chromium', loginom_build: build, platform: 'macos', browser: 'chromium' };
   const pinned = { actions, selectors, pins: {}, compatibility, manifest: { compatibility } };
   class ExternalClient {
@@ -174,6 +174,14 @@ test('MCP application refusals remain typed normal content and the same connecti
       assert.ok(observedReceipt.output.ui.elements.some(e => e.ref === args.root_ref && e.kind === 'region' && e.allowed_actions.length === 0));
       assert.equal(args.observation_id, observedReceipt.output.observation_id);
     }
+    const deadline=Date.now()+20000;
+    const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',
+      operation_id:'bounded-mcp-save',parameters:{path:'/user/data/packages/bounded-mcp.lgp',conflict_policy:'fail'}},
+      _meta:{loginomDeadline:deadline}});
+    assert.equal(JSON.parse(saved.content[0].text).status,'SUCCEEDED');
+    const rows=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+    const saveRows=rows.filter(r=>r.operation_id==='bounded-mcp-save'&&['prepared','completed'].includes(r.phase));
+    assert.equal(saveRows.length,2);assert(saveRows.every(r=>r.deadline_at===deadline));
   } finally {
     await client?.close();
     await bridge?.close();

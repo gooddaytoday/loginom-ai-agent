@@ -9,3 +9,18 @@
 Адресные независимые аудиторы `grouping_configuration_evidence.py` и `grouping_output_evidence.py` из `packages/loginom-runtime/tools/loginom-acceptance/` остаются источником проверок raw observations. Их CLI-транспорт и привязка к receipt/journal пока не квалифицированы; один cold-check не доказывает всю матрицу. Не объявлять полный PASS до завершения этой адаптации и всех пунктов подплана.
 
 Тесты генератора: `python3 -m unittest discover -s docs/node-development/nodes/grouping/acceptance -p 'test_*.py'` из корня репозитория. Входы, expectations и manifest версионируются до модельного прогона; результаты попыток сохраняются отдельно, без секретов.
+# Проверка полного результата и freshness
+
+`oracle.compare_output` сравнивает весь упорядоченный список колонок
+`name/label/type` и мультимножество полных строк. Порядок групп не является
+ожиданием; составные группы и совпадающие проекции исключённого ключа нельзя
+схлопывать по одному видимому ключу. Для header-only обязательна полная схема
+при нуле строк. Count считает строки, включая NULL/empty, а не COUNT(field).
+
+Перед сравнением caller обязан передать подтверждённые existing receipt evidence:
+`expected_execution_id`, совпадающий `observed_execution_id`, `read_complete=True`
+и `read_fresh=True`. Совпадение чисел само по себе не доказывает freshness.
+Флаги нельзя выводить из oracle или задавать без подтверждения выполнения/чтения.
+Helper не заменяет штатный CLI, cold-check, проверку конфигурации/пакета и cleanup.
+Native all-null semantics и матрица остаются `not_checked` до независимого живого
+подтверждения; ожидаемые legacy значения и критерии подплана не изменены.
