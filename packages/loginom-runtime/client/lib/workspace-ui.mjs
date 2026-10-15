@@ -85,7 +85,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // or GUID failures do not enter this wait.
     for(let sample=0;binding?.surface_pending===true && effectPossible
       && (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action?.verb)
-        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && sample<(task.opening_timeout_ms?900:200);sample++) {
+        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true)
+      &&(task.action?.verb==='open_node_views'&&task.opening_timeout_ms || sample<(task.opening_timeout_ms?900:200));sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
       binding=await readNodeContext(page,task.prepared_node_context);
@@ -4058,9 +4059,10 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
-    ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
-    throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(options.action?.verb)
+    ||!Number.isSafeInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1
+    ||options.action?.verb!=='open_node_views'&&options.opening_timeout_ms>45000))
+    throw Error('Extended opening wait requires a bound node opening; wizard waits are at most 45000 ms');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);

@@ -5202,3 +5202,31 @@ test('F3 epoch refusal sends no key and ordinary Enter retains ElementHandle sem
   assert.equal(stale.status,'NOT_APPLIED');assert.equal(stale.error.code,'UI_EPOCH_CHANGED');
   assert.deepEqual(page.events,['Enter']);
 });
+
+test('one bound node views click waits beyond forty-five seconds only within the parent remainder',async()=>{
+ for(const mode of ['long','expired','foreign']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;';
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;Filter','',{x:100,y:150,width:150,height:80},graph);
+  page.add('span',base+'Graph;Filter;Label;Label','Filter',{x:110,y:160,width:100,height:25},body);
+  page.add('button',base+'Graph;Filter;Visualizers','Views',{x:200,y:200,width:30,height:25},body);
+  const binding={document_id:'doc',node:{document_id:'doc',workflow_id:'flow',node_id:'node'},workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]}};
+  let views;
+  page.waitForTimeout=async ms=>{clock.advance(ms);if(clock.Date.now()>=70000&&!views)views=page.add('div',base+'ViewsForm','',{x:0,y:100,width:900,height:600});};
+  const reader=async()=>{
+   if(page.events.includes('click')) {
+    if(mode==='foreign'&&clock.Date.now()>20000)return {verified:false,reason:'node'};
+    if(!views)return {verified:false,surface_pending:true};
+   }
+   return {verified:true,...binding.node,surface:views?'views':'graph',tid:base+(views?'ViewsForm':'Graph;Filter')};
+  };
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},reader);
+  const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid===base+'Graph;Filter;Visualizers');assert.ok(button?.allowed_actions.includes('open_node_views'));
+  const options={mode:'act',action:{verb:'open_node_views',ref:button.ref},snapshot,prepared_node_context:binding,opening_timeout_ms:mode==='expired'?30000:120000};
+  assert.doesNotThrow(()=>makeWorkspaceUiCode(options));
+  const result=await execute(options);assert.equal(result.status,mode==='long'?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(mode==='long'){assert.ok(clock.Date.now()>=70000);assert.ok(result.trace.filter(e=>e.event==='node_surface_wait').length>900);}
+  if(mode==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(mode==='foreign')assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED');
+  assert.throws(()=>makeWorkspaceUiCode({...options,action:{verb:'begin_wizard',ref:button.ref},opening_timeout_ms:120000}),/45000/);
+ }
+});

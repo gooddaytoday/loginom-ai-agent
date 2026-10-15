@@ -45,3 +45,16 @@ Remaining: 84 of the newly requested 88 forms, including `Id_compare_3`, and
 persistence of the additional settings. Two previously accepted forms on older
 Product remain historical evidence. Full stage 0 and native acceptance of this
 correction remain open; stage 1, merge and release are outside this cut.
+
+The following cut addresses the fresh cold-header failure of `open_node_views`
+(after its single click, document `50edb1a3`, operation `n45`). That historical
+AMBIGUOUS action is not resumed. The fixed node procedure gives this verb the
+remaining original parent deadline through private `opening_timeout_ms`; other
+wizard openings retain their 45000-ms ceiling. The browser's post-gesture
+`surface_pending` loop uses that deadline instead of its 900-sample ceiling.
+Authentication, package/workflow/node identity checks and the original one-click
+preconditions remain. Admission still requires an exact prepared node binding
+and a positive safe integer. The focused browser-capability control has a
+70-second transition, an expired parent and a foreign-node refusal; it counts
+one gesture in every route. Its DOM/native inventory and clock are doubles.
+The old module rejects the same 120000-ms request before the gesture.

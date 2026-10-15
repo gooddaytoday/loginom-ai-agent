@@ -480,8 +480,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       lastPreparedStep = structuredClone(persisted);
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
-      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
-        ?Math.min(45000,Math.max(1,Math.floor(operation.deadline-now()))):null;
+      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(action.verb)
+        ?Math.min(action.verb==='open_node_views'?Number.MAX_SAFE_INTEGER:45000,Math.max(1,Math.floor(operation.deadline-now()))):null;
       const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
