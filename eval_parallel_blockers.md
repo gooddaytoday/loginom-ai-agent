@@ -523,3 +523,32 @@ serial/key reads0. Новый genuine A/B management native1/16 и audit584/177
 сессий. Нужен поддержанный производителем read-back либо достоверные issuance
 данные с явным лимитом и scope; числовой порог не выводится из отсутствия отказа.
 Production admission и полная приёмка остаются закрытыми.
+
+Дополнение 2026-10-15: поддержанный веб-монитор Guardant найден и доступен.
+[Loginom Admin Guide](https://help.loginom.ru/adminguide/linux/licenses/license-server.html)
+связывает `IP_NAME` в `gnclient.ini` с сервером ключей и описывает монитор на
+порту3185. Read-only проверка permanent research Server6ae20e683182… дала
+настроенный host `grdsrv-lin`; GET корня и `monitor.htm` успешны. Наблюдаются две
+группы модулей Loginom/Desktop/Server Team/Server Standart/Server Enterprise/Adapter;
+показанная пара ресурса Enterprise37/50 в одной группе не является доказанным
+лимитом браузерных сессий Loginom. Все13 прочитанных client records сообщают режим
+«По копиям» (10 `loginomd.exe`,3 `loginomd`); точного совпадения hostname собственного
+контейнера нет. Отсутствие совпадения не доказывает отсутствие выдачи: правило
+привязки Guardant host/process к нашему ServerIdentity ещё не квалифицировано.
+
+[Guardant Net](https://dev.guardant.ru/pages/viewpage.action?pageId=1277979)
+документирует отдельно ресурсы модуля и режим лицензирования клиента.
+[Loginom Help](https://help.loginom.ru/userguide/compare-editions.html) связывает
+браузерные сессии с приобретёнными пользовательскими лицензиями и отдельно
+описывает административные/пакетные исключения. Поэтому50 сетевых ресурсов нельзя
+подставлять в `max_sessions` либо выводить unlimited из названия Enterprise.
+Открыты точная выдача нашему daemon, число пользовательских лицензий и applicable
+session counting scope; network-monitor availability больше не является неизвестным.
+
+Private600 `licence-monitor-96ee8d5e-987d-43b9-85f3-579effdc789e/observation.json`
+SHA256 `478a91af8c188a614986a9672c25f0215fec27f30686f5ce32a5093843f33a56`:
+15 HTTP observations с hashes/timestamps и нормализованными полями, совпавшие
+container identity bookends, read-back сохранённого JSON. Raw HTML и query values,
+включающие key identifiers, отброшены; страницы серийных номеров не запрашивались.
+Нет settings/rescan/restart/key changes, Loginom login/model calls0. Evidence
+не является квалифицированным licence producer и не открывает admission.
