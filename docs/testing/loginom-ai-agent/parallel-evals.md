@@ -1077,3 +1077,28 @@ Empty/non-browser invocation qualification and normal finalizer/recovery wiring
 remain open; no release/admission or live acceptance follows from the collector.
 
 Related48 PASS/245 assertions55.60s, typecheck/diff PASS.
+
+
+Native empty-agent qualification (2026-10-16): the replay fixture now runs both a
+browser/tool invocation and a text-only invocation through the installed CLI.
+An explicit empty browser proof with no new same-user row produces no agent
+ledger; its physical invocation and native observation window remain accounted.
+Empty metadata cannot claim a genuine new browser row: the negative-copy RED
+initially published a false ledger, then the guard refused it before publication.
+
+Final native2/55 PASS242.82s, related49/248 PASS58.87s, typecheck/diff PASS.
+Private d84be043… auditca5c3ea5…1648/108/16 causal frames and71e4d75c…
+audit06a69132…80/58/6; both15 pins, own pairs/networks/controller roots absent,
+original histories retained. Browser Count1 close/setup survival still pass.
+
+The text trial D045… preserved a4096-byte main DB plus848752-byte WAL and32768-byte
+SHM. A copied SQLite family exposes the committed SDK session and quick_check=ok;
+original bytes are unchanged. Bun SQLite1.3.14 also read this actual three-file
+archive successfully (D045…/bun-sqlite-wal-audit.json SHAca9c44ae…). The native test now queries a private DB/WAL/SHM
+copy, then removes that copy. Main-file-only byte search was an invalid oracle
+for this state. Original artifacts and the failed oracle result are retained.
+Two duplicate unexecuted audit drafts were removed after copying verified recipes.
+
+Whole-run sealing remains required by the current collector. Per-attempt producer
+boundaries, normal slot/attempt finalizer and recovery remain the next work;
+production admission, backup/licence/resources/OAuth/real judge/live gates are open.

@@ -140,7 +140,7 @@ async function agentSessions(file: SlotFile, lease: SlotLease, secretFile: strin
   const input = { file: reference.path, commandId: origin.commandId, slotId: lease.slot.id, producerPid: process.pid }
   const processEntry = await readAgentProcess(input, reference.id)
   if (JSON.stringify(processEntry.entrySource) !== JSON.stringify(reference)) throw new EvalFailure("AGENT_SESSION_PROCESS_CHANGED", 2)
-  requireBrowserProof(await readLeaseReceipt(processEntry.source.path), lease.slot.profileDir, processEntry)
+  const browser = requireBrowserProof(await readLeaseReceipt(processEntry.source.path), lease.slot.profileDir, processEntry)
   const prepared = await readUserPreparation(file, lease, secretFile), owned = await readUserOwnership(file, lease, secretFile)
   const activation = await readUserActivation(file, lease, secretFile)
   if (!activation) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
@@ -151,7 +151,8 @@ async function agentSessions(file: SlotFile, lease: SlotLease, secretFile: strin
   const rows = [...new Map(fresh.map(row => [row.objectId, row])).values()]
   if (snapshots.after.sessions.some(row => sameUser(row.name) && !snapshots.before.sessions.some(previous => previous.objectId === row.objectId) &&
     !rows.some(observed => observed.objectId === row.objectId))) throw new EvalFailure("AGENT_SESSION_UNKNOWN", 2)
-  if (!rows.length || new Set(rows.map(row => JSON.stringify([row.name.toLowerCase(), row.createdAt]))).size !== rows.length ||
+  if (rows.length && !browser) throw new EvalFailure("AGENT_SESSION_BROWSER_UNCONFIRMED", 2)
+  if (new Set(rows.map(row => JSON.stringify([row.name.toLowerCase(), row.createdAt]))).size !== rows.length ||
     fresh.some(row => typeof row.createdAt !== "string" || !/^[1-9]\d*$/.test(row.name.slice(owned.username.length + 1)) ||
       snapshots.before.sessions.some(previous => previous.name.toLowerCase() === row.name.toLowerCase()) ||
       [...fresh, ...snapshots.after.sessions].some(current => current.objectId === row.objectId &&
@@ -169,6 +170,7 @@ async function agentSessions(file: SlotFile, lease: SlotLease, secretFile: strin
 
 function requireBrowserProof(value: unknown, profile: string, window: { startedAt: string; finishedAt: string }) {
   const proof = object(value), bindings = proof.browserBindings, directories = proof.runtimeDirectories, processes = proof.processes
+  if (Array.isArray(bindings) && !bindings.length && Array.isArray(directories) && !directories.length) return false
   if (!Array.isArray(bindings) || !bindings.length || !Array.isArray(directories) || !directories.length || !Array.isArray(processes) ||
     directories.some(dir => typeof dir !== "string" || path.resolve(dir) !== dir || !dir.startsWith(profile + path.sep)) || bindings.some(value => {
       const binding = object(value)
@@ -177,6 +179,7 @@ function requireBrowserProof(value: unknown, profile: string, window: { startedA
         typeof binding.observed_at !== "string" || !Number.isFinite(Date.parse(binding.observed_at)) ||
         Date.parse(binding.observed_at) < Date.parse(window.startedAt) || Date.parse(binding.observed_at) > Date.parse(window.finishedAt)
     })) throw new EvalFailure("AGENT_SESSION_BROWSER_UNCONFIRMED", 2)
+  return true
 }
 
 async function readObservations(file: SlotFile, lease: SlotLease, raw: Record<string, unknown>, window: { startedAt: string; finishedAt: string }) {
