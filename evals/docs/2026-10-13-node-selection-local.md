@@ -14,14 +14,17 @@ Baseline имеет4 правильных результата и2 отсутс�
 12normal releases/5manual releases. Политика отвергнутой версии не принята;
 приёмка исправленной версии ещё не выполнена.
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты24 candidate,
-policy PASS во всех24. Один итоговый расчёт правильный,23 результата не получены.
-Одна сессия завершена штатно,23 адресно освобождены после отказа.
-Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Остался1 candidate, текущая tags/3. Sequential
-runner264196/exec84159 продолжил серию2026-10-15T02:26:33.670903+00:00;
-следующий процесс разрешён только после strict own release предыдущего.
-Criteria/runtime/model/input прежние, без пересборки.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: все25 candidate закрыты,
+policy PASS во всех25; содержательно покрыты18 стандартных попыток (6задач×3),
+3 явных запросаJS,3 functional-gap и1 recovery. Необоснованных JS-попыток0.
+Один итоговый расчёт правильный,24 результата не получены; доказанных неверных0.
+Одна сессия завершена штатно,24 адресно освобождены после отказа. Это три разные оценки.
+Матрица31 завершена:25новых candidate+6 сопоставимых baseline references.
+Finalcontroller290801/exec2620 завершился02:36:39.292296Z/exit0:
+machine-complete-review-required, dispatched0,31unique latestledger alladvance.
+Активных моделей нет; собственные writer и serieslease отсутствуют.
+Aggregate `506f0cb0…`, available successreview `4895fbc4…`; финальное ревью
+агрегирования и итоговый отчёт оформляются. Runtime/model/input прежние, без пересборки.
 
 Итоговое ревью: отдельное уточнение `node-selection-final-review-v1` закреплено
 2026-10-14T23:48:53.959864+00:00 до следующей новой попытки; [критерии](../../docs/superpowers/specs/2026-10-15-loginom-node-selection-final-review-v1.md)
@@ -30,7 +33,30 @@ SHA `b9d63fd3a8588f2b54eaab655085ef373f0f58d80868ccffcd69dca6e6a58add`. Fixedsee
 unmet/ограничение выборки; нет extra models ради квоты. Всеfailure/anomaly reviews
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
-неизменность5b/f71/97. Actualsampling пока не выполнен.
+неизменность5b/f71/97. Actualsampling выполнен после закрытия25: selection `a031863d…`, semantic review
+`4895fbc4…`, Sales/1 eligibleN=reviewedN=1; target3UNMET/targetFulfilledfalse.
+Исходные35protected+4copies и producer664 modes сохранены, oracle/live повторов0.
+
+Tags/3 closed02:30:02.298Z: policy PASS `9300ca29…`, mandatory JS/failure
+review `fd829f99…`;21messages/83parts/24tools/68events/706runtime, nochildren.
+Gap rationale ДОJS по actual fixed-field Collapse/Calculator/Filter schemas.
+Один rawfanout source/apply314B/10LF SHAe8c92887078556d0625a79489f251c2fc1ce20afa92d239076ed1e3e9a2ac37f,
+GUIDc6240ada… SUCCEEDED. Все реальные splitчасти выходят неизменными; нет
+Trim/filter/count/sort/IO/hardcodedpositions/values. Ветка tags==null?[null]:split
+сохраняет ОДИН исходный RawTag=null без skip/coercion/normalization;161nonnullчасть+
+1Null дают162native rows. Empty/whitespace/duplicates сохранены,150red/varied3/4/3/151
+проверены на основном input. StdTrim attempted и заблокирован upstreamport;
+дальше только same-opresume/cancel/recover, новыхJSsource/apply нет.
+Полные downstream Filter/Group/Sort/Export НЕ выполнены. CSV/LGP/oracle не получены;
+CLI1/cleanupfalse/runtimeunsettled/JAVASCRIPT_NODE_REQUIRED сохранены,
+APPLY_MISMATCH этому кейсу не приписывается.
+Own305closed02:32:43.465Z/admin306logout02:32:45.207Z/browserclosed02:32:46.418Z;
+9actualPIDgone/exactguardarchive02:34:20.571709Z, unknown301+304 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+19case/26recovery readonly; descriptor `8408d952…`.
+Independent finalrelease review `a6b101e6…`/readback `1946a4c6…` approved;
+actualgate2026-10-15T02:36:18.254Z разрешил technical-failed.
+Originalattempt `a4713f62…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Explicit-js/3 closed02:19:24.618Z: policy PASS `806bc279…`, mandatory JS/failure
 review `7f7f3f7a…`;24messages/92parts/25tools/75events/1925runtime, nochildren.
