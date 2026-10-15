@@ -2230,3 +2230,24 @@ a Unix socket and is SIGKILLed before archival: RED ARCHIVE_TOPOLOGY→GREEN
 committed move/replay, original name absent, identical socket inode/metadata,
 symlink object/DB/auth preservation. Full archive12/78 PASS17.29s, typecheck/diff
 PASS. Native archive/finalizer qualification is pending a fresh exclusive probe.
+
+Strict native interrupted-finalizer8196b708-d490-415e-b559-75f4e69547bf now
+PASS1/35 (116.68s) after socket fix0961fe343d. The test pauses only its admitted
+CLI identity through signalProcess's fresh birth/executable check once its
+independent SDK host/browser is observed. It waits for the native new session
+row, requests the normal AbortSignal, observes pending SIGINT and always guarded
+SIGCONT in finally. The final public result must be interrupted=true (actual
+exit130/timedOut=false), with exactly that paused identity in its confirmed
+continuous cleanup proof; successful completion cannot satisfy this control.
+
+Setup plus interrupted check produce two distinct qualified origins/owned
+ledgers. Sealed census→committed archive→two targeted native closes→fresh absence
+and confirmed admin closure pass. Private finalizer-audit.json checks124
+conditions/12 private source hashes and exact pair/root absence on the same
+Docker daemon; read-back audit SHA102495e2bb65a35411af0cb8cc9049206794bd73c9e3aecfd1f77ec613a3788f,
+terminal SHA968101397334a031aeb12097a4db9662082e5e0e323d9fbe6d726286210e3a25.
+Typecheck/diff PASS. This qualifies actual interrupted management archive and
+closure only: liveQualified=false, storageDeletionAllowed=false,
+nextAdmissionAllowed=false, no slot release or model/judge invocation.
+The separate47d5228b... root/pair remains retained for scoped cleanup, and the
+older f5bf... missing topology remains unknown.
