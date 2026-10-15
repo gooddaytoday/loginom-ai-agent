@@ -18,7 +18,7 @@ const address='https://app.loginom.ai/app/offline-initial-execution';
 const html='<!doctype html><meta charset="utf-8">'+unused.map(p=>'<link rel="preload" as="script" href="'+p.url+'">').join('')+'<script>'+loader+'</script><script>globalThis.Debug=globalThis.debug={assert(){}};globalThis.loaderTask=(async()=>{for(const url of '+JSON.stringify(urls)+'){await bg.AddScriptAsync(url,false)}})();</script>';
 const browser=await chromium.launch({headless:true});
 try{
-for(const mode of ['native','duplicate-load','early-use','pre-get-export','pre-get-accessor','pre-get-flags','pre-get-prototype','synthetic-load','catalog-hash','catalog-partial','catalog-getter','catalog-marker','catalog-app-source','catalog-recheck','event-replay','event-accessor'])test('initial-load '+mode,{concurrency:false},async t=>{
+for(const mode of ['native','duplicate-load','early-use','pre-get-export','pre-get-accessor','pre-get-flags','pre-get-prototype','synthetic-load','catalog-hash','catalog-url-object','catalog-url-normalized','catalog-partial','catalog-getter','catalog-marker','catalog-app-source','catalog-recheck','event-replay','event-accessor'])test('initial-load '+mode,{concurrency:false},async t=>{
  const context=await browser.newContext({serviceWorkers:'block'});let unexpected=0,requests=0,fulfills=0,handleCreates=0,projections=0,getters=0,actualInitCount=0;
  try{
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));
@@ -36,6 +36,8 @@ for(const mode of ['native','duplicate-load','early-use','pre-get-export','pre-g
   if(injected)Object.defineProperty(page,'evaluateHandle',{value:function(fn,args){handleCreates++;return Reflect.apply(nativeHandle,page,[fn,args]).then(handle=>{
    const originalEvaluate=handle.evaluate;Object.defineProperty(handle,'evaluate',{value:function(project){projections++;return Reflect.apply(originalEvaluate,handle,[project]).then(result=>{
     if(mode==='catalog-hash'||(mode==='catalog-recheck'&&projections>1))result.initialLoad.records[0].integrity='sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    if(mode==='catalog-url-object'){const url=result.initialLoad.records[0].url;result.initialLoad.records[0].url={toString(){getters++;return url}}}
+    if(mode==='catalog-url-normalized')result.initialLoad.records[0].url=' '+result.initialLoad.records[0].url;
     if(mode==='catalog-partial')result.initialLoad.records.pop();
     if(mode==='catalog-getter')Object.defineProperty(result.initialLoad,'records',{get(){getters++;throw Error('foreign getter')},configurable:true});
     if(mode==='catalog-app-source')result.initialLoad.applicationSourcesJoined=false;
@@ -60,7 +62,8 @@ for(const mode of ['native','duplicate-load','early-use','pre-get-export','pre-g
   await page.evaluate(async()=>{let selectors=0;rpc.TBGSession.SelectPropertyDescs=()=>{selectors++;return []};rpc.TBGSession.GetPropertyValues=()=>[];const user=Object.create(rpc.TBGObjectProxy.prototype);user.$S={};user.$={$OW:1,$O:2};Object.assign(user,{Name:'account',IsAdmin:false,IsViewer:false,IsDesigner:true,Blocked:false,AllowPublish:false,SchedulerFullAccess:false,MustChangePassword:false,AuthMode:0});const connection=Object.create(bg.app.ServerConnection.prototype);connection.FSession={CurrentUser:user,$S:user.$S};const get=connection.GetCurrentUser();const set=bg.app.CurrentUser.Set(await get);await set;globalThis.fixtureGet=get;globalThis.fixtureSet=set;let ready=false,last;for(let n=0;n<100;n++){try{__loginomOriginalUserPublisherV1.inspect();ready=true;break}catch(e){last=e}await new Promise(r=>setTimeout(r,1))}if(!ready)throw last;globalThis.fixtureSelectorCount=selectors});
   assert.equal(load.inspect().sourceResponses.responseBytesComplete,true);let bound,caught,refused=false;
   try{bound=await api.bindTerminalScriptWitness(owner)}catch(e){caught=e;refused=true}
-  const expectedRefusal=['catalog-hash','catalog-partial','catalog-getter','catalog-marker','catalog-app-source'].includes(mode);
+  const expectedRefusal=['catalog-hash','catalog-url-object','catalog-url-normalized','catalog-partial','catalog-getter','catalog-marker','catalog-app-source'].includes(mode);
+  t.diagnostic(JSON.stringify({mode,refused,getters,joined:bound?.supportedInitialLoadJoined??false}));
   assert.equal(refused,expectedRefusal);assert.equal(getters,0);
   if(expectedRefusal)assert.match(String(caught),mode==='catalog-getter'?/ORIGINAL_ASSOCIATION_CHANGED/:/ORIGINAL_LOAD_CHANGED/);
   else{

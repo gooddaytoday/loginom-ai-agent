@@ -61,7 +61,9 @@ export function collectTerminalScriptWitness(expected){
    const loadRows=[];
    for(let i=0;i<loaded.length;i++){
     const r=requireFrozen(own(loaded,String(i))),receipt=requireFrozen(own(r,'receipt')),url=own(r,'url'),integrity=own(r,'integrity'),node=own(r,'node');
-    const pin=pins.find(([u])=>new URL(url).origin+new URL(url).pathname===u);
+    if(typeof url!=='string'||typeof integrity!=='string')throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+    const parsed=new URL(url);if(parsed.href!==url)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+    const pin=pins.find(([u])=>parsed.origin+parsed.pathname===u);
     if(!pin||pin[1]!==integrity||own(r,'loaded')!==true||own(r,'document')!==doc
       ||own(receipt,'node')!==node||own(receipt,'document')!==doc||own(receipt,'url')!==url||own(receipt,'integrity')!==integrity)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
     loadRows.push(Object.freeze({url,integrity,loaded:true}));

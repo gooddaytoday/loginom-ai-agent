@@ -74,3 +74,8 @@ load producer; closed join12/SRI17/boot/125/86/76/readonly matrices are not repe
 Bun factory's previous read-only stall remains NOT_VERIFIED. Native Loginom/login/
 model/acquire/Prepare/Save/Close/replay0; historical UNKNOWN/pending/.writer and
 profiles/journals/accounts/originals are preserved.
+
+Before handoff, the new URL metadata path was additionally hardened against implicit
+object-to-string conversion and normalized-but-different strings. Source/installed
+counterexamples on preliminary98a55f8d are preserved; the corrected path requires
+a primitive canonical URL string before constructing URL, without calling toString.

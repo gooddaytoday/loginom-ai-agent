@@ -331,7 +331,8 @@ export async function bindTerminalScriptWitness(owner){
    if(loadData(catalog,'definingExportsRetained')!==true||loadData(catalog,'applicationSourcesJoined')!==true||loadData(loaded,'length')!==expected.length)fail();
    const seen=new Set();
    for(let i=0;i<expected.length;i++){
-    const row=loadData(loaded,String(i)),url=loadData(row,'url'),parsed=new URL(url),canonical=parsed.origin+parsed.pathname;
+    const row=loadData(loaded,String(i)),url=loadData(row,'url');if(typeof url!=='string')fail();
+    const parsed=new URL(url);if(parsed.href!==url)fail();const canonical=parsed.origin+parsed.pathname;
     const pin=expected.find(([u])=>u===canonical);
     if(!pin||seen.has(canonical)||parsed.hash||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search))
       ||loadData(row,'integrity')!==pin[1]||loadData(row,'loaded')!==true)fail();seen.add(canonical);
