@@ -113,7 +113,7 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
 const execute = async (fixture, options = {}) => runInNewContext(makeWorkspacePrepareCode({
   loginomUrl: 'http://loginom.example/app?testable=true',
   compatibility: { profile_id: 'tested-ui', loginom_build: build, platform: 'macos', browser: 'chromium' }, platform: 'darwin', ...options,
-}))(fixture.page);
+}),fixture.prepareClock?{Date:fixture.prepareClock}:{})(fixture.page);
 
 test('normal preparation opens Loginom and asks for login without assuming test credentials', async () => {
   const fixture = pageFixture();
@@ -289,6 +289,8 @@ test('opening an exact package verifies its cached path without executing or sav
 
 test('preparation deadline returns the last named phase with no mutation', async () => {
   const fixture=pageFixture({actualBuild:null});
+  let clock=0;fixture.prepareClock=class extends Date {static now(){return clock}};
+  fixture.page.waitForTimeout=async ms=>{clock+=ms};
   const state=await execute(fixture,{timeoutMs:2});
   assert.equal(state.reason,'DEADLINE');assert.equal(state.phase,'ui_build');
   assert.equal(state.effect_possible,false);assert.equal(fixture.tabs.filter(t=>t.graph).length,0);
