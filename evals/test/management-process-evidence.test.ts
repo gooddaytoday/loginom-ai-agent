@@ -31,10 +31,14 @@ test("management process inventory precedes dispatch and binds actual continuous
     leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
   try {
     // Real OS probe, not a simulated Loginom operation. It independently reads admission before exit.
-    const program = `const rows=(await Bun.file(${JSON.stringify(file)}).json()).processes;process.stdout.write(rows.at(-1).state);await Bun.sleep(100)`
+    const program = `const admitted=await Bun.file(${JSON.stringify(journal)}).json();
+      if(!admitted.managementInventories?.some(entry=>entry.file===${JSON.stringify(file)}&&entry.leaseToken===${JSON.stringify(lease.token)})){await Bun.sleep(100);throw Error("INVENTORY_NOT_REGISTERED_BEFORE_DISPATCH")}
+      const rows=(await Bun.file(${JSON.stringify(file)}).json()).processes;process.stdout.write(rows.at(-1).state);await Bun.sleep(100)`
     const run = await superviseManagementProcess({ cmd: [process.execPath, "-e", program], cwd: root, env: { PATH: process.env.PATH ?? "", LOGINOM_AI_AGENT_CLI_BUNDLE: bundle },
       profileDir: lease.slot.profileDir, timeoutMs: 3000 }, { file, lease, directory, operation: ["loginom", "status"] })
     expect({ stdout: run.stdout, exitCode: run.exitCode, cleanup: run.processCleanup.status }).toEqual({ stdout: "planned", exitCode: 0, cleanup: "confirmed" })
+    const registered = await Bun.file(journal).text()
+    expect(await readLeaseReceipt(journal)).toMatchObject({ managementInventories: [{ file, leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir }] })
     const inventory = await readManagementProcessInventory(input)
     expect(inventory.processes).toHaveLength(1)
     expect(inventory.processes[0]).toMatchObject({ operation: ["loginom", "status"], owner: { kind: "slot" } })
@@ -94,6 +98,14 @@ test("management process inventory precedes dispatch and binds actual continuous
     expect({ interrupted: cancelled.interrupted, timedOut: cancelled.timedOut, cleanup: cancelled.processCleanup.status })
       .toEqual({ interrupted: true, timedOut: false, cleanup: "confirmed" })
     expect((await readManagementProcessInventory(input)).processes.at(-1)!.result).toMatchObject({ interrupted: true, timedOut: false })
+    expect(await Bun.file(journal).text()).toBe(registered)
+    const alternate = path.join(fixture.slots.controller.stateDir, "alternate.json"), alternateDirectory = path.join(fixture.slots.controller.stateDir, "alternate")
+    await mkdir(alternateDirectory, { mode: 0o700 })
+    await writeLeaseReceipt(alternate, { ...await readLeaseReceipt(file) as Record<string, unknown>, processes: [] })
+    await expect(superviseManagementProcess({ cmd: [process.execPath, "-e", "throw Error('must not dispatch')"], cwd: root,
+      env: {}, profileDir: lease.slot.profileDir, timeoutMs: 3000 }, { file: alternate, lease, directory: alternateDirectory, operation: ["loginom", "status"] }))
+      .rejects.toThrow("MANAGEMENT_INVENTORY_CONFLICT")
+    expect(await Bun.file(journal).text()).toBe(registered)
     const admitted = await Bun.file(file).text()
     await expect(superviseManagementProcess({ cmd: [process.execPath, "-e", "throw Error('must not dispatch')"], cwd: root,
       env: {}, profileDir: lease.slot.profileDir, timeoutMs: 3000 }, { file, lease, directory,
@@ -113,7 +125,42 @@ test("management process inventory precedes dispatch and binds actual continuous
       .rejects.toThrow("LEASE_NOT_HELD")
     expect(await Bun.file(proof).text()).toBe(bytes)
   } finally { await Promise.all([environment.server.close(), lease.close()]); await rm(root, { recursive: true, force: true }) }
-}, 10000)
+}, 30_000)
+
+test("parallel management owners register both slot inventories before dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-registry-")), fixture = await parallelFixture(root)
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json"), bundle = path.join(root, "bundle")
+  await mkdir(bundle, { mode: 0o700 })
+  await Bun.write(path.join(bundle, "browser"), Bun.file("/usr/bin/true"))
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "browser" }))
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "parallel-management", identity, phase: "cli_admitted" })
+  const environment = await acquireEnvironmentLeases(fixture.slots, 2, identity, journal, fixture.lockRoot)
+  try {
+    const settled = await Promise.allSettled(environment.slots.map(async lease => {
+      const file = path.join(fixture.slots.controller.stateDir, `management-${lease.slot.id}.json`), directory = path.join(fixture.slots.controller.stateDir, `capture-${lease.slot.id}`)
+      await mkdir(directory, { mode: 0o700 })
+      await writeLeaseReceipt(file, { version: 2, kind: "management-processes", commandId: "parallel-management", journal, identity,
+        leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
+      const program = `const command=await Bun.file(${JSON.stringify(journal)}).json();
+        if(!command.managementInventories.some(entry=>entry.file===${JSON.stringify(file)}&&entry.leaseToken===${JSON.stringify(lease.token)}))throw Error("NOT_REGISTERED");
+        process.stdout.write("registered");await Bun.sleep(100)`
+      const result = await superviseManagementProcess({ cmd: [process.execPath, "-e", program], cwd: root,
+        env: { PATH: process.env.PATH ?? "", LOGINOM_AI_AGENT_CLI_BUNDLE: bundle }, profileDir: lease.slot.profileDir, timeoutMs: 3000 },
+        { file, lease, directory, operation: ["loginom", "status"] })
+      expect({ stdout: result.stdout, code: result.exitCode, cleanup: result.processCleanup.status }).toEqual({ stdout: "registered", code: 0, cleanup: "confirmed" })
+      return { file, leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir }
+    }))
+    const results = settled.map(result => {
+      if (result.status === "rejected") throw result.reason
+      return result.value
+    })
+    const command = await readLeaseReceipt(journal) as { managementInventories: { slotId: string }[] }
+    expect(command.managementInventories.sort((a, b) => a.slotId.localeCompare(b.slotId))).toEqual(results)
+  } finally {
+    await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())])
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
 
 function hash(value: unknown) {
   return new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
