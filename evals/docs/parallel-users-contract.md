@@ -1148,3 +1148,26 @@ protected markers затем совпадают, readiness остаётся fals
 `native-standalone-56819dc0-0c24-480c-acee-8b0c6aa4747d/preparation.json` SHA256
 `945a9ce16f1241ec68fffa6ab7152bf39fda6f4b6401679ea87fbfa185b059c0`
 содержит5 source sets;41 independent checks и exact own pair absence PASS.
+
+
+### Whole-preparation recovery ownership
+
+`recoverPreparationLeases(file, identity, incident, lockRoot)` принимает exact
+private pre-CLI command kind unactivated-preparation/phase unactivated либо
+finalizing и configured prefix slots. На каждый slot требуется ровно один
+original retained manifest с тем же journal/command/identity/slot. Server
+reservation и все последующие recovery journals должны продолжать эту lineage.
+Новый private recovery intent и admin inventory предшествуют server CAS; slot
+CAS выполняются последовательно под held server fence. Каждый результат остаётся
+recovery-only; никакого нового provisioning/CLI/delete/release grant нет.
+
+При ошибке уже принятые reservations сохраняются, guards закрываются. Повтор
+после выхода recovery controller принимает исходный incident и продолжает CAS
+lineage. Live current owner отказывает BUSY. Полностью/частично released slots
+этот начальный API пока не принимает: terminal reconciliation отдельна.
+
+TDD missing module RED→GREEN.69 related unit PASS/311 (5.22s), real exited
+original→recovery→second recovery target1 PASS/8 (0.534s), typecheck/diff PASS.
+Revision3 связывает оба прежних server owners/journals; оба slots recovery-only,
+preparation refused, live retry не меняет reservations. Native cleanup/release
+и public recover ещё не квалифицированы.
