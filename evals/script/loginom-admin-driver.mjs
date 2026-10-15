@@ -176,12 +176,12 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
       if (payload.peer !== undefined && (payload.phase !== "session-storage-probe" || !payload.peer || Object.keys(payload.peer).length !== 2 ||
         typeof payload.peer.name !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(payload.peer.name) || payload.peer.name === payload.slot?.username ||
         typeof payload.peer.objectId !== "string" || !payload.peer.objectId)) throw Error("ADMIN_REQUEST_INVALID")
       if (!payload || Object.keys(payload).length !== (payload.peer !== undefined ? 9 :
-        ["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+        ["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -190,7 +190,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
           payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+      if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
         Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
@@ -233,8 +233,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
           const flags = [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]
-          if (owned && !["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
-          if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(phase)) {
+          if (owned && !["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(phase)) {
             stage = "ACL"
             console.info("ADMIN_USER_STAGE_ACL")
             const snapshot = async () => {
@@ -266,7 +266,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const before = await snapshot()
             if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
-            if (["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(phase)) {
+            if (["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(phase)) {
               const safePolicy = async () => owned.secretHash === secretHash && await user.AuthMode === bg.TBGDeductorUserAuthMode.uamLocal &&
                 (await Promise.all(flags.map(async ([name, value]) => await user[name] === value))).every(Boolean)
               if (before.some(directory => directory.permissions.length) || !await safePolicy())
@@ -329,7 +329,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
         password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null, peer: payload.peer ?? null }))
-      if (["session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload.phase) && result.outcome === "confirmed") {
+      if (["session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) && result.outcome === "confirmed") {
         const retainedPackage = ["session-package-crash-probe", "session-backup-probe"].includes(payload.phase)
         const storageRoots = payload.phase === "session-backup-probe" ? await bounded(request, page.evaluate(async () => {
           const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
@@ -383,10 +383,19 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               ownSession.isAdmin !== false || ownSession.isDesigner !== true) throw Error("ADMIN_USER_IDENTITY_CHANGED")
             const opened = await snapshot()
             process.stderr.write("ADMIN_USER_PROBE_STAGE_CREATE\n")
-            const handle = await bounded(request, probePage.evaluateHandle(async () =>
-              (await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session).CreatePackage()))
+            const handle = await bounded(request, probePage.evaluateHandle(async phase => {
+              const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+              return phase === "session-component-probe" ? session.OpenPackage("component-probe.lgp") : session.CreatePackage()
+            }, payload.phase))
             try {
               const withPackage = await snapshot()
+              const components = payload.phase === "session-component-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
+                const activation = await item.Activate(0)
+                try {
+                  while (!await activation.Finished && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25))
+                  return { finished: await activation.Finished, failed: await activation.Failed }
+                } finally { await ReleaseObject(activation, true) }
+              }, { item: handle, deadline: request.deadline })) : null
               const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer, shared }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 const source = peer ? "access-peer-probe.lgp" : "access-probe.lgp"
@@ -489,8 +498,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               }
               const afterPackage = await snapshot()
               // Interrupt only this owned renderer's orderly logout; the native server/RPC remains real.
-              if (!["session-probe", "session-storage-probe"].includes(payload.phase)) await probePage.evaluate(() => { window.onpagehide = null })
-              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false, ...(storage ? { storage } : {}), ...(backup ? { backup, storageRoots } : {}) }
+              if (!["session-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase)) await probePage.evaluate(() => { window.onpagehide = null })
+              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false, ...(storage ? { storage } : {}), ...(components ? { components } : {}), ...(backup ? { backup, storageRoots } : {}) }
             } finally { await handle.dispose() }
           } finally { await probeContext.close() }
         })()

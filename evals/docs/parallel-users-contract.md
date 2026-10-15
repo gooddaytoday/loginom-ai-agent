@@ -720,3 +720,20 @@ Copy-out destinations остаются валидными собственным
 одновременный heartbeat B всё ещё требуют отдельных positive/negative controls.
 
 Latest shared+neighbor control: private600 `research/evidence/native-user-d0a06c5b-7a61-4119-a120-5363660337a3/storage-probe.json`, SHA256 `10dc8b38624e6cdb53913d67076c6e000bf2ac36262b0390bc81d4a2d9e9f3c6`. Shared sentinels independently match the native positive package SHA. Unsupported traversal shared policy names refuse before probe. Native1 PASS/108 (40.91s);60 admin/user/slots PASS/260 and typecheck/diff PASS. Three superseded own artifacts removed only after process proofs and exact pair absence; audit retained beside this receipt.
+
+### Native server-component positive control
+
+Fixed research phase `session-component-probe` принимает стандартный configured
+user/ownership/policy payload без paths или JS. Под non-admin designer открывает
+собственный `component-probe.lgp`, выполняет `Activate(0)`, ждёт Finished в request
+deadline, сохраняет Finished/Failed и освобождает activation proxy. Используется
+настоящий frozen storage fixture: ImportTextFile→Group→ExportTextFile. Входные
+Новый вход A2/A7/B11 даёт физический TSV `Item\tQty|Сумма`, A9/B11, проверенный отдельным
+literal oracle. Новый input отличается от исходного dataset и подтверждает пересчёт;
+прежний artifact fixture CSV имеет другую wire форму и сохранён.
+Package/session проходят существующий causal 0→1→0 close/dispose gate. Private600
+receipt `research/evidence/native-user-df89ab92-6932-4ef5-829f-481efa571bb3/component-probe.json`,
+SHA256 `8ba4b3e821a01ae56a3141ff522e77000a5e0ddeb733418e23426d7766cfc92d`;
+native process confirmed, pair independently absent. Это positive server execution,
+`liveQualified=false`; import/export neighbor/shared negatives и runtime readiness
+этим не квалифицированы.
