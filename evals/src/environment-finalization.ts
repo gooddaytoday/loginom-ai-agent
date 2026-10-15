@@ -8,7 +8,7 @@ import { archiveProfileEvidence } from "./profile-archive"
 import { acquireEnvironmentLeases, finalizeReleasedSlot, type SlotFile, type SlotLease } from "./slots"
 import { readUnactivatedUserObservation, readUserOwnership, readUserPreparation } from "./user-environment"
 import { readPreparationRecoverySources } from "./preparation-recovery"
-import { readManagementProcessInventory } from "./management-process-evidence"
+import { readManagementProcessInventory, sealManagementProcessInventory } from "./management-process-evidence"
 import { assertProfileSettled } from "./profile"
 import { collectManagementSessions } from "./management-sessions"
 
@@ -63,6 +63,26 @@ export async function finalizeManagementEnvironment(file: SlotFile, environment:
   const target = `${journal}.management-finalization.json`
   await writeLeaseReceipt(target, receipt)
   return { status: receipt.status, slots, after: after.source, source: { path: target, sha256: hash(receipt) } }
+}
+
+/** Archives one closed management producer while peer slots continue. */
+export async function archiveManagementSlot(file: SlotFile, server: Awaited<ReturnType<typeof acquireEnvironmentLeases>>["server"], lease: SlotLease, inventoryFile: string) {
+  const sealed = await sealManagementProcessInventory(file, server, lease, inventoryFile)
+  await assertProfileSettled(lease.slot.profileDir)
+  const profile = await archiveEnvironmentProfile(lease, "management")
+  if (hash(await sealManagementProcessInventory(file, server, lease, inventoryFile)) !== hash(sealed))
+    throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  const receipt = { version: 2, kind: "management-slot-archive", status: "committed", identity: lease.identity,
+    slotId: lease.slot.id, leaseToken: lease.token, producerSeal: sealed.source, processInventory: sealed.inventory,
+    profile: { ...profile, sha256: hash(await readLeaseReceipt(profile.journal)) }, storageDeletionAllowed: false, nextAdmissionAllowed: false }
+  const target = `${lease.receipt}.management-archive.json`
+  const existing = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (existing !== undefined && hash(existing) !== hash(receipt)) throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  if (existing === undefined) await writeLeaseReceipt(target, receipt)
+  return { profile, source: { path: target, sha256: hash(receipt) } }
 }
 
 /** Archives every sealed normal management profile; server sessions and reservations remain held. */

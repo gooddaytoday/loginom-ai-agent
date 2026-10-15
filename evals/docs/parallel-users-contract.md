@@ -1723,6 +1723,16 @@ Further commands for that slot stop before CLI dispatch while peers retain
 admission. This local producer fence grants no storage deletion or release;
 the all-slot finalizer and SessionBackup gate remain mandatory.
 
+`archiveManagementSlot` uses that fence and the existing durable profile archive
+to commit one normal management slot while peers continue. Its private receipt
+binds the slot/token/epoch, producer seal, inventory and profile manifest SHA.
+History, DB/WAL/SHM and inputs move before server close; credentials remain in
+the profile. Replay preserves both receipts, and later all-slot finalization
+reuses the same archive. Server sessions and reservations stay held, with
+storageDeletionAllowed=false and nextAdmissionAllowed=false. The fake CLI and
+actual OS peer barrier qualify local composition; native A/B qualification is
+still blocked before this step by the retained process-identity incident.
+
 The actual OS child independently reads its registration before executing.
 Missing registration RED→GREEN1 PASS/27 (3.54s); parallel owners2 PASS/30
 (5.10s), related69 PASS/358 (16.61s), typecheck/diff PASS. Cold native1 PASS/56 (193.44s),181 source/closure/cleanup audit checks;
