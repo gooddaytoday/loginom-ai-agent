@@ -11,6 +11,45 @@ import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { recoveryStore } from "../src/connection/recovery-store"
 
+test.each([false, true])("saved-package shutdown is limited to opted-in model chats: %s", async (enabled) => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+  const directory = await mkdtemp(join(tmpdir(), "loginom-saved-shutdown-"))
+  const resources = join(directory, "resources")
+  const launches = join(directory, "launches.jsonl")
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await mkdir(join(resources, "bin"))
+  await symlink(node, join(resources, "bin/node"))
+  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
+  await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), `
+    import { appendFileSync } from 'node:fs';
+    process.on('message', m => {
+      if (m.operation === 'start') {
+        appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ chat:m.input.chat, validation:m.input.validation===true, cleanup:m.input.closeSavedPackageOnExit===true })+'\\n');
+        process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
+      }
+      if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+    });
+  `)
+  const root = join(directory, "profile")
+  const store = connectionStore(join(root, "connection"), credentials("linux"))
+  await store.stage({ generation: 1, revision: 1, url: "http://example.test", username: "user", apiKey: "fixture", password: "" })
+  await store.activate(1)
+  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, closeSavedPackageOnExit: enabled })
+  try {
+    await host.settled()
+    await host.runtime(1, "model-chat")
+    await host.api.check({ revision: 1, url: "http://example.test", username: "user", apiKey: { operation: "preserve" }, password: { operation: "preserve" } })
+    const started = (await readFile(launches, "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+    expect(started.find((entry) => entry.chat === "model-chat")?.cleanup).toBe(enabled)
+    expect(started.find((entry) => entry.chat === "readiness")?.cleanup).toBe(false)
+    expect(started.find((entry) => entry.validation)?.cleanup).toBe(false)
+  } finally {
+    await host.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
   "async operation journal retains ownership through waits: %s",
   async (ending) => {

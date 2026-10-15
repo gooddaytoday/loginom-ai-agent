@@ -27,5 +27,7 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup }
+  if (input.closeSavedPackageOnExit !== undefined && typeof input.closeSavedPackageOnExit !== "boolean")
+    throw Error("LOGINOM_START_INVALID")
+  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnExit: input.closeSavedPackageOnExit === true }
 }

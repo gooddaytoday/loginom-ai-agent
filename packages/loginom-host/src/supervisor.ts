@@ -16,6 +16,7 @@ export type Launch = {
   actionManifestSha256?: string
   validation?: boolean
   headless?: boolean
+  closeSavedPackageOnExit?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.

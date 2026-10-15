@@ -434,7 +434,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
-        if (config.acceptanceCleanupPackage) {
+        const cleanupPackage = config.acceptanceCleanupPackage
+          ?? (config.closeSavedPackageOnExit === true && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
+        if (cleanupPackage) {
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
           if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
@@ -443,7 +445,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Refuse unsettled background node jobs before waiting on the
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
-              if (session.metadata.workspaceReady !== true || !savedPackages.has(config.acceptanceCleanupPackage)) {
+              if (session.metadata.workspaceReady !== true || !savedPackages.has(cleanupPackage)) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
@@ -452,7 +454,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
                   tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
-                  packagePath:config.acceptanceCleanupPackage, loginomUrl:config.loginomUrl,
+                  packagePath:cleanupPackage, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity.loginom_build,
                 };
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
@@ -461,7 +463,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             } catch { cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'}; }
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
-            save_operation_id:savedPackages.get(config.acceptanceCleanupPackage) ?? null};
+            save_operation_id:savedPackages.get(cleanupPackage) ?? null};
           await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
           await recordExecution({event:'isolated_package_cleanup', cleanup});
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {

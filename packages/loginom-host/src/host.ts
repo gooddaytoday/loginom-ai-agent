@@ -14,6 +14,7 @@ export async function createLoginomHost(options: {
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
+  closeSavedPackageOnExit?: boolean
   strictRecovery?: boolean
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -61,6 +62,9 @@ export async function createLoginomHost(options: {
       connection,
       validation,
       headless: validation || chat === "readiness" || options.headless === true,
+      ...(options.closeSavedPackageOnExit === true && !validation && chat !== "readiness"
+        ? { closeSavedPackageOnExit: true }
+        : {}),
       environment,
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
       actionManifestUri: manifest.actionManifestUri,

@@ -5,14 +5,21 @@ import { validateStartInput } from "../src/start-input.mjs"
 const base = { protocol: 1, generation: 1, chat: "chat-1", stateDir: "/tmp/state" }
 
 test("managed start without cleanup input stays a product launch", () => {
-  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null })
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null })
+  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnExit: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnExit: false })
 })
 
 test("managed start accepts an exact saved package path for acceptance cleanup", () => {
   const path = "/user/loginom-ai-agent-acceptance-run-A.lgp"
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnExit: false })
   assert.equal(validateStartInput({ ...base, acceptanceCleanupPackage: "/a b/пакет.lgp" }).acceptanceCleanupPackage, "/a b/пакет.lgp")
+})
+
+test("managed start accepts only a boolean saved-package shutdown option", () => {
+  assert.equal(validateStartInput({ ...base, closeSavedPackageOnExit: true }).closeSavedPackageOnExit, true)
+  assert.equal(validateStartInput({ ...base, closeSavedPackageOnExit: false }).closeSavedPackageOnExit, false)
+  for (const value of [null, "true", 1, {}])
+    assert.throws(() => validateStartInput({ ...base, closeSavedPackageOnExit: value }), /^Error: LOGINOM_START_INVALID$/)
 })
 
 for (const [label, value] of [
