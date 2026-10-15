@@ -6,9 +6,21 @@ import { createPair, destroyPair, pairImages, readServerIdentity, verifyParallel
 import { parseSlots } from "../src/slots"
 import { cleanupIsolatedStorage } from "../src/artifact"
 import { writeLeaseReceipt } from "../src/lease"
+import { parallelFixture } from "./helpers/parallel-fixture"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 const pairProgram = 'const {createPair,destroyPair}=await import("./src/parallel-pair");const file=await Bun.file(process.argv[1]).json();try{await (process.argv[3]==="create"?createPair:destroyPair)(file,JSON.parse(process.argv[2]));process.exitCode=0}catch(error){console.error(error.message);process.exitCode=2}'
+
+integration("pair identity: a failed real Docker read exposes only safe operation and exit metadata", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "eval-pair-read-failure-")), fixture = await parallelFixture(root)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `eval-missing-${crypto.randomUUID()}` } }, 1)
+  try {
+    const failure = await readServerIdentity(file).then(() => undefined, error => error as unknown)
+    expect(failure).toMatchObject({ message: "PAIR_DOCKER_READ", exitCode: 2, docker: { operation: "inspect", exitCode: 1, timedOut: false } })
+    expect(JSON.stringify(failure)).not.toContain(file.server.container)
+    expect(JSON.stringify(failure)).not.toContain("Error response from daemon")
+  } finally { await rm(root, { recursive: true }) }
+}, 30_000)
 
 integration("research pair: real create qualifies private route and epoch without touching dev", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "eval-pair-integration-"))
