@@ -38,7 +38,11 @@ function close() {
     await Promise.allSettled([...requests])
     const results = []
     for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
+      results.push(...(await Promise.allSettled([Promise.resolve().then(async () => {
+        const result = await handle?.close()
+        if (handle && handle === state.bridge && result?.browser_transport_closed !== true)
+          throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      })])))
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
