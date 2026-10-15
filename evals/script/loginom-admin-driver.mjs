@@ -701,7 +701,7 @@ async function readSessionBinding(payload, identity) {
     throw Error("SESSION_SOURCE_UNCONFIRMED")
   const request = claim.observation?.payload, reply = claim.observation?.reply
   const own = reply?.data?.ownSession
-  if (!request || !["session-probe", "session-crash-probe"].includes(request.phase) || !request.owned ||
+  if (!request || !["session-probe", "session-crash-probe", "session-package-crash-probe"].includes(request.phase) || !request.owned ||
     typeof request.owned.objectId !== "string" || !request.owned.objectId || request.owned.userKind !== 0 ||
     request.owned.name !== payload.session?.username || own?.userObjectId !== request.owned.objectId || own.username !== payload.session.username ||
     own.isAdmin !== false || own.isDesigner !== true || reply?.v !== 1 || reply.id !== payload.proofId || reply.outcome !== "confirmed" ||
@@ -712,7 +712,21 @@ async function readSessionBinding(payload, identity) {
     createHash("sha256").update(JSON.stringify(source)).digest("hex") !== claim.source.sha256 ||
     source.desiredHash !== createHash("sha256").update(JSON.stringify(request)).digest("hex") ||
     source.replyHash !== createHash("sha256").update(JSON.stringify(reply)).digest("hex")) throw Error("SESSION_SOURCE_UNCONFIRMED")
-  return { session: payload.session, userObjectId: request.owned.objectId, retainedPackageCount: 0 }
+  const retainedPackage = request.phase === "session-package-crash-probe"
+  if (retainedPackage) {
+    const data = reply.data, binding = payload.session
+    if (data.sessionIdentityQualified !== false || [data.baseline, data.opened, data.withPackage, data.afterPackage, data.afterDisconnect]
+      .some(rows => !Array.isArray(rows) || rows.some(row => !row || typeof row.objectId !== "string"))) throw Error("SESSION_SOURCE_UNCONFIRMED")
+    const created = data.opened.filter(row => !data.baseline.some(old => old.objectId === row.objectId))
+    if (created.length !== 1 || created[0].objectId !== binding.remoteKey || created[0].name !== binding.name ||
+      created[0].createdAt !== binding.createdAt || created[0].packageCount !== 0 ||
+      [data.withPackage, data.afterPackage, data.afterDisconnect].some((rows, index) => {
+        const matches = rows.filter(row => row.objectId === binding.remoteKey)
+        return matches.length !== 1 || matches[0].name !== binding.name || matches[0].createdAt !== binding.createdAt ||
+          matches[0].packageCount !== 1 || index === 2 && matches[0].pendingDisconnect !== true
+      })) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  }
+  return { session: payload.session, userObjectId: request.owned.objectId, retainedPackageCount: retainedPackage ? 1 : 0 }
 }
 
 // Parent qualifies the frozen process/native sources under held slot and server fences immediately before dispatch.
