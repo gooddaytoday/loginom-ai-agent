@@ -105,6 +105,20 @@ launcher.ready=false отвергается. Coordinator с processProofs исп
 С frozen manifest требуется native proof каждого выбранного slot ID; отсутствие
 proof B при N=2 даёт incomplete. Это минимум выбранных slots, полный inventory
 всех attempts/admin/management/judge actors требует runtime journal integration.
+With a frozen manifest, every supervisor scope actually present in the raw samples
+requires a source-qualified process window with exact producer PID, owner kind/id
+and launcher PID/starttime. Omitting an observed judge/admin/management actor from
+both declared coverage and proofs now gives RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE.
+The real two-supervisor control first returned a false PASS, then incomplete after
+the guard; including both proofs passes (target1/12,5.14s). Related86 tests/605
+assertions PASS21.45s with runner --timeout30000; the default run had85 PASS and
+one5s manifest-test timeout. Isolated unchanged manifest control passed93
+assertions in4.78s. That control has at least77 explicit sync operations on the
+full path; precise stall stage/cause was not measured. Production deadlines,
+internal cadence/frame deadlines, fsync and assertions are unchanged. Typecheck
+and diff checks passed. This does not detect
+an entire actor lifetime between samples; the runtime journal integration remains
+mandatory for full inventory. Component declared-only checks keep their scope.
 Readonly qualification не выдаёт signal/delete/recovery grants.
 
 Resource scope manifest фиксируется через freezeResourceManifest до dispatch:
