@@ -1,5 +1,5 @@
 import type { ServerIdentity } from "./slots"
-import type { readResourceAgentInventories, readResourceJudgeInventory, readResourceProcessWindows } from "./parallel-resource-evidence"
+import type { readResourceAgentInventories, readResourceJudgeInventory, readResourceNativeCensus, readResourceProcessWindows } from "./parallel-resource-evidence"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
@@ -32,16 +32,18 @@ export async function checkResourceEvidence(input: {
   processProofs?: Parameters<typeof readResourceProcessWindows>[0]
   agentInventories?: Parameters<typeof readResourceAgentInventories>[0]["sources"]
   judgeInventory?: Parameters<typeof readResourceJudgeInventory>[0]["source"]
+  nativeCensus?: Parameters<typeof readResourceNativeCensus>[0]["source"]
 }) {
-  const { readResourceAgentInventories, readResourceJudgeInventory, readResourceProcessWindows, readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
+  const { readResourceAgentInventories, readResourceJudgeInventory, readResourceNativeCensus, readResourceProcessWindows, readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
   const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
   const manifest = input.manifest ? await readFrozenResourceManifest({ ...input.manifest, runId: input.runId, startedAt: input.startedAt }) : null
   const coverage = { ...input.coverage, ...(manifest?.coverage ?? {}) }
   const inventories = manifest && input.agentInventories ? await readResourceAgentInventories({ manifest, sources: input.agentInventories }) : null
   const judgeInventory = manifest ? await readResourceJudgeInventory({ manifest, source: input.judgeInventory }) : null
-  const processProofs = inventories || judgeInventory ? [...(inventories?.flatMap(inventory => inventory.proofs) ?? []),
-    ...(judgeInventory?.proofs ?? []), ...(input.processProofs ?? [])] : input.processProofs
-  const processWindows = processProofs ? await readResourceProcessWindows(processProofs) : input.processWindows
+  const nativeCensus = manifest && input.nativeCensus ? await readResourceNativeCensus({ manifest, source: input.nativeCensus }) : null
+  const processProofs = inventories || judgeInventory || nativeCensus ? [...(inventories?.flatMap(inventory => inventory.proofs) ?? []),
+    ...(judgeInventory?.proofs ?? []), ...(nativeCensus?.proofs ?? []), ...(input.processProofs ?? [])] : input.processProofs
+  const processWindows = [...(processProofs ? await readResourceProcessWindows(processProofs) : input.processWindows), ...(nativeCensus?.adminWindows ?? [])]
   const budgetSource = manifest?.budget ?? input.budget
   const budget = budgetSource ? await readFrozenResourceBudget({ ...budgetSource, runId: input.runId, startedAt: input.startedAt }) : null
   const groups = evidence.samples.flatMap(value => {
@@ -54,6 +56,8 @@ export async function checkResourceEvidence(input: {
       }) : [])]
   })
   const checks = {
+    nativeCensus: manifest && !nativeCensus ? { status: "incomplete" as const, codes: ["RESOURCE_NATIVE_CENSUS_INCOMPLETE"] }
+      : { status: "passed" as const, codes: [] },
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
     coverage: assessResourceCoverage({ ...coverage, samples: evidence.samples }),
     processTimeline: manifest && (!inventories || manifest.slots.some(slot => !inventories.some(inventory => inventory.slotId === slot.id)))
@@ -91,7 +95,8 @@ export async function checkResourceEvidence(input: {
     codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: budgetSource, ...(input.manifest ? { manifest_source: input.manifest } : {}),
     ...(processProofs ? { process_sources: processProofs } : {}),
     ...(inventories ? { agent_inventory_sources: inventories.map(inventory => inventory.source) } : {}),
-    ...(judgeInventory ? { judge_inventory_source: judgeInventory.source } : {}) }
+    ...(judgeInventory ? { judge_inventory_source: judgeInventory.source } : {}),
+    ...(nativeCensus ? { native_census_source: nativeCensus.source, admin_process_sources: nativeCensus.adminSources } : {}) }
 }
 
 export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {
