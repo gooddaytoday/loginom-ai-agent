@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { readAgentProcessInventory, sealAgentProcessInventory, superviseAgentProcess } from "../src/agent-process-evidence"
+import { readAgentProcess, readAgentProcessInventory, sealAgentProcessInventory, superviseAgentProcess } from "../src/agent-process-evidence"
 import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
 
 test("agent inventory durably admits a short CLI before spawn and seals its qualified proof", async () => {
@@ -31,10 +31,26 @@ test("agent inventory durably admits a short CLI before spawn and seals its qual
     expect(JSON.parse(result.stdout)).toEqual({ state: "open", entry: "planned", owner: { kind: "slot", id: "a" } })
     const input = { file, commandId: "run-one", slotId: "a", producerPid: process.pid }
     await expect(readAgentProcessInventory(input)).rejects.toThrow("AGENT_PROCESS_INVENTORY_UNSEALED")
+    const raw = await Bun.file(file).json()
+    const completed = await readAgentProcess(input, raw.processes[0].id)
+    expect(completed.entrySource).toMatchObject({ path: file, id: raw.processes[0].id })
+    expect(completed.source).toEqual(raw.processes[0].proof)
+    await mkdir(path.join(root, "next"), { mode: 0o700 })
+    const next = await superviseAgentProcess({ cmd: [process.execPath, "-e", `
+      const {readAgentProcess}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/agent-process-evidence.ts"))});
+      const input=${JSON.stringify(input)};
+      const inventory=await Bun.file(input.file).json();
+      try {await readAgentProcess(input,inventory.processes.at(-1).id);process.exit(3)}
+      catch(error) {if(error.message!=='AGENT_PROCESS_PROOF_UNCONFIRMED')throw error}
+      console.log((await readAgentProcess(input,${JSON.stringify(raw.processes[0].id)})).entrySource.sha256);
+    `], cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: path.join(root, "next") }, evidence)
+    confirmed = confirmed && next.processCleanup.status === "confirmed" && next.processCleanup.capture_complete
+    expect(next.exitCode).toBe(0)
+    expect(next.stdout.trim()).toBe(completed.entrySource.sha256)
     const sealed = await sealAgentProcessInventory(evidence)
     const inventory = await readAgentProcessInventory(input)
     expect(inventory.source).toEqual(sealed)
-    expect(inventory.processes).toHaveLength(1)
+    expect(inventory.processes).toHaveLength(2)
     expect(inventory.processes[0]!.owner).toEqual({ kind: "slot", id: "a" })
     const before = await readLeaseReceipt(file)
     await expect(superviseAgentProcess({ cmd: [process.execPath, "-e", "throw Error('late spawn')"], cwd: root,
