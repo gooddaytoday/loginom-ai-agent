@@ -24,6 +24,18 @@ CLI закрывает raw JSONL перед exclusive private summary с source 
 min/peak/delta и missing/reset counts; исходные frames сохраняются. Summary
 разделяет container epochs/process births и не складывает shared ancestors;
 наличие summary не доказывает полноту наблюдений или успешную приёмку.
+Для CPU-бюджета `host/cpu.utilization_percent` использует приращения первых
+восьми `/proc/stat` counters, исключая idle/iowait; отдельные guest counters
+повторно не складываются. `container:<ID>:<startedAt>/cpu.cores` — приращение
+Docker CPU nanoseconds на интервал его `read` timestamps, без нормализации по
+quota/online CPUs. `cpu.read_at` сверяется с тем же raw Docker snapshot/counter;
+оба timestamps должны попадать в соответствующие measured frames. Пропуск,
+сброс, неизвестный/повторный clock или смена epoch дают missing, а не нулевую
+нагрузку. Наблюдённое превышение бюджета имеет приоритет над неполнотой других
+интервалов. Старые receipts без derived rates проверяются и пересчитываются из
+raw bytes без переписывания; отсутствие container read clock не даёт CPU credit.
+Смысл полей и возможность уменьшения iowait описаны в
+[документации ядра](https://docs.kernel.org/filesystems/proc.html#miscellaneous-kernel-statistics-in-proc-stat).
 Readonly receipt verification получает expected source path/run/phase от
 controller, сверяет private source bytes/SHA и пересчитывает summary;
 изменённый receipt не выбирает произвольный source и не изменяет raw evidence.

@@ -163,7 +163,8 @@ export async function readResourceEvidence(input: { file: string; samplesFile: s
       const series = resourceObject(value)
       return series.scope === metric.scope && series.metric === metric.metric
     }) : undefined
-    if (metric.scope.startsWith("container:") && metric.scope.includes(":filesystem:") && savedMetric === undefined) return []
+    if (savedMetric === undefined && (metric.scope.startsWith("container:") && metric.scope.includes(":filesystem:") ||
+      ["cpu.utilization_percent", "cpu.cores"].includes(metric.metric))) return []
     return [Object.fromEntries(Object.entries(metric).filter(([key]) => key !== "counter_increases" || resourceObject(savedMetric).counter_increases !== undefined))]
   }) }
   if (JSON.stringify(saved.summary) !== JSON.stringify(comparable)) throw new EvalFailure("RESOURCE_SUMMARY_MISMATCH", 2)
@@ -292,6 +293,12 @@ function validContainerResources(value: unknown) {
       !validContainerCounters(container.memory, ["current_bytes", "limit_bytes"]) || !validContainerCounters(container.pids, ["current"]) ||
       !validCgroupResources(container.cgroup)) return false
     if (container.raw_stats !== null && container.raw_stats !== undefined && typeof container.raw_stats !== "string") return false
+    const cpu = resourceObject(container.cpu)
+    if (cpu.read_at !== null && cpu.read_at !== undefined) {
+      if (typeof cpu.read_at !== "string" || !Number.isFinite(Date.parse(cpu.read_at)) || typeof container.raw_stats !== "string") return false
+      const raw = resourceObject(JSON.parse(container.raw_stats))
+      if (raw.read !== cpu.read_at || resourceObject(resourceObject(raw.cpu_stats).cpu_usage).total_usage !== cpu.total_usage_ns) return false
+    }
     return container.io === null || container.io === undefined || Array.isArray(container.io) && container.io.every(value => {
       const entry = resourceObject(value)
       return typeof entry.op === "string" && ["major", "minor", "bytes"].every(key => Number.isInteger(entry[key]) && Number(entry[key]) >= 0)

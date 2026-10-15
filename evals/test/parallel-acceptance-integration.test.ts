@@ -194,6 +194,8 @@ test("container resource sampler observes a labelled bounded disposable containe
     expect(assessCgroupCoverage({ groups: [sample.cgroup], view: hostView })).toEqual({ status: "passed", codes: [] })
     expect(JSON.stringify(sample)).not.toContain("collector-private-env-canary")
     expect(JSON.parse(sample.raw_stats!).cpu_stats.cpu_usage.total_usage).toBe(sample.cpu?.total_usage_ns)
+    expect(sample.cpu?.read_at).toBe(JSON.parse(sample.raw_stats!).read)
+    expect(Number.isFinite(Date.parse(sample.cpu!.read_at!))).toBe(true)
     expect(sample.io === null ? sample.errors.includes("CONTAINER_IO_UNAVAILABLE") : sample.io.every(item => Number(item.bytes) >= 0)).toBe(true)
     const limits = await Bun.$`docker --host unix:///var/run/docker.sock inspect --format ${"{{.HostConfig.Memory}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.PidsLimit}}"} ${id}`.quiet().nothrow()
     expect(limits.exitCode).toBe(0)
@@ -201,7 +203,7 @@ test("container resource sampler observes a labelled bounded disposable containe
     const root = await mkdtemp(path.join(os.tmpdir(), "evals-container-collector-"))
     const out = path.join(root, "samples.jsonl")
     const abort = new AbortController()
-    const pending = collectHostResources({ paths: [root], out, intervalMs: 50, runId: "docker-smoke", phase: "run", signal: abort.signal,
+    const pending = collectHostResources({ paths: [root], out, intervalMs: 1000, runId: "docker-smoke", phase: "run", signal: abort.signal,
       containers: [{ role: "server", id, name: sample.inspect!.name.slice(1), image, nonce, purpose: "research" }] })
     try {
       const deadline = Date.now() + 5000
@@ -217,8 +219,15 @@ test("container resource sampler observes a labelled bounded disposable containe
       expect(rows[0].containers[0].container_id).toBe(id)
       expect(rows.every(row => row.containers[0].memory.current_bytes > 0 && row.containers[0].inspect.memory_bytes === 67108864)).toBe(true)
 
-      expect((await writeResourceSummary({ samplesFile: out, out: path.join(root, "control-summary.json") })).summary.samples).toBe(rows.length)
+      const summary = (await writeResourceSummary({ samplesFile: out, out: path.join(root, "control-summary.json") })).summary
+      expect(summary.samples).toBe(rows.length)
+      const rate = summary.metrics.find(row => row.scope === `container:${id}:${sample.inspect!.started_at}` && row.metric === "cpu.cores")
+      expect(rate?.observed).toBeGreaterThan(0)
+      expect(rate?.missing).toBe(0)
+      expect(rate?.min).toBeGreaterThanOrEqual(0)
       for (const [index, change] of [{ epoch_stable: "true" },
+        { cpu: { ...rows[0].containers[0].cpu, read_at: 123 } },
+        { cpu: { ...rows[0].containers[0].cpu, read_at: "2026-10-14T00:00:00Z" } },
         { memory: { current_bytes: "malformed-counter-canary", limit_bytes: 67108864 } },
         { io: [{ major: 8, minor: 0, op: "Write", bytes: "malformed-counter-canary" }] },
         { inspect: { ...rows[0].containers[0].inspect, running: "true" } },
