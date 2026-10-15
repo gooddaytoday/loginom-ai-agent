@@ -195,6 +195,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
         throw Error("ADMIN_REQUEST_INVALID")
+      if (payload.peer && payload.expectedPolicy.some(directory => !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(directory.name)))
+        throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
       const credentials = await readCredentials(payload.secretFile)
       if (credentials.username !== payload.slot.username || createHash("sha256").update(JSON.stringify(credentials)).digest("hex") !== payload.secretHash)
         throw Error("ADMIN_CREDENTIAL_INVALID")
@@ -385,7 +387,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               (await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session).CreatePackage()))
             try {
               const withPackage = await snapshot()
-              const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer }) => {
+              const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer, shared }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 const source = peer ? "access-peer-probe.lgp" : "access-probe.lgp"
                 const target = peer ? "access-peer-copy.lgp" : "access-copy.lgp"
@@ -406,7 +408,9 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 const denials = []
                 if (peer) {
                   console.info("ADMIN_USER_STAGE_STORAGE_DENIALS")
-                  for (const [pathKind, root] of [["virtual", `/${peer.name}`], ["absolute", `/workdir/UserStorage/${peer.name}`], ["traversal", `../${peer.name}`]]) {
+                  const roots = [["virtual", `/${peer.name}`], ["absolute", `/workdir/UserStorage/${peer.name}`], ["traversal", `../${peer.name}`],
+                    ...shared.flatMap(name => [[`shared:${name}:virtual`, `/${name}`], [`shared:${name}:absolute`, `/workdir/UserStorage/${name}`], [`shared:${name}:traversal`, `../${name}`]])]
+                  for (const [pathKind, root] of roots) {
                     for (const operation of ["read", "write", "copy-out", "copy-in"]) {
                       const denied = await (async () => {
                         try {
@@ -422,7 +426,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                             finally { await ReleaseObject(stream, true) }
                             return false
                           }
-                          if (operation === "copy-out") return !await storage.CopyFile(`${root}/access-probe.lgp`, `access-stolen-${pathKind}.lgp`, false, false)
+                          if (operation === "copy-out") return !await storage.CopyFile(`${root}/access-probe.lgp`, `access-stolen-${pathKind.replaceAll(":", "-")}.lgp`, false, false)
                           return !await storage.CopyFile(source, `${root}/access-forbidden.lgp`, false, false)
                         } catch { return true }
                       })()
@@ -434,7 +438,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 try { return { readConfirmed: size > 0 && buffer.some(value => value !== 0), size, copySize: copied ? copySize : null,
                   continued: await continued.Size === size, denials } }
                 finally { await ReleaseObject(continued, true) }
-              }, { item: handle, peer: payload.peer ?? null })) : null
+              }, { item: handle, peer: payload.peer ?? null, shared: payload.expectedPolicy.map(directory => directory.name).sort() })) : null
               const backup = payload.phase === "session-backup-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 const manager = await session.SessionBackupManager

@@ -55,7 +55,7 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
 liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
-liveIntegration("native effective storage: own operations succeed and both users refuse neighbor read, write and copy", () => nativeUserCapability("storage"), 120_000)
+liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 
 async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
@@ -169,14 +169,26 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
         expect(peerProbe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: neighbor.username }, storage: { readConfirmed: true } } })
         expect(await request("close-session", { proofId: peerProbe.id, session: (peerProbe.data as { binding: unknown }).binding }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+        const shared = after.map(directory => directory.name).sort()
+        expect(shared).toEqual(["common", "temp"])
+        for (const name of shared) {
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} test -d ${`${file.server.storageRoot}/${name}`}`.quiet().nothrow()).exitCode).toBe(0)
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cp -- ${`${file.server.storageRoot}/${user.name}/access-probe.lgp`} ${`${file.server.storageRoot}/${name}/access-probe.lgp`}`.quiet()
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${name}/access-probe.lgp`}`.quiet()).text().split(" ")[0]).toBe(digests[0])
+        }
         const denials = []
         for (const [owner, target, payload] of [[user, peer, activation], [peer, user, peerActivation]] as const) {
+          const sharedBefore = await Promise.all(shared.map(async name => ({ name,
+            entries: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text(),
+            hash: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${name}/access-probe.lgp`}`.quiet()).text() })))
           const before = await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${target.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()
           const hash = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${target.name}/access-probe.lgp`} ${`${file.server.storageRoot}/${target.name}/access-copy.lgp`}`.quiet()).text()
           expect(await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: target.name, objectId: "foreign" } }))
             .toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_PEER_IDENTITY_CHANGED" } })
           expect(await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: "../neighbor", objectId: target.objectId } }))
             .toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_REQUEST_INVALID" } })
+          expect(await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: target.name, objectId: target.objectId },
+            expectedPolicy: [{ ...after[0], name: "../common" }] })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_CAPABILITY_UNSUPPORTED" } })
           const denied = await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: target.name, objectId: target.objectId } })
           await writeLeaseReceipt(path.join(evidence, `storage-denials-${owner.name}.json`), denied)
           expect(denied.outcome).toBe("confirmed")
@@ -185,16 +197,21 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
           expect(data.storage.readConfirmed).toBe(true)
           expect(data.storage.continued).toBe(true)
           expect(data.storage.denials.map(row => [row.pathKind, row.operation])).toEqual(
-            ["virtual", "absolute", "traversal"].flatMap(pathKind => ["read", "write", "copy-out", "copy-in"].map(operation => [pathKind, operation])))
+            ["virtual", "absolute", "traversal", ...shared.flatMap(name => ["virtual", "absolute", "traversal"].map(kind => `shared:${name}:${kind}`))]
+              .flatMap(pathKind => ["read", "write", "copy-out", "copy-in"].map(operation => [pathKind, operation])))
           expect(data.storage.denials.every(row => row.denied)).toBe(true)
           expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${target.name}/access-probe.lgp`} ${`${file.server.storageRoot}/${target.name}/access-copy.lgp`}`.quiet()).text()).toBe(hash)
           expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${target.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(before.text())
+          for (const baseline of sharedBefore) {
+            expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${baseline.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(baseline.entries)
+            expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${baseline.name}/access-probe.lgp`}`.quiet()).text()).toBe(baseline.hash)
+          }
           expect(await request("close-session", { proofId: denied.id, session: data.binding }))
             .toMatchObject({ outcome: "confirmed", data: { closed: true } })
           denials.push({ username: owner.name, peer: target.name, ...data.storage })
         }
         await writeLeaseReceipt(path.join(evidence, "storage-probe.json"), { version: 1, identity: pair.identity,
-          username: credentials.username, positive: { ...data.storage, sha256: digests[0] }, denials, liveQualified: false })
+          username: credentials.username, positive: { ...data.storage, sha256: digests[0] }, sharedControls: shared.map(name => ({ name, sha256: digests[0] })), denials, liveQualified: false })
         complete = true
         return
       }
