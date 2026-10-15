@@ -113,7 +113,10 @@ test("durable archive: a hardlink refuses before any move and preserves its othe
   const context = await fixture()
   try {
     await link(path.join(context.profile, "data/loginom-ai-agent.db"), path.join(context.root, "other-database"))
-    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("ARCHIVE_TOPOLOGY")
+    const file = path.join(context.profile, "data/loginom-ai-agent.db"), info = await lstat(file, { bigint: true })
+    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toMatchObject({
+      message: "ARCHIVE_TOPOLOGY", exitCode: 2, cause: { path: file, kind: "file", type: 0o100000, device: String(info.dev), inode: String(info.ino),
+        uid: Number(info.uid), gid: Number(info.gid), mode: Number(info.mode), nlink: "2" } })
     expect(await Bun.file(path.join(context.profile, "data/loginom-ai-agent.db")).text()).toBe("database")
     expect(await Bun.file(path.join(context.root, "other-database")).text()).toBe("database")
     expect(await Bun.file(context.journal).exists()).toBe(false)

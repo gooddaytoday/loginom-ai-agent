@@ -57,6 +57,13 @@ origin/browser-binding всех двух admin и четырёх CLI proofs; UID
 
 ## Архив после фактически прерванного check: topology source не сохранён
 
+Диагностика дополнена: ARCHIVE_TOPOLOGY теперь сохраняет path/kind/POSIX type,
+mode/nlink/UID/GID/device/inode из того же lstat в Error.cause; native fixture
+пишет эти metadata в private native-primary-failure.json. Actual hardlink
+RED missing cause→GREEN archive11/69 PASS18.02s, typecheck/diff PASS. Исторический
+bad path не восстанавливается из этой проверки; требуется новая фактическая
+interruption и read-back её источников. Refusal/move/release policy не ослаблены.
+
 Native evidence `native-cli-sessions-f5bf5146-1c6a-4f01-8fc5-ef5b733f8cae`
 сохраняет exit130/interrupted=true/timedOut=false и confirmed continuous CLI proof,
 затем ARCHIVE_TOPOLOGY до publication первого archive manifest (35 assertions,
