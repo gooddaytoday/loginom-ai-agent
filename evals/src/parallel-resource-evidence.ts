@@ -81,7 +81,7 @@ export async function readResourceJudgeInventory(input: {
 }
 
 export async function readResourceNativeCensus(input: {
-  manifest: Pick<ResourceManifest, "state_dir" | "run_id" | "slots"> & { command_journal: string
+  manifest: Pick<ResourceManifest, "state_dir" | "run_id" | "slots" | "command_journal"> & {
     coverage: { containers: { role: string; id: string; startedAt: string }[] } }
   source: { file: string; sha256: string; producerPid: number }
 }) {
@@ -150,7 +150,7 @@ function resourceHash(value: unknown) {
 
 type ResourceManifest = {
   version: 1; kind: "parallel-resource-manifest"; run_id: string; fixed_at: string; interval_ms: 1000
-  parallel: number; slots: SlotDefinition[]; state_dir: string
+  parallel: number; slots: SlotDefinition[]; state_dir: string; command_journal: string
   judge: { enabled: boolean; codex_home: string }
   coverage: Pick<Parameters<typeof checkResourceEvidence>[0]["coverage"], "paths" | "containers">
   view: Parameters<typeof checkResourceEvidence>[0]["view"]; budget: { file: string; sha256: string }
@@ -158,7 +158,7 @@ type ResourceManifest = {
 
 export async function freezeResourceManifest(input: {
   out: string; slotsFile: string; parallel: number; runId: string; containers: ResourceManifest["coverage"]["containers"]
-  judgeEnabled: boolean
+  judgeEnabled: boolean; commandJournal: string
   view: ResourceManifest["view"]; budget: ResourceManifest["budget"]
 }) {
   await assertResourceDirectory(input.out)
@@ -172,7 +172,7 @@ export async function freezeResourceManifest(input: {
     throw new EvalFailure("RESOURCE_MANIFEST_INVALID", 2)
   const slots = file.slots.slice(0, input.parallel)
   const manifest = requireResourceManifest({ version: 1, kind: "parallel-resource-manifest", run_id: input.runId,
-    fixed_at: new Date().toISOString(), interval_ms: 1000, parallel: input.parallel, slots, state_dir: file.controller.stateDir,
+    fixed_at: new Date().toISOString(), interval_ms: 1000, parallel: input.parallel, slots, state_dir: file.controller.stateDir, command_journal: input.commandJournal,
     judge: { enabled: input.judgeEnabled, codex_home: file.judge.codexHome },
     coverage: { paths: [file.controller.stateDir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]),
       ...(input.judgeEnabled ? [file.judge.codexHome] : [])], containers: input.containers.map(container => ({ role: container.role, id: container.id,
@@ -203,10 +203,11 @@ function requireResourceManifest(value: unknown): ResourceManifest {
   const root = resourceObject(view.root), budget = resourceObject(manifest.budget), judge = resourceObject(manifest.judge)
   const slots = Array.isArray(manifest.slots) ? manifest.slots.map(resourceObject) : []
   const containers = Array.isArray(coverage.containers) ? coverage.containers.map(resourceObject) : []
-  const canonical = (value: unknown) => typeof value === "string" && path.isAbsolute(value) && path.resolve(value) === value
+  const canonical = (value: unknown): value is string => typeof value === "string" && path.isAbsolute(value) && path.resolve(value) === value
   if (manifest.version !== 1 || manifest.kind !== "parallel-resource-manifest" || typeof manifest.run_id !== "string" || !manifest.run_id.trim() ||
     typeof manifest.fixed_at !== "string" || !Number.isFinite(Date.parse(manifest.fixed_at)) || manifest.interval_ms !== 1000 ||
     !Number.isSafeInteger(manifest.parallel) || Number(manifest.parallel) < 1 || slots.length !== manifest.parallel || !canonical(manifest.state_dir) ||
+    !canonical(manifest.command_journal) || !manifest.command_journal.startsWith(manifest.state_dir + path.sep) ||
     typeof judge.enabled !== "boolean" || !canonical(judge.codex_home) ||
     slots.some(slot => typeof slot.id !== "string" || !slot.id || typeof slot.username !== "string" || !slot.username ||
       ![slot.profileDir, slot.workspaceRoot, slot.historyDir].every(canonical)) ||
