@@ -620,3 +620,13 @@ workspace, username/URL/container/root связаны с context до CLI dispat
 slotsFile без context refused. Native Docker/data-only account fixture проверяет
 этот guard через actual fake CLI; native sessions/full readiness этим не доказаны.
 Production main admission остаётся закрытым до остальных lifecycle gates.
+
+В slot-context runAttempt сохраняет LGP/result evidence, откладывает
+cleanupArtifact и удаление orphan CSV. storage-cleanup остаётся pending с
+removed=false/verified_absent=false; cleanup.json явно сохраняет неизвестное
+serverSessions и оба запрета storageDeletionAllowed/nextAdmissionAllowed.
+Legacy afterAttempt отказывает SLOT_CLEANUP_REQUIRED до management commands,
+архива/широкой очистки и сохраняет эти запреты в окончательном receipt; measured
+outcome не переписывается из-за незавершённого cleanup. Следующий attempt
+отвергает оставшиеся файлы. Положительный session-close/scoped-delete executor
+ещё необходим; эти negative gates не дают release authority.
