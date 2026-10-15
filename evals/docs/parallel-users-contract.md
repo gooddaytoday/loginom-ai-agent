@@ -611,3 +611,12 @@ null journal или заменённый inode сохраняют прежнее
 Epoch перечитывается перед mutations. Результат — observation, не ready receipt.
 Эта граница проверена на native Docker filesystem с data-only account authority;
 positive native parent account→root/effective ACL и full prepare/cleanup ещё open.
+
+`runAttempt` принимает внутренний SlotStorageContext и использует v2 ветку
+checkIsolatedLoginom: normal held lease, protected preparation/account, published
+storage journal с точным physical inode/owner и immutable source. Проверяется
+только собственная пустота; данные B не запрещают начало A. Config/command profile,
+workspace, username/URL/container/root связаны с context до CLI dispatch; binary
+slotsFile без context refused. Native Docker/data-only account fixture проверяет
+этот guard через actual fake CLI; native sessions/full readiness этим не доказаны.
+Production main admission остаётся закрытым до остальных lifecycle gates.
