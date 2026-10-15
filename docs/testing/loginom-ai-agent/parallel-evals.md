@@ -860,5 +860,6 @@ server/user/profile ownership через recovery-only CAS, проверяет �
 admin/process sources и native blocked/absent state, архивирует history и
 выпускает доказанно чистые reservations. Exit0/status released — завершение
 cleanup, ready:false. Неопределённый исход — retained/unconfirmed/exit2.
-Active CLI incidents, fully terminal repeat и partial terminal reconciliation
-пока не покрываются этим путём. Offline judge recover сохранён.
+Повтор с durable completion возвращает historical already_released без CAS/admin
+и сохраняет reservations следующего владельца. Active CLI incidents, crash до
+completion и partial terminal reconciliation пока не покрываются этим путём. Offline judge recover сохранён.
