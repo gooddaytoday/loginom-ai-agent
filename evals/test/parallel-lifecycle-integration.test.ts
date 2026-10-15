@@ -126,6 +126,18 @@ for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected
       }
       await writeLeaseReceipt(path.join(evidence, "readonly.json"), { identity: pair.identity, observations: readonly })
       await writeLeaseReceipt(path.join(evidence, "cli.json"), { identity: pair.identity, captures, liveQualified: false })
+      if (mode === "reconnected-finalizer") {
+        await admin.dispose()
+        peer.admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
+        command.managementEvidence.admin = peer.admin
+        const current = await peer.admin.inspectSessionInventory()
+        const receipt = await readLeaseReceipt(current.source.path) as { command: { path: string } }
+        const session = captures[0]!.session
+        expect(current.sessions.some(row => row.name === session.binding.name && row.createdAt === session.binding.createdAt &&
+          row.packageCount === 0 && row.objectId !== session.binding.remoteKey)).toBe(true)
+        await writeLeaseReceipt(path.join(evidence, "reconnected-before-check.json"), { current, receipt,
+          command: await readLeaseReceipt(receipt.command.path), admitted: (await readLeaseReceipt(inventoryFile) as { processes: unknown[] }).processes.length })
+      }
       const admitted = (await readLeaseReceipt(inventoryFile) as { processes: unknown[] }).processes.length
       const abort = new AbortController(), stopped = { value: false }
       const suspension: { process?: ProcessIdentity; stoppedAt?: string; signalQueuedAt?: string; continuedAt?: string; continued?: boolean } = {}
@@ -237,10 +249,6 @@ for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected
         source: { path: journal, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex") },
         inventories: [{ value: registeredInventory, source: { path: inventoryFile,
           sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") } }] })
-      if (mode === "reconnected-finalizer") {
-        await admin.dispose()
-        peer.admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
-      }
       const sealed = await sealAdminProcessInventory(file, environment.server,
         new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex"), environment.slots)
       expect(sealed).toMatchObject({ phase: "finalizing", managementSources: [{ path: inventoryFile,

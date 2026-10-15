@@ -48,7 +48,7 @@ export async function collectManagementSessions(file: SlotFile, lease: SlotLease
     if (process.result.exitCode !== 0 || process.result.timedOut || process.result.interrupted)
       throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
   }
-  if (new Set(sessions.map(session => session.id)).size !== sessions.length || new Set(sessions.map(session => session.binding.remoteKey)).size !== sessions.length ||
+  if (new Set(sessions.map(session => session.id)).size !== sessions.length ||
     new Set(sessions.map(session => JSON.stringify([session.binding.name, session.binding.createdAt]))).size !== sessions.length)
     throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
   const { readAdminSessionInventory } = await import("./loginom-admin")
@@ -60,9 +60,13 @@ export async function collectManagementSessions(file: SlotFile, lease: SlotLease
   const rows = current.sessions.filter(row => sameUser(row.name))
   const snapshots = inventory.processes.flatMap(process => process.sessions ? [process.sessions.before, ...process.sessions.during, process.sessions.after] : [])
   if (new Set(rows.map(row => JSON.stringify([row.name, row.createdAt]))).size !== rows.length ||
-    snapshots.some(snapshot => snapshot.sessions.some(row => sameUser(row.name) && !sessions.some(session =>
-    session.binding.remoteKey === row.objectId && session.binding.name === row.name && session.binding.createdAt === row.createdAt && row.packageCount === 0))) ||
-    // Managed-row proxy IDs belong to the observing admin context, unlike the qualified native tuple.
+    // Proxy IDs are local to each admin context, including historical observations after reconnect.
+    snapshots.some(snapshot => {
+      const observed = snapshot.sessions.filter(row => sameUser(row.name))
+      return new Set(observed.map(row => JSON.stringify([row.name, row.createdAt]))).size !== observed.length ||
+        observed.some(row => !sessions.some(session => session.binding.name === row.name &&
+          session.binding.createdAt === row.createdAt && row.packageCount === 0))
+    }) ||
     rows.some(row => !sessions.some(session => session.state !== "closed" &&
       session.binding.name === row.name && session.binding.createdAt === row.createdAt && row.packageCount === 0)))
     throw new EvalFailure("MANAGEMENT_SESSION_UNKNOWN", 2)
