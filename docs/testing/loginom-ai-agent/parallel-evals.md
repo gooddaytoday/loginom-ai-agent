@@ -958,3 +958,13 @@ SHAdd7acfd3197a7164153e1acdf2ff884ddc41726794123191d861c1e20fb7684a:
 UID incident остаётся retained и не объяснён этим PASS. Count0 management gate
 не заменяет full attempt cleanup/recovery/SessionBackup/licence/resource/OAuth
 и LLM N2→N1/node приёмку; delete/release/admission остаются запрещены.
+
+Normal production `finalizeManagementSlot` теперь обеспечивает этот порядок
+внутри API, сохраняя shared admin/B: native RED missing API→GREEN1/20 PASS164s,
+related29/126 PASS37.89s, typecheck PASS. Private
+`native-two-users-33d08445-a845-45b8-b7cb-3d374ae45861` terminal SHA5b145a49...
+и audit681f789752552be70ba11d822edfab3353070d1f2551ba9449330ec4e734ee20
+подтверждают628 checks/181 sources, code bytes before/after unchanged
+(pins a2a98eeb...), B survival/fresh check, global archive reuse и exact own
+pair/network/root absence. Receipt закрывает normal management Count0 sessions;
+полный attempt cleanup/recovery, backup/delete/release/readiness не заявлены.

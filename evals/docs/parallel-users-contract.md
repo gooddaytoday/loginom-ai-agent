@@ -1752,6 +1752,19 @@ stat birth/state without exposing argv. Failed diagnostic reads stay unknown;
 the refusal still fails process qualification. These samples do not establish
 an atomic identity or retrospectively qualify an earlier failed process proof.
 
+`finalizeManagementSlot` owns normal per-slot archive/accounting/close ordering.
+It commits the archive before its fresh complete accounting and first close,
+requires fresh closed-session read-back and revalidates the archive before the
+private terminal receipt. The shared admin remains live for peers. Receipt refs
+bind the slot/token/epoch, archive, inventory, snapshots and both session sources;
+they grant no deletion, release or next admission. This covers normal management
+Count0 sessions, with attempt actors and uncertain-close recovery still separate.
+Native TDD missing API RED→GREEN1/20 (164.00s), related29/126 PASS37.89s and
+typecheck PASS. Private native-two-users-33d08445... audit SHA
+681f789752552be70ba11d822edfab3353070d1f2551ba9449330ec4e734ee20 verifies628
+checks/181 sources, active B survival/fresh check, all four CLI/admin closures,
+global archive reuse and exact own pair/network/root absence.
+
 The actual OS child independently reads its registration before executing.
 Missing registration RED→GREEN1 PASS/27 (3.54s); parallel owners2 PASS/30
 (5.10s), related69 PASS/358 (16.61s), typecheck/diff PASS. Cold native1 PASS/56 (193.44s),181 source/closure/cleanup audit checks;

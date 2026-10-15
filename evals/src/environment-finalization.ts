@@ -65,6 +65,35 @@ export async function finalizeManagementEnvironment(file: SlotFile, environment:
   return { status: receipt.status, slots, after: after.source, source: { path: target, sha256: hash(receipt) } }
 }
 
+/** Closes one normal management slot after its archive; shared admin and peer admission remain live. */
+export async function finalizeManagementSlot(file: SlotFile, server: Awaited<ReturnType<typeof acquireEnvironmentLeases>>["server"], lease: SlotLease, inventoryFile: string, admin: AdminConnection) {
+  if (JSON.stringify(admin.identity) !== JSON.stringify(lease.identity)) throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  const archived = await archiveManagementSlot(file, server, lease, inventoryFile)
+  const secretFile = path.join(file.controller.stateDir, `prepare-${lease.slot.id}.secret.json`)
+  const before = await admin.inspectSessionInventory()
+  const accounted = await collectManagementSessions(file, lease, secretFile, inventoryFile, before.source)
+  await server.assertHeld()
+  if (hash(await readLeaseReceipt(archived.source.path)) !== archived.source.sha256) throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  for (const session of accounted.sessions) await admin.closeManagementSession(lease, secretFile, session.id)
+  const after = await admin.inspectSessionInventory()
+  const closed = await collectManagementSessions(file, lease, secretFile, inventoryFile, after.source)
+  const sessions = await Promise.all(closed.sessions.map(async session => {
+    if (session.state !== "closed") throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+    const observed = path.join(file.controller.stateDir, `management-session-${session.id}.json`)
+    const terminal = path.join(file.controller.stateDir, `management-session-${session.id}.closed.json`)
+    return { id: session.id, state: session.state, observed: { path: observed, sha256: hash(await readLeaseReceipt(observed)) },
+      closed: { path: terminal, sha256: hash(await readLeaseReceipt(terminal)) } }
+  }))
+  if (hash(await archiveManagementSlot(file, server, lease, inventoryFile)) !== hash(archived))
+    throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  const receipt = { version: 2, kind: "management-slot-finalization", status: "sessions_closed" as const, identity: lease.identity,
+    slotId: lease.slot.id, leaseToken: lease.token, archive: archived.source, processInventory: accounted.source,
+    before: before.source, after: after.source, sessions, storageDeletionAllowed: false, nextAdmissionAllowed: false }
+  const target = `${lease.receipt}.management-finalization.json`
+  await writeLeaseReceipt(target, receipt)
+  return { status: receipt.status, sessions, archived, before: before.source, after: after.source, source: { path: target, sha256: hash(receipt) } }
+}
+
 /** Archives one closed management producer while peer slots continue. */
 export async function archiveManagementSlot(file: SlotFile, server: Awaited<ReturnType<typeof acquireEnvironmentLeases>>["server"], lease: SlotLease, inventoryFile: string) {
   const sealed = await sealManagementProcessInventory(file, server, lease, inventoryFile)
