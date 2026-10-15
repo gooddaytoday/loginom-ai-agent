@@ -1939,3 +1939,22 @@ qualified by this end-of-management test; historical cross-context accounting
 remains a separate gate. ARCHIVE_TOPOLOGY after an actually interrupted check and
 the retained writer/proc incidents remain open. SessionBackup, scoped storage
 cleanup/release and full model/judge admission are still unqualified.
+
+
+Live native cancellation hint (2026-10-15)
+
+The test-only observer reads the mutable management manifest as a hint, because
+an open descriptor can have nlink0 after a producer's atomic rename. A real
+filesystem control confirmed that mechanism; it does not attribute every
+LEASE_FILE_PRIVATE predicate from the historical run. Immutable observation
+receipts and the settled manifest still pass the normal strict readers before
+ledger/close authority. Production receipt readers and deadlines are unchanged.
+Native observer RED LEASE_FILE_PRIVATE → finalizer GREEN1/53 in174.94s; the check
+completed before abort (exit0/interrupted=false/timedOut=false). This does not
+qualify an actual interrupted check or resolve historical ARCHIVE_TOPOLOGY.
+Private native-cli-sessions-70a965d2-d5ad-4a7e-a08c-867e05d4e394 retains eleven
+artifacts; audit154 checks/read-back passed. Terminal SHA256
+2f1da0101ea409ef44fab1c7fd9d04047c5074700fc0002042e156e7b5427475 binds three
+owned session closes, durable archive before close, fresh absence, five confirmed
+CLI closures and one admin closure, with no storage/admission grant. Same-daemon
+Docker listings and lstat confirm exact pair and temporary root absent.
