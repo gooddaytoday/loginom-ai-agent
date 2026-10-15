@@ -42,7 +42,7 @@ const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.E
 const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
 
-export async function writerIdentity(profile: string): Promise<WriterIdentity | null> {
+export async function writerIdentity(profile: string, createdAfter?: number): Promise<WriterIdentity | null> {
   const directory = path.join(profile, ".writer")
   const info = await lstat(directory).catch((error) => {
     if (gone(error)) return undefined
@@ -54,7 +54,8 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   const ownerBefore = await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
     // mkdir precedes the owner's first write during normal lock acquisition.
-    return observeWriterRelease(directory, info, true)
+    return observeWriterRelease(directory, info, createdAfter !== undefined && info.birthtimeMs >= createdAfter &&
+      info.uid === process.getuid?.() && (info.mode & 0o077) === 0)
   })
   if (!ownerBefore) return null
   if (!ownerBefore.isFile() || ownerBefore.isSymbolicLink()) throw Error("Writer owner is not a private file")
@@ -366,6 +367,10 @@ export async function superviseProcess(input: {
   const baseline = await snapshot()
   const existing = new Set(baseline.map(key))
   const oldDirectories = new Set(profile ? await runtimeDirectories(profile) : [])
+  const writerAbsentAtStart = profile ? await lstat(path.join(profile, ".writer")).then(() => false, error => {
+    if (gone(error)) return true
+    throw error
+  }) : false
   const browser = profile ? await browserIdentity(input.cmd, input.env) : undefined
   const cliExecutable = await realpath(Bun.which(input.cmd[0]!) ?? input.cmd[0]!)
   const cliInfo = await stat(cliExecutable)
@@ -385,6 +390,7 @@ export async function superviseProcess(input: {
   const nonce = crypto.randomUUID()
   await writeFile(path.join(capsule, "command.json"), JSON.stringify({ cmd: input.sandbox ?? input.cmd, cwd: input.cwd, nonce,
     sandbox: Boolean(input.sandbox) }), { mode: 0o600 })
+  const dispatchedAt = Date.now()
   const proc = spawn(process.execPath, [path.join(import.meta.dir, "process-launcher.ts"), capsule], { cwd: input.cwd, env: input.env,
     detached: true, stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
   let cliExitCode: number | undefined, cliPid: number | undefined, reaperReady = false
@@ -539,7 +545,9 @@ export async function superviseProcess(input: {
         entry.admission = "allowed"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
-      const writer = await writerIdentity(profile)
+      const ownCli = live.some(entry => entry.device === cliInfo.dev && entry.inode === cliInfo.ino &&
+        ledger.get(key(entry))?.origin?.via === "cli" && sameIdentity(entry, ledger.get(key(entry))!.process))
+      const writer = await writerIdentity(profile, writerAbsentAtStart && !cleanup.writer && ownCli ? dispatchedAt : undefined)
       if (writer && !cleanup.writer) cleanup.writer = writer
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }

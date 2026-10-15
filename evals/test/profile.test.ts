@@ -8,21 +8,22 @@ import { agentCommand } from "../src/cli"
 import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
+import { Database } from "bun:sqlite"
 
 test("writerIdentity: bounded initial owner creation is captured instead of mistaken for replacement", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-acquire-"))
   try {
-    await mkdir(path.join(profile, ".writer"))
+    const dispatchedAt = Date.now() - 1
+    await mkdir(path.join(profile, ".writer"), { mode: 0o700 })
     const created = new Promise<void>(resolve => setTimeout(async () => {
       await Bun.write(path.join(profile, ".writer/owner"), "new-owner")
       resolve()
     }, 20))
-    const identity = writerIdentity(profile)
+    const identity = writerIdentity(profile, dispatchedAt)
     await created
     expect(await identity).toMatchObject({ owner: "new-owner" })
   } finally { await rm(profile, { recursive: true, force: true }) }
 })
-import { Database } from "bun:sqlite"
 
 test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
