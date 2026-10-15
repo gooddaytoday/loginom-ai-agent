@@ -78,6 +78,44 @@ test('slow evaluate stays before close, preserves primary, and never proceeds to
   assert.deepEqual(f.events.slice(-2), ['receipt', 'close'])
 })
 
+test('never-settling evaluate releases the primary error and cleanup at 1000ms', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let started
+  const observed = new Promise(resolve => { started = resolve })
+  const original = new Error('click timeout'); original.name = 'TimeoutError'
+  const f = fixture(original, () => { started(); return new Promise(() => {}) })
+  const run = f.run()
+  await observed
+  t.mock.timers.tick(999)
+  assert.equal(f.events.includes('close'), false)
+  t.mock.timers.tick(1)
+  await assert.rejects(run, error => error === original)
+  assert.deepEqual(f.events, ['marker', 'username', 'password-click', 'diagnostic', 'close'])
+  assert.equal(f.owner.loginSubmitted, undefined)
+  assert.equal(f.owner.deadline, undefined)
+})
+
+for (const late of ['returned', 'rejected']) {
+  test('evaluate ' + late + ' after expiry never records or retries', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    let finish, fail, started
+    const observed = new Promise(resolve => { started = resolve })
+    const pending = new Promise((resolve, reject) => { finish = resolve; fail = reject })
+    const original = new Error('click timeout')
+    const f = fixture(original, () => { started(); return pending })
+    const run = f.run()
+    await observed
+    t.mock.timers.tick(1000)
+    await assert.rejects(run, error => error === original)
+    if (late === 'returned') finish({ diagnostic_only: true })
+    else fail(Error('late diagnostic failure'))
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(f.events, ['marker', 'username', 'password-click', 'diagnostic', 'close'])
+    assert.equal(f.owner.loginSubmitted, undefined)
+    assert.equal(f.owner.deadline, undefined)
+  })
+}
+
 for (const change of ['no-opt-in', 'foreign-page', 'foreign-context', 'empty-binding', 'late-page-drift']) {
   test('diagnostic refuses ' + change + ' without changing the click error', async () => {
     const original = new Error('click timeout')

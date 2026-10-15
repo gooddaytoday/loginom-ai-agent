@@ -63,8 +63,15 @@ export async function loginPage(page, candidate, owner) {
         if (typeof diagnostic?.read === 'function' && typeof diagnostic.record === 'function'
             && Object.values(originalBinding).every(value => typeof value === 'string' && value.trim() !== '')
             && original()) {
-          const receipt = await page.evaluate(diagnostic.read, originalBinding)
-          if (original()) await diagnostic.record(receipt)
+          const expired = Symbol('diagnostic read expired')
+          let timer
+          try {
+            const receipt = await Promise.race([
+              page.evaluate(diagnostic.read, originalBinding),
+              new Promise(resolve => { timer = setTimeout(() => resolve(expired), 1000) }),
+            ])
+            if (receipt !== expired && original()) await diagnostic.record(receipt)
+          } finally { clearTimeout(timer) }
         }
       } catch {}
       throw error
