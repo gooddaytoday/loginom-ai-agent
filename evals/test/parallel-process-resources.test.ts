@@ -4,12 +4,13 @@ import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
 import { assessProcessResourceTimeline, assessResourceCoverage, checkResourceEvidence } from "../src/parallel-acceptance"
-import { freezeResourceManifest, readResourceAgentInventories, readResourceProcessWindows, freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { freezeResourceManifest, readResourceAgentInventories, readResourceJudgeInventory, readResourceProcessWindows, freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { resourceBudgetFixture } from "./helpers/resource-budget-fixture"
 import { acquireResourceLease, writeLeaseReceipt } from "../src/lease"
 import { sealAgentProcessInventory, superviseAgentProcess } from "../src/agent-process-evidence"
 import { superviseProcess } from "../src/process-supervisor"
+import { readJudgeProcessInventory, sealJudgeProcessInventory, superviseJudgeProcess } from "../src/judge-process-evidence"
 
 test("resource evidence covers the actual persisted launcher lifetime from dispatch to exit", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-full-lifetime-"))
@@ -27,16 +28,23 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     const lease = await acquireResourceLease({ key: `agent:${slot.id}`, lockRoot: fixture.lockRoot, journal: file, commandId: "full-lifetime" })
     return { lease, evidence: { file, slotId: slot.id, commandId: "full-lifetime", assertHeld: lease.assertHeld } }
   }))
+  const judgeFile = path.join(inventoryDirectory, "judge-processes.json")
+  await writeLeaseReceipt(judgeFile, { version: 2, kind: "offline-judge-processes", commandId: "full-lifetime", state: "open", processes: [] })
+  const judgeLease = await acquireResourceLease({ key: `judge:${fixture.slots.judge.codexHome}`, lockRoot: fixture.lockRoot,
+    journal: judgeFile, commandId: "full-lifetime" })
+  const judgeEvidence = { file: judgeFile, commandId: "full-lifetime", assertHeld: judgeLease.assertHeld }
   const view = (await sampleHostResources([root])).collector_cgroup.view
   if (!view) throw Error("Fixture cgroup view unavailable")
   const containers = ["server", "studio"].map((role, index) => ({ role: role as "server" | "studio", id: String(index + 1).repeat(64),
     image: "sha256:" + String(index + 3).repeat(64), startedAt: "2026-10-14T10:00:00.000Z", name: fixture.slots.server[role === "server" ? "container" : "studioContainer"],
     nonce: crypto.randomUUID(), purpose: "research" }))
   const manifestBudget = await freezeResourceBudget({ out: path.join(root, "manifest-budget.json"), runId: "full-lifetime",
-    bounds: resourceBudgetFixture([fixture.slots.controller.stateDir, ...fixture.slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])], containers) })
+    bounds: resourceBudgetFixture([fixture.slots.controller.stateDir, ...fixture.slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]), fixture.slots.judge.codexHome], containers) })
   while (Date.now() <= Date.parse(manifestBudget.budget.fixed_at)) await Bun.sleep(1)
-  const manifests = await Promise.all([1, 2].map(parallel => freezeResourceManifest({ out: path.join(root, `manifest-${parallel}.json`),
+  const manifests = await Promise.all([1, 2].map(parallel => freezeResourceManifest({ judgeEnabled: true, out: path.join(root, `manifest-${parallel}.json`),
     runId: "full-lifetime", slotsFile, parallel, containers, view, budget: manifestBudget.source })))
+  const skippedManifest = await freezeResourceManifest({ judgeEnabled: false, out: path.join(root, "manifest-skipped.json"),
+    runId: "full-lifetime", slotsFile, parallel: 1, containers, view, budget: manifestBudget.source })
   const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "full-lifetime", phase: "run",
     signal: abort.signal, processes: sampleSupervisedResources })
   const releases = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
@@ -52,16 +60,16 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     pending.push(superviseAgentProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: root,
       env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "slot", id: "a" },
       stdin: new ReadableStream({ async start(controller) { await releases[0]!.promise; controller.close() } }) }, agents[0]!.evidence),
-    superviseProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: root,
+    superviseJudgeProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: root,
       env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: path.join(root, "observed-judge"), owner: { kind: "judge", id: "resource-judge" },
-      stdin: new ReadableStream({ async start(controller) { await releases[1]!.promise; controller.close() } }) }))
+      stdin: new ReadableStream({ async start(controller) { await releases[1]!.promise; controller.close() } }) }, judgeEvidence))
     const running = Promise.all(pending)
     void running.catch(() => {})
     while (true) {
       const text = await Bun.file(samplesFile).text()
       const frames = text.endsWith("\n") ? text.trim().split("\n").map(line => JSON.parse(line)) : []
-      if (frames.filter(frame => ["a", "resource-judge"].every(id => frame.processes.scopes.some((scope: { owner: { id: string }; processes: { verified: boolean }[] | null }) =>
-        scope.owner.id === id && scope.processes?.length && scope.processes.every(process => process.verified)))).length >= 2) break
+      if (frames.filter(frame => ["slot", "judge"].every(kind => frame.processes.scopes.some((scope: { owner: { kind: string }; processes: { verified: boolean }[] | null }) =>
+        scope.owner.kind === kind && scope.processes?.length && scope.processes.every(process => process.verified)))).length >= 2) break
       if (Date.now() > deadline) throw Error("Lifetime active frames did not arrive")
       await Bun.sleep(10)
     }
@@ -72,6 +80,9 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       const sealed = await sealAgentProcessInventory(agent.evidence)
       return { file: sealed.path, sha256: sealed.sha256, slotId: agent.evidence.slotId, producerPid: process.pid }
     }))
+    const judgeSealed = await sealJudgeProcessInventory(judgeEvidence)
+    const judgeInventory = { file: judgeSealed.path, sha256: judgeSealed.sha256, producerPid: process.pid }
+    const judgeCensus = await readJudgeProcessInventory({ ...judgeEvidence, producerPid: process.pid })
     const run = runs[0]!
     confirmed = runs.every(run => run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete)
     expect(confirmed).toBe(true)
@@ -101,20 +112,40 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       processWindows: [{ ...owner, startedAt: "unverified", finishedAt: lifetime.finished_at }], processProofs: [source],
       view: samples[0].host.collector_cgroup.view, budget: budget.source }
     expect(await checkResourceEvidence(request)).toMatchObject({ status: "passed", codes: [] })
-    expect((await checkResourceEvidence({ ...request, manifest: manifests[0]!.source,
-      processProofs: [], agentInventories: [agentInventories[0]!] })).checks.processTimeline)
-      .toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE"] })
     const judgeProof = await Bun.file(path.join(root, "observed-judge/process-cleanup.json")).json()
     const judgeSource = { file: path.join(root, "observed-judge/process-cleanup.json"), producerPid: process.pid, owner: judgeProof.lifetime.owner,
       sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(judgeProof)).digest("hex") }
     const complete = { ...request, manifest: manifests[0]!.source,
       coverage: { ...request.coverage, owners: [...request.coverage.owners, { ...judgeProof.lifetime.owner, launcher: judgeProof.lifetime.launcher }] },
-      processProofs: [judgeSource], agentInventories: [agentInventories[0]!] }
+      processProofs: [], agentInventories: [agentInventories[0]!], judgeInventory }
+    expect((await checkResourceEvidence({ ...complete, judgeInventory: undefined, processProofs: [judgeSource] })).checks.processTimeline)
+      .toEqual({ status: "incomplete", codes: ["RESOURCE_JUDGE_INVENTORY_INCOMPLETE"] })
     const admitted = await checkResourceEvidence(complete)
     expect(admitted.checks.processTimeline).toEqual({ status: "passed", codes: [] })
     expect(admitted.agent_inventory_sources).toEqual([agentInventories[0]!])
     expect(admitted.process_sources?.map(source => source.sha256)).toEqual([source.sha256, judgeSource.sha256])
+    expect(admitted.judge_inventory_source).toEqual(judgeInventory)
+    expect(admitted.process_sources?.[1]?.file).toBe(judgeCensus.processes[0]!.source.path)
     expect(admitted.process_sources?.[0]?.file).not.toBe(source.file)
+    for (const control of [
+      { source: { ...judgeInventory, file: path.join(root, "foreign-judge.json") }, code: "RESOURCE_JUDGE_INVENTORY_PATH_MISMATCH" },
+      { source: { ...judgeInventory, sha256: "0".repeat(64) }, code: "RESOURCE_SOURCE_HASH_MISMATCH" },
+      { source: { ...judgeInventory, producerPid: process.pid + 1 }, code: "JUDGE_PROCESS_PROOF_UNCONFIRMED" },
+    ]) await expect(checkResourceEvidence({ ...complete, judgeInventory: control.source })).rejects.toThrow(control.code)
+    await expect(readResourceJudgeInventory({ manifest: { ...manifests[0]!.manifest, run_id: "../foreign" }, source: judgeInventory }))
+      .rejects.toThrow("RESOURCE_JUDGE_INVENTORY_PATH_MISMATCH")
+    await expect(checkResourceEvidence({ ...complete, manifest: skippedManifest.source })).rejects.toThrow("RESOURCE_JUDGE_MODE_MISMATCH")
+    expect((await checkResourceEvidence({ ...complete, manifest: skippedManifest.source, judgeInventory: undefined, processProofs: [judgeSource] })).checks.processTimeline)
+      .toEqual({ status: "failed", codes: ["RESOURCE_JUDGE_MODE_MISMATCH"] })
+    const savedJudge = await Bun.file(judgeFile).json()
+    for (const changed of [{ ...savedJudge, state: "open" }, { ...savedJudge, processes: [] }]) {
+      await writeLeaseReceipt(judgeFile, changed)
+      try { await expect(checkResourceEvidence({ ...complete, judgeInventory: { ...judgeInventory,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changed)).digest("hex") } }))
+        .rejects.toThrow("RESOURCE_JUDGE_INVENTORY_UNCONFIRMED") }
+      finally { await writeLeaseReceipt(judgeFile, savedJudge) }
+    }
+
     for (const control of [
       { sources: [agentInventories[0]!, agentInventories[0]!], code: "RESOURCE_AGENT_INVENTORY_INVALID" },
       { sources: [{ ...agentInventories[0]!, file: path.join(root, "foreign-inventory.json") }], code: "RESOURCE_AGENT_INVENTORY_PATH_MISMATCH" },
@@ -129,7 +160,7 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     expect((await checkResourceEvidence({ ...complete, startedAt: request.finishedAt })).checks.processTimeline)
       .toEqual({ status: "failed", codes: ["RESOURCE_PROCESS_RUN_WINDOW_MISMATCH"] })
     expect((await checkResourceEvidence({ ...request, manifest: manifests[1]!.source,
-      processProofs: [judgeSource], agentInventories })).checks.processTimeline)
+      processProofs: [], agentInventories, judgeInventory })).checks.processTimeline)
       .toEqual({ status: "incomplete", codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] })
     await expect(readResourceProcessWindows([{ ...source, producerPid: process.pid + 1 }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
     await expect(readResourceProcessWindows([{ ...source, owner: { ...source.owner, id: "foreign-owner" } }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
@@ -145,7 +176,7 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     passed = true
 
   } finally { releases.forEach(release => release.resolve()); await Promise.allSettled(pending);
-    abort.abort(); await collecting; await Promise.all(agents.map(agent => agent.lease.close()));
+    abort.abort(); await collecting; await Promise.all([...agents.map(agent => agent.lease.close()), judgeLease.close()]);
     if (confirmed && passed) await rm(root, { recursive: true, force: true }) }
 }, 30000)
 
