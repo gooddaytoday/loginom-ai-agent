@@ -435,7 +435,7 @@ function installOriginalUserPublisher(origin) {
     };
     let restored=false;
     function retainedInitClass(ctor,asm,members,baseType,interfaces){
-      let kind,record;
+      let kind,record,call,checkCall;
       try{
         const rpc=lookup(root,'rpc'),bg=lookup(root,'bg'),bgRpc=bg&&lookup(bg,'rpc');
         if(ctor===lookup(rpc,'TBGObjectProxy'))kind='ObjectProxy';
@@ -450,9 +450,18 @@ function installOriginalUserPublisher(origin) {
           if(interfaces)checks.push(snapshot(interfaces));
           hold(asm,'__types');hold(asm,'name');hold(ctor,'__typeName');
           const basePrototype=baseType?hold(baseType,'prototype'):undefined;
+          const args=arguments,argsParent=prototype(args),keys=Reflect.ownKeys(args),slots=keys.map(key=>[key,descriptor(args,key)]);
+          const count=data(args,'length'),values=Object.freeze(Array.from({length:count},(_,i)=>data(args,String(i))));
+          const initializerParent=prototype(original),ctorParent=prototype(ctor);
+          checkCall=()=>{
+            if(prototype(args)!==argsParent||Reflect.ownKeys(args).length!==keys.length||prototype(original)!==initializerParent||prototype(ctor)!==ctorParent)unavailable();
+            for(const[key,d]of slots){const now=descriptor(args,key);if(!now||Reflect.ownKeys(now).length!==Reflect.ownKeys(d).length||Reflect.ownKeys(d).some(k=>!Object.is(now[k],d[k])))unavailable()}
+          };
+          call=Object.freeze({ordinal:records.length,initializer:original,receiver:this,ctor,assembly:asm,members,baseType,interfaces,
+            arguments:args,values,beforeOriginalCall:true,closureIdentityQualified:false,nativeReceiversQualified:false});
           record=Object.freeze({kind,ctor,assembly:asm,members,baseType,basePrototype,interfaces,dependencies,execution,receiver:this,
             methods:Object.freeze(heldMethods),initializer:original,ss});
-          checks.push(checkMembers);guard();
+          checks.push(checkMembers,checkCall);guard();
         }
       }catch(error){remember(error)}
       let value;try{value=apply(original,this,arguments)}catch(error){remember(error);throw error}
@@ -463,7 +472,7 @@ function installOriginalUserPublisher(origin) {
         if(kind==='ObjectProxy'){
           hold(hold(root,'rpc'),'TBGObjectProxy');
         }else hold(hold(hold(root,'bg'),'rpc'),kind==='FileStorage'?'TIBGFileStorage_Proxy':'TIBGStreamPersist_Proxy');
-        records.push(record);
+        checkCall();records.push(Object.freeze({...record,call,completion:Object.freeze({call,returned:value,originalReturned:true,closureIdentityQualified:false,nativeReceiversQualified:false})}));
         if(records.length===3){
           const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'?now.value!==retainedInitClass:now[key]!==d[key]))unavailable();
           define(ss,'initClass',d);restored=true;hold(root,'ss');
