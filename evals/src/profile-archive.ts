@@ -5,7 +5,7 @@ import { assertProfileClean, assertProfileSettled, profileHistory } from "./prof
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { EvalFailure } from "./fail"
 
-type Snapshot = { kind: "file" | "directory" | "link"; device: string; inode: string; uid: number; mode: number; size: string; hash: string }
+type Snapshot = { kind: "file" | "directory" | "link" | "socket"; device: string; inode: string; uid: number; mode: number; size: string; hash: string }
 type Manifest = { version: 1; kind: "profile-archive"; profile: string; archive: string;
   bindings: { directory: string; device: string; inode: string }[]; roots: { name: string; snapshot: Snapshot }[]; status: "intent" | "committed"; at: string; committedAt?: string }
 
@@ -119,8 +119,8 @@ function requireManifest(value: unknown, profile: string, archive: string, bindi
 
 async function capture(file: string): Promise<Snapshot> {
   const info = await lstat(file, { bigint: true })
-  const kind = info.isSymbolicLink() ? "link" : info.isDirectory() ? "directory" : info.isFile() ? "file" : undefined
-  if (!kind || info.uid !== BigInt(process.getuid!()) || kind === "file" && info.nlink !== 1n)
+  const kind = info.isSymbolicLink() ? "link" : info.isDirectory() ? "directory" : info.isFile() ? "file" : info.isSocket() ? "socket" : undefined
+  if (!kind || info.uid !== BigInt(process.getuid!()) || (kind === "file" || kind === "socket") && info.nlink !== 1n)
     throw Object.assign(new EvalFailure("ARCHIVE_TOPOLOGY", 2), { cause: { path: file, kind: kind ?? "other", type: Number(info.mode & 0o170000n),
       device: String(info.dev), inode: String(info.ino), uid: Number(info.uid), gid: Number(info.gid), mode: Number(info.mode), nlink: String(info.nlink) } })
   const hash = new Bun.CryptoHasher("sha256")
@@ -132,7 +132,8 @@ async function capture(file: string): Promise<Snapshot> {
 
 async function syncTree(file: string) {
   const info = await lstat(file)
-  if (info.isSymbolicLink()) return
+  // Socket objects have no file payload to fsync; their name is persisted with the containing directory.
+  if (info.isSymbolicLink() || info.isSocket()) return
   if (info.isDirectory()) await Promise.all((await readdir(file)).map(name => syncTree(path.join(file, name))))
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | (info.isDirectory() ? constants.O_DIRECTORY : 0))
   try { await handle.sync() } finally { await handle.close() }
