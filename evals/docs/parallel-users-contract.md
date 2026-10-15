@@ -1578,3 +1578,22 @@ native-cli-sessions-d31c525d-97b8-47e1-a742-2bffa28585b2/cli.json SHA256
 This is normal management composition under temporary research slot authority;
 production preparation, release, failed CLI/recovery lineage, active attempts
 and SessionBackup remain unqualified. Model/judge calls remain zero.
+
+### Configured status and no-op recover observations
+
+Actual installed status and recover with no pending recoveries now run through
+the same protected native fixture. Their private evidence retains whitelisted
+view state plus immutable result, continuous process and native snapshot source
+chains. No new user rows were observed during or after either command, and
+recordManagementSession refused ownership. Appending both commands preserved
+the earlier setup/check ledgers and subsequent exact targeted close.
+
+The product schema makes recoveries optional; an absent field denotes no
+pending entries. Observed starting/browser:unknown remains unchanged and grants
+no readiness. This qualifies metadata/no-op behavior only; pending recovery and
+failed CLI session ownership still need their own proofs.
+
+Native1 PASS/47 (69.85s), typecheck/diff PASS. Private600
+native-cli-sessions-1c1a6e34-8600-4dbb-a3d2-0078e9044f9c/cli.json SHA256
+5f8fdbeef7a76e078a1bc305d287c1551e6ba0cc8d0d3fa6f6595b0302883619,
+with readonly.json;295 source/close/cleanup audit checks, own pair/root absent.

@@ -98,6 +98,30 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
             return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
           })) })
       }
+      const readonly = []
+      for (const operation of ["status", "recover"] as const) {
+        settlement.cli = false
+        const result = await management(command, ["loginom", operation, "--format", "json"], undefined, 60_000)
+        settlement.cli = result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete
+        expect([result.stdout, result.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
+        expect({ code: result.exitCode, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+        const view = JSON.parse(result.stdout)
+        expect(view).toMatchObject({ username: credentials.username, url, hasApiKey: true })
+        expect(view.recoveries ?? []).toEqual([])
+        const inventory = await readManagementProcessInventory({ file: inventoryFile, journal, commandId: "native-cli-sessions", identity: pair.identity,
+          leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
+        const current = inventory.processes.at(-1)!, snapshots = current.sessions!
+        expect(current.result?.stdoutSha256).toBe(new Bun.CryptoHasher("sha256").update(result.stdout).digest("hex"))
+        expect([...snapshots.during, snapshots.after].flatMap(snapshot => snapshot.sessions.filter(row => row.name.startsWith(credentials.username + ":") &&
+          !snapshots.before.sessions.some(previous => previous.objectId === row.objectId)))).toEqual([])
+        await expect(recordManagementSession(file, lease, secretFile, inventoryFile, current.owner.id)).rejects.toThrow("MANAGEMENT_SESSION_UNCONFIRMED")
+        readonly.push({ operation, view: { state: view.state, browser: view.browser, generation: view.generation }, inventory, manifest: await readLeaseReceipt(inventoryFile), resultReceipt: await readLeaseReceipt(current.result!.source.path),
+          processes: result.processCleanup, sources: await Promise.all([snapshots.before, ...snapshots.during, snapshots.after].map(async snapshot => {
+            const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
+            return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
+          })) })
+      }
+      await writeLeaseReceipt(path.join(evidence, "readonly.json"), { identity: pair.identity, observations: readonly })
       await writeLeaseReceipt(path.join(evidence, "cli.json"), { identity: pair.identity, captures, liveQualified: false })
       for (const capture of captures) {
         expect(await readManagementSession(file, lease, secretFile, capture.session.id)).toEqual(capture.session)
