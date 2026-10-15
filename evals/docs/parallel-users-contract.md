@@ -2335,3 +2335,33 @@ PASS35.79s, typecheck/diff PASS. Logs native-resource-census-{red,green}.log and
 native-census-reader-regression.log remain private. Frozen journal binding and
 mandatory coordinator consumption are the next step; this reader alone grants
 no complete resource, storage deletion, slot release or production readiness.
+
+freezeResourceManifest now requires canonical commandJournal within controller
+stateDir and persists command_journal with the existing before-window timing
+checks. Relative/outside/controller-root journal paths are invalid; older
+manifests missing the field do not qualify new frozen admission, and historical
+files remain unchanged. checkResourceEvidence requires a nativeCensus for every
+frozen manifest, returning RESOURCE_NATIVE_CENSUS_INCOMPLETE when absent. It
+derives all management proof windows plus every admin dispatch-to-exit window,
+and returns native_census_source/admin_process_sources; callers cannot omit
+individual origins from that closed census. The no-manifest declared-scope
+component path keeps its previous meaning.
+
+Actual RED lacked the frozen field and native gate; GREEN unit missing/foreign/
+hash/negative-codec/unsafe journal controls plus current full resource files
+19/303 PASS20.13s, typecheck/diff PASS. Native063235e0-ca81-4677-9705-2854a17fce09
+reconnect composition1/50 PASS134.93s confirms both management sources/admin
+connections, wrong producer/container generation refusal and coordinator source
+read-back. Its real host frames are after-only and its budget is data-only; the
+native census check passes while full resource admission remains incomplete
+(missing eval-agent census). This does not qualify resources during CLI work,
+actual runner thresholds/quotas or production readiness.
+
+Private native-resource-coordinator-audit.json148 conditions/21 source hashes
+uses public frozen-manifest/raw-resource readers and revalidates exact pair/root
+absence, archive/targeted closure/admin proofs and all native process refs;
+read-back SHAef6fa649d17fc10d0d70390fa401507149f7777b5f4ff9e58cb2a8a172f5afb5,
+terminal SHA086d5028ffd8472adf6bdcde5474fee2a476f58170372dc63632d4e850ac24fb.
+SLOTS_ADMISSION_UNAVAILABLE/live model+judge calls0 remain. Full controller
+binding/before-during-after measurements/all runtime actors and actual budgets
+still precede live parallelism acceptance.

@@ -41,9 +41,9 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
   const manifestBudget = await freezeResourceBudget({ out: path.join(root, "manifest-budget.json"), runId: "full-lifetime",
     bounds: resourceBudgetFixture([fixture.slots.controller.stateDir, ...fixture.slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]), fixture.slots.judge.codexHome], containers) })
   while (Date.now() <= Date.parse(manifestBudget.budget.fixed_at)) await Bun.sleep(1)
-  const manifests = await Promise.all([1, 2].map(parallel => freezeResourceManifest({ judgeEnabled: true, out: path.join(root, `manifest-${parallel}.json`),
+  const manifests = await Promise.all([1, 2].map(parallel => freezeResourceManifest({ judgeEnabled: true, commandJournal: path.join(fixture.slots.controller.stateDir, "command.json"), out: path.join(root, `manifest-${parallel}.json`),
     runId: "full-lifetime", slotsFile, parallel, containers, view, budget: manifestBudget.source })))
-  const skippedManifest = await freezeResourceManifest({ judgeEnabled: false, out: path.join(root, "manifest-skipped.json"),
+  const skippedManifest = await freezeResourceManifest({ judgeEnabled: false, commandJournal: path.join(fixture.slots.controller.stateDir, "command.json"), out: path.join(root, "manifest-skipped.json"),
     runId: "full-lifetime", slotsFile, parallel: 1, containers, view, budget: manifestBudget.source })
   const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "full-lifetime", phase: "run",
     signal: abort.signal, processes: sampleSupervisedResources })

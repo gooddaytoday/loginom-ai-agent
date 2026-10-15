@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { mkdir, mkdtemp, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
+import { createPair, destroyPair, pairImages, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { loadConfig } from "../src/config"
 import { agentCommand } from "../src/cli"
 import { loadTasks } from "../src/task"
@@ -387,17 +387,60 @@ for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected
             command: await readLeaseReceipt(closed.close.path) }
         })) })
         if (mode === "reconnected-finalizer") {
-          const { readResourceNativeCensus } = await import("../src/parallel-resource-evidence")
-          const census = await readResourceNativeCensus({ manifest: { state_dir: file.controller.stateDir, run_id: "native-cli-sessions",
-            command_journal: journal, slots: [lease.slot], coverage: { containers: [
-              { role: "server", id: pair.identity.containerId, startedAt: pair.identity.startedAt },
-              { role: "studio", id: pair.identity.studioContainerId, startedAt: pair.identity.studioStartedAt },
-            ] } }, source: { file: finalized.source.path, sha256: finalized.source.sha256, producerPid: process.pid } })
+          const { readResourceNativeCensus, readResourceProcessWindows, freezeResourceBudget, freezeResourceManifest, writeResourceSummary } = await import("../src/parallel-resource-evidence")
+          const { collectHostResources, sampleHostResources } = await import("../src/parallel-resources")
+          const { checkResourceEvidence } = await import("../src/parallel-acceptance")
+          const { resourceBudgetFixture } = await import("./helpers/resource-budget-fixture")
+          const containers = (["server", "studio"] as const).map(role => ({ role, image: pairImages[role], nonce: pair.nonce, purpose: "research",
+            id: role === "server" ? pair.identity.containerId : pair.identity.studioContainerId,
+            startedAt: role === "server" ? pair.identity.startedAt : pair.identity.studioStartedAt,
+            name: file.server[role === "server" ? "container" : "studioContainer"] }))
+          const request = { manifest: { state_dir: file.controller.stateDir, run_id: "native-cli-sessions", command_journal: journal,
+            slots: [lease.slot], coverage: { containers } }, source: { file: finalized.source.path, sha256: finalized.source.sha256, producerPid: process.pid } }
+          const census = await readResourceNativeCensus(request)
           expect(census.proofs.map(proof => proof.sha256)).toEqual(inventory.processes.map(process => process.source.sha256))
           expect(census.adminWindows).toHaveLength(2)
           expect(census.adminSources).toHaveLength(2)
           expect(census.adminWindows.every(window => window.kind === "admin" && window.producerPid === process.pid)).toBe(true)
           await writeLeaseReceipt(path.join(evidence, "native-resource-census.json"), census)
+          await expect(readResourceNativeCensus({ ...request, source: { ...request.source, producerPid: process.pid + 1 } }))
+            .rejects.toThrow("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED")
+          await expect(readResourceNativeCensus({ ...request, manifest: { ...request.manifest, coverage: {
+            containers: containers.map(container => ({ ...container, startedAt: "2026-10-14T00:00:00.000Z" })) } } }))
+            .rejects.toThrow("RESOURCE_NATIVE_CENSUS_UNCONFIRMED")
+          const slotsFile = path.join(evidence, "resource-slots.json"), paths = [file.controller.stateDir, lease.slot.profileDir, lease.slot.workspaceRoot, lease.slot.historyDir]
+          await writeLeaseReceipt(slotsFile, file)
+          const budget = await freezeResourceBudget({ out: path.join(evidence, "resource-budget.json"), runId: "native-cli-sessions",
+            bounds: resourceBudgetFixture(paths, containers) })
+          while (Date.now() <= Date.parse(budget.budget.fixed_at)) await Bun.sleep(1)
+          const view = (await sampleHostResources(paths)).collector_cgroup.view
+          if (!view) throw Error("RESOURCE_VIEW_UNAVAILABLE")
+          const frozen = await freezeResourceManifest({ out: path.join(evidence, "resource-manifest.json"), slotsFile, parallel: 1, runId: "native-cli-sessions",
+            judgeEnabled: false, commandJournal: journal, containers, view, budget: budget.source })
+          while (Date.now() <= Date.parse(frozen.manifest.fixed_at)) await Bun.sleep(1)
+          const samplesFile = path.join(evidence, "resource-samples.jsonl"), samplingAbort = new AbortController()
+          const collecting = collectHostResources({ paths, out: samplesFile, intervalMs: 1000, runId: "native-cli-sessions", phase: "run", signal: samplingAbort.signal })
+          try {
+            const deadline = Date.now() + 5000
+            while (!await Bun.file(samplesFile).exists() || (await Bun.file(samplesFile).text()).trim().split("\n").length < 2) {
+              if (Date.now() > deadline) throw Error("RESOURCE_FRAMES_UNAVAILABLE")
+              await Bun.sleep(10)
+            }
+          } finally { samplingAbort.abort(); await collecting }
+          const frames = (await Bun.file(samplesFile).text()).trim().split("\n").map(line => JSON.parse(line))
+          const summary = path.join(evidence, "resource-summary.json")
+          await writeResourceSummary({ samplesFile, out: summary })
+          const windows = [...await readResourceProcessWindows(census.proofs), ...census.adminWindows]
+          const result = await checkResourceEvidence({ file: summary, samplesFile, runId: "native-cli-sessions", startedAt: frames[0].host.observed_at,
+            finishedAt: frames.at(-1).host.observed_at, coverage: { paths: [], containers: [], owners: windows }, processWindows: [],
+            view, budget: budget.source, manifest: frozen.source, nativeCensus: census.source })
+          expect(result.checks.nativeCensus).toEqual({ status: "passed", codes: [] })
+          expect(result.native_census_source).toEqual(census.source)
+          expect(result.admin_process_sources).toEqual(census.adminSources)
+          expect(result.process_sources).toEqual(census.proofs)
+          // These after-only host frames exercise source composition, without claiming full run resource coverage.
+          expect(result.status).not.toBe("passed")
+          await writeLeaseReceipt(path.join(evidence, "native-resource-coordinator.json"), { completeRunCoverage: false, dataOnlyBudget: true, frozen, result })
         }
         return
       }
