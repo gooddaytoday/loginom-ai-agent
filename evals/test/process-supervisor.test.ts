@@ -5,8 +5,22 @@ import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
+import { signalProcess, superviseProcess, confirmProcessNamespace, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
+
+test("namespace evidence requires the exact live process birth and kernel namespace", async () => {
+  const pid = process.pid
+  const raw = await readFile(`/proc/${pid}/stat`, "utf8")
+  const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+  const executable = await readlink(`/proc/${pid}/exe`)
+  const info = await stat(`/proc/${pid}/exe`)
+  const scope = await stat(`/proc/${pid}/ns/pid`)
+  const identity: ProcessIdentity = { pid, starttime: fields[19]!, uid: process.getuid!(), parent: Number(fields[1]),
+    group: Number(fields[2]), session: Number(fields[3]), executable, device: info.dev, inode: info.ino }
+  await expect(confirmProcessNamespace(identity, { device: scope.dev, inode: scope.ino })).resolves.toMatchObject({ pid, starttime: identity.starttime })
+  await expect(confirmProcessNamespace({ ...identity, starttime: "different" }, { device: scope.dev, inode: scope.ino })).resolves.toBeUndefined()
+  await expect(confirmProcessNamespace(identity, { device: scope.dev, inode: scope.ino + 1 })).resolves.toBeUndefined()
+})
 
 test("supervisor retains the live launcher until the terminated CLI exit receipt is observed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-exit-receipt-"))

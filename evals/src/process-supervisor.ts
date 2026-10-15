@@ -9,10 +9,11 @@ export type ProcessIdentity = {
   executable: string; device: number; inode: number
 }
 type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string }
-type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper"; parent?: string; observed_at: string }
+type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper" | "namespace"; parent?: string; observed_at: string }
 type ProcessEntry = {
   process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
   binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean; foreign?: boolean
+  namespace?: { device: number; inode: number; observed_at: string }
 }
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type RegistrationIdentity = { device: number; inode: number; uid: number; mode: number; bytes: string; mtimeNs: string; ctimeNs: string }
@@ -31,6 +32,8 @@ export type ProcessCleanup = {
   selectedCli?: { executable: string; device: number; inode: number }
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
+  sandboxNamespace?: { device: number; inode: number; owner: ProcessIdentity }
+  namespaceMembers?: { pid: number; starttime: string; device: number; inode: number; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
 }
 
@@ -159,6 +162,16 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
 async function snapshot(owners: ProcessIdentity[] = []) {
   return (await Promise.all((await readdir("/proc")).filter((name) => /^\d+$/.test(name))
     .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
+}
+
+/** Kernel membership is birth-bound evidence, independent of a transient parent chain. */
+export async function confirmProcessNamespace(saved: ProcessIdentity, scope: { device: number; inode: number }) {
+  const before = await processView(saved.pid)
+  if (!before || !sameIdentity(before, saved)) return undefined
+  const namespace = await stat(`/proc/${saved.pid}/ns/pid`).catch(error => { if (gone(error)) return undefined; throw error })
+  const after = await processView(saved.pid)
+  if (!namespace || !after || !sameIdentity(after, saved) || namespace.dev !== scope.device || namespace.ino !== scope.inode) return undefined
+  return { pid: saved.pid, starttime: saved.starttime, device: namespace.dev, inode: namespace.ino, observed_at: new Date().toISOString() }
 }
 
 /** Inspect only the canonical, private sibling registration; never follow aliases. */
@@ -528,6 +541,15 @@ export async function superviseProcess(input: {
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
     if (browser) {
+      if (input.sandbox && !cleanup.sandboxNamespace) {
+        const reaper = live.find(entry => entry.pid === namespacePid && isWrapper(entry) && ledger.get(key(entry))?.origin)
+        if (reaper) {
+          const scope = await stat(`/proc/${reaper.pid}/ns/pid`).catch(error => { if (gone(error)) return undefined; throw error })
+          const outer = await stat("/proc/self/ns/pid")
+          if (scope && (scope.dev !== outer.dev || scope.ino !== outer.ino))
+            cleanup.sandboxNamespace = { device: scope.dev, inode: scope.ino, owner: identity(reaper) }
+        }
+      }
       // Chromium rewrites argv into one space-separated process title. Read
       // its explicit flags in both observed forms; keep the same identity gates.
       const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16) ??
@@ -567,6 +589,19 @@ export async function superviseProcess(input: {
         const knownType = type && ["zygote", "gpu-process", "utility", "renderer", "broker", ...(browser.fake ? ["parent", "helper"] : [])].includes(type)
         const knownExecutable = browser.helpers.some((helper) => current.device === helper.device && current.inode === helper.inode)
         if (!entry.origin) {
+          // Chromium may exit between separate /proc reads, losing a short-lived
+          // child's parent observation. Admit only declared browser executables
+          // inside the private, observed bwrap PID namespace with an existing root binding.
+          if (cleanup.sandboxNamespace && (mainExecutable || knownExecutable) &&
+            [...ledger.values()].some(candidate => candidate.binding && candidate.origin)) {
+            const member = await confirmProcessNamespace(entry.process, cleanup.sandboxNamespace)
+            if (member) {
+              track(current, "namespace")
+              entry.namespace = member
+            }
+          }
+        }
+        if (!entry.origin) {
           const parent = live.find((candidate) => candidate.pid === current.parent)
           const parentData = parent ? dataDir(parent) : undefined
           entry.foreign ||= Boolean(data && !inside(data, profile!) || parentData && !inside(parentData, profile!))
@@ -587,7 +622,7 @@ export async function superviseProcess(input: {
           entry.admission = "allowed"
           continue
         }
-        entry.helper ||= Boolean(knownExecutable || knownType || mainExecutable && browserAncestor(entry))
+        entry.helper ||= Boolean(knownExecutable || knownType || mainExecutable && (browserAncestor(entry) || entry.namespace))
         entry.admission = entry.binding || entry.helper && [...ledger.values()].some((candidate) => candidate.binding && candidate.origin)
           ? "allowed" : "pending"
       }
@@ -607,6 +642,7 @@ export async function superviseProcess(input: {
       return { pid: entry.process.pid, starttime: entry.process.starttime, via: entry.origin!.via,
         parent_pid: parent?.pid ?? null, parent_starttime: parent?.starttime ?? null, observed_at: entry.origin!.observed_at }
     })
+    cleanup.namespaceMembers = owned.filter(entry => entry.namespace).map(entry => ({ pid: entry.process.pid, starttime: entry.process.starttime, ...entry.namespace! }))
     lastOwn = live.filter((entry) => ledger.get(key(entry))?.origin).map(identity)
     return lastOwn
   }
