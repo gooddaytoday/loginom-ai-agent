@@ -7,7 +7,7 @@ import { loadConfig } from "../src/config"
 import { agentCommand } from "../src/cli"
 import { loadTasks } from "../src/task"
 import { afterAttempt, runAttempt } from "../src/run"
-import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt } from "../src/lease"
 import { storageCodecFixture } from "./helpers/storage-codec-fixture"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
@@ -16,6 +16,88 @@ import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
 import { openLoginomAdmin } from "../src/loginom-admin"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
+
+test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("server fence after last slot: SIGKILL recovery preserves released user and profile reservations", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-recover-tail-")), fixture = await parallelFixture(root)
+  const name = `evals-tail-${crypto.randomUUID().slice(0, 8)}`
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${listener.port}/app/`
+  listener.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: globalLockRoot }
+  const pair = await createPair(file, options)
+  const slotsFile = path.join(root, "slots.json"), journal = path.join(file.controller.stateDir, "prepare-command.json")
+  const inventory = path.join(file.controller.stateDir, "processes-original.json")
+  await writeLeaseReceipt(slotsFile, file)
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "tail-fence", identity: pair.identity,
+    slotIds: ["a"], phase: "unactivated", processInventory: inventory })
+  await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "tail-fence", journal, identity: pair.identity, connections: [] })
+  const child = Bun.spawn([process.execPath, "-e", `const {mkdir,rmdir}=await import("node:fs/promises");
+    const {acquireEnvironmentLeases,loadSlots}=await import("./src/slots");const {openLoginomAdmin}=await import("./src/loginom-admin");
+    const {stageUserPreparation}=await import("./src/user-environment");const {prepareUserStorage}=await import("./src/parallel-pair");
+    const {finalizeUnactivatedEnvironment}=await import("./src/environment-finalization");
+    const file=await loadSlots(process.argv[1],1),identity=JSON.parse(process.argv[2]),journal=process.argv[3];
+    const environment=await acquireEnvironmentLeases(file,1,identity,journal),lease=environment.slots[0];
+    const admin=await openLoginomAdmin(file,identity,{serverLease:environment.server,processInventory:process.argv[4]});
+    const prepared=await stageUserPreparation(file,lease,"e".repeat(64));
+    await admin.reconcileUser(lease,prepared.secretFile);await prepareUserStorage(file,lease,prepared.secretFile,environment.server);
+    await Bun.write(lease.slot.profileDir+"/data/tail-history","preserve-tail-history");
+    await mkdir(journal+".server-finalization.json");
+    try{await finalizeUnactivatedEnvironment(file,environment,admin);throw Error("fault not reached")}
+    catch(error){if(error.code!=="EISDIR")throw error}
+    await rmdir(journal+".server-finalization.json");
+    if((await Bun.file(lease.receipt).json()).state!=="released"||(await Bun.file(environment.server.receipt).json()).state!=="retained")throw Error("wrong crash boundary");
+    await Bun.write(Bun.stdout,lease.receipt+"\\n");process.kill(process.pid,"SIGKILL");`,
+    slotsFile, JSON.stringify(pair.identity), journal, inventory], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
+      env: { PATH: process.env.PATH ?? "", HOME: root, EVAL_CLI_BIN: process.env.EVAL_CLI_BIN! } })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect({ code, stderr }).toEqual({ code: 137, stderr: "" })
+  const incident = stdout.trim(), originalSlot = await readLeaseReceipt(incident) as { resources: { receipt: string }[] }
+  const before = await Promise.all(originalSlot.resources.map(resource => Bun.file(resource.receipt).text()))
+  const originalServer = await readResourceReservation({ key: `server:${pair.identity.containerId}` })
+  expect(originalServer).toMatchObject({ state: "retained", owner: { pid: child.pid } })
+  const adminDirectories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-"))
+  const fromCLI = async (out: string) => {
+    const command = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "recover", "--config", slotsFile,
+      "--incident", journal, "--out", out], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
+      env: { PATH: process.env.PATH ?? "", HOME: root, EVAL_CLI_BIN: "/unreadable-runtime" } })
+    const [code, stdout, stderr] = await Promise.all([command.exited, new Response(command.stdout).text(), new Response(command.stderr).text()])
+    return { pid: command.pid, code, stdout, stderr }
+  }
+  const completed = { released: false }
+  try {
+    const connection = path.join(file.controller.stateDir, adminDirectories[0]!, "connection.json")
+    const bytes = await Bun.file(connection).text(), receipt = JSON.parse(bytes)
+    await writeLeaseReceipt(connection, { ...receipt, processes: { ...receipt.processes, capture_complete: false } })
+    try {
+      const refused = await fromCLI(path.join(root, "refused-recovery"))
+      expect({ code: refused.code, stdout: refused.stdout, stderr: refused.stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "ADMIN_FINALIZATION_UNCONFIRMED" })
+      expect(await readResourceReservation({ key: `server:${pair.identity.containerId}` })).toMatchObject({ state: "recovery-only",
+        revision: originalServer!.revision + 1, owner: { pid: refused.pid } })
+      expect(await Promise.all(originalSlot.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+    } finally { await writeLeaseReceipt(connection, JSON.parse(bytes)) }
+    const retainedAfterRefusal = await readResourceReservation({ key: `server:${pair.identity.containerId}` })
+    const command = await fromCLI(path.join(root, "recovery-output"))
+    expect({ code: command.code, stderr: command.stderr, output: command.code ? command.stdout : "" }).toEqual({ code: 0, stderr: "", output: "" })
+    const result = JSON.parse(command.stdout) as Awaited<ReturnType<typeof recoverUnactivatedPreparation>>
+    completed.released = result.status === "released"
+    expect(await Promise.all(originalSlot.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+    expect((await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-"))).toEqual(adminDirectories)
+    expect(await readResourceReservation({ key: `server:${pair.identity.containerId}` })).toMatchObject({ state: "released", revision: originalServer!.revision + 2,
+      lineage: [{ journal, owner: { pid: child.pid } }, { journal: retainedAfterRefusal!.journal, owner: retainedAfterRefusal!.owner }] })
+    const cleanup = await readLeaseReceipt(result.finalization.slots[0]!.cleanup.path) as { profileArchive: { archive: string } }
+    expect(await Bun.file(path.join(cleanup.profileArchive.archive, "data/tail-history")).text()).toBe("preserve-tail-history")
+    const completion = await readLeaseReceipt(`${journal}.completion.json`) as { proofs: { path: string; sha256: string }[] }
+    const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-tail-${crypto.randomUUID()}`)
+    await mkdir(evidence, { mode: 0o700 })
+    await writeLeaseReceipt(path.join(evidence, "tail.json"), { version: 2, identity: pair.identity, child: { pid: child.pid, code: 137 }, originalServer, retainedAfterRefusal,
+      originalSlot, releasedResourceSnapshots: before.map(value => JSON.parse(value)), result, completion,
+      sources: await Promise.all(completion.proofs.map(async source => ({ ...source, value: await readLeaseReceipt(source.path) }))), liveQualified: false })
+  } catch (error) { if (!completed.released) console.error(`tail recovery fixture retained: ${root}`); throw error }
+  finally { if (completed.released) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) } }
+}, 120_000)
 
 test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("preparation recovery: native blocked account releases after its controller exits", async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
