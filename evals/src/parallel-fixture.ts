@@ -12,6 +12,7 @@ import { assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter } from "
 import type { ProcessCleanup } from "./process-supervisor"
 import type { AttemptResult } from "./report"
 import { acquireSlotLease, parseSlots, type SlotFile, type SlotLease } from "./slots"
+import { readJudgeProcessInventory } from "./judge-process-evidence"
 
 export type ParallelFixture = { slots: SlotFile; lockRoot: string }
 
@@ -54,8 +55,12 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
     { version: 2, commandId: runId, liveQualified: false, identity })
   const judgeLease = config.skipJudge ? undefined : await acquireJudgeLease({ codexHome: file.judge.codexHome,
     journal: path.join(file.controller.stateDir, "run-journal.json"), commandId: runId, lockRoot: input.lockRoot })
+  const judgeEvidence = judgeLease ? { file: path.join(file.controller.stateDir, "judge-processes.json"),
+    commandId: runId, assertHeld: judgeLease.assertHeld } : undefined
   const leases: SlotLease[] = []
   try {
+    if (judgeEvidence) await writeLeaseReceipt(judgeEvidence.file,
+      { version: 2, kind: "offline-judge-processes", commandId: runId, processes: [] })
     for (const slot of input.file.slots.slice(0, config.parallel))
       leases.push(await acquireSlotLease(file, slot, identity, input.lockRoot))
     const contexts = []
@@ -84,7 +89,7 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
         path.join(file.controller.stateDir, `${runId}-${slot.id}-initial.archive.json`))
       const cleanup = path.join(file.controller.stateDir, `slot-${slot.id}.cleanup.json`)
       await writeLeaseReceipt(cleanup, fixtureCleanup(lease, receipt.archive))
-      contexts.push({ config: own, command, lease, cleanup, controllerDir: file.controller.stateDir, judgeLease,
+      contexts.push({ config: own, command, lease, cleanup, controllerDir: file.controller.stateDir, judgeLease, judgeEvidence,
         storage: { path: storage, device: storageInfo.dev, inode: storageInfo.ino } })
     }
     return contexts
@@ -104,19 +109,10 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
 export async function finishFixtureJudge(context: Awaited<ReturnType<typeof prepareFixture>>[number], runDir: string) {
   if (!context.judgeLease) return
   try {
-    const proofs = await Promise.all((await Array.fromAsync(new Bun.Glob("*/*/judge-processes-[12]").scan({ cwd: runDir, absolute: true, onlyFiles: false, dot: true })))
-      .map(async directory => {
-        const root = await lstat(directory)
-        const file = path.join(directory, "process-cleanup.json")
-        const info = await lstat(file)
-        const bytes = await Bun.file(file).bytes()
-        const proof = JSON.parse(new TextDecoder().decode(bytes)) as ProcessCleanup
-        if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
-          !info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.nlink !== 1 ||
-          proof.status !== "confirmed" || proof.capture_complete !== true)
-          throw Error("Judge process cleanup unconfirmed")
-        return { path: file, sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") }
-      }))
+    await context.judgeLease.assertHeld()
+    const inventory = await readJudgeProcessInventory({ file: path.join(context.controllerDir, "judge-processes.json"),
+      commandId: path.basename(runDir), producerPid: process.pid })
+    const proofs = inventory.processes.map(process => process.source)
     const receipt = path.join(context.controllerDir, "judge-release.json")
     await writeLeaseReceipt(receipt, { version: 2, status: "confirmed", liveQualified: false, key: context.judgeLease.reservation.key,
       token: context.judgeLease.reservation.token, revision: context.judgeLease.reservation.revision, judgeProcesses: "confirmed", proofs })

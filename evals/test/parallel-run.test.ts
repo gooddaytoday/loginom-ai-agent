@@ -9,6 +9,7 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
 import { readResourceProcessWindows } from "../src/parallel-resource-evidence"
 import { readAgentProcessInventory } from "../src/agent-process-evidence"
+import { readJudgeProcessInventory } from "../src/judge-process-evidence"
 
 
 
@@ -315,6 +316,31 @@ test("fixture main: shared judge home conflicts across servers before any agent 
     expect(next.code).toBe(0)
   } finally { await pending; await rm(root, { recursive: true, force: true }) }
 }, 40_000)
+
+test("fixture main: judge version and execution are both registered before home release", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-inventory-"))
+  let confirmed = false
+  try {
+    const input = await parallelFixture(root, ["parallel-fast"], true)
+    const run = await main(["--tasks", path.join(root, "tasks")], { ...input.env,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" },
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    confirmed = run.code === 0
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    const directory = path.join(input.slots.controller.stateDir, summary.run_id)
+    const inventory = await readJudgeProcessInventory({ file: path.join(directory, "judge-processes.json"),
+      commandId: summary.run_id, producerPid: process.pid })
+    expect(inventory.processes).toHaveLength(2)
+    expect(new Set(inventory.processes.map(process => `${process.launcher.pid}:${process.launcher.starttime}`)).size).toBe(2)
+    expect(await Bun.file(path.join(path.dirname(inventory.processes[0]!.source.path), "events.jsonl")).text()).toBe("fake-codex 0.0.0\n")
+    const cleanup = await Bun.file(path.join(directory, "judge-release.json")).json()
+    expect(cleanup.proofs).toEqual(inventory.processes.map(process => process.source))
+    const attemptProof = await Bun.file(path.join(run.runDir!, "parallel-fast/1/judge-processes-1/process-cleanup.json")).json()
+    expect(inventory.processes[1]!.source.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(attemptProof)).digest("hex"))
+    expect(inventory.processes[1]!.source.path).not.toBe(path.join(run.runDir!, "parallel-fast/1/judge-processes-1/process-cleanup.json"))
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 60000)
 
 test("fixture main: occupied judge home prevents even the version process", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-version-lease-"))
