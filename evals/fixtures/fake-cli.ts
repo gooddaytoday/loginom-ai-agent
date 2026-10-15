@@ -202,6 +202,13 @@ const id = infraRetry ? launch === 1 ? "host-timeout" : retryOutcomes[process.en
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
 process.stdout.write(await chosen.text())
+if (command === "run" && process.env.EVAL_FAKE_STATE_FILE) {
+  const state = await Bun.file(process.env.EVAL_FAKE_STATE_FILE).json() as { outputCanary?: string }
+  if (state.outputCanary) {
+    console.log(JSON.stringify({ type: "text", part: { text: state.outputCanary } }))
+    process.stderr.write(state.outputCanary)
+  }
+}
 if (packageFixture) {
   const packagePath = Bun.argv.at(-1)?.match(/Сохрани готовый пакет как `([^`]+)`/)?.[1]
   if (!packagePath || !process.env.EVAL_FAKE_SLOT_STORAGE) throw Error("Fixture package destination required")

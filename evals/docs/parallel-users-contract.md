@@ -323,6 +323,15 @@ audit SHA cf6d0929aff36faa062308901fb562e02c6563df3b32905dcac978b6b20ef0d0
 содержит первоначальный 109 PASS/1 FAIL и 3 stable воспроизведения; полный package
 regression и native admission этим не подтверждены.
 
+Fixture output policy (2026-10-15): каждый active slot command получает configured
+Loginom/Dock/provider `cleanupSecrets`, включая diagnostic archive path. Public
+main N=2 RED раскрыл raw stderr; итоговый GREEN1/8 (17.46s) проверил оба закрытых
+слота и все run files. Canary inputs остаются в private fake controller state,
+в task inputs не добавляются; admin/inactive credentials не читаются. Native
+active/admin collection остаётся открытым. Node wrapper help, strict parser и
+programmatic --parallel уже реализованы и подтверждены8 node-runner cases внутри
+composed87-test набора; source реализации не менялся при этой сверке.
+
 Новые eval-прогоны: агент `openai/gpt-6-luna/high`, судья `gpt-6-sol/xhigh`.
 Приёмка на lg-pc-75: новая acceptance pair и отдельная research pair, затем
 немодельные ACL/crash/cleanup/supervisor/backup gates, полный LLM N=2 → N=1
