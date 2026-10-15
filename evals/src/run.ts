@@ -10,6 +10,7 @@ import { checkIsolatedLoginom, gitInfo, preflight, type SlotStorageContext } fro
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { createJudgeGate, judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
+import { redactKnownSecrets } from "./output-redaction"
 import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
@@ -549,7 +550,7 @@ export const stamp = (date: Date) =>
   date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "").replace("T", "-")
 
 export function redact(config: EvalConfig) {
-  return {
+  return redactKnownSecrets({
     ...config,
     loginom: { ...config.loginom, password: config.loginom.password ? "<set>" : "<unset>" },
     dock: { ...config.dock, apiKey: config.dock.apiKey ? "<set>" : "<unset>" },
@@ -557,7 +558,7 @@ export function redact(config: EvalConfig) {
     judge: { ...config.judge, processEvidence: undefined, env: config.judge.env && Object.fromEntries(
       Object.entries(config.judge.env).map(([key, value]) => [key, value ? "<set>" : "<unset>"]),
     ) },
-  }
+  }, [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
 }
 
 export const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))

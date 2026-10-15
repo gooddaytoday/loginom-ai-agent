@@ -211,6 +211,27 @@ test("main --dry-run --only: подмножество задач", async () => {
   }
 }, 30_000)
 
+test("redact masks known credentials repeated in other snapshot fields without changing runtime config", () => {
+  const config = loadConfig(["--skip-judge"], {
+    LOGINOM_PASSWORD: "loginom-private-canary",
+    LOGINOM_URL: "https://loginom.test/?key=provider-private-canary",
+    LOGINOM_DOCK_API_KEY: "dock-private-canary/Ω",
+    LOGINOM_DOCK_BASE_URL: "https://dock.test/?key=loginom-private-canary",
+    EVAL_AGENT_MODEL: "fake/fake-model",
+    EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: `https://provider.test/?key=${encodeURIComponent("dock-private-canary/Ω")}`,
+    EVAL_AGENT_PROVIDER_API_KEY: "provider-private-canary", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+  })
+  const original = JSON.stringify(config)
+  const snapshot = JSON.stringify(redact(config))
+  for (const secret of [config.loginom.password, config.dock.apiKey, config.agent.provider!.apiKey]) {
+    expect(snapshot).not.toContain(secret)
+    expect(snapshot).not.toContain(encodeURIComponent(secret))
+  }
+  expect(JSON.stringify(config)).toBe(original)
+  expect(redact(config)).toMatchObject({ parallel: 1, loginom: { password: "<set>" }, dock: { apiKey: "<set>" },
+    agent: { provider: { apiKey: "<set>" } } })
+})
+
 test("redact: password, dock.apiKey и provider.apiKey не попадают в JSON", () => {
   const loaded = loadConfig([], {
     LOGINOM_DOCK_API_KEY: "dock-env",
