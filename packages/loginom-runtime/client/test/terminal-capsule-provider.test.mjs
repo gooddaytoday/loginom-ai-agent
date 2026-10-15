@@ -8,8 +8,10 @@ const lib=process.env.TERMINAL_PACKET_ROOT?new URL('file://'+process.env.TERMINA
 const witness=await import(new URL('terminal-script-witness.mjs',lib)),packet=await import(new URL('terminal-original-packet.mjs',lib));
 const text=await readFile(new URL('terminal-script-load.test.mjs',import.meta.url),'utf8'),ast=parse(text,{ecmaVersion:'latest',sourceType:'module'}),node=ast.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='scripts');
 const scripts=runInThisContext('('+text.slice(node.start,node.end)+')');
-async function control(fn,instrument=false){const realm=await setup(60000,'retain-only');try{
- const s=scripts(),f=await fresh({realm,scriptContext:s});
+async function control(fn,instrument=false,realCompletion=false){const realm=await setup(60000,'retain-only');try{
+ let originalCompletion;
+ if(realCompletion){const c=realm.page.context;runInContext('window=globalThis',c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/mscorlib.js','utf8'),c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/Task.js','utf8'),c);originalCompletion=c.ss.TaskCompletionSource}
+ const s=scripts(),f=await fresh({realm,scriptContext:s,originalCompletion});
  for(const kind of ['ObjectProxy','FileStorage','StreamPersist']){s.select(kind==='ObjectProxy'?'bg/js/rpc.js':'bg/js/bg.rtl.rpc.js');const ctor=f.constructors[kind];f.ss.initClass(ctor,f.asm,ctor.prototype)}
  f.receiver.FUsername='test-account';f.c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection=f.receiver;
  const probe={tasks:[],requests:[],readers:0,resolvers:0,continuations:0,releases:0};
@@ -366,3 +368,36 @@ test('storage continuation direct realm rejects copied packet, order and arbitra
  assert.throws(()=>x.provider.readStoragePacket(packet,'SaveToStream'),/METHOD/);
  assert.deepEqual(x.realm.native.calls,[0]);
 },{originalSdk:true,invokeSdk:true}));
+
+test('completion source retains actual original source/task and original success value, no query replay',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();const result=await b.query(),lower=b.inspect().lower;
+ assert.equal(lower.completionSourceCustodyVerified,true);assert.equal(lower.completionSource.task,lower.sourceTask);assert.equal(lower.sourceTask,b.inspect().task);
+ assert.equal(lower.sourceSettled,true);assert.equal(lower.sourceMethod,'setResult');assert.equal(lower.sourceValue,result);
+ assert.equal(Object.hasOwn(lower.completionSource,'setResult'),true);assert.equal(b.query(),b.inspect().work);assert.deepEqual(x.realm.native.calls,[0]);
+}));
+for(const target of ['task','setResult','setException','source prototype','task prototype','constructor prototype'])test('completion source pending '+target+' refuses getter0 without original settlement',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower;let gets=0,completed=false;
+ r.sourceTask.continueWith(()=>{completed=true});
+ if(target==='source prototype')Object.setPrototypeOf(r.completionSource,{});
+ else if(target==='task prototype')Object.setPrototypeOf(r.sourceTask,{});
+ else if(target==='constructor prototype')Object.setPrototypeOf(x.f.ss.TaskCompletionSource,{});
+ else Object.defineProperty(r.completionSource,target,{get(){gets++;throw Error('foreign source')},configurable:true});
+ const rejection=assert.rejects(work,/CHANGED|UNAVAILABLE/);await x.realm.native.drain();await rejection;await x.f.settle();
+ assert.equal(gets,0);assert.equal(completed,false);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);assert.equal(b.query(),work);
+},true));
+
+test('completion source actual pinned mscorlib constructor and Task IIFE keep original same-realm source/task',()=>control(async x=>{
+ const constructor=x.f.ss.TaskCompletionSource,prototype=constructor.prototype,taskPrototype=x.f.ss.Task.prototype;
+ const b=x.provider.arm(x.request);await x.prepare();const support=await b.query(),lower=b.inspect().lower;
+ assert.equal(Object.getPrototypeOf(lower.completionSource),prototype);assert.equal(Object.getPrototypeOf(lower.sourceTask),taskPrototype);
+ assert.equal(lower.sourceTask,b.inspect().task);assert.equal(lower.sourceTask.status,5);assert.equal(lower.sourceValue,support);
+ assert.equal(lower.completionSourceCustodyVerified,true);assert.equal(x.f.ss.TaskCompletionSource,constructor);
+ assert.equal(Object.hasOwn(lower.completionSource,'setResult'),false);assert.equal(Object.hasOwn(lower.completionSource,'setException'),false);
+ assert.equal(lower.sourceTask.getAwaitedResult(),support);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},false,true));
+
+test('completion source foreign task and early settlement refuse without manufactured result',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),source=b.inspect().lower.completionSource;
+ assert.throws(()=>source.setResult({}),/COMPLETION_RESULT/);await assert.rejects(work,/COMPLETION_RESULT/);
+ assert.equal(b.query(),work);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+}));
