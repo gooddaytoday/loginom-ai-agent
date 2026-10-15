@@ -55,7 +55,16 @@ Read-only signal audit: PID4086419 отсутствует в own/peer/unknown/ad
 origin/browser-binding всех двух admin и четырёх CLI proofs; UID/starttime не
 сохранены, сейчас PID отсутствует. Exec/exit/zombie/владелец не атрибутированы.
 
-## Архив после фактически прерванного check: новый socket source установлен, native finalizer открыт
+## Архив после фактически прерванного check: текущий native gate закрыт, старые источники сохранены
+
+2026-10-15 свежий `native-cli-sessions-8196b708-d490-415e-b559-75f4e69547bf`
+после0961fe343d прошёл1/35 (116.68s): actual exit130/interrupted=true, sealed
+registry→committed archive→two targeted closes→fresh absence→admin closure.
+Private audit124/12/read-back SHA102495e2bb65a35411af0cb8cc9049206794bd73c9e3aecfd1f77ec613a3788f;
+terminal SHA968101397334a031aeb12097a4db9662082e5e0e323d9fbe6d726286210e3a25;
+собственная pair/root отсутствуют. Typecheck/diff PASS. Текущий gate реального
+interrupted archive/close квалифицирован. Storage deletion/release/admission
+по-прежнему запрещены; 47d... pair/root пока сохранены, их уборка отдельно.
 
 2026-10-15 strict control `native-cli-sessions-47d5228b-5be6-4590-95ec-5804d054ca9f`
 подтвердил exit130/interrupted=true/timedOut=false и continuous cleanup confirmed.

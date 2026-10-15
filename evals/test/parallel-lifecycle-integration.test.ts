@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readdir, rm, rmdir } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { loadConfig } from "../src/config"
@@ -19,10 +19,11 @@ import { readManagementProcessInventory } from "../src/management-process-eviden
 import { management } from "../src/profile"
 import { readUserActivation, stageUserPreparation } from "../src/user-environment"
 import { readManagementSession, recordManagementSession } from "../src/management-sessions"
+import { signalProcess, supervisedProcesses, type ProcessIdentity } from "../src/process-supervisor"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 
-for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] as const) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(`native CLI setup and check retain session observations during their own process lifetimes${mode === "manual" ? "" : mode === "finalizer" ? " with finalizer" : mode === "reconnected-finalizer" ? " with reconnected finalizer" : " with unknown session"}`, async () => {
+for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected-finalizer", "unknown"] as const) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(`native CLI setup and check retain session observations during their own process lifetimes${mode === "manual" ? "" : mode === "finalizer" ? " with finalizer" : mode === "interrupted-finalizer" ? " with interrupted finalizer" : mode === "reconnected-finalizer" ? " with reconnected finalizer" : " with unknown session"}`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-cli-sessions-")), fixture = await parallelFixture(root)
   const name = `evals-cli-${crypto.randomUUID().slice(0, 8)}`
@@ -35,6 +36,7 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
   const pair = await createPair(file, options)
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-cli-sessions-${crypto.randomUUID()}`)
   await mkdir(evidence, { mode: 0o700 })
+  console.error(`native CLI session evidence: ${evidence}`)
   const journal = path.join(file.controller.stateDir, "cli-command.json"), inventoryFile = path.join(file.controller.stateDir, "management.json")
   const adminInventory = path.join(file.controller.stateDir, "admin-processes.json")
   // Temporary slot authority for external native research; no production release/readiness claim.
@@ -73,7 +75,7 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
       const command = { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, "captures"), cleanupSecrets: [credentials.password, config.dock.apiKey],
         managementEvidence: { file: inventoryFile, lease, admin } }
       const captures = []
-      for (const operation of mode === "reconnected-finalizer" ? ["setup"] as const : ["setup", "check"] as const) {
+      for (const operation of mode === "reconnected-finalizer" || mode === "interrupted-finalizer" ? ["setup"] as const : ["setup", "check"] as const) {
         settlement.cli = false
         const result = await management(command, ["loginom", operation, ...(operation === "setup" ? ["--stdin-json"] : []), "--format", "json"],
           operation === "setup" ? JSON.stringify({ url, ...credentials, apiKey: config.dock.apiKey }) : undefined, 60_000)
@@ -100,7 +102,7 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
           })) })
       }
       const readonly = []
-      for (const operation of mode === "reconnected-finalizer" ? [] : ["status", "recover"] as const) {
+      for (const operation of mode === "reconnected-finalizer" || mode === "interrupted-finalizer" ? [] : ["status", "recover"] as const) {
         settlement.cli = false
         const result = await management(command, ["loginom", operation, "--format", "json"], undefined, 60_000)
         settlement.cli = result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete
@@ -126,6 +128,11 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
       await writeLeaseReceipt(path.join(evidence, "cli.json"), { identity: pair.identity, captures, liveQualified: false })
       const admitted = (await readLeaseReceipt(inventoryFile) as { processes: unknown[] }).processes.length
       const abort = new AbortController(), stopped = { value: false }
+      const suspension: { process?: ProcessIdentity; stoppedAt?: string; signalQueuedAt?: string; continuedAt?: string; continued?: boolean } = {}
+      const selected = captures[0]!.processes.selectedCli
+      const browser = captures[0]!.processes.processes.find(process => process.executable.endsWith("/chrome"))
+      const node = captures[0]!.processes.processes.find(process => process.executable.endsWith("/bin/node"))
+      if (mode === "interrupted-finalizer" && (!selected || !browser || !node)) throw Error("NATIVE_CLI_GRAPH_UNAVAILABLE")
       settlement.cli = false
       const interrupted = management(command, ["loginom", "check", "--format", "json"], undefined, 60_000, abort.signal)
         .finally(() => { stopped.value = true })
@@ -134,15 +141,53 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
         if (!current) throw Error("CHECK_ROW_NOT_OBSERVED")
         return current
       }) : (async () => {
-        const deadline = Date.now() + 30_000
-        while (!stopped.value && Date.now() < deadline) {
-          const current = await observeCliSession(inventoryFile, admitted, credentials.username)
-          if (current?.state === "planned") { abort.abort(); return current }
-          await Bun.sleep(25)
+        try {
+          const deadline = Date.now() + 30_000
+          while (!stopped.value && Date.now() < deadline) {
+            if (mode === "interrupted-finalizer" && !suspension.process) {
+              const manifest = await Bun.file(inventoryFile).json() as { processes: { owner: { id: string }; state: string }[] }
+              const entry = manifest.processes.at(-1)
+              const scope = manifest.processes.length > admitted && entry?.state === "planned"
+                ? supervisedProcesses().scopes.find(scope => scope.owner.id === entry.owner.id && scope.status === "observed") : undefined
+              const cli = scope?.processes?.find(process => process.device === selected!.device && process.inode === selected!.inode)
+              const independentBrowser = scope?.processes?.some(process => process.device === browser!.device && process.inode === browser!.inode &&
+                scope.processes!.some(parent => parent.pid === process.parent && parent.device === node!.device && parent.inode === node!.inode))
+              // The SDK host can finish connecting while its CLI caller remains alive and cannot publish a successful reply.
+              if (cli && independentBrowser && await signalProcess(cli, "SIGSTOP")) {
+                suspension.process = cli
+                suspension.stoppedAt = new Date().toISOString()
+              }
+            }
+            const current = await observeCliSession(inventoryFile, admitted, credentials.username)
+            if (current?.state === "planned" && (mode !== "interrupted-finalizer" || suspension.process)) {
+              abort.abort()
+              if (suspension.process) {
+                const deadline = Date.now() + 2000
+                while (Date.now() < deadline && !stopped.value) {
+                  const status = await readFile(`/proc/${suspension.process.pid}/status`, "utf8")
+                  const pending = ["SigPnd", "ShdPnd"].reduce((bits, name) => bits | BigInt("0x" + (status.match(new RegExp(`^${name}:\\s+([a-f0-9]+)$`, "m"))?.[1] ?? "0")), 0n)
+                  if (pending & 2n) { suspension.signalQueuedAt = new Date().toISOString(); break }
+                  await Bun.sleep(10)
+                }
+              }
+              return current
+            }
+            await Bun.sleep(25)
+          }
+          throw Error("CANCELLED_CHECK_ROW_NOT_OBSERVED")
+        } finally {
+          if (suspension.process) {
+            suspension.continued = await signalProcess(suspension.process, "SIGCONT")
+            suspension.continuedAt = new Date().toISOString()
+          }
         }
-        throw Error("CANCELLED_CHECK_ROW_NOT_OBSERVED")
       })()).catch(error => { abort.abort(); throw error })
       const cancelled = await Promise.allSettled([interrupted, observed])
+      if (mode === "interrupted-finalizer") await writeLeaseReceipt(path.join(evidence, "interruption-control.json"), {
+        suspension, observer: cancelled[1].status, process: cancelled[0].status === "fulfilled" ? {
+          exitCode: cancelled[0].value.exitCode, interrupted: cancelled[0].value.interrupted, timedOut: cancelled[0].value.timedOut,
+          proof: cancelled[0].value.processCleanup } : null,
+        manifest: await readLeaseReceipt(inventoryFile).catch(() => null) })
       if (cancelled[0].status === "rejected") throw cancelled[0].reason
       settlement.cli = cancelled[0].value.processCleanup.status === "confirmed" && cancelled[0].value.processCleanup.capture_complete
       if (cancelled[1].status === "rejected") throw cancelled[1].reason
@@ -150,6 +195,7 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
         leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
       const current = inventory.processes.at(-1)!, snapshots = current.sessions!
       const cancelledEvidence = { cancelRequested: mode !== "reconnected-finalizer", observed: cancelled[1].value, inventory, manifest: await readLeaseReceipt(inventoryFile), processes: cancelled[0].value.processCleanup,
+        ...(mode === "interrupted-finalizer" ? { suspension } : {}),
         resultReceipt: await readLeaseReceipt(current.result!.source.path), sources: await Promise.all([snapshots.before, ...snapshots.during, snapshots.after].map(async snapshot => {
           const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
           return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
@@ -159,6 +205,12 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
       expect([cancelled[0].value.stdout, cancelled[0].value.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
       expect(current.result).toMatchObject({ interrupted: cancelled[0].value.interrupted, timedOut: false })
       if (mode === "reconnected-finalizer") expect(cancelled[0].value.interrupted).toBe(false)
+      if (mode === "interrupted-finalizer") {
+        expect(cancelled[0].value.interrupted).toBe(true)
+        expect(suspension).toMatchObject({ stoppedAt: expect.any(String), signalQueuedAt: expect.any(String), continuedAt: expect.any(String), continued: true })
+        if (!suspension.process) throw Error("CLI_PAUSE_NOT_OBSERVED")
+        expect(cancelled[0].value.processCleanup.processes).toContainEqual(suspension.process)
+      }
       if (!current.result?.interrupted) expect(current.result).toMatchObject({ exitCode: 0,
         reply: { browser: "verified", ok: true, code: "LOGINOM_CONNECTION_VALID" } })
       // A completed check may win the abort race; an observed interruption grants no readiness.
@@ -277,7 +329,7 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
       await writeLeaseReceipt(path.join(evidence, "archived.json"), { source: archived.source, value: await readLeaseReceipt(archived.source.path),
         profiles: [{ source: { path: archived.profiles[0]!.journal, sha256: archived.profiles[0]!.sha256 }, value: archiveManifest }],
         beforeClose: { value: beforeClose, receipt: beforeCloseReceipt, command: await readLeaseReceipt(beforeCloseReceipt.command.path) } })
-      if (mode === "finalizer" || mode === "reconnected-finalizer") {
+      if (mode === "finalizer" || mode === "interrupted-finalizer" || mode === "reconnected-finalizer") {
         const { finalizeManagementEnvironment } = await import("../src/environment-finalization")
         if (peer.admin) {
           const current = await peer.admin.inspectSessionInventory()
