@@ -19,12 +19,17 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   const journal = server.reservation.journal
   const command = await readLeaseReceipt(journal)
   const recovered = server.reservation.state === "recovery-only"
-  if (!object(command) || Object.keys(command).length !== (recovered ? 9 : 7) || command.version !== 2 ||
+  if (!object(command) || Object.keys(command).length !== (recovered ? command.completedSlots === undefined ? 9 : 10 : 7) || command.version !== 2 ||
     command.kind !== (recovered ? "unactivated-recovery" : "unactivated-preparation") ||
     command.commandId !== server.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity) || command.phase !== "unactivated" ||
     !recovered && JSON.stringify(command.slotIds) !== JSON.stringify(environment.slots.map(lease => lease.slot.id)) || typeof command.processInventory !== "string" ||
     path.dirname(command.processInventory) !== file.controller.stateDir) throw new EvalFailure("ENVIRONMENT_FINALIZATION_UNCONFIRMED", 2)
   const recoveryProcessInventories = recovered ? await readPreparationRecoverySources(file, environment) : []
+  const completedSlots = recovered && Array.isArray(command.completedSlots) ? command.completedSlots.map(entry => {
+    if (!object(entry) || typeof entry.slotId !== "string" || !object(entry.cleanup) || typeof entry.cleanup.path !== "string" || typeof entry.cleanup.sha256 !== "string")
+      throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    return { slotId: entry.slotId, cleanup: { path: entry.cleanup.path, sha256: entry.cleanup.sha256 } }
+  }) : []
   for (const lease of environment.slots) {
     await lease.assertHeld()
     const source = await readLeaseReceipt(lease.receipt)
@@ -36,13 +41,7 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   for (const lease of environment.slots) {
     const secretFile = path.join(file.controller.stateDir, `prepare-${lease.slot.id}.secret.json`)
     const observation = await admin.inspectUnactivatedUser(lease, secretFile)
-    const history = await lstat(lease.slot.historyDir)
-    if (!history.isDirectory() || history.isSymbolicLink() || history.uid !== process.getuid?.() || (history.mode & 0o777) !== 0o700 ||
-      await realpath(lease.slot.historyDir) !== lease.slot.historyDir) throw new EvalFailure("ARCHIVE_ROOT_PRIVATE", 2)
-    const archive = path.join(lease.slot.historyDir, `unactivated-${lease.token}`)
-    await mkdir(archive, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
-    await lease.assertHeld()
-    const archived = await archiveProfileEvidence(lease.slot.profileDir, archive, `${lease.receipt}.archive.json`)
+    const archived = await archivePreparationProfile(lease)
     prepared.push({ lease, secretFile, observation, archived })
   }
   // Archive commits precede the native transport disconnect and process settlement.
@@ -54,7 +53,7 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   await verifyParallelPair(file, identity)
   if (recovered && JSON.stringify(await readPreparationRecoverySources(file, environment)) !== JSON.stringify(recoveryProcessInventories))
     throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_CHANGED", 2)
-  const slots = []
+  const slots = [...completedSlots]
   for (const entry of prepared) {
     const lease = entry.lease
     await lease.assertHeld()
@@ -83,12 +82,46 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
     slots.push({ slotId: lease.slot.id, cleanup: { path: cleanup, sha256: hash(completed) } })
   }
   await server.assertHeld()
+  const released = file.slots.flatMap(slot => slots.filter(entry => entry.slotId === slot.id))
   const target = `${journal}.server-finalization.json`
   const receipt = { version: 2, kind: "unactivated-server-finalization", status: "confirmed", key: server.reservation.key,
-    token: server.reservation.token, revision: server.reservation.revision, serverEpoch: identity.serverEpoch, processInventory: processes.source, slots }
+    token: server.reservation.token, revision: server.reservation.revision, serverEpoch: identity.serverEpoch, processInventory: processes.source, slots: released }
   await writeLeaseReceipt(target, receipt)
   await server.release(target)
-  return { status: "released" as const, slots, server: { path: target, sha256: hash(receipt) } }
+  return { status: "released" as const, slots: released, server: { path: target, sha256: hash(receipt) } }
+}
+
+async function archivePreparationProfile(lease: SlotLease) {
+  await lease.assertHeld()
+  const history = await lstat(lease.slot.historyDir)
+  if (!history.isDirectory() || history.isSymbolicLink() || history.uid !== process.getuid?.() || (history.mode & 0o777) !== 0o700 ||
+    await realpath(lease.slot.historyDir) !== lease.slot.historyDir) throw new EvalFailure("ARCHIVE_ROOT_PRIVATE", 2)
+  const previous = []
+  if (lease.recoveryOnly) {
+    const manifest = await readLeaseReceipt(lease.receipt)
+    if (!object(manifest) || typeof manifest.incident !== "string" || !Array.isArray(manifest.resources)) throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    const profile = manifest.resources.find(entry => object(entry) && entry.key === `profile:${lease.slot.profileDir}`)
+    if (!object(profile) || typeof profile.receipt !== "string") throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    const reservation = await readLeaseReceipt(profile.receipt)
+    if (!object(reservation) || !Array.isArray(reservation.lineage)) throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    const sources = [manifest.incident, ...reservation.lineage.filter(object).flatMap(entry => typeof entry.journal === "string" && entry.journal.endsWith(".recovery.json") ? [entry.journal] : [])]
+    for (const source of new Set(sources)) {
+      const journal = `${source}.archive.json`
+      const saved = await readLeaseReceipt(journal).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined
+        throw error
+      })
+      if (saved === undefined) continue
+      if (!object(saved) || saved.kind !== "profile-archive" || saved.profile !== lease.slot.profileDir || typeof saved.archive !== "string" ||
+        path.dirname(saved.archive) !== lease.slot.historyDir) throw new EvalFailure("ARCHIVE_MANIFEST_INVALID", 2)
+      previous.push({ archive: saved.archive, journal })
+    }
+  }
+  if (previous.length > 1) throw new EvalFailure("ARCHIVE_SOURCE_AMBIGUOUS", 2)
+  const target = previous[0] ?? { archive: path.join(lease.slot.historyDir, `unactivated-${lease.token}`), journal: `${lease.receipt}.archive.json` }
+  if (!previous.length) await mkdir(target.archive, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
+  await lease.assertHeld()
+  return archiveProfileEvidence(lease.slot.profileDir, target.archive, target.journal)
 }
 
 async function inspectUnusedStorage(file: SlotFile, lease: SlotLease) {

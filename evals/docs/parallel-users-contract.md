@@ -1312,7 +1312,39 @@ retained slots. Новый mixed command имеет10 keys, descriptor запи�
 
 TDD released A rejection RED→GREEN. Real OS exited controller/fs/flock +
 data-only release codec: A bytes unchanged, pending B adopted, server held.
-101 unit PASS/438 (7.30s), typecheck/diff PASS. Это ownership-only checkpoint: native
-finalizer пока требует9-key full-pending command. Descriptor/native lifecycle
-и reuse прежнего committed archive B ещё необходимы; release/dispatch grants
-этим primitive не выдаются.
+101 unit PASS/438 (7.30s), typecheck/diff PASS. Владение само по себе release/dispatch
+grants не выдаёт; native finalization описана ниже.
+
+### Mixed pre-CLI finalization и прежний архив
+
+Native finalizer принимает completedSlots только после проверки исходных slot
+release proofs, cleanup SHA и точного pending subset. Итоговые slot refs следуют
+порядку config. Если оба resource tombstones уже released, missing composite
+согласуется через finalizeReleasedSlot без нового slot CAS. Неопределённые proofs
+сохраняют общий fence.
+
+Recovery ищет прежний archive manifest по original slot incident и предыдущим
+recovery journals в profile lineage. Единственный найденный manifest повторно
+проверяется archiveProfileEvidence (в том числе intent); committed archive
+сохраняется, новый пустой не подменяет историю. Несколько источников или чужой
+profile/history root дают отказ.
+
+TDD: native mixed10 отвергался старым finalizer; missing composite повторно
+захватывал A; missing result/completion после mixed recovery давали
+PREPARATION_COMPLETION_UNCONFIRMED. Исправления проверены по отдельным RED→GREEN.
+113 related unit PASS/512 (19.26s), descriptor unit3 PASS/25 (1.65s), typecheck/diff
+PASS. Sequential native1 PASS/18 (82.52s): original controller SIGKILL137 после
+release A/отказа B; первый recovery отказал B canary и сохранил server fence;
+retry завершил B, resource bytes A не изменились, original history-b сохранена.
+После удаления только result/completion metadata восстановилась byte-identical
+с unreadable CLI runtime, без новых controller files/изменения server row.
+
+Private600 `native-mixed-c6167cfe-f281-48ba-9b00-a5139c305a3e/mixed.json`
+SHA256 `d71d7ca4d91e05b5ab5edd5a98bd3dfb79f4c735681bfc3ce0a229839a6ad8b9`:
+23 source hashes verified, exact pair absent. Original RED izBc4f также
+завершена public CLI,23 sources/36 audit checks, штатный destroy/root removal;
+`native-mixed-red-resume-20261015/qualified-mixed.json` SHA256
+`43a5ab7685db5a5e416f208e761f57876b4d3dd89de3351069e37811cd841336`.
+Один concurrent own browser run получил unknown-process quarantine; incident
+dyI2ST сохранён в blockers, его proof не переписан. Partial resource release,
+active CLI sessions и остальные readiness gates остаются открытыми.
