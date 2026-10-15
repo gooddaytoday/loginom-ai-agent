@@ -141,3 +141,26 @@ for(const key of ['count','loading','remoteFilter','remoteSort','source_membersh
   assert.ok(!JSON.stringify(d).includes('before'));assert.ok(!JSON.stringify(d).includes('record_id'));
  }finally{reset();}
 });
+
+for(const kind of ['own-data','own-object','own-accessor','inherited-data','inherited-accessor','absent','depth-bound'])test('actual collector descriptor diagnosis never invokes getters or changes gate: '+kind,async()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;let getterCalls=0;
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   const st=v.getStore();delete st.isBufferedStore;
+   const accessor={get(){getterCalls++;throw Error('getter must not run');}};
+   if(kind==='own-data')st.isBufferedStore=false;
+   if(kind==='own-object')st.isBufferedStore={private:'never copy'};
+   if(kind==='own-accessor')Object.defineProperty(st,'isBufferedStore',accessor);
+   if(kind.startsWith('inherited-')){const proto={};Object.defineProperty(proto,'isBufferedStore',kind==='inherited-data'?{value:false}:accessor);Object.setPrototypeOf(st,proto);}
+   if(kind==='depth-bound'){let proto={isBufferedStore:false};for(let i=0;i<8;i++)proto=Object.create(proto);Object.setPrototypeOf(st,proto);}
+   return st;
+  }};};
+  const r=await new Function('page','return ('+makeCalculatorCaptureCode({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS})+')(page)')(f.page);
+  const d=captureWindowDiagnostic(r);assert.equal(getterCalls,0);
+  const expected={own:kind.startsWith('own-')?(kind==='own-accessor'?'accessor':'data'):'absent',own_type:kind==='own-data'?'boolean':kind==='own-object'?'object':null,
+   inherited:kind.startsWith('own-')?'not_checked':kind==='inherited-data'?'data':kind==='inherited-accessor'?'accessor':kind==='depth-bound'?'depth_bound':'absent',
+   inherited_type:kind==='inherited-data'?'boolean':null,depth:kind.startsWith('inherited-')?1:null};
+  for(const w of d.windows){assert.deepEqual(w.isBufferedStore_descriptor,expected);assert.equal(w.evaluated,kind==='own-data');}
+  assert.ok(!JSON.stringify(d).includes('never copy'));assert.ok(!JSON.stringify(d).includes('private'));
+ }finally{reset();}
+});

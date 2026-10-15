@@ -121,3 +121,9 @@ test('cached-window type telemetry whitelists seven inputs and never copies arra
  assert.deepEqual(r.windows[0].available_inputs.count,{type:null,isArray:null,length:null});
  assert.ok(!JSON.stringify(r).includes('private'));assert.ok(!JSON.stringify(r).includes('foreign'));
 });
+
+test('descriptor diagnostic strips values and bounds prototype depth',()=>{
+ const r=captureWindowDiagnostic({predicates:{cached_windows:[{isBufferedStore_descriptor:{own:'absent',own_type:'object',inherited:'data',inherited_type:'boolean',depth:999,value:false,private:'secret'}}]}});
+ assert.deepEqual(r.windows[0].isBufferedStore_descriptor,{own:'absent',own_type:null,inherited:'data',inherited_type:'boolean',depth:null});
+ assert.ok(!JSON.stringify(r).includes('secret'));assert.ok(!JSON.stringify(r).includes('private'));
+});

@@ -4101,6 +4101,23 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   if(e.children.length+stack.length+dom.length>limits.dom)fail('DOM_BOUND');
   for(let i=e.children.length-1;i>=0;i--)stack.push(e.children[i]);
  }
+ const bufferedDescriptor=store=>{
+  const result={own:'unavailable',own_type:null,inherited:'not_checked',inherited_type:null,depth:null};
+  try{
+   const d=Object.getOwnPropertyDescriptor(store,'isBufferedStore');
+   result.own=d?('value'in d?'data':'accessor'):'absent';
+   if(d){if('value'in d)result.own_type=typeof d.value;return result;}
+   let p=store;
+   for(let depth=1;depth<=8;depth++){
+    p=Object.getPrototypeOf(p);
+    if(p===null){result.inherited='absent';return result;}
+    const inherited=Object.getOwnPropertyDescriptor(p,'isBufferedStore');
+    if(inherited){result.inherited='value'in inherited?'data':'accessor';
+     result.inherited_type='value'in inherited?typeof inherited.value:null;result.depth=depth;return result;}
+   }
+   result.inherited='depth_bound';return result;
+  }catch{return result;}
+ };
  const stores=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(suffix=>{
   const candidates=root.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']');
   if(candidates.length!==1)fail('GRID');const element=candidates[0],view=globalThis.Ext?.getCmp?.(element.id);
@@ -4117,6 +4134,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const pendingKeys=pending&&'value'in pending&&pending.value?Object.keys(pending.value):null;
   if(pendingKeys&&pendingKeys.length>limits.records)fail('PENDING_BOUND');
   return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
+   isBufferedStore_descriptor:bufferedDescriptor(store),
    flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,own(store,k)])),
    cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
     remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
@@ -4135,7 +4153,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const available_inputs=Object.fromEntries(Object.entries({count:c.count,loading:c.loading,
    remoteFilter:c.remoteFilter,remoteSort:c.remoteSort,source_membership:s.source_membership,
    pendingKeys:s.pendingKeys,isBufferedStore:f.isBufferedStore}).map(([key,value])=>[key,inputType(value)]));
-  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable',available_inputs};
+  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable',available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor};
   const cache=f.$className==='Ext.data.Store'&&f.isBufferedStore===false&&c.loading===false
    &&f.currentPage===1&&c.remoteFilter===false&&c.remoteSort===false&&s.pendingKeys.length===0
    &&s.proxy_class==='bg.ext.CollectionProxy'&&c.count===s.records.length
@@ -4145,7 +4163,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const rows=s.rows.length===s.records.length&&s.rows.every((r,i)=>
    r.record_index===String(i)&&r.record_id===String(s.records[i].internalId)
    &&r.bound_view===dom.find(e=>e.id===s.element_id)?.attrs.id);
-  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows,available_inputs};
+  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows,available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor};
  });
  const result={owner,root_tid,root_ref,dom,stores,collector_revision:1,
   predicates:{status:'partial',evaluated:false,cached_windows:window,

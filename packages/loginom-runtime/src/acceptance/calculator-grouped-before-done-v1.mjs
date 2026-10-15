@@ -171,11 +171,21 @@ export function captureWindowDiagnostic(capture) {
   return [key,{type:['undefined','null','boolean','number','string','object','function','symbol','bigint'].includes(d?.type)?d.type:null,
    isArray:flag(d?.isArray),length:d?.isArray===true&&Number.isSafeInteger(d?.length)&&d.length>=0?d.length:null}];
  }));
+ const descriptor=p=>{
+  const d=p.isBufferedStore_descriptor;
+  const type=t=>['undefined','boolean','number','string','object','function','symbol','bigint'].includes(t)?t:null;
+  return {own:['absent','accessor','data','unavailable'].includes(d?.own)?d.own:null,
+   own_type:d?.own==='data'?type(d.own_type):null,
+   inherited:['not_checked','absent','accessor','data','depth_bound'].includes(d?.inherited)?d.inherited:null,
+   inherited_type:d?.inherited==='data'?type(d.inherited_type):null,
+   depth:['data','accessor'].includes(d?.inherited)&&Number.isInteger(d?.depth)&&d.depth>=1&&d.depth<=8?d.depth:null};
+ };
  return {length:Array.isArray(windows)?windows.length:null,truncated:Array.isArray(windows)&&windows.length>2,
   windows:Array.isArray(windows)?windows.slice(0,2).map(p=>({evaluated:flag(p?.evaluated),value:flag(p?.value),
    reason:typeof p?.reason==='string'?p.reason.slice(0,256):null,
    cache_complete:flag(p?.cache_complete),rows_complete:flag(p?.rows_complete),
-   ...(p?.available_inputs?{available_inputs:inputs(p)}:{})})):[]};
+   ...(p?.available_inputs?{available_inputs:inputs(p)}:{}),
+   ...(p?.isBufferedStore_descriptor?{isBufferedStore_descriptor:descriptor(p)}:{})})):[]};
 }
 
 export function validateCapture(capture,owner,state) {
