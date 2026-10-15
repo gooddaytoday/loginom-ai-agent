@@ -1,11 +1,11 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты15 candidate,
-policy PASS во всех15. Один итоговый расчёт правильный,14 результатов не получены.
-Одна сессия завершена штатно,14 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты16 candidate,
+policy PASS во всех16. Один итоговый расчёт правильный,15 результатов не получены.
+Одна сессия завершена штатно,15 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось10 candidate, включая текущую explicit-js/2. Sequential
-runner3724959/exec55216 продолжил серию2026-10-15T00:14:34.609924+00:00;
+Осталось9 candidate, включая текущую tags/2. Sequential
+runner3817370/exec67779 продолжил серию2026-10-15T00:27:05.703503+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -21,6 +21,26 @@ unmet/ограничение выборки; нет extra models ради кво
 - [x] Закрепить отдельное итоговое уточнение доступности seeded выборки: target3,
   min(3,N)/reviewALLN при N<3, явная невыполненная квота без extra моделей;
   independent design/readback a6c54942/e2e714b8, исходные5b/f71/97 неизменны.
+
+Explicit-js/2 closed00:20:28.870Z: policy PASS `f930cba6…`, mandatory failure/JS
+review `00c361ac…`;24messages/95parts/26tools/77events/1905runtime, nochildren.
+Actualuserrequest JSaggregation подтверждён. Один source/apply980B/23LF SHA
+`46cc5223ffec4c1d6b287d52851bd04f00b5e25ce94cae52353fe5ad50975cc4`,
+JS GUIDa92ad4f8… SUCCEEDED: dynamiccategory/rowcounts/sums/means изInputTable;
+нет hardcodedoutputs/JSsorting/filtering/IO/callbacksideeffects. Source/configSHA/
+finish и completeJS→Sortpreview связаны. Std Import500→JS→Sort→Export;
+послеExportreadAMBIG нетapply/JS, честный блокер. Native9rows содержат реактивацию/
+деактивацию того жеJS, не дополнительныйsource/apply; initial2rows/GUID ожидание
+сборщика отвергнуто доproofwrite, реальные9rows сохранены без runtimeповтора.
+CSV/LGP/oracle не получены; savedGraphJS_REQUIRED limitation сохранено отдельно,
+CLI1/cleanupfalse/runtimefalse не улучшены. Own278closed00:25:03.477Z/
+admin279logout00:25:05.088Z/browserclosed00:25:06.300Z;9actualPIDgone,
+exactguardarchive00:25:22.942300Z, unknown274+277 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+19case(сcode+review)/26recovery readonly; descriptor `ad65f2fc…`.
+Independent explicit2 finalrelease review `3647015e…`/readback `497b9bd3…`
+approved; actualgate2026-10-15T00:27:01.656Z разрешил technical-failed.
+Originalattempt `086f7fa3…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 First-last-touch/2 closed2026-10-15T00:08:35.360Z: policy PASS `d86f4946…`,
 mandatory review `d53f02b0…`;45messages/166parts/46tools/138events/3525runtime,
