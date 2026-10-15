@@ -60,6 +60,8 @@ export async function createLoginomHost(options: {
       chat,
       connection,
       validation,
+      ...(!validation && chat !== "readiness" && environment.LOGINOM_AI_AGENT_ACCEPTANCE_CLEANUP_PACKAGE
+        ? { acceptanceCleanupPackage: environment.LOGINOM_AI_AGENT_ACCEPTANCE_CLEANUP_PACKAGE } : {}),
       headless: validation || chat === "readiness" || options.headless === true,
       environment,
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,

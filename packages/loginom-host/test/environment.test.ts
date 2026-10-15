@@ -4,6 +4,7 @@ import { runtimeEnvironment } from "../src/supervisor"
 test("runtime inherits proxy routes and Linux system settings without provider credentials", () => {
   const env = runtimeEnvironment(
     {
+      LOGINOM_AI_AGENT_ACCEPTANCE_CLEANUP_PACKAGE: "/fixture/current.lgp",
       HTTP_PROXY: "http://127.0.0.1:10808",
       HTTPS_PROXY: "http://127.0.0.1:10808",
       NO_PROXY: "localhost,.internal",
@@ -17,6 +18,7 @@ test("runtime inherits proxy routes and Linux system settings without provider c
     },
     "linux",
   )
+  expect(env.LOGINOM_AI_AGENT_ACCEPTANCE_CLEANUP_PACKAGE).toBe("/fixture/current.lgp")
   expect(env.HTTP_PROXY).toBe("http://127.0.0.1:10808")
   expect(env.HTTPS_PROXY).toBe(env.HTTP_PROXY)
   expect(env.NO_PROXY).toBe("localhost,.internal")
