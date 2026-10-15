@@ -4,7 +4,7 @@ import * as module from 'node:module';import * as crypto from 'node:crypto';impo
 import * as url from 'node:url';import * as os from 'node:os';import * as fs from 'node:fs/promises';
 const file=process.env.MANAGED_DRAIN_ENTRY,scenario=process.env.MANAGED_DRAIN_SCENARIO;
 const context=vm.createContext({process,URL,AbortController,setImmediate,console,Error,Promise,Map,Set});
-const builtin={'node:module':module,'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os,'node:fs/promises':{...fs,writeFile:async(...args)=>{if(scenario==='receipt-failure' && String(args[1]).includes('\"status\": \"returned\"'))throw Error('fixture receipt write rejected');return fs.writeFile(...args)}}};
+const builtin={'node:module':module,'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os,'node:fs/promises':fs};
 const entry=new vm.SourceTextModule(await readFile(file,'utf8')+'\nexport {state,requests};',{context,identifier:url.pathToFileURL(file).href,initializeImportMeta(meta){meta.url=url.pathToFileURL(file).href}});
 await entry.link(specifier=>{
  const exports=builtin[specifier]??({
@@ -18,9 +18,9 @@ await entry.link(specifier=>{
 const events=[];let release,native=0,bridgeCalls=0;const gate=new Promise(r=>{release=r});
 const rejection=()=>scenario==='throw-error'?Error('fixture primary'):scenario==='throw-undefined'?undefined:scenario==='throw-null'?null:scenario==='throw-false'?false:scenario==='throw-empty'?'':0;
 state.session={directory:process.env.MANAGED_DRAIN_DIRECTORY};state.authenticatedReadiness={account:'fixture-user'};
-state.client={async listTools(){events.push('request-start');process.send({fixture:'in-flight'});await gate;events.push('request-settled');if(scenario==='request-rejection')throw 0;return {tools:[]}},async close(){events.push('client-close')}};
-state.browser={async close(){events.push('context-close')}};
-state.bridge={async close(){bridgeCalls++;if(!native){native++;events.push('native-cleanup-double')}
+state.client={async listTools(){events.push('request-start');process.send({fixture:'in-flight'});await gate;events.push('request-settled');if(scenario==='request-rejection')throw 0;return {tools:[]}},async close(){events.push('client-close');process.send?.({fixture:'client-close'},()=>{})}};
+state.browser={async close(){events.push('context-close');process.send?.({fixture:'context-close'},()=>{})}};
+state.bridge={async close(){bridgeCalls++;if(process.connected)process.send({fixture:'bridge-close',bridgeCalls},()=>{});if(!native){native++;events.push('native-cleanup-double')}
  if(scenario.startsWith('throw-'))throw rejection();
  const incomplete=['pending','unknown','unsaved','missing-cleanup'].includes(scenario);
  return {browser_transport_closed:!incomplete,native_logout_confirmed:!incomplete,
@@ -29,7 +29,7 @@ state.bridge={async close(){bridgeCalls++;if(!native){native++;events.push('nati
  }};
 process.on('message',m=>{
  if(m?.fixture==='release')release();
- if(m?.fixture==='probe')process.send({fixture:'probe',events,native,bridgeCalls,shutdown:state.shutdown,
+ if(m?.fixture==='probe')process.send({fixture:'probe',events,native,bridgeCalls,retained:!!(state.bridge&&state.client&&state.browser),
  closeFailure:state.closeFailure instanceof Error?{message:state.closeFailure.message,cause:state.closeFailure.cause}:state.closeFailure,
  closeFailureUndefined:state.closeFailure===undefined});
 });
