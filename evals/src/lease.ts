@@ -29,6 +29,31 @@ export function acquireResourceLease(input: ResourceRequest, admit?: (previous: 
   return acquireResource(input, undefined, admit)
 }
 
+export async function acquireResourceSet(inputs: ResourceRequest[], admit?: (previous: Reservation | undefined, input: ResourceRequest) => Promise<void>) {
+  if (!inputs.length || new Set(inputs.map(input => input.key)).size !== inputs.length || inputs.some(input => input.lockRoot !== inputs[0]!.lockRoot))
+    throw new EvalFailure("LEASE_KEYS_INVALID", 2)
+  const ordered = [...inputs].sort((a, b) => a.key < b.key ? -1 : 1)
+  const guards: Awaited<ReturnType<typeof resourceGuard>>[] = []
+  try {
+    for (const input of ordered) guards.push(await resourceGuard(input.key, input.lockRoot))
+    // Inspect the entire guarded set before publishing its first reservation.
+    for (const input of ordered) {
+      await readLeaseReceipt(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
+      const previous = await readResourceReservation(input)
+      await admit?.(previous, input)
+      if (previous && previous.state !== "released") throw new EvalFailure("RECOVERY_REQUIRED", 2)
+    }
+    const leases = [] as Awaited<ReturnType<typeof acquireResourceLease>>[]
+    for (const [index, input] of ordered.entries()) leases.push(await acquireResource(input, undefined,
+      admit ? previous => admit(previous, input) : undefined, undefined, guards[index]))
+    return leases
+  } catch (error) {
+    // A persistence failure can leave retained rows; no caller has admitted work yet.
+    await Promise.all(guards.map(guard => guard.close()))
+    throw error
+  }
+}
+
 export async function readResourceReservation(input: { key: string; lockRoot?: string }) {
   const root = input.lockRoot ?? globalLockRoot
   await requireLockRoot(root)
@@ -62,11 +87,11 @@ export function recoverResourceLease(input: ResourceRequest, expected: { token: 
   return acquireResource(input, expected, undefined, admitReleased)
 }
 
-async function acquireResource(input: ResourceRequest, expected?: { token: string; revision: number; incidentToken?: string }, admit?: (previous: Reservation | undefined) => Promise<void>, admitReleased?: (previous: Reservation) => Promise<void>) {
+async function acquireResource(input: ResourceRequest, expected?: { token: string; revision: number; incidentToken?: string }, admit?: (previous: Reservation | undefined) => Promise<void>, admitReleased?: (previous: Reservation) => Promise<void>, heldGuard?: Awaited<ReturnType<typeof resourceGuard>>) {
   await requireLockRoot(input.lockRoot)
   await readLeaseReceipt(input.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
   const key = new Bun.CryptoHasher("sha256").update(input.key).digest("hex")
-  const guard = await resourceGuard(input.key, input.lockRoot)
+  const guard = heldGuard ?? await resourceGuard(input.key, input.lockRoot)
   try {
     const receipt = path.join(input.lockRoot, `${key}.reservation.json`)
     const previous = await readReservation(receipt, input.key)
