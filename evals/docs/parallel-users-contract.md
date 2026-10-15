@@ -1406,3 +1406,31 @@ Private600 `native-management-sessions-5a141ba0-0109-4bd0-97f3-80dc8f980d64/mana
 SHA256 `65b242b94c7379ef1df3b0a167117b8e2859faf63ae39c7e83874591a34bc745`:
 16 independent checks связывают manifest/process proof, both snapshots/commands,
 intervals и admin connection/dispose/continuous closure. Нет model/judge calls.
+
+### Native CLI observations during execution
+
+Trusted admin sampler пишет новые immutable session snapshot refs в planned
+management entry, пока supervisor выполняет CLI. После завершения сохраняются
+observations, пересекающие controller process lifetime; reader проверяет эти
+source chains/identity/unique refs/intervals. При ошибке sampler actual process
+settlement всё равно ожидается, запись остаётся unconfirmed. Legacy records
+без during читаются с пустым массивом и не получают новых grants.
+
+Реальные installed CLI setup и check проходят с browser.state=verified на
+disposable native account (wire creation/configuration/ACL/activation). Для
+каждой команды observed ровно один новый managed ID, отсутствующий в baseline,
+с неизменными Name/CreateTime и Count0. Setup eval-a:3 и check eval-a:4 остаются
+pending после CLI exit; их нельзя считать closed. Fixture использует data-only
+slot authority для внешнего native research, production activation/session
+ownership ledger/close/readiness ещё open. Native CreateTime отличается от
+controller clock на3ч: использовать только opaque equality, не host-time bounds.
+Controller command timestamps отдельно проверяются относительно process proof.
+
+TDD missing during RED→GREEN;166 related unit PASS/612 (77.76s), extended reader
+target1 PASS/17 (2.30s) с out-of-window/duplicate refs controls; final native3
+PASS/35 (90.82s), typecheck/diff PASS. Private600
+`native-cli-sessions-4c5a22e9-8f43-413c-8067-f0836648432a/cli.json` SHA256
+`baf21b38296da5a8d3b805fc87287edab79808265a647c9540b2ed67c152ccb7`:
+25 setup+28 check during observations,192 independent source/process/admin/wire
+closure checks, exact own pair/root absent. No model/judge calls. Recover-created
+sessions и positive targeted CLI-session close остаются отдельными gates.

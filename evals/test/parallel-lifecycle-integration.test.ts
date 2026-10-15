@@ -13,12 +13,128 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
-import { openLoginomAdmin, readAdminFinalization } from "../src/loginom-admin"
+import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, type AdminOperation } from "../src/loginom-admin"
+import { verifyAdminRuntime } from "../src/preflight"
+import { superviseProcess } from "../src/process-supervisor"
 
 import { readManagementProcessInventory } from "../src/management-process-evidence"
 import { management } from "../src/profile"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
+
+test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)("native CLI setup and check retain session observations during their own process lifetimes", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-cli-sessions-")), fixture = await parallelFixture(root)
+  const name = `evals-cli-${crypto.randomUUID().slice(0, 8)}`
+  const port = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${port.port}/app/`
+  port.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: globalLockRoot }
+  const pair = await createPair(file, options)
+  const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-cli-sessions-${crypto.randomUUID()}`)
+  await mkdir(evidence, { mode: 0o700 })
+  const runtime = await verifyAdminRuntime(process.env.EVAL_CLI_BIN!)
+  const credentials = { username: file.slots[0]!.username, password: `E-${crypto.randomUUID()}!` }
+  const secretFile = path.join(root, "user-secret.json")
+  await writeLeaseReceipt(secretFile, credentials)
+  const wireProfile = path.join(root, "wire-profile"), wireCommands = path.join(evidence, "wire-commands")
+  await mkdir(wireProfile, { mode: 0o700 })
+  await mkdir(wireCommands, { mode: 0o700 })
+  const input = new TransformStream<Uint8Array, Uint8Array>(), output = new TransformStream<Uint8Array, Uint8Array>()
+  const abort = new AbortController()
+  const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
+    env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
+    timeoutMs: 60_000, profileDir: wireProfile, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: wireProfile } })
+  const channel = createJournaledAdminChannel(output.readable, input.writable, wireCommands)
+  const request = (op: AdminOperation, payload: unknown) => channel.request({ v: 1, id: crypto.randomUUID(), op, payload,
+    expectedIdentity: pair.identity, deadline: Date.now() + 30_000 })
+  const settlement = { wire: false, cli: true, admin: false }
+  try {
+    try {
+      expect((await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
+        credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(wireProfile, "loginom/runtime/admin/attempts/context/browser-profile") })).outcome).toBe("confirmed")
+      const payload = { phase: "blocked", slot: file.slots[0]!, secretFile, preparationNonce: crypto.randomUUID(), desiredHash: "e".repeat(64),
+        secretHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(credentials)).digest("hex"), owned: null }
+      const created = await request("reconcile-user", payload)
+      expect(created.outcome).toBe("confirmed")
+      const user = (created.data as { user: { objectId: string; name: string; userKind: number } }).user
+      const owned = { objectId: user.objectId, name: user.name, userKind: 0, preparationNonce: payload.preparationNonce, secretHash: null }
+      expect((await request("reconcile-user", { ...payload, phase: "configure", owned })).outcome).toBe("confirmed")
+      const policy = (await request("inspect", {})).data as { sharedDirectories: unknown[] }
+      const acl = await request("reconcile-user", { ...payload, phase: "acl", owned: { ...owned, secretHash: payload.secretHash }, expectedPolicy: policy.sharedDirectories })
+      expect(acl.outcome).toBe("confirmed")
+      expect((await request("reconcile-user", { ...payload, phase: "activate", owned: { ...owned, secretHash: payload.secretHash },
+        expectedPolicy: (acl.data as { policy: unknown[] }).policy })).outcome).toBe("confirmed")
+    } finally {
+      const disposed = await request("dispose", {}).catch(() => undefined)
+      if (disposed?.outcome !== "confirmed") abort.abort()
+      await channel.end().catch(() => abort.abort())
+      const wire = await pending
+      await channel.close().catch(() => undefined)
+      settlement.wire = disposed?.outcome === "confirmed" && wire.exitCode === 0 && wire.processCleanup.status === "confirmed" && wire.processCleanup.capture_complete
+      await writeLeaseReceipt(path.join(evidence, "wire.json"), { disposed, processes: wire.processCleanup, exitCode: wire.exitCode })
+      expect(settlement.wire).toBe(true)
+    }
+    await rm(path.join(file.slots[0]!.profileDir, "data/auth.json"))
+    await rmdir(path.join(file.slots[0]!.profileDir, "data"))
+    const journal = path.join(file.controller.stateDir, "cli-command.json"), inventoryFile = path.join(file.controller.stateDir, "management.json")
+    // Data-only slot authority for external native research; no production admission/release claim.
+    await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "native-cli-sessions", identity: pair.identity, phase: "cli_admitted" })
+    const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
+    await writeLeaseReceipt(inventoryFile, { version: 2, kind: "management-processes", commandId: "native-cli-sessions", journal, identity: pair.identity,
+      leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
+    const admin = await openLoginomAdmin(file, pair.identity)
+    try {
+      const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!, EVAL_PROFILE_DIR: lease.slot.profileDir,
+        EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: process.env.LOGINOM_DOCK_API_KEY! })
+      const command = { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, "captures"), cleanupSecrets: [credentials.password, config.dock.apiKey],
+        managementEvidence: { file: inventoryFile, lease, admin } }
+      const captures = []
+      for (const operation of ["setup", "check"] as const) {
+        settlement.cli = false
+        const result = await management(command, ["loginom", operation, ...(operation === "setup" ? ["--stdin-json"] : []), "--format", "json"],
+          operation === "setup" ? JSON.stringify({ url, ...credentials, apiKey: config.dock.apiKey }) : undefined, 60_000)
+        settlement.cli = result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete
+        expect([result.stdout, result.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
+        expect({ code: result.exitCode, stderr: result.stderr, outputOnFailure: result.exitCode ? result.stdout : "" }).toEqual({ code: 0, stderr: "", outputOnFailure: "" })
+        expect(JSON.parse(result.stdout)).toMatchObject(operation === "setup" ? { username: credentials.username, url, hasApiKey: true } :
+          { ok: true, code: "LOGINOM_CONNECTION_VALID", browser: { state: "verified" } })
+        const inventory = await readManagementProcessInventory({ file: inventoryFile, journal, commandId: "native-cli-sessions", identity: pair.identity,
+          leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
+        const sessions = inventory.processes.at(-1)!.sessions!
+        captures.push({ operation, output: JSON.parse(result.stdout), inventory, manifest: await readLeaseReceipt(inventoryFile), processes: result.processCleanup,
+          sources: await Promise.all([sessions.before, ...sessions.during, sessions.after].map(async snapshot => {
+            const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
+            return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
+          })) })
+      }
+      await writeLeaseReceipt(path.join(evidence, "cli.json"), { identity: pair.identity, captures, liveQualified: false })
+      for (const capture of captures) {
+        const sessions = capture.inventory.processes.at(-1)!.sessions!
+        const created = sessions.during.flatMap(snapshot => snapshot.sessions.filter(row => row.name.startsWith(credentials.username + ":") &&
+          !sessions.before.sessions.some(previous => previous.objectId === row.objectId)))
+        expect(new Set(created.map(row => row.objectId)).size).toBe(1)
+        expect(created.every(row => row.name === created[0]!.name && row.createdAt === created[0]!.createdAt && row.packageCount === 0)).toBe(true)
+        expect(created[0]!.createdAt).toBeString()
+      }
+    } finally {
+      await admin.dispose()
+      settlement.admin = true
+      const directory = path.join(file.controller.stateDir, (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!)
+      const finalization = await readAdminFinalization(file, pair.identity, directory, process.pid)
+      const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
+      await writeLeaseReceipt(path.join(evidence, "admin.json"), { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) })
+      await Promise.all([environment.server.close(), lease.close()])
+    }
+  } finally {
+    if (settlement.wire && settlement.cli && settlement.admin) {
+      await destroyPair(file, options)
+      await rm(root, { recursive: true, force: true })
+    } else console.error(`native CLI session fixture retained: ${root}`)
+  }
+}, 200_000)
 
 for (const partialRelease of [false, true]) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)(`mixed native recovery: released A survives B ${partialRelease ? "partial release and recovery SIGKILL" : "dirty root"} and B reuses its committed history`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
