@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
-import { writeLeaseReceipt } from "../src/lease"
+import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { claimUserOwnership, readServerSession, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
@@ -118,6 +118,26 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     await writeLeaseReceipt(lease.receipt, { ...leaseManifest, token: "foreign-lease" })
     await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("LEASE_NOT_HELD")
     await writeLeaseReceipt(lease.receipt, leaseManifest)
+    const reconnectDir = path.join(fixture.slots.controller.stateDir, "reconnected", "commands")
+    await mkdir(reconnectDir, { recursive: true, mode: 0o700 })
+    const reconnectReply = { v: 1 as const, id: "reconnected-close", outcome: "confirmed" as const, data: { closed: true, disposition: "rpc_closed" } }
+    const reconnectPayload = { proofId: observed.id, session: binding, adopt: { receipt: sessionFile,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(session)).digest("hex") } }
+    const reconnectSource = path.join(reconnectDir, `${reconnectReply.id}.json`)
+    await writeLeaseReceipt(reconnectSource, { version: 1, kind: "loginom-admin-command", id: reconnectReply.id, op: "close-session", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reconnectPayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reconnectReply)).digest("hex"), settledAt: new Date().toISOString() })
+    const originalReconnectSource = await readLeaseReceipt(reconnectSource) as Record<string, unknown>
+    await writeLeaseReceipt(reconnectSource, { ...originalReconnectSource,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify({ proofId: observed.id, session: binding })).digest("hex") })
+    await expect(recordServerSessionClosed(fixture.slots, lease, prepared.secretFile, observed.id, reconnectSource, reconnectReply))
+      .rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
+    expect(await Bun.file(path.join(fixture.slots.controller.stateDir, "session-probe-a.closed.json")).exists()).toBe(false)
+    await writeLeaseReceipt(reconnectSource, originalReconnectSource)
+    expect(await recordServerSessionClosed(fixture.slots, lease, prepared.secretFile, observed.id, reconnectSource, reconnectReply)).toMatchObject({ state: "closed", binding })
+    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toMatchObject({ state: "closed", binding })
+    // Data-only reconstruction of the pre-close state for the existing same-context controls.
+    await rm(path.join(fixture.slots.controller.stateDir, "session-probe-a.closed.json"))
     const closeReply = { v: 1 as const, id: "close-a", outcome: "confirmed" as const, data: { closed: true, disposition: "rpc_closed" } }
     const closePayload = { proofId: observed.id, session: binding }
     const closeSource = path.join(fixture.slots.controller.stateDir, "close-a.json")
