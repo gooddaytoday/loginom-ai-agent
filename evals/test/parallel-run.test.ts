@@ -7,6 +7,7 @@ import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
+import { readResourceProcessWindows } from "../src/parallel-resource-evidence"
 
 
 
@@ -465,6 +466,14 @@ test("fixture main: one infra retry keeps the same slot and archives the initial
     expect(summary.metrics.total).toBe(2)
     const initial = await Bun.file(path.join(run.runDir!, result.task_id, "1", "infra-error/result.json")).json()
     expect(initial).toEqual(result.infra_retry!.initial)
+    const sources = await Promise.all(["infra-error", "."].map(async directory => {
+      const file = path.join(run.runDir!, result.task_id, "1", directory, "process-cleanup.json")
+      return { file, producerPid: process.pid, owner: { kind: "slot" as const, id: "a" },
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await Bun.file(file).json())).digest("hex") }
+    }))
+    const windows = await readResourceProcessWindows(sources)
+    expect(windows.map(window => window.id)).toEqual(["a", "a"])
+    expect(new Set(windows.map(window => `${window.launcher.pid}:${window.launcher.starttime}`)).size).toBe(2)
     const slot = input.slots.slots[0]!
     const history = await Promise.all((await readdir(slot.historyDir)).map(async archive => {
       const file = Bun.file(path.join(slot.historyDir, archive, "data/loginom-ai-agent.db"))
