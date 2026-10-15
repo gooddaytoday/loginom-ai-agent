@@ -9,7 +9,7 @@ import {readPreparedNodeContext} from '../lib/node-context.mjs';
 const read=n=>JSON.parse(fs.readFileSync(new URL('./fixtures/input-port-context/'+n,import.meta.url)));
 const proof=read('native-node-context.json'),geometry=read('navigation-geometry.json'),observed=read('mapping-observation.json').output;
 async function run(mode,alter){
- const f=nativePage(),page=new NavigationPage(),binding=structuredClone(proof.binding),prefix=binding.workflow_ref.prefix;
+ const f=nativePage({packagePath:observed.package_identity.path}),page=new NavigationPage(),binding=structuredClone(proof.binding),prefix=binding.workflow_ref.prefix;
  page.context.innerWidth=geometry.viewport.width;page.context.innerHeight=geometry.viewport.height;
  page.document.documentElement.box={x:0,y:0,width:1280,height:800};page.document.body.box=page.document.documentElement.box;
  Object.assign(f.binding,binding);f.prep.id=binding.document_id;f.prep.document=page.document;

@@ -3,11 +3,11 @@ import fs from 'node:fs';
 const before=JSON.parse(fs.readFileSync(new URL('./saved-package-before.json',import.meta.url))),after=JSON.parse(fs.readFileSync(new URL('./saved-package-after.json',import.meta.url)));
 // Native-object/DOM double built from diagnostic 03 projections. UUIDs and
 // ownership are deliberately local; the captured breadcrumb bytes are exact.
-export function nativePage(){
+export function nativePage({packagePath='/own/diagnostic.lgp'}={}){
  class MapTreeNode{};class PackagesTreeParentNode{};class PackageTreeNode{};class ModelUnitItemTreeNode{};class WorkFlowTreeNode{};class ModelNodeTreeNode{};class WizardTreeNode{};class ModelForm{};class WizardModelComponentForm{};
  const types=[MapTreeNode,PackagesTreeParentNode,PackageTreeNode,ModelUnitItemTreeNode,WorkFlowTreeNode,ModelNodeTreeNode,WizardTreeNode];
  const native=types.map((T,i)=>new T());for(let i=1;i<native.length;i++)native[i].ParentNode=native[i-1];
- const pkg=native[2],flow=native[4],node=native[5];pkg.PackageName=before.crumbs[2].label;pkg.PackageFileName='/own/diagnostic.lgp';node.FGuid='node';node.FModelNode={};
+ const pkg=native[2],flow=native[4],node=native[5];pkg.PackageName=before.crumbs[2].label;pkg.PackageFileName=packagePath;node.FGuid='node';node.FModelNode={};
  const wf={workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:before.crumbs.map(({tid,label})=>({tid,label}))};
  const binding={document_id:'doc',workflow_ref:wf,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  let active=true,crumbs=[],elements=[],counter=0;const components=new Map();
@@ -18,7 +18,8 @@ export function nativePage(){
  const controller={Node:{data:{node:flow}},FController:graph};
  const setCrumbs=values=>{crumbs=values.map((c,i)=>{const e=element(c.tid,c.label);components.set(e.id,{el:{dom:e},_node:{data:{node:native[i]}}});return e;});};setCrumbs(before.crumbs);elements=[tab,root,dom];
  const document={querySelectorAll:s=>s.startsWith('[data-tid^=')?crumbs:[...elements,...crumbs].filter(e=>s==='[data-tid='+JSON.stringify(e.getAttribute())+']')};
- const record={phase:'verified',workflowId:'flow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow,crumbs:wf.navigation_path.map(c=>({...c}))};
+ const request=JSON.stringify({session:'standalone',intent:'open_package',packagePath:pkg.PackageFileName,workflowRef:null});
+ const record={request,phase:'verified',workflowId:'flow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow,crumbs:wf.navigation_path.map(c=>({...c}))};
  const prep={document,id:'doc',receipts:new Map([['refresh',record]])};
  const main={FMapTree:{FServerConnection:{UserName:'own'}},Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}};
  const app={Version:'7.4.2',MapTreeNode,PackagesTreeParentNode,PackageTreeNode,ModelUnitItemTreeNode,WorkFlowTreeNode,ModelNodeTreeNode,WizardTreeNode,ModelForm,Application:{FInstance:{FMainForm:main}}};
