@@ -1434,3 +1434,25 @@ PASS/35 (90.82s), typecheck/diff PASS. Private600
 25 setup+28 check during observations,192 independent source/process/admin/wire
 closure checks, exact own pair/root absent. No model/judge calls. Recover-created
 sessions и positive targeted CLI-session close остаются отдельными gates.
+
+### Immutable management command outcome
+
+Каждый новый management process сохраняет private `management-result.json` с
+identity/command/slot/lease/profile/owner/operation, actual process-proof reference,
+exit code/interruption/timeout и SHA256 raw stdout. Reply сохраняется только как
+whitelist url/username/hasApiKey/ok/known code/browser state; credentials и
+произвольные поля не копируются. Raw stdout не архивируется этим receipt.
+Inventory содержит result source SHA; reader проверяет exact context/schema,
+process binding и whitelist. Старые process-only records без result остаются
+совместимы и не получают подтверждённого command outcome.
+
+TDD missing result RED→GREEN; changed source rejected, password canary absent.
+Target1 PASS/20 (2.83s),166 related unit PASS/618 (64.62s), native setup/check1
+PASS/20 (65.73s), typecheck/diff PASS.
+Native сравнивает stdout SHA с actual returned bytes и получает browser verified
+для обеих команд. Private600
+`native-cli-sessions-13c29bbe-7605-40db-abb4-2293c2aa8d94/cli.json` SHA256
+`8ef0738db7f18dec6ca07d68dfec3c98cd4a577b0e4f5792c2eba781de3f777c`:
+result source/process SHA links и192 full source/closure audit checks PASS;
+own pair/root absent. Это prerequisite для ownership ledger; production
+activation, positive targeted close и full readiness ещё открыты.
