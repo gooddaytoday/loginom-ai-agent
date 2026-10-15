@@ -16,7 +16,7 @@ const values=[Error('original startup refusal'),undefined,null,false,0,''];
 function fixture(directory,phase,rejected){
  const events=[],document={querySelectorAll:()=>[]},connection={Connected:false,UserName:'user'};
  const pageState=vm.createContext({document,location:{href:'about:blank',origin:'null'},getComputedStyle:()=>({visibility:'visible'}),Error});
- const native=()=>{pageState.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection,PackageNodes:{Count:phase==='packages'?1:0},HasRunningNodes:()=>false}}}}}}};
+ const native=()=>{pageState.bg={app:{Version:phase==='build'?'7.4.3':'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection,PackageNodes:{Count:phase==='packages'?1:phase==='missing-package-count'?undefined:0},HasRunningNodes:()=>phase==='running'}}}}}}};
  const owner={directory};let logout=0,contextClose=0;
  const page={
   async goto(){events.push('goto');if(phase==='goto')throw rejected;pageState.location={href:'https://loginom.invalid/app',origin:'https://loginom.invalid'};native()},
@@ -187,4 +187,18 @@ for(const [label,native] of [['Error',Error('independent native refusal')],['und
   try {
    assert.ok(contains(durable,serial(native)), 'durable retry must retain original native rejection separately from authentication/unknown/persistence failures');
   } finally {await rm(root,{recursive:true,force:true})}
+ });
+
+for(const [phase,failedCheck] of [['build','build'],['packages','package_count'],['missing-package-count','package_count'],['running','running_nodes']])
+ test('startup persists exact refused predicate '+phase+' without logout or context close',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'startup-refused-predicate-'));const f=fixture(root,phase);
+  try{
+   await assert.rejects(f.functions.checkConnection(f.options));
+   const evidence=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));
+   assert.equal(evidence.native_observation.reason,'STARTUP_NOT_OWN_EMPTY_IDLE');
+   assert.equal(evidence.native_observation.failed_check,failedCheck);
+   assert.equal(evidence.cleanup_complete,false);
+   assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+   if(phase==='missing-package-count')assert.equal(evidence.native_observation.package_count,null);
+  }finally{await rm(root,{recursive:true,force:true})}
  });

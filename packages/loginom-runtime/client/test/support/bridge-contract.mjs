@@ -1,6 +1,6 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,7 @@ import * as actionCatalog from '../../lib/action-catalog.mjs';
 import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
 import { actions, selectors, build, Page, nodeParameters } from './executor-fixture.mjs';
+import { beginTerminalManagedCall } from '../../../src/terminal-managed-call.mjs';
 
 // Exercise the actual bridge request handler and MCP Server/Client protocol.
 // Only external services, catalog delivery and browser transport are replaced;
@@ -75,6 +76,22 @@ test('MCP application refusals remain typed normal content and the same connecti
     client = new ProtocolClient({ name: 'test-agent', version: '1.0.0' });
     const [agentTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(bridgeTransport), client.connect(agentTransport)]);
+    // Keep the actual managed-call custody on ordinary preparation. This is
+    // the ordinary startup (no diagnostic load purpose or original lender).
+    let managedSequence=0;
+    const managedPrepare=async (input,owner={bridge,client,session})=>{
+      const state={...owner,controller:undefined};
+      const message={id:'managed-'+(++managedSequence),operation:'call',input};
+      const invocation=beginTerminalManagedCall(message,state);
+      const work=(async()=>{
+        await invocation.beforeDispatch();
+        state.controller=new AbortController();
+        invocation.bindController(state.controller);
+        return invocation.invoke({signal:state.controller.signal});
+      })();
+      invocation.bindTask(work);
+      try{return await work}finally{assert.equal(invocation.finish(),true)}
+    };
     const listed = await client.listTools();
     assert.ok(listed.tools.some(tool => tool.name === 'dock_operation_recover'));
     assert.ok(listed.tools.some(tool => tool.name === 'dock_artifact_upload'));
@@ -108,11 +125,28 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(JSON.parse(premature.content[0].text).status, 'FAILED');
     assert.equal(browserCalls, 1);
 
-    const invalidPreparation = await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:'../bad.lgp'}});
+    // A private diagnostic with a missing provider still refuses before any
+    // preparation/browser call. A public request cannot enable this option.
+    const privateDirectory=join(directory,'private');
+    await mkdir(privateDirectory);
+    const privateSession={...session,directory:privateDirectory,metadata:{...session.metadata,sessionId:'private-session'}};
+    const privateBridge=await createBridge(config,privateSession,{acceptanceCapture:{
+      binding:{harness:'sorting-before-close-v1'},harness:async()=>{throw Error('must not capture')},
+    }});
+    const privateClient=new ProtocolClient({name:'private-test-agent',version:'1.0.0'});
+    try{
+      const [a,b]=InMemoryTransport.createLinkedPair();
+      await Promise.all([privateBridge.server.connect(b),privateClient.connect(a)]);
+      const before=browserCalls;
+      await assert.rejects(managedPrepare({name:'dock_prepare',arguments:{}},
+        {bridge:privateBridge,client:privateClient,session:privateSession}),/LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE/);
+      assert.equal(browserCalls,before);
+    }finally{await privateClient.close();await privateBridge.close()}
+    const invalidPreparation = await managedPrepare({name:'dock_prepare',arguments:{intent:'open_package',package_path:'../bad.lgp'}});
     assert.equal(invalidPreparation.isError,true);
     assert.equal(session.metadata.workspacePreparation,undefined);
     assert.equal(browserCalls,1);
-    const prepared = await client.callTool({ name: 'dock_prepare', arguments: {} });
+    const prepared = await managedPrepare({ name: 'dock_prepare', arguments: {} });
     assert.notEqual(prepared.isError, true);
     const metadata = JSON.parse(prepared.content[0].text);
     assert.equal(metadata.prepared, true);

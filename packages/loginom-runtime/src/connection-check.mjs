@@ -121,10 +121,16 @@ function startupOwner(owner, profile, candidate) {
             if([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible))
               return {reason:'STARTUP_OPERATION_OPEN'}
             if(m?.FServerConnection?.Connected!==true) return {unauthenticatedCandidate:!o.loginSubmitted,reason:'LOGIN_EFFECT_UNKNOWN'}
-            if(app.Version!=='7.4.2'||m.FServerConnection.UserName!==o.account||m.PackageNodes?.Count!==0||m.HasRunningNodes()!==false)
-              return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE'}
+            const build=app.Version;
+            if(build!=='7.4.2') return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE',failed_check:'build',loginom_build:build??null}
+            if(m.FServerConnection.UserName!==o.account) return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE',failed_check:'account'}
+            const packageCount=m.PackageNodes?.Count;
+            if(packageCount!==0) return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE',failed_check:'package_count',package_count:packageCount??null}
+            const running=m.HasRunningNodes();
+            if(running!==false) return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE',failed_check:'running_nodes',running_nodes:running??null}
             return {authenticated:true}
           },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true})
+          owner.evidence.native_observation=observed
           if(observed.authenticated) {
             owner.nativeAttempted=true
             nativeStage='native_menu_open'

@@ -70,3 +70,40 @@ The embedded models snapshot lacked the assigned model. Standard `models openai
 --refresh --verbose` populated the isolated profile cache and listed the exact
 `openai/gpt-6-luna` model with `high`. No model substitution or model invocation
 was used to repair preparation.
+
+## Ordinary managed preparation and retained refusals
+
+The initial map missed an active bridge gate: `beginTerminalManagedCall` is used
+for every managed `dock_prepare`, while `requireTerminalPrepareProvider` requires
+a private original lender/source load. Ordinary startup has neither. The actual
+MCP protocol regression now uses the real managed-call custody around its
+ordinary preparation requests: the previous code fails with
+`LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE` before workspace preparation.
+
+The bridge now selects that experimental provider requirement only from its
+existing private `acceptanceCapture.binding.harness`. Public request arguments
+do not select the branch. `terminalManagedCallForBridge` is still called on
+ordinary requests, preserving its original guard. The original lender's
+`requireInvocation` remains mandatory when a lender actually exists. No success
+witness is constructed and the provider implementation is unchanged. A protocol
+negative control supplies a private diagnostic with a missing provider and
+confirms refusal without a browser call. Ordinary invalid preparation still
+refuses, then the same protocol connection can prepare and create a fixture node.
+
+This admission selection needs independent safety review before a live
+`dock_prepare`/package mutation. No model or Sorting node has been run yet.
+
+On clean installed `1f85f06e`, the second ordinary setup progressed through
+`loginPage` account readback. Startup shutdown then refused
+`STARTUP_NOT_OWN_EMPTY_IDLE`; its historical receipt does not distinguish build,
+account, package-count and running-node predicates. It is not evidence of an
+empty or idle session. The next candidate records the first failed predicate
+from those same ordered checks, without extra native reads or accepting missing
+values. Four tests retain refusal/no logout/no context close, including missing
+package-count evidence. Both failed profiles/writers and original logs remain.
+
+Only exact owned local processes of this setup were terminated after recording
+provenance and exclusion of the workspace daemon. The attempt created no
+package, node or business result. Server logout/session closure is not claimed;
+old server sessions are untouched. Before the next business run, use the
+expanded refusal evidence to establish the supported cleanup/preflight path.

@@ -274,7 +274,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         const managedCall=terminalManagedCallForBridge(bridge);
         // Consume only the branded per-call/startup/load association. Parsed
         // request and SDK extra remain evidence, never provider registration.
-        if(managedCall)await requireTerminalPrepareProvider(bridge);
+        // The source-load provider is required only by the private diagnostic.
+        // Ordinary managed calls still pass the custody guard above and all
+        // preparation, identity, journal and confirmed-save checks below.
+        if(managedCall&&acceptanceCapture?.binding?.harness==='sorting-before-close-v1')
+          await requireTerminalPrepareProvider(bridge);
         if(prepareLender)prepareLender.requireInvocation();
       }
       if (request.params.name === 'dock_diagnostics') {
