@@ -1490,7 +1490,7 @@ Frozen process и connection descriptors входят в private session record.
 Общий `readManagementProcess` qualifier проверяет frozen sources по тем же
 правилам, что live inventory. Поздний append не инвалидирует старую запись;
 exact retry сохраняет её, changed binding отказан. Kind owned-management-session
-пока содержит state observed; targeted close, failed CLI/recover/status sessions
+сохраняет immutable state observed; effective closed читается из отдельного terminal receipt (см. ниже). Failed CLI/recover/status sessions
 и recovery-only lineage остаются открытыми. Native CreateTime остаётся opaque,
 sessionGuid не выдумывается. Общая readiness не изменена.
 
@@ -1499,6 +1499,36 @@ unit PASS/618 (68.88s), typecheck/diff PASS. Private600
 `native-cli-sessions-429167f3-9b12-4ccd-aa10-ae3899687aba/cli.json` SHA256
 `b9d9e6a26bb80fbcf8c19fe5626c95218a68428cd00e36451263fe0a99954e71`:
 204 independent source/generation/actor/closure checks, own pair/root absent.
-Предыдущий combined native+unit run получил EACCES от proc-denial control:
+Предыдущий combined native+unit run получил EACCES на фоне proc-denial control; точный PID не атрибутирован:
 fixture00q2hZ retained в blockers. Native browser qualification выполнять
 отдельно также от unit suite с nondumpable/proc controls; proof не ослаблен.
+
+### Targeted close of actual CLI management sessions
+
+`closeManagementSession` uses the normal held slot ledger and current server
+identity. Serialized dispatch rereads protected/frozen sources and verifies the
+pair under the held server fence. Native adoption validates the immutable
+management claim, user generation/activation, process/result and native snapshot
+hashes before fresh account and row inspection. Only the exact pending Count0
+row can close; ambiguity or changed identity refuses the operation.
+
+An immutable observed ledger remains separate from its private close receipt.
+The latter binds the original ledger semantic SHA and actual confirmed close
+command/reply. Reading reconstructs both chains. A confirmed repeat performs
+no RPC and preserves terminal bytes. This currently covers successful setup
+and check, normal ownership only; recovery, failed CLI and active attempts
+remain open. SessionBackup and production readiness are not qualified.
+
+Native source-adoption RED→GREEN1 PASS/37 (53.17s): closing check preserves
+setup, then setup closes and an exact retry sends no command. Private600
+`native-cli-sessions-9ed7c989-708e-4c07-a8d4-21bb1707518c/cli.json` SHA256
+`31dbf23adf28c9cbf7808891a2e5467c59d3d634e3bccf8660f799febe991724`;
+221 independent source/closure/cleanup audit checks. Terminal receipts and
+actual close commands are retained in closed-sessions.json; own pair/root absent.
+
+Final native source-corruption regression1 PASS/39 (55.39s): null terminal
+and changed close-command replyHash refuse; exact restored sources read back.
+153 related unit PASS/633 (62.13s), typecheck/Node syntax/diff PASS. Final
+private600 native-cli-sessions-25f6d5cd-06c2-4c3b-bbd2-d6e6fa2acdbe/cli.json
+SHA256 254bec2fac4bbf48ebabf6f793341a00c3d490a8e2c101f22f8dc9651139fb2f;
+212 source/close/cleanup audit checks, exact pair and root absent.
