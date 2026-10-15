@@ -1121,3 +1121,30 @@ SHA256 `0294cfa0166a29769c01388f5da8b3f438222d1013a5886ac212488e4bb6548d`
 continuous process proof, archive и slot/server terminal receipts.16 independent
 checks подтвердили source hashes, process qualification, archive-before-dispose
 и отсутствие exact own pair. Старые recovery-only incidents не изменены.
+
+
+### Preparation failure finalization
+
+Если prepare/verify отказывает после открытия admin context, controller проверяет
+journal phase. Пока phase=unactivated, он вызывает тот же normal finalizer до
+dispose/закрытия guards. Released публикуется только после полного existing
+archive/native observation/process/root/lease release пути. Неопределённый
+finalizer даёт finalization.status=unconfirmed и сохраняет reservations. Уже
+sealed/finalizing journal повторно не исполняется; original admission error
+остаётся reason failed receipt.
+
+`EnvironmentFailure` содержит ссылку на private controller receipt. CLI перечитывает
+этот receipt и сохраняет его целиком в private output, поэтому actual cleanup
+result не теряется при переводе исключения в exit2. Ошибка до controller receipt
+тоже явно указывает finalization:unconfirmed; это не утверждение об acquired либо
+released ownership. Measured summary и readiness при отказе не создаются.
+
+TDD missing failure finalization status RED→GREEN.98 unit PASS/418 (6.90s),
+8 CLI PASS/41 (0.465s), native1 PASS/24 (97.76s), typecheck/diff PASS. Actual
+prepare2→1→public prepare1→failed verify missing configuration→verify1: error
+USER_CONFIGURATION_UNCONFIRMED, failed receipt finalization released, следующий
+verify получает ownership. Test восстанавливает exact configuration source;10
+protected markers затем совпадают, readiness остаётся false. Private600
+`native-standalone-56819dc0-0c24-480c-acee-8b0c6aa4747d/preparation.json` SHA256
+`945a9ce16f1241ec68fffa6ab7152bf39fda6f4b6401679ea87fbfa185b059c0`
+содержит5 source sets;41 independent checks и exact own pair absence PASS.
