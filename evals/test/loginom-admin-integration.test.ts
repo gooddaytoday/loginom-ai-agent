@@ -143,16 +143,34 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${storage}/data`}`.quiet()
         await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")} ${`${pair.identity.containerId}:${storage}/component-probe.lgp`}`.quiet()
         await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/data/sales.csv`}`.quiet()
+        const shared = after.map(directory => directory.name).sort()
+        expect(shared).toEqual(["common", "temp"])
+        const baseline = await Promise.all(shared.map(async name => {
+          await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()
+          return { name, hash: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()).text(),
+            entries: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text() }
+        }))
         const probe = await request("reconcile-user", { ...activation, phase: "session-component-probe" })
         await writeLeaseReceipt(path.join(evidence, "component-probe-reply.json"), probe)
         expect(probe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: credentials.username }, components: { finished: true, failed: false } } })
+        const components = (probe.data as { components: { continued: boolean;
+          denials: { pathKind: string; operation: string; finished: boolean; failed: boolean; targetStatus: number; denied: boolean }[] } }).components
+        expect(components.continued).toBe(true)
+        expect(components.denials.map(row => [row.pathKind, row.operation])).toEqual(shared.flatMap(name =>
+          ["virtual", "absolute", "traversal"].flatMap(kind => ["import", "export"].map(operation => [`shared:${name}:${kind}`, operation]))))
+        expect(components.denials.every(row => row.denied)).toBe(true)
+        expect(components.denials.map(row => [row.finished, row.failed, row.targetStatus])).toEqual(Array.from({ length: 12 }, () => [true, true, 3]))
+        for (const before of baseline) {
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${before.name}/component-input.csv`}`.quiet()).text()).toBe(before.hash)
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${before.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(before.entries)
+        }
         const csv = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cat ${`${storage}/group_sum_qty.result.csv`}`.quiet()).text()
         // This package's native exporter defaults to TSV and the aggregate column caption.
         expect(csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")).toBe("Item\tQty|Сумма\nA\t9\nB\t11\n")
         expect(await request("close-session", { proofId: probe.id, session: (probe.data as { binding: unknown }).binding }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true } })
         await writeLeaseReceipt(path.join(evidence, "component-probe.json"), { version: 1, identity: pair.identity, username: credentials.username,
-          finished: true, failed: false, csvSha256: new Bun.CryptoHasher("sha256").update(csv).digest("hex"), liveQualified: false })
+          finished: true, failed: false, ...components, csvSha256: new Bun.CryptoHasher("sha256").update(csv).digest("hex"), liveQualified: false })
         complete = true
         return
       }
