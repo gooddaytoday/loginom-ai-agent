@@ -9,7 +9,7 @@ function fixture({count=130,heterogeneous=false,mixedTypes=false,virtualized=tru
  const defaults={formatting:true,custom:true,format_string:'',thousands:false,scientific:false,decimal_digits:'0',currency:''};
  const stored=Array.from({length:count},(_,i)=>({...defaults,...(heterogeneous?{format_string:i%3===0?'0.00':'',custom:i%3!==0}:{}),...(heterogeneous&&i===5?{formatting:false}:{} )}));
  const baseline=structuredClone(stored),selection=new Set();let draft,offset=0,open=true,clock=0,top=0;
- const counts={ordinary:0,group:0,mask:0,apply:0,scrolls:0,originalSelections:[]},transactions=[];
+ const counts={ordinary:0,group:0,mask:0,apply:0,scrolls:0,originalSelections:[],originalReads:[],captureAvailability:0},transactions=[];
  const id=i=>({index:i,source_index:i,name_key:'F'+i,type:mixedTypes&&i%2?'real':'integer',record_id:'r'+i});
  const fields=()=>stored.map((v,i)=>({...id(i),status:'observed',label_ref:'f'+i,selected:selection.has(i),format_string:v.format_string}));
  const painted=()=>fields().slice(offset,offset+8).filter(f=>!virtualized||f.index>=Math.floor(top/24)&&f.index<Math.floor(top/24)+viewportRows);
@@ -28,7 +28,10 @@ function fixture({count=130,heterogeneous=false,mixedTypes=false,virtualized=tru
  const tick=cost=>{clock+=cost;if(clock>=deadline)throw Error('original procedure budget exhausted');};
  const commit=()=>{if(draft)for(const i of selection)stored[i]={...draft,...(fault==='corrupt_stored'&&i===12?{format_string:'wrong'}:{})};};
  const choose=indices=>{commit();selection.clear();indices.forEach(i=>selection.add(i));draft={...stored[indices[0]]};};
- const channel={observe:async o=>{tick(500);offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},
+ const channel={observe:async o=>{tick(500);offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);
+   if(counts.originalReads.length<count&&(o.condition??'').startsWith('Table format field '))counts.captureAvailability++;
+   if(counts.mask===0&&o.condition==='individual numeric format observed')counts.originalReads.push(s.table_settings.format.selected_numeric.source_index);
+   return s;},
   perform:async o=>{tick(1000);const s=state();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);
    if(a.verb==='scroll'){top=Math.max(0,Math.min((count-viewportRows)*24,top+a.delta_y));counts.scrolls++;}
    else if(/^f\d+$/.test(a.ref)){const i=Number(a.ref.slice(1));counts.ordinary++;counts.originalSelections.push(i);choose([i]);}
@@ -50,6 +53,8 @@ test('130 numeric fields preserve individual originals and restore within the un
  assert.equal(p.grouped_numeric,true);assert.equal(p.original_formats.length,130);
  assert.deepEqual(p.original_formats.map(f=>f.settings),x.baseline);
  assert.deepEqual(x.counts.originalSelections.slice(0,130),Array.from({length:130},(_,i)=>i));
+ assert.deepEqual(x.counts.originalReads,Array.from({length:130},(_,i)=>i));
+ assert.ok(x.counts.captureAvailability<=2*Math.ceil(130/8),'same-page availability is already in the completed individual observation');
  assert.ok(x.stored.every(f=>f.format_string==='0'));assert.equal(p.numeric_formats.length,130);
  assert.ok(x.transactions.every(t=>t.indices.length<=8));assert.equal(x.counts.mask,1);
  x.reopen();const r=await configureTablePrecision(x.channel,x.table,{alreadyOpen:true,restore:p.original_formats});

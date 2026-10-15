@@ -8,10 +8,10 @@ function fixture(count=66) {
  const ch={async observe({tableFormatPage,ready}) {
   const {offset,limit}=tableFormatPage,end=Math.min(count,offset+limit),start=Math.floor(top/24),stop=Math.min(count,start+13);
   const rendered=fields.slice(offset,end).filter(f=>f.index>=start&&f.index<stop).map(f=>({...f,status:'observed'}));
-  const s={table_settings:{status:'observed',kind:'format',format:{page:{schema_id:'schema',status:rendered.length===end-offset?'complete_definition_page':'rendered_definition_window',offset,limit,total_columns:count,next_offset:end===count?null:end,rendered_start:start,rendered_end:stop},metadata_fields:structuredClone(fields.slice(offset,end)),fields:rendered,definition_scroll_ref:'scroll'}},
+  const s={table_settings:{status:'observed',kind:'format',view_key:table.table_tid,format:{page:{schema_id:'schema',status:rendered.length===end-offset?'complete_definition_page':'rendered_definition_window',offset,limit,total_columns:count,next_offset:end===count?null:end,rendered_start:start,rendered_end:stop},metadata_fields:structuredClone(fields.slice(offset,end)),fields:rendered,definition_scroll_ref:'scroll'}},
     ui:{elements:[{ref:'scroll',scroll:{ref:'scroll',top,max_top:(count-13)*24},allowed_actions:['scroll'],bounding_box:{height:312}}]}};
-  ch.mutate?.(s,++reads);assert.equal(ready(s),true);return s;
- },async perform(step){assert.equal(step.ready(step.initialObservation),true);const a=step.resolve(step.initialObservation);assert.equal(a.verb,'scroll');assert.equal(a.ref,'scroll');assert.ok(Math.abs(a.delta_y)<=1000);actions++;if(!ch.stuck)top=Math.max(0,Math.min((count-13)*24,top+a.delta_y));},get actions(){return actions;}};
+  reads++;ch.mutate?.(s,reads);assert.equal(ready(s),true);return s;
+ },async perform(step){assert.equal(step.ready(step.initialObservation),true);const a=step.resolve(step.initialObservation);assert.equal(a.verb,'scroll');assert.equal(a.ref,'scroll');assert.ok(Math.abs(a.delta_y)<=1000);actions++;if(!ch.stuck)top=Math.max(0,Math.min((count-13)*24,top+a.delta_y));},get actions(){return actions;},get reads(){return reads;}};
  return {ch,fields};
 }
 test('Table metadata assembles unrendered fields and reveals last then first without changing identity',async()=>{
@@ -31,4 +31,27 @@ test('Table field reveal stops when native scrolling does not move',async()=>{
 test('Table field reveal rejects a changed record before scrolling',async()=>{
  const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);fields[65]={...fields[65],record_id:'new-record'};
  await assert.rejects(revealTableFormatField(ch,table,d,d.fields[65]),/field changed/);assert.equal(ch.actions,0);
+});
+test('a completed owned page supplies another visible row without another read',async()=>{
+ const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);
+ const s=await revealTableFormatField(ch,table,d,fields[7]),before=ch.reads;
+ assert.equal(await revealTableFormatField(ch,table,d,fields[1],s),s);
+ assert.equal(ch.reads,before);assert.equal(ch.actions,0);
+});
+for(const fault of ['schema','record','incomplete'])test('reused format page refuses '+fault+' before a gesture',async()=>{
+ const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);
+ const s=await revealTableFormatField(ch,table,d,fields[7]),before=ch.reads;
+ if(fault==='schema')s.table_settings.format.page.schema_id='foreign';
+ if(fault==='record')s.table_settings.format.metadata_fields[1].record_id='foreign';
+ if(fault==='incomplete')s.table_settings.format.page.status='partial';
+ await assert.rejects(revealTableFormatField(ch,table,d,fields[1],s));
+ assert.equal(ch.reads,before);assert.equal(ch.actions,0);
+});
+test('another table or page is freshly observed; scrolling never reuses its pre-gesture page',async()=>{
+ const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);
+ const s=await revealTableFormatField(ch,table,d,fields[7]);s.table_settings.view_key='foreign';
+ let before=ch.reads;assert.notEqual(await revealTableFormatField(ch,table,d,fields[1],s),s);assert.equal(ch.reads,before+1);
+ const offscreen=await ch.observe({tableFormatPage:{offset:8,limit:8},ready:()=>true});before=ch.reads;
+ const revealed=await revealTableFormatField(ch,table,d,fields[15],offscreen);
+ assert.notEqual(revealed,offscreen);assert.equal(ch.reads,before+1);assert.equal(ch.actions,1);
 });

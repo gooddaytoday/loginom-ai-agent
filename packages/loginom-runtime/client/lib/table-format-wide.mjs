@@ -28,8 +28,8 @@ export async function configureWideNumericFormats(channel,table,definition,field
  };
  const native=t=>definition.fields.find(f=>f.index===t.definition_index);
  const one=xs=>{need(xs.length===1,'Unique owned Table format control required');return xs[0];};
- const selectOne=async t=>{
-  offset=Math.floor(t.definition_index/8)*8;s=await revealTableFormatField(channel,table,definition,native(t));
+ const selectOne=async(t,initialObservation)=>{
+  offset=Math.floor(t.definition_index/8)*8;s=await revealTableFormatField(channel,table,definition,native(t),initialObservation);
   await action('select individual original format',s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.table_field?.source_index===t.index&&e.table_field.name_key===t.key)).ref}),{field:t});
   s=await read('individual numeric format observed',s=>s.table_settings.format.selected_numeric?.source_index===t.index
    &&s.table_settings.format.selected_numeric.name_key===t.key&&s.table_settings.format.selection?.complete===true
@@ -47,8 +47,10 @@ export async function configureWideNumericFormats(channel,table,definition,field
  }else for(const [at,t] of fields.entries()){
   // Paint a whole page before its individual reads; otherwise revealing only
   // the next bottom row scrolls once per field on a virtualized list.
-  if(at%8===0)await revealTableFormatField(channel,table,definition,native(fields[Math.min(fields.length-1,at+7)]));
-  await selectOne(t);originals.push({index:t.index,key:t.key,type:t.type,settings:settings(selected(s))});
+  if(at%8===0)s=await revealTableFormatField(channel,table,definition,native(fields[Math.min(fields.length-1,at+7)]),s);
+  // The previous individual read is still the completed observation: no
+  // gesture intervenes before checking the next row on that same owned page.
+  await selectOne(t,s);originals.push({index:t.index,key:t.key,type:t.type,settings:settings(selected(s))});
  }
  const groups=new Map();
  for(const t of fields){
