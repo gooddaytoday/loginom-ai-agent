@@ -56,8 +56,9 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
 liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
+liveIntegration("native components: evaluated user imports and exports its own CSV", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -135,6 +136,26 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
       expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: false,
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
+      if (mode === "components") {
+        const storage = `${file.server.storageRoot}/${credentials.username}`
+        const input = path.join(root, "sales.csv")
+        await writeFile(input, "Item,Qty\nA,2\nA,7\nB,11\n", { mode: 0o600 })
+        await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${storage}/data`}`.quiet()
+        await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")} ${`${pair.identity.containerId}:${storage}/component-probe.lgp`}`.quiet()
+        await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/data/sales.csv`}`.quiet()
+        const probe = await request("reconcile-user", { ...activation, phase: "session-component-probe" })
+        await writeLeaseReceipt(path.join(evidence, "component-probe-reply.json"), probe)
+        expect(probe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: credentials.username }, components: { finished: true, failed: false } } })
+        const csv = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cat ${`${storage}/group_sum_qty.result.csv`}`.quiet()).text()
+        // This package's native exporter defaults to TSV and the aggregate column caption.
+        expect(csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")).toBe("Item\tQty|Сумма\nA\t9\nB\t11\n")
+        expect(await request("close-session", { proofId: probe.id, session: (probe.data as { binding: unknown }).binding }))
+          .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+        await writeLeaseReceipt(path.join(evidence, "component-probe.json"), { version: 1, identity: pair.identity, username: credentials.username,
+          finished: true, failed: false, csvSha256: new Bun.CryptoHasher("sha256").update(csv).digest("hex"), liveQualified: false })
+        complete = true
+        return
+      }
       if (mode === "storage") {
         const probe = await request("reconcile-user", { ...activation, phase: "session-storage-probe" })
         await writeLeaseReceipt(path.join(evidence, "storage-probe-reply.json"), probe)
