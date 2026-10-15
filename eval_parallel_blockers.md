@@ -61,6 +61,15 @@ user context. Они также не дали положительного sessi
 отсутствие поддержки платформой. Native roots: UserStorage/SessionBackup, relative
 к рабочему каталогу. Drafts не autosave по официальной документации.
 
+Дополнительная граница исследования (2026-10-15): опубликованный RPC manager
+(interface674) содержит GetSessionsList, DeleteSessionBackup, DeletePackageBackups,
+RestoreSessionBackup и RestorePackageBackups; подтверждённого create/enable trigger
+не найдено. Settings публикует SessionBackupDirectory, а PackageAutoSavePeriod
+относится к package autosave. Это не является доказательством disabled policy.
+Private600 `research/evidence/management-registry-20261015/backup-policy-primary-boundary.json`
+фиксирует SHA256 обоих pinned primary JS, methods и ссылки на официальную документацию.
+Gate остаётся `SESSION_BACKUP_POLICY_UNPROVEN`; повтор старых recipes не снимает его.
+
 Startup race подтверждён fixed BACKUP_DRIFT telemetry: MainForm поздно применяет
 сохранённый user autosave period. Published end-of-initialization callback wait
 сохранил исходный deadline и убрал этот drift. Named autosave теперь имеет

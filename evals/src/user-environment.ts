@@ -361,7 +361,7 @@ async function sessionFromProbe(file: SlotFile, lease: SlotLease, secretFile: st
   if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
     !path.isAbsolute(commandFile) || path.resolve(commandFile) !== commandFile || !commandFile.startsWith(file.controller.stateDir + path.sep) ||
     path.basename(commandFile) !== `${reply.id}.json` || Object.keys(request).length !== 8 ||
-    !["session-probe", "session-crash-probe"].includes(String(request.phase)) || JSON.stringify(request.slot) !== JSON.stringify(lease.slot) ||
+    !["session-probe", "session-crash-probe", "session-package-crash-probe"].includes(String(request.phase)) || JSON.stringify(request.slot) !== JSON.stringify(lease.slot) ||
     request.secretFile !== secretFile || request.preparationNonce !== prepared.nonce || request.desiredHash !== prepared.desiredHash ||
     request.secretHash !== prepared.secretHash || Object.keys(owner).length !== 5 || owner.objectId !== owned.objectId ||
     owner.name !== owned.username || owner.userKind !== 0 || owner.preparationNonce !== prepared.nonce || owner.secretHash !== prepared.secretHash ||
@@ -387,8 +387,13 @@ async function sessionFromProbe(file: SlotFile, lease: SlotLease, secretFile: st
     created[0]!.createdAt !== binding.createdAt || created[0]!.packageCount !== 0 ||
     [data.withPackage, data.afterPackage].some((list, index) => {
       const matches = (list as Record<string, unknown>[]).filter(row => row.objectId === binding.remoteKey)
-      return matches.length !== 1 || matches[0]!.name !== binding.name || matches[0]!.createdAt !== binding.createdAt || matches[0]!.packageCount !== (index === 0 ? 1 : 0)
+      return matches.length !== 1 || matches[0]!.name !== binding.name || matches[0]!.createdAt !== binding.createdAt || matches[0]!.packageCount !== (index === 0 || request.phase === "session-package-crash-probe" ? 1 : 0)
     })) throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
+  if (request.phase === "session-package-crash-probe") {
+    const disconnected = (data.afterDisconnect as Record<string, unknown>[]).filter(row => row.objectId === binding.remoteKey)
+    if (disconnected.length !== 1 || disconnected[0]!.name !== binding.name || disconnected[0]!.createdAt !== binding.createdAt ||
+      disconnected[0]!.packageCount !== 1 || disconnected[0]!.pendingDisconnect !== true) throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
+  }
   const source = record(await readLeaseReceipt(commandFile))
   if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
     source.op !== "reconcile-user" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
