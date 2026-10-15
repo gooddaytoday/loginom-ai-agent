@@ -690,10 +690,11 @@ async function bounded(request, promise) {
 async function readSessionBinding(payload, identity) {
   const adopt = payload.adopt
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(payload.proofId) || !adopt || Object.keys(adopt).length !== 2 ||
-    typeof adopt.receipt !== "string" || path.basename(adopt.receipt) !== `session-${payload.proofId}.json` ||
+    typeof adopt.receipt !== "string" || ![`session-${payload.proofId}.json`, `management-session-${payload.proofId}.json`].includes(path.basename(adopt.receipt)) ||
     typeof adopt.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(adopt.sha256)) throw Error("SESSION_SOURCE_UNCONFIRMED")
   const claim = await readSessionReceipt(adopt.receipt)
-  if (!claim || claim.version !== 2 || claim.kind !== "owned-server-session" || claim.state !== "observed" ||
+  if (claim?.kind === "owned-management-session") return readManagementBinding(payload, identity, claim)
+  if (path.basename(adopt.receipt) !== `session-${payload.proofId}.json` || !claim || claim.version !== 2 || claim.kind !== "owned-server-session" || claim.state !== "observed" ||
     JSON.stringify(claim.identity) !== JSON.stringify(identity) || JSON.stringify(claim.binding) !== JSON.stringify(payload.session) ||
     createHash("sha256").update(JSON.stringify(claim)).digest("hex") !== adopt.sha256 || claim.source?.id !== payload.proofId ||
     typeof claim.source.path !== "string" || path.basename(claim.source.path) !== `${payload.proofId}.json`)
@@ -712,6 +713,71 @@ async function readSessionBinding(payload, identity) {
     source.desiredHash !== createHash("sha256").update(JSON.stringify(request)).digest("hex") ||
     source.replyHash !== createHash("sha256").update(JSON.stringify(reply)).digest("hex")) throw Error("SESSION_SOURCE_UNCONFIRMED")
   return { session: payload.session, userObjectId: request.owned.objectId, retainedPackageCount: 0 }
+}
+
+// Parent qualifies the frozen process/native sources under held slot and server fences immediately before dispatch.
+async function readManagementBinding(payload, identity, claim) {
+  const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex")
+  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+  const root = path.dirname(payload.adopt.receipt)
+  if (!/^[a-f0-9]{64}$/.test(payload.proofId) || path.basename(payload.adopt.receipt) !== `management-session-${payload.proofId}.json` ||
+    Object.keys(claim).length !== 13 || claim.version !== 2 || claim.state !== "observed" || claim.id !== payload.proofId ||
+    hash(claim) !== payload.adopt.sha256 || !same(claim.identity, identity) || !same(claim.binding, payload.session) ||
+    Object.keys(claim.actor ?? {}).length !== 5 || claim.actor.kind !== "management" || claim.actor.attemptId !== null ||
+    Object.keys(claim.binding ?? {}).length !== 6 || claim.binding.serverEpoch !== identity.serverEpoch ||
+    !claim.binding.name?.startsWith(claim.binding.username + ":") || !/^[1-9]\d*$/.test(claim.binding.name.slice(claim.binding.username.length + 1)) ||
+    Object.keys(claim.source ?? {}).length !== 3 || path.dirname(claim.source.inventoryFile ?? "") !== root)
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const lease = await readSessionReceipt(path.join(root, `slot-${claim.slotId}-${claim.leaseToken}.lease.json`))
+  const prepared = await readSessionReceipt(path.join(root, `prepare-${claim.slotId}.json`))
+  const user = await readSessionReceipt(path.join(root, `user-${claim.slotId}.json`))
+  const activation = await readSessionReceipt(path.join(root, `activation-${claim.slotId}.json`))
+  if (lease.version !== 2 || lease.state !== "retained" || lease.recoveryOnly === true || lease.token !== claim.leaseToken ||
+    !same(lease.identity, identity) || lease.slot?.id !== claim.slotId || lease.slot.username !== claim.binding.username || lease.commandId !== claim.actor.runId ||
+    prepared.kind !== "user-preparation" || prepared.state !== "staged" || prepared.nonce !== claim.preparationNonce ||
+    prepared.slotId !== claim.slotId || prepared.username !== claim.binding.username || !same(prepared.identity, identity) ||
+    user.kind !== "owned-loginom-user" || user.preparationNonce !== claim.preparationNonce || user.objectId !== claim.userObjectId ||
+    user.userKey !== claim.binding.userKey || user.username !== claim.binding.username || !same(user.identity, identity) ||
+    activation.kind !== "user-activation-intent" || activation.nonce !== claim.activationNonce || activation.preparationNonce !== claim.preparationNonce ||
+    activation.objectId !== claim.userObjectId || activation.userKey !== claim.binding.userKey || !same(activation.identity, identity))
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const results = []
+  for (const entry of [claim.source.connection, claim.source.command]) {
+    if (entry?.state !== "confirmed" || entry.proof?.path !== path.join(entry.directory ?? "", "process-cleanup.json") ||
+      entry.result?.path !== path.join(entry.directory ?? "", "management-result.json")) throw Error("SESSION_SOURCE_UNCONFIRMED")
+    const proof = await readSessionReceipt(entry.proof.path), result = await readSessionReceipt(entry.result.path)
+    if (hash(proof) !== entry.proof.sha256 || hash(result) !== entry.result.sha256 || proof.status !== "confirmed" || proof.error !== null ||
+      proof.capture_complete !== true || proof.observation_mode !== "continuous" || !same(proof.unknownProcesses, []) ||
+      proof.verification?.length !== 2 || proof.verification.some(pass => pass.owned_remaining !== 0) || !same(proof.lifetime?.owner, entry.owner) ||
+      result.version !== 2 || result.kind !== "management-command-result" || !same(result.identity, identity) || result.leaseToken !== claim.leaseToken ||
+      result.slotId !== claim.slotId || result.profileDir !== lease.slot.profileDir || result.commandId !== claim.actor.runId ||
+      !same(result.owner, entry.owner) || !same(result.operation, entry.operation) || !same(result.process, entry.proof) ||
+      result.exitCode !== 0 || result.timedOut !== false || result.interrupted !== false || result.reply?.browser !== "verified")
+      throw Error("SESSION_SOURCE_UNCONFIRMED")
+    results.push(result)
+  }
+  const connection = results[0], command = results[1], entry = claim.source.command
+  if (!same(connection.operation, ["loginom", "setup"]) || connection.reply.username !== claim.binding.username ||
+    connection.reply.url !== prepared.endpoint || connection.reply.hasApiKey !== true || !same(command.owner, claim.actor.owner) ||
+    !same(command.operation, claim.actor.operation) || !["loginom setup", "loginom check"].includes(command.operation.join(" ")) ||
+    command.operation[1] === "setup" && !same(entry.proof, claim.source.connection.proof) ||
+    command.operation[1] === "check" && (command.reply.code !== "LOGINOM_CONNECTION_VALID" || command.reply.ok !== true))
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const snapshots = []
+  if (!entry.sessions?.during?.length) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  for (const source of [entry.sessions.before, ...entry.sessions.during, entry.sessions.after]) {
+    const snapshot = await readSessionReceipt(source?.path)
+    if (hash(snapshot) !== source.sha256 || snapshot.kind !== "admin-session-inventory" || !same(snapshot.identity, identity) ||
+      !Array.isArray(snapshot.sessions)) throw Error("SESSION_SOURCE_UNCONFIRMED")
+    snapshots.push(snapshot)
+  }
+  const rows = snapshots.slice(1, -1).flatMap(snapshot => snapshot.sessions.filter(row => row.name.startsWith(claim.binding.username + ":") &&
+    !snapshots[0].sessions.some(previous => previous.objectId === row.objectId)))
+  if (!rows.length || rows.some(row => row.objectId !== claim.binding.remoteKey || row.name !== claim.binding.name ||
+    row.createdAt !== claim.binding.createdAt || row.packageCount !== 0) ||
+    snapshots.at(-1).sessions.some(row => row.objectId === claim.binding.remoteKey && (row.name !== claim.binding.name || row.createdAt !== claim.binding.createdAt)))
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  return { session: payload.session, userObjectId: claim.userObjectId, retainedPackageCount: 0 }
 }
 
 async function readSessionReceipt(file) {

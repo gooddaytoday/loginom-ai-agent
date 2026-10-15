@@ -39,8 +39,11 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
   await mkdir(evidence, { mode: 0o700 })
   const runtime = await verifyAdminRuntime(process.env.EVAL_CLI_BIN!)
   const journal = path.join(file.controller.stateDir, "cli-command.json"), inventoryFile = path.join(file.controller.stateDir, "management.json")
+  const adminInventory = path.join(file.controller.stateDir, "admin-processes.json")
   // Temporary slot authority for external native research; no production release/readiness claim.
-  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "native-cli-sessions", identity: pair.identity, phase: "cli_admitted" })
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "native-cli-sessions", identity: pair.identity,
+    slotIds: [file.slots[0]!.id], phase: "unactivated", processInventory: adminInventory })
+  await writeLeaseReceipt(adminInventory, { version: 2, kind: "admin-processes", commandId: "native-cli-sessions", journal, identity: pair.identity, connections: [] })
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
   const prepared = await stageUserPreparation(file, lease, "e".repeat(64)), secretFile = prepared.secretFile
   const credentials = await readLeaseReceipt(secretFile) as { username: string; password: string }
@@ -99,7 +102,9 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
     await rmdir(path.join(file.slots[0]!.profileDir, "data"))
     await writeLeaseReceipt(inventoryFile, { version: 2, kind: "management-processes", commandId: "native-cli-sessions", journal, identity: pair.identity,
       leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
-    const admin = await openLoginomAdmin(file, pair.identity)
+    const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
+    const commandIntent = await readLeaseReceipt(journal) as Record<string, unknown>
+    await writeLeaseReceipt(journal, { ...commandIntent, phase: "cli_admitted" })
     try {
       const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!, EVAL_PROFILE_DIR: lease.slot.profileDir,
         EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: process.env.LOGINOM_DOCK_API_KEY! })
@@ -148,10 +153,40 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
       await writeLeaseReceipt(ledgerFile, { ...saved, binding: { ...saved.binding, name: credentials.username + ":999" } })
       await expect(readManagementSession(file, lease, secretFile, captures[0]!.session.id)).rejects.toThrow("MANAGEMENT_SESSION_UNCONFIRMED")
       await writeLeaseReceipt(ledgerFile, saved)
+      const setupSession = captures[0]!.session, checkSession = captures[1]!.session
+      await admin.closeManagementSession(lease, secretFile, checkSession.id)
+      expect(await readManagementSession(file, lease, secretFile, checkSession.id)).toMatchObject({ state: "closed" })
+      const remaining = await admin.inspectSessionInventory()
+      expect(remaining.sessions.some(row => row.objectId === checkSession.binding.remoteKey)).toBe(false)
+      expect(remaining.sessions.some(row => row.objectId === setupSession.binding.remoteKey)).toBe(true)
+      await admin.closeManagementSession(lease, secretFile, setupSession.id)
+      const closedFile = path.join(file.controller.stateDir, `management-session-${setupSession.id}.closed.json`)
+      const closedBytes = await Bun.file(closedFile).text()
+      const commands = await readdir(path.join((await readLeaseReceipt(adminInventory) as { connections: { directory: string }[] }).connections[0]!.directory, "commands"))
+      await admin.closeManagementSession(lease, secretFile, setupSession.id)
+      await Bun.write(closedFile, "null")
+      await expect(readManagementSession(file, lease, secretFile, setupSession.id)).rejects.toThrow()
+      await Bun.write(closedFile, closedBytes)
+      const closed = await readManagementSession(file, lease, secretFile, setupSession.id)
+      if (closed.state !== "closed") throw Error("MANAGEMENT_CLOSE_EXPECTED")
+      const closeCommand = await Bun.file(closed.close.path).text()
+      await writeLeaseReceipt(closed.close.path, { ...await readLeaseReceipt(closed.close.path) as Record<string, unknown>, replyHash: "0".repeat(64) })
+      await expect(readManagementSession(file, lease, secretFile, setupSession.id)).rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
+      await Bun.write(closed.close.path, closeCommand)
+      expect(await Bun.file(closedFile).text()).toBe(closedBytes)
+      expect(await readdir(path.join((await readLeaseReceipt(adminInventory) as { connections: { directory: string }[] }).connections[0]!.directory, "commands"))).toEqual(commands)
+      expect((await admin.inspectSessionInventory()).sessions.some(row => row.name.startsWith(credentials.username + ":"))).toBe(false)
+      await writeLeaseReceipt(path.join(evidence, "closed-sessions.json"), { sessions: await Promise.all(captures.map(async capture => {
+        const closed = await readManagementSession(file, lease, secretFile, capture.session.id)
+        if (closed.state !== "closed") throw Error("MANAGEMENT_CLOSE_EXPECTED")
+        return { observed: capture.session, closed, terminal: await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${capture.session.id}.closed.json`)),
+          command: await readLeaseReceipt(closed.close.path) }
+      })) })
     } finally {
       await admin.dispose()
       settlement.admin = true
-      const directory = path.join(file.controller.stateDir, (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!)
+      const connections = await readLeaseReceipt(adminInventory) as { connections: { directory: string }[] }
+      const directory = connections.connections[0]!.directory
       const finalization = await readAdminFinalization(file, pair.identity, directory, process.pid)
       const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
       await writeLeaseReceipt(path.join(evidence, "admin.json"), { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) })

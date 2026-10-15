@@ -19,6 +19,7 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
   })
 }
 import { EvalFailure } from "./fail"
+import { readManagementSession, recordManagementSessionClosed } from "./management-sessions"
 import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
@@ -54,6 +55,7 @@ export type AdminConnection = {
     source: { path: string; id: string; sha256: string } }>
   observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
+  closeManagementSession(lease: SlotLease, secretFile: string, id: string): Promise<void>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
@@ -396,6 +398,21 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       })
       requireAdminReply(reply)
       await recordServerSessionClosed(file, lease, secretFile, proofId, path.join(directory, "commands", `${reply.id}.json`), reply)
+    },
+    async closeManagementSession(lease, secretFile, id) {
+      const entry = await readManagementSession(file, lease, secretFile, id)
+      if (entry.state === "closed") return
+      if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
+        throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      const adopt = { receipt: path.join(file.controller.stateDir, `management-session-${id}.json`),
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex") }
+      const reply = await request("close-session", { proofId: id, session: entry.binding, adopt }, async () => {
+        if (JSON.stringify(await readManagementSession(file, lease, secretFile, id)) !== JSON.stringify(entry))
+          throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+        await verifyParallelPair(file, identity)
+      })
+      requireAdminReply(reply)
+      await recordManagementSessionClosed(file, lease, secretFile, id, path.join(directory, "commands", `${reply.id}.json`), reply)
     },
     async closeSession(session) {
       const data = requireAdminReply(await request("close-session", { session }))
