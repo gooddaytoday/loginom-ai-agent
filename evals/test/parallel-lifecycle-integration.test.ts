@@ -104,7 +104,12 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         const inventory = await readManagementProcessInventory({ file: inventoryFile, journal, commandId: "native-cli-sessions", identity: pair.identity,
           leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
         const sessions = inventory.processes.at(-1)!.sessions!
+        const execution = inventory.processes.at(-1)!.result!
+        expect(execution).toMatchObject({ exitCode: 0, timedOut: false, interrupted: false,
+          stdoutSha256: new Bun.CryptoHasher("sha256").update(result.stdout).digest("hex"), reply: operation === "setup" ?
+            { username: credentials.username, url, browser: "verified" } : { ok: true, code: "LOGINOM_CONNECTION_VALID", browser: "verified" } })
         captures.push({ operation, output: JSON.parse(result.stdout), inventory, manifest: await readLeaseReceipt(inventoryFile), processes: result.processCleanup,
+          resultReceipt: await readLeaseReceipt(execution.source.path),
           sources: await Promise.all([sessions.before, ...sessions.during, sessions.after].map(async snapshot => {
             const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
             return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
