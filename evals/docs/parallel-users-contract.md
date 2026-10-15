@@ -2251,3 +2251,26 @@ closure only: liveQualified=false, storageDeletionAllowed=false,
 nextAdmissionAllowed=false, no slot release or model/judge invocation.
 The separate47d5228b... root/pair remains retained for scoped cleanup, and the
 older f5bf... missing topology remains unknown.
+
+Frozen resource admission now requires explicit judgeEnabled at creation,
+persisting judge.enabled/codex_home; a manifest missing this intent is invalid.
+Enabled judge home joins filesystem coverage and requires its budget bounds.
+The coordinator requires a nonempty sealed inventory at the canonical private
+state_dir/run_id/judge-processes.json, captured semantic SHA and the existing
+judge reader/shared continuous closure qualifier. It derives every judge proof
+and returns judge_inventory_source alongside process_sources. Missing inventory
+is incomplete even when a caller supplies an otherwise valid isolated judge
+proof; unsealed/empty, foreign path, changed SHA/producer and unsafe run reject.
+A skipped judge cannot supply this inventory or an explicit judge process window.
+No-manifest declared-scope API keeps its existing component semantics.
+
+Actual agent+judge children run under held leases and independent sealed
+inventories. RED previously returned processTimeline passed with only an
+isolated judge proof and no census; GREEN requires the census and derives its
+canonical proof copy. Frozen intent/home coverage RED→GREEN and missing-mode/
+home-budget plus open/empty/skip/foreign/source controls pass. Full current
+parallel-process-resources + parallel-resource-evidence19/292 PASS20.12s;
+typecheck/diff PASS. Private management-registry-20261015/resource-judge-*.log
+retains RED/GREEN/full output. Native management/admin census, full runtime
+resource windows/budgets/quotas and production admission remain unqualified;
+SLOTS_ADMISSION_UNAVAILABLE/live model+judge calls0 are unchanged.

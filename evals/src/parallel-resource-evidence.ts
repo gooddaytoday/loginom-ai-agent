@@ -58,15 +58,39 @@ export async function readResourceAgentInventories(input: {
   }))
 }
 
+export async function readResourceJudgeInventory(input: {
+  manifest: Pick<ResourceManifest, "state_dir" | "run_id" | "judge">
+  source?: { file: string; sha256: string; producerPid: number }
+}) {
+  if (!input.manifest.judge.enabled) {
+    if (input.source) throw new EvalFailure("RESOURCE_JUDGE_MODE_MISMATCH", 2)
+    return null
+  }
+  if (!input.source) return null
+  const directory = path.join(input.manifest.state_dir, input.manifest.run_id)
+  if (path.dirname(directory) !== input.manifest.state_dir || path.basename(directory) !== input.manifest.run_id ||
+    input.source.file !== path.join(directory, "judge-processes.json"))
+    throw new EvalFailure("RESOURCE_JUDGE_INVENTORY_PATH_MISMATCH", 2)
+  const { readJudgeProcessInventory } = await import("./judge-process-evidence")
+  const inventory = await readJudgeProcessInventory({ file: input.source.file, commandId: input.manifest.run_id, producerPid: input.source.producerPid })
+  if (inventory.source.sha256 !== input.source.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+  if (!inventory.sealed || !inventory.processes.length) throw new EvalFailure("RESOURCE_JUDGE_INVENTORY_UNCONFIRMED", 2)
+  return { source: { file: inventory.source.path, sha256: inventory.source.sha256, producerPid: input.source.producerPid },
+    proofs: inventory.processes.map(process => ({ file: process.source.path, sha256: process.source.sha256,
+      owner: process.owner, producerPid: input.source!.producerPid })) }
+}
+
 type ResourceManifest = {
   version: 1; kind: "parallel-resource-manifest"; run_id: string; fixed_at: string; interval_ms: 1000
   parallel: number; slots: SlotDefinition[]; state_dir: string
+  judge: { enabled: boolean; codex_home: string }
   coverage: Pick<Parameters<typeof checkResourceEvidence>[0]["coverage"], "paths" | "containers">
   view: Parameters<typeof checkResourceEvidence>[0]["view"]; budget: { file: string; sha256: string }
 }
 
 export async function freezeResourceManifest(input: {
   out: string; slotsFile: string; parallel: number; runId: string; containers: ResourceManifest["coverage"]["containers"]
+  judgeEnabled: boolean
   view: ResourceManifest["view"]; budget: ResourceManifest["budget"]
 }) {
   await assertResourceDirectory(input.out)
@@ -75,13 +99,15 @@ export async function freezeResourceManifest(input: {
     ...(file.auth ? [file.auth.sharedDir] : []), ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])]
     .some(root => input.out === root || input.out.startsWith(root + path.sep) || root.startsWith(input.out + path.sep)))
     throw new EvalFailure("RESOURCE_OUTPUT_EXPOSED", 2)
-  if (!Number.isSafeInteger(input.parallel) || input.parallel < 1 || input.parallel > file.slots.length ||
+  if (typeof input.judgeEnabled !== "boolean" || !Number.isSafeInteger(input.parallel) || input.parallel < 1 || input.parallel > file.slots.length ||
     input.containers.some(container => container.name !== file.server[container.role === "server" ? "container" : "studioContainer"]))
     throw new EvalFailure("RESOURCE_MANIFEST_INVALID", 2)
   const slots = file.slots.slice(0, input.parallel)
   const manifest = requireResourceManifest({ version: 1, kind: "parallel-resource-manifest", run_id: input.runId,
     fixed_at: new Date().toISOString(), interval_ms: 1000, parallel: input.parallel, slots, state_dir: file.controller.stateDir,
-    coverage: { paths: [file.controller.stateDir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])], containers: input.containers.map(container => ({ role: container.role, id: container.id,
+    judge: { enabled: input.judgeEnabled, codex_home: file.judge.codexHome },
+    coverage: { paths: [file.controller.stateDir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]),
+      ...(input.judgeEnabled ? [file.judge.codexHome] : [])], containers: input.containers.map(container => ({ role: container.role, id: container.id,
       image: container.image, startedAt: container.startedAt, name: container.name, nonce: container.nonce, purpose: container.purpose })) },
     view: { namespace: input.view.namespace, root: { device: input.view.root.device, inode: input.view.root.inode } },
     budget: { file: input.budget.file, sha256: input.budget.sha256 } })
@@ -106,17 +132,19 @@ export async function readFrozenResourceManifest(input: { file: string; sha256: 
 
 function requireResourceManifest(value: unknown): ResourceManifest {
   const manifest = resourceObject(value), coverage = resourceObject(manifest.coverage), view = resourceObject(manifest.view)
-  const root = resourceObject(view.root), budget = resourceObject(manifest.budget)
+  const root = resourceObject(view.root), budget = resourceObject(manifest.budget), judge = resourceObject(manifest.judge)
   const slots = Array.isArray(manifest.slots) ? manifest.slots.map(resourceObject) : []
   const containers = Array.isArray(coverage.containers) ? coverage.containers.map(resourceObject) : []
   const canonical = (value: unknown) => typeof value === "string" && path.isAbsolute(value) && path.resolve(value) === value
   if (manifest.version !== 1 || manifest.kind !== "parallel-resource-manifest" || typeof manifest.run_id !== "string" || !manifest.run_id.trim() ||
     typeof manifest.fixed_at !== "string" || !Number.isFinite(Date.parse(manifest.fixed_at)) || manifest.interval_ms !== 1000 ||
     !Number.isSafeInteger(manifest.parallel) || Number(manifest.parallel) < 1 || slots.length !== manifest.parallel || !canonical(manifest.state_dir) ||
+    typeof judge.enabled !== "boolean" || !canonical(judge.codex_home) ||
     slots.some(slot => typeof slot.id !== "string" || !slot.id || typeof slot.username !== "string" || !slot.username ||
       ![slot.profileDir, slot.workspaceRoot, slot.historyDir].every(canonical)) ||
     new Set(slots.map(slot => slot.id)).size !== slots.length || new Set(slots.map(slot => slot.username)).size !== slots.length ||
-    JSON.stringify(coverage.paths) !== JSON.stringify([manifest.state_dir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])]) ||
+    JSON.stringify(coverage.paths) !== JSON.stringify([manifest.state_dir, ...slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir]),
+      ...(judge.enabled ? [judge.codex_home] : [])]) ||
     containers.length !== 2 || ["server", "studio"].some(role => containers.filter(container => container.role === role).length !== 1) ||
     new Set(containers.map(container => container.id)).size !== 2 || containers.some(container =>
       typeof container.id !== "string" || !/^[0-9a-f]{64}$/.test(container.id) || typeof container.image !== "string" || !/^sha256:[0-9a-f]{64}$/.test(container.image) ||
