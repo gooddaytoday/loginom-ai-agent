@@ -185,7 +185,7 @@ export function collectTerminalScriptWitness(expected){
   for(let p=completionPrototype;p;p=parent(p)){if(descriptor(p,'task'))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');birthChain.push({p,prototype:parent(p)})}
   providerChecks.push(()=>{for(const x of birthChain)if(parent(x.p)!==x.prototype||!descriptorEqual(descriptor(x.p,'task'),x.p===completionPrototype?birthWindow:undefined))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED')});
  }
- let armed,creationState;const storageStates=[];
+ let armed,creationState,activeBoundLower;const storageStates=[],boundTokens=new WeakMap();
  function continuePrimary(lower,task,continuation,callback){
   try{guard();
   if(!taskDefinition){lower.continuationBirth=Object.freeze({observed:false,reason:'ORIGINAL_TASK_DEFINITION_UNAVAILABLE',lexicalCalleeIdentityQualified:false});return apply(continuation,task,[callback])}
@@ -392,7 +392,13 @@ export function collectTerminalScriptWitness(expected){
         ||call.initial!==armed.initial||call.packet!==creationState.packet)throw Error('TERMINAL_PROVIDER_STORAGE_RECEIVER');
       if(!r.mkdelCall||r.mkdelCompletion?.call!==r.mkdelCall||r.mkdelCall.storageCall!==call
         ||r.mkdelCall.receiver!==call.receiver||r.mkdelCall.mkdel!==originalMkdel)throw Error('TERMINAL_PROVIDER_STORAGE_MKDEL_UNAVAILABLE');
-      r.storageDispatch=Object.freeze({call,request,receiver:call.receiver,method:call.method,initial:call.initial,packet:call.packet,
+      const bound=boundTokens.get(r.boundToken);
+      if(!bound||bound.phase!=='active'||bound!==r.boundActivation||!bound.entered||bound.lower!==r||activeBoundLower!==r)throw Error('TERMINAL_PROVIDER_BOUND_NOT_ARMED');
+      bound.phase='consumed';
+      r.boundReceipt=Object.freeze({scope:'FileStorage.'+readMethod+':bound',callee:bound.token.callee,delegate:bound.token.delegate,receiver:storage,
+       mkdelCall:r.mkdelCall,mkdelCompletion:r.mkdelCompletion,initial:armed.initial,packet:creationState.packet,request,
+       activationToken:bound.token,operator:bound.token.operator,boundCallQualified:true,closureIdentityQualified:false,nativeReceiversQualified:false});
+      r.storageDispatch=Object.freeze({call,request,receiver:call.receiver,method:call.method,initial:call.initial,packet:call.packet,boundReceipt:r.boundReceipt,
        mkdelCall:r.mkdelCall,mkdelCompletion:r.mkdelCompletion,scope:'FileStorage.'+readMethod+':dispatch',nativeReceiversQualified:true,closureIdentityQualified:false});
      }
      r.request=request;
@@ -446,9 +452,9 @@ export function collectTerminalScriptWitness(expected){
        scope:'FileStorage.'+readMethod+':call',nativeReceiversQualified:false,closureIdentityQualified:false});
       return apply(r.storageCall.method,this,arguments);
      };
-     r.task=apply(invoke,proxy,[]);
+     activeBoundLower=r;r.task=apply(invoke,proxy,[]);
     }else r.task=apply(originalQuery,proxy,[type]);
-   }finally{invoking=false}
+   }finally{invoking=false;if(activeBoundLower===r)activeBoundLower=undefined}
    if(!r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_DISPATCH_UNAVAILABLE');
    if(!r.completion||r.sourceTask!==r.task)throw Error('TERMINAL_PROVIDER_COMPLETION_TASK');
    return r;
@@ -519,6 +525,41 @@ export function collectTerminalScriptWitness(expected){
      ||packet.completion!==creationState.completion||own(packet.completion,'packageProxy')!==packet.proxy)throw Error('TERMINAL_PROVIDER_CREATION_CHANGED');
    return true},
   queryPacket(packet){if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');provider.checkPacket(packet);return armed.binding.query()},
+  retainBoundPause(lower,callee,receiver,method,operator){
+   if(this!==provider||lower!==activeBoundLower||lower.boundToken)throw Error('TERMINAL_PROVIDER_BOUND_UNAVAILABLE');
+   guard();provider.checkPacket(creationState.packet);
+   const call=lower.mkdelCall,completion=lower.mkdelCompletion;
+   if(typeof method!=='string'||!Object.hasOwn(storageReaders,method)||!call||!completion||completion.call!==call||callee!==completion.returned||receiver!==storage||receiver!==armed.initial.storage
+     ||call.storageCall!==lower.storageCall||call.storageCall.method!==storageReaders[method]||call.scope!=='FileStorage.'+method+':mkdel'
+     ||!Object.isFrozen(operator)||own(operator,'method')!==call.storageCall.method||typeof own(operator,'scriptSha256')!=='string'
+     ||own(operator,'scriptSha256')!=='11ac2c63d2e8162b974f57d14e0f4f57b19cc80d3d39797be377e22eced6a973'||own(operator,'fullScript')!==true
+     ||typeof own(operator,'scriptId')!=='string'||!Number.isInteger(own(operator,'lineNumber'))||!Number.isInteger(own(operator,'columnNumber')))throw Error('TERMINAL_PROVIDER_BOUND_CHANGED');
+   const delegate=call.delegate,token=Object.freeze({lower,callee,delegate,receiver,call,completion,name:method,operator});
+   const state={lower,token,phase:'paused',entered:false};boundTokens.set(token,state);lower.boundToken=token;
+   lower.boundApplyPatch=patch(delegate,'apply',original=>function(target,args){
+    if(lower.boundFailure)throw lower.boundFailure.value;
+    guard();
+    if(state.phase!=='armed'||state.entered||this!==delegate||target!==storage||activeBoundLower!==lower)throw Error('TERMINAL_PROVIDER_BOUND_NOT_ARMED');
+    state.entered=true;state.phase='active';lower.boundActivation=state;
+    try{return apply(original,this,[target,args])}finally{
+     lower.boundActivation=undefined;
+     restore([lower.boundApplyPatch]);
+     if(state.phase!=='consumed')throw Error('TERMINAL_PROVIDER_BOUND_DISPATCH_MISSING');
+    }
+   });return token;
+  },
+  refuseBoundPause(token,reason){
+   if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');const state=boundTokens.get(token);
+   if(!state||state.lower!==activeBoundLower||!['paused','armed'].includes(state.phase))throw Error('TERMINAL_PROVIDER_BOUND_UNAVAILABLE');
+   state.lower.boundFailure??={value:reason};state.phase='refused';return true;
+  },
+  armBoundPause(token){
+   if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();
+   const state=boundTokens.get(token),lower=state?.lower;
+   if(!state||state.phase!=='paused'||lower!==activeBoundLower||lower.boundToken!==token||own(lower,'mkdelCompletion')!==token.completion
+     ||token.completion.returned!==token.callee)throw Error('TERMINAL_PROVIDER_BOUND_UNAVAILABLE');
+   state.phase='armed';return true;
+  },
   readStoragePacket(packet,method){
    if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');
    const names=['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'],index=names.indexOf(method);
