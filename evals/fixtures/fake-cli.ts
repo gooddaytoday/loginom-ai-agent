@@ -143,7 +143,7 @@ if (command === "loginom") {
         : view
   if (stateFile && (sub === "recover" || sub === "setup")) await Bun.write(stateFile, JSON.stringify(next))
   process.stdout.write(JSON.stringify(setup?.reply ?? next) + "\n")
-  process.exit(0)
+  process.exit(sub === "status" ? Number(view.exitCode ?? 0) : 0)
 }
 
 if (command === "run" && /^parallel-/.test(process.env.EVAL_TASK_ID ?? "")) {

@@ -303,7 +303,9 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
     await mkdir(path.join(config.profileDir, "cache"), { recursive: true, mode: 0o700 })
     await Bun.write(modelsCache, Bun.file(path.join(repoRoot, "packages", "product", "models.json")))
   }
-  const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+  const observed = await management(command, ["loginom", "status", "--format", "json"])
+  if (config.slotsFile && observed.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
+  const view = parseView(observed.stdout)
   if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
     throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
   const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
@@ -327,7 +329,9 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
       const prepared = parseView(setup.stdout)
       if (!prepared || prepared.url !== config.loginom.url || prepared.username !== config.loginom.username)
         throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
-      const saved = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+      const checked = await management(command, ["loginom", "status", "--format", "json"])
+      if (checked.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
+      const saved = parseView(checked.stdout)
       if (!saved || saved.url !== config.loginom.url || saved.username !== config.loginom.username)
         throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
     }

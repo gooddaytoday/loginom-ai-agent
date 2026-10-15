@@ -470,6 +470,8 @@ expect(() => selectOwnedSessions([owned, owned], [owned])).toThrow("SESSION_IDEN
 
 **Interfaces:** Produces `ReadyEnvironment`, `prepareEnvironment`, `verifyEnvironment`; script `prepare|verify|status`. Consumes admin adapter и slot leases. Публичная standalone-команда закрывает свой admin context; `run.ts` позднее использует те же шаги со своим context.
 
+- [x] V2 profile status exit qualification: `ensureProfile` отказывает PROFILE_STATUS_FAILED/exit2 при nonzero status, даже если JSON имеет ожидаемые username/url/state. Проверены initial status и fresh read-back после успешного setup; оба отказа сохраняют прежний agent config, initial не вызывает setup. Два последовательных TDD RED (ошибочный resolve)→GREEN2/6 assertions; related profile/preflight cases прошли в составе3-file run, total110PASS/1 existing ownership timeout5000ms/383 assertions84.31s; timeout исследуется отдельно. Typecheck/diff PASS. Production change6 added lines, legacy policy сохранена; это profile prerequisite, не готовый all-slot admission.
+
 - [ ] RED через fake CLI: готовый профиль с чужими username/endpoint отвергается до `run`, собственный повторно не вызывает setup. Расширить fake status строго проверяемыми `url`/`username`, сохранив старые fixtures. Пример утверждений после двух запусков preparation:
 
 ```ts
