@@ -266,7 +266,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessHistory = false } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -275,6 +275,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleOutputPort!==undefined&&(!readOutputs||!preparedNodeContext||tablePage||tableDialog
         ||typeof settleOutputPort!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(settleOutputPort)))
         throw Error('Output settlement requires a prepared native port');
+      if(typeof settleProcessHistory!=='boolean'||settleProcessHistory&&(!readProcesses||!preparedNodeContext||tablePage||tableDialog||settleOutputPort!==undefined))
+        throw Error('History settlement requires a prepared native process read');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
@@ -295,11 +297,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      const deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
+      const deadline = settleOutputPort||settleProcessHistory?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
       let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
-      for (let sample = 0; settleOutputPort || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessHistory || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));

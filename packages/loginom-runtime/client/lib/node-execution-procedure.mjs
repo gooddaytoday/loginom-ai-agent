@@ -151,15 +151,17 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
           // long sequence of insertions. Refresh the native history BEFORE
           // capturing a baseline: the filter recreates local record IDs, so
           // it must never be toggled while tracking an execution.
+          // The native filter can settle after an ordinary 15-second read.
+          // Keep all refresh observations inside this operation's original deadline.
           const history=p=>p.processes.map(({process_id,parent_id,caption,state,error})=>({process_id,parent_id,caption,state,error}));
           const previous=JSON.stringify(history(s.node_processes));
           await act(s,filter);
-          s=await observe('completed history temporarily hidden',s=>s.node_processes?.verified===true&&s.node_processes.show_completed===false);
-          s=await observe('history refresh menu settled',s=>consoleVisible(s)&&control(s,grid,'right_click').length===1,{confirmIdentity:consoleMenuIdentity});
+          s=await observe('completed history temporarily hidden',s=>s.node_processes?.verified===true&&s.node_processes.show_completed===false,{settleProcessHistory:true});
+          s=await observe('history refresh menu settled',s=>consoleVisible(s)&&control(s,grid,'right_click').length===1,{confirmIdentity:consoleMenuIdentity,settleProcessHistory:true});
           await act(s,grid,'right_click');
           s=await observe('completed history filter disabled',s=>control(s,filter).length===1&&s.node_processes?.show_completed===false);
           await act(s,filter);
-          s=await observe('complete history refreshed before execution baseline',s=>processes(s)&&JSON.stringify(history(s.node_processes))===previous);
+          s=await observe('complete history refreshed before execution baseline',s=>processes(s)&&JSON.stringify(history(s.node_processes))===previous,{settleProcessHistory:true});
         } else {
           await act(s,filter,'press',()=>node,'Escape');s=await observe('completed process menu closed',processes);
         }
