@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease, finalizeReleasedSlot, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
@@ -444,4 +444,112 @@ test("loadSlots: a profile symlink is refused even with a private disjoint targe
     await writeFile(file, JSON.stringify({ ...item.value, slots: [{ ...item.value.slots[0], profileDir: alias }, item.value.slots[1]] }), { mode: 0o600 })
     await expect(loadSlots(file, 2)).rejects.toThrow("SLOT_PATH_PRIVATE")
   } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+
+test("environment leases: busy slot B leaves earlier slot and server unreserved", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 2)
+  const lockRoot = path.join(item.root, "locks")
+  const b = await acquireSlotLease(file, file.slots[1]!, identity, lockRoot)
+  try {
+    const journal = path.join(file.controller.stateDir, "prepare-command.json")
+    await writeFile(journal, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
+    const before = await Bun.file(path.join(file.controller.stateDir, "run-journal.json")).text()
+    const manifests = await readdir(file.controller.stateDir)
+    const { acquireEnvironmentLeases } = await import("../src/slots")
+    await expect(acquireEnvironmentLeases(file, 2, identity, journal, lockRoot)).rejects.toThrow("BUSY")
+    for (const key of [`server:${identity.containerId}`, `user:${identity.containerId}:${file.slots[0]!.username}:0`, `profile:${file.slots[0]!.profileDir}`])
+      expect(await readResourceReservation({ key, lockRoot })).toBeUndefined()
+    expect(await readdir(file.controller.stateDir)).toEqual(manifests)
+    expect(await Bun.file(path.join(file.controller.stateDir, "run-journal.json")).text()).toBe(before)
+    await b.assertHeld()
+  } finally { await b.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("environment leases: command-local journals survive another run journal during recovery", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 2)
+  const lockRoot = path.join(item.root, "locks")
+  try {
+    const journal = path.join(file.controller.stateDir, "prepare-command.json")
+    await writeFile(journal, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
+    const before = await Bun.file(path.join(file.controller.stateDir, "run-journal.json")).text()
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+      const env=await acquireEnvironmentLeases(${JSON.stringify(file)},2,${JSON.stringify(identity)},${JSON.stringify(journal)},${JSON.stringify(lockRoot)});
+      await env.server.assertHeld();for(const slot of env.slots)await slot.assertHeld();
+      console.log(JSON.stringify(env.slots.map(slot=>slot.receipt)));
+      await env.server.close();for(const slot of env.slots)await slot.close()`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    expect(await new Response(child.stderr).text()).toBe("")
+    const incidents: string[] = JSON.parse(await new Response(child.stdout).text())
+    expect(incidents).toHaveLength(2)
+    expect(await Bun.file(path.join(file.controller.stateDir, "run-journal.json")).text()).toBe(before)
+    const server = await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot })
+    expect(server).toMatchObject({ state: "retained", journal, commandId: "prepare-command" })
+    for (const [index, incident] of incidents.entries()) {
+      expect(await readLeaseReceipt(incident)).toMatchObject({ journal, commandId: "prepare-command", state: "retained" })
+      const lease = await recoverSlotLease(file, file.slots[index]!, identity, incident, lockRoot)
+      try { await lease.assertHeld(); expect(lease.recoveryOnly).toBe(true) }
+      finally { await lease.close() }
+    }
+    expect(await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot })).toEqual(server)
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("environment leases: terminal release reconciles against its command journal", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  const journal = path.join(file.controller.stateDir, "prepare-command.json")
+  await writeFile(journal, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const environment = await acquireEnvironmentLeases(file, 1, identity, journal, lockRoot)
+  const lease = environment.slots[0]!
+  try {
+    const original = await readLeaseReceipt(lease.receipt) as object
+    const cleanup = path.join(file.controller.stateDir, "codec-cleanup.json")
+    // Data-only cleanup proof tests the release codec; no native actor has been admitted.
+    await writeFile(cleanup, JSON.stringify({ status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
+      processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true, nextAdmissionAllowed: true }), { mode: 0o600 })
+    await lease.release(cleanup)
+    await writeFile(lease.receipt, JSON.stringify(original), { mode: 0o600 })
+    expect(await finalizeReleasedSlot(file, lease.slot, identity, lease.receipt, lockRoot)).toMatchObject({ status: "released", cleanupReceipt: cleanup })
+    expect(await finalizeReleasedSlot(file, lease.slot, identity, lease.receipt, lockRoot)).toMatchObject({ status: "already_released" })
+    await environment.server.assertHeld()
+    const next = await acquireSlotLease(file, lease.slot, identity, lockRoot)
+    try { await next.assertHeld() } finally { await next.close() }
+  } finally {
+    await Promise.all([environment.server.close(), ...environment.slots.map(slot => slot.close())])
+    await rm(item.root, { recursive: true, force: true })
+  }
+})
+
+test("environment leases: recovery refuses an untrusted command journal without changing resources", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 1)
+  const lockRoot = path.join(item.root, "locks")
+  const journal = path.join(file.controller.stateDir, "prepare-command.json")
+  await writeFile(journal, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const environment = await acquireEnvironmentLeases(file, 1, identity, journal, lockRoot)
+  const lease = environment.slots[0]!
+  try {
+    const original = await readLeaseReceipt(lease.receipt) as { resources: { receipt: string }[] }
+    const before = await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))
+    const foreign = path.join(item.root, "foreign.json")
+    const alias = path.join(file.controller.stateDir, "alias.json")
+    await writeFile(foreign, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
+    await symlink(foreign, alias)
+    await lease.close()
+    for (const untrusted of [null, 42, foreign, alias, path.join(file.controller.stateDir, "run-journal.json")]) {
+      await writeFile(lease.receipt, JSON.stringify({ ...original, journal: untrusted }), { mode: 0o600 })
+      await expect(recoverSlotLease(file, lease.slot, identity, lease.receipt, lockRoot)).rejects.toThrow("SLOT_RECOVERY_LINEAGE_INVALID")
+      expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+    }
+    await environment.server.assertHeld()
+  } finally {
+    await Promise.all([environment.server.close(), ...environment.slots.map(slot => slot.close())])
+    await rm(item.root, { recursive: true, force: true })
+  }
 })
