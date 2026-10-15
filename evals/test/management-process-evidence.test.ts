@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireEnvironmentLeases } from "../src/slots"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { readManagementProcessInventory, superviseManagementProcess } from "../src/management-process-evidence"
+import { readManagementProcessInventory, sealManagementProcessInventory, superviseManagementProcess } from "../src/management-process-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { agentCommand } from "../src/cli"
 import { loadConfig } from "../src/config"
@@ -13,6 +13,47 @@ import { openLoginomAdmin, sealAdminProcessInventory } from "../src/loginom-admi
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("one management slot seals before further dispatch while its peer continues", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-slot-seal-")), fixture = await parallelFixture(root)
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "slot-seal", identity,
+    slotIds: ["a", "b"], phase: "cli_admitted" })
+  const environment = await acquireEnvironmentLeases(fixture.slots, 2, identity, journal, fixture.lockRoot)
+  try {
+    const contexts = []
+    for (const lease of environment.slots) {
+      const file = path.join(fixture.slots.controller.stateDir, `management-${lease.slot.id}.json`)
+      const calls = path.join(root, `calls-${lease.slot.id}.jsonl`)
+      await writeLeaseReceipt(file, { version: 2, kind: "management-processes", commandId: "slot-seal", journal, identity,
+        leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
+      const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: lease.slot.profileDir })
+      contexts.push({ file, lease, calls, command: { ...command, env: { ...command.env, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls },
+        cleanupDir: path.join(fixture.slots.controller.stateDir, `captures-${lease.slot.id}`), managementEvidence: { file, lease } } })
+    }
+    for (const context of contexts) expect((await management(context.command, ["loginom", "status", "--format", "json"])).exitCode).toBe(0)
+    const a = contexts[0]!, b = contexts[1]!
+    const before = await Bun.file(a.file).text(), calls = await Bun.file(a.calls).text(), command = await Bun.file(journal).text()
+    const sealed = await sealManagementProcessInventory(fixture.slots, environment.server, a.lease, a.file)
+    expect(sealed).toMatchObject({ status: "sealed", inventory: { path: a.file, sha256: hash(JSON.parse(before)) } })
+    const seal = await Bun.file(sealed.source.path).text()
+    expect(hash(JSON.parse(seal))).toBe(sealed.source.sha256)
+    expect((await stat(sealed.source.path)).mode & 0o777).toBe(0o600)
+    expect(await sealManagementProcessInventory(fixture.slots, environment.server, a.lease, a.file)).toEqual(sealed)
+    await expect(management(a.command, ["loginom", "status", "--format", "json"])).rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_SEALED")
+    expect(await Bun.file(a.file).text()).toBe(before)
+    expect(await Bun.file(a.calls).text()).toBe(calls)
+    const continued = await management(b.command, ["loginom", "status", "--format", "json"])
+    expect({ exitCode: continued.exitCode, cleanup: continued.processCleanup.status }).toEqual({ exitCode: 0, cleanup: "confirmed" })
+    expect((await Bun.file(b.calls).text()).trim().split("\n")).toHaveLength(2)
+    expect(await Bun.file(sealed.source.path).text()).toBe(seal)
+    expect(await Bun.file(journal).text()).toBe(command)
+    await writeLeaseReceipt(a.file, { ...JSON.parse(before), processes: [] })
+    await expect(readManagementProcessInventory({ file: a.file, journal, commandId: "slot-seal", identity, leaseToken: a.lease.token,
+      slotId: a.lease.slot.id, profileDir: a.lease.slot.profileDir, producerPid: process.pid })).rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_CHANGED")
+    expect(await Bun.file(sealed.source.path).text()).toBe(seal)
+  } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]); await rm(root, { recursive: true, force: true }) }
+}, 30_000)
 
 test("management process inventory precedes dispatch and binds actual continuous process closure to its slot", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-evidence-")), fixture = await parallelFixture(root)
@@ -184,6 +225,9 @@ test("parallel management owners register both slot inventories before dispatch"
       const until = Date.now() + 2000
       while (!await Bun.file(marker).exists() && Date.now() < until) await Bun.sleep(10)
       expect(await Bun.file(marker).exists()).toBe(true)
+      await expect(sealManagementProcessInventory(fixture.slots, environment.server, environment.slots[0]!, results[0]!.file))
+        .rejects.toThrow("MANAGEMENT_PROCESS_BUSY")
+      expect(await Bun.file(`${results[0]!.file}.sealed.json`).exists()).toBe(false)
       await expect(sealAdminProcessInventory(fixture.slots, environment.server, hash(admitted), environment.slots))
         .rejects.toThrow("MANAGEMENT_PROCESS_BUSY")
       expect(await readLeaseReceipt(journal)).toEqual(admitted)
