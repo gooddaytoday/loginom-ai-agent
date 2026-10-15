@@ -102,3 +102,40 @@ test('native fetch refusal retains its original error and cause across serializa
 test('diagnostic classification uses the original owned request object',async()=>{
  const f=await fixture();await f.invokeRoute();assert.equal(f.loader.owns(f.calls.find(x=>x.input).pointer),true);assert.equal(f.loader.owns(f.request(url,'fetch')),false);await f.loader.stop();
 });
+
+test('first route evidence is absent before a route is observed',async()=>{
+ const f=await fixture();assert.equal(Object.hasOwn(f.loader.evidence,'first_route'),false);await f.loader.stop();
+});
+
+test('first route evidence distinguishes entry from awaited continue without copying request data',async()=>{
+ const f=await fixture(),r=f.route(f.request('https://own.invalid/app/?private=must-not-copy','document'));
+ let release;r.continue=()=>new Promise(resolve=>{release=resolve});
+ const job=f.invokeRoute(r),first=f.loader.evidence.first_route;
+ assert.deepEqual(Object.keys(first).sort(),['continued_at','eligible','entered_at','resource_type']);
+ assert.equal(Number.isFinite(Date.parse(first.entered_at)),true);assert.equal(first.resource_type,'document');assert.equal(first.eligible,false);assert.equal(first.continued_at,null);
+ assert.equal(JSON.stringify(first).includes('private'),false);assert.equal(JSON.stringify(first).includes('own.invalid'),false);
+ // Completion of a later ordinary route must not timestamp the first one.
+ await f.invokeRoute(f.route(f.request('https://own.invalid/app/GetCredential','xhr')));
+ assert.equal(f.loader.evidence.first_route,first);assert.equal(first.continued_at,null);
+ release();await job;assert.equal(Number.isFinite(Date.parse(first.continued_at)),true);assert.ok(Date.parse(first.continued_at)>=Date.parse(first.entered_at));
+ await f.loader.stop();
+});
+
+test('first route evidence for a held eligible script never claims an ordinary continue',async()=>{
+ const f=await fixture();await f.invokeRoute();const first=f.loader.evidence.first_route,snapshot=structuredClone(first);
+ assert.equal(first.resource_type,'script');assert.equal(first.eligible,true);assert.equal(first.continued_at,null);assert.equal(f.calls.filter(x=>x.fulfill).length,1);
+ await f.invokeRoute(f.route(f.request('https://own.invalid/app/','document')));
+ assert.equal(f.loader.evidence.first_route,first);assert.deepEqual(first,snapshot);await f.loader.stop();
+});
+
+for(const rejection of [Error('continue refused'),undefined])test('first route evidence keeps continue null on original rejection '+String(rejection),async()=>{
+ const f=await fixture(),r=f.route(f.request('https://own.invalid/app/','document'));r.continue=async()=>{throw rejection};await f.invokeRoute(r);
+ assert.equal(f.loader.evidence.first_route.continued_at,null);assert.equal(f.loader.evidence.first_route.eligible,false);
+ let caught=false,value;try{await f.loader.stop()}catch(error){caught=true;value=error};assert.equal(caught,true);assert.equal(value,rejection);assert.equal(f.calls.filter(x=>x.abort).length,1);
+});
+
+test('first route evidence reports the existing foreign-frame classification without a fetch',async()=>{
+ const f=await fixture();await f.invokeRoute(f.route(f.request(url,'script','GET',{})));
+ assert.equal(f.loader.evidence.first_route.resource_type,'script');assert.equal(f.loader.evidence.first_route.eligible,false);assert.equal(Number.isFinite(Date.parse(f.loader.evidence.first_route.continued_at)),true);
+ assert.equal(f.calls.some(x=>x.input||x.fulfill),false);assert.equal(f.calls.filter(x=>x.continue).length,1);await f.loader.stop();
+});

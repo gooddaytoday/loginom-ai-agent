@@ -71,10 +71,13 @@ export async function createStartupStaticLoader(page, context, owner, deadline) 
     return value;
   };
   const handler=async route=>{
-    const request=route.request();const url=new URL(request.url());
-    const eligible=request.resourceType()==='script'&&request.method()==='GET'&&url.origin===identity.origin&&!url.username&&!url.password&&!url.search&&!url.hash&&
+    const enteredAt=evidence.first_route?null:new Date().toISOString();
+    const request=route.request();const url=new URL(request.url()),resourceType=request.resourceType();
+    const eligible=resourceType==='script'&&request.method()==='GET'&&url.origin===identity.origin&&!url.username&&!url.password&&!url.search&&!url.hash&&
       /^\/app\/(bg|ext|thirdparty)\/[A-Za-z0-9_./-]+\.js$/.test(url.pathname)&&!url.pathname.split('/').includes('..')&&request.frame()===page.mainFrame();
-    if(sealing||stopped||!eligible){await route.continue();return}
+    const firstRoute=enteredAt===null?null:{entered_at:enteredAt,resource_type:resourceType,eligible,continued_at:null};
+    if(firstRoute)evidence.first_route=firstRoute;
+    if(sealing||stopped||!eligible){await route.continue();if(firstRoute)firstRoute.continued_at=new Date().toISOString();return}
     bound();if(seen.has(url.href)){await route.continue();return}if(seen.size>=1024)throw Error('LOGINOM_STARTUP_STATIC_LIMIT');seen.add(url.href);
     const item={pathname:url.pathname,attempts:0,completed:false};evidence.reads.push(item);
     const h=await retained();
