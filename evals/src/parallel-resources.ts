@@ -273,6 +273,7 @@ export async function sampleContainerResources(id: string) {
     inspect,
     epoch_stable: Boolean(stable), cgroup,
     cpu: resourceCounter(usage.total_usage) !== null ? { total_usage_ns: resourceCounter(usage.total_usage),
+      read_at: typeof matched?.data.read === "string" && Number.isFinite(Date.parse(matched.data.read)) ? matched.data.read : null,
       system_cpu_usage_ns: resourceCounter(cpu.system_cpu_usage), online_cpus: resourceCounter(cpu.online_cpus) } : null,
     memory: resourceCounter(memory.usage) !== null && resourceCounter(memory.limit) !== null
       ? { current_bytes: resourceCounter(memory.usage), limit_bytes: resourceCounter(memory.limit) } : null,

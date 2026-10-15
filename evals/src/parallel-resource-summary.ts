@@ -1,4 +1,11 @@
 import { serverStorageBinding } from "./parallel-resource-storage"
+import { summarizeResourceRates } from "./parallel-resource-rates"
+
+export type ResourceMetric = {
+  scope: string; metric: string; observed: number; missing: number
+  min: number | null; peak: number | null; delta: number | null
+  counter_increases?: number; counter_resets?: number
+}
 
 type SummaryFilesystem = { path: string; capacity: { available_bytes?: number; total_bytes?: number; available_inodes?: number; total_inodes?: number } | null }
 
@@ -12,10 +19,11 @@ type SummaryCgroup = {
   ancestors?: SummaryCgroup[] | null
 }
 
-type ResourceSummarySample = {
+export type ResourceSummarySample = {
   sequence: number
   elapsed_ms: number
   missed_intervals: number
+  duration_ms?: number
   processes?: { producer_pid: number; scopes: {
     owner: { kind: string; id: string }; status: "observed" | "unavailable"
     processes: { identity: { pid: number; starttime: string }; verified: boolean; rss_bytes: number | null; cgroup?: SummaryCgroup | null
@@ -25,11 +33,12 @@ type ResourceSummarySample = {
     container_id: string; epoch_stable: boolean; inspect: { started_at: string } | null; cgroup?: SummaryCgroup | null
     storage?: { container_id: string; epoch_stable: boolean; inspect: Record<string, unknown> | null; filesystems: SummaryFilesystem[] } | null
     io?: { major: unknown; minor: unknown; op: unknown; bytes: unknown }[] | null
-    cpu?: { total_usage_ns: number | null; system_cpu_usage_ns?: number | null; online_cpus?: number | null } | null
+    cpu?: { total_usage_ns: number | null; read_at?: string | null; system_cpu_usage_ns?: number | null; online_cpus?: number | null } | null
     memory?: { current_bytes: number | null; limit_bytes: number | null } | null
     pids?: { current: number | null } | null
   }[] | null
   host: {
+    observed_at?: string
     collector_cgroup?: SummaryCgroup | null
     filesystems?: SummaryFilesystem[]
     cpu: { ticks: number[] } | null
@@ -89,7 +98,7 @@ export function summarizeResourceSamples(samples: readonly ResourceSummarySample
     samples: samples.length,
     missed_intervals: samples.reduce((sum, sample) => sum + sample.missed_intervals, 0),
     max_gap_ms: samples.length > 1 ? Math.max(...samples.slice(1).map((sample, index) => sample.elapsed_ms - samples[index]!.elapsed_ms)) : null,
-    metrics: samples.length ? metrics.map(series => {
+    metrics: samples.length ? [...metrics.map(series => {
       const observed = series.values.filter((value): value is number => value !== null && Number.isSafeInteger(value) && value >= 0)
       const counter = ["cpu.ticks.", "cpu_usage.", "cpu_throttling.", "memory_events."].some(prefix => series.metric.startsWith(prefix)) || series.metric === "bytes" && series.scope.startsWith("container:") || ["cpu.total_usage_ns", "cpu.system_cpu_usage_ns", "cpu.user_ticks", "cpu.system_ticks"].includes(series.metric)
       const resets = counter ? observed.slice(1).filter((value, index) => value < observed[index]!).length : 0
@@ -98,7 +107,7 @@ export function summarizeResourceSamples(samples: readonly ResourceSummarySample
         delta: observed.length > 1 && !resets ? observed.at(-1)! - observed[0]! : null,
         ...(series.metric.startsWith("memory_events.") ? { counter_increases: observed.slice(1).filter((value, index) => value > observed[index]!).length } : {}),
         ...(counter ? { counter_resets: resets } : {}) }
-    }) : [],
+    }), ...summarizeResourceRates(samples)] : [],
   }
 }
 
