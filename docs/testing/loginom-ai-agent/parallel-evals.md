@@ -978,3 +978,14 @@ RED→GREEN; report/compare/policy108/436, run/rejudge43/334, current retry2/22 
 extended rejudge1/16 PASS, typecheck PASS. Private limit-aggregate-198c93eb...
 verification SHAebcee9a1b425adc590b523fee6acaa4eda09e252df1286448c979aab70890e1f.
 Full hidden transport/Dock/judge coverage и v2 admission этим не подтверждены.
+
+Native SessionBackup hard-crash/startup research теперь выполнено отдельно:
+real pending Count1/modified package/autosave5062 bytes, period5000 и
+keepAlive1800000, old admin closure → exact own daemon SIGKILL137 без OOM →
+same CIDs/new epoch и fresh admin init/inspect/dispose. Pre-crash backup list
+пуст; post-kill/post-restart physical copies пусты, post-restart cfg absent. Paired graceful+crash
+2 PASS/146 assertions147.83s после RED oracle0≠137; typecheck PASS. Private
+native-user-831bf8d0... audit7678658c18976971879db5dc3c56d1f906a0b2dc1ed0f2b736a6985adcf03f4e
+(24 checks/32 sources), verificationfa28c0dd...96 original source hashes/all3
+own pairs+networks+roots absent. Нужен supported create trigger либо доказанный
+enforced-disabled contract; этот отрицательный recipe gate не снимает.
