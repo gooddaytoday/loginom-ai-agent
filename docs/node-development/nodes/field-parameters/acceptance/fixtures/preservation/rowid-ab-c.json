@@ -1,0 +1,240 @@
+{
+  "case": "rowid-ab-c",
+  "scope": "offline independent fixture; not native observation",
+  "format": {
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "decimal_separator": ".",
+    "null_marker": "NULL",
+    "text_qualifier": "\""
+  },
+  "input_columns": [
+    {
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer",
+      "index": 0,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "A",
+      "label": "Same",
+      "type": "string",
+      "index": 1,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "B",
+      "label": "Same",
+      "type": "integer",
+      "index": 2,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "C",
+      "label": "Unused",
+      "type": "boolean",
+      "index": 3,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "Extra",
+      "label": "Unrequested",
+      "type": "string",
+      "index": 4,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    }
+  ],
+  "input_rows": [
+    [
+      101,
+      "alpha",
+      17,
+      true,
+      "keep"
+    ],
+    [
+      102,
+      "",
+      0,
+      false,
+      ""
+    ],
+    [
+      103,
+      null,
+      null,
+      null,
+      null
+    ],
+    [
+      104,
+      "semi;colon",
+      -7,
+      true,
+      "Кириллица"
+    ],
+    [
+      105,
+      "say \"yes\"",
+      2147483647,
+      false,
+      "NULL-ish"
+    ]
+  ],
+  "changes": [
+    {
+      "field": {
+        "kind": "configured_field",
+        "name": "A"
+      },
+      "label": "Only A"
+    },
+    {
+      "field": {
+        "kind": "configured_field",
+        "name": "B"
+      },
+      "name": "RenamedB",
+      "usage": "Группа",
+      "data_kind": "Неопределенное"
+    },
+    {
+      "field": {
+        "kind": "configured_field",
+        "name": "C"
+      },
+      "excluded": true
+    }
+  ],
+  "expected_configuration": [
+    {
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer",
+      "index": 0,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "A",
+      "label": "Only A",
+      "type": "string",
+      "index": 1,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "RenamedB",
+      "label": "Same",
+      "type": "integer",
+      "index": 2,
+      "data_kind": "Неопределенное",
+      "usage_type": 6,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "C",
+      "label": "Unused",
+      "type": "boolean",
+      "index": 3,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": true
+    },
+    {
+      "name": "Extra",
+      "label": "Unrequested",
+      "type": "string",
+      "index": 4,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    }
+  ],
+  "expected": {
+    "columns": [
+      {
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer"
+      },
+      {
+        "name": "A",
+        "label": "Only A",
+        "type": "string"
+      },
+      {
+        "name": "RenamedB",
+        "label": "Same",
+        "type": "integer"
+      },
+      {
+        "name": "Extra",
+        "label": "Unrequested",
+        "type": "string"
+      }
+    ],
+    "rows": [
+      [
+        101,
+        "alpha",
+        17,
+        "keep"
+      ],
+      [
+        102,
+        "",
+        0,
+        ""
+      ],
+      [
+        103,
+        null,
+        null,
+        null
+      ],
+      [
+        104,
+        "semi;colon",
+        -7,
+        "Кириллица"
+      ],
+      [
+        105,
+        "say \"yes\"",
+        2147483647,
+        "NULL-ish"
+      ]
+    ],
+    "cardinality": 5
+  },
+  "value_sources": [
+    "RowID",
+    "A",
+    "B",
+    "Extra"
+  ]
+}

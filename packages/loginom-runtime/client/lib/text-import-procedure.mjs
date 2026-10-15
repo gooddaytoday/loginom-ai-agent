@@ -25,6 +25,39 @@ export function textImportFormatChoice(state, name, kind, label) {
   }),'Exact import format '+kind+' unavailable or ambiguous');
 }
 
+// A format preview can repaint between observation and the durable action
+// record. Use the existing bound recovery gate only for a proved pre-gesture
+// refusal; preserve the native field, owner, prior value and requested text.
+export function setTextImportFormatField(channel, initial, name, text) {
+  const target = state => {
+    const w=state.wizard, f=w?.settings?.fields?.[name];
+    requireValue(w?.status==='observed' && w.stage==='text_import_format'
+      && w.root_tid && w.root_ref && w.owner_context?.status==='observed'
+      && w.owner_context.node?.tid && w.owner_context.path?.length
+      && f?.status==='observed' && f.truncated!==true && f.enabled===true
+      && f.read_only===false && f.source_tid && f.input_ref && f.owner_ref,
+      'Import format field ownership unavailable');
+    return one(state.ui.elements.filter(e=>e.ref===f.input_ref
+      && e.identity?.anchor_tid===f.source_tid
+      && e.wizard_field?.name===name && e.wizard_field.scope==='import_format'
+      && e.wizard_field.stage===w.stage && e.wizard_field.root_ref===w.root_ref
+      && e.wizard_field.owner_ref===f.owner_ref
+      && e.allowed_actions?.includes('set_wizard_field')),
+      'Exact import format input unavailable or ambiguous');
+  };
+  const describe = state => {
+    const e=target(state), w=state.wizard, f=w.settings.fields[name];
+    return {root:w.root_tid,owner:{node:w.owner_context.node.tid,
+      path:w.owner_context.path.map(({tid,label})=>({tid,label}))},
+      name,source_tid:f.source_tid,input_identity:e.identity,value:f.value,
+      max_length_utf16:f.native_max_length_utf16};
+  };
+  const expected=describe(initial);
+  return channel.perform({condition:'set bound import format '+name,initialObservation:initial,
+    ready:state=>{requireValue(same(describe(state),expected),'Import format field binding changed');return true;},identity:describe,
+    resolve:state=>({verb:'set_wizard_field',ref:target(state).ref,text})});
+}
+
 // Inline editors occupy the entire column, including a picker at its right edge.
 // A clickable sliver is sufficient for a cell gesture, but not for its editor.
 export function importFieldRevealDelta(target, scroller) {
@@ -419,7 +452,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         state.wizard.settings.fields[name]?.value === label), name);
       requireValue(after.value === label && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
         'Import format field or exact label changed after selection');
-    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
+    } else await setTextImportFormatField(channel, s, name, text);
   }
   let parsedColumns;
   if(patch) {

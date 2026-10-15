@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
+import { makeWorkspaceUiCode, makeTableFormatRootsCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
+import { createNodeProcedure } from '../lib/node-procedure.mjs';
 
 const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -4119,25 +4120,17 @@ test('Group blank summary may reuse the final data-cell tid without becoming act
 });
 
 
-test('scan time budget accepts 500 ms but rejects 501 ms before issuing references', async () => {
-  for (const elapsed of [500, 501]) {
-    const clock = fixtureClock(), page = new Page({ clock: clock.Date });
-    page.add('button', 'Safe;btnAction', 'Action');
-    const query = page.document.querySelectorAll.bind(page.document);
-    let first = true;
-    page.document.querySelectorAll = selector => {
-      if (first) { first = false; clock.advance(elapsed); }
-      return query(selector);
-    };
-    const outcome = await page.execute({ mode: 'observe', discover_roots: true });
-    assert.equal(outcome.status, elapsed === 500 ? 'SUCCEEDED' : 'NOT_APPLIED');
-    if (elapsed === 501) {
-      assert.equal(outcome.error.code, 'UI_SCAN_LIMIT');
-      assert.equal(outcome.output.scan.complete, false);
-      assert.equal(outcome.output.ui, undefined);
-      assert.equal(outcome.effect_possible, false);
-    }
-    assert.deepEqual(page.events, []);
+test('scan time bounds distinguish non-actionable roots and detailed observations', async () => {
+  for (const [discoverRoots,limit] of [[true,2000],[false,500]]) for (const elapsed of [limit,limit+1]) {
+    const clock=fixtureClock(),page=new Page({clock:clock.Date});
+    page.add('button','Safe;btnAction','Action');
+    const query=page.document.querySelectorAll.bind(page.document);let first=true;
+    page.document.querySelectorAll=selector=>{if(discoverRoots&&first){first=false;clock.advance(elapsed)}return query(selector)};
+    const walk=page.document.createTreeWalker.bind(page.document);page.document.createTreeWalker=(...args)=>{if(!discoverRoots&&first){first=false;clock.advance(elapsed)}return walk(...args)};
+    const outcome=await page.execute({mode:'observe',discover_roots:discoverRoots});
+    assert.equal(outcome.status,elapsed===limit?'SUCCEEDED':'NOT_APPLIED',JSON.stringify({discoverRoots,elapsed,outcome}));
+    if(elapsed>limit){assert.equal(outcome.error.code,'UI_SCAN_LIMIT');assert.equal(outcome.output.scan.complete,false);assert.equal(outcome.output.ui,undefined);assert.equal(outcome.effect_possible,false)}
+    assert.deepEqual(page.events,[]);
   }
 });
 
@@ -4179,6 +4172,68 @@ test('wide import definitions have addressed pages with one schema identity and 
  const legacy=(await page.observe()).wizard.import_columns;assert.equal(legacy.fields.length,8);assert.equal(legacy.page,undefined);
  c.cols[11].cells[1].ownText='changed label';
  assert.notEqual((await read(0)).page.schema_id,first.page.schema_id,'changing a field outside the page invalidates its definition identity');
+});
+
+test('wide Import procedure confirms one format gesture within the unchanged scan budget',async t=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=importCoverageFixture(page,130);
+ const owner=page.add('div','MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtDelimiterChar;ValueControl','',
+  {x:30,y:60,width:100,height:25},c.form);
+ const input=page.add('input',null,'',owner.box,owner);input.value='Точка с запятой';input.attrs.maxlength='1';
+ // Deterministic header lookup cost, charged only on the post-gesture scan.
+ // This measures the repeated-header regression, not host scheduling or a
+ // prediction of native latency. All other reads still execute normally.
+ let postTidReads=0,matching=0;
+ for(const e of page.document.all()) {
+  const get=e.getAttribute.bind(e),match=e.matches.bind(e),header=/;normalHeaderCt;\d+$/.test(e.attrs['data-tid']??'');
+  // Native selector internals do not call JavaScript getAttribute. Exclude the
+  // selector double's implementation from the charged observer lookups.
+  e.matches=selector=>{matching++;try{return match(selector);}finally{matching--;}};
+  e.getAttribute=name=>{if(!matching&&header&&name==='data-tid'&&page.events.includes('keyboard_type')){postTidReads++;clock.advance(0.05);}return get(name);};
+ }
+ const postReadCosts=[],evaluate=page.evaluate.bind(page);
+ page.evaluate=async(fn,arg)=>{
+  const before=postTidReads;
+  try{return await evaluate(fn,arg);}finally{if(postTidReads>before)postReadCosts.push((postTidReads-before)*0.05);}
+ };
+ const seed=await page.observe();
+ const records=[],channel=createNodeProcedure({operation:{id:'wide-format',action:{action_key:'node.apply',revision:'1'},
+  deadline:900000,checkpoint:{document_id:seed.dom_epoch.document,workflow_ref:seed.workflow_ref}},
+  now:()=>clock.Date.now(),wait:async()=>{},targetOrigin:origin,targetBuild:build,
+  record:async e=>{records.push(e);return structuredClone(e);},wrapMutation:code=>code,
+  execute:async code=>clone(await vm.runInContext('('+code+')',page.context)(page))});
+ const initial=await channel.observe({condition:'wide Import format ready',importColumnPage:{offset:0,limit:8},
+  ready:s=>s.wizard.import_columns.page?.status==='complete_definition_page'});
+ const schema=initial.wizard.import_columns.page.schema_id;
+ assert.equal(initial.wizard.import_columns.page.total_columns,130);
+ await channel.perform({condition:'set bound delimiter on wide Import',initialObservation:initial,
+  ready:s=>s.wizard.settings.fields.delimiter.status==='observed',
+  identity:s=>({source_tid:s.wizard.settings.fields.delimiter.source_tid,value:s.wizard.settings.fields.delimiter.value}),
+  resolve:s=>({verb:'set_wizard_field',ref:s.wizard.settings.fields.delimiter.input_ref,text:';'})});
+ const receipt=records.find(e=>e.phase==='node_step_completed').outcome;
+ assert.equal(receipt.status,'SUCCEEDED',JSON.stringify(receipt.error));
+ assert.equal(receipt.output.scan.max_ms,500);
+ assert.equal(receipt.output.scan.complete,true);assert.ok(postReadCosts.every(ms=>ms<500));
+ assert.equal(receipt.output.wizard.import_columns.page.schema_id,schema);
+ assert.equal(receipt.output.wizard.import_columns.page.total_columns,130);
+ assert.equal(receipt.output.wizard.import_columns.definition_coverage.status,'partial');
+ assert.equal(input.value,';');assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+ assert.ok(postTidReads>0);assert.ok(postReadCosts.length>0);
+ t.diagnostic(JSON.stringify({post_header_reads:postTidReads,synthetic_read_costs_ms:postReadCosts,max_ms:receipt.output.scan.max_ms}));
+ assert.equal(records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+});
+
+test('wide header index retains off-page duplicate headers and cells as ambiguity',async()=>{
+ for(const kind of ['header','cell']) {
+  const page=new Page({clock:fixtureClock().Date}),c=importCoverageFixture(page,130);
+  const original=kind==='header'?c.cols[129].header:c.cols[129].cells[1];
+  // A duplicate outside the native header/body must not overwrite its indexed
+  // peer or disappear simply because the requested page covers fields 0–7.
+  page.add('div',original.attrs['data-tid'],original.ownText,original.box,c.form);
+  const observed=await page.execute({mode:'observe',import_column_page:{offset:0,limit:8}});
+  assert.equal(observed.status,'SUCCEEDED');
+  assert.equal(observed.output.wizard.import_columns.page.status,'unverified');
+  assert.equal(observed.output.wizard.import_columns.definition_coverage.status,'partial');
+ }
 });
 
 test('a malformed field outside the selected page prevents complete schema pagination',async()=>{
@@ -4370,6 +4425,31 @@ function pagedTableFixture() {
  f.page.context.Ext={getCmp:id=>id==='view-table'?{el:{dom:f.grid},getStore:()=>store}:undefined};
  return {...f,records,store};
 }
+test('typed wide Table format skips discarded legacy DOM passes without falling back on invalid metadata',async t=>{
+ const f=pagedTableFixture();f.page.context.Date=fixtureClock().Date;
+ for(let i=66;i<130;i++)f.records.push({isModel:true,internalId:String(100+i),data:{Index:i,Name:'Field'+i,
+  DisplayName:'Field'+i,SourceColumnIndex:i,DataType:3,InGrid:true,DisplayFormat:'0.00'}});
+ for(let i=0;i<400;i++)f.page.add('span',null,'',{x:1100,y:900,width:1,height:1},f.modal);
+ let cellContains=0;
+ for(const row of f.rows)for(const cell of row.children.filter(e=>/;col(?:DisplayName|InAll)_/.test(e.attrs['data-tid']??''))) {
+  const contains=cell.contains.bind(cell);cell.contains=e=>{cellContains++;return contains(e);};
+ }
+ const get=f.page.context.Ext.getCmp,grid=get('view-table');grid.getSelectionModel=()=>({getSelection:()=>[f.records[1]]});
+ f.page.context.Ext.getCmp=id=>id==='view-table'?grid:get(id);
+ const first=await f.page.execute({mode:'observe',table_format_page:{offset:0,limit:8}});
+ assert.equal(first.status,'SUCCEEDED');const fmt=first.output.table_settings.format;
+ assert.equal(fmt.page.total_columns,130);assert.equal(fmt.metadata_fields.length,8);
+ assert.equal(fmt.fields.length,2);assert.equal(fmt.fieldlist_complete,false);
+ assert.equal(fmt.selection.complete,true);assert.equal(fmt.selected_numeric.name_key,'Amount');
+ for(const k of ['formatting','custom','format_string','thousands','scientific','decimal_digits','currency'])assert.equal(fmt.selected_numeric[k].status,'observed');
+ assert.ok(cellContains<64,'typed observer must not scan the full DOM once per legacy cell: '+cellContains);
+ t.diagnostic(JSON.stringify({cell_contains_calls:cellContains,columns:130}));
+ f.records[129].data.Name='Region';
+ const invalid=(await f.page.execute({mode:'observe',table_format_page:{offset:0,limit:8}})).output.table_settings.format;
+ assert.equal(invalid.page.status,'unverified_definition_page');assert.equal(invalid.fields.length,0);
+ assert.equal(invalid.fieldlist_complete,false);assert.equal(invalid.selected_numeric,undefined);
+ assert.deepEqual(f.page.events,[]);
+});
 test('Table format page separates full cached metadata from painted editable rows',async()=>{
  const f=pagedTableFixture();
  const first=(await f.page.execute({mode:'observe',table_format_page:{offset:0,limit:8}})).output;
@@ -5148,4 +5228,120 @@ test('fractional Reform rows retain complete definitions and native record bindi
   assert.equal(s.wizard.reform_columns.definition_coverage.status,'complete_configured_fields',String(scale));
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
+});
+test('contended root discovery is bounded independently of actionable scans',async()=>{
+ for(const [discover,elapsed,success] of [[true,1200,true],[true,2000,true],[true,2001,false],[false,501,false]]){
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  const query=page.document.querySelectorAll.bind(page.document);let charged=false;
+  page.document.querySelectorAll=(selector)=>{if(discover&&!charged){charged=true;clock.advance(elapsed)}return query(selector)};
+  const walk=page.document.createTreeWalker.bind(page.document);page.document.createTreeWalker=(...args)=>{if(!discover&&!charged){charged=true;clock.advance(elapsed)}return walk(...args)};
+  const result=await page.execute({mode:'observe',discover_roots:discover});
+  if(success){
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.output.observation_kind,'roots');
+   assert.equal(result.output.scan.max_ms,2000);assert.ok(result.output.ui.elements.every(e=>e.allowed_actions.length===0));
+  }else{assert.equal(result.error?.code,'UI_SCAN_LIMIT',JSON.stringify({discover,elapsed,result}));assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true)}
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('wide format group binds common controls to full native selection including unrendered members',async()=>{
+ const f=pagedTableFixture(),get=f.page.context.Ext.getCmp,grid=get('view-table');
+ const selection=[f.records[1],f.records[40],f.records[65]];
+ grid.getSelectionModel=()=>({getSelection:()=>selection});f.page.context.Ext.getCmp=id=>id==='view-table'?grid:get(id);
+ const r=await f.page.execute({mode:'observe',table_format_page:{offset:0,limit:8}}),fmt=r.output.table_settings.format;
+ assert.equal(fmt.selection.complete,true);assert.deepEqual(fmt.selection.fields.map(f=>f.source_index),[1,40,65]);
+ assert.equal(fmt.selected_numeric,undefined);assert.deepEqual(fmt.selected_group.fields.map(f=>f.record_id),['101','140','165']);
+ assert.equal(fmt.selected_group.format_string.value,'0.00');assert.equal(fmt.selected_group.custom.value,true);assert.deepEqual(f.page.events,[]);
+});
+for(const fault of ['foreign','duplicate','painted_mismatch','mixed_type'])test('wide format group refuses '+fault,async()=>{
+ const f=pagedTableFixture(),get=f.page.context.Ext.getCmp,grid=get('view-table');let selection=[f.records[1],f.records[40]];
+ if(fault==='foreign')selection.push({isModel:true,data:{}});
+ if(fault==='duplicate')selection.push(f.records[1]);
+ if(fault==='painted_mismatch')selection=[f.records[40]];
+ if(fault==='mixed_type'){selection.push(f.records[0]);f.rows[0].attrs.class+=' x-grid-item-selected';}
+ grid.getSelectionModel=()=>({getSelection:()=>selection});f.page.context.Ext.getCmp=id=>id==='view-table'?grid:get(id);
+ const r=await f.page.execute({mode:'observe',table_format_page:{offset:0,limit:8}});assert.equal(r.output.table_settings.format.selected_group,undefined);assert.deepEqual(f.page.events,[]);
+});
+
+for(const fault of ['none','epoch_after_key','deadline_after_key','foreign_owner','lost_click','release_failure'])test('private format Control click keeps primitive guards and releases the key: '+fault,async()=>{
+ const f=pagedTableFixture(),get=f.page.context.Ext.getCmp,grid=get('view-table');
+ grid.getSelectionModel=()=>({getSelection:()=>[f.records[1]]});f.page.context.Ext.getCmp=id=>id==='view-table'?grid:get(id);
+ let clock=Date.now();f.page.context.Date={now:()=>clock};
+ const binding={document_id:'doc',workflow_ref:{prefix:'MF;TF-1'},node:{node_id:'node'}};
+ const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'views'};
+ const table={table_tid:f.viewKey,view_guid:'view',port_guid:'port'};
+ const readNode=async()=>node;
+ const invoke=async task=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',f.page.context)(f.page,task,readNode,undefined,undefined,
+  async()=>({verified:fault!=='foreign_owner',surface:'views',tables:[{...table,active:true}]})));
+ const before=(await invoke({mode:'observe',expected_origin:origin,expected_build:build,prepared_node_context:binding,table_format_page:{offset:0,limit:8}})).output;
+ const target=before.ui.elements.find(e=>e.table_field?.name_key==='Amount');assert.ok(target);
+ f.page.keyboard.down=async key=>{assert.equal(key,'Control');f.page.events.push('format_key_down');if(fault==='deadline_after_key')clock+=16000;if(fault==='epoch_after_key')f.page.mutationObserver.pending.push({type:'attributes',target:f.rows[1],attributeName:'title'});};
+ f.page.keyboard.up=async key=>{assert.equal(key,'Control');f.page.events.push('format_key_up');if(fault==='release_failure')throw Error('release failed');};
+ f.page.failClick=fault==='lost_click';
+ const result=await invoke({mode:'act',expected_origin:origin,expected_build:build,prepared_node_context:binding,snapshot:before,
+  action:{verb:'click',ref:target.ref},table_format_modifier:true,table_format_deadline:clock+15000,table_format_table:table});
+ assert.equal(result.status,fault==='none'?'SUCCEEDED':fault==='foreign_owner'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ assert.equal(f.page.events.filter(e=>e==='click').length,['epoch_after_key','deadline_after_key','foreign_owner'].includes(fault)?0:1);
+ assert.equal(f.page.events.filter(e=>e==='format_key_up').length,fault==='foreign_owner'?0:1);
+ assert.equal(result.cleanup_complete,fault!=='release_failure');
+ if(fault==='lost_click')assert.ok(f.page.events.indexOf('mouse_up')<f.page.events.indexOf('format_key_up'));
+});
+
+test('private typed format discovery uses only the exact fresh modal selector and issues no actions',async()=>{
+ const f=pagedTableFixture(),page=f.page;page.context.Date=fixtureClock().Date;
+ f.modal.getBoundingClientRect=()=>{throw Error('root discovery must not lay out the modal');};
+ const tid=f.modal.getAttribute('data-tid'),queries=[],query=page.document.querySelectorAll.bind(page.document);
+ page.document.querySelectorAll=selector=>{queries.push(selector);return query(selector);};
+ const read=()=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {mode:'observe',expected_origin:origin,expected_build:build,discover_roots:true,table_format_root_tid:tid});
+ const first=await read();assert.equal(first.status,'SUCCEEDED',JSON.stringify(first.error));
+ const region=first.output.ui.elements.find(e=>e.tid===tid);assert.ok(region);assert.deepEqual([...region.allowed_actions],[]);
+ assert.ok(queries.includes('[data-tid="'+tid+'"]'));
+ assert.equal(queries.some(s=>s.includes('[role="grid"],table,[role="form"]')),false);
+ assert.equal(queries.some(s=>s==='[data-tid*=";ViewsForm;BrowseView-"]'),false);
+ assert.equal(first.output.scan.max_ms,2000);assert.equal(first.output.scan.complete,true);
+ assert.equal(first.output.origin,origin);assert.equal(first.output.loginom_build,build);
+ assert.equal(first.output.workflow_ref.prefix,'MF;TF-1');assert.ok(first.output.dom_epoch.document);
+ assert.equal(first.output.ui.elements.length,1);assert.equal(first.output.ui.truncated.dialogs,true);
+ const old=f.modal;old.remove();
+ const missing=await read();assert.equal(missing.status,'NOT_APPLIED');assert.equal(missing.error.code,'UI_ROOT_STALE');
+ assert.equal(missing.effect_possible,false);assert.equal(missing.output.ui,undefined);
+ const replacement=page.add('div',tid);const fresh=await read();
+ assert.equal(fresh.status,'SUCCEEDED');assert.notEqual(fresh.output.ui.elements.find(e=>e.tid===tid).ref,region.ref);
+ const stale=await page.execute({mode:'observe',root_ref:region.ref});assert.equal(stale.error.code,'UI_ROOT_STALE');
+ // Hidden duplicates also prevent a root from being chosen.
+ const duplicate=page.add('div',tid);duplicate.style.display='none';
+ const ambiguous=await read();assert.equal(ambiguous.status,'NOT_APPLIED');assert.equal(ambiguous.error.code,'UI_ROOT_STALE');
+ assert.equal(ambiguous.effect_possible,false);assert.equal(ambiguous.output.ui,undefined);
+ assert.deepEqual(page.events,[]);assert.ok(replacement.isConnected);
+});
+
+for(const fault of ['absent','duplicate','hidden_duplicate','foreign','malformed'])test('typed format root requires one active workflow without dialog layout: '+fault,async()=>{
+ const f=pagedTableFixture(),page=f.page;page.context.Date=fixtureClock().Date;
+ const tid=f.modal.getAttribute('data-tid');
+ f.modal.getBoundingClientRect=()=>{throw Error('root metadata layout forbidden');};
+ const tabs=page.document.querySelectorAll('.x-tab-active[data-tid]');
+ assert.equal(tabs.length,1);
+ if(fault==='absent')tabs[0].attrs.class='';
+ if(fault==='foreign')tabs[0].attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
+ if(fault==='malformed')tabs[0].attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-bad';
+ if(fault.includes('duplicate')) {
+  const extra=page.add('div',tabs[0].getAttribute('data-tid'));extra.attrs.class='x-tab-active';
+  if(fault==='hidden_duplicate')extra.style.display='none';
+ }
+ const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {mode:'observe',expected_origin:origin,expected_build:build,discover_roots:true,table_format_root_tid:tid});
+ assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'UI_ROOT_STALE');
+ assert.equal(result.effect_possible,false);assert.equal(result.output.ui,undefined);assert.deepEqual(page.events,[]);
+});
+
+test('exact format root selector is private and bound to the prepared workflow',()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const options={mode:'observe',prepared_node_context:binding,expected_origin:origin,expected_build:build};
+ assert.throws(()=>makeWorkspaceUiCode({...options,table_format_root_tid:'anything'}),/private/);
+ assert.throws(()=>makeTableFormatRootsCode({...options,root_ref:'ui-old'},{table_tid:'MF;TF-1;ViewsForm;BrowseView'}),/fresh root/);
+ const code=makeTableFormatRootsCode(options,{table_tid:'MF;TF-1;ViewsForm;BrowseView-2'});
+ assert.ok(code.includes('"table_format_root_tid":"MF;TF-1;ViewsForm;BrowseView-2;ModalWindow_BrowseFormat"'));
+ for(const table_tid of ['MF;TF-2;ViewsForm;BrowseView','MF;TF-1;ViewsForm;BrowseView;extra','MF;TF-1;ViewsForm;BrowseView"],[role="dialog'])
+  assert.throws(()=>makeTableFormatRootsCode(options,{table_tid}),/bound typed/);
 });

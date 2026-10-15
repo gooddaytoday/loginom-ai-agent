@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {nativePage} from './fixtures/navigation/native-page.mjs';
+import {readPreparedNodeContext} from '../lib/node-context.mjs';
+import {openPreparedWizard} from '../lib/node-wizard-open.mjs';
+for(const fault of [null,'document','workflow','node','unverified','proof','observed','label','missing','duplicate'])test('saved-package wizard binding: '+fault,async()=>{
+const f=nativePage(),before=await readPreparedNodeContext(f.page,f.binding);
+let state={prepared_node_context:before,wizard:{status:'absent'},ui:{elements:[{tid:before.tid+';Setting',ref:'settings',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'NavigationDiagnostic'},workflow_path:f.binding.workflow_ref.navigation_path}},{tid:before.tid+';Label;Label',graph_node:{part:'label'},label:'NavigationDiagnostic'}]}};
+let gestures=0;
+const channel={observe:async()=>state,perform:async()=>{gestures++;f.enterWizard();const crumbs=f.crumbs().map(e=>({tid:e.getAttribute(),label:e.textContent}));state={prepared_node_context:await readPreparedNodeContext(f.page,f.binding),wizard:{status:'observed',owner_context:{status:'observed',node:crumbs.at(-2),path:crumbs}},ui:{elements:[]}};
+if(['document','workflow','node'].includes(fault))state.prepared_node_context[fault+'_id']='foreign';
+if(fault==='unverified')state.prepared_node_context.verified=false;
+if(fault==='proof')delete state.prepared_node_context.navigation_rebinding;
+if(fault==='observed')state.prepared_node_context.navigation_rebinding.observed_path=[];
+if(fault==='label')state.wizard.owner_context.node.label='Foreign';
+if(fault==='missing')state.wizard.owner_context.path.shift();
+if(fault==='duplicate')state.wizard.owner_context.path.unshift(state.wizard.owner_context.path[0]);
+}};
+if(fault)await assert.rejects(openPreparedWizard(channel),/owner differs/);
+else assert.equal((await openPreparedWizard(channel)).verified,true);assert.equal(gestures,1);
+});

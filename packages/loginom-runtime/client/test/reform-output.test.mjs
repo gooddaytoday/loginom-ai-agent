@@ -1,13 +1,59 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {reformOutputSources} from '../lib/reform-output.mjs';
+import {reformOutputSources,resolveReformOutputMapping} from '../lib/reform-output.mjs';
 const fixture=()=>{
  const owner={verified:true,document_id:'doc',workflow_id:'flow',node_id:'reform'};
  const configuration={verified:true,inventory_complete:true,source_identity_verified:true,node_context:owner,fields:[{field_id:'3',name:'Amount',label:'Same',type:'real',excluded:false},{field_id:'8',name:'Discard',label:'Same',type:'string',excluded:true}]};
  const native={verified:true,inventory_complete:true,source_identity_verified:true,node_context:owner,source_fields:[{field_id:'0',name:'Amount',label:'Same',type:'real'}]};
  return {configuration,native};
 };
+const orderedOutput=()=>{
+ const sources=['Id','NetAmount','Enabled','Timestamp'].map((name,i)=>({name,label:name,type:'string',used:true,
+  record_id:'s'+i,field_id:String(i),required:false}));
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,autosync:true,
+  mapping_wizard:'DerivedDataSourceOutputSocketWizard',source_fields:sources,
+  target_fields:sources.map((source,i)=>({...source,record_id:'t'+i,source,excluded:false,inherited:false,data_kind:'Дискретный'}))};
+ const fields=['Timestamp','Id','NetAmount','Enabled'].map(name=>({source:{kind:'configured_field',name}}));
+ return {sources,native,mapping:{fields}};
+};
+test('complete custom reform order selects a manual socket before native edits',()=>{
+ const f=orderedOutput(),before=structuredClone(f);
+ const request=resolveReformOutputMapping(f.mapping,f.sources,f.native);
+ assert.equal(request.autosync,false);
+ assert.deepEqual(request.fields.map(f=>f.source.name),['Timestamp','Id','NetAmount','Enabled']);
+ assert.deepEqual(f,before,'caller mapping and original native inventory stay unchanged');
+ f.mapping.autosync=true;
+ assert.throws(()=>resolveReformOutputMapping(f.mapping,f.sources,f.native),/conflicts with autosync/);
+ f.mapping.autosync=false;
+ assert.equal(resolveReformOutputMapping(f.mapping,f.sources,f.native).autosync,false);
+});
+test('natural order and property-only reform edits preserve synchronization policy',()=>{
+ const f=orderedOutput();
+ f.mapping.fields=f.sources.map(f=>({source:{kind:'configured_field',name:f.name}}));
+ assert.equal(resolveReformOutputMapping(f.mapping,f.sources,f.native).autosync,undefined);
+ assert.equal(resolveReformOutputMapping({changes:[{source:{kind:'configured_field',name:'NetAmount'},label:'Сумма'}]},f.sources,f.native).autosync,undefined);
+ assert.equal(resolveReformOutputMapping({autosync:true},f.sources,f.native).autosync,true);
+ assert.equal(resolveReformOutputMapping({autosync:false},f.sources,f.native).autosync,false);
+});
+test('custom order requires the same complete verified source layout before any policy change',()=>{
+ for(const mutate of [f=>f.mapping.fields.pop(),f=>f.mapping.fields[0].source.name='Foreign',
+  f=>f.native.source_identity_verified=false,f=>f.native.target_fields[0].source=null]){
+  const f=orderedOutput();mutate(f);
+  assert.throws(()=>resolveReformOutputMapping(f.mapping,f.sources,f.native));
+ }
+});
 test('reform output uses converted nonexcluded fields without confusing socket and input IDs',()=>{
  const f=fixture(),sources=reformOutputSources(f.configuration,f.native);assert.equal(sources.length,1);assert.equal(sources[0].name,'Amount');assert.equal(sources[0].type,'real');assert.equal(sources[0].used,true);
+});
+test('a complete layout accounts for post-change sources, not fields excluded by the node',()=>{
+ const f=fixture();
+ f.native.autosync=false;f.native.mapping_wizard='DerivedDataSourceOutputSocketWizard';
+ f.native.source_fields[0]={...f.native.source_fields[0],record_id:'output-source',required:false};
+ f.native.target_fields=[{record_id:'output-target',source:f.native.source_fields[0],name:'Amount',label:'Same',type:'real',data_kind:'Непрерывный',excluded:false,required:false,inherited:false}];
+ const sources=reformOutputSources(f.configuration,f.native),before=structuredClone(f);
+ const layout={fields:[{source:{kind:'configured_field',name:'Amount'}}]};
+ assert.deepEqual(resolveReformOutputMapping(layout,sources,f.native).fields,layout.fields);
+ assert.throws(()=>resolveReformOutputMapping({fields:[...layout.fields,{source:{kind:'configured_field',name:'Discard'}}]},sources,f.native),/every configured source field/);
+ assert.deepEqual(f,before);
 });
 test('reform refuses original, incomplete, duplicate or foreign output schemas',()=>{
  for(const mutate of [f=>f.configuration.source_identity_verified=false,f=>f.native.source_fields=[],f=>f.native.source_fields.push({...f.native.source_fields[0]}),

@@ -49,8 +49,9 @@ export function validateUiAction(action, snapshot) {
   return action;
 }
 
-export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
-  const started = Date.now(), deadline = started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000);
+export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus, readTableOwner) {
+  const started = Date.now(), deadline = Math.min(started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000),
+    task.table_format_modifier!==undefined?task.table_format_deadline:Infinity);
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -59,7 +60,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   let navigationSurfaceReads=0;
   let processFocusTicket,processShowCompleted=false,processFocusAttempted=false;
   let graphLockReads=0;
-  let phase = 'observing', effectPossible = false, mouseHeld = false, mouseButton = 'left';
+  let phase = 'observing', effectPossible = false, mouseHeld = false, mouseButton = 'left', formatControlHeld = false;
   const record = (event, details = {}) => trace.push({ at_ms: Date.now() - started, event, ...details });
   const result = (status, output = {}, error = null) => ({ status, action_key: task.mode === 'observe' ? 'workspace.observe' : 'ui.act',
     action_revision: '1', operation_id: task.operation_id ?? null, phase, effect_possible: effectPossible, output, error, trace });
@@ -105,11 +106,15 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
-    try {
+    const observed = await page.evaluate(({rootRef,discoverRoots,formatRootTid,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
+    // Retain failed-read measurements across the browser realm without exporting partial action refs.
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
-    let maxMs = 500;
-    let work = 0,scanStage='collect';
+    // Root discovery issues only region references with no allowed actions.
+    // Under renderer contention even this small bounded scan can take >500ms.
+    // Actionable observations retain 500ms; retries never extend the parent deadline.
+    let maxMs = discoverRoots ? 2000 : 500;
+    let work = 0,scanStage='collect',visitedElements=0,scanRootTid=null,documentEpoch=null;
+    try {
     const charge = () => {
       if (++work > maxWork || Date.now() - scanStarted > maxMs) {
         const error = new Error('Workspace scan budget exceeded; no complete observation or action references were issued');
@@ -122,6 +127,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       state = { document, ids: new WeakMap(), sequence: 0, epoch: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` };
       Object.defineProperty(globalThis, stateKey, { value: state, configurable: true });
     }
+    documentEpoch=state.epoch;
     if (!state.observer) {
       if (typeof MutationObserver !== 'function') {
         const error = new Error('DOM mutation tracking is unavailable'); error.code = 'UI_EPOCH_UNAVAILABLE'; throw error;
@@ -178,13 +184,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if (rootRef && !requestedRoot?.isConnected) {
       const error=new Error('Observed root is detached or its reference expired');error.code='UI_ROOT_STALE';throw error;
     }
+    scanRootTid=requestedRoot?.getAttribute('data-tid')??null;
     const dom = [], seenElements = new Set();
     const include = element => {
       charge(); if (seenElements.has(element)) return;
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
-      seenElements.add(element);dom.push(element);
+      seenElements.add(element);dom.push(element);visitedElements=dom.length;
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"],[data-tid$="NavigationBar;NavPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -193,16 +200,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Indexed Table roots use the same E2E IdSuffix convention as the first
     // view. The candidate selector also finds descendants: admit only exact
     // numeric root identities, charging every candidate against the budget.
-    const indexedViews=discoverRoots && storageSelector===null
+    const indexedViews=discoverRoots && !formatRootTid && storageSelector===null
       ? [...document.querySelectorAll('[data-tid*=";ViewsForm;BrowseView-"]')].filter(element=>{
         charge();return /^MF;TF(?:-\d+)?;ViewsForm;BrowseView-[1-9][0-9]*$/.test(element.getAttribute('data-tid')??'');
       }):[];
-    const processMenuCandidates=discoverRoots?document.querySelectorAll('[data-tid="mnContextMenu"]'):[];charge();
+    const processMenuCandidates=discoverRoots&&!formatRootTid?document.querySelectorAll('[data-tid="mnContextMenu"]'):[];charge();
     const processMenuRegions=processMenuCandidates.length===1
       && processMenuCandidates[0].querySelectorAll('[data-tid="mnContextMenu;mniShowNodeToProcess"]').length===1
       && processMenuCandidates[0].querySelectorAll('[data-tid="mnContextMenu;mniShowCompletedProcesses"]').length===1
       ? [processMenuCandidates[0]]:[];charge();
-    const regionElements=discoverRoots ? [...new Set([...document.querySelectorAll(storageSelector ?? regionSelector),...indexedViews,...(storageSelector===null?processMenuRegions:[])])] : [];
+    // Internal typed-format discovery addresses exactly one modal incarnation.
+    // No old ref, suffix match, or general-region fallback is usable here.
+    const formatRoots=formatRootTid ? [...document.querySelectorAll('[data-tid="'+formatRootTid+'"]')] : [];
+    charge();
+    if(formatRootTid && formatRoots.length!==1) {
+      const error=new Error('Typed Table format root is absent or ambiguous');error.code='UI_ROOT_STALE';throw error;
+    }
+    const regionElements=discoverRoots ? formatRootTid ? formatRoots
+      : [...new Set([...document.querySelectorAll(storageSelector ?? regionSelector),...indexedViews,...(storageSelector===null?processMenuRegions:[])])] : [];
     charge();
     if (discoverRoots) for (const element of regionElements) include(element);
     const omittedRegions=new Set();
@@ -265,7 +280,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid$=";NavigationBar;NavPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       ...Object.entries({ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
@@ -314,9 +329,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       charge();for (const element of guards)if(addressedImportField(element))include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
-      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
+      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"],[data-tid*=";ViewsForm;cntPorts;"],[data-tid*=";ViewsForm;ViewerCard"]');
       charge();for (const element of tableOwners) {
-        charge();if(/^MF;TF(?:-\d+)?;ViewsForm;BrowseView(?:-[1-9][0-9]*)?$/.test(element.getAttribute('data-tid')??''))include(element);
+        charge();if(/^MF;TF(?:-\d+)?;ViewsForm(?:;BrowseView(?:-[1-9][0-9]*)?|;cntPorts;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|;ViewerCard(?:-[0-9]+)?)?$/.test(element.getAttribute('data-tid')??''))include(element);
       }
     }
     if(!requestedRoot && !discoverRoots && omittedRegions.has('preview_data_cells')) {
@@ -332,6 +347,26 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const panels=document.querySelectorAll('[data-tid="ConsoleForm"]');charge();
       if(panels.length===1) {include(panels[0]);const descendants=panels[0].querySelectorAll('*');charge();
         for(const element of descendants)include(element);}
+    }
+    if(formatRootTid && discoverRoots) {
+      // This pass issues only a fresh region ref. Do not lay out the format
+      // dialog or its rows; the following detail read proves visibility,
+      // blockers, native ownership and the document epoch before any action.
+      const tabs=dom.filter(element=>element.classList.contains('x-tab-active')
+        && (element.getAttribute('data-tid')??'').startsWith('MF;cntMain;cntWorkspace;Workspace;t.br;tb'));
+      charge();
+      const tab=tabs.length===1?tabs[0]:null,tabTid=tab?.getAttribute('data-tid');
+      const match=/^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-(\d+))?$/.exec(tabTid??'');
+      const workflow=match?{tab_tid:tabTid,prefix:match[1]?'MF;TF-'+match[1]:'MF;TF'}:null;
+      if(!workflow || !formatRootTid.startsWith(workflow.prefix+';ViewsForm;')) {
+        const error=new Error('Typed Table format workflow is absent or ambiguous');error.code='UI_ROOT_STALE';throw error;
+      }
+      return {origin:location.origin,loginom_build:globalThis.bg?.app?.Version??null,
+        workflow_ref:workflow,dom_epoch:{document:state.epoch,revision:state.revision},
+        scan:{complete:true,mutation_counts:{...state.mutations},visited_elements:dom.length,
+          max_elements:maxElements,max_work:maxWork,max_ms:maxMs},
+        ui:{elements:[{ref:refOf(formatRoots[0]),tid:formatRootTid,kind:'region',allowed_actions:[]}],
+          dialogs:[],masks:[],truncated:{dialogs:true,masks:true,elements:true}}};
     }
     scanStage='metadata';
     const select = selector => dom.filter(element => { charge(); return element.matches(selector); });
@@ -529,7 +564,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
       // breadcrumb buttons, not document.title. This is observed context only;
       // proving which graph click opened the wizard requires an action receipt.
-      const panels=(tids.get(workflow.prefix+';NavigationBar;NavigationPanel')??[]).filter(e=>visible(e) && !sensitive(e));
+      // Native 7.4.2 shortnames uses NavPanel; keep the legacy exact name.
+      // Both candidates still belong to this tab and must resolve uniquely.
+      const panels=['NavPanel','NavigationPanel'].flatMap(name=>tids.get(workflow.prefix+';NavigationBar;'+name)??[])
+        .filter(e=>visible(e) && !sensitive(e));
       let ownerContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       let portContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       if(panels.length===1) {
@@ -561,7 +599,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             vendor_icon:e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const chain=items.every((item,index)=>item.tid.length<=2048 && item.label.length<240
-            && (!index || item.tid.startsWith(items[index-1].tid+'>')));
+            && (!index || item.tid.startsWith(items[index-1].tid+'>')
+              && !item.tid.slice(items[index-1].tid.length+1).includes('>')));
           if(unique&&chain&&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
             &&items.length>=preparedWorkflowPath.length&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096
             &&preparedWorkflowPath.every((c,i)=>c.tid===items[i].tid&&c.label===items[i].label)
@@ -1640,19 +1679,27 @@ function readRenderedInputMapping(observation) {
       }
       const headers=definitionElements.filter(e=>{charge();const tid=getTid(e);return tid?.startsWith(columnBase)
         && /^\d{1,4}$/.test(tid.slice(columnBase.length)) && visible(e) && !sensitive(e);});
-      const indexes=[...new Set(headers.map(e=>getTid(e).slice(columnBase.length)))];
+      // Keep every peer: indexing must not turn duplicate headers into a unique
+      // field. Repeated whole-header searches made each full page quadratic.
+      const headersByIndex=new Map();
+      for(const header of headers) {
+        const index=getTid(header).slice(columnBase.length),peers=headersByIndex.get(index)??[];
+        peers.push(header);headersByIndex.set(index,peers);
+      }
+      const indexes=[...headersByIndex.keys()];
       const types={'Целый':'integer','Вещественный':'real','Строковый':'string','Логический':'boolean','Дата/Время':'datetime','Переменный':'variant'};
       const readColumn=(index,retain=true)=>{
         const cells=[0,1,2,3,4].map(row=>(definitionTids.get(columnBase+index+'_'+row)??[])
           .filter(e=>visible(e) && !sensitive(e) && wizardForms[0].contains(e)));
-        const unique=headers.filter(e=>getTid(e)===columnBase+index).length===1 && cells.every(es=>es.length===1);
+        const peers=headersByIndex.get(index)??[];
+        const unique=peers.length===1 && cells.every(es=>es.length===1);
         if(!unique)return {index:Number(index),status:'unobserved_or_ambiguous'};
         const values=cells.slice(0,4).map(es=>textOf(es[0],true));
         const checks=cells[4][0].querySelectorAll('.x-grid-checkcolumn');charge();
         const used=checks.length===1 && visible(checks[0]) && !sensitive(checks[0]) ? checks[0].classList.contains('x-grid-checkcolumn-checked'):null;
         if(values.some(v=>!v || v.length>120) || !types[values[2]] || used===null)
           return {index:Number(index),status:'unobserved_or_ambiguous'};
-        return {index:Number(index),status:'observed',header_ref:refOf(headers.find(e=>getTid(e)===columnBase+index),retain),name:values[0],label:values[1],label_associated:cells[1][0].classList.contains('bg-associated-value'),type:types[values[2]],data_kind:values[3],used,
+        return {index:Number(index),status:'observed',header_ref:refOf(peers[0],retain),name:values[0],label:values[1],label_associated:cells[1][0].classList.contains('bg-associated-value'),type:types[values[2]],data_kind:values[3],used,
           cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map((key,i)=>[key,refOf(cells[i][0],retain)]))};
       };
       const offset=columnPage?.offset??0,limit=columnPage?.limit??8;
@@ -1733,7 +1780,10 @@ function readRenderedInputMapping(observation) {
       };
       const noOverflow=e=>Number.isFinite(e.clientWidth) && Number.isFinite(e.scrollWidth)
         && e.clientWidth>0 && e.scrollWidth<=e.clientWidth;
-      if(grids.length===1 && headerContainers.length===1 && bodies.length===1) {
+      // This certificate requires at most eight fields. Wide pages retain
+      // partial geometry coverage and use the full definition inventory below;
+      // measuring every clipped cell cannot make them fully visible.
+      if(indexes.length>0 && indexes.length<=8 && grids.length===1 && headerContainers.length===1 && bodies.length===1) {
         const grid=grids[0],container=headerContainers[0],body=bodies[0];
         const nativeHeaders=[...container.querySelectorAll('.x-column-header')];charge();
         const indexed=all.filter(e=>{charge();return (getTid(e)??'').startsWith(columnBase)
@@ -1797,12 +1847,13 @@ function readRenderedInputMapping(observation) {
         if(grids.length===1 && headerContainers.length===1 && bodies.length===1 && !editors.length) {
           const grid=grids[0],container=headerContainers[0],body=bodies[0];
           const native=[...container.querySelectorAll('.x-column-header')];charge();
+          const nativeSet=new Set(native);
           const count=indexes.length;
           if(count>0 && count<=1000 && offset<count && native.length===count
             && wizardForms[0].contains(grid) && grid.contains(container) && grid.contains(body)
             && contained(grid,grid) && visible(container) && visible(body)
-            && indexes.every((index,i)=>index===String(i) && headers.filter(h=>getTid(h)===columnBase+index).length===1
-              && native.includes(headers.find(h=>getTid(h)===columnBase+index))
+            && indexes.every((index,i)=>index===String(i) && headersByIndex.get(index).length===1
+              && nativeSet.has(headersByIndex.get(index)[0])
               && [0,1,2,3,4].every(row=>{const cells=definitionTids.get(columnBase+index+'_'+row)??[];return cells.length===1&&body.contains(cells[0]);}))
             && native.filter(h=>h.classList.contains('x-column-header-first')).length===1
             && native[0].classList.contains('x-column-header-first')
@@ -2505,6 +2556,8 @@ function readRenderedInputMapping(observation) {
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
       .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||preparedNodeId&&['NavigationPanel','NavPanel'].some(name=>getTid(selectedRoot)===definitionPrefix+';NavigationBar;'+name)
+          &&['NavigationPanel','NavPanel'].flatMap(name=>tids.get(definitionPrefix+';NavigationBar;'+name)??[]).filter(e=>visible(e)&&!sensitive(e)).length===1&&viewerControls.has(state.ids.get(element))
         ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
@@ -3027,10 +3080,13 @@ function readRenderedInputMapping(observation) {
               predicates_complete:coverage?.rows.length===0,effective_filter_verified:false,
               ...(coverage?{rendered_row_count:coverage.rows.length,grid_ref:coverage.grid_ref,container_ref:coverage.container_ref}:{})};
           } else {
-            const labelCells=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colDisplayName_') && modal.contains(e);});
+            // Typed pages validate their own native inventory and painted rows
+            // below. Do not build then discard the legacy whole-list geometry
+            // and per-cell DOM scans before every individual/group selection.
+            const labelCells=tableFormatPage?[]:all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colDisplayName_') && modal.contains(e);});
             const rows=[...new Set(labelCells.map(e=>e.closest('table')).filter(Boolean))];
             const grid=unique(base+'grdFields;tbl');
-            const coverage=bounds(grid),filter=input('txtColumnsFilterField');
+            const coverage=tableFormatPage?null:bounds(grid),filter=input('txtColumnsFilterField');
             let fields=labelCells.slice(0,16).map(cell=>{
               const key=getTid(cell).slice((base+'colDisplayName_').length),row=cell.closest('table');
               const index=unique(base+'colSourceColumnIndex_'+key),visibility=unique(base+'colInAll_'+key);
@@ -3055,7 +3111,7 @@ function readRenderedInputMapping(observation) {
               && new Set(fields.map(f=>f.source_index)).size===fields.length && fields.every(f=>f.source_index<fields.length)
               && filter.status==='observed' && filter.value===''
               && !dom.some(e=>{charge();return modal.contains(e) && /celleditor|EditColumnDefForm/.test(getTid(e)??'') && visible(e);});
-            let formatPage=null,metadataFields=[],formatScroll=null;
+            let formatPage=null,metadataFields=[],formatScroll=null,formatSelection=null;
             if(tableFormatPage && grid) {
               const nativeView=globalThis.Ext?.getCmp?.(grid.id),store=nativeView?.getStore?.(),records=store?.getData?.()?.items;
               const own=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
@@ -3098,6 +3154,12 @@ function readRenderedInputMapping(observation) {
                     row_ref:refOf(row),label_ref:refOf(labels[0]),visibility_status:'cached_native'});
                 }
                 if(cacheValid) {
+                  const selection=nativeView.getSelectionModel?.()?.getSelection?.();
+                  if(Array.isArray(selection)&&selection.length<=metadata.length&&new Set(selection).size===selection.length
+                    &&selection.every(r=>records.includes(r))
+                    &&nativeRows.every(row=>row.classList.contains('x-grid-item-selected')===selection.includes(records[Number(row.getAttribute('data-recordindex'))])))
+                    formatSelection={complete:true,fields:metadata.filter((f,i)=>selection.includes(records[i]))
+                      .map(({index,source_index,name_key,type,record_id})=>({index,source_index,name_key,type,record_id}))};
                   valid=true;formatScroll=refOf(grid);
                   formatPage={status:fields.length===metadataFields.length?'complete_definition_page':'rendered_definition_window',
                     schema_id:state.tableFormatDefinition.schema_id,offset:tableFormatPage.offset,limit:tableFormatPage.limit,
@@ -3106,7 +3168,7 @@ function readRenderedInputMapping(observation) {
                 } else {fields=[];metadataFields=[];}
               }
             }
-            tableSettings.format={fields,fieldlist_complete:!!valid&&!tableFormatPage,...(formatPage?{page:formatPage,metadata_fields:metadataFields,definition_scroll_ref:formatScroll}:{}),visibility_complete:!!valid && fields.every(f=>f.visibility_status==='observed'),filter,source_identity_verified:false};
+            tableSettings.format={fields,fieldlist_complete:!!valid&&!tableFormatPage,...(formatPage?{page:formatPage,metadata_fields:metadataFields,definition_scroll_ref:formatScroll,selection:formatSelection}:{}),visibility_complete:!!valid && fields.every(f=>f.visibility_status==='observed'),filter,source_identity_verified:false};
             const selected=fields.filter(f=>f.status==='observed' && f.selected);
             if(valid && selected.length===1 && selected[0].type==='datetime') {
               tableSettings.format.selected_datetime={name_key:selected[0].name_key,source_index:selected[0].source_index,
@@ -3119,6 +3181,20 @@ function readRenderedInputMapping(observation) {
                 thousands:checked('BrowseFormatPanel;cbThousand'),scientific:checked('BrowseFormatPanel;cbScientific'),
                 decimal_digits:input('BrowseFormatPanel;edtDecimalDigit'),currency:input('BrowseFormatPanel;edtCurrency'),
                 format_string:input('BrowseFormatPanel;edtFormatStr'),losslessness_verified:false};
+            }
+            if(formatSelection?.fields.length!==1&&formatSelection?.complete===true)delete tableSettings.format.selected_numeric;
+            // A complete native selection binds the common rendered controls to
+            // every member, including virtualized rows. Mixed types and any
+            // indeterminate checkbox remain unavailable to the fixed procedure.
+            if(valid&&formatSelection?.fields.length>1&&new Set(formatSelection.fields.map(f=>f.type)).size===1
+              &&['integer','real'].includes(formatSelection.fields[0].type)) {
+              tableSettings.format.selected_group={fields:formatSelection.fields,
+                formatting:checked('BrowseFormatPanel;cntFormat;cnt-1;chb'),custom:checked('BrowseFormatPanel;cbFormatStr'),
+                thousands:checked('BrowseFormatPanel;cbThousand'),scientific:checked('BrowseFormatPanel;cbScientific'),
+                decimal_digits:input('BrowseFormatPanel;edtDecimalDigit'),currency:input('BrowseFormatPanel;edtCurrency'),
+                format_string:input('BrowseFormatPanel;edtFormatStr')};
+              // A rendered singleton window is not a singleton selection.
+              delete tableSettings.format.selected_numeric;
             }
           }
         }
@@ -3226,13 +3302,16 @@ function readRenderedInputMapping(observation) {
       const code=['UI_SCAN_LIMIT','UI_ROOT_STALE','UI_EPOCH_UNAVAILABLE'].includes(error?.code)
         ? error.code : 'UI_OBSERVATION_FAILED';
       return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
-        ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
+        ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{}),...(code==='UI_SCAN_LIMIT'?{diagnostics:{root_ref:rootRef??null,root_tid:scanRootTid,document_epoch:documentEpoch,global_scan:!rootRef&&!discoverRoots,discover_roots:discoverRoots,elapsed_ms:Math.max(0,Date.now()-scanStarted),work,visited_elements:visitedElements,max_ms:maxMs,max_work:maxWork,max_elements:maxElements}}:{})}};
     }
-  },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
+  },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,formatRootTid:task.table_format_root_tid??null,storageName:task.storage_name ?? null,
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
     mappingPage:task.output_column_page??(task.snapshot?.wizard?.output_columns?.page?{offset:task.snapshot.wizard.output_columns.page.offset,limit:task.snapshot.wizard.output_columns.page.limit}:null),
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
-    preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
+    // Save As can rebuild breadcrumb TIDs while retaining this native node.
+    // Only boundNode's verified rebind supplies the current path; the same
+    // complete native context is checked again after the UI read below.
+    preparedWorkflowPath:nodeContext?.navigation_rebinding?.observed_path??task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
@@ -3240,7 +3319,7 @@ function readRenderedInputMapping(observation) {
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
-      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
+      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown',...observed.ui_read_failure.diagnostics});
       const messages={UI_SCAN_LIMIT:'Workspace scan budget exceeded; use root discovery and a narrower observation',
         UI_ROOT_STALE:'Observed root is detached, hidden, inactive or expired',
         UI_EPOCH_UNAVAILABLE:'DOM mutation tracking is unavailable',UI_OBSERVATION_FAILED:'Browser observation failed'};
@@ -3400,6 +3479,8 @@ function readRenderedInputMapping(observation) {
     let outcome, cleanupComplete = true, refreshedAfterCleanup = false;
     record('ui_observation_started');
     try {
+      if(task.table_format_modifier!==undefined&&(!Number.isSafeInteger(task.table_format_deadline)||!task.prepared_node_context))
+        fail('TABLE_FORMAT_SELECTION_CHANGED','Bound format selection deadline required');
       const current = await readUi();
       if (task.mode === 'observe') {
         phase = 'observed';
@@ -3456,6 +3537,14 @@ function readRenderedInputMapping(observation) {
         const nodeBeforeGesture=await boundNode();
         if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture))
           fail('PREPARED_NODE_CONTEXT_CHANGED','The node surface changed before the gesture');
+        const checkFormatOwner=async()=>{
+          if(task.table_format_modifier===undefined)return;
+          if(typeof readTableOwner!=='function')fail('TABLE_FORMAT_SELECTION_CHANGED','Native Table owner reader required');
+          const owner=await readTableOwner(page,task.prepared_node_context,readNodeContext),t=task.table_format_table;
+          if(owner?.verified!==true||owner.surface!=='views'||!t||owner.tables?.filter(v=>v.active&&v.view_guid===t.view_guid&&v.port_guid===t.port_guid&&v.table_tid===t.table_tid).length!==1)
+            fail('TABLE_FORMAT_SELECTION_CHANGED','Native Table format owner changed');
+        };
+        await checkFormatOwner();
         if(['execute_graph_node','deactivate_graph_node'].includes(task.action.verb)) {
           const launch=await readUi(),before=current.ui.elements.find(e=>e.ref===task.action.ref),after=launch.ui.elements.find(e=>e.ref===task.action.ref);
           if(!before?.graph_execution||!after?.allowed_actions.includes(task.action.verb)||!same(before.graph_execution,after.graph_execution))
@@ -3473,6 +3562,20 @@ function readRenderedInputMapping(observation) {
         });
         if (!same(current.dom_epoch,epochBeforeGesture)) fail('UI_EPOCH_CHANGED','The document changed while checking the target; observe again');
         record('ui_preconditions_verified', { verb: task.action.verb, refs });
+        if(task.table_format_modifier!==undefined) {
+          const f=current.table_settings?.format,e=current.ui.elements.find(e=>e.ref===task.action.ref);
+          if(task.action.verb!=='click'||typeof task.table_format_modifier!=='boolean'||!task.prepared_node_context
+            ||current.table_settings?.kind!=='format'||f?.selection?.complete!==true
+            ||!e?.table_field||!['integer','real'].includes(e.table_field.type)
+            ||f.fields.filter(v=>v.source_index===e.table_field.source_index&&v.name_key===e.table_field.name_key&&v.type===e.table_field.type&&v.label_ref===e.ref).length!==1)
+            fail('TABLE_FORMAT_SELECTION_CHANGED','Owned numeric format row required');
+          if(task.table_format_modifier){
+            timeout();effectPossible=true;formatControlHeld=true;await page.keyboard.down('Control');
+            await checkFormatOwner();
+            const epoch=await page.evaluate(()=>{const s=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];if(!s?.observer)return null;s.captureMutations(s.observer.takeRecords());return {document:s.epoch,revision:s.revision};});
+            if(!same(current.dom_epoch,epoch)||!same(current.prepared_node_context,await boundNode()))fail('UI_EPOCH_CHANGED','Format row changed before modified click');
+          }
+        }
         phase = 'applying'; effectPossible = true;
         const first = targets[0].handle;
         const clickTarget = async (clickCount, button = 'left') => {
@@ -3780,9 +3883,15 @@ function readRenderedInputMapping(observation) {
                 &&beforeNode.pending_wizard_node.label===owner?.node?.label
               :labels.length===1&&normalizeLabel(labels[0].label)!==''
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
+          // Only the prepared native binding can authorize a saved-package
+          // rekey; the raw owner path or displayed label cannot do so.
+          const rebound=afterNode?.navigation_rebinding;
+          const ownerPath=owner?.path?.slice(0,-2).map(({tid,label})=>({tid,label}));
+          const openingPathMatches=same(ownerPath,opening.workflow_path)
+            ||guidOwnerMatches&&same(rebound?.prepared_path,opening.workflow_path)&&same(rebound?.observed_path,ownerPath);
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingPathMatches))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
@@ -4036,6 +4145,10 @@ function readRenderedInputMapping(observation) {
         try { await page.mouse.up({ button: mouseButton }); record('cleanup_completed', { resource: 'mouse', button: mouseButton }); refreshedAfterCleanup = true; }
         catch { cleanupComplete = false; outcome = result('AMBIGUOUS', outcome?.output, { code: 'UI_CLEANUP_FAILED', message: 'Mouse release could not be confirmed' }); record('cleanup_failed', { resource: 'mouse' }); }
       }
+      if(formatControlHeld) {
+        try{await page.keyboard.up('Control');formatControlHeld=false;refreshedAfterCleanup=true;record('cleanup_completed',{resource:'format_control_key'});}
+        catch{cleanupComplete=false;outcome=result('AMBIGUOUS',outcome?.output,{code:'UI_CLEANUP_FAILED',message:'Format selection modifier release could not be confirmed'});}
+      }
       for (const handle of handles) { try { await handle.dispose(); } catch { /* Disposal does not mutate Loginom. */ } }
     }
     if (refreshedAfterCleanup) {
@@ -4048,6 +4161,7 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.table_format_root_tid!==undefined||options.table_format_modifier!==undefined||options.table_format_deadline!==undefined||options.table_format_table!==undefined)throw Error('Format modifiers are private to the fixed Table selection procedure');
   const tableFilterOpening=options.action?.verb==='click'&&options.snapshot?.node_outputs?.verified===true
     &&options.snapshot.node_outputs.surface==='views'&&options.snapshot.prepared_node_context?.surface==='views'
     &&options.snapshot.node_outputs.tables.filter(t=>t.active&&t.view_guid&&t.port_guid
@@ -4073,6 +4187,25 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
   const task = { ...structuredClone(options), kind: 'workspace-ui' };
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
+  return workspaceUiTaskCode(task,{snapshotArgument});
+}
+
+function workspaceUiTaskCode(task,{snapshotArgument=false}={}) {
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
   return `async (page) => (${workspaceUiCapability.toString()})(page, ${JSON.stringify(task)}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
+}
+
+// Internal root selection only: the ordinary detail read still proves the
+// Table owner, document epoch, blockers and actionable references.
+export function makeTableFormatRootsCode(options, table) {
+  if(!options || Object.keys(options).some(key=>!['mode','operation_id','prepared_node_context','discover_roots','expected_origin','expected_build'].includes(key)))
+    throw Error('Typed Table format discovery accepts only a fresh root request');
+  // Reuse all public observation/binding validation, without exposing the selector.
+  makeWorkspaceUiCode({...options,mode:'observe',discover_roots:true});
+  const prefix=options.prepared_node_context?.workflow_ref.prefix;
+  if(!prefix || typeof table?.table_tid!=='string' || !table.table_tid.startsWith(prefix+';ViewsForm;')
+    || !/^MF;TF(?:-[1-9][0-9]*)?;ViewsForm;BrowseView(?:-[1-9][0-9]*)?$/.test(table.table_tid))
+    throw Error('A bound typed Table format root is required');
+  return workspaceUiTaskCode({...structuredClone(options),mode:'observe',kind:'workspace-ui',discover_roots:true,
+    table_format_root_tid:table.table_tid+';ModalWindow_BrowseFormat'});
 }

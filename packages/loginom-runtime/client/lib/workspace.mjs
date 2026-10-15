@@ -5,8 +5,9 @@ async function prepareWorkspace(page, options) {
   const trace = [];
   let authenticated = false;
   const remaining = () => {
-    if (Date.now() >= deadline) throw new Error('DEADLINE');
-    return deadline - Date.now();
+    const left = deadline - Date.now();
+    if (left <= 0) throw new Error('DEADLINE');
+    return left;
   };
   const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
   const wait = async (name, probe) => {
@@ -123,6 +124,7 @@ async function prepareWorkspace(page, options) {
       await page.goto(options.url,{waitUntil:'domcontentloaded',timeout:remaining()});
     }
     const build=await wait('ui_build',()=>page.evaluate(()=>globalThis.bg?.app?.Version??null));
+    remaining();
     target={profile_id:options.profileId,loginom_build:build,platform:options.platform,browser:'chromium'};
     if (build!==options.expectedBuild) return result('INCOMPATIBLE','UI_BUILD_MISMATCH');
     const avatar=tid('MF;cntMain;tlbMainToolbar;btnAvatar'), login=tid('LoginForm;Login;edtUsername');

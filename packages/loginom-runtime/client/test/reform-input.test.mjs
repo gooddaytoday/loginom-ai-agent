@@ -26,3 +26,12 @@ test('reform never substitutes name, label or index when native source identity 
 test('input-name patches require verified input binding even if the current name happens to match',()=>{
  const f=fixture();assert.throws(()=>resolveReformChanges({changes:[{field:{kind:'input_field',name:'Amount'},label:'X'}]},f.configuration),/Verified reform input/);
 });
+test('editing a renamed output keeps the effective input selector and rejects the output alias',()=>{
+ const f=fixture(),bound=bindReformInput(f.configuration,f.input),before=structuredClone(bound);
+ assert.throws(()=>resolveReformChanges({changes:[{field:{kind:'input_field',name:'Amount'},name:'NetAmount'}]},bound),/Unknown reform field/);
+ const selector=bound.fields[0].input_field.name;
+ const changed=resolveReformChanges({changes:[{field:{kind:'input_field',name:selector},name:'NetAmount',usage:'Показатель'}]},bound);
+ assert.equal(selector,'UnitPrice');assert.equal(changed.fields[0].name,'NetAmount');assert.equal(changed.fields[0].usage_type,7);
+ assert.deepEqual(changed.fields[0].input_field,bound.fields[0].input_field);
+ assert.deepEqual(changed.fields[1],bound.fields[1]);assert.deepEqual(bound,before);
+});

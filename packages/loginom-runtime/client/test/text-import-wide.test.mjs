@@ -18,11 +18,11 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
  const check=()=>{assert.ok(++steps<=budget,'fixed procedure exhausted its schema allowance');};
  const values=o=>Object.fromEntries(Object.entries(o).map(([k,value])=>[k,{status:'observed',truncated:false,value}]));
  const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
-  import_source:{fields:values({...parameters.source,encoding:'UTF-8 (65001)',rows_to_skip:'0'})},settings:{fields:{...values(parameters.format),null_marker:{status:'observed',truncated:false,value:marker,owner_ref:'marker-owner',input_ref:selected&&optionMode==='replaced_input'?'foreign-input':'marker-input'}}},
+  import_source:{fields:values({...parameters.source,encoding:'UTF-8 (65001)',rows_to_skip:'0'})},settings:{fields:{...values(parameters.format),null_marker:{status:'observed',truncated:false,enabled:true,read_only:false,source_tid:'wizard;null_marker',native_max_length_utf16:128,value:marker,owner_ref:'marker-owner',input_ref:selected&&optionMode==='replaced_input'?'foreign-input':'marker-input'}}},
   ...(editor?{import_column_editor:{...editor}}:{}),
   import_columns:{initial_layout:{status:'rendered_definition_layout'},fields:columns.slice(offset,offset+8),
    page:{status:'complete_definition_page',schema_id:'wide',offset,limit:8,returned:Math.min(8,count-offset),total_columns:count,next_offset:offset+8<count?offset+8:null}}},
-  ui:{elements:[...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:['scroll_horizontal'],bounding_box:{x:0,width:800}}, {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'}})))]}});
+  ui:{elements:[{ref:'marker-input',identity:{anchor_tid:'wizard;null_marker',path:[0]},allowed_actions:['set_wizard_field'],wizard_field:{name:'null_marker',scope:'import_format',stage:'text_import_format',root_ref:'wizard-ref',owner_ref:'marker-owner'}},...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:['scroll_horizontal'],bounding_box:{x:0,width:800}}, {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'}})))]}});
  const channel={observe:async options=>{
   check();const offset=options.importColumnPage?.offset??0;reads.push({condition:options.condition,offset});
   if(options.condition==='complete import definition page at 0'&&initialSweep&&drift)columns.at(-1).used=false;
@@ -45,6 +45,7 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
  },perform:async options=>{
   const before=options.initialObservation;
   assert.equal(options.ready(before),true);
+  if(options.condition==='set bound import format null_marker')return channel.act(options.resolve(before));
   const refreshed=structuredClone(before);
   refreshed.wizard.import_column_editor.input_ref='fresh-editor';
   const filling=options.resolve(before).verb==='fill';

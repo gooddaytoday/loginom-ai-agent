@@ -5,7 +5,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
-import { makeWorkspaceUiCode, validateUiAction } from './workspace-ui.mjs';
+import { makeWorkspaceUiCode, makeTableFormatRootsCode, validateUiAction } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
 import {makeNodePreviewSchemaCode} from './node-preview-schema.mjs';
@@ -21,6 +21,7 @@ import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './no
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
+import {makeTableFormatSelectionCode,validateTableFormatSelection} from './table-format-selection.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
 const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args);
@@ -73,9 +74,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       throw new Error('Node procedure budget exhausted; inspect the partial result');
     }
   };
-  const entry = (phase, details) => record({ operation_id: operation.id,
+  const entryValue = (phase, details) => ({ operation_id: operation.id,
     action_key: operation.action.action_key, action_revision: operation.action.revision,
     phase, internal_provenance: 'client_node_procedure_v1', ...details });
+  const entry = (phase, details) => record(entryValue(phase,details));
+  const observationAck=(ack,expected)=>ack?.phase===expected.phase
+    &&['operation_id','action_key','action_revision','internal_provenance','step','internal_operation_id'].every(k=>ack[k]===expected[k])
+    &&JSON.stringify(canonical(ack.readiness))===JSON.stringify(canonical(expected.readiness))&&!!ack.outcome?.output;
   const allowedDialog=(d,dialog)=>dialog && d.identity?.anchor_tid===dialog.table.table_tid+';ModalWindow_Browse'+(dialog.kind==='format'?'Format':'Filter');
   const allowedOutputEditor=(dialog,state)=>['output_mapping','input_mapping'].includes(state.wizard?.stage)
     &&state.wizard.column_parameters?.status==='observed'&&state.wizard.column_parameters.portal_bound===true
@@ -179,6 +184,33 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     return structuredClone(result.output);
   };
   const channel = {
+    async selectTableFormatGroup(table,refs,reset) {
+      checkBudget();
+      if(!preparedNodeContext||!snapshot)throw Error('Fresh prepared Table format observation required');
+      assertContext(snapshot,false,snapshotTableDialog);
+      const before=snapshot,plan=validateTableFormatSelection(before,table,refs,reset);
+      const step=nextStep(),id=operation.id+':n'+step,actionKey='node.table_format.select.internal';
+      const action={verb:'select_table_format_group',table,plan},signature=digest([id,action,evidenceSnapshot]);
+      snapshot=null;evidenceSnapshot=null;
+      const saved=await entry('node_step_prepared',{step,internal_operation_id:id,action,signature});
+      if(saved?.signature!==signature||JSON.stringify(saved.action)!==JSON.stringify(action))throw Error('Table format selection was not durably prepared');
+      checkBudget();
+      const code=makeTableFormatSelectionCode(preparedNodeContext,{snapshot:before,table,refs,reset,operation_id:id,
+        deadline:Math.min(operation.deadline,now()+15000),origin:targetOrigin,build:targetBuild});
+      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'TABLE_FORMAT_SELECTION_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
+      let r;
+      try{r=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:20000});}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      operation.nodeEffectPossible ||= r.effect_possible===true;operation.cleanupConfirmed=r.cleanup_complete===true;
+      const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(r)});
+      if(r.operation_id!==id||r.action_key!==actionKey||JSON.stringify(completed?.outcome)!==JSON.stringify(r)) {
+        operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Table format selection receipt changed');
+      }
+      if(r.status!=='SUCCEEDED'||r.output?.verified!==true||!operation.cleanupConfirmed
+        ||JSON.stringify(canonical(r.output.selection))!==JSON.stringify(canonical((reset?[]:plan.before).concat(plan.fields)))
+        ||!['document_id','workflow_id','node_id'].every(k=>r.output.node_context?.[k]===(k==='document_id'?preparedNodeContext.document_id:k==='workflow_id'?preparedNodeContext.workflow_ref.workflow_id:preparedNodeContext.node.node_id)))throw new NodeProcedureStepError(r);
+      return structuredClone(r.output);
+    },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async openOutputPort(port) {return channel.openPort('output',port);},
@@ -238,24 +270,39 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       const deadline = Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, satisfied = false, admitted = false, admittedElapsed, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      const sampleWrites=[];
+      let sampleWriteFailure, admittingSample, admittingSampleAck, rootScanTimeout;
+      try {
       try {
       for (let sample = 0; sample < 80; sample++) {
+        if(sampleWriteFailure)throw sampleWriteFailure;
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         // Rediscover the root: wizard transitions and combo portals can replace it.
-        const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
-          ...boundOptions,
-          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
-        { timeout: readTimeout() });
+        const rootOptions={mode:'observe',operation_id:id,...boundOptions,
+          discover_roots:true,expected_origin:targetOrigin,expected_build:targetBuild};
+        const typedFormatRoot=tableDialog?.kind==='format'&&tableFormatPage!==undefined;
+        const roots = await execute(typedFormatRoot ? makeTableFormatRootsCode(rootOptions,tableDialog.table)
+          : makeWorkspaceUiCode(rootOptions),{ timeout: readTimeout() });
         if (roots.status !== 'SUCCEEDED') {
           if (timeScanRefusal(roots,'workspace.observe')) {
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
               condition,stage:'roots',outcome:structuredClone(roots)});
             satisfied=false;confirmations=0;previousIdentity=undefined;
+            const scan=roots.trace.find(event=>event.event==='ui_scan_limit'&&event.limit_kind==='time');
+            const remaining=deadline-observationNow();
+            if(remaining<=0 || Number.isFinite(scan?.elapsed_ms)&&remaining<scan.elapsed_ms) {
+              // Durable confirmation can consume the remaining window. Do not
+              // begin another browser read which this refusal already outlasts.
+              rootScanTimeout={rediscovery_started:false,stage:'roots',limit_kind:'time',
+                elapsed_ms:scan?.elapsed_ms??null,max_ms:scan?.max_ms??null,
+                work:scan?.work??null,visited_elements:scan?.visited_elements??null};
+              break;
+            }
             continue;
           }
           throw new Error('Node procedure roots could not be observed');
@@ -271,7 +318,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const outputRoot=readOutputs ? [preparedNodeContext.workflow_ref.prefix+';ViewsForm;BrowseView',preparedNodeContext.workflow_ref.prefix+';ViewsForm',preparedNodeContext.workflow_ref.prefix+';ModelForm;cmpDiagram']
           .map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid)).find(xs=>xs.length===1)?.[0].ref : undefined;
         const dialogRoot=tableDialog ? (roots.output.ui?.elements??[]).filter(e=>e.tid===tableDialog.table.table_tid+';ModalWindow_Browse'+(tableDialog.kind==='format'?'Format':'Filter')) : [];
-        if(dialogRoot.length>1)throw new Error('Table dialog is ambiguous');
+        if(dialogRoot.length>1||typedFormatRoot&&dialogRoot.length!==1)throw new Error('Table dialog is absent or ambiguous');
         const navigationRoot=readNavigation&&preparedNodeContext?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';NavigationBar;NavigationPanel')?.ref:undefined;
         const graphRoot=preparedNodeContext?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;cmpDiagram')?.ref:undefined;
         if(readNavigation&&!navigationRoot)throw Error('Prepared workflow navigation region unavailable');
@@ -296,7 +343,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const rolePortal=wizard?.stage==='input_mapping'&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
         const produceMenus=readMappings&&wizard?.stage==='output_mapping'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnProduceType;mn'||e.tid===wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnProduceType;mn'):[];
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
-        const root = crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        const root = typedFormatRoot ? dialogRoot[0].ref : crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
@@ -305,14 +352,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           ...(outputColumnPage===undefined?{}:{output_column_page:outputColumnPage}),
           ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) }),
         { timeout: readTimeout() });
-        if(result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
+        if(observationNow()<deadline&&result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
           // Ext's message box has no root data-tid. Re-read its observed portal;
           // native field ownership and exact prompt controls are checked below.
           result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:result.output.ui.dialogs[0].ref,expected_origin:targetOrigin,expected_build:targetBuild}),
           {timeout:readTimeout()});
         }
-        if(result.status==='SUCCEEDED' && wizardConfirmationOwner(result.output,wizardConfirmation)) {
+        if(observationNow()<deadline&&result.status==='SUCCEEDED' && wizardConfirmationOwner(result.output,wizardConfirmation)) {
           // The native message box is a portal outside the wizard subtree.
           const dialog=result.output.ui.dialogs[0];
           result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
@@ -349,24 +396,31 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           error.nodeObservationRefusal = structuredClone(result);
           throw error;
         }
-        if(readPreview){
+        if(readPreview&&observationNow()<deadline){
           result.output.node_preview_schema=await execute(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
         }
-        if(readFilter){
+        if(readFilter&&observationNow()<deadline){
           result.output.node_filter=await execute(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_filter.node_context&&JSON.stringify(canonical(result.output.node_filter.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native filter context changed during observation');
         }
-        if(readMissingValues){
+        if(readMissingValues&&observationNow()<deadline){
           result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
         }
         // CrossTable modal ownership is attested by its native cached record,
         // before a modal can pass the context gate or authorize any action.
-        if(readCrossTable&&result.output.wizard?.stage==='crosstable'){
+        if(observationNow()<deadline&&readCrossTable&&result.output.wizard?.stage==='crosstable'){
           result.output.node_crosstable=await execute(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
           const native=result.output.node_crosstable;
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
+        }
+        if (observationNow() >= deadline) {
+          await entry('node_observation_sample', {step, sample, internal_operation_id:id,
+            readiness:{policy:'semantic_condition_v2',required_samples:confirmIdentity?2:1,
+              identity_sha256:null,condition,satisfied:false,timeout_ms:timeoutMs,elapsed_ms:observationNow()-started},
+            outcome:structuredClone(result)});
+          break;
         }
         try {
           assertContext(result.output, true, tableDialog, false, wizardConfirmation);
@@ -393,20 +447,18 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(native.node_context && JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw new Error('Native process/output context changed during observation');
         }
-        if(tablePage) {
-          if(observationNow()>=deadline)break;
+        if(tablePage&&observationNow()<deadline) {
           result.output.node_table_request=structuredClone(tablePage);
           result.output.node_table=await execute(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
             {timeout:readTimeout()});
         }
-        if(observationNow()>=deadline)break;
-        if(tableDialog) {
+        if(tableDialog&&observationNow()<deadline) {
           const tables=result.output.node_outputs?.tables??[];
           if(result.output.node_outputs?.verified!==true || tables.filter(t=>t.active&&t.view_guid===tableDialog.table.view_guid
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
         }
-        satisfied = (boundWizardConfirmation(result.output,wizardConfirmation)
+        satisfied = observationNow() < deadline && (boundWizardConfirmation(result.output,wizardConfirmation)
           || result.output.ui.masks.every(m=>result.output.ui.dialogs.length===1&&allowedNodeEditor(result.output.ui.dialogs[0],result.output)
             &&m.kind==='modal_background'&&m.target_tid===result.output.wizard.root_tid&&m.ref===result.output.wizard.root_ref)
             &&result.output.ui.dialogs.every(d=>allowedDialog(d,tableDialog)||allowedOutputEditor(d,result.output)||allowedNodeEditor(d,result.output)))
@@ -414,23 +466,52 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const identity = satisfied && confirmIdentity ? digest(confirmIdentity(result.output)) : null;
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
-        await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: observationNow() - started },
+        // Admission belongs to the evidence window, not the duration of its
+        // durable acknowledgement. Actions still require completed below.
+        const elapsed = observationNow() - started;
+        admitted = satisfied && started + elapsed < deadline && confirmations >= (confirmIdentity ? 2 : 1);
+        if (admitted) admittedElapsed = elapsed;
+        // The journal serializes these writes. Keep polling read-only while a
+        // sample acknowledgement is pending, within the same evidence window.
+        // Drain every write below before completed can publish actionable refs.
+        const sampleEntry=entryValue('node_observation_sample', { step, sample, internal_operation_id: id,
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: elapsed },
           outcome: structuredClone(result) });
+        if(admitted)admittingSample=sampleEntry;
+        if(!admitted||typeof record.observationPair!=='function')sampleWrites.push(Promise.resolve(record(sampleEntry)).then(ack=>{
+          if(!observationAck(ack,sampleEntry)||ack.sample!==sampleEntry.sample)throw Error('Node observation sample was not durably acknowledged');
+          if(sampleEntry===admittingSample)admittingSampleAck=ack;
+        }).catch(error=>{sampleWriteFailure??=error;}));
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
-        if (satisfied && confirmations >= (confirmIdentity ? 2 : 1)) break;
+        if (admitted) break;
       }
-      if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
+      } finally {
+        await Promise.all(sampleWrites);
+        if(sampleWriteFailure)throw sampleWriteFailure;
+      }
+      signal?.throwIfAborted();
+      if (!admitted) {
+        const elapsed=observationNow()-started;
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
-          elapsed_ms:observationNow()-started,effect_possible:false});
+          elapsed_ms:elapsed,effect_possible:false,
+          ...(rootScanTimeout?{observation_elapsed_ms:elapsed,...rootScanTimeout}:{} )});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
       }
-      const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
-        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: timeoutMs, elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
+      const completedEntry=entryValue('node_observation_completed', { step, internal_operation_id: id,
+        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: timeoutMs, elapsed_ms: admittedElapsed }, outcome: structuredClone(result) });
+      const receipts=typeof record.observationPair==='function'
+        ?await record.observationPair(admittingSample,completedEntry,{signal})
+        :[admittingSampleAck,await record(completedEntry)];
+      if(!Array.isArray(receipts)||receipts.length!==2||!observationAck(receipts[0],admittingSample)
+        ||receipts[0].sample!==admittingSample.sample||!observationAck(receipts[1],completedEntry)
+        ||JSON.stringify(receipts[0].outcome)!==JSON.stringify(receipts[1].outcome))
+        throw Error('Node observation requires both durable pair acknowledgements');
+      const persisted=receipts[1];
+      signal?.throwIfAborted();
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);

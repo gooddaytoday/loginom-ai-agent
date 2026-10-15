@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {open,mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 
-function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
+function fixture({ onRecord, pairWrite, recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
   const events = [], records = []; let reads = 0;
   const operation = sharedOperation ?? { id: 'parent', action: { action_key: 'node.import.configure', revision: '1' },
     deadline: 10000, checkpoint: { workflow_ref: { prefix: 'MF;TF-1', tab_tid: 'tab' }, document_id: 'doc' } };
@@ -11,9 +15,11 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
     dom_epoch: { document: changedDocument ? 'foreign' : 'doc', revision: 1 }, scan: { complete: true }, wizard: staleReads ? {status:'observed',root_ref:'ui-root',root_tid:'Wizard'} : { status: 'absent' },
     ui: { masks: [], dialogs: [], truncated: { elements: false, masks: false, dialogs: false },
       elements: [{ ref: 'ui-button', allowed_actions: ['click'] }] } };
+  const record=async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); await onRecord?.(entry); return structuredClone(entry); };
+  if(pairWrite)record.observationPair=(sample,completed,options)=>pairWrite(sample,completed,options,record);
   const channel = createNodeProcedure({ operation, maxSteps, signal, now, monotonicNow, wait,
     targetOrigin: 'http://example.test', targetBuild: '7.4.2',
-    record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); return structuredClone(entry); },
+    record,
     wrapMutation: (code, options) => { events.push('wrapped'); return { code, options }; },
     execute: async (code, options) => {
       if (typeof code === 'string') { reads++;
@@ -54,6 +60,23 @@ test('a time scan refusal resets consecutive identity confirmation',async()=>{
  const f=fixture({readRefusal:n=>n===4?timedScanRefusal():undefined});
  await f.channel.observe({condition:'field settled',ready:()=>true,confirmIdentity:()=>({node:'same'})});
  assert.equal(f.records.filter(r=>r.phase==='node_observation_sample').length,3);
+});
+for(const fault of ['insufficient_remaining','durable_write_crosses_deadline'])test('roots time refusal avoids rediscovery after acknowledgement: '+fault,async()=>{
+ let clock=0,reads=0;
+ const refusal=timedScanRefusal();Object.assign(refusal.trace[0],{elapsed_ms:9161,max_ms:2000,work:130,visited_elements:52});
+ const f=fixture({now:()=>clock,monotonicNow:()=>clock,sharedOperation:{id:'parent',action:{action_key:'node.import.configure',revision:'1'},deadline:900000,checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}},
+  readRefusal:()=>{reads++;clock+=9161;return refusal;},
+  onRecord:r=>{if(r.phase==='node_observation_scan_retried'&&fault==='durable_write_crosses_deadline')clock+=11424;}});
+ await assert.rejects(f.channel.observe({condition:'numeric group members confirmed',ready:()=>true,timeoutMs:15000}),/readiness timeout/);
+ assert.equal(reads,1);assert.equal(f.records.filter(r=>r.phase==='node_observation_scan_retried').length,1);
+ const timeout=f.records.find(r=>r.phase==='node_observation_timeout');
+ assert.equal(timeout.rediscovery_started,false);assert.equal(timeout.stage,'roots');assert.equal(timeout.limit_kind,'time');
+ assert.equal(timeout.elapsed_ms,9161);assert.equal(timeout.max_ms,2000);
+ assert.equal(timeout.work,130);assert.equal(timeout.visited_elements,52);
+ assert.equal(timeout.observation_elapsed_ms,clock);assert.equal(f.operation.deadline,900000);
+ assert.equal(f.records.some(r=>r.phase==='node_observation_sample'||r.phase==='node_observation_completed'),false);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+ assert.ok(!f.events.includes('mutated'));
 });
 for(const [name,alter] of Object.entries({work:r=>{r.trace[0].limit_kind='work'},elements:r=>{r.trace[0].limit_kind='elements'},traversal:r=>{r.trace[0].limit_kind='traversal'},unknown:r=>{r.trace=[]},effect:r=>{r.effect_possible=true},cleanup:r=>{r.cleanup_complete=false},gesture:r=>{r.trace.push({event:'ui_gesture_applied'})},precondition:r=>{r.trace.push({event:'ui_preconditions_verified'})}}))test('scan retry rejects '+name,async()=>{
  const refusal=timedScanRefusal();alter(refusal);
@@ -721,4 +744,346 @@ test('readiness expiry retains geometry across a final incomplete scan',async()=
   f.state.geometry={device_pixel_ratio:1.75,failure:{condition:'rows_end',actual:200.25,expected:200,delta:0.25,tolerance:1/64}};
   await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
   assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
+});
+
+test('durable sample and completion latency cannot revoke readiness admitted inside its window',async()=>{
+ for(const confirmIdentity of [undefined,()=>({owner:'same'})]) {
+  let clock=1,samples=0;
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRecord:async e=>{
+   if(e.phase==='node_observation_sample'&&++samples===(confirmIdentity?2:1))clock+=33000;
+   if(e.phase==='node_observation_completed')clock+=33000;
+  }});
+  f.operation.deadline=100000;
+  await f.channel.observe({condition:'value applied',timeoutMs:15000,ready:()=>true,confirmIdentity});
+  assert.ok(f.records.find(e=>e.phase==='node_observation_completed').readiness.elapsed_ms<15000);
+  assert.equal(samples,confirmIdentity?2:1);
+  assert.ok(!f.events.includes('node_observation_timeout'));
+  assert.ok(!f.events.includes('mutated'));
+ }
+});
+
+test('one identity sample cannot admit after its acknowledgement exhausts the window',async()=>{
+ let clock=1,reads=0;
+ const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>reads++,onRecord:async e=>{
+  if(e.phase==='node_observation_sample')clock+=33000;
+ }});
+ f.operation.deadline=100000;
+ await assert.rejects(f.channel.observe({condition:'stable owner',timeoutMs:15000,ready:()=>true,confirmIdentity:()=>({owner:'same'})}),/readiness timeout/);
+ assert.equal(reads,2);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_sample').length,1);
+ assert.ok(!f.events.includes('node_observation_completed'));
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('a returned late detail is journaled without readiness admission or another execute',async()=>{
+ let clock=1,reads=0,checks=0;
+ const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{if(++reads===2)clock+=33000;}});
+ f.operation.deadline=100000;
+ await assert.rejects(f.channel.observe({condition:'late detail',timeoutMs:15000,ready:()=>{checks++;return true;}}),/readiness timeout/);
+ assert.equal(reads,2);assert.equal(checks,0);
+ const sample=f.records.find(e=>e.phase==='node_observation_sample');
+ assert.equal(sample.outcome.status,'SUCCEEDED');assert.equal(sample.readiness.satisfied,false);
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('readiness still rejects a bound above 15000 before any read',async()=>{
+ let reads=0;const f=fixture({onRead:()=>reads++});
+ await assert.rejects(f.channel.observe({condition:'value',timeoutMs:15001,ready:()=>true}),/bounded readiness/);
+ assert.equal(reads,0);
+});
+
+test('failed durable readiness acknowledgements never authorize a gesture',async()=>{
+ for(const recordFailure of ['node_observation_sample','node_observation_completed']) {
+  const f=fixture({recordFailure});
+  await assert.rejects(f.channel.observe({condition:'applied',ready:()=>true}),/disk failure/);
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+ }
+});
+
+test('admitted readiness does not bypass the parent mutation deadline',async()=>{
+ let clock=1;const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRecord:async e=>{
+  if(e.phase==='node_observation_sample')clock+=33000;
+ }});
+ await f.channel.observe({condition:'applied',ready:()=>true});
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/budget exhausted/);
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('pending sample durability does not spend the remaining read-only readiness window',async()=>{
+ let clock=1,checks=0,releaseWrite,releasePoll,firstStarted;
+ const writing=new Promise(resolve=>{releaseWrite=resolve;});
+ const poll=new Promise(resolve=>{releasePoll=resolve;});
+ const started=new Promise(resolve=>{firstStarted=resolve;});
+ let pending=false;
+ const f=fixture({now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{await poll;clock+=ms;},onRecord:async e=>{
+  if(e.phase==='node_observation_sample'&&e.sample===0){pending=true;firstStarted();await writing;clock+=33000;pending=false;}
+  if(e.phase==='node_observation_completed')assert.equal(pending,false);
+ }});
+ f.operation.deadline=100000;
+ const observing=f.channel.observe({condition:'new card settled',timeoutMs:15000,ready:()=>{
+  checks++;
+  if(checks===3)queueMicrotask(releaseWrite);
+  return checks>1;
+ },confirmIdentity:()=>({owner:'same'})});
+ await started;
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+ releasePoll();await observing;
+ const samples=f.records.filter(e=>e.phase==='node_observation_sample');
+ assert.deepEqual(samples.map(e=>e.readiness.satisfied),[false,true,true]);
+ assert.ok(samples.every(e=>e.readiness.elapsed_ms<15000));
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,1);
+ assert.ok(!f.events.includes('node_observation_timeout'));
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('a pending sample write failure invalidates later admitted reads before completion',async()=>{
+ let releaseWrite,checks=0;
+ const writing=new Promise(resolve=>{releaseWrite=resolve;});
+ const f=fixture({onRecord:async e=>{
+  if(e.phase==='node_observation_sample'&&e.sample===0){await writing;throw Error('pending sample disk failure');}
+ }});
+ await assert.rejects(f.channel.observe({condition:'card settled',ready:()=>{
+  if(++checks===2)queueMicrotask(releaseWrite);
+  return checks===2;
+ }}),/pending sample disk failure/);
+ assert.equal(checks,2);
+ assert.ok(!f.events.includes('node_observation_completed'));
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('pending durability cannot admit a second identity read after the window',async()=>{
+ let clock=1,reads=0,releaseWrite;
+ const writing=new Promise(resolve=>{releaseWrite=resolve;});
+ const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>reads++,wait:async()=>{clock+=15000;releaseWrite();},onRecord:async e=>{
+  if(e.phase==='node_observation_sample')await writing;
+ }});
+ f.operation.deadline=100000;
+ await assert.rejects(f.channel.observe({condition:'stable card',timeoutMs:15000,ready:()=>true,confirmIdentity:()=>({owner:'same'})}),/readiness timeout/);
+ assert.equal(reads,2);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_sample').length,1);
+ assert.ok(!f.events.includes('node_observation_completed'));
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('cancellation while a sample is becoming durable cannot publish completed refs',async()=>{
+ const controller=new AbortController(),reason=Error('cancel pending sample');
+ const f=fixture({signal:controller.signal,onRecord:async e=>{
+  if(e.phase==='node_observation_sample'){await Promise.resolve();controller.abort(reason);}
+ }});
+ await assert.rejects(f.channel.observe({condition:'ready card',ready:()=>true}),error=>error===reason);
+ assert.ok(!f.events.includes('node_observation_completed'));
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_interrupted').length,1);
+ assert.ok(!f.events.includes('mutated'));
+});
+
+test('fixed Table format group keeps durable admission, original budget and exact owner/selection receipt',async()=>{
+ const table={view_guid:'11111111-1111-1111-1111-111111111111',port_guid:'22222222-2222-2222-2222-222222222222',table_tid:'MF;TF-1;ViewsForm;BrowseView'};
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'views'};
+ const fields=Array.from({length:2},(_,index)=>({index,source_index:index,name_key:'F'+index,type:'integer',record_id:'r'+index,status:'observed',label_ref:'ui-f'+index}));
+ for(const fault of ['none','prepare_write','deadline','transport','wrong_owner','wrong_selection','ambiguous','complete_write']){
+  let clock=1,mutations=0;const records=[];
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,
+   scan:{complete:true},wizard:{status:'absent'},table_settings:{status:'observed',kind:'format',view_key:table.table_tid,format:{page:{schema_id:'schema',offset:0,limit:8},fields,selection:{complete:true,fields:[]}}},
+   ui:{elements:fields.map(f=>({ref:f.label_ref,table_field:{...f,view_key:table.table_tid},allowed_actions:['click'],interaction:{state:'point_observed'}})),masks:[],dialogs:[{identity:{anchor_tid:table.table_tid+';ModalWindow_BrowseFormat'}}],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'group',deadline:100,action:{action_key:'node.apply',revision:'1'}};
+  const ch=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,
+   record:async r=>{records.push(r);if(r.phase==='node_step_prepared'){if(fault==='prepare_write')return {...r,signature:'different'};if(fault==='deadline')clock=100;}
+    if(fault==='complete_write'&&r.phase==='node_step_completed')throw Error('writer failed');return structuredClone(r);},
+   wrapMutation:(code,r)=>({code,r}),execute:async code=>{
+    if(typeof code==='string')return code.includes('function workspaceUiCapability')?{status:'SUCCEEDED',output:structuredClone(state)}:{verified:true,node_context:node,tables:[{...table,active:true}]};
+    mutations++;assert.ok(code.code.includes('selectTableFormatPage'));assert.equal(records.at(-1).phase,'node_step_prepared');
+    if(fault==='transport')throw Error('lost receipt');
+    return {operation_id:code.r.id,action_key:'node.table_format.select.internal',status:fault==='ambiguous'?'AMBIGUOUS':'SUCCEEDED',effect_possible:true,cleanup_complete:true,
+     output:{verified:true,selection:fields.map(({index,source_index,name_key,type,record_id})=>({index,source_index,name_key,type,record_id})).slice(fault==='wrong_selection'?1:0),node_context:{...node,node_id:fault==='wrong_owner'?'other':'node'}}};
+   }});
+  await ch.observe({condition:'owned format',tableDialog:{table,kind:'format'},ready:()=>true});
+  const call=()=>ch.selectTableFormatGroup(table,['ui-f0','ui-f1'],true);
+  if(fault==='none'){assert.equal((await call()).verified,true);await assert.rejects(call,/Fresh/);}
+  else await assert.rejects(call);
+  assert.equal(mutations,['prepare_write','deadline'].includes(fault)?0:1,fault);
+  if(fault==='transport')assert.equal(operation.transportUncertain,true);
+ }
+});
+
+function typedFormatRootsFixture({fault,recordFailure}={}) {
+ const table={view_guid:'11111111-1111-1111-1111-111111111111',port_guid:'22222222-2222-2222-2222-222222222222',table_tid:'MF;TF-1;ViewsForm;BrowseView'};
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'views'},modal=table.table_tid+';ModalWindow_BrowseFormat';
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,
+  scan:{complete:true},wizard:{status:'absent'},table_settings:{format:{schema_id:'original',page:{offset:64,limit:8}}},
+  ui:{elements:[{tid:modal,ref:'ui-modal-0'},{ref:'ui-input',allowed_actions:['press']}],masks:[],dialogs:[{identity:{anchor_tid:modal}}],truncated:{dialogs:false,masks:false}}};
+ const records=[],queries=[],events=[];let roots=0,details=0,clock=1;
+ const refusal=code=>({status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',effect_possible:false,cleanup_complete:true,error:{code}});
+ const operation={id:'typed-root',deadline:900001,action:{action_key:'node.apply',revision:'1'}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},record:async r=>{if(recordFailure===r.phase)throw Error('disk failure');records.push(structuredClone(r));return structuredClone(r)},
+  wrapMutation:(code,r)=>({r}),execute:async code=>{
+   if(typeof code!=='string'){events.push('gesture');return {operation_id:code.r.id,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};}
+   if(code.includes('function workspaceUiCapability')) {
+    queries.push(code);const output=structuredClone(state);
+    if(code.includes('"discover_roots":true')) {
+     roots++;output.ui.elements[0].ref='ui-modal-'+roots;
+     if(fault==='absent')output.ui.elements=[];
+     if(fault==='duplicate')output.ui.elements.push({...output.ui.elements[0],ref:'ui-second'});
+     return {status:'SUCCEEDED',output};
+    }
+    details++;assert.ok(code.includes('"root_ref":"ui-modal-'+roots+'"'));
+    assert.ok(code.includes('"table_format_page":{"offset":64,"limit":8}'));
+    if(fault==='stale-once'&&details===1)return refusal('UI_ROOT_STALE');
+    if(fault==='epoch')return refusal('UI_EPOCH_CHANGED');
+    if(fault==='foreign-node')output.prepared_node_context.node_id='foreign';
+    if(fault==='document'&&details===2)output.dom_epoch.document='foreign';
+    if(fault==='scan')output.scan.complete=false;
+    if(fault==='dialog')output.ui.dialogs.push({identity:{anchor_tid:'msgbox'}});
+    if(fault==='mask')output.ui.masks=[{kind:'busy'}];
+    if(fault==='schema')output.table_settings.format.schema_id='changed';
+    return {status:'SUCCEEDED',output};
+   }
+   return {verified:true,node_context:node,tables:[{...table,active:true,...(fault==='owner'?{port_guid:'foreign'}:{})}]};
+  }});
+ const read=extra=>channel.observe({condition:'typed format page',tableDialog:{table,kind:'format'},tableFormatPage:{offset:64,limit:8},timeoutMs:1000,
+  ready:s=>s.table_settings.format.schema_id==='original',...extra});
+ return {channel,read,records,queries,events,operation,roots:()=>roots,details:()=>details};
+}
+test('typed format page freshly addresses its exact root, then keeps detail and completed before a gesture',async()=>{
+ const f=typedFormatRootsFixture();await f.read();
+ assert.equal(f.roots(),1);assert.equal(f.details(),1);
+ assert.ok(f.queries[0].includes('"table_format_root_tid":"MF;TF-1;ViewsForm;BrowseView;ModalWindow_BrowseFormat"'));
+ assert.ok(!f.queries[1].includes('"table_format_root_tid"'));
+ assert.equal(f.records.at(-1).phase,'node_observation_completed');
+ await f.channel.act({verb:'press',ref:'ui-input',key:'Tab'});assert.deepEqual(f.events,['gesture']);
+ await assert.rejects(f.channel.act({verb:'press',ref:'ui-input',key:'Tab'}),/fresh internal observation/);
+ assert.equal(f.operation.deadline,900001);
+});
+for(const fault of ['absent','duplicate','epoch','foreign-node','document','scan','dialog','mask','schema','owner'])test('typed format exact root preserves refusal: '+fault,async()=>{
+ const f=typedFormatRootsFixture({fault});
+ await assert.rejects(f.read(fault==='document'?{confirmIdentity:()=>({same:true})}:{}));
+ await assert.rejects(f.channel.act({verb:'press',ref:'ui-input',key:'Tab'}),/fresh internal observation/);
+ assert.deepEqual(f.events,[]);assert.ok(!f.records.some(r=>r.phase==='node_observation_completed'));
+ if(['absent','duplicate'].includes(fault))assert.equal(f.details(),0);
+ if(fault==='epoch')assert.equal(f.details(),1);
+});
+test('detached typed format root rediscovery uses a new exact ref without replaying a gesture',async()=>{
+ const f=typedFormatRootsFixture({fault:'stale-once'});await f.read();
+ assert.equal(f.roots(),2);assert.equal(f.details(),2);assert.deepEqual(f.events,[]);
+ assert.equal(f.records.filter(r=>r.phase==='node_observation_root_refreshed').length,1);
+ assert.ok(f.queries.filter(q=>q.includes('"discover_roots":true')).every(q=>q.includes('"table_format_root_tid"')));
+});
+test('typed format completed journal failure leaves no actionable snapshot',async()=>{
+ const f=typedFormatRootsFixture({recordFailure:'node_observation_completed'});await assert.rejects(f.read(),/disk failure/);
+ await assert.rejects(f.channel.act({verb:'press',ref:'ui-input',key:'Tab'}),/fresh internal observation/);assert.deepEqual(f.events,[]);
+});
+
+const acknowledgePair=async(sample,completed,{signal},write)=>{
+ signal?.throwIfAborted();const a=await write(sample);signal?.throwIfAborted();const b=await write(completed);signal?.throwIfAborted();return [a,b];
+};
+test('admitting sample and completed jointly acknowledge before any snapshot or gesture',async()=>{
+ let release,started;const gate=new Promise(resolve=>{release=resolve}),entered=new Promise(resolve=>{started=resolve});
+ let offered;const f=fixture({pairWrite:async(s,c,options,write)=>{offered=[s,c];started();await gate;return acknowledgePair(s,c,options,write)}});
+ const observing=f.channel.observe({condition:'ready',ready:()=>true});await entered;
+ assert.deepEqual(offered.map(x=>x.phase),['node_observation_sample','node_observation_completed']);
+ assert.equal(offered[0].sample,0);assert.deepEqual(offered[0].outcome,offered[1].outcome);assert.deepEqual(offered[0].readiness,offered[1].readiness);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);assert.deepEqual(f.events,[]);
+ release();await observing;await f.channel.act({verb:'click',ref:'ui-button'});assert.equal(f.events.filter(x=>x==='mutated').length,1);
+});
+test('only the admitting identity sample joins completed; earlier samples drain separately',async()=>{
+ let clock=1,checks=0,pairs=0;const standalone=[];
+ const f=fixture({now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},onRecord:async r=>{standalone.push(r.phase+':'+r.sample)},
+  pairWrite:async(s,c,options,write)=>{pairs++;assert.equal(s.sample,2);assert.deepEqual(standalone,['node_observation_sample:0','node_observation_sample:1']);return acknowledgePair(s,c,options,write)}});
+ await f.channel.observe({condition:'identity',ready:()=>++checks>1,confirmIdentity:()=>({same:'owner'})});
+ assert.equal(pairs,1);assert.deepEqual(f.records.filter(x=>x.phase==='node_observation_sample').map(x=>x.sample),[0,1,2]);
+ assert.deepEqual(f.records.filter(x=>x.phase==='node_observation_sample').map(x=>x.readiness.satisfied),[false,true,true]);
+ assert.equal(f.records.filter(x=>x.phase==='node_observation_completed').length,1);
+});
+for(const recordFailure of ['node_observation_sample','node_observation_completed'])test('paired '+recordFailure+' failure leaves snapshot empty',async()=>{
+ const f=fixture({recordFailure,pairWrite:acknowledgePair});await assert.rejects(f.channel.observe({condition:'ready',ready:()=>true}),/disk failure/);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);assert.ok(!f.events.includes('mutated'));
+});
+for(const fault of ['missing-sample','missing-completed','swapped','sample-index','step','readiness','outcome'])test('paired acknowledgement refuses '+fault,async()=>{
+ const f=fixture({pairWrite:async(s,c)=>{const a=[structuredClone(s),structuredClone(c)];
+  if(fault==='missing-sample')a.shift();if(fault==='missing-completed')a.pop();if(fault==='swapped')a.reverse();
+  if(fault==='sample-index')a[0].sample++;if(fault==='step')a[0].step++;if(fault==='readiness')a[1].readiness.satisfied=false;if(fault==='outcome')a[1].outcome.output={};return a;}});
+ await assert.rejects(f.channel.observe({condition:'ready',ready:()=>true}),/both durable pair/);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);assert.ok(!f.events.includes('mutated'));
+});
+test('earlier failed sample prevents even offering the admitting pair',async()=>{
+ let checks=0,pairs=0;const f=fixture({recordFailure:'node_observation_sample',pairWrite:async()=>{pairs++}});
+ await assert.rejects(f.channel.observe({condition:'ready later',ready:()=>++checks>1}),/disk failure/);assert.equal(pairs,0);
+ assert.ok(!f.events.includes('node_observation_completed'));await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+});
+test('abort during the admitting sample records a checked separate interruption and no completed ack',async()=>{
+ const controller=new AbortController(),reason=Error('cancel pair sample');
+ const f=fixture({signal:controller.signal,pairWrite:acknowledgePair,onRecord:async r=>{if(r.phase==='node_observation_sample')controller.abort(reason)}});
+ await assert.rejects(f.channel.observe({condition:'ready',ready:()=>true}),e=>e===reason);
+ assert.equal(f.records.filter(x=>x.phase==='node_observation_interrupted').length,1);assert.ok(!f.records.some(x=>x.phase==='node_observation_completed'));assert.ok(!f.events.includes('mutated'));
+});
+test('abort while pair acknowledgement is pending cannot publish snapshots even if both receipts return',async()=>{
+ const controller=new AbortController(),reason=Error('cancel pending ack');
+ const f=fixture({signal:controller.signal,pairWrite:async(s,c)=>{controller.abort(reason);return [s,c]}});
+ await assert.rejects(f.channel.observe({condition:'ready',ready:()=>true}),e=>e===reason);
+ assert.equal(f.records.filter(x=>x.phase==='node_observation_interrupted').length,1);assert.ok(!f.events.includes('mutated'));
+});
+test('failed interrupted receipt after a cancelled pair never supplies continuation proof',async()=>{
+ const controller=new AbortController();const f=fixture({signal:controller.signal,recordFailure:'node_observation_interrupted',pairWrite:async()=>{controller.abort(Error('cancel'));controller.signal.throwIfAborted()}});
+ await assert.rejects(f.channel.observe({condition:'ready',ready:()=>true}),/disk failure/);assert.ok(!f.records.some(x=>x.phase==='node_observation_interrupted'));
+});
+test('pair sync delay cannot turn admitted evidence into timeout or extend the parent mutation deadline',async()=>{
+ let clock=1;const f=fixture({now:()=>clock,monotonicNow:()=>clock,pairWrite:async(s,c,o,write)=>{clock+=33000;return acknowledgePair(s,c,o,write)}});
+ await f.channel.observe({condition:'ready',timeoutMs:15000,ready:()=>true});
+ assert.equal(f.records.find(x=>x.phase==='node_observation_sample').readiness.elapsed_ms,0);assert.ok(!f.events.includes('node_observation_timeout'));
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/budget exhausted/);assert.ok(!f.events.includes('mutated'));
+});
+test('timeout, context refusal and scan refusal never offer an observation pair',async()=>{
+ for(const kind of ['timeout','context','scan']) {
+  let clock=1,pairs=0;const f=fixture({now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},changedDocument:kind==='context',
+   readRefusal:kind==='scan'?()=>({status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',effect_possible:false,cleanup_complete:true,error:{code:'UI_REFERENCE_STALE'}}):undefined,
+   pairWrite:async()=>{pairs++}});
+  await assert.rejects(f.channel.observe({condition:'not admitted',timeoutMs:1000,ready:()=>kind!=='timeout'}));assert.equal(pairs,0);assert.ok(!f.events.includes('mutated'));
+ }
+});
+
+test('a delayed earlier sample failure suppresses the already admitted pair',async()=>{
+ let release,checks=0,pairs=0;const writing=new Promise(resolve=>{release=resolve});
+ const f=fixture({onRecord:async r=>{if(r.phase==='node_observation_sample'&&r.sample===0){await writing;throw Error('earlier pending failure')}},pairWrite:async()=>{pairs++}});
+ await assert.rejects(f.channel.observe({condition:'later admission',ready:()=>{if(++checks===2)queueMicrotask(release);return checks===2}}),/earlier pending failure/);
+ assert.equal(checks,2);assert.equal(pairs,0);assert.ok(!f.events.includes('node_observation_completed'));assert.ok(!f.events.includes('mutated'));
+});
+test('one identity sample followed by the deadline cannot become an admitting pair',async()=>{
+ let clock=1,pairs=0;const f=fixture({now:()=>clock,monotonicNow:()=>clock,wait:async()=>{clock+=15000},pairWrite:async()=>{pairs++}});
+ await assert.rejects(f.channel.observe({condition:'two identities',timeoutMs:15000,ready:()=>true,confirmIdentity:()=>({same:true})}),/readiness timeout/);
+ assert.equal(pairs,0);assert.equal(f.records.filter(x=>x.phase==='node_observation_sample').length,1);assert.ok(!f.events.includes('mutated'));
+});
+test('procedure and real journal persist early sample plus admitting pair with exactly two syncs',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'node-observation-pair-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ let syncs=0;const journal=createExecutionJournal({directory,metadata:{sessionId:'s'}},{openFile:async(...args)=>{
+  const h=await open(...args);return {writeFile:text=>h.writeFile(text),sync:async()=>{syncs++;await h.sync()},close:()=>h.close()};
+ }});
+ const f=fixture({onRecord:r=>journal(r),pairWrite:(s,c,options)=>journal.observationPair(s,c,options)});
+ await f.channel.observe({condition:'identity ready',ready:()=>true,confirmIdentity:()=>({same:true})});
+ const rows=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+ assert.deepEqual(rows.map(x=>x.phase),['node_observation_sample','node_observation_sample','node_observation_completed']);
+ assert.deepEqual(rows.filter(x=>x.phase==='node_observation_sample').map(x=>x.sample),[0,1]);assert.equal(syncs,2);
+ await f.channel.act({verb:'click',ref:'ui-button'});assert.equal(f.events.filter(x=>x==='mutated').length,1);
+});
+
+test('an unacknowledged earlier standalone sample cannot reach the admitting pair',async()=>{
+ let pairs=0;const f=fixture({pairWrite:async()=>{pairs++}});
+ // Use a writer that fulfills without confirming its sample, as opposed to rejecting.
+ const operation={id:'no-sample-ack',action:{action_key:'node.apply',revision:'1'},deadline:1000,checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}};
+ const channel=createNodeProcedure({operation,now:()=>1,wait:async()=>{},targetOrigin:f.state.origin,targetBuild:f.state.loginom_build,
+  record:Object.assign(async()=>undefined,{observationPair:async()=>{pairs++}}),execute:async()=>({status:'SUCCEEDED',output:f.state}),wrapMutation:()=>{throw Error('unexpected gesture')}});
+ await assert.rejects(channel.observe({condition:'two confirmations',ready:()=>true,confirmIdentity:()=>({same:true})}),/sample was not durably acknowledged/);
+ assert.equal(pairs,0);await assert.rejects(channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+});
+test('legacy single-record writer also requires its admitting sample acknowledgement',async()=>{
+ const f=fixture();const operation={id:'legacy-no-ack',action:{action_key:'node.apply',revision:'1'},deadline:1000,checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}};
+ const records=[];const channel=createNodeProcedure({operation,now:()=>1,targetOrigin:f.state.origin,targetBuild:f.state.loginom_build,
+  record:async r=>{records.push(r);return r.phase==='node_observation_sample'?undefined:structuredClone(r)},
+  execute:async()=>({status:'SUCCEEDED',output:f.state}),wrapMutation:()=>{throw Error('unexpected gesture')}});
+ await assert.rejects(channel.observe({condition:'ready',ready:()=>true}),/sample was not durably acknowledged/);
+ assert.ok(!records.some(r=>r.phase==='node_observation_completed'));await assert.rejects(channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
 });

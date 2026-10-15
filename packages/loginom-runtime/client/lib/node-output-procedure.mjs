@@ -1,4 +1,5 @@
 import {readTableFormatDefinitions,revealTableFormatField} from './table-format-pages.mjs';
+import {configureWideNumericFormats} from './table-format-wide.mjs';
 const requireValue=(v,m)=>{if(!v)throw Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const tableRef=t=>({view_guid:t.view_guid,port_guid:t.port_guid,table_tid:t.table_tid});
@@ -122,6 +123,8 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
   let s;
   const fields=definition.fields.map(f=>({index:f.source_index,definition_index:f.index,key:f.name_key,type:f.type,label:f.label}));
   const numeric=fields.filter(f=>['integer','real'].includes(f.type)),datetime=fields.filter(f=>f.type==='datetime');
+  if(fields.length>=16&&numeric.length===fields.length&&typeof channel.selectTableFormatGroup==='function')
+    return configureWideNumericFormats(channel,table,definition,fields,{restore,verifyNumeric:verifyTableNumericFormat});
   const deferred=restore?datetime.filter(t=>{const original=restore.find(f=>f.index===t.index&&f.key===t.key&&f.type===t.type);return original?.settings.format_string===''&&original.settings.custom===false&&original.settings.formatting===true;}):[];
   const targets=[...numeric,...datetime.filter(t=>!deferred.includes(t))];
   const originals=[];
