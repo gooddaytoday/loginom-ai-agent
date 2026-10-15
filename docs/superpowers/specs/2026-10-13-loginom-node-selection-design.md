@@ -1,11 +1,11 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты22 candidate,
-policy PASS во всех22. Один итоговый расчёт правильный,21 результат не получен.
-Одна сессия завершена штатно,21 адресно освобождена после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты23 candidate,
+policy PASS во всех23. Один итоговый расчёт правильный,22 результата не получены.
+Одна сессия завершена штатно,22 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось3 candidate, включая текущую first-last-touch/3. Sequential
-runner177354/exec27014 продолжил серию2026-10-15T01:57:33.338234+00:00;
+Осталось2 candidate, включая текущую explicit-js/3. Sequential
+runner238969/exec40520 продолжил серию2026-10-15T02:13:14.879128+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -17,6 +17,24 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+First-last-touch/3 closed02:05:52.193Z: policy PASS `5235ac00…`, mandatory
+review `7096df41…`;29messages/107parts/31tools/90events/2476runtime, JS0/nochildren.
+Std Import500→GroupFirst→Calculator IF last3→2→1→GroupLast→InnerJoin5 SUCCEEDED5;
+оба полных channelsets равны. Round Calculator AMBIGUOUS WIZARD_OPEN_NOT_CONFIRMED,
+Execute не был запрошен; Sort/Export ещё не применялись. Новыхapply/JS после отказа нет.
+Frozen monitor остановил CLI: LIVE_EVIDENCE_INVALID/interruptSentAt02:05:51.794Z.
+Полная CLOSED history/provenance проверены и валидны; точное live-read exception
+не записано monitor catch324–328 и из evidence не устанавливается. Это UNKNOWNcause,
+не утверждение о harmlessrace, исправлении или доказанной порче истории.
+CSV/LGP/oracle не получены; CLI1/cleanupfalse/runtimefalse/APPLY_MISMATCH сохранены.
+Own299closed02:10:59.137Z/admin300logout02:11:00.848Z/browserclosed02:11:02.073Z;
+9actualPIDgone/exactguardarchive02:11:03.185787Z, unknown295+298 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+18case/26recovery readonly; descriptor `01759ba1…`.
+Independent finalrelease review `9ca7d810…`/readback `b590d4ca…` approved;
+actualgate2026-10-15T02:13:14.692Z разрешил technical-failed.
+Originalattempt `b8ebedfa…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Campaign-ROI/3 closed01:50:29.284Z: policy PASS `4ce5c4e8…`, mandatory
 review `46b4c6c8…`;28messages/107parts/30tools/88events/2542runtime, JS0/nochildren.
