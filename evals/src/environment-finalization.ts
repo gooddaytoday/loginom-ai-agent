@@ -8,6 +8,71 @@ import { archiveProfileEvidence } from "./profile-archive"
 import { acquireEnvironmentLeases, finalizeReleasedSlot, type SlotFile, type SlotLease } from "./slots"
 import { readUnactivatedUserObservation, readUserOwnership, readUserPreparation } from "./user-environment"
 import { readPreparationRecoverySources } from "./preparation-recovery"
+import { readManagementProcessInventory } from "./management-process-evidence"
+import { assertProfileSettled } from "./profile"
+
+/** Archives every sealed normal management profile; server sessions and reservations remain held. */
+export async function archiveManagementEnvironment(file: SlotFile, environment: Awaited<ReturnType<typeof acquireEnvironmentLeases>>) {
+  const server = environment.server, identity = server.reservation.identity, journal = server.reservation.journal
+  await server.assertHeld()
+  const command = await readLeaseReceipt(journal)
+  if (!identity || server.reservation.state !== "retained" || server.reservation.key !== `server:${identity.containerId}` ||
+    server.reservation.owner.pid !== process.pid || !object(command) || command.version !== 2 || command.kind !== "unactivated-preparation" ||
+    command.commandId !== server.reservation.commandId || command.phase !== "finalizing" || JSON.stringify(command.identity) !== JSON.stringify(identity) ||
+    !environment.slots.length || JSON.stringify(command.slotIds) !== JSON.stringify(environment.slots.map(lease => lease.slot.id)) ||
+    new Set(environment.slots.map(lease => lease.slot.id)).size !== environment.slots.length || !Array.isArray(command.managementSources))
+    throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  const bindings = command.managementInventories === undefined ? [] : command.managementInventories
+  if (!Array.isArray(bindings) || bindings.length !== command.managementSources.length ||
+    ["file", "slotId", "leaseToken", "profileDir"].some(key => new Set(bindings.map(entry => object(entry) ? entry[key] : undefined)).size !== bindings.length) ||
+    command.managementSources.some(source => !object(source) || Object.keys(source).length !== 2 || typeof source.path !== "string" ||
+      typeof source.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(source.sha256)) ||
+    new Set(command.managementSources.map(source => source.path)).size !== bindings.length)
+    throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  const sources = []
+  for (const lease of environment.slots) {
+    await lease.assertHeld()
+    const origin = await readLeaseReceipt(lease.receipt)
+    if (lease.recoveryOnly || JSON.stringify(lease.identity) !== JSON.stringify(identity) || !object(origin) || origin.journal !== journal ||
+      origin.commandId !== command.commandId || !file.slots.some(slot => JSON.stringify(slot) === JSON.stringify(lease.slot)))
+      throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  }
+  for (const binding of bindings) {
+    if (!object(binding) || Object.keys(binding).length !== 4 || typeof binding.file !== "string" || path.dirname(binding.file) !== file.controller.stateDir ||
+      path.resolve(binding.file) !== binding.file) throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+    const lease = environment.slots.find(lease => lease.slot.id === binding.slotId && lease.token === binding.leaseToken && lease.slot.profileDir === binding.profileDir)
+    if (!lease) throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+    const inventory = await readManagementProcessInventory({ file: binding.file, journal, commandId: server.reservation.commandId, identity,
+      leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
+    if (!command.managementSources.some(source => source.path === inventory.source.path && source.sha256 === inventory.source.sha256))
+      throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
+    sources.push(inventory.source)
+  }
+  if (hash(await readLeaseReceipt(journal)) !== hash(command)) throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  // No profile moves until every slot is free of pending recovery and live writers.
+  for (const lease of environment.slots) await assertProfileSettled(lease.slot.profileDir)
+  const profiles = []
+  for (const lease of environment.slots) {
+    const archived = await archiveEnvironmentProfile(lease, "management")
+    profiles.push({ slotId: lease.slot.id, leaseToken: lease.token, ...archived, sha256: hash(await readLeaseReceipt(archived.journal)) })
+  }
+  await server.assertHeld()
+  await Promise.all(environment.slots.map(lease => lease.assertHeld()))
+  for (const source of sources) {
+    if (hash(await readLeaseReceipt(source.path)) !== source.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
+  }
+  if (hash(await readLeaseReceipt(journal)) !== hash(command)) throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  const receipt = { version: 2, kind: "management-environment-archive", command: { path: journal, sha256: hash(command) }, identity,
+    managementSources: sources, profiles }
+  const target = `${journal}.management-archive.json`
+  const existing = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (existing !== undefined && hash(existing) !== hash(receipt)) throw new EvalFailure("MANAGEMENT_ARCHIVE_UNCONFIRMED", 2)
+  if (existing === undefined) await writeLeaseReceipt(target, receipt)
+  return { profiles, source: { path: target, sha256: hash(receipt) } }
+}
 
 /** Only the pre-CLI, never-activated preparation path can use this finalizer. */
 export async function finalizeUnactivatedEnvironment(file: SlotFile, environment: Awaited<ReturnType<typeof acquireEnvironmentLeases>>, admin: AdminConnection) {
@@ -41,7 +106,7 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   for (const lease of environment.slots) {
     const secretFile = path.join(file.controller.stateDir, `prepare-${lease.slot.id}.secret.json`)
     const observation = await admin.inspectUnactivatedUser(lease, secretFile)
-    const archived = await archivePreparationProfile(lease)
+    const archived = await archiveEnvironmentProfile(lease, "unactivated")
     prepared.push({ lease, secretFile, observation, archived })
   }
   // Archive commits precede the native transport disconnect and process settlement.
@@ -91,7 +156,7 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   return { status: "released" as const, slots: released, server: { path: target, sha256: hash(receipt) } }
 }
 
-async function archivePreparationProfile(lease: SlotLease) {
+async function archiveEnvironmentProfile(lease: SlotLease, kind: "unactivated" | "management") {
   await lease.assertHeld()
   const history = await lstat(lease.slot.historyDir)
   if (!history.isDirectory() || history.isSymbolicLink() || history.uid !== process.getuid?.() || (history.mode & 0o777) !== 0o700 ||
@@ -118,7 +183,7 @@ async function archivePreparationProfile(lease: SlotLease) {
     }
   }
   if (previous.length > 1) throw new EvalFailure("ARCHIVE_SOURCE_AMBIGUOUS", 2)
-  const target = previous[0] ?? { archive: path.join(lease.slot.historyDir, `unactivated-${lease.token}`), journal: `${lease.receipt}.archive.json` }
+  const target = previous[0] ?? { archive: path.join(lease.slot.historyDir, `${kind}-${lease.token}`), journal: `${lease.receipt}.archive.json` }
   if (!previous.length) await mkdir(target.archive, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
   await lease.assertHeld()
   return archiveProfileEvidence(lease.slot.profileDir, target.archive, target.journal)

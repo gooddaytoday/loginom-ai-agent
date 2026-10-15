@@ -200,6 +200,37 @@ test("parallel management owners register both slot inventories before dispatch"
       processInventory: adminInventory, binary: "/unreadable-runtime" })).rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
     expect(await Bun.file(results[0]!.file).text()).toBe(before)
     expect(await readLeaseReceipt(journal)).toEqual(sealed)
+    const history = ["data/loginom-ai-agent.db", "data/loginom-ai-agent.db-wal", "data/loginom-ai-agent.db-shm", "loginom/inputs/input.csv"]
+    for (const lease of environment.slots) {
+      await mkdir(path.join(lease.slot.profileDir, "loginom/inputs"), { recursive: true, mode: 0o700 })
+      for (const name of history) await Bun.write(path.join(lease.slot.profileDir, name), `${lease.slot.id}:${name}`)
+    }
+    const { archiveManagementEnvironment } = await import("../src/environment-finalization")
+    const retained = await readLeaseReceipt(results[0]!.file) as { processes: unknown[] }
+    await writeLeaseReceipt(results[0]!.file, { ...retained, processes: [] })
+    await expect(archiveManagementEnvironment(fixture.slots, environment)).rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_CHANGED")
+    expect(await Bun.file(path.join(environment.slots[0]!.slot.profileDir, history[0]!)).exists()).toBe(true)
+    await writeLeaseReceipt(results[0]!.file, retained)
+    const pending = path.join(environment.slots[1]!.slot.profileDir, "loginom/connection/pending.json")
+    await mkdir(path.dirname(pending), { recursive: true, mode: 0o700 })
+    await Bun.write(pending, "{}")
+    await expect(archiveManagementEnvironment(fixture.slots, environment)).rejects.toThrow("Профиль имеет незавершённое состояние")
+    expect(await Bun.file(path.join(environment.slots[0]!.slot.profileDir, history[0]!)).exists()).toBe(true)
+    await rm(pending)
+    const archived = await archiveManagementEnvironment(fixture.slots, environment)
+    expect(archived.profiles.map(profile => profile.slotId)).toEqual(["a", "b"])
+    for (const profile of archived.profiles) {
+      const lease = environment.slots.find(lease => lease.slot.id === profile.slotId)!
+      for (const name of history) {
+        expect(await Bun.file(path.join(profile.archive, name)).text()).toBe(`${profile.slotId}:${name}`)
+        expect(await Bun.file(path.join(lease.slot.profileDir, name)).exists()).toBe(false)
+      }
+      expect(await Bun.file(path.join(lease.slot.profileDir, "data/auth.json")).text()).toContain("fixture")
+    }
+    const archiveBytes = await Bun.file(archived.source.path).text()
+    expect(await archiveManagementEnvironment(fixture.slots, environment)).toEqual(archived)
+    expect(await Bun.file(archived.source.path).text()).toBe(archiveBytes)
+    await environment.server.assertHeld()
   } finally {
     await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())])
     await rm(root, { recursive: true, force: true })
