@@ -395,6 +395,8 @@ name и каждого container name, в общем порядке захват
 - [x] Подзадача 1а: frozen full unit 595 PASS/3 SKIP/0 FAIL (457.92s), 12 targeted pair/CI tests, real Docker 24 assertions и typecheck/diff check PASS. Source/test SHA до/после совпали. Первый запуск с umask077 был ошибкой команды проверки; diagnosis в runbook, assertions/runtime не менялись.
 - [ ] Research pair для SessionBackup, restart/epoch и crash-тестов имеет собственные имена/network/порт/paths/receipt, не совпадающие с acceptance config. Свободный research-порт выбирается и фиксируется отдельно; acceptance pair не используется для этих опытов. Проверить `bun run test:unit`, `bun typecheck`, затем `bun test test/parallel-pair-integration.test.ts` на этом хосте с receipt; коммит `feat(evals): provision dedicated user-eval pairs`.
 
+- [x] Safe Docker read diagnostics: `PAIR_DOCKER_READ` сохраняет только operation/numeric exit/timedOut, без argv/stdout/stderr. Реальный missing-container inspect RED missing metadata→GREEN1/3 assertions (1.60s); pair unit11/45 и typecheck/diff PASS. Production deadline20s и mutation/reconciliation policy сохранены; это диагностика, не readiness gate.
+
 ### Задача 2. Trusted административный Playwright adapter
 
 **Files:** Create `evals/src/loginom-admin.ts`, `evals/script/loginom-admin-driver.mjs`, `evals/test/loginom-admin.test.ts`, `evals/test/loginom-admin-integration.test.ts`; Modify `evals/src/preflight.ts` для проверки установленного browser runtime.

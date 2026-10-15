@@ -590,16 +590,19 @@ async function resourceExists(kind: string, id: string) {
 
 async function dockerText(argv: string[]) {
   const result = await docker(argv)
-  if (result.code !== 0) throw new EvalFailure("PAIR_DOCKER_READ", 2)
+  if (result.code !== 0) throw Object.assign(new EvalFailure("PAIR_DOCKER_READ", 2), {
+    docker: { operation: argv[0], exitCode: result.code, timedOut: result.timedOut },
+  })
   return result.text
 }
 
 async function docker(argv: string[]) {
   const child = Bun.spawn(["docker", ...argv], { stdout: "pipe", stderr: "pipe", stdin: "ignore",
     env: Object.fromEntries(["PATH", "HOME", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG", "XDG_RUNTIME_DIR"].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])) })
-  const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
+  const state = { timedOut: false }
+  const timer = setTimeout(() => { state.timedOut = true; child.kill("SIGKILL") }, 20_000)
   try {
     const [text, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
-    return { code: await child.exited, text, stderr }
+    return { code: await child.exited, text, stderr, timedOut: state.timedOut }
   } finally { clearTimeout(timer) }
 }
