@@ -14,6 +14,32 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('mapping conflict explains full-request repair while preserving finish and strict rejection',async()=>{
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
+ for(const key of ['fields','changes'])assert.match(tool.inputSchema.properties.mappings.items.properties[key].description,/Mutually exclusive/);
+ const b=createUserWorkflowBindings();b.remember({document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'scenario',label:'Scenario'}]}});
+ const args={...request(),target:{kind:'new',type:'transform.calculator'},mode:'expression',
+  mappings:[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Region'},excluded:true}],changes:[]}]};
+ const before=structuredClone(args),handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){},configure(){}}]]);
+ let rejection;
+ try{validateNodeApplyRequest(b.expandNode(args),handlers);}catch(error){rejection=error;}
+ assert.equal(rejection?.message,'Output changes and full fields are mutually exclusive');
+ const failure={effect_possible:false,action_key:'request.validate',error:{code:'REQUEST_REJECTED',message:rejection.message}};
+ const reply=compactNodeRequestFailure(failure,args);
+ assert.equal(reply.status,'NOT_APPLIED');assert.equal(reply.error.parameter_path,'mappings');
+ for(const text of [reply.error.message,reply.next_step.instruction]){
+  assert.match(text,/remove changes/);assert.match(text,/excluded:true/);assert.match(text,/including top-level finish/);
+  assert.match(text,/COMPLETE corrected request/);assert.match(text,/NEW operation_id/);
+ }
+ assert.deepEqual(args,before);
+ const repaired=structuredClone(args);delete repaired.mappings[0].changes;
+ assert.equal(repaired.finish,'execute');assert.doesNotThrow(()=>validateNodeApplyRequest(b.expandNode(repaired),handlers));
+ assert.throws(()=>validateNodeApplyRequest(b.expandNode(args),handlers),/mutually exclusive/);
+ const uncertain=compactNodeRequestFailure({...failure,effect_possible:true,operation_id:'pending'},args);
+ assert.equal(uncertain.next_step.tool,'dock_operation_inspect');assert.equal(uncertain.error.message,rejection.message);
+});
+
 test('published Calculator and common node schemas require root finish and explain a usable repair',async()=>{
  const {calculatorParametersSchema}=await import('../lib/node-api.mjs');
  const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
