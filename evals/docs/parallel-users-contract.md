@@ -1730,3 +1730,32 @@ Private600 native-cli-sessions-5317c73a-d9aa-4c0f-b16f-6637328f4169/sealed.json
 SHA256 e17d353f25a16dc5fdeb53094f834ab9108fe736cf648e720763ec3538200d45.
 The native fixture still exercises separate close primitives; an activated
 all-owner finalizer with archive-before-close remains the next step.
+
+### Sealed management profile archives
+
+archiveManagementEnvironment validates the exact finalizing normal command, full
+held slot set/original manifests and every frozen inventory/process source. All
+profiles must pass pending recovery/writer checks before the first profile move.
+The existing durable archive engine then commits each private management-token
+archive and writes one private receipt binding sealed command, sources, slot tokens
+and archive manifest hashes. Exact repeat preserves the committed receipt.
+Settings remain in the profile and all reservations remain held. This API neither
+closes server sessions nor grants deletion, readiness or release.
+
+TDD missing public API RED→GREEN1/36; a pending B profile initially allowed A to
+move (RED), now all-profile preflight prevents that move (GREEN1/38). Related
+archive/admin/process36 PASS/212 (41.87s), final typecheck PASS. Final source
+tamper/archive/recovery16 PASS/161 (57.11s), typecheck/diff PASS. Native
+archive-before-first-close qualification passed1/67 (171.08s), separately from
+unit suites. The native fixture now archives before its first session close.
+Its data-only canary verifies actual profile movement; all CLI/session operations
+remain genuine. A fresh observation retains all three own rows after archive
+commit. Subsequent targeted close receipts preserve both earlier peer rows until
+their own closes.
+
+Private600 native-cli-sessions-e3acc33c-c586-43e4-baca-d812986b460d/archived.json
+SHA256 de0c6b491f9c3dd8cdf5bed7b871c8bc9bbc8604b2f716b932c9940454586369.
+The independent audit links nine artifacts and passed188 process/source/archive
+manifest/order/session/cleanup checks; exact own pair/root are absent. Automated
+all-owner session accounting and unknown same-user refusal remain the next
+finalizer step; backup/storage/recovery gates still prohibit release.
