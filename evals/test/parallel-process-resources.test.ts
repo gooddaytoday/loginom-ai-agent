@@ -6,6 +6,7 @@ import { collectHostResources, sampleHostResources, sampleProcessResources, samp
 import { assessProcessResourceTimeline, assessResourceCoverage, checkResourceEvidence } from "../src/parallel-acceptance"
 import { freezeResourceManifest, readResourceProcessWindows, freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { resourceBudgetFixture } from "./helpers/resource-budget-fixture"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -21,8 +22,11 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
   const containers = ["server", "studio"].map((role, index) => ({ role: role as "server" | "studio", id: String(index + 1).repeat(64),
     image: "sha256:" + String(index + 3).repeat(64), startedAt: "2026-10-14T10:00:00.000Z", name: fixture.slots.server[role === "server" ? "container" : "studioContainer"],
     nonce: crypto.randomUUID(), purpose: "research" }))
+  const manifestBudget = await freezeResourceBudget({ out: path.join(root, "manifest-budget.json"), runId: "full-lifetime",
+    bounds: resourceBudgetFixture([fixture.slots.controller.stateDir, ...fixture.slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])], containers) })
+  while (Date.now() <= Date.parse(manifestBudget.budget.fixed_at)) await Bun.sleep(1)
   const manifests = await Promise.all([1, 2].map(parallel => freezeResourceManifest({ out: path.join(root, `manifest-${parallel}.json`),
-    runId: "full-lifetime", slotsFile, parallel, containers, view, budget: budget.source })))
+    runId: "full-lifetime", slotsFile, parallel, containers, view, budget: manifestBudget.source })))
   const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "full-lifetime", phase: "run",
     signal: abort.signal, processes: sampleSupervisedResources })
   let confirmed = false

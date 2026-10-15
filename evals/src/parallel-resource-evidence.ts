@@ -9,7 +9,7 @@ import type { ProcessOwner } from "./process-supervisor"
 import type { SlotDefinition } from "./slots"
 import type { checkResourceEvidence } from "./parallel-acceptance"
 import { summarizeResourceSamples } from "./parallel-resource-summary"
-import { validResourceBound } from "./parallel-resource-budget"
+import { requireResourceBudgetScopes, validResourceBound } from "./parallel-resource-budget"
 import type { ResourceBound } from "./parallel-resource-budget"
 
 export async function writeResourceSummary(input: { samplesFile: string; out: string }) {
@@ -63,7 +63,8 @@ export async function freezeResourceManifest(input: {
       image: container.image, startedAt: container.startedAt, name: container.name, nonce: container.nonce, purpose: container.purpose })) },
     view: { namespace: input.view.namespace, root: { device: input.view.root.device, inode: input.view.root.inode } },
     budget: { file: input.budget.file, sha256: input.budget.sha256 } })
-  await readFrozenResourceBudget({ ...manifest.budget, runId: input.runId, startedAt: manifest.fixed_at })
+  const budget = await readFrozenResourceBudget({ ...manifest.budget, runId: input.runId, startedAt: manifest.fixed_at })
+  requireResourceBudgetScopes(budget.bounds, manifest.coverage)
   await writeResourceDocument(input.out, manifest)
   return { manifest, source: { file: input.out, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(manifest) + "\n").digest("hex") } }
 }
@@ -76,7 +77,8 @@ export async function readFrozenResourceManifest(input: { file: string; sha256: 
   const started = Date.parse(input.startedAt)
   if (!Number.isFinite(started)) throw new EvalFailure("RESOURCE_MANIFEST_TIME_UNVERIFIED", 2)
   if (Date.parse(manifest.fixed_at) >= started) throw new EvalFailure("RESOURCE_MANIFEST_NOT_FIXED_BEFORE_RUN", 2)
-  await readFrozenResourceBudget({ ...manifest.budget, runId: input.runId, startedAt: manifest.fixed_at })
+  const budget = await readFrozenResourceBudget({ ...manifest.budget, runId: input.runId, startedAt: manifest.fixed_at })
+  requireResourceBudgetScopes(budget.bounds, manifest.coverage)
   return manifest
 }
 
