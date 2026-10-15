@@ -835,3 +835,12 @@ bun script/parallel-env.ts status --config /home/kiselev/.local/state/loginom-ev
 reservations каждого configured slot, server/judge state и snapshotChanged.
 Status не захватывает ownership, не входит в Loginom и не выдаёт live admission;
 `admission:not_verified` — обязательное ограничение снимка. Credentials не читаются.
+
+
+Подготовка собственной v2 пары доступна через `bun script/parallel-env.ts prepare
+--config <private-slots.json> --parallel 2 --out <new-private-directory>` из `evals/`.
+Это текущая стадия blocked-user preparation: actual session capability пока даёт
+`SESSION_IDENTITY_UNSUPPORTED`, receipt содержит ready:false, exit2. Native global
+fences, повторное использование users/passwords, архив и normal slot/server release
+квалифицированы отдельно; CLI setup/check/active cleanup, verify и full readiness
+ещё не готовы. Подготовка не является model N2→N1 acceptance.
