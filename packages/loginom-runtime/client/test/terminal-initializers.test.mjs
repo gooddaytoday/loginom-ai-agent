@@ -22,8 +22,8 @@ const tables={};for(const[file,targets]of[['rpc.js',{'$rpc_TBGObjectProxy':'Obje
   }
  });
 }
-export async function fresh({initializer,realm,scriptContext}={}){
- const f=await fixture({realm,initializeDOM:scriptContext?.install,initializeSS(ss,c){ss.shallowCopy=runInContext('('+functions.shallowCopy+')',c);ss.initClass=initializer??runInContext('('+functions.initClass+')',c)}});
+export async function fresh({initializer,realm,scriptContext,originalCompletion}={}){
+ const f=await fixture({realm,originalCompletion,initializeDOM:scriptContext?.install,initializeSS(ss,c){ss.shallowCopy=runInContext('('+functions.shallowCopy+')',c);ss.initClass=initializer??runInContext('('+functions.initClass+')',c)}});
  const ss=f.c.ss;f.c.ss_initClass=ss.initClass; // The actual modifier saves the unwrapped original.
  ss.prepareProperties=()=>{}; // Explicit property-preparation dependency double.
  scriptContext?.select('bg/js/bg.mscorlib.js');
