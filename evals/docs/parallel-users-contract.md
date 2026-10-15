@@ -641,3 +641,12 @@ Count0/pending и bounded absence checks. Username не заменяет proof. 
 active-session claims не получают adoption authority. Closure journal нового
 context связывает adopt receipt/SHA; старый same-context payload сохраняется.
 Full parent provisioning/admission и Session CAS recovery ещё требуют интеграции.
+
+Initialized admin dispose ожидает собственный rpc.TBGSession.Disconnect Task
+до browser closure. В pinned Studio connector Dispose/Disconnect возвращает
+void и запускает RPC disposal фоном; его await не является нужным барьером.
+Driver отвечает transportDisconnect=confirmed только после ожидаемого Task;
+parent сохраняет это поле и quarantines initialized connection без подтверждения.
+Native independent-observer Count0 admin control подтверждает исчезновение
+causally new peer row и сохранность первого admin. Transport confirmation
+сам по себе не меняет slot serverSessions/storage/admission grants.

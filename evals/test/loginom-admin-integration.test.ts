@@ -220,6 +220,7 @@ async function nativeUserCapability(mode: "sessions" | "backup") {
         observation: { payload: { ...activation, phase: "session-crash-probe" }, reply: reconnectProbe } }
       const claimFile = path.join(evidence, `session-${reconnectProbe.id}.json`)
       await writeLeaseReceipt(claimFile, claim)
+      const adminBaseline = await request("inspect", {})
       const reconnected = await nativeAdminPeer(runtime, file, pair.identity, root, evidence)
       try {
         expect(await reconnected.request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url: file.server.url,
@@ -248,7 +249,32 @@ async function nativeUserCapability(mode: "sessions" | "backup") {
         expect(resumed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
         expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding, adopt }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
-      } finally { await reconnected.dispose() }
+      } finally {
+        const beforeDispose = await request("inspect", {}).catch(() => undefined)
+        const disposed = await reconnected.dispose()
+        expect(disposed).toMatchObject({ outcome: "confirmed", data: { disposed: true, transportDisconnect: "confirmed" } })
+        expect(beforeDispose?.outcome).toBe("confirmed")
+        const baseline = (adminBaseline.data as { rawSessions: { objectId: string }[] }).rawSessions
+        const observedAdmin = beforeDispose!.data as { rawSessions: { objectId: string; name: string; createdAt: string; packageCount: number }[]; ownSession: { username: string } }
+        const peerRows = observedAdmin.rawSessions.filter(row => !baseline.some(old => old.objectId === row.objectId))
+        expect(peerRows).toHaveLength(1)
+        expect(peerRows[0]).toMatchObject({ packageCount: 0 })
+        expect(peerRows[0]!.name.startsWith(observedAdmin.ownSession.username + ":")).toBe(true)
+        const deadline = Date.now() + 5000
+        const afterDispose = async () => {
+          const observed = await request("inspect", {})
+          expect(observed.outcome).toBe("confirmed")
+          return (observed.data as typeof observedAdmin).rawSessions
+        }
+        let after = await afterDispose()
+        while (after.some(row => row.name === peerRows[0]!.name && row.createdAt === peerRows[0]!.createdAt) && Date.now() < deadline) {
+          await Bun.sleep(100)
+          after = await afterDispose()
+        }
+        await writeLeaseReceipt(path.join(evidence, "admin-disconnect-observation.json"), { identity: pair.identity,
+          baseline: baseline.map(row => row.objectId), opened: observedAdmin.rawSessions, peer: peerRows[0], disposed, after })
+        expect(after.some(row => row.name === peerRows[0]!.name && row.createdAt === peerRows[0]!.createdAt)).toBe(false)
+      }
       const pendingPackage = await request("reconcile-user", { ...activation, phase: "session-package-crash-probe" })
       expect(pendingPackage.outcome).toBe("confirmed")
       const pendingPackageData = pendingPackage.data as typeof observed
@@ -336,7 +362,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
   const directories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-") && !previous.has(name))
   expect(directories).toHaveLength(1)
   const receipt = await Bun.file(path.join(file.controller.stateDir, directories[0]!, "connection.json")).json()
-  expect(receipt).toMatchObject({ kind: "loginom-admin-connection", status: "disposed", initialization: "confirmed", dispose: "confirmed",
+  expect(receipt).toMatchObject({ kind: "loginom-admin-connection", status: "disposed", initialization: "confirmed", dispose: "confirmed", transportDisconnect: "confirmed",
     identity, processes: { status: "confirmed", error: null, observation_mode: "continuous", capture_complete: true } })
   const observation = await Bun.file(path.join(file.controller.stateDir, directories[0]!, "session-observations.json")).json()
   expect(observation).toMatchObject({ version: 1, kind: "admin-session-observations", identity, sessionIdentityQualified: false })
@@ -479,5 +505,6 @@ async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRun
     expect(result.exitCode).toBe(0)
     expect(result.processCleanup.status).toBe("confirmed")
     expect(result.processCleanup.capture_complete).toBe(true)
+    return disposed
   } }
 }
