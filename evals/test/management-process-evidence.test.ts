@@ -38,6 +38,13 @@ test("management process inventory precedes dispatch and binds actual continuous
     const inventory = await readManagementProcessInventory(input)
     expect(inventory.processes).toHaveLength(1)
     expect(inventory.processes[0]).toMatchObject({ operation: ["loginom", "status"], owner: { kind: "slot" } })
+    expect(inventory.processes[0]!.result).toMatchObject({ exitCode: 0, interrupted: false, timedOut: false,
+      stdoutSha256: new Bun.CryptoHasher("sha256").update("planned").digest("hex"), reply: null })
+    const resultFile = inventory.processes[0]!.result!.source.path
+    const resultBytes = await Bun.file(resultFile).text()
+    await writeLeaseReceipt(resultFile, { ...JSON.parse(resultBytes), exitCode: 2 })
+    await expect(readManagementProcessInventory(input)).rejects.toThrow("MANAGEMENT_RESULT_UNCONFIRMED")
+    await writeLeaseReceipt(resultFile, JSON.parse(resultBytes))
     // Native snapshots below are data-only codecs around the actual OS process window.
     const baseline = await readLeaseReceipt(file) as { processes: Record<string, unknown>[] }
     const lifetime = (await Bun.file(inventory.processes[0]!.source.path).json()).lifetime
@@ -70,7 +77,9 @@ test("management process inventory precedes dispatch and binds actual continuous
     expect(managed.processCleanup.status).toBe("confirmed")
     expect((await readManagementProcessInventory(input)).processes).toHaveLength(2)
     await management(command, ["loginom", "setup", "--stdin-json", "--format", "json"], '{"password":"private-management-canary"}')
-    expect((await readManagementProcessInventory(input)).processes).toHaveLength(3)
+    const setup = await readManagementProcessInventory(input)
+    expect(setup.processes).toHaveLength(3)
+    expect(await Bun.file(setup.processes[2]!.result!.source.path).text()).not.toContain("private-management-canary")
     expect(await Bun.file(file).text()).not.toContain("private-management-canary")
     const admitted = await Bun.file(file).text()
     await expect(superviseManagementProcess({ cmd: [process.execPath, "-e", "throw Error('must not dispatch')"], cwd: root,

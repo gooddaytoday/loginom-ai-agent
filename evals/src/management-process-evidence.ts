@@ -58,6 +58,17 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
     const result = settled[0].value
     const proof = path.join(evidence.directory, "process-cleanup.json")
     await writeLeaseReceipt(proof, result.processCleanup)
+    const parsed = await new Response(result.stdout).json().catch(() => null)
+    const reply = object(parsed) ? { url: typeof parsed.url === "string" ? parsed.url : null, username: typeof parsed.username === "string" ? parsed.username : null,
+      hasApiKey: typeof parsed.hasApiKey === "boolean" ? parsed.hasApiKey : null, ok: typeof parsed.ok === "boolean" ? parsed.ok : null,
+      code: parsed.code === "LOGINOM_CONNECTION_VALID" ? parsed.code : null,
+      browser: object(parsed.browser) && ["verified", "failed", "unknown"].includes(String(parsed.browser.state)) ? String(parsed.browser.state) : "unknown" } : null
+    const completed = { version: 2, kind: "management-command-result", identity: expected.identity, commandId: expected.commandId,
+      leaseToken: expected.leaseToken, slotId: expected.slotId, profileDir: expected.profileDir, owner, operation: evidence.operation,
+      process: { path: proof, sha256: hash(result.processCleanup) }, exitCode: result.exitCode, timedOut: result.timedOut, interrupted: result.interrupted,
+      stdoutSha256: new Bun.CryptoHasher("sha256").update(result.stdout).digest("hex"), reply }
+    const resultFile = path.join(evidence.directory, "management-result.json")
+    await writeLeaseReceipt(resultFile, completed)
     await evidence.lease.assertHeld()
     const qualified = qualifyClosedProcessEvidence(result.processCleanup, { owner, producerPid: process.pid })
     const after = qualified && settled[1].status === "fulfilled" ? await evidence.admin?.inspectSessionInventory() : undefined
@@ -65,6 +76,7 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
       Date.parse(snapshot.observation.finishedAt) >= Date.parse(qualified.startedAt)) : during
     await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, { ...entry,
       state: qualified && settled[1].status === "fulfilled" ? "confirmed" : "unconfirmed", proof: { path: proof, sha256: hash(result.processCleanup) },
+      result: { path: resultFile, sha256: hash(completed) },
       ...(before ? { sessions: { before: before.source, during: snapshots.map(snapshot => snapshot.source), ...(after ? { after: after.source } : {}) } } : {}) }] })
     if (!qualified) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
     if (settled[1].status === "rejected") throw new EvalFailure("MANAGEMENT_SESSION_OBSERVATION_UNCONFIRMED", 2)
@@ -76,7 +88,7 @@ export async function readManagementProcessInventory(input: InventoryInput) {
   const inventory = await readInventory(input)
   const processes = []
   for (const entry of inventory.processes) {
-    if (!object(entry) || Object.keys(entry).length !== (entry.sessions === undefined ? 5 : 6) || entry.state !== "confirmed" || !object(entry.owner) || entry.owner.kind !== "slot" ||
+    if (!object(entry) || Object.keys(entry).length !== 5 + Number(entry.sessions !== undefined) + Number(entry.result !== undefined) || entry.state !== "confirmed" || !object(entry.owner) || entry.owner.kind !== "slot" ||
       typeof entry.owner.id !== "string" || !entry.owner.id.startsWith(`${input.commandId}:${input.slotId}:`) || typeof entry.directory !== "string" ||
       !Array.isArray(entry.operation) || entry.operation.length !== 2 || !entry.operation.every(value => typeof value === "string") ||
       !operations.has(entry.operation.join(" ")) || !object(entry.proof) ||
@@ -87,11 +99,31 @@ export async function readManagementProcessInventory(input: InventoryInput) {
     const qualified = qualifyClosedProcessEvidence(proof, { owner: { kind: "slot", id: entry.owner.id }, producerPid: input.producerPid })
     if (!qualified || hash(proof) !== entry.proof.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
     const sessions = entry.sessions === undefined ? undefined : await readManagementSessions(input, entry.sessions, qualified)
+    const result = entry.result === undefined ? undefined : await readManagementResult(input, entry)
     processes.push({ owner: qualified.owner, operation: entry.operation, launcher: qualified.launcher, identities: qualified.identities,
-      source: { path: entry.proof.path, sha256: entry.proof.sha256 }, ...(sessions ? { sessions } : {}) })
+      source: { path: entry.proof.path, sha256: entry.proof.sha256 }, ...(sessions ? { sessions } : {}), ...(result ? { result } : {}) })
   }
   if (JSON.stringify(await readInventory(input)) !== JSON.stringify(inventory)) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
   return { processes, source: { path: input.file, sha256: hash(inventory) } }
+}
+
+async function readManagementResult(input: InventoryInput, entry: Record<string, unknown>) {
+  if (!object(entry.result) || Object.keys(entry.result).length !== 2 || entry.result.path !== path.join(String(entry.directory), "management-result.json"))
+    throw new EvalFailure("MANAGEMENT_RESULT_UNCONFIRMED", 2)
+  const value = await readLeaseReceipt(String(entry.result.path)).catch(() => null)
+  if (!object(value) || Object.keys(value).length !== 15 || value.version !== 2 || value.kind !== "management-command-result" ||
+    hash(value) !== entry.result.sha256 || JSON.stringify(value.identity) !== JSON.stringify(input.identity) || value.commandId !== input.commandId ||
+    value.leaseToken !== input.leaseToken || value.slotId !== input.slotId || value.profileDir !== input.profileDir ||
+    JSON.stringify(value.owner) !== JSON.stringify(entry.owner) || JSON.stringify(value.operation) !== JSON.stringify(entry.operation) ||
+    JSON.stringify(value.process) !== JSON.stringify(entry.proof) || !Number.isSafeInteger(value.exitCode) || typeof value.timedOut !== "boolean" ||
+    typeof value.interrupted !== "boolean" || typeof value.stdoutSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.stdoutSha256) ||
+    value.reply !== null && (!object(value.reply) || Object.keys(value.reply).length !== 6 ||
+      [value.reply.url, value.reply.username].some(value => value !== null && typeof value !== "string") ||
+      [value.reply.hasApiKey, value.reply.ok].some(value => value !== null && typeof value !== "boolean") ||
+      value.reply.code !== null && value.reply.code !== "LOGINOM_CONNECTION_VALID" || !["verified", "failed", "unknown"].includes(String(value.reply.browser))))
+    throw new EvalFailure("MANAGEMENT_RESULT_UNCONFIRMED", 2)
+  return { exitCode: value.exitCode as number, timedOut: value.timedOut, interrupted: value.interrupted, stdoutSha256: value.stdoutSha256,
+    reply: value.reply as Record<string, unknown> | null, source: { path: String(entry.result.path), sha256: String(entry.result.sha256) } }
 }
 
 async function readManagementSessions(input: InventoryInput, value: unknown, window: { startedAt: string; finishedAt: string }) {
