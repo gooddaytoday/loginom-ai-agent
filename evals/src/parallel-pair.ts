@@ -1,6 +1,6 @@
 import path from "node:path"
 import { lstat, mkdir, open, readFile, realpath, readdir, rename } from "node:fs/promises"
-import type { ServerIdentity, SlotFile } from "./slots"
+import type { ServerIdentity, SlotDefinition, SlotFile } from "./slots"
 import { EvalFailure } from "./fail"
 import { acquireResourceLease, readLeaseReceipt, recoverResourceLease, writeLeaseReceipt } from "./lease"
 import type { Reservation } from "./lease"
@@ -126,6 +126,46 @@ export async function verifyParallelPair(file: SlotFile, expected: ServerIdentit
   if (JSON.stringify(current) !== JSON.stringify(expected)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
   if (JSON.stringify(await readLeaseReceipt(source)) !== JSON.stringify(journal)) throw new EvalFailure("PAIR_JOURNAL_CHANGED", 2)
   return current
+}
+
+export async function inspectUserStorage(file: SlotFile, identity: ServerIdentity, slot: SlotDefinition, owner: string) {
+  if (!ownerNonce.test(owner) || !file.slots.some(configured => JSON.stringify(configured) === JSON.stringify(slot)))
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  await verifyParallelPair(file, identity)
+  const markerFile = "/workdir/.loginom-evals-isolated.json"
+  const markerBytes = await dockerText(["exec", identity.containerId, "cat", markerFile])
+  const marker = JSON.parse(markerBytes) as ReturnType<typeof usersMarker>
+  const root = `${file.server.storageRoot}/${slot.username}`
+  if (!marker.inventory.some(row => row.username === slot.username && row.storage_dir === root && row.owner_nonce === owner))
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  const script = 'set -eu; for dir in / /workdir /workdir/UserStorage "$1"; do ' +
+    'test -d "$dir" && ! test -L "$dir" && test "$(readlink -f -- "$dir")" = "$dir" || exit 1; done; ' +
+    'stat --printf "%d\\0%i\\0%u\\0%g\\0" -- "$1"; ' +
+    'find -P "$1" -mindepth 1 -printf "%P\\0%y\\0%n\\0%U\\0%G\\0%D\\0%i\\0%s\\0"; ' +
+    'stat --printf "%d\\0%i\\0%u\\0%g\\0" -- "$1"'
+  const scanned = await docker(["exec", identity.containerId, "env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C", "sh", "-c", script, "user-storage", root])
+  if (scanned.code !== 0) throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+  const fields = scanned.text.split("\0")
+  if (fields.pop() !== "" || fields.length < 8 || fields.length % 8 !== 0 ||
+    JSON.stringify(fields.slice(0, 4)) !== JSON.stringify(fields.slice(-4))) throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+  const [device, inode, uid, gid] = fields.slice(0, 4)
+  const service = await dockerText(["exec", identity.containerId, "cat", "/proc/1/status"])
+  if (!/^\d+$/.test(device!) || ![inode, uid, gid].every(value => /^\d+$/.test(value!) && Number.isSafeInteger(Number(value))) || Number(inode) < 1 ||
+    service.match(/^Uid:\s+\d+\s+\d+\s+\d+\s+(\d+)$/m)?.[1] !== uid || service.match(/^Gid:\s+\d+\s+\d+\s+\d+\s+(\d+)$/m)?.[1] !== gid)
+    throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+  const entries = Array.from({ length: (fields.length - 8) / 8 }, (_, index) => {
+    const row = fields.slice(4 + index * 8, 12 + index * 8)
+    if (!row[0] || row[0].startsWith("/") || row[0].split("/").some(part => !part || [".", ".."].includes(part)) ||
+      !["f", "d", "l"].includes(row[1]!) || !row.slice(2).every(value => /^\d+$/.test(value) && Number.isSafeInteger(Number(value))) ||
+      Number(row[2]) < 1 || Number(row[6]) < 1 || row[3] !== uid || row[4] !== gid || row[5] !== device || row[1] === "f" && row[2] !== "1")
+      throw new EvalFailure("USER_STORAGE_TOPOLOGY", 2)
+    return { name: row[0]!, type: row[1]!, links: Number(row[2]), uid: Number(row[3]), gid: Number(row[4]), device: row[5]!, inode: Number(row[6]), bytes: Number(row[7]) }
+  })
+  if (new Set(entries.map(entry => entry.name)).size !== entries.length ||
+    await dockerText(["exec", identity.containerId, "cat", markerFile]) !== markerBytes) throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+  if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+  return { version: 2, kind: "user-storage-observation", identity, username: slot.username, ownerNonce: owner, root,
+    markerHash: new Bun.CryptoHasher("sha256").update(markerBytes).digest("hex"), device: device!, inode: Number(inode), uid: Number(uid), gid: Number(gid), entries }
 }
 
 async function usePair(file: SlotFile, options: PairOptions, action: "create" | "destroy") {

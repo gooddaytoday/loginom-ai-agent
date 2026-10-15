@@ -593,3 +593,11 @@ resource только при private slot proof, незавершённом comp
 под resource guard перед CAS; generic recovery released resources не принимает
 без slot-specific callback. Live owner/source drift сохраняют прежнее владение.
 Это admission восстановления, не повторное model admission или delete grant.
+
+`inspectUserStorage` выполняет readonly observation выбранного configured slot:
+verified pair/epoch и inventory owner nonce, canonical ancestors/root, stable
+device/inode и fs UID/GID service PID1. NUL-safe traversal сохраняет unusual
+имена и metadata; symlink не раскрывается, hardlink/foreign ownership/unknown
+type отказывают. Это observation без delete/release/readiness authority.
+Native Docker controls проверены с synthetic inventory; production publication
+и positive native user→root binding ещё требуют отдельной квалификации.
