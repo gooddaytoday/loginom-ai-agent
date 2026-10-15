@@ -316,6 +316,22 @@ test("fixture main: shared judge home conflicts across servers before any agent 
   } finally { await pending; await rm(root, { recursive: true, force: true }) }
 }, 40_000)
 
+test("fixture main: occupied judge home prevents even the version process", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-version-lease-"))
+  const input = await parallelFixture(root, ["parallel-fast"], true)
+  const journal = path.join(root, "holder.json"), version = path.join(root, "version.json")
+  await writeLeaseReceipt(journal, { commandId: "holder" })
+  const lease = await acquireJudgeLease({ codexHome: input.slots.judge.codexHome, journal, commandId: "holder", lockRoot: input.lockRoot })
+  try {
+    await expect(main(["--tasks", path.join(root, "tasks")], { ...input.env,
+      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")} --version-home-file ${version}`,
+      JUDGE_MODEL: "gpt-6-sol" }, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })).rejects.toThrow("BUSY")
+    expect(await Bun.file(version).exists()).toBe(false)
+    expect(await readdir(input.slots.slots[0]!.workspaceRoot)).toEqual([])
+    expect((await Bun.file(lease.receipt).json()).state).toBe("retained")
+  } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+}, 15000)
+
 test("fixture main: skip-judge does not acquire an occupied judge home", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-no-judge-"))
   const input = await parallelFixture(root, ["parallel-fast"])
