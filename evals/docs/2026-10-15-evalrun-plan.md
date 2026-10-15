@@ -3,13 +3,13 @@
 Approved 2026-10-15. Branch `evalrun-runtime`, harness base `51459ab905d4151ee4cf8d15521ac46ce0497102`.
 
 - [x] Inspect memory, both related chats, Multica API, source/target hosts and local images.
-- [ ] Add and test standalone EvalRunner admission/execution/check/export without baseline registry.
-- [ ] Pin zero infrastructure retries, strict recovery, external skill isolation and management budget.
-- [ ] Preserve target registration/auth/old agents; clean verified obsolete artifacts only.
-- [ ] Install Docker and prepare clean Loginom 7.4.2 from LOCAL images plus verified libxml2/Python-disabled config.
-- [ ] Install official CLI 0.2.0, own profile/catalog/auth, judge home, bwrap/AppArmor.
-- [ ] Configure proxy/systemd using existing Multica registration and both existing providers.
-- [ ] Qualify environment without product model calls; transfer EvalRunner and verify actor memory.
+- [x] Add and test standalone EvalRunner admission/execution/check/export without baseline registry.
+- [x] Pin zero infrastructure retries, strict recovery, external skill isolation and management budget.
+- [x] Preserve target registration/auth/old agents; clean verified obsolete artifacts only.
+- [x] Install Docker and prepare clean Loginom 7.4.2 from LOCAL images plus verified libxml2/Python-disabled config.
+- [x] Install official CLI 0.2.0, own profile/catalog/auth, judge home, bwrap/AppArmor.
+- [x] Configure proxy/systemd using existing Multica registration and both existing providers.
+- [x] Qualify environment without product model calls; transfer EvalRunner and verify actor memory.
 - [ ] Two distinct smoke admissions: calc-data-double and crosstable-fixed-sum, repeat=1, infraRetries=0.
 - [ ] Verify actual product model, cleanup/history/release and curated delivery round trip.
 - [ ] Verify service restart/reboot with empty task queues; publish final runbook/checkpoint.

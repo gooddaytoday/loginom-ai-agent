@@ -67,6 +67,8 @@ python3 script/evalrunner-archive.py verify "$DOWNLOADED_ARCHIVE" "$SHA256"
 `loginom-evalrun-stand.service` запускает только два собственных контейнера `loginom-evals-server`/`loginom-evals-studio`; без bind mounts, Studio127.0.0.1:80.
 `loginom-evalrun-multica.service` использует существующий daemon ID, concurrency1, отключённые auto-update/reload и старые provider paths.
 Docker29.1.3, Bun1.3.14, Node24.19.0, bwrap0.9.0. AppArmor допускает userns только точным путям bwrap/поставленного Chrome; глобальная restriction сохранена.
-Сеть использует существующий proxy127.0.0.1:2080 через xray/sing-box, Node env proxy включён. Private runtime.env0600 — окружение службы, не продукта.
+Сеть использует существующий proxy127.0.0.1:2080 через xray/sing-box, Node env proxy включён. Для управляющего Multica CLI/daemon задан GODEBUG=tlsmlkem=0 после подтверждённых ошибок TLS handshake. Private runtime.env0600 — окружение службы, не продукта.
 Перезапуск/обновление только при пустых очередях, свободном stand и подтверждённом cleanup. Перед reboot сохранить checkpoint; после проверить enabled/active служб, оба runtime online с прежними IDs, container IDs, HTTP /app/ и отсутствие самозапущенных задач.
 Старые артефакты удалять адресно после проверки очередей, процессов/FD и Git; общий prune не применять.
+
+MCP OpenViking в агенте: request timeout60s, tool timeout120s/startup60s, после реального15s actorfind timeout. Health/auth/systemstatus/ready проверены установленным doctor; exact actorfind и новая агентская сессия подтверждены. Старый BLOCKED receipt сохранён отдельно.

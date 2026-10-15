@@ -31,3 +31,25 @@ Target receipt `R/evidence/positive-replay.json`, product model calls=0. New gpt
 ## Storage cleanup
 
 No active/queued task for preserved agents or EvalRunner. No process cwd/exe/FD into removed paths; maintenance Git clones clean. Removed old task workspaces, LAB23 maintenance artifacts, Bun/npm caches, Codex temporary/cache trees and two previous installation backups (2447732KiB). Removed five unused managed Codex releases after config/symlink/maps/FD checks (2189216KiB). Preserved standalone0.159.3, managed0.162.1, Cursor, auth/settings and registration. Receipts `R/evidence/obsolete-cleanup.json`, `obsolete-releases.json`.
+
+## Frozen deployment after reboot
+
+Harness708c72ebce60690d91d1b51137974bd6aa123209: typecheck PASS, full suite788PASS/0FAIL,4070assertions,61files,551.50s. No skipped Docker/sandbox fixtures. Log SHA is recorded in R/evidence/acceptance-ready.json. Gate opened only after successful process exit and repeated prepare check.
+
+New judge live qualification on saved positive calc artifact: gpt-6-sol/xhigh, Codex0.159.3,100/PASS, no product model calls. Prompt/schema hashes and result in R/evidence/judge-qualification.json.
+
+Reboot accepted: all5services active, unchanged2container IDs,HTTP200,standFREE. Both existing Codex/Cursor runtimes registered automatically; Cursor cold version detection timed out once and native discovery retried successfully after2minutes. Source/current provider/auth paths and old agent settings preserved.
+
+## Agent memory transport recovery
+
+First LAB76 management task01a13f5c-0cf0-7ba2-bcbc-12b321c69289 stopped before prepare/admission: MCPhealthPASS,actorfind hit15s. Original BLOCKED receipt/checkpoint retained with task ID. Installed doctor confirmed auth/systemstatus/fs/MCP list/ready all healthy; health network latency7.99s. Hook/install warnings are expected for this explicitly configured scripts-only stdio adapter, which does not install global hooks.
+
+The exact read-only actor query passed through the same wrapper with60s request budget. Own agent MCP config now sets OPENVIKING_TIMEOUT_MS60000, tool_timeout_sec120/startup_timeout_sec60; no global memory/config/server changes. Agent must reconfirm actual health/find before product. No product attempt was consumed by the memory incident.
+
+## First live smoke
+
+calc-data-double: one admitted attempt, infraRetries0, completed221498ms, judge100/PASS, cleanup/history/RELEASED confirmed. Exact Session ses_ec097f426ffebJyB9b9ofWJYJ6: independent copy of closed SQLite verifies all11assistant messages openai/gpt-6.1-sol/medium; raw DB(+sidecars) source hashes unchanged. Independent release check verifies88sealed evidence files. Node smoke admitted only after this release.
+
+Calc curated delivery: attachment01a13f6d-f4a4-77eb-979c-fd5ab79e731c, SHA25664fe0314d6891cc1ba7ad48a6ab8639e2b85dfe19a5a54d712ebe7c161373af7. Agent upload→download→verify confirmed; operator additionally downloads and verifies independently. No env/auth/history/rawlogs in archive.
+
+Multica CLI produced explicit TLS handshake failures locally and in agent task, resolved by its recommended GODEBUG=tlsmlkem=0. This is set in EvalRunner custom env and future daemon runtime.env; apply daemon environment only at an empty queue after delivery. Product/Judge env pins are unchanged.

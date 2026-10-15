@@ -1,5 +1,17 @@
 # Evalrun checkpoint
-- Branch evalrun-runtime, base 51459ab9; approved execution started 2026-10-15.
-- Target kartai@10.200.9.134, existing registration retained; old agents preserved.
-- Plan: 2026-10-15-evalrun-plan.md. Private controller/evidence: /home/kiselev/storage/tmp/evalrun-20261015.
-- No product attempts admitted yet. Next: offline TDD and target bootstrap.
+- Approved plan: `2026-10-15-evalrun-plan.md`; branch `evalrun-runtime`, base51459ab9.
+- Frozen target harness `708c72ebce60690d91d1b51137974bd6aa123209`, clean checkout R/checkouts/evalrunner.
+- R=/home/kartai/.local/share/loginom-evals-runtime; host kartai@10.200.9.134.
+- Existing daemon/runtime IDs retained, old «Спамиель»/«Cursor» settings unchanged; EvalRunner transferred to target Codex runtime.
+- CLI0.2.0/source0c975a73676d9aba556085dbda97e1a9ceb23cc6; product openai/gpt-6.1-sol/medium; judge gpt-6-sol/xhigh.
+- Own Loginom7.4.2 from local original images; full CLI payload, native check, sandbox, storage, history qualified.
+- Original failed native qualification preserved; explicit operator no-process recovery recorded; namespace ownership fix passes20tests/nativecheck.
+- Offline saved positive replay calc100/PASS and nodePASS; real new judge positive qualification100/PASS, product calls0.
+- Reboot accepted: all5services active, same2containerIDs, HTTP200, both provider runtimes automatically online, stand FREE.
+- Obsolete artifacts/releases removed:4636948KiB, receipts in R/evidence. Auth/current providers preserved.
+- Full first suite786PASS/1DockerfixturetimingFAIL; exactrepeatPASS, fixture budget60s. Final fullsuite after reboot:788PASS/0FAIL,4070assertions,551.50s; typecheckPASS.
+- LAB-76 issue01a13f4c-c8c5-7916-9c86-9cb302d38987, task01a13f63-7941-7530-89f4-61c2a4df6900 active.
+- Gate PASS. First management task blocked before product by15s actorfind timeout; retained receipt. New MCP timeout60/120s, actual health/findPASS.
+- Calc RELEASED/PASS100, raw88files and actual11assistant modelIDs/medium independentlyverified; node admitted once, active. Next: node release/modelproof→archive roundtrip→in_review.
+- No full corpus/baseline promotion; historical comparison INCOMPARABLE; new judge uncalibrated.
+- Private controller/evidence /home/kiselev/storage/tmp/evalrun-20261015. Runbook/validation docs alongside this file.
