@@ -10,6 +10,7 @@ export type EvalrunnerConfig = {
   endpoint: string; readinessIssue: string
   cliVersion?: string; cliSourceSha?: string
   judgeBin?: string; judgeVersion?: string; judgeSha256?: string; bunSha256?: string
+  qualificationFile?: string; qualificationSha256?: string
 }
 
 export function checkEvalrunnerOutcome(summary: RunSummary, node = false) {
