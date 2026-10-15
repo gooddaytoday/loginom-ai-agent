@@ -880,3 +880,12 @@ exact pair absence PASS. Offline judge
 recover сохранён. Browser qualification запускать последовательно: неизвестный
 одновременно запущенный browser оставляет process proof quarantined; другой
 успешный запуск не исправляет его задним числом.
+
+Для native management snapshot control из `evals/` запустить
+`bun test test/parallel-lifecycle-integration.test.ts -t 'installed CLI management'`
+с закреплённым EVAL_CLI_BIN; вариант `with native session snapshots` дополнительно
+требует EVAL_ADMIN_LIVE_CONFIG. Этот control выполняет unconfigured status без
+входа CLI в Loginom, сохраняет native admin snapshots до/после процесса и
+проверяет source hashes/temporal order. Оба snapshots остаются unqualified;
+setup/check/recover и actual user-session attribution требуют следующих gates.
+Process-only fake/FS tests остаются в management-process-evidence.test.ts.

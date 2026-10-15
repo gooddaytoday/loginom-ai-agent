@@ -28,7 +28,8 @@ test("session inventory reader preserves unqualified snapshots and refuses chang
   await writeLeaseReceipt(target, receipt)
   const source = { path: target, sha256: hash(receipt) }
   try {
-    expect(await readAdminSessionInventory(fixture.slots, identity, source)).toEqual({ identity, sessionIdentityQualified: false, sessions: receipt.sessions, source })
+    expect(await readAdminSessionInventory(fixture.slots, identity, source)).toEqual({ identity, sessionIdentityQualified: false, sessions: receipt.sessions,
+      observation: { startedAt: command.at, finishedAt: command.settledAt }, source })
     await writeLeaseReceipt(target, { ...receipt, sessions: [] })
     await expect(readAdminSessionInventory(fixture.slots, identity, source)).rejects.toThrow("SESSION_INVENTORY_UNCONFIRMED")
     await writeLeaseReceipt(target, receipt)

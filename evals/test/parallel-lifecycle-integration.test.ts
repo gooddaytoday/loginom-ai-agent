@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, rmdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { createPair, destroyPair, prepareUserStorage } from "../src/parallel-pair"
+import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { loadConfig } from "../src/config"
 import { agentCommand } from "../src/cli"
 import { loadTasks } from "../src/task"
@@ -13,7 +13,10 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
-import { openLoginomAdmin } from "../src/loginom-admin"
+import { openLoginomAdmin, readAdminFinalization } from "../src/loginom-admin"
+
+import { readManagementProcessInventory } from "../src/management-process-evidence"
+import { management } from "../src/profile"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 
@@ -424,3 +427,78 @@ async function slotAttemptFixture() {
     slot: { file: fixture.file, lease: fixture.lease, secretFile: fixture.prepared.secretFile } }
   return { ...fixture, storage, input }
 }
+
+for (const sessions of [false, true]) test.skipIf(!process.env.EVAL_CLI_BIN || sessions && !process.env.EVAL_ADMIN_LIVE_CONFIG)(`installed CLI management publishes continuous slot evidence for an unconfigured status${sessions ? " with native session snapshots" : ""}`, async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "evals-management-native-")), fixture = await parallelFixture(root)
+  const source = sessions ? await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1) : undefined
+  const slots = source ? parseSlots({ ...fixture.slots, server: source.server,
+    controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1) : fixture.slots
+  const serverIdentity = source ? await readServerIdentity(slots) : { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+  // Native CLI initializes its own marker and requires an empty fresh profile.
+  await rm(path.join(fixture.slots.slots[0]!.profileDir, "data/auth.json"))
+  await rmdir(path.join(fixture.slots.slots[0]!.profileDir, "data"))
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json")
+  // Slot authority is a data-only fixture; this control makes no Loginom login or readiness claim.
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "native-management", identity: serverIdentity, phase: "cli_admitted" })
+  const environment = await acquireEnvironmentLeases(slots, 1, serverIdentity, journal, fixture.lockRoot), lease = environment.slots[0]!
+  const file = path.join(fixture.slots.controller.stateDir, "management-a.json")
+  await writeLeaseReceipt(file, { version: 2, kind: "management-processes", commandId: "native-management", journal, identity: serverIdentity,
+    leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
+  const admin = source ? await openLoginomAdmin(slots, serverIdentity) : undefined
+  const captures: unknown[] = []
+  let confirmed = false
+  try {
+    const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!,
+      EVAL_PROFILE_DIR: lease.slot.profileDir, EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: "unused-metadata-control" })
+    const command = { ...agentCommand(config), cleanupDir: path.join(fixture.slots.controller.stateDir, "captures"), managementEvidence: { file, lease, admin } }
+    const result = await management(command, ["loginom", "status", "--format", "json"])
+    expect({ code: result.exitCode, stderr: result.stderr, outputOnFailure: result.exitCode ? result.stdout : "" })
+      .toEqual({ code: 0, stderr: "", outputOnFailure: "" })
+    expect(JSON.parse(result.stdout)).toMatchObject({ state: "unconfigured", hasApiKey: false })
+    const inventory = await readManagementProcessInventory({ file, journal, commandId: "native-management", identity: serverIdentity, leaseToken: lease.token,
+      slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
+    expect(inventory.processes).toHaveLength(1)
+    expect(inventory.processes[0]!.identities.length).toBeGreaterThan(1)
+    confirmed = result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete
+    expect(confirmed).toBe(true)
+    if (sessions) {
+      const snapshots = inventory.processes[0]!.sessions!
+      expect(snapshots.before.sessionIdentityQualified).toBe(false)
+      expect(snapshots.after.sessionIdentityQualified).toBe(false)
+      expect(snapshots.before.source.path).not.toBe(snapshots.after.source.path)
+      expect(Date.parse(snapshots.before.observation.finishedAt)).toBeLessThanOrEqual(Date.parse(result.processCleanup.lifetime!.started_at))
+      expect(Date.parse(snapshots.after.observation.startedAt)).toBeGreaterThanOrEqual(Date.parse(result.processCleanup.lifetime!.finished_at!))
+      const original = await readLeaseReceipt(file) as { processes: { sessions: { before: unknown; after: unknown } }[] }
+      const reversed = structuredClone(original)
+      reversed.processes[0]!.sessions = { before: original.processes[0]!.sessions.after, after: original.processes[0]!.sessions.before }
+      await writeLeaseReceipt(file, reversed)
+      await expect(readManagementProcessInventory({ file, journal, commandId: "native-management", identity: serverIdentity, leaseToken: lease.token,
+        slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })).rejects.toThrow("MANAGEMENT_SESSION_SCOPE_INVALID")
+      await writeLeaseReceipt(file, original)
+      const snapshot = await readLeaseReceipt(snapshots.before.source.path)
+      await writeLeaseReceipt(snapshots.before.source.path, { ...snapshot as Record<string, unknown>, sessions: [] })
+      await expect(readManagementProcessInventory({ file, journal, commandId: "native-management", identity: serverIdentity, leaseToken: lease.token,
+        slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })).rejects.toThrow("SESSION_INVENTORY_UNCONFIRMED")
+      await writeLeaseReceipt(snapshots.before.source.path, snapshot as Record<string, unknown>)
+      captures.push({ inventory, manifest: await readLeaseReceipt(file), process: result.processCleanup, journal: await readLeaseReceipt(journal),
+        sources: await Promise.all([snapshots.before, snapshots.after].map(async snapshot => {
+          const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
+          return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
+        })) })
+    }
+  } finally {
+    await admin?.dispose()
+    if (source && confirmed && captures.length) {
+      const directory = path.join(slots.controller.stateDir, (await readdir(slots.controller.stateDir)).find(name => name.startsWith("admin-"))!)
+      const finalization = await readAdminFinalization(slots, serverIdentity, directory, process.pid)
+      const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
+      const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-management-sessions-${crypto.randomUUID()}`)
+      await mkdir(evidence, { mode: 0o700 })
+      await writeLeaseReceipt(path.join(evidence, "management.json"), { kind: "native-management-session-snapshots", identity: serverIdentity, captures,
+        finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path), liveQualified: false })
+    }
+    await Promise.all([environment.server.close(), lease.close()])
+    if (confirmed) await rm(root, { recursive: true, force: true })
+  }
+}, 30000)
