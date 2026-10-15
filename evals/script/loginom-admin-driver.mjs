@@ -195,7 +195,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (payload.peer && payload.expectedPolicy.some(directory => !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(directory.name)))
+      if ((payload.peer || payload.phase === "session-component-probe") && payload.expectedPolicy.some(directory => !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(directory.name)))
         throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
       const credentials = await readCredentials(payload.secretFile)
       if (credentials.username !== payload.slot.username || createHash("sha256").update(JSON.stringify(credentials)).digest("hex") !== payload.secretHash)
@@ -389,13 +389,61 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             }, payload.phase))
             try {
               const withPackage = await snapshot()
-              const components = payload.phase === "session-component-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
-                const activation = await item.Activate(0)
-                try {
-                  while (!await activation.Finished && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25))
-                  return { finished: await activation.Finished, failed: await activation.Failed }
-                } finally { await ReleaseObject(activation, true) }
-              }, { item: handle, deadline: request.deadline })) : null
+              const components = payload.phase === "session-component-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline, shared }) => {
+                const finish = async activation => {
+                  try {
+                    while (!await activation.Finished && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25))
+                    return { finished: await activation.Finished, failed: await activation.Failed }
+                  } finally { await ReleaseObject(activation, true) }
+                }
+                const positive = await finish(await item.Activate(0))
+                if (!positive.finished || positive.failed) return { ...positive, continued: false, denials: [] }
+                console.info("ADMIN_USER_STAGE_COMPONENT_BIND")
+                const units = await item.ModelUnits
+                console.info("ADMIN_USER_COMPONENT_UNITS_" + await units.Count)
+                if (await units.Count !== 1) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const unit = await (await units.getItem(0)).ModelUnit
+                const workflow = await unit.WorkFlow
+                const nodes = await workflow.Nodes
+                console.info("ADMIN_USER_COMPONENT_NODES_" + await nodes.Count)
+                if (await nodes.Count !== 3) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const input = await nodes.getItem(0)
+                const output = await nodes.getItem(2)
+                const importer = await cast(await (await input.Component).Engine, bg.IBGImportTextFile)
+                const exporter = await cast(await (await output.Component).Engine, bg.IBGExportTextFile)
+                if (await importer.FileName !== "data/sales.csv" || await exporter.FileName !== "group_sum_qty.result.csv")
+                  throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const denials = []
+                for (const name of shared) {
+                  for (const [kind, root] of [["virtual", `/${name}`], ["absolute", `/workdir/UserStorage/${name}`], ["traversal", `../${name}`]]) {
+                    for (const operation of ["import", "export"]) {
+                      console.info("ADMIN_USER_STAGE_COMPONENT_NEGATIVE")
+                      const deactivated = await finish(await workflow.DeactivateAllAsync())
+                      if (!deactivated.finished || deactivated.failed) throw Error("ADMIN_COMPONENT_DEACTIVATION_UNCONFIRMED")
+                      const source = operation === "import" ? `${root}/component-input.csv` : "data/sales.csv"
+                      const target = operation === "export" ? `${root}/component-forbidden.tsv` : "component-import-control.tsv"
+                      await importer.set_FileName(source)
+                      await exporter.set_FileName(target)
+                      await input.UpdateConfiguration()
+                      await output.UpdateConfiguration()
+                      if (await importer.FileName !== source || await exporter.FileName !== target) throw Error("ADMIN_COMPONENT_READBACK_UNCONFIRMED")
+                      const activation = await finish(await item.Activate(0))
+                      const targetStatus = await (operation === "import" ? input : output).Status
+                      denials.push({ pathKind: `shared:${name}:${kind}`, operation, ...activation, targetStatus,
+                        denied: activation.finished && activation.failed && targetStatus === bg.TBGModelNodeStatus.mnsInactiveError })
+                    }
+                  }
+                }
+                console.info("ADMIN_USER_STAGE_COMPONENT_RESET")
+                const deactivated = await finish(await workflow.DeactivateAllAsync())
+                if (!deactivated.finished || deactivated.failed) throw Error("ADMIN_COMPONENT_DEACTIVATION_UNCONFIRMED")
+                await importer.set_FileName("data/sales.csv")
+                await exporter.set_FileName("group_sum_qty.result.csv")
+                await input.UpdateConfiguration()
+                await output.UpdateConfiguration()
+                const continued = await finish(await item.Activate(0))
+                return { ...positive, continued: continued.finished && !continued.failed, denials }
+              }, { item: handle, deadline: request.deadline, shared: payload.expectedPolicy.map(directory => directory.name).sort() })) : null
               const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer, shared }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 const source = peer ? "access-peer-probe.lgp" : "access-probe.lgp"
@@ -587,7 +635,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
 await context?.close().catch(() => { process.stderr.write("ADMIN_DISPOSE_UNKNOWN\n"); process.exitCode = 2 })
 
 function traceConsole(message) {
-  if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK|STORAGE_(SAVE|READ|COPY|DENIALS)|BACKUP_(BASELINE|MODIFIED|PERIOD|WAIT|DRIFT))|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
+  if (/^ADMIN_USER_COMPONENT_(UNITS|NODES)_\d{1,2}$/.test(message.text())) process.stderr.write(message.text() + "\n")
+  if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK|COMPONENT_(BIND|NEGATIVE|RESET)|STORAGE_(SAVE|READ|COPY|DENIALS)|BACKUP_(BASELINE|MODIFIED|PERIOD|WAIT|DRIFT))|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
 }
 
 function respond(id, outcome, data) {

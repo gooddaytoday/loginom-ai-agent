@@ -703,7 +703,8 @@ Research `session-storage-probe` допускает дополнительный
 SHA обоих peer files и NUL-safe directory entries, отсутствие partial new files;
 foreign peer identity и traversal name отвергаются. Evidence private600:
 `research/evidence/native-user-dfb3a33f-9f9f-402b-9f18-7fbbbfdf9c15/storage-probe.json`.
-Shared directories, imports/exports и concurrent heartbeat ещё не проверены.
+Этот receipt покрывает соседние roots; shared directories и component operations
+проверяются отдельными controls ниже. Concurrent heartbeat остаётся открытым.
 В production parent эти research phases не подключены и не дают ready/release.
 
 Тот же native research probe проверяет shared directories из exact read-back
@@ -716,8 +717,8 @@ A и B после удаления Everyone grants отвергают все ч�
 absolute и `../` paths; shared/peer file hashes и NUL-safe entries остаются
 неизменными. Всего72 отрицательные операции с native own-root positives до/после.
 Copy-out destinations остаются валидными собственными basenames. Конкретный
-код серверной ACL ошибки не утверждается; import/export, unusual names и
-одновременный heartbeat B всё ещё требуют отдельных positive/negative controls.
+код серверной ACL ошибки не утверждается. Component import/export проверяются
+отдельно ниже; unusual names и одновременный heartbeat B остаются открытыми.
 
 Latest shared+neighbor control: private600 `research/evidence/native-user-d0a06c5b-7a61-4119-a120-5363660337a3/storage-probe.json`, SHA256 `10dc8b38624e6cdb53913d67076c6e000bf2ac36262b0390bc81d4a2d9e9f3c6`. Shared sentinels independently match the native positive package SHA. Unsupported traversal shared policy names refuse before probe. Native1 PASS/108 (40.91s);60 admin/user/slots PASS/260 and typecheck/diff PASS. Three superseded own artifacts removed only after process proofs and exact pair absence; audit retained beside this receipt.
 
@@ -737,3 +738,21 @@ SHA256 `8ba4b3e821a01ae56a3141ff522e77000a5e0ddeb733418e23426d7766cfc92d`;
 native process confirmed, pair independently absent. Это positive server execution,
 `liveQualified=false`; import/export neighbor/shared negatives и runtime readiness
 этим не квалифицированы.
+
+Shared import/export extension использует public native chain
+`ModelUnits.getItem(0).ModelUnit.WorkFlow` (Item wrapper interface903,
+PackageModelUnit907, workflow908), не QueryInterface коллекционного Item.
+Для frozen fixture требуется один module/три Nodes; Import0 и Export2 приводятся
+к IBGImportTextFile/IBGExportTextFile. Перед сменой FileName полностью ожидается
+`DeactivateAllAsync()` work item Finished/Failed и освобождается его proxy.
+`set_FileName`+`UpdateConfiguration` и getter read-back предшествуют Activate(0).
+Ровно12 shared paths/operations требуют Finished=true, Failed=true и status
+целевого node `TBGModelNodeStatus.mnsInactiveError`(3). Ошибка другого node или
+незавершённая activation не получает denied credit. Перед/после negative matrix
+own execution успешен; shared input bytes/SHA и NUL-safe entries проверяются
+независимым Docker observer. Исходные common/temp sentinels существуют и содержат
+тот же корректный CSV, что own positive. Результат описывает observed rejection,
+точный ACL exception code не утверждается. Latest private600 receipt:
+`research/evidence/native-user-29beba5b-138e-4c0a-bef8-1f60ee981ece/component-probe.json`,
+SHA256 `36529410d2723843c24a84b306f62e666c21b4f37b1d5df72c8cbeb2392bfe78`.
+Neighbor component operations, live concurrency и parent readiness остаются open.
