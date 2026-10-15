@@ -1,11 +1,11 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты19 candidate,
-policy PASS во всех19. Один итоговый расчёт правильный,18 результатов не получены.
-Одна сессия завершена штатно,18 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты20 candidate,
+policy PASS во всех20. Один итоговый расчёт правильный,19 результатов не получены.
+Одна сессия завершена штатно,19 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось6 candidate, включая текущую monthly-demand/3. Sequential
-runner4185233/exec3686 продолжил серию2026-10-15T01:14:39.523345+00:00;
+Осталось5 candidate, включая текущую risky-approved-claims/3. Sequential
+runner14366/exec74492 продолжил серию2026-10-15T01:29:07.025404+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -17,6 +17,22 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+Monthly-demand/3 closed01:23:26.486Z: policy PASS `b0954457…`, mandatory
+review `44928acd…`;31messages/116parts/32tools/97events/2944runtime, JS0/nochildren.
+Std Import365→DateTimeMonth→GroupCount/Sum/Avg/Max/promotionSUM→SortMonthASC12→
+ReformPromoDaysInteger SUCCEEDED5. NativeExportcompleted/readAMBIG file-search
+scroll budget exhausted; затем только same-opinspect/blockedSave/recover/resume,
+новыхapply/JS нет. CSV/LGP/oracle не получены; CLI1/cleanupfalse/APPLY_MISMATCH
+сохранены отдельно от policyPASS.
+Own290closed01:26:35.425Z/admin291logout01:26:37.042Z/browserclosed01:26:38.249Z;
+9actualPIDgone/exactguardarchive01:26:45.764536Z, unknown289 видна вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+18case/26recovery readonly; descriptor `1dae3f97…`.
+Independent finalrelease review `c0ba9406…`/readback `d6d0f183…` approved;
+actualgate2026-10-15T01:29:06.830Z разрешил technical-failed.
+Originalattempt `1e3b85e1…` неизменен; отдельный policyPASS не заменяет исходный FAIL.
+Все auxiliary snapshot aliases server.evidence разрешаются на реальные bound files.
 
 ABC/Pareto/3 closed00:58:56.029Z: policy PASS `e9868668…`, mandatory
 review `c53c990b…`;42messages/151parts/45tools/132events/2895runtime, JS0/nochildren.
