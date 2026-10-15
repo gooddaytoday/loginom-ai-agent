@@ -304,12 +304,25 @@ export async function bindTerminalScriptWitness(owner){
   if(loadData(summary,'id')!==id||loadData(summary,'account')!==account||loadData(summary,'projectionOnly')!==true
     ||loadData(summary,'sourceExecutionQualified')!==false||loadData(summary,'closureIdentityQualified')!==false)fail();
   const rows=loadData(summary,'rows');if(loadData(rows,'length')!==5)fail();
-  const kinds=['initial','modifier','ObjectProxy','FileStorage','StreamPersist'],paths=['bg/js/mscorlib.js','bg/js/bg.mscorlib.js','bg/js/rpc.js','bg/js/bg.rtl.rpc.js','bg/js/bg.rtl.rpc.js'],matches=[];
+  const kinds=['initial','modifier','ObjectProxy','FileStorage','StreamPersist'],paths=['bg/js/mscorlib.js','bg/js/bg.mscorlib.js','bg/js/rpc.js','bg/js/bg.rtl.rpc.js','bg/js/bg.rtl.rpc.js'],matches=[];let integrityCount=0;
   for(let i=0;i<5;i++){
    const row=loadData(rows,String(i)),url=loadData(row,'url'),pinUrl='https://app.loginom.ai/app/'+paths[i];if(loadData(row,'kind')!==kinds[i])fail();
    const matching=responses.records.filter(record=>record.url===url&&record.pinUrl===pinUrl);if(matching.length!==1)fail();
-   matches.push(Object.freeze({kind:kinds[i],url,pinUrl,responseReceipt:matching[0]}));
+   const responseReceipt=matching[0],integrityDescriptor=Object.getOwnPropertyDescriptor(row,'integrity');
+   const hasMetadata=['integrity','armedBeforeSource','initialExecutionObserved'].some(k=>Object.hasOwn(row,k));
+   if(hasMetadata){
+    // No original handle means the projected metadata has no retained realm custody.
+    if(!originalHandle||!integrityDescriptor||!('value'in integrityDescriptor))fail();
+    const integrity=loadData(row,'integrity'),sha256=loadData(responseReceipt,'sha256');
+    if(typeof sha256!=='string'||!/^[a-f0-9]{64}$/.test(sha256)
+      ||integrity!=='sha256-'+Buffer.from(sha256,'hex').toString('base64')
+      ||loadData(row,'armedBeforeSource')!==true||loadData(row,'initialExecutionObserved')!==true)fail();
+    integrityCount++;
+    matches.push(Object.freeze({kind:kinds[i],url,pinUrl,responseReceipt,integrity,armedBeforeSource:true,initialExecutionObserved:true}));
+   }else matches.push(Object.freeze({kind:kinds[i],url,pinUrl,responseReceipt}));
   }
+  if(integrityCount!==0&&integrityCount!==5)fail();
+  const selectedInitialExecutionJoined=integrityCount===5;
   let pending,failed;
   function recheck(){
    if(pending)return pending;if(failed)return failed;
@@ -325,7 +338,7 @@ export async function bindTerminalScriptWitness(owner){
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
-   realmOriginalAssociation:!!originalHandle,realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
+   realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
    recheck:originalHandle?()=>recheck():undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}
