@@ -9,6 +9,10 @@ import { agentCommand } from "./cli"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { superviseProcess } from "./process-supervisor"
 import { judgeEnvironment, judgeVersion, type JudgeSettings } from "./judge"
+import type { SlotFile, SlotLease } from "./slots"
+import { readLeaseReceipt } from "./lease"
+import { readUserOwnership, readUserPreparation } from "./user-environment"
+import { inspectUserStorage } from "./parallel-pair"
 
 export type Environment = {
   git: { sha: string; dirty: boolean } | null
@@ -52,7 +56,31 @@ export async function preflight(config: EvalConfig, source: ArtifactSource, sign
   return environment
 }
 
-export async function checkIsolatedLoginom(source: ArtifactSource) {
+export type SlotStorageContext = { file: SlotFile; lease: SlotLease; secretFile: string }
+
+export async function checkIsolatedLoginom(source: ArtifactSource, slot?: SlotStorageContext) {
+  if (slot) {
+    await slot.lease.assertHeld()
+    if (slot.lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
+    const prepared = await readUserPreparation(slot.file, slot.lease, slot.secretFile)
+    const owned = await readUserOwnership(slot.file, slot.lease, slot.secretFile)
+    const root = `${slot.file.server.storageRoot}/${slot.lease.slot.username}`
+    if (source.kind !== "docker" || source.container !== slot.lease.identity.containerId || source.storageDir !== root)
+      throw new EvalFailure("SLOT_STORAGE_SOURCE_MISMATCH", 2)
+    const journal = path.join(slot.file.controller.stateDir, `storage-${slot.lease.slot.id}.json`)
+    const receipt = await readLeaseReceipt(journal).catch(() => { throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2) }) as Record<string, unknown>
+    const expected = { version: 2, kind: "owned-user-storage", state: "published", slotId: slot.lease.slot.id, username: slot.lease.slot.username,
+      identity: slot.lease.identity, preparationNonce: prepared.nonce, userKey: owned.userKey, ownerSource: owned.source.sha256, root }
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt) ||
+      Object.entries(expected).some(([key, value]) => JSON.stringify(receipt[key]) !== JSON.stringify(value)))
+      throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+    const observed = await inspectUserStorage(slot.file, slot.lease.identity, slot.lease.slot, prepared.nonce)
+    if (["device", "inode", "uid", "gid"].some(key => receipt[key] !== observed[key as keyof typeof observed]) ||
+      JSON.stringify(await readLeaseReceipt(journal)) !== JSON.stringify(receipt)) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+    await slot.lease.assertHeld()
+    if (observed.entries.length) throw new EvalFailure("USER_STORAGE_NOT_EMPTY", 2)
+    return
+  }
   const storage = await assertIsolatedStorageEmpty(source)
   const read = await Bun.$`docker exec ${storage.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet().nothrow()
   const marker = await Promise.resolve(read.text()).then((text) => JSON.parse(text)).catch(() => undefined) as
