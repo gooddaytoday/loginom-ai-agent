@@ -11,6 +11,7 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
 import { stageUserPreparation } from "../src/user-environment"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
+import { prepareEnvironment } from "../src/environment-preparation"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -696,6 +697,48 @@ async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRun
     return disposed
   } }
 }
+
+liveIntegration("standalone preparation: repeated two-to-one preparation preserves users and releases ownership without readiness", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-standalone-prepare-")), fixture = await parallelFixture(root)
+  const name = `evals-prepare-${crypto.randomUUID().slice(0, 8)}`
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${listener.port}/app/`
+  listener.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 2)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
+  const pair = await createPair(file, options)
+  const slotsFile = path.join(root, "slots.json")
+  await writeLeaseReceipt(slotsFile, file)
+  const first = await prepareEnvironment({ slotsFile, parallel: 2 }, fixture.lockRoot)
+  expect(first).toMatchObject({ code: 2, ready: false, status: "blocked", reason: "SESSION_IDENTITY_UNSUPPORTED", finalization: { status: "released" } })
+  expect(first.slots.map(slot => slot.id)).toEqual(["a", "b"])
+  expect(first.changedUsers).toEqual(["eval-a", "eval-b"])
+  expect(first.changedPasswords).toEqual(["eval-a", "eval-b"])
+  const second = await prepareEnvironment({ slotsFile, parallel: 1 }, fixture.lockRoot)
+  expect(second).toMatchObject({ code: 2, ready: false, status: "blocked", reason: "SESSION_IDENTITY_UNSUPPORTED", finalization: { status: "released" } })
+  expect(second.slots).toHaveLength(1)
+  expect(second.slots[0]).toEqual(first.slots[0])
+  expect(second.changedUsers).toEqual([])
+  expect(second.changedPasswords).toEqual([])
+  const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-standalone-${crypto.randomUUID()}`)
+  await mkdir(evidence, { mode: 0o700 })
+  const sources = await Promise.all([first, second].map(async result => {
+    const command = await readLeaseReceipt(result.journal) as { processInventory: string }
+    const inventory = await readLeaseReceipt(command.processInventory) as { connections: { directory: string }[] }
+    return { command, inventory, admins: await Promise.all(inventory.connections.map(connection => readLeaseReceipt(path.join(connection.directory, "connection.json")))),
+      server: await readLeaseReceipt(result.finalization.server.path), slots: await Promise.all(result.finalization.slots.map(async slot => {
+        const cleanup = await readLeaseReceipt(slot.cleanup.path) as { profileArchive: { journal: string }; observation: { path: string } }
+        const observation = await readLeaseReceipt(cleanup.observation.path) as { command: { path: string } }
+        return { cleanup, archive: await readLeaseReceipt(cleanup.profileArchive.journal), observation, observationCommand: await readLeaseReceipt(observation.command.path) }
+      })) }
+  }))
+  await writeLeaseReceipt(path.join(evidence, "preparation.json"), { version: 2, kind: "native-standalone-preparation", identity: pair.identity,
+    first, second, sources, receipts: await Promise.all([first, second].map(result => readLeaseReceipt(result.receipt))), liveQualified: false })
+  await destroyPair(file, options)
+  await rm(root, { recursive: true, force: true })
+}, 120_000)
 
 liveIntegration("parent preparation: blocked account, configuration, ACL and physical root compose without password rotation", async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)

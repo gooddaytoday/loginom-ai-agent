@@ -7,6 +7,21 @@ import { readEnvironmentStatus } from "../src/parallel-status"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { prepareEnvironment } from "../src/environment-preparation"
+
+test("preparation rejects an invalid slot count before controller or runtime side effects", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-prepare-count-")), fixture = await parallelFixture(root)
+  const slotsFile = path.join(root, "slots.json")
+  await writeLeaseReceipt(slotsFile, fixture.slots)
+  try {
+    const before = await readdir(fixture.slots.controller.stateDir)
+    for (const parallel of [0, 3, 1.5]) {
+      await expect(prepareEnvironment({ slotsFile, parallel }, fixture.lockRoot)).rejects.toThrow("SLOT_COUNT")
+      expect(await readdir(fixture.slots.controller.stateDir)).toEqual(before)
+      expect(await readdir(fixture.lockRoot)).toEqual([])
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("status reads retained ownership without guards, credentials or file changes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-status-"))
