@@ -2345,6 +2345,8 @@ function readRenderedInputMapping(observation) {
         for(const [tid,elements] of tids)if(tid.startsWith(base+'colSourceName_')||tid.startsWith(base+'colDisplayName_'))
           for(const e of elements)outputLinksUnsettled.add(e);
     }
+    let outputLinksFailure=null;
+    const outputLinksCounts={sources:null,targets:null,pairs:null,unbound_sources:null,unbound_targets:null};
     if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output')try{
       const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
       const model=card?.Controller?.FController,entries=[...(p?.outputPortOpenReceipts?.entries()??[])];
@@ -2394,6 +2396,7 @@ function readRenderedInputMapping(observation) {
         return records;
       });
       const [sources,targets]=inventories,g=controller.Items?.LinkGrid,d=g?.FLinkDrawContainer;
+      outputLinksCounts.sources=sources.length;outputLinksCounts.targets=targets.length;
       requireLink(sources.length===targets.length&&d?.FTables?.length===2&&d.FTables.every((v,i)=>v.getView?.()===views[i]&&v.getStore?.()===stores[i]),'output_link_native_tables');
       // Stores alone do not establish settlement of the native relation/draw
       // update. Missing or non-boolean flags are not evidence of false.
@@ -2403,8 +2406,10 @@ function readRenderedInputMapping(observation) {
       requireLink(settled,'output_link_settlement');
       requireLink(d.FSelectedLinks&&typeof d.FSelectedLinks==='object'&&!Array.isArray(d.FSelectedLinks),'output_link_selection_inventory');
       const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks);
+      outputLinksCounts.pairs=pairs.length;
       const boundSources=new Set(pairs.map(([,pair])=>pair?.[0])),boundTargets=new Set(pairs.map(([,pair])=>pair?.[1]));
       const unboundSources=sources.filter(record=>!boundSources.has(record)),unboundTargets=targets.filter(record=>!boundTargets.has(record));
+      outputLinksCounts.unbound_sources=unboundSources.length;outputLinksCounts.unbound_targets=unboundTargets.length;
       // A null endpoint is not a relation. Reconnect stages only one completely
       // observed vacant pair, beside the remaining reciprocal native pairs.
       const reconnect=sources.length>=1&&sources.length<=80&&pairs.length===sources.length-1&&unboundSources.length===1&&unboundTargets.length===1
@@ -2476,7 +2481,13 @@ function readRenderedInputMapping(observation) {
         dateTimeCells.set(refOf(element),metadata);
         if(metadata.role==='output_relation_remove'&&!candidates.includes(element))candidates.push(element);
       }
-    }catch(error){if(error?.code==='UI_SCAN_LIMIT')throw error;}
+    }catch(error){
+      if(error?.code==='UI_SCAN_LIMIT')throw error;
+      const reason=error?.message;
+      // Fixed diagnostic vocabulary only; never export arbitrary page errors.
+      if(['output_link_opening', 'output_link_owner', 'output_link_form', 'output_link_controller', 'output_link_mode', 'output_link_radio', 'output_link_grids', 'output_link_stores', 'output_link_inventory', 'output_link_records', 'output_link_native_tables', 'output_link_settlement', 'output_link_selection_inventory', 'output_link_pairs', 'output_link_remove_inventory', 'output_link_remove_aliases', 'output_link_row', 'output_link_cell', 'output_link_unbound_alias', 'output_link_remove_items', 'output_link_remove_dom'].includes(reason))
+        outputLinksFailure={reason,counts:{...outputLinksCounts}};
+    }
     // The constant trigger is a role-less Ext div. Bind it to the active
     // method editor and its exact cached field before exposing a gesture.
     if(!discoverRoots&&wizard.stage==='missing_values'){
@@ -3439,6 +3450,7 @@ function readRenderedInputMapping(observation) {
     }
     return { origin: location.origin, authenticated: !!tids.get('MF;cntMain;tlbMainToolbar;btnAvatar')?.some(visible), loginom_build: globalThis.bg?.app?.Version ?? null,
       workflow_ref: workflow, graph_identity:graphIdentity, active_tab_ref:active?refOf(active):null, active_identity: active ? textOf(active) : null, package_identity: packageIdentity,
+      ...(outputLinksFailure?{output_links_proof:outputLinksFailure}:{}),
       geometry,file_storage:fileStorage,wizard,wizard_pending_owner:pendingWizardOwner,workflow_navigation:workflowNavigation,navigation_context:navigationContext,node_context:nodeContext,table_settings:tableSettings,table_coverage:tableCoverage,process_console:processConsole,
       dom_epoch: {document:state.epoch,revision:state.revision},
       ...(selectedRoot ? {observation_root:{ref:rootRef,identity:identityOf(selectedRoot),detail_scope:'elements_and_cells',global_scan:false,global_guards:'fixed_native_queries'}} : {}),
