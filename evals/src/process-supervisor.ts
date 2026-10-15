@@ -4,6 +4,7 @@ import { Readable, Writable } from "node:stream"
 import os from "node:os"
 import { constants } from "node:fs"
 import { lstat, mkdtemp, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
+import { createJsonOutputRedactor, createOutputRedactor } from "./output-redaction"
 
 export type ProcessIdentity = {
   pid: number; starttime: string; uid: number; parent: number; group: number; session: number
@@ -353,7 +354,7 @@ async function browserIdentity(cmd: string[], env: Record<string, string>) {
  */
 export async function superviseProcess(input: {
   cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number | null
-  profileDir?: string; outDir?: string; stdin?: string | ReadableStream<Uint8Array>; stdout?: WritableStream<Uint8Array>; signal?: AbortSignal; sandbox?: string[]
+  profileDir?: string; outDir?: string; stdin?: string | ReadableStream<Uint8Array>; stdout?: WritableStream<Uint8Array>; signal?: AbortSignal; sandbox?: string[]; captureSecrets?: string[]
   observationMode?: "continuous" | "unit_after_exit"
   owner?: ProcessOwner
 }) {
@@ -386,6 +387,7 @@ export async function superviseProcess(input: {
   }) : undefined
   const files = input.outDir ? await Promise.all(["events.jsonl", "stderr.txt"]
     .map((name) => open(path.join(input.outDir!, name), "w", 0o600))) : []
+  const redactors = files.map((_, index) => index === 0 ? createJsonOutputRedactor(input.captureSecrets ?? []) : createOutputRedactor(input.captureSecrets ?? []))
   let writing = Promise.resolve()
   const capsule = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-"))
   const nonce = crypto.randomUUID()
@@ -457,9 +459,12 @@ export async function superviseProcess(input: {
     if (index === 0 && input.stdout) continue
     stream.on("data", (chunk: Buffer) => {
       (index === 0 ? stdout : stderr).push(chunk)
-      if (files[index]) writing = writing.then(async () => { await files[index]!.write(chunk) }).catch(() => {
-        cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
-      })
+      if (files[index]) {
+        const captured = redactors[index]!(chunk)
+        writing = writing.then(async () => { if (captured.length) await files[index]!.write(captured) }).catch(() => {
+          cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
+        })
+      }
     })
   }
   const streams = Promise.all([proc.stdout!, proc.stderr!].map((stream) => new Promise<void>((resolve) => {
@@ -805,6 +810,12 @@ export async function superviseProcess(input: {
       proc.stdout!.destroy(); proc.stderr!.destroy()
     }
   })])
+  for (const [index, redact] of redactors.entries()) {
+    const tail = redact(Buffer.alloc(0), true)
+    writing = writing.then(async () => { if (tail.length) await files[index]!.write(tail) }).catch(() => {
+      cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
+    })
+  }
   await writing
   const transportDeadline = Promise.withResolvers<void>()
   const transportTimer = setTimeout(() => {

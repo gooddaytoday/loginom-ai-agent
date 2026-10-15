@@ -300,6 +300,17 @@ CDP/inspector сохраняются. Shared model OAuth RW-store — отдел
 при skip-judge/code-only его auth/lease не нужны. OAuth-кандидат — продуктовая
 зависимость; собственные адаптации остаются в evals отдельными коммитами.
 
+Known-output masking (2026-10-15): `runAgent` передаёт только явно разрешённые
+`cleanupSecrets` в supervisor. До записи stdout JSONL маскируются строковые
+значения, stderr фильтруется по байтам с сохранением границ chunks/UTF-8;
+учитываются literal, URI и JSON-escaped варианты. Незавершённый/malformed JSON
+задерживается до EOF, глубокие диагностические значения после 40 уровней
+заменяются `[omitted]`. Parsed free-form поля и stderr маскируются до усечения
+квитанций/20 строк. Измеренные counters/cost/429 классифицируются по исходному
+потоку; process cleanup proofs не переписываются. Проверка не читает auth store
+или credentials неактивных слотов. Полный native сбор секретов активных слотов
+и admin остаётся отдельным незавершённым gate.
+
 Новые eval-прогоны: агент `openai/gpt-6-luna/high`, судья `gpt-6-sol/xhigh`.
 Приёмка на lg-pc-75: новая acceptance pair и отдельная research pair, затем
 немодельные ACL/crash/cleanup/supervisor/backup gates, полный LLM N=2 → N=1

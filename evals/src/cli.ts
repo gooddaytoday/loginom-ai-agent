@@ -6,6 +6,7 @@ import type { AgentProcessEvidence } from "./agent-process-evidence"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { assertProfileClean } from "./profile"
 import type { ManagementProcessEvidence } from "./management-process-evidence"
+import { redactKnownSecrets } from "./output-redaction"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -25,7 +26,7 @@ type Part = {
 }
 type Event = { type?: string; sessionID?: string; part?: Part; error?: { name?: string; data?: { message?: string; statusCode?: number } } }
 
-export function parseEvents(text: string) {
+export function parseEvents(text: string, secrets: string[] = []) {
   const events = text.split("\n").flatMap((line) => {
     const parsed = parseJson(line)
     return typeof parsed === "object" && parsed !== null ? [parsed as Event] : []
@@ -46,7 +47,7 @@ export function parseEvents(text: string) {
       return found ? [found] : []
     })
   const receipts = truncateReceipts(
-    tools.filter((part) => nodeTools.has(part.tool ?? "") && completed(part)).map((part) => part.state?.output ?? ""),
+    tools.filter((part) => nodeTools.has(part.tool ?? "") && completed(part)).map((part) => redactKnownSecrets(part.state?.output ?? "", secrets)),
   )
   const prepare = tools.find((part) => part.tool === "loginom_dock_prepare" && completed(part))
   const preparation = firstJsonObject(prepare?.state?.output ?? "") as { skillRevision?: unknown } | undefined
@@ -176,7 +177,7 @@ export async function runAgent(input: {
   const processRun = await superviseAgentProcess({
     cmd, cwd: boundary?.cwd ?? input.command.cwd,
     env: boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }, sandbox: boundary?.cmd,
-    profileDir: input.profileDir, outDir: input.outDir,
+    profileDir: input.profileDir, outDir: input.outDir, captureSecrets: input.command.cleanupSecrets,
     timeoutMs: input.timeoutMs, signal: input.signal,
     owner: { kind: "slot", id: input.slotId ?? input.profileDir ?? input.workdir },
   }, input.command.agentEvidence).catch((error: unknown) => {
@@ -186,18 +187,18 @@ export async function runAgent(input: {
   const stdout = processRun.stdout
   const stderr = processRun.stderr
   const exitCode = processRun.exitCode
-  const parsed = parseEvents(stdout)
+  const parsed = parseEvents(stdout, input.command.cleanupSecrets)
   const run = {
     exitCode,
     timedOut: processRun.timedOut,
     interrupted: processRun.interrupted,
     startedAt: processRun.startedAt,
     durationMs: processRun.durationMs,
-    ...parsed,
+    ...redactKnownSecrets(parsed, input.command.cleanupSecrets ?? []),
     processCleanup: processRun.processCleanup,
     sandboxError: processRun.sandboxError,
     failureKind: failureKind({ exitCode, errors: parsed.errors, errorTexts: parsed.errorTexts, stderr }),
-    stderrHead: stderr.split("\n").slice(0, 20).join("\n"),
+    stderrHead: redactKnownSecrets(stderr, input.command.cleanupSecrets ?? []).split("\n").slice(0, 20).join("\n"),
   }
   await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2)).catch(() => {
     run.processCleanup.status = "failed"
