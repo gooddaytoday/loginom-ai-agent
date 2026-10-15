@@ -43,17 +43,28 @@ async function fixture(options,check) {
    assert.equal(invoke(fn,arg),true);resolve();
    // Fulfill the final provider first: loginPage finishes its own page check,
    // then this mutation runs before its caller's success continuation.
-   if(options.afterLogin)queueMicrotask(()=>options.afterLogin({owner,page,context}));
+   queueMicrotask(()=>{
+    if(options.blockDirectory)owner.directory=join(directory,'not-a-directory');
+    if(Object.hasOwn(options,'serializationError'))owner.evidence.toJSON=()=>{throw options.serializationError};
+    options.afterLogin?.({owner,page,context});
+   });
   }catch(error){reject(error)}
  }});
- if(options.blockDirectory){owner.directory=join(directory,'not-a-directory');await writeFile(owner.directory,'occupied')}
- if(Object.hasOwn(options,'serializationError'))owner.evidence.toJSON=()=>{throw options.serializationError};
+ if(options.blockDirectory)await writeFile(join(directory,'not-a-directory'),'occupied');
  const originalLaunch=chromium.launchPersistentContext;
  chromium.launchPersistentContext=async()=>context;
  try {
   await check({owner,page,context,directory,closeCalls:()=>closeCalls,
    run:keepOpen=>loginBrowser({browserPath:join(directory,'browser-double'),profile:join(directory,'profile'),candidate:{url:owner.origin+'/app/',username:'User',password:''},headless:true,keepOpen,owner})});
  }finally{chromium.launchPersistentContext=originalLaunch;await context.close();await rm(directory,{recursive:true,force:true})}
+}
+
+async function assertOnlyPhaseSnapshot(directory) {
+ const data=JSON.parse(await readFile(join(directory,'startup-cleanup.json'),'utf8'));
+ assert.equal(data.owner_id,'original');
+ assert.ok(data.startup_phases.createStartupStaticLoader.settled_at);
+ assert.equal(data.goto,undefined);assert.equal(data.startup_diagnostics,undefined);
+ assert.equal(data.cleanup_complete,undefined);
 }
 
 test('successful keepOpen snapshot is durable0600 while original context stays open, without cleanup authority',async()=>{
@@ -71,7 +82,7 @@ test('successful keepOpen snapshot is durable0600 while original context stays o
 for(const key of ['id','account','origin','context','page'])test('keepOpen '+key+' drift after login success refuses publication and invokes original close once',async()=>{
  await fixture({afterLogin:({owner})=>{owner[key]=['context','page'].includes(key)?{}:'foreign';owner.close=()=>{throw Error('substituted close must not run')}}},async f=>{
   await assert.rejects(f.run(true),e=>e.message==='LOGINOM_STARTUP_OWNER_CHANGED');
-  await assert.rejects(readFile(join(f.directory,'startup-cleanup.json')),e=>e.code==='ENOENT');assert.equal(f.closeCalls(),1);
+  await assertOnlyPhaseSnapshot(f.directory);assert.equal(f.closeCalls(),1);
  });
 });
 
@@ -81,7 +92,7 @@ test('owner drift during snapshot serialization is rejected before atomic public
   loader.toJSON=()=>{owner.id='foreign';return {version:loader.version,reads:loader.reads,first_route:loader.first_route,stopped:loader.stopped}};
  }},async f=>{
   await assert.rejects(f.run(true),e=>e.message==='LOGINOM_STARTUP_OWNER_CHANGED');
-  await assert.rejects(readFile(join(f.directory,'startup-cleanup.json')),e=>e.code==='ENOENT');assert.equal(f.closeCalls(),1);
+  await assertOnlyPhaseSnapshot(f.directory);assert.equal(f.closeCalls(),1);
  });
 });
 
@@ -100,13 +111,13 @@ for(const first of [Error('snapshot first',{cause:Error('original cause')}),unde
  await fixture({serializationError:first,closeError:secondary},async f=>{
   let caught=false,value;try{await f.run(true)}catch(error){caught=true;value=error}
   assert.equal(caught,true);assert.equal(value,first);assert.equal(f.owner.primaryFailure,first);assert.equal(f.owner.cleanupFailure,secondary);assert.equal(f.closeCalls(),1);
-  await assert.rejects(readFile(join(f.directory,'startup-cleanup.json')),e=>e.code==='ENOENT');
+  await assertOnlyPhaseSnapshot(f.directory);
  });
 });
 
-test('non-keepOpen branch still delegates directly to existing close without an early snapshot',async()=>{
+test('non-keepOpen branch delegates to existing close without a success snapshot',async()=>{
  await fixture({onClose:({owner})=>{assert.equal(owner.evidence.persistence_attempts,undefined)}},async f=>{
   const result=await f.run(false);assert.deepEqual(result,{authenticated:true});assert.equal(f.closeCalls(),1);
-  await assert.rejects(readFile(join(f.directory,'startup-cleanup.json')),e=>e.code==='ENOENT');
+  await assertOnlyPhaseSnapshot(f.directory);
  });
 });

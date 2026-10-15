@@ -204,6 +204,22 @@ async function startupEvidence(owner, validate) {
     throw primary;
   }
 }
+async function startupPhase(owner, name, operation) {
+  const phases=owner.evidence.startup_phases??={}
+  const phase=phases[name]={entered_at:new Date().toISOString(),settled_at:null}
+  // This records the last durable boundary, not proof that operation started:
+  // the writer itself must return before the original operation is invoked.
+  await startupEvidence(owner)
+  let value,failed=false,primary
+  try {value=await operation()}
+  catch(error) {failed=true;primary=error}
+  if(failed) {phase.rejected_at=new Date().toISOString();phase.rejection=startupRejection(primary)}
+  else phase.settled_at=new Date().toISOString()
+  try {await startupEvidence(owner)}
+  catch(error) {if(!failed)throw error} // writer records its own failure; keep the native primary
+  if(failed)throw primary
+  return value
+}
 // Internal foreground owner, assigned before authentication. No IPC authority.
 function startupOwner(owner, profile, candidate) {
   if(owner.id) {
@@ -378,9 +394,9 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     const { chromium } = require('playwright-core')
     const launch=browserLaunch(headless)
     await mkdir(profile,{recursive:true,mode:0o700})
+    await startupPhase(owner,'launchPersistentContext',async()=>{
     owner.launchAttempted=true
-    owner.context = await chromium
-    .launchPersistentContext(profile, {
+    owner.context = await chromium.launchPersistentContext(profile, {
       executablePath: browserPath,
       headless,
       chromiumSandbox: true,
@@ -406,12 +422,15 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       viewport: launch.viewport,
     })
     if(original)original.context=owner.context
+    })
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
     if(original)original.page=owner.page
-    await owner.context.addInitScript({content:browserDownloadScript(candidate.url)})
-    owner.staticLoader=await createStartupStaticLoader(owner.page,owner.context,owner,
-      Math.min(Date.now()+60_000,Number.isSafeInteger(owner.deadline)?owner.deadline:Infinity))
-    owner.evidence.startup_static_loader=owner.staticLoader.evidence
+    await startupPhase(owner,'addInitScript',()=>owner.context.addInitScript({content:browserDownloadScript(candidate.url)}))
+    const staticDeadline=Math.min(Date.now()+60_000,Number.isSafeInteger(owner.deadline)?owner.deadline:Infinity)
+    await startupPhase(owner,'createStartupStaticLoader',async()=>{
+      owner.staticLoader=await createStartupStaticLoader(owner.page,owner.context,owner,staticDeadline)
+      owner.evidence.startup_static_loader=owner.staticLoader.evidence
+    })
     const result=await loginPage(owner.page,candidate,owner)
     if(!keepOpen) {await owner.close();return result}
     snapshot=true
