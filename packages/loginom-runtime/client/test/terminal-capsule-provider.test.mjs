@@ -30,6 +30,7 @@ async function control(fn,instrument=false,realCompletion=false){const realm=awa
  }
  const task=f.invoke();f.deliver();await task;await f.c.bg.app.CurrentUser.Set(f.user);await f.settle();
  f.c.__loginomStartupV1={document:f.c.document,id:'original',account:'test-account'};
+ if(realCompletion.beforeCapture)realCompletion.beforeCapture(f);
  f.c.__witnessArgs=witness.terminalScriptWitnessArguments('original','test-account');
  const capsule=runInContext('('+witness.collectTerminalScriptWitness.toString()+')(__witnessArgs)',f.c);
  originalSources.length=0;probe.tasks.length=0;probe.readers=0;probe.resolvers=0;probe.continuations=0;
@@ -410,7 +411,7 @@ test('completion source foreign task and early settlement refuse without manufac
 test('birth continuation observes one original lexical construction and restores prototype before return',()=>control(async x=>{
  const prototype=x.f.ss.TaskCompletionSource.prototype,initial=Object.getOwnPropertyDescriptor(prototype,'task');assert.equal(initial,undefined);
  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower,birth=r.continuationBirth;
- assert(Object.isFrozen(birth));assert.equal(birth.observed,true);assert.equal(birth.assignmentObserved,true);assert.equal(birth.prototypeRestored,true);assert.equal(birth.lexicalCalleeIdentityQualified,false);
+ assert(Object.isFrozen(birth));assert.equal(birth.observed,true);assert.equal(birth.assignmentObserved,true);assert.equal(birth.prototypeRestored,true);assert.equal(birth.lexicalCalleeIdentityQualified,true);
  assert.equal(birth.primarySource,r.completionSource);assert.equal(birth.primaryTask,r.sourceTask);assert.notEqual(birth.source,r.completionSource);assert.notEqual(birth.task,r.sourceTask);
  assert.equal(birth.returnedTask,birth.task);assert.equal(birth.source.task,birth.task);assert.equal(Object.getPrototypeOf(birth.source),prototype);assert.equal(Object.getPrototypeOf(birth.task),x.f.ss.Task.prototype);
  assert.equal(birth.statusAtReturn,3);assert.equal(birth.task.status,3);assert.equal(r.sourceTask.status,3);
@@ -521,3 +522,68 @@ for(const reason of [false,0,null,undefined,'',Error('forward first',{cause:0})]
  const rejected=assert.rejects(work,e=>Object.is(e,reason));await x.realm.native.drain();await rejected;
  assert.equal(gets,0);assert.equal(r.sourceTask.status,3);assert.equal(r.forwarders.task.status,3);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
 },true,true));
+
+
+// Same pinned IIFEs/VM. Only the pair of observed constructor objects on this
+// one original continueWith is qualified; broader native/closure flags stay false.
+test('callee pair observes retained function prototypes and restores instances/descriptors before return',()=>control(async x=>{
+ const tc=x.f.ss.TaskCompletionSource,task=x.f.ss.Task,ds=Object.getOwnPropertyDescriptor(tc,'prototype'),dt=Object.getOwnPropertyDescriptor(task,'prototype');
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),lower=b.inspect().lower,r=lower.continuationBirth;
+ assert.equal(r.lexicalCalleeIdentityQualified,true);assert.equal(r.lexicalCalleeScope,'Task.continueWith:TaskCompletionSource/Task');assert.equal(r.sourceConstructor,tc);assert.equal(r.taskConstructor,task);
+ assert.notEqual(r.sourceMarker,ds.value);assert.notEqual(r.taskMarker,dt.value);assert.equal(Object.getPrototypeOf(r.sourceMarker),ds.value);assert.equal(Object.getPrototypeOf(r.taskMarker),dt.value);
+ assert(Object.isFrozen(r));assert(Object.isFrozen(r.sourceMarker));assert(Object.isFrozen(r.taskMarker));
+ assert.deepEqual(Object.getOwnPropertyDescriptor(tc,'prototype'),ds);assert.deepEqual(Object.getOwnPropertyDescriptor(task,'prototype'),dt);
+ assert.equal(Object.getPrototypeOf(r.source),ds.value);assert.equal(Object.getPrototypeOf(r.task),dt.value);assert.equal(r.returnedTask,r.task);assert.equal(r.task.status,3);assert.equal(lower.sourceTask.status,3);
+ await x.realm.native.drain();assert.equal(await work,x.realm.native.support);assert.equal(r.task.status,5);assert.equal(b.query(),work);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},true,true));
+test('callee pair remains scoped on same packet/control storage route',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const result=await x.host.witness.continueStorage(x.host.f.bridge);
+ const r=x.provider.arm(x.f.c.__armInput).inspect().lower.continuationBirth;assert.equal(r.lexicalCalleeIdentityQualified,true);assert.equal(r.task.status,5);
+ assert.equal(Object.getPrototypeOf(r.source),r.sourcePrototype);assert.equal(Object.getPrototypeOf(r.task),r.taskPrototype);
+ assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');assert.equal(result.componentReady,false);assert.equal(result.readonlyStorageVerified,true);
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);
+ for(const key of ['closureIdentityQualified','nativeAuthority','contentAuthority','saveAuthority','closeAuthority'])assert.equal(result[key],false);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
+for(const reason of [false,0,null,undefined,'',Error('callee first',{cause:0})])test('callee pair original throw '+String(reason)+' restores owned function descriptors before refusal',()=>{
+ let tcCtor,taskCtor,tcDescriptor,taskDescriptor,born;return control(async x=>{
+  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,e=>Object.is(e,reason));
+  assert.deepEqual(Object.getOwnPropertyDescriptor(tcCtor,'prototype'),tcDescriptor);assert.deepEqual(Object.getOwnPropertyDescriptor(taskCtor,'prototype'),taskDescriptor);assert.equal(Object.getOwnPropertyDescriptor(tcDescriptor.value,'task'),undefined);assert.equal(Object.getPrototypeOf(born),taskDescriptor.value);assert.equal(born.status,3);
+  await x.realm.native.drain();assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);assert.equal(b.query(),work);
+ },true,{beforeCapture(f){tcCtor=f.ss.TaskCompletionSource;taskCtor=f.ss.Task;tcDescriptor=Object.getOwnPropertyDescriptor(tcCtor,'prototype');taskDescriptor=Object.getOwnPropertyDescriptor(taskCtor,'prototype')},continuation({primary,callback,original}){born=Reflect.apply(original,primary,[callback]);throw reason}});
+});
+
+for(const which of ['Task','TaskCompletionSource'])for(const samePrototype of [true,false])test('callee pair dynamic '+which+' alias '+(samePrototype?'same':'different')+' prototype cannot replace lexical callee',async()=>{
+ let entered=false;await control(async x=>{
+  entered=true;const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,/CALLEE|BIRTH|DEFINITION|CHANGED|UNAVAILABLE/);await x.realm.native.drain();assert.equal(x.probe.resolvers,0);assert.equal(x.realm.native.writes(),0);assert.equal(b.query(),work);
+ },true,{beforeCapture(f){const original=f.ss[which];function foreign(...args){return Reflect.construct(original,args,original)}foreign.prototype=samePrototype?original.prototype:Object.create(original.prototype);f.ss[which]=foreign}}).catch(error=>{if(entered)throw error;assert.match(String(error),/CALLEE|BIRTH|DEFINITION|CHANGED|UNAVAILABLE/)})
+});
+for(const which of ['Task','TaskCompletionSource'])test('callee pair pending '+which+' prototype descriptor drift refuses before resolver',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower;const ctor=x.f.ss[which],foreign={foreign:true};ctor.prototype=foreign;
+ const failed=assert.rejects(work,/CHANGED|UNAVAILABLE/);await x.realm.native.drain();await failed;assert.equal(ctor.prototype,foreign);assert.equal(x.probe.resolvers,0);assert.equal(r.sourceTask.status,3);assert.equal(r.continuationBirth.task.status,3);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true,true));
+for(const which of ['Task','TaskCompletionSource'])test('callee pair foreign '+which+' descriptor is not overwritten after raw throw',()=>{
+ const reason=which==='Task'?false:Error('original raw',{cause:0});let taskCtor,sourceCtor,originalTaskPrototype,originalSourcePrototype,born,foreign;
+ return control(async x=>{
+  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,e=>Object.is(e,reason));
+  assert.equal(x.f.ss[which].prototype,foreign);assert.equal(Object.getPrototypeOf(born),originalTaskPrototype);
+  assert.equal((which==='Task'?sourceCtor:taskCtor).prototype,which==='Task'?originalSourcePrototype:originalTaskPrototype);
+  assert.equal(Object.getOwnPropertyDescriptor(originalSourcePrototype,'task'),undefined);await x.realm.native.drain();assert.equal(born.status,3);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+ },true,{beforeCapture(f){taskCtor=f.ss.Task;sourceCtor=f.ss.TaskCompletionSource;originalTaskPrototype=taskCtor.prototype;originalSourcePrototype=sourceCtor.prototype},continuation({primary,callback,original,ss}){
+  born=Reflect.apply(original,primary,[callback]);foreign={foreign:true};ss[which].prototype=foreign;throw reason;
+ }});
+});
+for(const which of ['Task','TaskCompletionSource'])test('callee pair pre-call '+which+' nonwritable prototype refuses before original continuation',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();const ctor=x.f.ss[which];
+ x.probe.onDispatch=()=>Object.defineProperty(ctor,'prototype',{...Object.getOwnPropertyDescriptor(ctor,'prototype'),writable:false});
+ x.realm.native.hold();const work=b.query();await assert.rejects(work,/CHANGED|UNAVAILABLE|PROTOTYPE/);await x.realm.native.drain();assert.equal(x.probe.resolvers,0);assert.equal(b.query(),work);
+},true,true));
+
+test('callee pair raw throw restores through retained intrinsic without foreign getter',()=>{
+ const reason=false;let born,ctor,prototype,object,gets=0;return control(async x=>{
+  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,e=>Object.is(e,reason));
+  assert.equal(Object.getPrototypeOf(born),prototype);assert.equal(ctor.prototype,prototype);assert.equal(gets,0);await x.realm.native.drain();assert.equal(born.status,3);assert.equal(x.probe.resolvers,0);assert.equal(b.query(),work);
+ },true,{beforeCapture(f){ctor=f.ss.Task;prototype=ctor.prototype;object=runInContext('Object',f.c)},continuation({primary,callback,original}){
+  born=Reflect.apply(original,primary,[callback]);Object.defineProperty(object,'setPrototypeOf',{get(){gets++;throw Error('foreign intrinsic')},configurable:true});
+  throw reason;
+ }});
+});
