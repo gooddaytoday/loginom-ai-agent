@@ -38,6 +38,31 @@ test("management process inventory precedes dispatch and binds actual continuous
     const inventory = await readManagementProcessInventory(input)
     expect(inventory.processes).toHaveLength(1)
     expect(inventory.processes[0]).toMatchObject({ operation: ["loginom", "status"], owner: { kind: "slot" } })
+    // Native snapshots below are data-only codecs around the actual OS process window.
+    const baseline = await readLeaseReceipt(file) as { processes: Record<string, unknown>[] }
+    const lifetime = (await Bun.file(inventory.processes[0]!.source.path).json()).lifetime
+    const start = Date.parse(lifetime.started_at), finish = Date.parse(lifetime.finished_at)
+    const codec = path.join(fixture.slots.controller.stateDir, "admin-codec")
+    await mkdir(path.join(codec, "commands"), { recursive: true, mode: 0o700 })
+    const snapshots = await Promise.all([["before", start - 2, start - 1], ["during", start, finish], ["after", finish + 1, finish + 2]].map(async values => {
+      const id = String(values[0]), commandFile = path.join(codec, "commands", `${id}.json`)
+      const command = { version: 1, kind: "loginom-admin-command", id, op: "inspect", expectedIdentity: identity, desiredHash: hash({}),
+        replyHash: "e".repeat(64), state: "confirmed", at: new Date(Number(values[1])).toISOString(), settledAt: new Date(Number(values[2])).toISOString() }
+      const receipt = { version: 2, kind: "admin-session-inventory", identity, sessionIdentityQualified: false, sessions: [],
+        command: { path: commandFile, sha256: hash(command) }, reply: { id, sha256: command.replyHash } }
+      const source = { path: path.join(codec, `session-inventory-${id}.json`), sha256: hash(receipt) }
+      await writeLeaseReceipt(commandFile, command)
+      await writeLeaseReceipt(source.path, receipt)
+      return source
+    }))
+    const sessions = { before: snapshots[0]!, during: [snapshots[1]!], after: snapshots[2]! }
+    await writeLeaseReceipt(file, { ...baseline, processes: [{ ...baseline.processes[0], sessions }] })
+    expect((await readManagementProcessInventory(input)).processes[0]!.sessions!.during).toHaveLength(1)
+    await writeLeaseReceipt(file, { ...baseline, processes: [{ ...baseline.processes[0], sessions: { ...sessions, during: [sessions.before] } }] })
+    await expect(readManagementProcessInventory(input)).rejects.toThrow("MANAGEMENT_SESSION_SCOPE_INVALID")
+    await writeLeaseReceipt(file, { ...baseline, processes: [{ ...baseline.processes[0], sessions: { ...sessions, during: [sessions.after] } }] })
+    await expect(readManagementProcessInventory(input)).rejects.toThrow("MANAGEMENT_SESSION_SCOPE_INVALID")
+    await writeLeaseReceipt(file, baseline)
     // The allowed fake-CLI seam checks management wiring; no native Loginom readiness is claimed.
     const command = { ...agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: lease.slot.profileDir }),
       cleanupDir: path.join(fixture.slots.controller.stateDir, "management"), managementEvidence: { file, lease } }
@@ -67,3 +92,7 @@ test("management process inventory precedes dispatch and binds actual continuous
     expect(await Bun.file(proof).text()).toBe(bytes)
   } finally { await Promise.all([environment.server.close(), lease.close()]); await rm(root, { recursive: true, force: true }) }
 }, 10000)
+
+function hash(value: unknown) {
+  return new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
+}
