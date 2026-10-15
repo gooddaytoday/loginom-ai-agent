@@ -2049,3 +2049,21 @@ PID. The PID was absent on later readback; no ownership inference or signal is
 permitted. Exact timeout phases were not preserved by old fixture teardown.
 Private logs agent-process-inventory-{related,isolated,cold}.log under
 management-registry-20261015 retain these outcomes. No full-suite PASS is claimed.
+
+The two four-attempt fixture tests now budget60s and retain their exact root on
+failure. Their unchanged assertions passed in30.51s (crossing) and51.86s
+(quarantine), both beyond the former30s limit. The same targeted command ended
+3 PASS/2 FAIL/43 assertions117.24s: the unknown-judge fault injector gave up
+waiting for preparation after10s, then deleted its root while main was still
+running. Its pending rejection opening judge-unused.json appeared in the next
+retry test (ENOENT of that other root), not as a retry ownership failure.
+
+That fault-injection fixture now waits at most30s for dispatch, handles early
+main rejection, awaits the pending main in finally and removes its root only
+after successful assertions; its total budget is60s. Real unknown-judge then
+retry controls passed2/19 in37.28s with no error between tests. Original
+quarantine/remaining-slot/retained-judge assertions remain. Production deadlines,
+10s peer gate and cleanup policy are unchanged. The earlier unattributed
+JUDGE_VERSION_UNCONFIRMED/EACCES signal is not retroactively explained by this
+separate observed teardown race. Logs agent-inventory-fixture-controls.log and
+agent-inventory-fault-drain-green.log preserve both outcomes.
