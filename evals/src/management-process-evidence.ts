@@ -5,8 +5,9 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 import { superviseProcess } from "./process-supervisor"
 import type { ServerIdentity, SlotLease } from "./slots"
+import type { AdminConnection } from "./loginom-admin"
 
-export type ManagementProcessEvidence = { file: string; lease: SlotLease }
+export type ManagementProcessEvidence = { file: string; lease: SlotLease; admin?: AdminConnection }
 type InventoryInput = { file: string; journal: string; commandId: string; identity: ServerIdentity; leaseToken: string;
   slotId: string; profileDir: string; producerPid: number }
 const active = new Set<string>()
@@ -33,7 +34,10 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
     if (hash(inventory) !== previous.source.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
     await privateDirectory(evidence.directory)
     const owner = { kind: "slot" as const, id: `${expected.commandId}:${expected.slotId}:${crypto.randomUUID()}` }
-    const entry = { owner, directory: evidence.directory, operation: evidence.operation, state: "planned" }
+    if (evidence.admin && JSON.stringify(evidence.admin.identity) !== JSON.stringify(expected.identity)) throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
+    const before = await evidence.admin?.inspectSessionInventory()
+    const entry = { owner, directory: evidence.directory, operation: evidence.operation, state: "planned",
+      ...(before ? { sessions: { before: before.source } } : {}) }
     await evidence.lease.assertHeld()
     await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, entry] })
     const result = await superviseProcess({ ...input, owner })
@@ -41,8 +45,10 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
     await writeLeaseReceipt(proof, result.processCleanup)
     await evidence.lease.assertHeld()
     const qualified = qualifyClosedProcessEvidence(result.processCleanup, { owner, producerPid: process.pid })
+    const after = qualified ? await evidence.admin?.inspectSessionInventory() : undefined
     await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, { ...entry,
-      state: qualified ? "confirmed" : "unconfirmed", proof: { path: proof, sha256: hash(result.processCleanup) } }] })
+      state: qualified ? "confirmed" : "unconfirmed", proof: { path: proof, sha256: hash(result.processCleanup) },
+      ...(before && after ? { sessions: { before: before.source, after: after.source } } : {}) }] })
     if (!qualified) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
     return result
   } finally { active.delete(evidence.file) }
@@ -52,7 +58,7 @@ export async function readManagementProcessInventory(input: InventoryInput) {
   const inventory = await readInventory(input)
   const processes = []
   for (const entry of inventory.processes) {
-    if (!object(entry) || Object.keys(entry).length !== 5 || entry.state !== "confirmed" || !object(entry.owner) || entry.owner.kind !== "slot" ||
+    if (!object(entry) || Object.keys(entry).length !== (entry.sessions === undefined ? 5 : 6) || entry.state !== "confirmed" || !object(entry.owner) || entry.owner.kind !== "slot" ||
       typeof entry.owner.id !== "string" || !entry.owner.id.startsWith(`${input.commandId}:${input.slotId}:`) || typeof entry.directory !== "string" ||
       !Array.isArray(entry.operation) || entry.operation.length !== 2 || !entry.operation.every(value => typeof value === "string") ||
       !operations.has(entry.operation.join(" ")) || !object(entry.proof) ||
@@ -62,11 +68,26 @@ export async function readManagementProcessInventory(input: InventoryInput) {
     const proof = await readLeaseReceipt(entry.proof.path).catch(() => null)
     const qualified = qualifyClosedProcessEvidence(proof, { owner: { kind: "slot", id: entry.owner.id }, producerPid: input.producerPid })
     if (!qualified || hash(proof) !== entry.proof.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
+    const sessions = entry.sessions === undefined ? undefined : await readManagementSessions(input, entry.sessions, qualified)
     processes.push({ owner: qualified.owner, operation: entry.operation, launcher: qualified.launcher, identities: qualified.identities,
-      source: { path: entry.proof.path, sha256: entry.proof.sha256 } })
+      source: { path: entry.proof.path, sha256: entry.proof.sha256 }, ...(sessions ? { sessions } : {}) })
   }
   if (JSON.stringify(await readInventory(input)) !== JSON.stringify(inventory)) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
   return { processes, source: { path: input.file, sha256: hash(inventory) } }
+}
+
+async function readManagementSessions(input: InventoryInput, value: unknown, window: { startedAt: string; finishedAt: string }) {
+  if (!object(value) || Object.keys(value).length !== 2) throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
+  const { readAdminSessionInventory } = await import("./loginom-admin")
+  const snapshots = await Promise.all([value.before, value.after].map(source => {
+    if (!object(source) || Object.keys(source).length !== 2 || typeof source.path !== "string" || typeof source.sha256 !== "string")
+      throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
+    return readAdminSessionInventory({ controller: { stateDir: path.dirname(input.file) } }, input.identity, { path: source.path, sha256: source.sha256 })
+  }))
+  const before = snapshots[0]!, after = snapshots[1]!
+  if (before.source.path === after.source.path || Date.parse(before.observation.finishedAt) > Date.parse(window.startedAt) ||
+    Date.parse(after.observation.startedAt) < Date.parse(window.finishedAt)) throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
+  return { before, after }
 }
 
 async function readInventory(input: InventoryInput) {

@@ -43,7 +43,7 @@ export type AdminConnection = {
   identity: ServerIdentity
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
   inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
-    source: { path: string; sha256: string } }>
+    observation: { startedAt: string; finishedAt: string }; source: { path: string; sha256: string } }>
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
   inspectUnactivatedUser(lease: SlotLease, secretFile: string): Promise<{ identity: ServerIdentity; username: string;
     account: { objectId: string; name: string; blocked: boolean } | null; serverSessions: "absent";
@@ -482,7 +482,7 @@ async function withAdminInventoryWrite<T>(file: string, callback: () => Promise<
 }
 
 /** Immutable native observations; this reader grants no session ownership or cleanup authority. */
-export async function readAdminSessionInventory(file: SlotFile, identity: ServerIdentity, source: { path: string; sha256: string }) {
+export async function readAdminSessionInventory(file: { controller: { stateDir: string } }, identity: ServerIdentity, source: { path: string; sha256: string }) {
   const directory = path.dirname(source.path)
   if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
     path.resolve(source.path) !== source.path || !/^[a-f0-9]{64}$/.test(source.sha256)) throw new EvalFailure("SESSION_INVENTORY_UNCONFIRMED", 2)
@@ -512,7 +512,8 @@ export async function readAdminSessionInventory(file: SlotFile, identity: Server
     typeof command.at !== "string" || !Number.isFinite(Date.parse(command.at)) || typeof command.settledAt !== "string" ||
     !Number.isFinite(Date.parse(command.settledAt)) || Date.parse(command.settledAt) < Date.parse(command.at))
     throw new EvalFailure("SESSION_INVENTORY_UNCONFIRMED", 2)
-  return { identity, sessionIdentityQualified: false as const, sessions: receipt.sessions as AdminSessionRow[], source }
+  return { identity, sessionIdentityQualified: false as const, sessions: receipt.sessions as AdminSessionRow[],
+    observation: { startedAt: command.at, finishedAt: command.settledAt }, source }
 }
 
 export async function readAdminProcessInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {

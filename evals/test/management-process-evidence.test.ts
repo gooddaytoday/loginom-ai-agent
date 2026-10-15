@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, rmdir } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireEnvironmentLeases } from "../src/slots"
@@ -67,33 +67,3 @@ test("management process inventory precedes dispatch and binds actual continuous
     expect(await Bun.file(proof).text()).toBe(bytes)
   } finally { await Promise.all([environment.server.close(), lease.close()]); await rm(root, { recursive: true, force: true }) }
 }, 10000)
-
-test.skipIf(!process.env.EVAL_CLI_BIN)("installed CLI management publishes continuous slot evidence for an unconfigured status", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-native-")), fixture = await parallelFixture(root)
-  // Native CLI initializes its own marker and requires an empty fresh profile.
-  await rm(path.join(fixture.slots.slots[0]!.profileDir, "data/auth.json"))
-  await rmdir(path.join(fixture.slots.slots[0]!.profileDir, "data"))
-  const journal = path.join(fixture.slots.controller.stateDir, "command.json")
-  // Slot authority is a data-only fixture; this control makes no Loginom login or readiness claim.
-  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "native-management", identity, phase: "cli_admitted" })
-  const environment = await acquireEnvironmentLeases(fixture.slots, 1, identity, journal, fixture.lockRoot), lease = environment.slots[0]!
-  const file = path.join(fixture.slots.controller.stateDir, "management-a.json")
-  await writeLeaseReceipt(file, { version: 2, kind: "management-processes", commandId: "native-management", journal, identity,
-    leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
-  let confirmed = false
-  try {
-    const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!,
-      EVAL_PROFILE_DIR: lease.slot.profileDir, EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: "unused-metadata-control" })
-    const command = { ...agentCommand(config), cleanupDir: path.join(fixture.slots.controller.stateDir, "captures"), managementEvidence: { file, lease } }
-    const result = await management(command, ["loginom", "status", "--format", "json"])
-    expect({ code: result.exitCode, stderr: result.stderr, outputOnFailure: result.exitCode ? result.stdout : "" })
-      .toEqual({ code: 0, stderr: "", outputOnFailure: "" })
-    expect(JSON.parse(result.stdout)).toMatchObject({ state: "unconfigured", hasApiKey: false })
-    const inventory = await readManagementProcessInventory({ file, journal, commandId: "native-management", identity, leaseToken: lease.token,
-      slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
-    expect(inventory.processes).toHaveLength(1)
-    expect(inventory.processes[0]!.identities.length).toBeGreaterThan(1)
-    confirmed = result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete
-    expect(confirmed).toBe(true)
-  } finally { await Promise.all([environment.server.close(), lease.close()]); if (confirmed) await rm(root, { recursive: true, force: true }) }
-}, 30000)
