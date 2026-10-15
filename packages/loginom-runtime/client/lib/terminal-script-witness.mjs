@@ -125,7 +125,66 @@ export function collectTerminalScriptWitness(expected){
  const storageIdentity=hold(storage,'$');for(const key of ['$OW','$O']){const value=hold(storageIdentity,key);if(!Number.isInteger(value)||value<0)throw Error('TERMINAL_PROVIDER_STORAGE_IDENTITY')}
  const messages=hold(transport,'$M');hold(messages,'GetDynamicData');hold(transport,'$R');hold(transport,'DispatchMessageAsync');
  const nativeSS=own(bindings,'ss');const originalCompletionConstructor=hold(nativeSS,'TaskCompletionSource');hold(originalCompletionConstructor,'prototype');hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
+ const completionPrototype=hold(originalCompletionConstructor,'prototype');
+ // Freeze the optional Task definition now. A double/missing definition cannot
+ // be repaired by publishing a class after collection or by a returned DTO.
+ let taskDefinition;const taskSlot=descriptor(nativeSS,'Task'),taskNamespacePrototype=parent(nativeSS);
+ if(taskSlot){
+  const ctor=hold(nativeSS,'Task'),prototype=hold(ctor,'prototype'),continuation=hold(prototype,'continueWith');
+  if(typeof ctor!=='function'||typeof continuation!=='function')throw Error('TERMINAL_PROVIDER_TASK_DEFINITION');
+  for(const key of ['getAwaitedResult','isCompleted','_complete','_fail','_runCallbacks'])if(typeof hold(prototype,key)!=='function')throw Error('TERMINAL_PROVIDER_TASK_DEFINITION');
+  taskDefinition=Object.freeze({ctor,prototype,continuation});
+ }else providerChecks.push(()=>{if(descriptor(nativeSS,'Task')||parent(nativeSS)!==taskNamespacePrototype)throw Error('TERMINAL_PROVIDER_TASK_DEFINITION_CHANGED')});
+ let birthWindow;const birthChain=[];
+ if(taskDefinition){
+  for(let p=completionPrototype;p;p=parent(p)){if(descriptor(p,'task'))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');birthChain.push({p,prototype:parent(p)})}
+  providerChecks.push(()=>{for(const x of birthChain)if(parent(x.p)!==x.prototype||!descriptorEqual(descriptor(x.p,'task'),x.p===completionPrototype?birthWindow:undefined))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED')});
+ }
  let armed,creationState;const storageStates=[];
+ function continuePrimary(lower,task,continuation,callback){
+  try{guard();
+  if(!taskDefinition){lower.continuationBirth=Object.freeze({observed:false,reason:'ORIGINAL_TASK_DEFINITION_UNAVAILABLE',lexicalCalleeIdentityQualified:false});return apply(continuation,task,[callback])}
+  if(task!==lower.sourceTask||parent(task)!==taskDefinition.prototype||continuation!==taskDefinition.continuation)throw Error('TERMINAL_PROVIDER_CONTINUATION_DEFINITION');
+  // Own/inherited task slots would change the constructor assignment semantics.
+  // Inspect descriptors only: never invoke a foreign getter on this seam.
+  const chain=[];for(let p=completionPrototype;p;p=parent(p)){
+   if(descriptor(p,'task'))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');chain.push({p,prototype:parent(p)});
+  }
+  const checkChain=()=>{for(const x of chain)if(parent(x.p)!==x.prototype||x.p!==completionPrototype&&descriptor(x.p,'task'))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED')};
+  let source,born,returned,first;
+  const set=function(value){
+   if(!descriptorEqual(descriptor(completionPrototype,'task'),temporary))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');
+   checkChain();guard();
+   if(source||this===completionPrototype||parent(this)!==completionPrototype||descriptor(this,'task')
+     ||!value||typeof value!=='object'||value===task||parent(value)!==taskDefinition.prototype)throw Error('TERMINAL_PROVIDER_CONTINUATION_BIRTH');
+   source=this;born=value;
+   Object.defineProperty(source,'task',{value,writable:true,enumerable:true,configurable:true});
+  };
+  const temporary={get:undefined,set,enumerable:false,configurable:true};
+  Object.defineProperty(completionPrototype,'task',temporary);birthWindow=temporary;
+  try{
+   returned=apply(continuation,task,[callback]);
+   checkChain();guard();
+   if(!source||source===lower.completion||returned!==born||born===task||parent(source)!==completionPrototype||parent(born)!==taskDefinition.prototype
+     ||own(born,'status')!==3||own(source,'task')!==born)throw Error('TERMINAL_PROVIDER_CONTINUATION_BIRTH');
+  }catch(value){first={value}}
+  // Restore exactly our descriptor before returning to the native caller. The
+  // raw first throw survives a secondary descriptor/prototype refusal.
+  try{checkChain()}catch(value){first??={value}}
+  try{if(!descriptorEqual(descriptor(completionPrototype,'task'),temporary))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');
+   delete completionPrototype.task;
+  }catch(value){first??={value}}
+  birthWindow=undefined;if(first)throw first.value;
+  hold(source,'task');for(const key of ['setResult','setException'])hold(source,key);
+  for(const key of ['continueWith','getAwaitedResult'])hold(born,key);
+  lower.continuationBirth=Object.freeze({observed:true,source,task:born,primarySource:lower.completion,primaryTask:task,
+   returnedTask:returned,continuation,sourcePrototype:completionPrototype,taskPrototype:taskDefinition.prototype,
+   statusAtReturn:3,assignmentObserved:true,prototypeRestored:true,lexicalCalleeIdentityQualified:false});
+  for(const key of Reflect.ownKeys(lower.continuationBirth))hold(lower.continuationBirth,key);
+  guard();return returned;
+  }catch(value){providerFailure??={value};throw providerFailure.value}
+ }
+
  function patchCheck(p){if(parent(p.object)!==p.prototype||!descriptorEqual(descriptor(p.object,p.key),p.active?p.temporary:p.original))throw Error('TERMINAL_PROVIDER_PATCH_CHANGED')}
  function suspendNative(check){
   const selected=providerPatches.filter(p=>p.active&&(p.object===transport||p.object===nativeSS));
@@ -306,7 +365,7 @@ export function collectTerminalScriptWitness(expected){
    try{
     const lower=startLower(storage,undefined,rejectFirst,method);state.lower=lower;
     const task=lower.task,continuation=hold(task,'continueWith'),begin=providerChecks.length,reader=hold(task,'getAwaitedResult'),checks=providerChecks.slice(begin);let completed=false;
-    apply(continuation,task,[()=>{if(completed)return;completed=true;
+    continuePrimary(lower,task,continuation,()=>{if(completed)return;completed=true;
      try{for(const fn of checks)fn();const value=apply(reader,task,[]);restore();lower.restored=true;
       if(!lower.completed||!lower.sourceSettled||lower.sourceMethod!=='setResult'||value!==lower.value)throw Error('TERMINAL_PROVIDER_STORAGE_COMPLETION');
       provider.checkPacket(packet);
@@ -315,7 +374,7 @@ export function collectTerminalScriptWitness(expected){
       if(['get_CurrentDirectory','get_RootPath'].includes(method)&&(typeof value!=='string'||!value))throw Error('TERMINAL_INTERFACE_ROOT_UNKNOWN');
       state.value=value;state.settled=true;resolve(value);
      }catch(error){const first=lower.primary?lower.primary.value:error;try{restore();lower.restored=true}catch{}providerFailure??={value:first};rejectFirst(first)}
-    }]);
+    });
    }catch(error){providerFailure??={value:error};rejectFirst(error)}return state.work;
   },
   arm(request){
@@ -351,18 +410,18 @@ export function collectTerminalScriptWitness(expected){
       check();lower=startLower(proxy,streamType,rejectFirst);task=lower.task;
       const continuation=hold(task,'continueWith'),begin=providerChecks.length,reader=hold(task,'getAwaitedResult'),readerChecks=providerChecks.slice(begin);let completed=false;
       if(typeof continuation!=='function'||typeof reader!=='function')throw Error('TERMINAL_PROVIDER_TASK');
-      apply(continuation,task,[()=>{if(completed)return;completed=true;
+      continuePrimary(lower,task,continuation,()=>{if(completed)return;completed=true;
        try{for(const fn of readerChecks)fn();support=apply(reader,task,[]);restore();lower.restored=true;
         if(!lower.completed||!lower.sourceSettled||lower.sourceMethod!=='setResult'||support!==lower.support)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
         if(hold(support,'$S')!==transport||hold(support,'SaveToStream')!==own(bindings,'persist'))throw Error('TERMINAL_PROVIDER_SUPPORT');
         const identity=hold(support,'$'),w=hold(identity,'$OW'),o=hold(identity,'$O');if(!Number.isInteger(w)||w<0||!Number.isInteger(o)||o<0)throw Error('TERMINAL_PROVIDER_SUPPORT');
         check();resolve(support)}catch(error){const first=lower.primary?lower.primary.value:error;try{restore();lower.restored=true}catch{}rejectFirst(first)}
-      }]);
+      });
      }catch(error){rejectFirst(error)}return work;
     },
     inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,initial:armed?.initial,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType,
      lower:lower?Object.freeze({dispatchTask:lower.dispatchTask,request:lower.request,response:lower.response,continuation:lower.originalContinuation,reader:lower.originalReader,resolver:lower.resolverPatch.method,
-      completionSource:lower.completion,sourceTask:lower.sourceTask,sourceSettled:lower.sourceSettled,sourceMethod:lower.sourceMethod,sourceValue:lower.sourceValue,completionSourceCustodyVerified:lower.sourceTask===lower.task&&lower.sourceSettled===true,
+      continuationBirth:lower.continuationBirth,completionSource:lower.completion,sourceTask:lower.sourceTask,sourceSettled:lower.sourceSettled,sourceMethod:lower.sourceMethod,sourceValue:lower.sourceValue,completionSourceCustodyVerified:lower.sourceTask===lower.task&&lower.sourceSettled===true,
       w:lower.w,o:lower.o,hresult:lower.hresult,returnedType:lower.returnedType,support:lower.support,observed:lower.observed,completed:lower.completed,restored:lower.restored}):undefined})},
    });
    // Same-realm initial custody is captured before begin/reserve/effect. The
