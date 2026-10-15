@@ -40,6 +40,7 @@ test("standalone outcome blocks infrastructure and missing cleanup, preserves me
   expect(checkEvalrunnerOutcome(summary)).toBe("FAIL")
   expect(() => checkEvalrunnerOutcome({ ...summary, storage_leftovers: null })).toThrow("cleanup")
   expect(() => checkEvalrunnerOutcome({ ...summary, tasks: [{ ...summary.tasks[0]!, attempts: [{ ...summary.tasks[0]!.attempts[0]!, status: "infra_error" }] }] })).toThrow("infrastructure")
+  expect(() => checkEvalrunnerOutcome({ ...summary, tasks: [{ ...summary.tasks[0]!, attempts: [{ ...summary.tasks[0]!.attempts[0]!, status: "failed", failure_kind: "provider" }] }] })).toThrow("infrastructure")
 })
 
 test("standalone CLI integrity rejects changed bytes and extra payload files", async () => {

@@ -17,7 +17,7 @@ export function checkEvalrunnerOutcome(summary: RunSummary, node = false) {
   if (summary.interrupted || summary.stopped_reason || summary.storage_leftovers === null || summary.storage_leftovers.length ||
     summary.config.infra_retries !== 0 || !summary.tasks.length) throw new EvalFailure("Run cleanup/config unconfirmed", 2)
   const attempts = summary.tasks.flatMap(item => item.attempts)
-  if (!attempts.length || attempts.some(item => item.infra_retry || item.cleanup_error || item.failure_kind === "recovery" ||
+  if (!attempts.length || attempts.some(item => item.infra_retry || item.cleanup_error || item.failure_kind === "recovery" || item.failure_kind === "provider" ||
     !["completed", "failed", "timeout", "no_artifact"].includes(item.status))) throw new EvalFailure("Run infrastructure/unknown outcome", 2)
   if (attempts.some(item => item.environment_cleanup?.status !== "confirmed")) throw new EvalFailure("Run cleanup unconfirmed", 2)
   if (!node && attempts.some(item => item.judge_status === "error" || item.status === "completed" && item.judge_status !== "scored"))
