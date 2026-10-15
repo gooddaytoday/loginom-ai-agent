@@ -1,5 +1,8 @@
 # JavaScript: рабочее исследование на Loginom 7.4.2
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Текущий итог: **scope v1 реализован и candidate15 принят**.
 G1–G7 и J01–J27 сведены с текущими доказательствами в
 [completion audit](completion-audit.md); [итог](completion.md).
@@ -9,15 +12,15 @@ G1–G7 и J01–J27 сведены с текущими доказательст
 ## Историческая сводка исследования
 
 Статус на 2026-10-01: **`discovery_required`**. Это сводка прямых наблюдений
-фазы 0B [подплана](plan.md), а не допуск публичного обработчика или автономной
+фазы 0B [подплана](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md), а не допуск публичного обработчика или автономной
 CLI-приёмки. Стенд — `http://logi-test-plan.bg.local/app/`, Loginom Enterprise
 7.4.2; оператор — Ubuntu, только видимый headed Chromium. ОС **сервера** —
 Linux по принадлежащему `Session.Version.IsWindows=false`; дистрибутив и версия
 ядра неизвестны. Продуктовая база кампании остаётся
 `a8ad59766dbdb4f2da0b54367a755ce00891dd71`; более новая база документации
-`3f35c5f232` добавила общее [чтение ошибки мастера](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки).
+`3f35c5f232` добавила общее [чтение ошибки мастера](../../history/programming-javascript/origin-javascript-399bb8b589/workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки).
 Исходные отчёты и журналы находятся в приватной кампании; подтверждённые SHA,
-ревизии операторов и границы каждой попытки перечислены в [checkpoint](checkpoint.md).
+ревизии операторов и границы каждой попытки перечислены в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 
 Фаза4 source на9b8e40b418: original CLI/cold launch controller и detached-browser
 ownership; ab721a703e сохраняет headed для CLI preflight. Controller15/observer9/
@@ -28,20 +31,20 @@ binding/whole auditor и fresh candidate/CLI остаются открытыми
 committed QA freeze/candidate runtime overlay проверены10 Git/filesystem/Node
 fixtures, controller15/capture22 PASS; generic cold dependency loading и actual
 factory/native proof ещё не выполнены.
-[Текущий checkpoint](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
+[Текущий checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
 
 На15c0fb4f3c original CLI native-artifact ownership/source/append integrity
 проверены75 source/process tests, provenance5045 PASS. Допущены только точные
 plain/testable URL стенда по фактическому production normalizer. Fresh native
 Close/logout/CLI не подтверждены; technical cold collection/lease/whole composition
-остаются открытыми. [Checkpoint](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
+остаются открытыми. [Checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
 
 Technical cold capture и preparation fixes наb3878d0bd1 проверены75 tests:
 original10-minute collection, exact summary, adjacent assignment, новый отсутствующий
 evidence target, committed product release в freeze v2. Host registry только
 прочитан: own preparation reserved_active/browser closed_verified, CLI slot свободен.
 Actual factory/live не запускались; до F остаются lease/whole composition.
-[Checkpoint](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
+[Checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
 
 Последняя source-граница **e5e8c99286/1a8d236b76**: manual lease/original holder
 и whole writer/trial/pair API реализованы; source review полного авторского кода
@@ -51,9 +54,9 @@ regression23PASS. Candidate теперь собран и заморожен (с�
 actual factory/native/whole acceptance не доказаны. Same-task Astra/medium F выполнен наe02e8fd41f;
 старое назначение модели заменено в launcher/общем auditor/SQLite gate на
 openai/gpt-6.1-sol / low.68 адресных tests/provenance5045 PASS. Далее OAuth и live.
-[Актуальный checkpoint](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
+[Актуальный checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
 
-Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
+Исходная сводка обновлена по acceleration review (`acceleration-review.md` — исторический документ недоступен) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
 остаётся проверкой реализации и приёмки. Непроверенные пункты в ней не возвращают
@@ -65,7 +68,7 @@ retry zero events, full source/settings/graph, full6×4/1950 и default material
 context. Independent v2 audit/36 non-noop negatives каждого и cleanup приняты.
 Done не обещает fresh output; explicit=false/internal=null. Эти trials используют
 existing saved nodes, новый generic Done покрыт source tests; product registration,
-review/candidate/CLI остаются открыты. [Границы и hashes](checkpoint.md#текущее-состояние),
+review/candidate/CLI остаются открыты. [Границы и hashes](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#текущее-состояние),
 [design](configuration-lifecycle-design.md). Failed444 и verified recovery не
 превращены в PASS.
 
@@ -160,7 +163,7 @@ Done refusal/technical details/public throw/Stop/recovery и прочий J/F о
 | G6 — ошибки и восстановление | Private run08; public finite Stop/repair fresh393 на `69c1f3d60c`; public local read cancel/SAME-ID continuation fresh394 на `56f8df0250`: те же root/group/child records, один Raw Execute, native cancelled13,976s/NEW repair6×4, audit/negative87/87 и cleanup/process absence. Public Code Next SyntaxError и explicit sync throw/NEW repair обоих modes также приняты; hashes в checkpoint. | Next/Done потенциально эффектны; неизвестные gestures не повторять. Конечный цикл ≤60s, server Stop — только own native terminal; JS resume — только proved read-only pause и те же native records под исходным deadline. Public caller apply reply loss/retained backend Stop/settlement/inspect/NEW repair6×4 на 90c3bdd7c6 принят, audit/negative88/88 и cleanup. | Полный G6/CLI не закрыт. Public caller reply loss принят в fresh398; первоначальный failed395 и отдельная recovery сохранены. Fixed J09 Code399/declared400 на052909/238 addressed+18270 full принят2/2: source Required=true/target Required=false, manual label/autosync false, public mapping refusal/source edit/full6×4, audit v2/negative38/38 каждый/cleanup. Следующий — J19 current context/inert labels/comments. Потерянный browser gesture receipt остаётся fail-closed. Owned details expansion432 принят в fixed required scope; natural insufficient-primary/Done refusal и прочие recovery cases открыты. |
 | G7 — сохранение | Для `code` и `declared` выполнены отдельные writer/cold пары: последнее S2-состояние открыто в новом профиле, source/settings/schema прочитаны без передачи кода в reader, новый Execute дал полный результат 6×2. После каждого из двух Save native `IsPackageModified=false`. Дополнительный read-only audit скачал точные `.lgp` обоих режимов через штатный `FileDownloader`: ZIP/CRC, GUID узла, decoded `Engine.Code`, mode и объявленные колонки сверены с writer и cold reader. Отдельный фиксированный `usage`-вариант declared-схемы прошёл тот же writer/cold/bytes цикл; первая колонка сохранила `DefaultUsageType=4` в UI, новом сеансе и XML. Все три private byte audits имеют `package_bytes_verified=true` и `dirty_state_verified=true`; девять процессов подтвердили package close/logout/browser close. | Осуществимость обоих режимов принята по private writer/cold/bytes и dirty-state; повторять эти же пакеты ради 0B не нужно. Доказательство ограничено фиксированными случаями 6×2. | Save/cold на public handler с результатом 6×4 в каждом режиме, затем candidate/CLI. `public_handler_verified=false`; частные proofs не равны принятию G7. |
 
-Наблюдения G1 и G4 подробно записаны в [checkpoint](checkpoint.md) (operator15/16,
+Наблюдения G1 и G4 подробно записаны в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md) (operator15/16,
 source97). Для G2/G3 авторитетная сводка — [переходы и эффекты](execution-effects.md),
 для имён — [schema telemetry](schema-telemetry-observations.md) и
 [D witness audit](native-output-schema-witness-design.md), для G5/J20 —
@@ -199,18 +202,18 @@ trigger `EditColumnDefForm;cbxUsageType;trg_picker` (`rendered=true`,
 двухколоночной declared-схемы (profiles 223–225) writer дважды сохранил пакет,
 новый процесс прочитал `DefaultUsageType=4` и выполнил свежий Execute, а
 независимый byte-auditor подтвердил `DefaultUsageType="utPredicted"` в сохранённом
-`Unit.xml`. Точные SHA и граница доказательства — в [checkpoint](checkpoint.md).
+`Unit.xml`. Точные SHA и граница доказательства — в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 
 Ограниченный B public configure existing подтверждён в испытательном runtime:
 headed `public-node-apply-03`, независимый public source-read, сохранённые
 settings/input mapping/связи и cleanup 3/3. `configured_only` относится к
 output mapping evidence; публичный Done вернул `output.status=not_refreshed`,
 `execution.status=not_requested` и сохранил неизвестность внутренних эффектов
-как `execution_started=null`. Точные SHA и границы — в [checkpoint](checkpoint.md).
+как `execution_started=null`. Точные SHA и границы — в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 Ранние private P1 code/base и declared/base 6×4 прошли: полные typed UI
 input/output, независимый unchanged oracle, отдельные owned Execute и cleanup
 3/3. Это не native byte или public handler evidence. Source `ba46d2ecda`,
-точные report/journal/receipt SHA и ограничения — в [checkpoint](checkpoint.md).
+точные report/journal/receipt SHA и ограничения — в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 Code changed/reordered также прошли с тем же source SHA: полный pinned input,
 fresh owned Execute и unchanged independent oracle, cleanup 3/3.
 Fixed public C/D writer/Save/independent cold уже приняты в checkpoint.
@@ -307,7 +310,7 @@ Source product registry child161353dadef6 подключает общий handle
 Normal CLI package shutdown source на49dcfa0d99: native Close/logout по last
 confirmed own Save до browser closure; runtime30/Client25/Host13/actual CLI
 preflight3/typechecks PASS. Fresh Loginom/native cleanup/candidate/model здесь
-не проверены. [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
+не проверены. [Checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
 Наff8b2 normal final shutdown сохраняет retired/unsolicited-exit failures;
 Host21/typechecks/provenance5045 PASS. Normal native receipt audit eb051/948bc
 проверен13 tests, Linux original Popen observer ec73da —9 actual process tests;

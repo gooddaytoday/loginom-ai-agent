@@ -1,5 +1,8 @@
 # JavaScript: наблюдения технических имён и меток
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Стенд: `http://logi-test-plan.bg.local/app/`, Loginom Enterprise 7.4.2.
 Оператор: Ubuntu, headed Chromium, отдельный профиль на каждую пробу.
 Runtime: `9d9a2af27ae5780f26fbb61a438643eb802ca40d` (source96).
@@ -69,7 +72,7 @@ native source/reciprocal target mapping → physical schema, полный user-v
 независимый source-read. Observed пары в первой таблице подтверждены этим путём.
 Каждый run417–421 прошёл independent audit v3, negative50/50 и cleanup3/3/
 process absence. [Дизайн и границы](public-column-names-design.md), hashes/handles
-и failed416 без повышения до PASS — в [checkpoint](checkpoint.md).
+и failed416 без повышения до PASS — в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 
 Knowledge1.1 на child`276c344820` доставляет scoped Name/DisplayName rule;
 actual bridge MCP fixture и budgets/source/direct проверены. Historical1.0

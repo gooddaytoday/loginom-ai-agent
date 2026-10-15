@@ -1,5 +1,8 @@
 # JavaScript: автономная CLI-приёмка pair13
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 - event_id: `javascript-phase6-pair13-20261002`; campaign_id: `javascript-20260926-ubuntu`.
 - node_id: `component.programming.JavaScript`; attempt_id: `pair13`.
 - phase: 6; outcome: completed (CLI-пара, не вся Goal).
@@ -82,7 +85,7 @@ acceptance_lease=null, acceptance.lock отсутствует. Holder получ
 candidate15 отдельно подтвердил32KiB source delivery; он technical, не третий
 автономный writer.
 
-Следующий этап — полный аудит требований [плана](plan.md): G1–G7, J01–J27,
+Следующий этап — полный аудит требований [плана](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md): G1–G7, J01–J27,
 фазы0–6 и named deliverables, затем согласованные card/registry/discovery и
 итоговый completion. Эта запись подтверждает фазу6 и не заменяет тот аудит.
 Общая Goal активна. Integration, merge, push, release и обновление установленного

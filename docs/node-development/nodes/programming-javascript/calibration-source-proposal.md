@@ -1,5 +1,8 @@
 # Fixed K1/K2: предложение источников и независимых oracle
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: **design only, NOT_RUN**, 2026-09-28. Исполнение/реализация требуют
 отдельного назначения root после текущего B live. Основание — актуальный ROOT
 `/home/george/git/loginom-ai-agent/docs/node-development/nodes/programming-javascript/native-error-attribution-design.md`,

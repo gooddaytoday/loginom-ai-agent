@@ -1,8 +1,11 @@
 # JavaScript: профиль своего мастера G1/J22
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Следующий scoped live результат после [response budgets](response-budget-design.md).
 Основания — G1 в [discovery](discovery.md), J22 и допустимая замена недоступного
-FullType явным identity-контрактом в [плане](plan.md). Source/direct J21 и actual
+FullType явным identity-контрактом в [плане](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md). Source/direct J21 и actual
 candidate/CLI — разные уровни проверки.
 
 ## Существующая граница
@@ -77,7 +80,7 @@ entrypoint — существующий source adapter и cleanup. Два отд
 видимым, scoped quiet — отдельный факт. Cached wizard arrays проверяют own
 slots без getters, включая пустые conditional FPages. Final addressed95 и
 operator full18324 подтверждены с оговоркой последнего narrow изменения в
-[checkpoint](checkpoint.md). Source freeze1512/helper/oracle закреплены до
+[checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md). Source freeze1512/helper/oracle закреплены до
 fresh412 Code. Это source verification; live identity/UI решение ещё открыто.
 
 ## Принятое live решение — 2026-10-01

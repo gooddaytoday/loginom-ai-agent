@@ -1,6 +1,9 @@
 # JavaScript: граница доставки J21
 
-Продолжение [плана](plan.md), после current context и reordered input.
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
+Продолжение [плана](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md), после current context и reordered input.
 Это решение для source/direct-runtime проверки; candidate/CLI J01/J21 и
 поведение модели остаются отдельной приёмкой в F. Продуктовая база прежняя.
 
@@ -89,4 +92,4 @@ wire bytes, полные context mappings и warmup/final6×4 без readback su
 Actual CLI effective limits, `metadata.truncated=false` и immutable candidate
 остаются обязательными в F. J21 этим source/direct результатом полностью не
 закрыт; следующая точка — [G1/J22 UI profile](ui-profile-design.md) и
-[checkpoint](checkpoint.md).
+[checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).

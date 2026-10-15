@@ -1,5 +1,8 @@
 # Атрибуция native JavaScript errors для B / G6 / J25
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: предложение для root review, **design only**. Основа исходников —
 source83 `562f8ffebf8f5c4e1d38eff6c65beddbfd087fbc` плюс frozen source84
 (только artifact-discovery и его тест). Подготовка и чтение: 2026-09-27–28.

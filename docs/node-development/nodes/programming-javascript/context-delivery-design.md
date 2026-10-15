@@ -1,12 +1,15 @@
 # JavaScript: доставка текущего контекста J19/J21
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: fixed Code/declared current context live2/2 приняты через independent
 audit/negative64/64 каждый/cleanup. Reordered input/old source Code410/Declared411
 на9c93 также принят2/2: audit v3/negative80/80 каждый/cleanup. Переименование
 technical names, model resistance/candidate/CLI остаются открытыми.
 Reader child — `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`, compact bridge и
-guidance — `23e8488e29`. Точные evidence в [checkpoint](checkpoint.md). Продуктовая база
-и общие ограничения [плана](plan.md) сохраняются. Это композиция существующих
+guidance — `23e8488e29`. Точные evidence в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md). Продуктовая база
+и общие ограничения [плана](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md) сохраняются. Это композиция существующих
 readers; новый универсальный интерпретатор UI не требуется.
 
 ## Подтверждённый пробел

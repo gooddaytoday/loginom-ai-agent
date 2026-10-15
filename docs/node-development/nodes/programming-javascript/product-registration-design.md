@@ -1,5 +1,8 @@
 # JavaScript: продуктовая регистрация общего lifecycle
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Scope — уже согласованное ядро plan.md, не новая функция модели. General
 lifecycle-v5 source73a8 проверен new/existing Execute и saved Done/Close;
 operatorfecbc подтверждён standalone new Done2/2. Fixed B/private operators

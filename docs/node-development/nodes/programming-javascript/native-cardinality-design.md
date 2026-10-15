@@ -1,7 +1,10 @@
 # JavaScript native cardinality — bounded proposal
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: **все4 фиксированных случая независимо проверены live: keep2/duplicate source75, odd source77, UI-declared empty source81/empty04. Всего33nativecells. Это private bounded evidence, не полный G5/public handler/CLI. Предыдущие отказы сохранены.**
-Актуальные evidence и границы — в [checkpoint](checkpoint.md). Описание исходных ограничений ниже относится к source74 перед реализацией.
+Актуальные evidence и границы — в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md). Описание исходных ограничений ниже относится к source74 перед реализацией.
 Source74 HEAD `cb3e608baac8ca9f0270540ac4c65e7930d08d21`.
 Координатор сообщил terminal OBSERVED для Date roundtrip02/source74/profile56:
 independent 9 native + 9 civil / 1025 refs / 190 pins PASS, baseline matched,

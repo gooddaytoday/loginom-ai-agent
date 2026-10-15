@@ -1,9 +1,12 @@
 # G5 native types: текущие доказательства и следующие проверки
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус на 2026-09-27: private INPUT и identity JS roundtrip подтверждены для
 real/NULL, boolean, string, safe int64 и двух canonical Date значений сNULL.
 Это ограниченные observed_local проверки; полныйG5, публичный handler и CLI
-ещё не подтверждены. Точные receipts/hashes находятся в [checkpoint](checkpoint.md).
+ещё не подтверждены. Точные receipts/hashes находятся в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 
 - Source70 `c1ae171e50`: real/profile49,12native cells/627journalrefs/75pins.
 - Source71 `0115eccd20`: boolean/profile50,9cells/570refs; string/profile51,

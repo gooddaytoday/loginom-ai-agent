@@ -1,5 +1,8 @@
 # Выходное сопоставление до материализации исходных полей
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 2026-09-28. Уточнение private G7 persistence flow по live source105 writer08.
 Reader и explicit private admission реализованы в source106; интеграция
 source-cycle/writer/cold/auditor — source107 (e2f8036b2a). Локальный JS suite:

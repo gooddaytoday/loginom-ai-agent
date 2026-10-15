@@ -1,5 +1,8 @@
 # JavaScript: завершение обучения узла
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 - event_id: `javascript-v1-completion-20261003`; campaign_id: `javascript-20260926-ubuntu`.
 - node_id: `component.programming.JavaScript`; outcome: completed, candidate accepted.
 - owner task: `01a0ddc9-3e19-75d3-a5c9-724783ed6c35`.

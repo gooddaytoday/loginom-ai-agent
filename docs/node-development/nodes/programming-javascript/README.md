@@ -1,5 +1,13 @@
 # JavaScript
 
+## История обучения и прежняя приёмка
+
+[Архив и происхождение переноса](../../history/programming-javascript/README.md) · [матрица J01–J27/G1–G7](completion-audit.md) · [автономная pair13](completion-phase6.md).
+
+Обучение v1 и candidate15 относятся к source `6f6a66eb62`, Loginom 7.4.2/Linux
+и прежнему клиенту. Они не заменяют проверки нынешнего SHA. Решения после rebase,
+исправления ревью и дальнейший охват Multica ниже сохраняют приоритет.
+
 Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
 Исторического номера подплана нет. Runtime type: `programming.javascript`,
 режим `script`; обработчик зарегистрирован для Loginom 7.4.2.

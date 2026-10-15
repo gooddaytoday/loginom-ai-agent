@@ -1,11 +1,14 @@
 # JavaScript: аудит завершения плана
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: **проверки завершены в согласованном scope v1**. Итог опирается на
 матрицу ниже, текущий код, actual candidate CLI и отдельные source/live proofs;
 один CLI PASS не подменяет остальные требования. Проверяемый source:
 `6f6a66eb62c78ab2e8b10cd1bd7f38bcf931d8d6` в `node-javascript`;
-canonical docs — ветка `javascript`. Исходные требования: [plan](plan.md),
-G1–G7, J01–J27, фазы0–6, [постоянные указания](checkpoint.md#указания-пользователя).
+canonical docs — ветка `javascript`. Исходные требования: [plan](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md),
+G1–G7, J01–J27, фазы0–6, [постоянные указания](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#указания-пользователя).
 
 ## Уже повторно проверено — 2026-10-02
 

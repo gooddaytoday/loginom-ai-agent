@@ -1,5 +1,8 @@
 # JavaScript: bounded Date/civil identity proposal
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: **дизайн проверен координатором; реализация назначена, live ещё не выполнен**. Основание
 исходников: `7982cc35425efbac15d5c225893bd7a1544b5491` (source72).
 Runtime, tests, fixtures, config и private evidence этим документом не меняются.

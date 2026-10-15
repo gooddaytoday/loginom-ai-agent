@@ -1,5 +1,8 @@
 # Renamed JavaScript graph controls — source78 investigation and bounded correction
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: Fix79 реализован в source `6d8b16e8c230ff5ea98ea8f4377a5cff66c34d8d`, root regression PASS (2472 client pass/10 skip,1292 main+3deny+11Python). Empty02 live запущен; результат ещё не принят. Ниже сохранены исходное обоснование и условия реализации.
 Source78 HEAD `66f0ad6e732fd9e9f717284d3bf93a2c9cbcafc1`.
 
@@ -18,19 +21,19 @@ kind=port, native output active=true. Его `allowed_actions` равны
 
 Причинная цепочка в текущем source:
 
-- [workspace-ui.mjs:446](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/workspace-ui.mjs#L446):
+- [workspace-ui.mjs:446](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) (историческая позиция `#L446`; ссылка ведёт к текущему файлу):
   `controlCodeIdentity` возвращает name/id/TID; native type туда не входит.
-- [workspace-ui.mjs:465](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/workspace-ui.mjs#L465):
+- [workspace-ui.mjs:465](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) (историческая позиция `#L465`; ссылка ведёт к текущему файлу):
   script deny — regex `script|javascript|python|codeeditor` с границами слов.
   `JS:_Value` ему не соответствует. Расширять regex на `JS` недостаточно:
   пользовательское имя может быть любым.
-- [workspace-ui.mjs:2643](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/workspace-ui.mjs#L2643)
-  и [2772](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/workspace-ui.mjs#L2772):
+- [workspace-ui.mjs:2643](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) (историческая позиция `#L2643`; ссылка ведёт к текущему файлу)
+  и [2772](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) (историческая позиция `#L2772`; ссылка ведёт к текущему файлу):
   enabled+identity+!dangerous допускают generic actions для этого port.
-- [javascript-native-roundtrip-opening.mjs:89](../../../../.worktrees/node-javascript/packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-opening.mjs#L89)
+- [javascript-native-roundtrip-opening.mjs:89](../../../../packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-opening.mjs) (историческая позиция `#L89`; ссылка ведёт к текущему файлу)
   требует exact denied control с пустым allowed_actions. Отказ происходит
   до binding/intent loop, native inspect, click и F3. Private guard сработал правильно.
-- [workspace-ui.test.mjs:5189](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/test/workspace-ui.test.mjs#L5189)
+- [workspace-ui.test.mjs:5189](../../../../packages/loginom-runtime/client/test/workspace-ui.test.mjs) (историческая позиция `#L5189`; ссылка ведёт к текущему файлу)
   проверяет только TID с буквальным `JavaScript`, без native graph owner.
   Поэтому прежний deny-test не обнаруживал зависимость от имени.
 
@@ -47,23 +50,23 @@ FNodes.FCollection → node.FCell → renderer state → DOM и cached node.FIco
 
 Уже реализованные источники:
 
-- [node-context.mjs:47](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/node-context.mjs#L47):
+- [node-context.mjs:47](../../../../packages/loginom-runtime/client/lib/node-context.mjs) (историческая позиция `#L47`; ссылка ведёт к текущему файлу):
   prepared package/workflow/GUID, ModelForm, bounded nodes≤200, same graph.container,
   `view.getState(node.FCell).shape.node` и scoped unique DOM.
-- [node-target-browser.mjs:33](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/node-target-browser.mjs#L33):
-  native graph/container binding; [48](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/node-target-browser.mjs#L48) —
-  node cell/rendered shape; [54](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/node-target-browser.mjs#L54) —
-  exact label cell/parent/rendered text; [62](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/node-target-browser.mjs#L62) —
+- [node-target-browser.mjs:33](../../../../packages/loginom-runtime/client/lib/node-target-browser.mjs) (историческая позиция `#L33`; ссылка ведёт к текущему файлу):
+  native graph/container binding; [48](../../../../packages/loginom-runtime/client/lib/node-target-browser.mjs) (историческая позиция `#L48`; ссылка ведёт к текущему файлу) —
+  node cell/rendered shape; [54](../../../../packages/loginom-runtime/client/lib/node-target-browser.mjs) (историческая позиция `#L54`; ссылка ведёт к текущему файлу) —
+  exact label cell/parent/rendered text; [62](../../../../packages/loginom-runtime/client/lib/node-target-browser.mjs) (историческая позиция `#L62`; ссылка ведёт к текущему файлу) —
   существующая классификация vendor по **native FIconCls**; далее native port cells.
-- [node-output-context.mjs:20](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/node-output-context.mjs#L20):
+- [node-output-context.mjs:20](../../../../packages/loginom-runtime/client/lib/node-output-context.mjs) (историческая позиция `#L20`; ссылка ведёт к текущему файлу):
   bounded port groups≤16/ports≤100, native FCell→shape, scoped unique port DOM/GUID.
-- [javascript-native-roundtrip-owner.mjs:63](../../../../.worktrees/node-javascript/packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-owner.mjs#L63),
-  [95](../../../../.worktrees/node-javascript/packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-owner.mjs#L95):
+- [javascript-native-roundtrip-owner.mjs:63](../../../../packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-owner.mjs) (историческая позиция `#L63`; ссылка ведёт к текущему файлу),
+  [95](../../../../packages/loginom-runtime/tools/loginom-acceptance/javascript-native-roundtrip-owner.mjs) (историческая позиция `#L95`; ссылка ведёт к текущему файлу):
   fixed JS admission uses FGuid+`bg-vendor-icon-javascript`, затем удерживает
   node/data/cell/GUID/icon/ports. Переименование не меняет эту identity.
-- [workspace-ui.mjs:2443](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/workspace-ui.mjs#L2443):
+- [workspace-ui.mjs:2443](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) (историческая позиция `#L2443`; ссылка ведёт к текущему файлу):
   graph label keys могут содержать `;`; нельзя брать первый split token.
-- [workspace-ui.mjs:3274](../../../../.worktrees/node-javascript/packages/loginom-runtime/client/lib/workspace-ui.mjs#L3274):
+- [workspace-ui.mjs:3274](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) (историческая позиция `#L3274`; ссылка ведёт к текущему файлу):
   act проверяет свежие current.allowed_actions до получения gesture handle.
   Исправление общей observation-классификации действует и на повторную act-проверку.
 

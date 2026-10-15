@@ -1,5 +1,8 @@
 # JavaScript: следующий шаг после source audit D
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Дата: 2026-09-28. Решение ROOT в рамках исполнения согласованного plan.md.
 Основание: [source audit](native-output-schema-witness-design.md), revision44,
 SHA256 `774407b4a13e15eeb9084e7a49f46e86e7353a35d1cd4a69833a604cab8cff32`.

@@ -1,7 +1,10 @@
 # Независимые аудиторы JavaScript для фазы 4
 
-Продолжение утверждённого [плана](plan.md), 2026-10-02. Аудиторы читают
-сохранённый native journal; не запускают Hermes, браузер или JavaScript модели.
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
+Продолжение утверждённого [плана](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md), 2026-10-02. Аудиторы читают
+сохранённый native journal; не запускают Hermes, браузер или JavaScript модели. (историческое упоминание)
 Решение `allow_configured_output: true` остаётся отдельным контрактом чтения
 контекста и не превращает `source_pending` в доказательство исполнения.
 
@@ -235,7 +238,7 @@ document/workflow/DOM epoch, wizard prefix и уже принятый `Connected
 launch argv/процессы с controller evidence. Cold report/journal helper сам не
 выставляет whole CLI, model authorship, authenticated journal или process PASS.
 
-Native admission связывается с фактическим standalone Host, без Codex/Hermes
+Native admission связывается с фактическим standalone Host, без Codex/Hermes (историческое упоминание)
 ticket envelope. `packages/loginom-host/src/host.ts` передаёт в `inputStore`
 chat `${generation}:${cliSessionID}` и исходный user message ID. `inputs.ts`
 формирует имя `${SHA256(JSON.stringify([chat,userMessage]))}-${index}-${name.slice(-120)}`;
@@ -431,7 +434,7 @@ Same-task review выполнен на фактическом Astra/medium. На
 model check и общий writer auditor требуют **openai/gpt-6.1-sol / low**.
 Старая модель в user или assistant metadata отвергается.68 адресных tests
 и provenance5045 PASS; это source проверка, actual candidate/live ещё впереди.
-[Scope и receipt](checkpoint.md#f-same-task-source-review-и-модель-общего-аудитора--2026-10-02).
+[Scope и receipt](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md#f-same-task-source-review-и-модель-общего-аудитора--2026-10-02).
 
 
 ### Original и redacted CLI delivery — 2026-10-02

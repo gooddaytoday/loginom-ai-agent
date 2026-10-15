@@ -1016,6 +1016,16 @@
       "runtime": null,
       "platform": null,
       "scope": "Исходники ограниченного JavaScript-ядра после rebase; эта запись не подтверждает живое выполнение или установленный продукт."
+    },
+    "javascript-v1-candidate15": {
+      "path": "nodes/programming-javascript/completion.md",
+      "sha256": "db4b068d51692daeacd313afc0200be2649adcd8dd8709995e91e08072015be8",
+      "kind": "candidate_acceptance",
+      "availability": "retained_document",
+      "source_commit": "6f6a66eb62c78ab2e8b10cd1bd7f38bcf931d8d6",
+      "runtime": "0.0.0-dev-202610022103",
+      "platform": "Ubuntu x64 / Loginom7.4.2 Linux / headed Chromium",
+      "scope": "Историческая приёмка child candidate15: original code/declared CLI pair13, source 6f6a66eb62. Перенос документации не подтверждает текущий SHA; integration/release не выполнены. Подробная матрица в completion-audit.md."
     }
   },
   "nodes": [

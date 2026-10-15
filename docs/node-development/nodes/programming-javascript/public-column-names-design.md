@@ -1,6 +1,9 @@
 # E/J24: фактические имена через публичный JS lifecycle
 
-Дата: 2026-10-01. Продолжение [плана](plan.md), после bounded G1/J22 на child8acf.
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
+Дата: 2026-10-01. Продолжение [плана](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md), после bounded G1/J22 на child8acf.
 Все5 cases417–421 приняты independent audit v3/negative50 каждый/cleanup
 на child`eed5760102`; knowledge1.1 source/direct delivery принята на`276c344820`:
 client3189+10SKIP/operator126/addressed14 и actual bridge MCP budgets.

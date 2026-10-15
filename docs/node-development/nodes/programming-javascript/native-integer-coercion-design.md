@@ -1,5 +1,8 @@
 # Предложение: bounded Integer coercion characterization
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Статус: **ROOT REVIEWED — разрешена реализация семи bounded случаев; live ещё не начат**. База исходников: `14a9df5fcee360fd551c36e6410bd0bd6fa429b2` (source81). Root сообщил independent empty04 OBSERVED/cleanup3/3 и аудит6 native cells [3,0,3]; этот результат не закрывает Integer coercion, public handler, CLI и весь G5.
 
 ## Основания и границы
@@ -249,7 +252,7 @@ Source `87332cec9804c761465dad766f989fb458c4d997`, pinned Loginom frontend7.4.2.
 Это characterization одного fixed case; никакой общий rounding/truncation
 алгоритм и внутренний механизм ChakraCore не объявляются доказанными.
 Матрица7/7 characterized; все семь private случаев независимо проверены. Подробности и актуальное
-продолжение — [checkpoint](checkpoint.md); full G5/handler/CLI не закрыты.
+продолжение — [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md); full G5/handler/CLI не закрыты.
 
 Отдельный fraction-negative01/profile67 на том же source: native Real−1.75
 INPUT/upstream exact, Integer OUTPUT−1 (ffffffffffffffff). Root audit3 cells,

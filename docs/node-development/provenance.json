@@ -7658,6 +7658,473 @@
         "old_checkout_to_unavailable_reference",
         "relative_navigation_and_classified_legacy_paths"
       ]
+    },
+    {
+      "path": "nodes/programming-javascript/calibration-source-proposal.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/calibration-source-proposal.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "4cedda32bd4a3af7024de4ccfed09dac75c891a3e78c77a0f394996cc2ea3a1f",
+      "adapted_sha256": "76926292c5c2e472880a491446a612c6710f73c4425cc88c2d9f4917a21f08be",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/cli-auditor-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/cli-auditor-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "876e2a0e198a98fed145c1802aeb9c196b99b62625277e451f5cb175e19d575d",
+      "adapted_sha256": "36c80e30f2f6a6114bee09d6cc682f8330f2a9010f9bb8aae342bd69f7566278",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/close-settlement-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/close-settlement-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "34cce2c94a1a02cdea784a47549691488b043979ada3610294c0bf18a30fea6f",
+      "adapted_sha256": "f16a5ba202ffaba983923a368852dac1e3c8ec419363fc16043e12ee0edc57cb",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/completion-audit.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/completion-audit.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "d84a57fd1161a933128dee91fdba5d060fe3387aab5f54f6cbb457082b2fd34e",
+      "adapted_sha256": "2829b63db2c268e17b33748d846e27279029187ac3ece7b9771d385d9bc16c32",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/completion-phase6.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/completion-phase6.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "9882a34aff60e9044d9985752839b1d0fa16332ec543030fe5dce44d57db714e",
+      "adapted_sha256": "cee420260ea85d539eb8a6119bad460ab619f375b8544f315a8a3ac93ccb4c3a",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/completion.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/completion.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "99fbcbca49cc4073f8222c081e8f6ccb7a92c5c45b9dea0351017f7023199d6e",
+      "adapted_sha256": "db4b068d51692daeacd313afc0200be2649adcd8dd8709995e91e08072015be8",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/configuration-lifecycle-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/configuration-lifecycle-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "d48f1377a98ba8bcc8ffd3939a2ca4baeb87bb2f26aef36e8666f5e5c1f54160",
+      "adapted_sha256": "b961a1e4826ea4321eb48311adf6587cee3fb9dae09f7415eecc39b53ff45374",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/context-delivery-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/context-delivery-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "eef0f2fa841c2f43b08d28483c0df759e0cda05fa70b15b01540444d0acb9ea4",
+      "adapted_sha256": "39aa2b77e9dce7d5a02167b25beb8f4babb5ec7fe6587800b2ef994443a66b81",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/discovery.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/discovery.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "55958c3ae3961c04a14f93b340b8c1bcbf430cc4523e1d04a3d661b4d4fc3b1b",
+      "adapted_sha256": "c69a0e110433cb1a9aa7f9fa9af6093cbc427f838cc6bed91547800cb8850d2e",
+      "transformations": [
+        "classify_unavailable_acceleration_review",
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/engine-profile.json",
+      "repo_path": "docs/node-development/nodes/programming-javascript/engine-profile.json",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "c779cb9498161daad725b3c2eb4ef3fddae2d1ba26c35757201c78d7e866205b",
+      "adapted_sha256": "c779cb9498161daad725b3c2eb4ef3fddae2d1ba26c35757201c78d7e866205b",
+      "transformations": []
+    },
+    {
+      "path": "nodes/programming-javascript/execution-effects.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/execution-effects.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "db6752ebb97e238e764cc23c16b57dd0e598157d0c41a631cbba21a6c936c7d9",
+      "adapted_sha256": "4bbd067d4cdea9b999b2a8c4119b1e4fa6d1510f95d98aa849f423b05fbb6c9f",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/fixtures/operator-only/typed-native-oracle.json",
+      "repo_path": "docs/node-development/nodes/programming-javascript/fixtures/operator-only/typed-native-oracle.json",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "382097f8c5491c1c30208c5c799d06c096a12496fb85298c43cc5b97b899e1ff",
+      "adapted_sha256": "382097f8c5491c1c30208c5c799d06c096a12496fb85298c43cc5b97b899e1ff",
+      "transformations": []
+    },
+    {
+      "path": "nodes/programming-javascript/metadata-diagnostic-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/metadata-diagnostic-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "d35e8d8b3d6c1d92f8ee718adcfd6d2ecd074804244fa4cd73c775bdf0ca68e9",
+      "adapted_sha256": "913d449af81336dcb34c00e1f82a3beb303326727bc173550d88b9414573ce4f",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/module-policy-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/module-policy-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "0f5f56aa8337935959f1123f673132f4090a5c06eec10f5cb956c55c3863d7fc",
+      "adapted_sha256": "772f54f0f671ea4e600c9e41ac3c7eb403eb3f3daad5fd4eb639969278ca9907",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-cardinality-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-cardinality-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "07891a489a819717da8d44c7edb023cbe65c595c30dfcd7ddfa8299b4fea3c9e",
+      "adapted_sha256": "be05aad31217ee823a1f88875b1636d88c0abd5b1eaa52da7f40c76e08053ed5",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-datetime-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-datetime-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "34744bfeae1b22a063d24f4de1a7ba0f6cbaa2b4fd5b224c067c4934ce50d0fc",
+      "adapted_sha256": "4c53bdf23656f25c5c588bcb0a62261808586e4ad4b52fa3c8c48f5a943b9271",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-error-attribution-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-error-attribution-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "4f3b37f86aa1168ab430e8363685206387ceaa31e4ae23958a176d9bb303f1ea",
+      "adapted_sha256": "445f9048d0adb1005cc3e37be458dbcb8d8f1f7c66b75a811fae056a816a90f4",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-integer-coercion-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-integer-coercion-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "762444e08522aa78bd2c4fbda72decb0e9fb26257f5d50952e1b73937ff52dfb",
+      "adapted_sha256": "97aea2739cdfe09bc2f05ee51f3ff8f6ac10317c08a99e0625492037fc792433",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-named-access-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-named-access-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "b00c2ac9da6a5bee6c7078e97506c31bdf095fd9485a0050194f775ab202b930",
+      "adapted_sha256": "2e95aeccb9b3e149b272da80a821bc3c2ad97b3abef89a0bbed0ccaf054a5e29",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-output-schema-witness-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-output-schema-witness-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "c0e10b10dbbc3ce3a8b87dec184a11cf2334b9dec1f71eb18c4d297dd63e18d0",
+      "adapted_sha256": "cc1fb4e184981439c4e80d78290a33f0ca520cccf53486f4e39f905a71df640b",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-script-guard-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-script-guard-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "c8669421db7aa6fdb387154dc28669321839364dda71127d45a0e87131a5a6aa",
+      "adapted_sha256": "6354e31187cc43ffcb71cd5c772d091dccc2bf5e9d225cf27edf3cee4533bd0b",
+      "transformations": [
+        "historical_scope_notice",
+        "legacy_worktree_link_to_current_file_keep_historical_position"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/native-types-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/native-types-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "77d550d8cd4ce6b6fb304aca14a00afb48a031b50b957e29db6b5f1d10dcb813",
+      "adapted_sha256": "f394676a8cdcd2a96a37807b8057eac064e7e2d584c79a5ea5e4b7998f8a6d0a",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/pending-output-mapping-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/pending-output-mapping-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "bf503a9824398997e9ad0d0aaf9dc5361f65dce674d96ca289024d603a27d1a2",
+      "adapted_sha256": "7c72201d8543364ef5d82c5fc5004e9216613f43621c1a7d3b65bf4b61bad17c",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/persistence-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/persistence-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "b62d546fca5af1cb504a0076ae9333a9370ca14697a05040c5d1b4666a6ead8e",
+      "adapted_sha256": "d9c7eea679a3c0b6a2e00531c54059201fb2c4a6d8fe5d969f5b6413d2afd04c",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/product-registration-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/product-registration-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "db893a1bdc8b839808487b61fbcb7ce6df75e3a8cd4504d5f1288d0df5233f71",
+      "adapted_sha256": "f259091bf4e01421b599e5d3f80598c3e7e40ba13f7332ffc6babe6db9733d10",
+      "transformations": [
+        "historical_scope_notice"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/public-column-names-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/public-column-names-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "31a842923f9e33e455ca31acae74517467f9799691031b1793f2cb8981ebd947",
+      "adapted_sha256": "7a157611318387078a0b87c1754e478a03f12a70c984eadad41e5024092b6650",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/response-budget-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/response-budget-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "ab1b6db5338b004fc49ca6bba6529715efdaf39eb2f7dd40d8793f28afce4a3b",
+      "adapted_sha256": "29bbc37eec870ef1a4cdcce1fe84dbd0f076f9687c7ff9f07574f16d1e02fe64",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/schema-telemetry-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/schema-telemetry-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "9f5181459f12e2e7aec4e926b624a9d2bf5d6c2c414fd5330369ecc7eea21ea9",
+      "adapted_sha256": "01819a4e26ad02aa8ae803f642ec59e9f87e22571089aad70b3496cc4b6fcbf8",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/schema-telemetry-observations.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/schema-telemetry-observations.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "c647914571545238a8dae4f0e93c1d21381d0cec074fa0f4a01c1aef455b1cba",
+      "adapted_sha256": "39534651fffdd603e2285e9bfa71bfb41737af483ed21b20fdf31f47a45ba857",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/selection-blocker-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/selection-blocker-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "ae40e4412e10f2d897a9e6fe5cd252dfb7927b93a9f89828cbabf70e675f4f1f",
+      "adapted_sha256": "d7c84d446637d3ff09b6b196b1bbb8637fa54d7b3fa9bc1b0388c666d52bbded",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/ui-profile-design.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/ui-profile-design.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "3bef6cb58d941b73a9645afb4fe1af5754c72fa00619cfb8e786cb86cab5dc55",
+      "adapted_sha256": "cd1d7f74bf5ed2f540318cecd3f1ad4c80ce2a5615cf7eaa8d2056be541d0d39",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "history/programming-javascript/origin-javascript-399bb8b589/README.md",
+      "repo_path": "docs/node-development/history/programming-javascript/origin-javascript-399bb8b589/README.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "c39c643eac36074d75ad61fef2884cff1eb2e555245942592712ca01d6093a90",
+      "adapted_sha256": "de57cb07dbcbcc31d1c1df60b9abf260db47ac2fed7055a42b83b51af212475a",
+      "transformations": [
+        "classify_unavailable_acceleration_review",
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors",
+        "removed_workflow_to_pinned_source_permalink"
+      ]
+    },
+    {
+      "path": "history/programming-javascript/origin-javascript-399bb8b589/plan.md",
+      "repo_path": "docs/node-development/history/programming-javascript/origin-javascript-399bb8b589/plan.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "0bf0680eb4f46b0cfec64660d1474374a0465ef5b419d58d90367aec72c07fc6",
+      "adapted_sha256": "06e32a62cbf184693808021246f8385e8199c13dd032b6d94d7b24f2cace60f2",
+      "transformations": [
+        "classify_unavailable_acceleration_review",
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors",
+        "removed_workflow_to_existing_historical_document",
+        "removed_workflow_to_pinned_source_permalink"
+      ]
+    },
+    {
+      "path": "history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md",
+      "repo_path": "docs/node-development/history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "c28a071d9f9b0b96ed64390ab1022b36420d456422d23dc75cd041a91e48fe92",
+      "adapted_sha256": "c54ba1fbf111052e59e5a59c771276a47c9c0718af871b2ff93691393f9dcdb9",
+      "transformations": [
+        "classify_unavailable_acceleration_review",
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "history/programming-javascript/node-javascript-4ca0a4b07f/checkpoint.md",
+      "repo_path": "docs/node-development/history/programming-javascript/node-javascript-4ca0a4b07f/checkpoint.md",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "d8d3d7e61baba6c582fd0f443762bbc3192c6c981240867b7fd5f615441995ff",
+      "adapted_sha256": "49effd3a33f72aa07e306642cb533dbff59889d99d7eb16b4acaab92ff975d2e",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors"
+      ]
+    },
+    {
+      "path": "history/programming-javascript/origin-javascript-399bb8b589/workflow/lifecycle.md",
+      "repo_path": "docs/node-development/history/programming-javascript/origin-javascript-399bb8b589/workflow/lifecycle.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "10c3bf1c0340ffb9c555121717db6c4e33e8ab5441c216a01b200b7e11c42008",
+      "adapted_sha256": "979f51274ca5bd0e75aa1ada98423656fbfa78852c40899f2d7a25637784a2c9",
+      "transformations": [
+        "historical_scope_notice",
+        "relative_navigation_and_historical_checkpoint_anchors",
+        "removed_workflow_to_existing_historical_document",
+        "removed_workflow_to_pinned_source_permalink"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/README.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/README.md",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "6e33a5c8c9e6697d494efc91108ca080bac2e5b0554ae8e576d17ff8958df990",
+      "adapted_sha256": "c98837dc7a7ad41b064a4681e5892a9bd6bb802ae40620e3784f4d22253e88af",
+      "transformations": [
+        "add_training_archive_navigation_preserve_target_decisions"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/plan.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/plan.md",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "1b6c74456d25a28220cfbdd8baad7b3414613c845b7c56842e846bb301898971",
+      "adapted_sha256": "1d395fedb56d340aa2bab98a87a1245e8724a92eb4548021acea52aee83bf8ff",
+      "transformations": [
+        "add_training_archive_navigation_preserve_target_decisions"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/research.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/research.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "aa054dc6137d0f5701a01b65667643b517ba83970261bbca7eca71040ead8e94",
+      "adapted_sha256": "3bdbf636876854276f9373e1dfcc08b902e935bdf542b0647095bafa93a4a9b9",
+      "transformations": [
+        "merge_integer_coercion_addendum_preserve_target_research"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/e2e-coverage.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/e2e-coverage.md",
+      "source_git_commit": "399bb8b589818eab322088ec424d4110bb7990d0",
+      "source_sha256": "8c70baae9d27a184cb1f2b781ebbd94c9cf87d40916a62a105b32d11d4a44157",
+      "adapted_sha256": "ab594d9964a68bf1a0fcd1c59c88904a52bea3ec6e6191a43872bc97ec528b81",
+      "transformations": [
+        "merge_engine_identity_and_autobinding_observations_preserve_target"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/fixtures/README.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/fixtures/README.md",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "6ba72faa5189f80e60acbc080c15e42656d82b787694bb3041006eb3336e06b7",
+      "adapted_sha256": "5ed0d24cd9db6130183ff2f3ee05f81e16c7aa7bf09e1a886372578a98d018ca",
+      "transformations": [
+        "document_independent_oracle_and_preserve_seven_coercion_fixtures"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/fixtures/manifest.json",
+      "repo_path": "docs/node-development/nodes/programming-javascript/fixtures/manifest.json",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "afb38c02d3d97240b7aa618bdac2fb13137fa70b26729553dfc7ec26d38ed14b",
+      "adapted_sha256": "7d61b88980bd184b4086c7f85bd64e096859aa0e5f014f5fc11f0fe833138803",
+      "transformations": [
+        "fixture_manifest_v4_union17_recompute_digests_preserve_model_workspace"
+      ]
+    },
+    {
+      "path": "nodes/programming-javascript/checkpoint.md",
+      "repo_path": "docs/node-development/nodes/programming-javascript/checkpoint.md",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "d8d3d7e61baba6c582fd0f443762bbc3192c6c981240867b7fd5f615441995ff",
+      "adapted_sha256": "c5d749dcc8bbbe0f1cb449ac64c4384a3c97d7c93c6185926d5c1e70ef03059e",
+      "transformations": [
+        "archive_complete_previous_checkpoint_and_write_short_resume"
+      ]
+    },
+    {
+      "path": "registry.json",
+      "repo_path": "docs/node-development/registry.json",
+      "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
+      "source_sha256": "74cf54d2be7f38aaa84c1d53d056e016969ebe3327a4bd2a3d57b7fe788b064f",
+      "adapted_sha256": "474af24c930c20ff0e2bf3553d6ce32d429adb86ff05f7c4bb10e718ffc0f506",
+      "transformations": [
+        "retain_historical_candidate_evidence_without_readiness_change"
+      ]
     }
   ]
 }

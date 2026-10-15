@@ -143,6 +143,9 @@ GUID JS vendor: `28865f89-eea0-4143-b155-291791324a4b`; engine:
 `TBGCodeModelComponentEngine`. В XML есть DataSource/Variables inputs и DataSet
 output. Проверено чтение 496 LGP ZIP/XML, найдено 134 JS nodes в 45 пакетах,
 ошибок чтения не было. Это поиск исходных примеров, не исполнение 134 узлов.
+В двух отдельно принятых пакетах живого Loginom 7.4.2 сохранён уже
+`TBGJavaScriptEngine` с тем же VendorGuid; исторический engine type не следует
+переносить на текущий стенд. Это сравнение XML не устанавливает runtime `FullType`.
 
 Дополнительные источники: `testdata/common/lgp/Vars.lgp`,
 `testdata/wizards/transform/filterdata/FilterData.lgp`,
@@ -201,3 +204,33 @@ OpenPackage по умолчанию запускает узлы. Поэтому 
 
 В planning e2e config не изменялся. Source-read, TestCafe PASS, прямой runtime
 PASS и автономный CLI PASS — четыре разные категории доказательств.
+
+## Историческое дополнение discovery: автосвязь новых узлов — 2026-09-27
+
+> Наблюдения прежнего обучения; указанные дальнейшие шаги не назначаются повторно.
+
+
+В batch38 создание второго JS дало связь от предыдущего JS, а не от исходного
+JSInput. Проверка графа отклонила её; первый отдельный code-table case прошёл,
+но весь batch не завершён. Подробности и границы — [исторический checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
+
+На том же чистом e2e SHA `7a41b5adbb9c45dca8d756a8220615554301c2e0` найдены
+дополнительные источники, относящиеся к созданию любого узла:
+
+- `tests/helpers/workflow/node.ts:140–157`: два случая AddNode сравнивают
+  Alt=false (связь ожидается) и Alt=true (связь отсутствует).
+  SHA256 `4a632266cc9b525a26d6df9ff6632987a219fdef7278199ad25554102a1d076f`.
+- `bg/helpers/workflow/node.ts:77–91,194–225`: AddNodeBase передаёт
+  `modifiers.alt` в TestCafe drag; это UI-жест, не изменение серверного графа.
+  SHA256 `c50802326ad3b32bcceb35e892606bae5726eaaafab0fd5d833f26dfb6ebea64`.
+- `tests/toreview/helpers/al/autobinding_helpers.ts:137–174`: исторический
+  расчёт ближайшего порта по геометрии. Константы191/63 не являются доказанным
+  контрактом7.4.2; смена selection сама по себе не доказывает отключение связи.
+  SHA256 `0c86e76eee606b5cb42b64bd61a5193a8c0583ecda2b10d18b0851abdcad3d75`.
+
+[Официальная справка портов](https://help.loginom.ru/userguide/workflow/ports/index.html)
+подтверждает Alt при перетаскивании как способ отключения автоматических связей.
+Эти e2e только прочитаны, TestCafe не запускался. Предстоящая operator-проба
+должна отдельно подтвердить Alt-drag на Ubuntu, отсутствие новых рёбер после
+создания и затем ровно одну явную связь от original input. Строгая проверка
+неизменности прежнего графа остаётся обязательной.

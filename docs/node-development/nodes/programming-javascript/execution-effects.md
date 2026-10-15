@@ -1,5 +1,8 @@
 # JavaScript: наблюдённые переходы и эффекты
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Состояние на 27 сентября 2026, Loginom Enterprise 7.4.2,
 `http://logi-test-plan.bg.local/app/`. Оператор работает на Ubuntu в headed
 Chromium. ОС сервера не установлена. Это сводка частичных доказательств G2/G3,
@@ -107,7 +110,7 @@ events, отдельном boundary verifier и native ShowNode, а не на э
 `~/.local/state/loginom-ai-agent/node-development/campaigns/javascript-20260926-ubuntu`.
 Ни credentials, ни raw journals не публикуются в Git. Для каждого перечисленного
 batch имеется отдельный `g2-batch-N-verification.json`; детали проверок и recovery
-находятся в [checkpoint](checkpoint.md).
+находятся в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 
 | Отчёт в каталоге кампании | SHA256 report.json |
 | --- | --- |

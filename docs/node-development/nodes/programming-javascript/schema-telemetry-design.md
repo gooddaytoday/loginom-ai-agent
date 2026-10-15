@@ -1,7 +1,10 @@
 # JavaScript: code-side metadata и физический выход
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Дата: 2026-09-28. Выбранный дизайн source96; runtime admission и live ещё не выполнены.
-Полный [план](plan.md) и обязательные G/J сохраняются. Этот документ не объявляет
+Полный [план](../../history/programming-javascript/origin-javascript-399bb8b589/plan.md) и обязательные G/J сохраняются. Этот документ не объявляет
 готовым публичный handler и не закрывает прежние одноколоночные D cases задним числом.
 
 ## Основание и выбор
@@ -9,7 +12,7 @@
 [Metadata diagnostic](metadata-diagnostic-design.md) source94/95 проверил границу
 настоящих selectors. В source95 прошла принадлежность model port своему узлу,
 но engine Socket и model Socket оказались разными native objects. Наблюдение
-сохранено в [checkpoint](checkpoint.md); причина различия пока не доказана.
+сохранено в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md); причина различия пока не доказана.
 
 Равенство этих внутренних объектов не является требованием конечного handler.
 Для проверки generated names требуется наблюдать API внутри JS и фактический

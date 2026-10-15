@@ -1,5 +1,8 @@
 # JavaScript: сохранение последней редакции и холодное открытие
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 ## Продолжение E/J23: cold именно long source — 2026-10-01
 
 J26 Code422/Declared423 на3b59423f1a принят2/2; новый результат — сохранность
@@ -51,7 +54,7 @@ execution/Close/candidate claims должны быть отклонены. Actua
 Новые headed writer/cold/byte-reader тройки для `code` и `declared` дали
 `dirty_state_verified=true` и `package_bytes_verified=true` для одних и тех же
 двух сохранённых пакетов. Независимые SHA и пределы доказательства приведены в
-[checkpoint](checkpoint.md). Публичный обработчик и CLI-приёмка всё ещё открыты.
+[checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md). Публичный обработчик и CLI-приёмка всё ещё открыты.
 
 ## Состояние после независимого byte audit — 2026-09-29
 
@@ -59,7 +62,7 @@ execution/Close/candidate claims должны быть отклонены. Actua
 получение точных байтов сохранённого `.lgp`. Воспроизводимый независимый аудитор
 `javascript_package_byte_audit.py` связывает ZIP/XML с принятым writer/cold audit,
 не передавая expected в cold reader и не запуская новый Execute. Подтверждённые
-SHA и границы доказательства перечислены в [checkpoint](checkpoint.md).
+SHA и границы доказательства перечислены в [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
 Child source `945f75baf0` теперь читает `IsPackageModified` сразу после
 каждого Save с проверкой прежнего владельца и журналом; аудитор проверяет два
 согласованных ответа. Это пока source-only: старые пакеты не получают

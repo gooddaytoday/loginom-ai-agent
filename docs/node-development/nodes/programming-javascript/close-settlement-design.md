@@ -1,5 +1,8 @@
 # Завершение Close перед проверкой неизменности графа
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 2026-09-28, продолжение согласованного persistence-design.md; private operator.
 Основание — source100 writer03 (original66147 exit1): после нашего Close граф
 восстановлен, JS locked:false→true, прочие semantic graph fields неизменны.

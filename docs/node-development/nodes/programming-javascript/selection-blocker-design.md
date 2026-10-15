@@ -1,5 +1,8 @@
 # Source75: отказ выбора перед открытием JavaScript
 
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
 Исследование 2026-09-27, без изменения runtime и без браузерного прогона. Наблюдаемый HEAD: `f4603ad552aa3a85a8bb00b5726511d3c7fdb234`. Проверены все 192 SHA256 pins из `javascript-freeze75-source.json`: несовпадений нет. Root параллельно выполняет duplicate; его результаты здесь не оцениваются.
 
 ## Вывод
@@ -65,4 +68,4 @@ Receipt: стадия inspect, исходный deadline, native/held-DOM checks
 диагностика первого failing inspect с прежним fail-closed/no-wait/no-replay.
 Duplicate source75 независимо завершён PASS12cells/620refs/192pins,cleanup3/3;
 браузер закрыт. После проверки и freeze76 нужен fresh odd run. Успех нового run
-не установит причину прежнего отказа. Подробнее — [checkpoint](checkpoint.md).
+не установит причину прежнего отказа. Подробнее — [checkpoint](../../history/programming-javascript/origin-javascript-399bb8b589/checkpoint.md).
