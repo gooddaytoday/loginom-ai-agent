@@ -2067,3 +2067,33 @@ quarantine/remaining-slot/retained-judge assertions remain. Production deadlines
 JUDGE_VERSION_UNCONFIRMED/EACCES signal is not retroactively explained by this
 separate observed teardown race. Logs agent-inventory-fixture-controls.log and
 agent-inventory-fault-drain-green.log preserve both outcomes.
+
+Frozen resource admission now requires a sealed agent inventory for every
+selected slot. Its expected file is state_dir/run_id/agent-processes-<slot>.json;
+unsafe run paths, duplicate/foreign slots and alternate files are refused before
+opening a replacement. The reader binds captured semantic SHA, command/slot and
+producer, then derives every process source through the shared closure reader.
+These sources are combined with other declared actor proofs; callers cannot
+remove one agent launch by shortening processProofs. Missing inventories return
+RESOURCE_AGENT_INVENTORIES_INCOMPLETE. Both process_sources and qualified
+agent_inventory_sources are returned for audit. Declared-only calls remain
+compatible. Complete management/admin/judge census and production main remain open.
+
+TDD actual two-supervisor RED: sealed slot proof was ignored and returned
+RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE instead of checking the observed judge.
+GREEN derives that proof, accepts the complete process window and refuses
+missing/duplicate/foreign/path/hash/producer/unsafe-run controls. Related38/338
+PASS20.21s across5 files; policy/sampler/collector/judge58/350 PASS12.94s across4;
+typecheck/diff PASS. These are component checks, without live admission authority.
+
+During this change the retained Gj27dk fixture captured a real boundary refusal:
+judge launcher487344:140855147 was unverified with null cgroup in frame4 at
+13:32:32.374Z,11ms before its persisted exit32.385Z. Earlier active frames were
+verified. This correctly makes the full resource gate incomplete; no null was
+replaced with zero. The fixture now releases its actual stdin-waiting children
+after two fully observed active frames, retaining the original full-gate PASS
+assertion, baseline and final bracket,1000ms interval and all ownership checks.
+A diagnostic baseline regression returned RESOURCE_TIMELINE_UNBRACKETED before
+the original baseline wait was restored. Final target1/14 PASS5.05s, then the
+related run included all additional refusal controls. Failed roots retain their
+sources until a separate exact-own synthetic-fixture cleanup audit.

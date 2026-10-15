@@ -2,6 +2,18 @@
 
 ## Native ledger fixture: EACCES global proc scan, точный источник не атрибутирован
 
+2026-10-15, отдельный unit related run: clean-stop fixture отказал на profile
+owner PID457454, поздний agent inventory primitive — на EACCES
+`/proc/457454/exe` во входном baseline до spawn. PID уже исчез при readback;
+UID/starttime/принадлежность не сохранены, сигналы не подавались. Самостоятельный
+cold primitive1/10 PASS2.40s; clean-stop позднее PASS24.75s. Это не объясняет
+native incidents ниже и не подтверждает полного regression PASS. Private log
+`management-registry-20261015/agent-process-inventory-isolated.log` содержит
+62 PASS/5 FAIL/1error411.75s, включая два отдельных30s timeout и unattributed
+JUDGE_VERSION_UNCONFIRMED. Primitive root
+`/home/kiselev/storage/tmp/evals-agent-inventory-aeGGa8` retained с planned entry;
+по одному отсутствующему PID release/cleanup authority не синтезируется.
+
 2026-10-15: `/tmp/evals-cli-sessions-00q2hZ`, parent admin-J0anbT завершил
 disconnect/dispose ACK, но process proof quarantined: EACCES на
 `/proc/2551505/exe`, PID отсутствует среди own/origin/admission entries;

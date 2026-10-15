@@ -29,6 +29,13 @@ Actual two-file module-cache smoke: без flag1 PASS/1 FAIL, с flag2 PASS;
 установленного Bun эффекта не дал. Изоляция не устраняет timeout или ошибку
 ownership внутри одного файла и не означает успешную полную регрессию.
 
+Resource coordinator с frozen manifest теперь требует sealed agent inventory
+каждого выбранного slot из canonical controller state/runId. Captured SHA и
+command/slot/producer проверяются до вывода всех process sources, включая retry;
+caller list не исключает записанные запуски. Missing inventory даёт INCOMPLETE.
+Component38/338 и policy/sampler/collector/judge58/350 PASS, typecheck/diff PASS.
+Полный runtime census остальных actors и production admission ещё открыты.
+
 ## Подготовка и границы
 
 Целевой host — lg-pc-75/10.200.2.58. Новая пара на отдельной сети и loopback-порту,

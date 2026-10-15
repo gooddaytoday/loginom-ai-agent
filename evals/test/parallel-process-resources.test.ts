@@ -4,10 +4,11 @@ import os from "node:os"
 import path from "node:path"
 import { collectHostResources, sampleHostResources, sampleProcessResources, sampleSupervisedResources } from "../src/parallel-resources"
 import { assessProcessResourceTimeline, assessResourceCoverage, checkResourceEvidence } from "../src/parallel-acceptance"
-import { freezeResourceManifest, readResourceProcessWindows, freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
+import { freezeResourceManifest, readResourceAgentInventories, readResourceProcessWindows, freezeResourceBudget, writeResourceSummary } from "../src/parallel-resource-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { resourceBudgetFixture } from "./helpers/resource-budget-fixture"
-import { writeLeaseReceipt } from "../src/lease"
+import { acquireResourceLease, writeLeaseReceipt } from "../src/lease"
+import { sealAgentProcessInventory, superviseAgentProcess } from "../src/agent-process-evidence"
 import { superviseProcess } from "../src/process-supervisor"
 
 test("resource evidence covers the actual persisted launcher lifetime from dispatch to exit", async () => {
@@ -17,6 +18,15 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })
   const fixture = await parallelFixture(root), slotsFile = path.join(root, "slots.json")
   await writeLeaseReceipt(slotsFile, fixture.slots)
+  const inventoryDirectory = path.join(fixture.slots.controller.stateDir, "full-lifetime")
+  await mkdir(inventoryDirectory, { mode: 0o700 })
+  const agents = await Promise.all(fixture.slots.slots.map(async slot => {
+    const file = path.join(inventoryDirectory, `agent-processes-${slot.id}.json`)
+    await writeLeaseReceipt(file, { version: 2, kind: "eval-agent-processes", commandId: "full-lifetime", slotId: slot.id,
+      producerPid: process.pid, state: "open", processes: [] })
+    const lease = await acquireResourceLease({ key: `agent:${slot.id}`, lockRoot: fixture.lockRoot, journal: file, commandId: "full-lifetime" })
+    return { lease, evidence: { file, slotId: slot.id, commandId: "full-lifetime", assertHeld: lease.assertHeld } }
+  }))
   const view = (await sampleHostResources([root])).collector_cgroup.view
   if (!view) throw Error("Fixture cgroup view unavailable")
   const containers = ["server", "studio"].map((role, index) => ({ role: role as "server" | "studio", id: String(index + 1).repeat(64),
@@ -29,7 +39,9 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
     runId: "full-lifetime", slotsFile, parallel, containers, view, budget: manifestBudget.source })))
   const collecting = collectHostResources({ paths: [root], out: samplesFile, intervalMs: 1000, runId: "full-lifetime", phase: "run",
     signal: abort.signal, processes: sampleSupervisedResources })
-  let confirmed = false
+  const releases = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  const pending: ReturnType<typeof superviseProcess>[] = []
+  let confirmed = false, passed = false
   try {
     const deadline = Date.now() + 10000
     while (!await Bun.file(samplesFile).exists() || !(await Bun.file(samplesFile).text()).includes("\n")) {
@@ -37,10 +49,29 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       await Bun.sleep(10)
     }
     await mkdir(path.join(root, "observed-judge"), { mode: 0o700 })
-    const runs = await Promise.all([superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
-      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "slot", id: "a" } }),
-    superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
-      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: path.join(root, "observed-judge"), owner: { kind: "judge", id: "resource-judge" } })])
+    pending.push(superviseAgentProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "slot", id: "a" },
+      stdin: new ReadableStream({ async start(controller) { await releases[0]!.promise; controller.close() } }) }, agents[0]!.evidence),
+    superviseProcess({ cmd: [process.execPath, "-e", "await Bun.stdin.text()"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: path.join(root, "observed-judge"), owner: { kind: "judge", id: "resource-judge" },
+      stdin: new ReadableStream({ async start(controller) { await releases[1]!.promise; controller.close() } }) }))
+    const running = Promise.all(pending)
+    void running.catch(() => {})
+    while (true) {
+      const text = await Bun.file(samplesFile).text()
+      const frames = text.endsWith("\n") ? text.trim().split("\n").map(line => JSON.parse(line)) : []
+      if (frames.filter(frame => ["a", "resource-judge"].every(id => frame.processes.scopes.some((scope: { owner: { id: string }; processes: { verified: boolean }[] | null }) =>
+        scope.owner.id === id && scope.processes?.length && scope.processes.every(process => process.verified)))).length >= 2) break
+      if (Date.now() > deadline) throw Error("Lifetime active frames did not arrive")
+      await Bun.sleep(10)
+    }
+    // Release both children after complete frames, avoiding a fixed exit at a sampling boundary.
+    releases.forEach(release => release.resolve())
+    const runs = await running
+    const agentInventories = await Promise.all(agents.map(async agent => {
+      const sealed = await sealAgentProcessInventory(agent.evidence)
+      return { file: sealed.path, sha256: sealed.sha256, slotId: agent.evidence.slotId, producerPid: process.pid }
+    }))
     const run = runs[0]!
     confirmed = runs.every(run => run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete)
     expect(confirmed).toBe(true)
@@ -70,18 +101,35 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       processWindows: [{ ...owner, startedAt: "unverified", finishedAt: lifetime.finished_at }], processProofs: [source],
       view: samples[0].host.collector_cgroup.view, budget: budget.source }
     expect(await checkResourceEvidence(request)).toMatchObject({ status: "passed", codes: [] })
-    expect((await checkResourceEvidence({ ...request, manifest: manifests[0]!.source })).checks.processTimeline)
+    expect((await checkResourceEvidence({ ...request, manifest: manifests[0]!.source,
+      processProofs: [], agentInventories: [agentInventories[0]!] })).checks.processTimeline)
       .toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE"] })
     const judgeProof = await Bun.file(path.join(root, "observed-judge/process-cleanup.json")).json()
     const judgeSource = { file: path.join(root, "observed-judge/process-cleanup.json"), producerPid: process.pid, owner: judgeProof.lifetime.owner,
       sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(judgeProof)).digest("hex") }
     const complete = { ...request, manifest: manifests[0]!.source,
       coverage: { ...request.coverage, owners: [...request.coverage.owners, { ...judgeProof.lifetime.owner, launcher: judgeProof.lifetime.launcher }] },
-      processProofs: [source, judgeSource] }
-    expect((await checkResourceEvidence(complete)).checks.processTimeline).toEqual({ status: "passed", codes: [] })
+      processProofs: [judgeSource], agentInventories: [agentInventories[0]!] }
+    const admitted = await checkResourceEvidence(complete)
+    expect(admitted.checks.processTimeline).toEqual({ status: "passed", codes: [] })
+    expect(admitted.agent_inventory_sources).toEqual([agentInventories[0]!])
+    expect(admitted.process_sources?.map(source => source.sha256)).toEqual([source.sha256, judgeSource.sha256])
+    expect(admitted.process_sources?.[0]?.file).not.toBe(source.file)
+    for (const control of [
+      { sources: [agentInventories[0]!, agentInventories[0]!], code: "RESOURCE_AGENT_INVENTORY_INVALID" },
+      { sources: [{ ...agentInventories[0]!, file: path.join(root, "foreign-inventory.json") }], code: "RESOURCE_AGENT_INVENTORY_PATH_MISMATCH" },
+      { sources: [{ ...agentInventories[0]!, slotId: "foreign" }], code: "RESOURCE_AGENT_INVENTORY_PATH_MISMATCH" },
+      { sources: [{ ...agentInventories[0]!, sha256: "0".repeat(64) }], code: "RESOURCE_SOURCE_HASH_MISMATCH" },
+      { sources: [{ ...agentInventories[0]!, producerPid: process.pid + 1 }], code: "AGENT_PROCESS_INVENTORY_INVALID" },
+    ]) await expect(checkResourceEvidence({ ...complete, agentInventories: control.sources })).rejects.toThrow(control.code)
+    await expect(readResourceAgentInventories({ manifest: { ...manifests[0]!.manifest, run_id: "../foreign" }, sources: agentInventories }))
+      .rejects.toThrow("RESOURCE_AGENT_INVENTORY_INVALID")
+    expect((await checkResourceEvidence({ ...complete, agentInventories: [] })).checks.processTimeline)
+      .toEqual({ status: "incomplete", codes: ["RESOURCE_AGENT_INVENTORIES_INCOMPLETE"] })
     expect((await checkResourceEvidence({ ...complete, startedAt: request.finishedAt })).checks.processTimeline)
       .toEqual({ status: "failed", codes: ["RESOURCE_PROCESS_RUN_WINDOW_MISMATCH"] })
-    expect((await checkResourceEvidence({ ...request, manifest: manifests[1]!.source })).checks.processTimeline)
+    expect((await checkResourceEvidence({ ...request, manifest: manifests[1]!.source,
+      processProofs: [judgeSource], agentInventories })).checks.processTimeline)
       .toEqual({ status: "incomplete", codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] })
     await expect(readResourceProcessWindows([{ ...source, producerPid: process.pid + 1 }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
     await expect(readResourceProcessWindows([{ ...source, owner: { ...source.owner, id: "foreign-owner" } }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
@@ -94,9 +142,12 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(unready)).digest("hex") }]))
       .rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
     await writeLeaseReceipt(proofFile, savedProof)
+    passed = true
 
-  } finally { abort.abort(); await collecting; if (confirmed) await rm(root, { recursive: true, force: true }) }
-}, 15000)
+  } finally { releases.forEach(release => release.resolve()); await Promise.allSettled(pending);
+    abort.abort(); await collecting; await Promise.all(agents.map(agent => agent.lease.close()));
+    if (confirmed && passed) await rm(root, { recursive: true, force: true }) }
+}, 30000)
 
 test("resource sampling observes two admitted supervisors and retains B after draining A", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-owned-"))
