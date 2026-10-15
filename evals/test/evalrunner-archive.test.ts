@@ -75,7 +75,10 @@ test("versioned readiness archive includes its manifest and model receipt while 
     await Bun.write(path.join(run, "summary.json"), summary)
     await Bun.write(path.join(selected, "stdout.log"), "PRIVATE")
     await Bun.write(path.join(root, "auth.json"), "PRIVATE")
-    await Bun.write(path.join(root, "manifest.json"), JSON.stringify({ scope: "readiness-calc", slots: [{ id, case: "calc-data-double" }] }))
+    const recovery = JSON.stringify({ kind: "evalrunner-readiness-recovery", status: "RECOVERED_PRE_INFERENCE", originalReleased: false })
+    await Bun.write(path.join(root, "recovery.json"), recovery)
+    await Bun.write(path.join(root, "manifest.json"), JSON.stringify({ scope: "readiness-calc", generation: 1,
+      recovery: { sha256: evalrunnerHash(recovery) }, slots: [{ id, case: "calc-data-double" }] }))
     await Bun.write(path.join(root, "completions", id + ".json"), JSON.stringify({ model: { status: "VERIFIED" } }))
     await Bun.write(path.join(selected, "release.json"), JSON.stringify({ status: "RELEASED", runDir: run, summarySha256: new Bun.CryptoHasher("sha256").update(summary).digest("hex") }))
     await Bun.write(path.join(root, "release.json"), JSON.stringify({ status: "RELEASED", kind: "evalrunner-full-series-release", scope: "readiness-calc", expected: 1, completed: 1, evidence: await sealEvalrunnerEvidence(root) }))
@@ -85,6 +88,7 @@ test("versioned readiness archive includes its manifest and model receipt while 
     const verify = await Bun.$`python3 ${path.join(evalsRoot, "script/evalrunner-archive.py")} verify ${path.join(root, "delivery.tar.gz")} ${receipt.sha256}`.quiet().nothrow()
     expect(verify.exitCode).toBe(0)
     expect(verify.json().files).toContain("manifest.json")
+    expect(verify.json().files).toContain("recovery.json")
     expect(verify.json().files).toContain("completions/" + id + ".json")
     expect(verify.json().files.some((file: string) => /stdout|auth|history/.test(file))).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }

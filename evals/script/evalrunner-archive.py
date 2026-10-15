@@ -30,6 +30,13 @@ def create(series, target):
         for name in ['manifest.json', 'cli-manifest.json', 'qualification.json', 'summary.json', 'finalizing.json']:
             if (series / name).is_file():
                 files[name] = series / name
+        if manifest.get('generation'):
+            recovery = series / 'recovery.json'
+            assert manifest['generation'] == 1 and manifest['scope'] == 'readiness-calc', 'unauthorized generation'
+            assert digest(recovery.read_bytes()) == manifest['recovery']['sha256'], 'recovery receipt changed'
+            recovered = json.loads(recovery.read_text())
+            assert recovered['status'] == 'RECOVERED_PRE_INFERENCE' and recovered['originalReleased'] is False, 'recovery unconfirmed'
+            files['recovery.json'] = recovery
         for slot in manifest['slots']:
             selected = series / 'slots' / slot['id']
             assert selected.resolve().is_relative_to(series) and not selected.is_symlink(), 'foreign slot'

@@ -13,7 +13,7 @@ const { values, positionals } = parseArgs({ args: Bun.argv.slice(2), allowPositi
 const command = positionals[0]
 try {
   if (values.help) {
-    console.log("prepare|smoke|run|check|status (legacy compatible)\nprepare-series --config FILE --issue ID --task ID --scope full|readiness-calc|readiness-node\nstart-series|resume-series|check-series --config FILE --series DIR --task ID\ncompare-series --config FILE --series DIR --baseline ARCHIVE")
+    console.log("prepare|smoke|run|check|status (legacy compatible)\nprepare-series --config FILE --issue ID --task ID --scope full|readiness-calc|readiness-node\nstart-series|resume-series|check-series --config FILE --series DIR --task ID\ncompare-series --config FILE --series DIR --baseline ARCHIVE\nrecover-readiness --config FILE --series ORIGINAL_DIR --task ID --proof-sha256 SHA (authorized LAB-77 calc only)")
   } else if (command === "check") {
     if (!values.series) throw Error("--series required")
     console.log(JSON.stringify(await checkEvalrunnerEvidence(values.series)))

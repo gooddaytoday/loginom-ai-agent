@@ -17,6 +17,7 @@ export async function auditEvalrunnerPreInference(config: Roots, input: { series
   const proof = JSON.parse(await readEvalrunnerDocument(input.proofFile))
   const admission = path.join(config.root, "operations/series-admissions", authorizedIssue + "-readiness-calc/readiness-calc-r1.json")
   const ownerFile = path.join(config.root, "operations/stand.lease/owner.json")
+  if (JSON.stringify((await readdir(path.dirname(ownerFile))).sort()) !== '["owner.json"]') throw new EvalFailure("Unknown files in recovery lease", 2)
   const manifestSha256 = evalrunnerHash(await readEvalrunnerDocument(path.join(input.series, "manifest.json")))
   const admissionSha256 = evalrunnerHash(await readEvalrunnerDocument(admission))
   const ownerRaw = await readEvalrunnerDocument(ownerFile), owner = JSON.parse(ownerRaw)
@@ -135,6 +136,8 @@ export async function recoverEvalrunnerReadiness(config: EvalrunnerConfig, input
     }
     const newSeries = input.series + "-g1", pins = { ...proof, env: undefined }
     const preserved = [
+      { file: proofFile, sha256: audit.proofSha256 },
+      { file: sealFile, sha256: evalrunnerHash(await readFile(sealFile)) },
       { file: path.join(input.series, "manifest.json"), sha256: audit.manifestSha256 },
       { file: path.join(config.root, "operations/series-registry", authorizedIssue + "-readiness-calc.json"), sha256: audit.reservationSha256 },
       { file: path.join(config.root, "operations/series-admissions", authorizedIssue + "-readiness-calc/readiness-calc-r1.json"), sha256: audit.admissionSha256 },

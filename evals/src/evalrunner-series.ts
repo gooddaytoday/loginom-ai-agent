@@ -178,6 +178,13 @@ export async function verifyEvalrunnerRecoveryLink(config: { root: string }, man
     if (!item.file.startsWith(config.root + path.sep) || await realpath(item.file) !== item.file ||
       evalrunnerHash(await readFile(item.file)) !== item.sha256) throw new EvalFailure("Recovered original evidence changed", 2)
   }
+  if (!receipt.audit.archive?.startsWith(config.root + path.sep) || await realpath(receipt.audit.archive) !== receipt.audit.archive)
+    throw new EvalFailure("Recovered history boundary changed", 2)
+  for (const source of receipt.audit.sources as { name: string; sha256: string }[]) {
+    if (!["loginom-ai-agent.db", "loginom-ai-agent.db-shm", "loginom-ai-agent.db-wal"].includes(source.name)) throw new EvalFailure("Recovery source differs", 2)
+    const file = path.join(receipt.audit.archive, "data", source.name)
+    if (await realpath(file) !== file || evalrunnerHash(await readFile(file)) !== source.sha256) throw new EvalFailure("Recovered history changed", 2)
+  }
 }
 
 async function inventory(root: string, relative = ""): Promise<{ path: string; sha256: string }[]> {
