@@ -50,9 +50,16 @@ export async function downloadExportWithFreshObservation({snapshot,file,download
  for(let attempt=0;attempt<3;attempt++){
   guard();const outcome=await download(snapshot,file,attempt);
   const checks=outcome.trace?.find(t=>t.event==='download_context_refused')?.checks;
+  const gesture=outcome.trace?.filter(t=>t.event==='download_gesture_result')??[];
+  const epochRefused=outcome.error?.code==='DOWNLOAD_CONTEXT_CHANGED'&&checks?.epoch===false
+   &&['observation','authenticated','origin','build','workflow','tab','package','storage','dialogs','masks'].every(k=>checks[k]===true);
+  // The shared download primitive can also observe an epoch change while
+  // checking the gesture. Refresh only its explicit, settled no-effect refusal.
+  const gestureRefused=outcome.error?.code==='DOWNLOAD_GESTURE_NOT_CONFIRMED'&&gesture.length===1
+   &&gesture[0].status==='NOT_APPLIED'&&gesture[0].effect_possible===false&&gesture[0].cleanup_complete===true
+   &&gesture[0].error_code==='UI_EPOCH_CHANGED';
   if(attempt===2||outcome.status!=='NOT_APPLIED'||outcome.effect_possible!==false||outcome.cleanup_complete!==true
-   ||outcome.error?.code!=='DOWNLOAD_CONTEXT_CHANGED'||!checks||checks.epoch!==false
-   ||!['observation','authenticated','origin','build','workflow','tab','package','storage','dialogs','masks'].every(k=>checks[k]===true))return outcome;
+   ||!epochRefused&&!gestureRefused)return outcome;
   const fresh=await refresh(file.ref),matches=fresh.ui.elements.filter(e=>e.ref===file.ref&&e.tid===file.tid&&e.label===file.label&&e.storage_entry?.bytes===file.storage_entry.bytes);
   need(fresh.authenticated&&fresh.origin===original.origin&&fresh.loginom_build===original.loginom_build
    &&fresh.dom_epoch.document===original.dom_epoch.document&&same(fresh.workflow_ref,original.workflow_ref)
