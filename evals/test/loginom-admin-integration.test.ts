@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
 import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, sealAdminProcessInventory, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease, type SlotFile, type ServerIdentity } from "../src/slots"
-import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { acquireResourceLease, globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
 import { stageUserPreparation } from "../src/user-environment"
@@ -707,24 +707,36 @@ liveIntegration("standalone preparation: repeated two-to-one preparation preserv
   listener.stop(true)
   const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
     network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 2)
-  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: globalLockRoot }
   const pair = await createPair(file, options)
   const slotsFile = path.join(root, "slots.json")
   await writeLeaseReceipt(slotsFile, file)
-  const first = await prepareEnvironment({ slotsFile, parallel: 2 }, fixture.lockRoot)
+  const first = await prepareEnvironment({ slotsFile, parallel: 2 })
   expect(first).toMatchObject({ code: 2, ready: false, status: "blocked", reason: "SESSION_IDENTITY_UNSUPPORTED", finalization: { status: "released" } })
   expect(first.slots.map(slot => slot.id)).toEqual(["a", "b"])
   expect(first.changedUsers).toEqual(["eval-a", "eval-b"])
   expect(first.changedPasswords).toEqual(["eval-a", "eval-b"])
-  const second = await prepareEnvironment({ slotsFile, parallel: 1 }, fixture.lockRoot)
+  const second = await prepareEnvironment({ slotsFile, parallel: 1 })
   expect(second).toMatchObject({ code: 2, ready: false, status: "blocked", reason: "SESSION_IDENTITY_UNSUPPORTED", finalization: { status: "released" } })
   expect(second.slots).toHaveLength(1)
   expect(second.slots[0]).toEqual(first.slots[0])
   expect(second.changedUsers).toEqual([])
   expect(second.changedPasswords).toEqual([])
+  const out = path.join(root, "cli-output")
+  const child = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "prepare", "--config", slotsFile, "--out", out],
+    { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe", env: { HOME: root,
+      ...Object.fromEntries(["PATH", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "EVAL_CLI_BIN"]
+        .flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])) } })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  const third = JSON.parse(stdout) as Awaited<ReturnType<typeof prepareEnvironment>>
+  expect({ code, stderr, ready: third.ready, reason: third.reason }).toEqual({ code: 2, stderr: "", ready: false, reason: "SESSION_IDENTITY_UNSUPPORTED" })
+  expect(third.slots).toEqual(second.slots)
+  expect(await Bun.file(path.join(out, "receipt.json")).json()).toEqual(third)
+  expect((await stat(path.join(out, "receipt.json"))).mode & 0o777).toBe(0o600)
+  expect(await readdir(out)).toEqual(["receipt.json"])
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-standalone-${crypto.randomUUID()}`)
   await mkdir(evidence, { mode: 0o700 })
-  const sources = await Promise.all([first, second].map(async result => {
+  const sources = await Promise.all([first, second, third].map(async result => {
     const command = await readLeaseReceipt(result.journal) as { processInventory: string }
     const inventory = await readLeaseReceipt(command.processInventory) as { connections: { directory: string }[] }
     return { command, inventory, admins: await Promise.all(inventory.connections.map(connection => readLeaseReceipt(path.join(connection.directory, "connection.json")))),
@@ -735,7 +747,7 @@ liveIntegration("standalone preparation: repeated two-to-one preparation preserv
       })) }
   }))
   await writeLeaseReceipt(path.join(evidence, "preparation.json"), { version: 2, kind: "native-standalone-preparation", identity: pair.identity,
-    first, second, sources, receipts: await Promise.all([first, second].map(result => readLeaseReceipt(result.receipt))), liveQualified: false })
+    first, second, third, sources, receipts: await Promise.all([first, second, third].map(result => readLeaseReceipt(result.receipt))), liveQualified: false })
   await destroyPair(file, options)
   await rm(root, { recursive: true, force: true })
 }, 120_000)
