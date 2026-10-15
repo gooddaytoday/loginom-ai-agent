@@ -270,7 +270,7 @@ export async function recoverPreparationLeases(file: SlotFile, identity: ServerI
     throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_INVALID", 2)
   const selected = parseSlots(file, original.slotIds.length).slots.slice(0, original.slotIds.length)
   if (JSON.stringify(original.slotIds) !== JSON.stringify(selected.map(slot => slot.id))) throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_INVALID", 2)
-  const names = await readdir(file.controller.stateDir), slotIncidents = []
+  const names = await readdir(file.controller.stateDir), slotIncidents = [], released = new Set<string>()
   for (const slot of selected) {
     const candidates = []
     for (const name of names.filter(name => name.startsWith(`slot-${slot.id}-`) && name.endsWith(".lease.json"))) {
@@ -278,7 +278,8 @@ export async function recoverPreparationLeases(file: SlotFile, identity: ServerI
       if (object(value) && value.commandId === original.commandId && value.journal === incident &&
         JSON.stringify(value.identity) === JSON.stringify(identity) && JSON.stringify(value.slot) === JSON.stringify(slot)) candidates.push({ source, value })
     }
-    if (candidates.length !== 1 || candidates[0]!.value.state !== "retained") throw new EvalFailure("PREPARATION_RECOVERY_SLOT_UNCONFIRMED", 2)
+    if (candidates.length !== 1 || !["retained", "released"].includes(String(candidates[0]!.value.state))) throw new EvalFailure("PREPARATION_RECOVERY_SLOT_UNCONFIRMED", 2)
+    if (candidates[0]!.value.state === "released") released.add(slot.id)
     slotIncidents.push(candidates[0]!.source)
   }
   const key = `server:${identity.containerId}`, current = await readResourceReservation({ key, lockRoot })
@@ -296,8 +297,9 @@ export async function recoverPreparationLeases(file: SlotFile, identity: ServerI
   }
   const commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `recover-command-${commandId}.json`)
   const processInventory = path.join(file.controller.stateDir, `processes-${commandId}.json`)
+  const completedSlots: { slotId: string; incident: string; cleanup: { path: string; sha256: string } }[] = []
   const command = { version: 2, kind: "unactivated-recovery", commandId, identity, incident: reference, slotIncidents,
-    slotRecoveries: [] as string[], phase: "unactivated", processInventory }
+    slotRecoveries: [] as string[], phase: "unactivated", processInventory, ...(released.size ? { completedSlots } : {}) }
   await writeLeaseReceipt(journal, command)
   await writeLeaseReceipt(processInventory, { version: 2, kind: "admin-processes", commandId, journal, identity, connections: [] })
   const server = await recoverResourceLease({ key, identity, journal, commandId, lockRoot },
@@ -307,13 +309,20 @@ export async function recoverPreparationLeases(file: SlotFile, identity: ServerI
     if (hash(await readLeaseReceipt(incident)) !== reference.sha256) throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_CHANGED", 2)
     for (const [index, slot] of selected.entries()) {
       await server.assertHeld()
+      if (released.has(slot.id)) {
+        const finalized = await finalizeReleasedSlot(file, slot, identity, slotIncidents[index]!, lockRoot)
+        completedSlots.push({ slotId: slot.id, incident: slotIncidents[index]!, cleanup: { path: finalized.cleanupReceipt,
+          sha256: hash(await readLeaseReceipt(finalized.cleanupReceipt)) } })
+        await writeLeaseReceipt(journal, command)
+        continue
+      }
       const lease = await recoverSlotLease(file, slot, identity, slotIncidents[index]!, lockRoot)
       slots.push(lease)
       command.slotRecoveries.push(lease.receipt)
       await writeLeaseReceipt(journal, command)
     }
     await server.assertHeld()
-    return { server, slots, journal }
+    return { server, slots, journal, completedSlots }
   } catch (error) {
     await Promise.all([server.close(), ...slots.map(lease => lease.close())])
     throw error

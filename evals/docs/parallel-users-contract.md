@@ -1300,3 +1300,19 @@ SHA256 `243a1648ebb63ff3caa08c36dac2d0117802ed22f9814fa5730da128df1de2ff`:
 `528096e030f8ce44ccb1db849d006c4241af50499162a64a1598325c7ed9d0d5`,
 штатный destroy/root cleanup с private audit. Other incidents preserved.
 Mixed partial A/B и другие crash windows пока open.
+
+
+### Mixed preparation ownership checkpoint
+
+Whole-preparation adoption теперь принимает mixed original manifests: released
+slot проверяется через finalizeReleasedSlot под held server recovery-only fence,
+его cleanup source SHA сохраняется в completedSlots; CAS выполняется только для
+retained slots. Новый mixed command имеет10 keys, descriptor записывается до
+следующего adoption. Released user/profile rows не переписываются.
+
+TDD released A rejection RED→GREEN. Real OS exited controller/fs/flock +
+data-only release codec: A bytes unchanged, pending B adopted, server held.
+101 unit PASS/438 (7.30s), typecheck/diff PASS. Это ownership-only checkpoint: native
+finalizer пока требует9-key full-pending command. Descriptor/native lifecycle
+и reuse прежнего committed archive B ещё необходимы; release/dispatch grants
+этим primitive не выдаются.
