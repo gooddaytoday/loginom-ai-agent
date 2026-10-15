@@ -2523,3 +2523,16 @@ retain before/after hashes and three archived helpers in native-two-users-6ebb97
 Acceptance pair journal is still absent; readiness=false. This records initial
 private filesystem preparation, with no new public command or auth/licence/
 SessionBackup qualification. Existing data and retained incidents are preserved.
+
+Hard-crash backup observation дополнена paired graceful control: native
+pending Count1/modified named package/autosave5062 bytes с period5000 и
+keepAlive1800000, old admin disconnect/continuous closure перед SIGKILL exact
+own disposable daemon CID. Docker state137/OOMKilled=false; после restart
+сохранились CIDs, изменились StartedAt/epoch, новый admin init/inspect/dispose
+и continuous closure confirmed. Pre-crash backup list пуст; post-kill и
+post-restart physical copies пусты, post-restart cfg absent. TDD oracle RED graceful0≠137→GREEN paired2/146 PASS147.83s, typecheck
+PASS. Hard native-user-831bf8d0... audit SHA
+7678658c18976971879db5dc3c56d1f906a0b2dc1ed0f2b736a6985adcf03f4e
+проверяет24 checks/32 sources; verificationfa28c0dd... перечитала96 sources
+трёх controls и exact own pair/network/root absence. Recipe не доказывает
+positive/disabled backup policy; production admission/grants не изменены.
