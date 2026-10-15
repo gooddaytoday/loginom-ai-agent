@@ -115,6 +115,15 @@ continuous process absence proof. Это позволяет продолжать
 
 ## Model и judge OAuth — файлы появились, live qualification открыта
 
+2026-10-15: фактический model store принят штатным `assertAuth`; два pinned-candidate
+CLI в разных bubblewrap profiles одновременно прочли public provider status
+(ready, same generation/principal, refresh_required=false, overlap5802ms). Общий
+lock inode стабилен, оба process proofs confirmed/capture complete. Private
+evidence: research/evidence/actual-shared-status-0WIqV1/receipt.json600, SHA
+b00e0ba6103b7706317a0d606f3ea74df3ee817f1cc4d2cc95e1a05e05d77fd8. Это
+снимает неизвестность schema/локального чтения реального store; remote token
+validity, forced refresh и model/judge live acceptance остаются открытыми.
+
 Обновление 2026-10-14 16:23 UTC: configured model-oauth/auth.json и
 judge-codex/auth.json присутствуют как regular current-UID0600. Проверены только
 metadata, auth bytes не читались; действующий вход, сроки/refresh и реальные

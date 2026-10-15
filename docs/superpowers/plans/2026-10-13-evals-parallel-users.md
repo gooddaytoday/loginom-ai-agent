@@ -626,6 +626,8 @@ expect(a.processCleanup.processes.some(item => item.pid === bRootPid)).toBe(fals
 
 ### Задача 7. Потребить временный shared OAuth, сохранив независимую авторизацию судьи
 
+- [x] Actual configured shared-store status control 2026-10-15: pinned candidate binary/manifest SHA и shared-oauth-v1 проверены; real `assertAuth` admission, затем два отдельных CLI в bubblewrap `providers status` дали ready с теми же generation/principal SHA, refresh_required=false. Overlap5802ms, общий auth.json.lock device/inode неизменён; оба process cleanup confirmed/capture complete. Private receipt actual-shared-status-0WIqV1/receipt.json600 SHA b00e0ba6103b7706317a0d606f3ea74df3ee817f1cc4d2cc95e1a05e05d77fd8/read-back; helper setup errors до sandbox spawn убраны по отдельному cleanup audit, временные profiles/workspaces удалены после proofs. Это реальная schema/consumer/lock проверка; remote token validity, forced refresh, cancellation/uncertain refresh, model dispatch и judge live не квалифицированы.
+
 **Files:** Modify только harness `evals/src/cli.ts`, `evals/src/sandbox.ts`, `evals/src/profile.ts`, `evals/src/preflight.ts`, `evals/test/cli.test.ts`, `evals/test/sandbox.test.ts`, `evals/test/profile.test.ts`, `evals/test/judge.test.ts`, `evals/test/preflight.test.ts`; Create `evals/test/shared-oauth-integration.test.ts`. Product integration и её файлы принадлежат основному чату.
 
 **Interfaces:** Consumes установленный CLI capability `shared-oauth-v1` и canonical `auth.sharedDir`; передаёт `LOGINOM_AI_AGENT_SHARED_AUTH_DIR` и обязательный `LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS=false` агентским и management процессам; judge использует отдельный `judge.codexHome`.
