@@ -55,8 +55,9 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
 liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
+liveIntegration("native effective storage: evaluated user saves, reads and copies its own package", () => nativeUserCapability("storage"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup") {
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -134,6 +135,28 @@ async function nativeUserCapability(mode: "sessions" | "backup") {
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
       expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: false,
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
+      if (mode === "storage") {
+        const probe = await request("reconcile-user", { ...activation, phase: "session-storage-probe" })
+        await writeLeaseReceipt(path.join(evidence, "storage-probe-reply.json"), probe)
+        expect(probe.outcome).toBe("confirmed")
+        const data = probe.data as { ownSession: { username: string }; binding: unknown;
+          storage: { readConfirmed: boolean; size: number; copySize: number } }
+        expect(data.ownSession.username).toBe(credentials.username)
+        expect(data.storage.readConfirmed).toBe(true)
+        expect(data.storage.size).toBeGreaterThan(0)
+        expect(data.storage.copySize).toBe(data.storage.size)
+        const hashes = await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${credentials.username}/access-probe.lgp`} ${`${file.server.storageRoot}/${credentials.username}/access-copy.lgp`}`.quiet()
+        const digests = hashes.text().trim().split("\n").map(line => line.split(" ")[0])
+        expect(digests).toHaveLength(2)
+        expect(digests[0]).toMatch(/^[0-9a-f]{64}$/)
+        expect(digests[1]).toBe(digests[0])
+        expect(await request("close-session", { proofId: probe.id, session: data.binding }))
+          .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+        await writeLeaseReceipt(path.join(evidence, "storage-probe.json"), { version: 1, identity: pair.identity,
+          username: credentials.username, ...data.storage, sha256: digests[0], liveQualified: false })
+        complete = true
+        return
+      }
       if (mode === "backup") {
         const backupProbe = await request("reconcile-user", { ...activation, phase: "session-backup-probe" })
         await writeLeaseReceipt(path.join(evidence, "session-backup-reply.json"), backupProbe)

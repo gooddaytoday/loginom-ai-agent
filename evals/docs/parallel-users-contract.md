@@ -670,3 +670,21 @@ parent сохраняет это поле и quarantines initialized connection 
 Native independent-observer Count0 admin control подтверждает исчезновение
 causally new peer row и сохранность первого admin. Transport confirmation
 сам по себе не меняет slot serverSessions/storage/admission grants.
+
+### Native own-storage positive control
+
+Fixed research phase `session-storage-probe` использует тот же causally bound
+non-admin designer login и native session snapshots, что session-probe. Пакет
+сохраняется под фиксированным `access-probe.lgp` через `Session.SavePackageAs`,
+читается через `Session.FileStorage.OpenFile` (fomRead/shareDenyNone) и
+`ReadBuffer(Uint8Array)`, копируется `CopyFile(source, target, false, false)`
+в `access-copy.lgp`; `GetFileInfo.Size` подтверждает размер копии. Stream/info
+освобождаются `ReleaseObject(..., true)`, пакет закрывается штатно, session
+проходит существующий exact tuple/close gate. Ни пути, ни JS от caller не
+исполняются. Методы/сигнатуры проверены по pinned Studio bg.model.rpc.js и
+bg.rtl.rpc.js (file storage interface277, CopyFile926, stream ReadBuffer1285),
+client FileDownloader.js и CopyPasteManager.js; native control подтвердил
+два физических файла2290 bytes с совпадающим SHA-256. Evidence private600:
+`research/evidence/native-user-b4aaf4ce-b2a7-4972-b12f-bbfb1649a29f/storage-probe.json`.
+Это positive own-root capability, `liveQualified=false`; соседние/shared
+операции, imports/exports, concurrent B и production readiness ещё открыты.
