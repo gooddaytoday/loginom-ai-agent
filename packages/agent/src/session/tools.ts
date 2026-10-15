@@ -1,4 +1,3 @@
-import { retainUnionInvocation } from "./union-invocation"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
@@ -564,7 +563,6 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             } as JSONSchema7),
           ),
           execute(args, options) {
-            const invocation = retainUnionInvocation({ definition, request: args, options, owner: loginom, sessionInput: input, user: user.info })
             return run.promise(
               Effect.gen(function* () {
                 const ctx = context(args, options)
@@ -576,7 +574,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
-                    await (invocation ? invocation.invoke() : loginom.call(definition.name, args, user.info.id, options.abortSignal)),
+                    await loginom.call(definition.name, args, user.info.id, options.abortSignal),
                   ),
                 )
                 yield* plugin.trigger(

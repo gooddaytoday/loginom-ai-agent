@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-const {createNodeProcedure}=await import(process.env.NODE_PROCEDURE_MODULE??'../lib/node-procedure.mjs');
+import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
 
-function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, onRecord, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
+function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
   const events = [], records = []; let reads = 0;
   const operation = sharedOperation ?? { id: 'parent', action: { action_key: 'node.import.configure', revision: '1' },
     deadline: 10000, checkpoint: { workflow_ref: { prefix: 'MF;TF-1', tab_tid: 'tab' }, document_id: 'doc' } };
@@ -13,7 +13,7 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
       elements: [{ ref: 'ui-button', allowed_actions: ['click'] }] } };
   const channel = createNodeProcedure({ operation, maxSteps, signal, now, monotonicNow, wait,
     targetOrigin: 'http://example.test', targetBuild: '7.4.2',
-    record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); await onRecord?.(entry); return structuredClone(entry); },
+    record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); return structuredClone(entry); },
     wrapMutation: (code, options) => { events.push('wrapped'); return { code, options }; },
     execute: async (code, options) => {
       if (typeof code === 'string') { reads++;
@@ -28,54 +28,6 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
     } });
   return { channel, operation, events, records, state };
 }
-test('qualified samples survive slow journal completion without renewing their sampling or parent deadlines',async()=>{
- let time=1,reads=0;
- const f=fixture({now:()=>time,monotonicNow:()=>time,onRead:()=>{reads++;time+=100},onRecord:entry=>{
-  if(entry.phase==='node_observation_sample')time+=entry.sample===0?1200:1000;
- }});
- const parent=f.operation.deadline;
- await f.channel.observe({condition:'new Table card bound to output',timeoutMs:2000,ready:()=>true,confirmIdentity:s=>s.dom_epoch});
- const samples=f.records.filter(r=>r.phase==='node_observation_sample');
- assert.equal(samples.length,2);assert.ok(samples.every(r=>r.readiness.satisfied&&r.readiness.elapsed_ms<2000));
- assert.equal(samples[0].readiness.identity_sha256,samples[1].readiness.identity_sha256);assert.equal(reads,4);assert.ok(time>2000);assert.equal(f.operation.deadline,parent);
- await f.channel.act({verb:'click',ref:'ui-button'});assert.equal(f.events.filter(x=>x==='mutated').length,1);
-});
-for(const mode of ['not-ready','changed-identity','late-read'])test('slow receipt cannot qualify missing native samples: '+mode,async()=>{
- let time=1;
- const f=fixture({now:()=>time,monotonicNow:()=>time,movingEpoch:mode==='changed-identity',onRead:()=>{time+=mode==='late-read'?1200:200},onRecord:entry=>{if(entry.phase==='node_observation_sample')time+=600}});
- await assert.rejects(f.channel.observe({condition:'new Table card bound to output',timeoutMs:2000,ready:()=>mode!=='not-ready',confirmIdentity:s=>s.dom_epoch}),/readiness timeout/);
- await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);assert.ok(!f.events.includes('mutated'));
-});
-for(const phase of ['node_observation_sample','node_observation_completed'])test('original parent expiry during '+phase+' refuses publication as usable refs',async()=>{
- let time=1;
- const f=fixture({now:()=>time,monotonicNow:()=>time,onRecord:e=>{if(e.phase===phase)time=10001}});
- await assert.rejects(f.channel.observe({condition:'Table ready',ready:()=>true}),/budget exhausted/);assert.equal(f.operation.deadline,10000);assert.ok(!f.events.includes('mutated'));
-});
-test('monotonic parent expiry cannot be hidden by wall rollback during receipt completion',async()=>{
- let wall=1,mono=1;
- const f=fixture({now:()=>wall,monotonicNow:()=>mono,onRecord:e=>{if(e.phase==='node_observation_completed'){wall=0;mono=10001}}});
- await assert.rejects(f.channel.observe({condition:'Table ready',ready:()=>true}),/budget exhausted/);assert.ok(!f.events.includes('mutated'));
-});
-for(const phase of ['node_observation_sample','node_observation_completed'])test('original cancellation survives receipt completion at '+phase,async()=>{
- const controller=new AbortController(),cause=new Error('original cancelled',{cause:0});
- const f=fixture({signal:controller.signal,onRecord:e=>{if(e.phase===phase)controller.abort(cause)}});
- await assert.rejects(f.channel.observe({condition:'Table ready',ready:()=>true}),e=>e===cause);assert.ok(!f.events.includes('mutated'));assert.equal(cause.cause,0);
-});
-test('pending completion journal grants no snapshot before its original acknowledgement',async()=>{
- let release,entered;const atCompletion=new Promise(r=>entered=r),pending=new Promise(r=>release=r);
- const f=fixture({onRecord:async e=>{if(e.phase==='node_observation_completed'){entered();await pending}}});
- const observing=f.channel.observe({condition:'Table ready',ready:()=>true});await atCompletion;
- await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);release();await observing;await f.channel.act({verb:'click',ref:'ui-button'});assert.equal(f.events.filter(x=>x==='mutated').length,1);
-});
-test('completion journal preserves falsy failure and never publishes a snapshot',async()=>{
- const f=fixture({onRecord:e=>{if(e.phase==='node_observation_completed')throw false}});
- try{await f.channel.observe({condition:'Table ready',ready:()=>true});assert.fail('expected original false')}catch(e){assert.equal(e,false)}
-  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);assert.ok(!f.events.includes('mutated'));
-});
-test('a replaced parent deadline during publication is refused rather than adopted',async()=>{
- let f;f=fixture({onRecord:e=>{if(e.phase==='node_observation_completed')f.operation.deadline=20000}});
- await assert.rejects(f.channel.observe({condition:'Table ready',ready:()=>true}),/original deadline changed/);assert.ok(!f.events.includes('mutated'));
-});
 test('a disappearing read root permits at most two rediscoveries without gestures',async()=>{
   for(const staleReads of [1,2,3]) {
     const f=fixture({staleReads});

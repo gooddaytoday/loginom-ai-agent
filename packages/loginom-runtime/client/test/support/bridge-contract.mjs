@@ -18,6 +18,8 @@ import { actions, selectors, build, Page, nodeParameters } from './executor-fixt
 test('MCP application refusals remain typed normal content and the same connection can create a node afterwards', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-bridge-contract-'));
   const page = new Page(); let browserCalls = 0;
+  // Before dock_prepare the simulated external browser has not opened Loginom.
+  page.url = () => 'about:blank';
   const compatibility = { profile_id: 'unit-macos-chromium', loginom_build: build, platform: 'macos', browser: 'chromium' };
   const pinned = { actions, selectors, pins: {}, compatibility, manifest: { compatibility } };
   class ExternalClient {
@@ -99,6 +101,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     const initial = JSON.parse(bootstrap.content[0].text);
     assert.equal(initial.status, 'SUCCEEDED');
     assert.equal(initial.output.bootstrap, true);
+    assert.equal(initial.output.target_state, 'not_open');
     assert.equal(initial.effect_possible, false);
     assert.equal(browserCalls, 1);
     assert.equal(session.metadata.workspaceReady, undefined);

@@ -1,6 +1,5 @@
 import { standalone } from "./cli/standalone"
 
-let contextCleanupRefused = false
 await standalone(process.argv.slice(2), async (args, paths) => {
   if (["providers", "auth", "models"].includes(args[0] ?? "")) {
     const { standaloneModels } = await import("./cli/standalone-models")
@@ -8,12 +7,6 @@ await standalone(process.argv.slice(2), async (args, paths) => {
     return
   }
   const command = args.filter((value) => !["--headless", "--no-headless"].includes(value))[0]
-  if (command === "serve") {
-    const { standaloneServe, standaloneServeClosed } = await import("./cli/standalone-serve")
-    try { await standaloneServe(args) }
-    catch (error) { contextCleanupRefused = !standaloneServeClosed(); throw error }
-    return
-  }
   if (command !== "loginom") {
     const { standaloneRun } = await import("./cli/standalone-run")
     await standaloneRun(args, paths, command === "run" ? "run" : "tui")
@@ -34,19 +27,18 @@ await standalone(process.argv.slice(2), async (args, paths) => {
     process.exitCode = 2
   }
 })
+  .catch((error: unknown) => {
+    const code =
+      error instanceof Error && /^(PROFILE|LOGINOM)_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED"
+    process.stderr.write(`${code}\n`)
+    process.exitCode = code === "PROFILE_BUSY" ? 3 : 1
+  })
   .then(async () => {
-    if (contextCleanupRefused) return
-    // Only a resolved owner cleanup permits transport/process exit.
+    // Failed cleanup retains the profile guard; both outcomes still need a bounded CLI exit.
     // Provider libraries may retain process-global handles after a finished request.
     await Promise.all([
       new Promise<void>((resolve) => process.stdout.write("", () => resolve())),
       new Promise<void>((resolve) => process.stderr.write("", () => resolve())),
     ])
     process.exit(process.exitCode ?? 0)
-  })
-  .catch((error: unknown) => {
-    const code =
-      error instanceof Error && /^(PROFILE|LOGINOM)_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED"
-    process.stderr.write(`${code}\n`)
-    process.exitCode = code === "PROFILE_BUSY" ? 3 : 1
   })

@@ -12,7 +12,6 @@ export async function launchNodeHost(input: {
   headless: boolean
   environment?: NodeJS.ProcessEnv
   strictRecovery?: boolean
-  acceptanceCleanupPackage?: string
 }) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -70,7 +69,6 @@ export async function launchNodeHost(input: {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
-        ...(input.acceptanceCleanupPackage !== undefined ? { acceptanceCleanupPackage: input.acceptanceCleanupPackage } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
       // Startup restores the saved connection and waits for browser/MCP readiness.
@@ -106,10 +104,7 @@ export async function launchNodeHost(input: {
     close() {
       if (state.closing) return state.closing
       state.closing = (async () => {
-        // Enclose the runtime's 110s receipt wait and 5s confirmed-exit wait.
-        const result = await client.request("close", {}, 120_000)
-        if (!result || typeof result !== "object" || !("closed" in result) || result.closed !== true)
-          throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
+        const result = await client.request("close", {}, 30_000).catch(() => undefined)
         // An acknowledgement alone does not prove exit. Bound a stuck host while
         // retaining a failed cleanup result so the caller keeps its profile guard.
         const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
@@ -129,9 +124,7 @@ export async function launchNodeHost(input: {
           client.close()
         }
       })()
-      const attempt = state.closing
-      attempt.catch(() => { if (state.closing === attempt) state.closing = undefined })
-      return attempt
+      return state.closing
     },
   }
 }

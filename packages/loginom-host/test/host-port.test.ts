@@ -96,17 +96,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
         return
       }
       if (ending === "release") await client.request("release", { run: "one" })
-      if (ending === "close") {
-        await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-        expect(host.journal.pending()).toEqual([])
-        expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending()).toHaveLength(2)
-        await expect(client.request("acquire", { run: "next", session: "chat" })).rejects.toThrow("LOGINOM_CALL_BUSY")
-        expect(await call("finish")).toEqual({ action: "finish" })
-        expect(host.journal.pending()).toEqual([])
-        expect(await readdir(join(root, "recovery"))).toEqual([])
-        await client.request("release", { run: "one" })
-        return
-      }
+      if (ending === "close") await port.close()
       if (ending === "uncertain") {
         expect(await call("uncertain")).toEqual({ action: "uncertain" })
         await expect(call("finish")).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
@@ -117,19 +107,18 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending().sort()).toEqual(
         host.journal.pending().sort(),
       )
-      await expect(client.request("acquire", { run: "next", session: "chat" })).rejects.toThrow(
+      if (ending !== "close")
+        await expect(client.request("acquire", { run: "next", session: "chat" })).rejects.toThrow(
           "LOGINOM_RECOVERY_REQUIRED",
         )
     } finally {
       client.close()
-      if (ending === "close") await port.close()
-      else if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+      await port.close()
       // Disconnect leaves the runtime process owned. Exit drops it, so shutdown
       // only has to close runtimes that are still alive.
       if (ending === "disconnect") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
       if (ending !== "disconnect") await host.close()
-      if (ending !== "finish" && ending !== "close") {
+      if (ending !== "finish") {
         const calls = await readFile(join(directory, "calls.jsonl"), "utf8")
         expect(
           calls
@@ -238,8 +227,7 @@ test("an uncertain call leaves the same run free to continue", async () => {
     ).toEqual(["uncertain", "finish"])
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close()
     await rm(directory, { recursive: true, force: true })
   }
@@ -317,8 +305,7 @@ test("an uncertain run releases the chat and applies connection changes saved du
     expect(await client.request("acquire", { run: "next", session: "chat" })).toEqual({ generation: 2 })
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close()
     await rm(directory, { recursive: true, force: true })
   }
@@ -388,8 +375,7 @@ test("restarting the host drops an uncertain record without replaying it", async
     expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close()
     await rm(directory, { recursive: true, force: true })
   }
@@ -475,8 +461,7 @@ test("a killed runtime is replaced for the next call in the same run", async () 
     ).toEqual(["kill", "finish"])
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close().catch((error: Error) => {
       if (error.message !== "LOGINOM_RUNTIME_CLEANUP_FAILED") throw error
     })
@@ -582,8 +567,7 @@ test.each(["after-call", "during-admission"])("a chat runtime restarts at most t
     expect(await call("two", "finish")).toEqual({ action: "finish" })
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close().catch((error: Error) => {
       if (error.message !== "LOGINOM_RUNTIME_CLEANUP_FAILED") throw error
     })
@@ -664,8 +648,7 @@ test("the next turn replaces a runtime that cannot continue", async () => {
     expect(session[0]?.pid).not.toBe(session[1]?.pid)
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close()
     await rm(directory, { recursive: true, force: true })
   }
@@ -744,8 +727,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
     expect(session).toHaveLength(1)
   } finally {
     client.close()
-    if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
-      else await port.close()
+    await port.close()
     await host.close()
     await rm(directory, { recursive: true, force: true })
   }

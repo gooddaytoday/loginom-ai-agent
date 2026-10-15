@@ -3,19 +3,15 @@ export * as LoginomHost from "./adapter"
 
 import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
-import { originalUnionInvocation, registerUnionInvocationCarrier } from "./union-invocation"
 
-type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }> }
-const state: { connection?: ReturnType<typeof transport>; owner?: Owner } = {}
-export function connect(port: Port, owner?: Owner) {
+const state: { connection?: ReturnType<typeof transport> } = {}
+export function connect(port: Port) {
   state.connection?.close()
   state.connection = transport(port)
-  state.owner = owner
 }
 export function disconnect() {
   state.connection?.close()
   state.connection = undefined
-  state.owner = undefined
 }
 export async function acquire(session: string) {
   const connection = state.connection
@@ -25,9 +21,8 @@ export async function acquire(session: string) {
   if (!value) throw new Error("LOGINOM_HOST_NOT_READY")
   if (typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number")
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
-  const owner = state.owner
   const queue = { tail: Promise.resolve(), released: false }
-  const lease = {
+  return {
     generation: value.generation,
     async admit(userMessage: string, files: InputFile[]) {
       return connection.request("admit", { run, userMessage, files })
@@ -35,13 +30,7 @@ export async function acquire(session: string) {
     async tools() {
       return connection.request("tools", { run })
     },
-    async call(name: string, args: unknown, userMessage: string, signal?: AbortSignal, invocation?: unknown) {
-      const original = invocation === undefined ? undefined : originalUnionInvocation(invocation, lease)
-      if (
-        original &&
-        (name !== "dock_node_apply" || original.request !== args || original.userMessage !== userMessage || original.signal !== signal)
-      )
-        throw new Error("UNION_INVOCATION_BINDING_CHANGED")
+    async call(name: string, args: unknown, userMessage: string, signal?: AbortSignal) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
       // or create durable recovery records for calls that have not started.
       const previous = queue.tail
@@ -53,7 +42,6 @@ export async function acquire(session: string) {
       }
       try {
         if (queue.released || signal?.aborted) throw new Error("LOGINOM_RUN_ABORTED")
-        if (invocation !== undefined) originalUnionInvocation(invocation, lease)
         signal?.addEventListener("abort", abort, { once: true })
         return await connection.request("call", { run, name, args, userMessage })
       } finally {
@@ -62,16 +50,8 @@ export async function acquire(session: string) {
       }
     },
     async release() {
-      if (owner?.deferRelease) return
       queue.released = true
       await connection.request("release", { run }).catch(() => undefined)
-      owner?.leases.delete(lease)
     },
   }
-  // Register the original method at its real lease factory, before publication.
-  // The packet retains request/identity/cancellation guards across queue waits;
-  // registration grants no native ownership or cleanup authority.
-  registerUnionInvocationCarrier(lease)
-  owner?.leases.add(lease)
-  return lease
 }

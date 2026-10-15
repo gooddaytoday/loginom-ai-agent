@@ -2,8 +2,7 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm, writeFile, open } from "node:fs/promises"
-import { constants, open as evidenceOpen, writeFile as evidenceWrite, fsync as evidenceSync, close as evidenceClose, rename as evidenceRename, unlink as evidenceUnlink } from "node:fs"
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
@@ -32,328 +31,34 @@ const send = (message, disconnect = false) => {
       if (disconnect && process.connected) process.disconnect()
     })
 }
-function closeRejection(value) {
-  return value instanceof Error ? {kind:"Error",name:value.name,message:value.message,
-    ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
-    {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
-}
-async function closeEvidenceFile(file) {
-  if (file.closeComplete) return
-  if (file.io?.pending) throw Error("LOGINOM_MANAGED_WRITER_IO_UNKNOWN")
-  if (file.closeStarted) throw file.closeFailure ? file.closeFailure.value : Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
-  file.closeStarted=true
-  let projection
-  const completion=new Promise((resolve,reject)=>{
-    try {projection=evidenceClose(file.fd,error=>{
-      if(error===null||error===undefined){file.closeComplete=true;resolve()}
-      else {file.closeFailure={value:error};reject(error)}
-    })}catch(value){file.closeFailure ??= {value};reject(value)}
-  })
-  // A returned thenable may report a failure, but fulfillment never replaces
-  // the original kernel callback (the standard Node API returns void).
-  await Promise.all([completion,projection])
-}
-function assertNormalStartupBinding() {
-  const binding=state.normalStartupBinding
-  if (!binding) return
-  const owner=binding.owner
-  if (state.startupOwner!==owner || state.startupRequest!==binding.request
-      || owner.directory!==binding.directory || owner.id!==binding.id
-      || owner.account!==binding.account || owner.origin!==binding.origin
-      || ((!binding.pending || binding.context!==undefined) && owner.context!==binding.context)
-      || ((!binding.pending || binding.page!==undefined) && owner.page!==binding.page))
-    throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
-}
-async function recordClose(stage, detail) {
-  assertNormalStartupBinding()
-  state.shutdown ??= {stages:[]}
-  if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
-  state.shutdown.stages.push({stage,...detail})
-  const owner=state.session??state.startupOwner
-  const directory=owner?.directory
-  const retained=state.evidenceOwnerBinding
-  const acquired=retained || owner || state.startupBinding || state.startupCleanup
-    || state.bridge || state.bridgeCleanup || state.bridgeCloseAttempted
-    || state.browser || state.browserServer || state.browserProfile || state.client
-    || state.evidenceWriters?.size || state.evidencePublication
-  if (!acquired) return // Only a genuinely unacquired no-start may omit evidence.
-  if (!owner || typeof directory!=="string" || !directory)
-    throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
-  state.evidenceOwnerBinding ??= Object.freeze({owner,directory,session:state.session,
-    startupOwner:state.startupOwner,id:owner.id,account:owner.account,origin:owner.origin,
-    context:owner.context,page:owner.page,metadata:owner.metadata,sessionId:owner.metadata?.sessionId,
-    pendingStartup:owner===state.startupOwner && state.startupPending===true,
-    startupRequest:state.startupRequest})
-  const binding=state.evidenceOwnerBinding
-  const assertBinding=()=>{
-    assertNormalStartupBinding()
-    if (binding.owner!==(state.session??state.startupOwner) || binding.directory!==binding.owner.directory
-        || binding.session!==state.session || binding.startupOwner!==state.startupOwner
-        || binding.id!==owner.id || binding.account!==owner.account || binding.origin!==owner.origin
-        || ((!binding.pendingStartup || binding.context!==undefined) && binding.context!==owner.context)
-        || ((!binding.pendingStartup || binding.page!==undefined) && binding.page!==owner.page)
-        || binding.metadata!==owner.metadata || binding.sessionId!==owner.metadata?.sessionId)
-      throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
-  }
-  assertBinding()
-  const bytes=JSON.stringify(state.shutdown,null,2)+"\n"
-  state.evidenceWriters ??= new Set()
-  // Atomic publication belongs to this receiving owner, not a whole source blob.
-  if (state.evidencePublication?.pending) throw state.evidencePrimary ? state.evidencePrimary.value : Error("LOGINOM_MANAGED_PUBLICATION_UNKNOWN")
-  const publishOperation=async invoke=>{
-    const operation={pending:true};state.evidencePublication=operation
-    let projection
-    const completion=new Promise((resolve,reject)=>{
-      try {projection=invoke(error=>{
-        operation.pending=false
-        if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve()
-      })}catch(value){reject(value)}
-    })
-    return Promise.all([completion,projection])
-  }
-  const removeTemporary=async target=>{
-    try {await publishOperation(done=>evidenceUnlink(target,error=>done(error?.code==="ENOENT"?null:error)))}
-    catch(value){state.evidencePrimary ??= {phase:"temporary_unlink",value};throw state.evidencePrimary.value}
-  }
-  // Descriptor retirement (including FileHandle's fd=-1/close event) is not
-  // kernel completion. Only the original fs.close success callback is proof.
-  for (const file of state.evidenceWriters) {
-    // An original open callback may arrive after its caller lost the reply.
-    // Retire that same confirmed descriptor once, never open a replacement first.
-    if (!file.closeStarted && file.openComplete && file.fd!==undefined) {
-      try {await closeEvidenceFile(file)} catch(error) {file.closeFailure ??= {value:error}}
-    }
-    if (!file.closeComplete) {
-      const error=file.closeFailure ? file.closeFailure.value : Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
-      state.shutdown.persistenceFailures ??= []
-      state.shutdown.persistenceFailures.push({phase:"retained_file_close",rejection:closeRejection(error)})
-      throw state.evidencePrimary ? state.evidencePrimary.value : error
-    }
-    assertBinding()
-    state.evidenceWriters.delete(file)
-    // Only a confirmed original close permits cleanup of this owned temporary.
-    if (file.temporary && file.ownsTemporary) await removeTemporary(file.temporary)
-  }
-  const path=join(directory,"managed-shutdown.json")
-  const temporary=join(directory,".managed-shutdown-"+randomUUID()+".json")
-  const attempt={created:false,published:false}
-  const persist=async(target,write)=>{
-    assertBinding()
-    const file={binding,fd:undefined,closeComplete:false,...(write?{temporary:target}:{})}
-    state.evidenceWriters.add(file)
-    let phase=write?"file_open":"directory_open",primary
-    const remember=value=>{
-      primary ??= {phase,value}
-      state.evidencePrimary ??= primary
-      state.shutdown.persistencePrimary ??= {phase:primary.phase,rejection:closeRejection(primary.value)}
-      state.shutdown.persistenceFailures ??= []
-      state.shutdown.persistenceFailures.push({phase,rejection:closeRejection(value)})
-    }
-    const callback=invoke=>{
-      const operation={pending:true,phase}
-      file.io=operation
-      let projection
-      const completion=new Promise((resolve,reject)=>{
-        try {projection=invoke((error,result)=>{
-          operation.pending=false
-          if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}
-          else resolve(result)
-        })}catch(value){reject(value)}
-      })
-      return Promise.all([completion,projection]).then(([result])=>result)
-    }
-    try {
-      await callback(done=>evidenceOpen(target,write?(constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW):(constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW),0o600,(error,fd)=>{
-        file.openComplete=true
-        if(error===null||error===undefined){file.fd=fd;if(write){file.ownsTemporary=true;attempt.created=true}}
-        else state.evidenceWriters.delete(file) // authoritative open failure acquired no writer
-        done(error,fd)
-      }))
-      assertBinding()
-      if(write){phase="file_write";await callback(done=>evidenceWrite(file.fd,bytes,done));assertBinding()}
-      phase=write?"file_sync":"directory_sync";await callback(done=>evidenceSync(file.fd,done));assertBinding()
-    }catch(value){remember(value)}
-    if(file.fd!==undefined){
-      phase=write?"file_close":"directory_close"
-      // Register the native operation before invoking it. A wrapper may throw
-      // after scheduling close: retain the original callback, never retry it.
-      try {
-        await closeEvidenceFile(file)
-        assertBinding()
-        state.evidenceWriters.delete(file)
-      }catch(value){file.closeFailure ??= {value};remember(value)}
-    }
-    if(primary)throw primary.value
-    if(!file.closeComplete)throw Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
-  }
-  try {
-    await persist(temporary,true)
-    assertBinding()
-    await publishOperation(done=>evidenceRename(temporary,path,error=>{if(error===null||error===undefined)attempt.published=true;done(error)}))
-    assertBinding()
-    await persist(directory,false)
-    assertBinding()
-  } catch(value) {
-    state.evidencePrimary ??= {phase:"publication",value}
-    state.shutdown.persistencePrimary ??= {phase:state.evidencePrimary.phase,rejection:closeRejection(state.evidencePrimary.value)}
-    // Unknown IO/close/publication retains original writer and owned temporary.
-    if (attempt.created && !attempt.published && !state.evidencePublication?.pending && ![...state.evidenceWriters].some(f=>f.temporary===temporary)) {
-      try {assertBinding();await removeTemporary(temporary)} catch(secondary) {
-        state.shutdown.persistenceFailures ??= []
-        state.shutdown.persistenceFailures.push({phase:"temporary_unlink",rejection:closeRejection(secondary)})
-      }
-    }
-    throw state.evidencePrimary.value
-  }
-}
 function close() {
   if (state.closing) return state.closing
+  state.controller?.abort()
   state.closing = (async () => {
-    state.shutdown ??= {stages:[]}
-    state.release ??= {}
-    let stage="drain",primary
-    try {
-      // Normal start may acquire a session after launch; wait for its original
-      // request before taking session identity. Validation owns the same owner
-      // throughout and can durably record its provisional drain before waiting.
-      if (state.startupPending && state.startupValidation!==true) {
-        const owner=state.startupOwner
-        if (owner) state.normalStartupBinding ??= Object.freeze({owner,directory:owner.directory,
-          id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page,
-          request:state.startupRequest,pending:true})
-        assertNormalStartupBinding()
-        await Promise.allSettled([...requests])
-      }
-      assertNormalStartupBinding()
-      const early=state.normalStartupBinding
-      if (early?.pending) {
-        if (state.startupPending) throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
-        // Refusal retains this tuple; only its original request may qualify late handles.
-        state.normalStartupBinding=Object.freeze({...early,pending:false,
-          context:early.owner.context,page:early.owner.page})
-      }
-      await recordClose(stage,{status:"started"})
-      await Promise.allSettled([...requests])
-      const pendingBinding=state.evidenceOwnerBinding
-      if (pendingBinding?.pendingStartup) {
-        const owner=pendingBinding.owner
-        if (state.startupPending || state.startupRequest!==pendingBinding.startupRequest
-            || state.startupOwner!==owner || state.session!==pendingBinding.session
-            || owner.directory!==pendingBinding.directory || owner.id!==pendingBinding.id
-            || owner.account!==pendingBinding.account || owner.origin!==pendingBinding.origin
-            || (pendingBinding.context!==undefined && owner.context!==pendingBinding.context)
-            || (pendingBinding.page!==undefined && owner.page!==pendingBinding.page))
-          throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
-        // Only settlement of this original tracked start qualifies late handles.
-        state.evidenceOwnerBinding=Object.freeze({...pendingBinding,pendingStartup:false,
-          context:owner.context,page:owner.page})
-      }
-      if (state.startupOwner && !state.bridge) {
-        stage="startup_owner"
-        const owner=state.startupOwner
-        state.startupBinding ??= Object.freeze({owner,id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page})
-        const binding=state.startupBinding
-        if (binding.owner!==owner || binding.id!==owner.id || binding.account!==owner.account
-            || binding.origin!==owner.origin || binding.context!==owner.context || binding.page!==owner.page)
-          throw Error("LOGINOM_STARTUP_OWNER_CHANGED")
-        if (state.startupCleanup && state.startupCleanup.owner!==owner) throw Error("LOGINOM_STARTUP_OWNER_CHANGED")
-        if (!state.startupCleanup) {
-          try {
-            const receipt=owner.closed===true?owner.receipt:await owner.close()
-            if (receipt?.cleanup_complete!==true || owner.closed!==true
-                || (owner.context && owner.contextClosed!==true))
-              throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:receipt})
-            state.startupCleanup={owner,receipt}
-          } catch (error) {
-            // Preserve the original native value, including undefined/falsy,
-            // independently of authentication and later persistence failures.
-            primary={stage,error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{
-              cause:owner.nativeFailure?owner.nativeFailure.value:error})}
-            throw primary.error
-          }
-        }
-        await recordClose(stage,{status:"returned",receipt:state.startupCleanup.receipt})
-        if (owner.contextClosed) state.browser=undefined
-      }
-      if (state.authenticatedReadiness && !state.browser && !state.startupOwner?.closed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      if (state.browser && !state.bridge) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      if (state.bridge) {
-        stage="bridge"
-        if (!state.bridgeCleanup) {
-          if (state.bridgeCloseAttempted) throw state.bridgeCloseFailure
-          await recordClose(stage,{status:"started"})
-          state.bridgeCloseAttempted=true
-          try {
-            const receipt=await state.bridge.close()
-            // Preserve this receiving branch's existing bridge receipt contract.
-            if (receipt?.browser_transport_closed!==true || receipt.cleanup_complete!==true
-                || (state.authenticatedReadiness && receipt.native_logout_confirmed!==true)) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:receipt})
-            state.bridgeCleanup=receipt
-          } catch (error) {
-            state.bridgeCloseFailure=new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error})
-            throw state.bridgeCloseFailure
-          }
-        }
-        await recordClose(stage,{status:"returned",receipt:state.bridgeCleanup})
-      }
-      state.controller?.abort()
-      for (const [name,handle] of [["client",state.client],["browser_server",state.browserServer],["browser_context",state.browser]]) {
-        // Validation already closed its original context and acquired no client
-        // or browser server. Do not run six durable publications for absent
-        // handles. Retained/attempted releases still follow their original path.
-        if (handle===undefined && !state.release[name] && !state.release[name+"_attempted"]) continue
-        stage=name
-        if (!state.release[name]) {
-          if (state.release[name+"_attempted"]) throw state.release[name+"_failure"]
-          await recordClose(stage,{status:"started"})
-          state.release[name+"_attempted"]=true
-          try {await handle?.close();state.release[name]=true}
-          catch (error) {state.release[name+"_failure"]=new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error});throw state.release[name+"_failure"]}
-        }
-        await recordClose(stage,{status:"returned"})
-      }
-      stage="browser_profile"
-      if (state.browserProfile && !state.release.browser_profile) {
-        await rm(state.browserProfile,{recursive:true,force:true})
-        state.release.browser_profile=true
-      }
-      await recordClose("outer_acknowledgement",{status:"allowed"})
-    } catch (error) {
-      const rejection=primary?.error??(error instanceof Error?error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error}))
-      state.closeFailure=rejection
-      state.shutdown.primaryFailure ??= {stage,rejection:closeRejection(rejection)}
-      if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
-      if (primary && error!==rejection) state.shutdown.persistenceFailure=closeRejection(error)
-      try {await recordClose("refused",{rejection:closeRejection(rejection)})}
-      catch (persistenceFailure) {state.shutdown.persistenceFailure=closeRejection(persistenceFailure)}
-      throw rejection
+    await Promise.allSettled([...requests])
+    const results = []
+    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
+      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
     }
+    if (state.browserProfile)
+      results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
+    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   })()
-  state.closing.catch(error=>{state.closeFailure=error;state.closing=undefined})
   return state.closing
 }
 const stop = () => {
   void close().then(
     () => process.exit(0),
-    error => { state.closeFailure = error },
+    () => process.exit(1),
   )
 }
 process.on("disconnect", stop)
 process.on("SIGTERM", stop)
 process.on("message", (message) => {
   const request = handle(message)
-  // Close awaits the ordinary requests; tracking its own control handler would
-  // make that drain wait for itself (and for every concurrent Close handler).
-  if (message?.operation !== "close") requests.add(request)
-  if (message?.operation === "start" && !state.startupRequest) {
-    state.startupRequest=request
-    state.startupPending=true
-  }
+  requests.add(request)
   void request
-    .finally(() => {
-      requests.delete(request)
-      if (state.startupRequest===request) state.startupPending=false
-    })
+    .finally(() => requests.delete(request))
     .catch(() => {
       process.exitCode = 1
     })
@@ -365,11 +70,8 @@ async function handle(message) {
     if (message.operation === "start") {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
-      state.startupValidation=message.input?.validation===true
       const input = message.input
       const { acceptanceCleanupPackage } = validateStartInput(input)
-      if (Object.hasOwn(message,"deadline") && (!Number.isSafeInteger(message.deadline) || message.deadline<=Date.now()))
-        throw Error("LOGINOM_INITIAL_READINESS_DEADLINE")
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -388,29 +90,19 @@ async function handle(message) {
       const browserProfile =
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
-      state.startupController=new AbortController()
-      state.startupOwner={directory,generation:input.generation,chat:input.chat,
-        deadline:Number.isSafeInteger(message.deadline)?message.deadline:null,
-        deadlineSource:Number.isSafeInteger(message.deadline)?"supervisor.request.start":"NOT_SUPPLIED",
-        signal:state.startupController.signal}
       const login = {
-        owner:state.startupOwner,
         browserPath: resources.browserPath,
         profile: browserProfile,
         candidate: input.connection,
         headless: input.headless === true,
       }
       if (input.validation === true) {
-        try {await checkConnection({ ...login, endpoint: input.endpoint })}
-        finally {state.startupController=undefined}
+        await checkConnection({ ...login, endpoint: input.endpoint })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      let authenticated
-      try {authenticated = await loginBrowser({ ...login, keepOpen: true })}
-      finally {state.startupController=undefined}
-      state.browser = state.normalStartupBinding?.context ?? authenticated.context
-      if (!state.normalStartupBinding) state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+      const authenticated = await loginBrowser({ ...login, keepOpen: true })
+      state.browser = authenticated.context
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -440,19 +132,6 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
-      // Bind only the document owned by this successful private login. This is
-      // not workspace preparation and confers no package-close authority.
-      const documentId=randomUUID()
-      state.authenticatedReadiness=await authenticated.context.pages()[0].evaluate(o=>{
-        const app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
-        if(location.origin!==o.origin||app?.Version!=='7.4.2'||m?.FServerConnection?.UserName!==o.account
-            ||m.FServerConnection.Connected!==true||globalThis.__loginomDockReadinessV1)
-          throw Error('LOGINOM_READINESS_IDENTITY_REQUIRED');
-        globalThis.__loginomDockReadinessV1={document,documentId:o.documentId,sessionId:o.sessionId,
-          account:o.account,loginomBuild:app.Version};
-        return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
-      },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
-        origin:new URL(config.loginomUrl).origin})
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -462,8 +141,7 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
-      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
-        authenticatedReadiness:state.authenticatedReadiness })
+      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       await state.bridge.server.connect(serverTransport)
@@ -488,12 +166,6 @@ async function handle(message) {
       return
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
-    if (message.operation === "interrupt" && state.startupController) {
-      state.startupController.abort(Error("LOGINOM_INITIAL_STARTUP_CANCELLED"))
-      await recordClose("interrupt",{status:"startup_cancelled"})
-      send({id:message.id,result:{interrupted:true}})
-      return
-    }
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
@@ -513,7 +185,6 @@ async function handle(message) {
       return
     }
     if (message.operation === "interrupt") {
-      await recordClose("interrupt",{status:"received"})
       state.controller?.abort()
       send({ id: message.id, result: { interrupted: true } })
       return
@@ -536,13 +207,8 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code })
+    send({ id: message.id, error: code }, message.operation === "close")
     if (message.operation === "start") {
-      state.startupFailure=error
-      if(state.startupOwner?.context) {
-        state.browser=state.normalStartupBinding?.context ?? state.startupOwner.context
-        if (!state.normalStartupBinding) state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
-      }
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
       setImmediate(() => {
