@@ -158,6 +158,7 @@ export function collectTerminalScriptWitness(expected){
  if(taskSlot){
   const ctor=hold(nativeSS,'Task'),prototype=hold(ctor,'prototype'),continuation=hold(prototype,'continueWith');
   if(typeof ctor!=='function'||typeof continuation!=='function')throw Error('TERMINAL_PROVIDER_TASK_DEFINITION');
+  if(hold(prototype,'constructor')!==ctor)throw Error('TERMINAL_PROVIDER_CALLEE_CONSTRUCTOR');
   for(const key of ['getAwaitedResult','isCompleted','_complete','_fail','_runCallbacks'])if(typeof hold(prototype,key)!=='function')throw Error('TERMINAL_PROVIDER_TASK_DEFINITION');
   const forwarders={};for(const key of ['toPromise','then','catch','finally']){const value=hold(prototype,key);if(typeof value!=='function')throw Error('TERMINAL_PROVIDER_TASK_FORWARDER');forwarders[key]=value}
   const promise=hold(globalThis,'Promise'),promisePrototype=hold(promise,'prototype'),promiseThen=hold(promisePrototype,'then');
