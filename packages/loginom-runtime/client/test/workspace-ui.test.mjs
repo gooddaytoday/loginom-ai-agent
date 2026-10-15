@@ -5262,3 +5262,95 @@ test('prepared input-port Close is never issued from a Yes label without the com
   assert.equal(page.events.length,0,fault);
  }
 });
+
+async function preparedInputFinishFixture() {
+ const f=await preparedInputCloseFixture(),{page,wizard,native,dialog,marker}=f;
+ dialog.remove();marker.remove();
+ native.input_port={direction:'input',port:2,native_index:2,port_guid:'48960769-8b6d-4eba-bba6-087918eb68c7',opening_operation_id:'union-edit118-config-exec-001:n44'};
+ const c=mappingCoverageFixture(page,4),old=c.base;page.context.innerWidth=1440;page.context.innerHeight=1000;
+ for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(old))e.attrs['data-tid']=e.attrs['data-tid'].replace(old,'MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;').replace('colDefaultUsageType_','colUsageType_');
+ for(const child of [...c.form.children]){child.remove();wizard.append(child);}c.form.remove();
+ c.body.clientHeight=50;c.body.scrollHeight=100;
+ const done=page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:800,y:700,width:100,height:25},wizard);
+ const execute=page.execute;page.execute=options=>execute({output_column_page:{offset:0,limit:8},...options});
+ return {...f,c,done};
+}
+
+test('prepared input-port Done admits Edit118 complete definition page with partial coverage',async()=>{
+ const {page}=await preparedInputFinishFixture(),s=await page.observe();
+ assert.equal(s.wizard.input_port_context.status,'unobserved');assert.equal(s.wizard.owner_context.status,'unobserved');
+ assert.equal(s.wizard.output_columns.definition_coverage.status,'partial');
+ assert.equal(s.wizard.output_columns.page.status,'complete_definition_page');
+ assert.equal(s.wizard.output_columns.page.returned,4);assert.equal(s.wizard.output_columns.fields.length,4);
+ const done=s.ui.elements.find(e=>e.tid===s.wizard.root_tid+';btnDone');
+ assert.ok(done.allowed_actions.includes('finish_wizard'));
+ assert.equal(done.wizard_finish.prepared_owner.input_port.port,2);
+ assert.doesNotThrow(()=>validateUiAction({verb:'finish_wizard',ref:done.ref},s));
+ const r=await page.act({verb:'finish_wizard',ref:done.ref},s);
+ assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.ok(r.trace.some(e=>e.event==='input_port_finish_verified'));
+});
+
+test('prepared input-port Done needs the complete binding and addressed page before issuing a verb',async()=>{
+ for(const fault of ['unbound','unverified','document','workflow','node','root','direction','port','native_index','port_guid','opening_operation','workflow_path','incomplete_page','autosync_off','autosync_missing','disabled','dialog','mask']){
+  const {page,native,prepared,c,done}=await preparedInputFinishFixture();
+  if(fault==='unverified')native.verified=false;
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='root')native.tid='MF;TF-5;OtherWizard';
+  if(fault==='direction')native.input_port.direction='output';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=-1;
+  if(fault==='port_guid')delete native.input_port.port_guid;
+  if(fault==='opening_operation')delete native.input_port.opening_operation_id;
+  if(fault==='workflow_path')prepared.workflow_ref.navigation_path=[];
+  if(fault==='incomplete_page')c.rows[3].children.at(-1).remove();
+  if(fault==='autosync_off')c.auto.attrs.class='';
+  if(fault==='autosync_missing')c.auto.remove();
+  if(fault==='disabled')done.disabled=true;
+  if(fault==='dialog')page.add('div',null,'Foreign').attrs.class='x-window';
+  if(fault==='mask')page.add('div',null,'Загрузка').attrs.class='x-mask-msg';
+  const r=await page.execute({mode:'observe',...(fault==='unbound'?{prepared_node_context:null}:{})});
+  assert.equal(page.events.length,0,fault);
+  if(r.status!=='SUCCEEDED'){assert.equal(fault,'unverified',fault+JSON.stringify(r.error));continue;}
+  const button=r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.ok(!button?.allowed_actions.includes('finish_wizard'),fault);
+ }
+});
+
+test('prepared input-port Done rechecks its full binding and page before one click',async()=>{
+ for(const fault of ['document','workflow','node','port','native_index','port_guid','opening_operation','root','incomplete_page','autosync_off']){
+  const {page,native,c}=await preparedInputFinishFixture(),s=await page.observe();
+  const done=s.ui.elements.find(e=>e.wizard_finish?.prepared_owner);assert.ok(done,fault);
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=1;
+  if(fault==='port_guid')native.input_port.port_guid='foreign';
+  if(fault==='opening_operation')native.input_port.opening_operation_id='foreign';
+  if(fault==='root')native.tid='MF;TF-5;OtherWizard';
+  if(fault==='incomplete_page')c.rows[3].children.at(-1).remove();
+  if(fault==='autosync_off')c.auto.attrs.class='';
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},s);
+  assert.equal(r.status,'NOT_APPLIED',fault+JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='click').length,0,fault);
+ }
+});
+
+test('prepared input-port Done refuses foreign or incomplete destinations after exactly one click',async()=>{
+ for(const fault of ['document','workflow','node','body','duplicate_body','locked','workflow_path','wizard','dialog','mask']){
+  const {page,native,crumbs}=await preparedInputFinishFixture(),s=await page.observe();
+  const done=s.ui.elements.find(e=>e.wizard_finish?.prepared_owner);assert.ok(done,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+   if(fault==='body')native.tid='MF;TF-5;Graph;Foreign';
+   if(fault==='duplicate_body')page.add('g','MF;TF-5;Graph;Revenue');
+   if(fault==='locked')native.locked=true;
+   if(fault==='workflow_path')crumbs[4].ownText='Другой сценарий';
+   if(fault==='wizard')page.add('div','MF;TF-5;WizrdMCF');
+   if(fault==='dialog')page.add('div',null,'Foreign').attrs.class='x-window';
+   if(fault==='mask')page.add('div',null,'Загрузка').attrs.class='x-mask-msg';
+  };
+  const clock=fixtureClock();page.context.Date=clock.Date;page.waitForTimeout=async ms=>clock.advance(ms);
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},s);
+  assert.equal(r.status,'AMBIGUOUS',fault+JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.ok(!r.trace.some(e=>e.event==='input_port_finish_verified'),fault);
+ }
+});

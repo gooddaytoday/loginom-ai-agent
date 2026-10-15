@@ -2691,6 +2691,21 @@ function readRenderedInputMapping(observation) {
         && wizard.input_mapping.source_rows?.length===wizard.input_mapping.rendered_coverage.source_count
         && wizard.input_mapping.target_rows?.length===wizard.input_mapping.rendered_coverage.target_count
         && wizard.input_mapping.links?.length===wizard.input_mapping.rendered_coverage.link_count);
+      // Some input wizards omit breadcrumbs. The verified native opening
+      // receipt and a complete addressed definition page bind this Done.
+      const preparedInputFinishOwner=wizard.status==='observed'&&wizard.stage==='input_mapping'
+        &&wizard.input_port_context?.status==='unobserved'&&preparedInputCloseNode?.root_tid===wizard.root_tid
+        &&preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
+        &&Number.isInteger(preparedInputPort.native_index)&&preparedInputPort.native_index>=0
+        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+        &&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
+        &&preparedWorkflowPath.every(c=>typeof c.tid==='string'&&typeof c.label==='string')
+        &&wizard.output_columns?.auto_sync?.status==='observed'&&wizard.output_columns.auto_sync.value===true
+        &&wizard.output_columns.page?.status==='complete_definition_page'
+        &&wizard.output_columns.page.returned===wizard.output_columns.fields?.length
+        &&!dialogs.length&&select('.bg-mask-message,.x-mask-msg').filter(visible).every(e=>refOf(e)===wizard.root_ref)
+        ? {node:preparedInputCloseNode,input_port:preparedInputPort,workflow_path:preparedWorkflowPath}:null;
       const outputPortFinishReady=wizard.stage==='output_mapping' && wizard.port_context?.status==='observed'
         && wizard.port_context.kind==='output_data' && wizard.output_columns?.status==='rendered_rows'
         && (wizard.output_columns.definition_coverage?.status==='complete_configured_rows'
@@ -2730,6 +2745,8 @@ function readRenderedInputMapping(observation) {
         ? {...(tid.endsWith(';btnExecute')?{mode:'execute'}:{}),root_ref:wizard.root_ref,owner:wizard.owner_context,completion:wizard.completion}
         : tid===wizard.root_tid+';btnDone' && wizard.controls.btnDone?.status==='observed' && inputPortFinishReady
           ? {mode:'input_port',root_ref:wizard.root_ref,node_ref:wizard.input_port_context.node.ref,port_ref:wizard.input_port_context.port_ref}
+          : tid===wizard.root_tid+';btnDone' && wizard.controls.btnDone?.status==='observed' && preparedInputFinishOwner
+            ? {mode:'input_port',root_ref:wizard.root_ref,prepared_owner:preparedInputFinishOwner}
           : tid===wizard.root_tid+';btnDone' && wizard.controls.btnDone?.status==='observed' && outputPortFinishReady
             ? {mode:'output_port',root_ref:wizard.root_ref,node_ref:wizard.port_context.node.ref,port_ref:wizard.port_context.port.ref}:null;
       const reformColumn=wizard.stage==='field_parameters',column=reformColumn?wizard.reform_parameters:wizard.column_parameters;
@@ -3700,10 +3717,18 @@ function readRenderedInputMapping(observation) {
           const finish=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_finish;
           const contextMatches=lifecycleContextMatches;
           const inputPort=finish.mode==='input_port',outputPort=finish.mode==='output_port',port=inputPort||outputPort;
-          const finishOwner=inputPort?current.wizard.input_port_context:outputPort?current.wizard.port_context:finish.owner;
-          const expectedLabel=port?finishOwner.node.label:finish.completion.fields.label.value;
-          const workflowPath=(inputPort?finishOwner.node_path.slice(0,-1):outputPort?finishOwner.path.slice(0,-4):finishOwner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
+          const preparedInput=inputPort?finish.prepared_owner:null;
+          const finishOwner=preparedInput??(inputPort?current.wizard.input_port_context:outputPort?current.wizard.port_context:finish.owner);
+          const expectedLabel=preparedInput?null:port?finishOwner.node.label:finish.completion.fields.label.value;
+          const workflowPath=(preparedInput?preparedInput.workflow_path:inputPort?finishOwner.node_path.slice(0,-1):outputPort?finishOwner.path.slice(0,-4):finishOwner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
           const targetNode=fresh=>{
+            if(preparedInput){
+              const bound=fresh.prepared_node_context,owner=preparedInput.node;
+              if(!bound?.verified||bound.surface!=='graph'||bound.locked===true
+                ||!['document_id','workflow_id','node_id'].every(k=>bound[k]===owner[k]))return null;
+              const bodies=fresh.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.tid===bound.tid);
+              return bodies.length===1?bodies[0]:null;
+            }
             const expected=expectedLabel;
             // E2E Format maps whitespace to underscores and removes commas.
             // Wrapped SVG labels may lose whitespace at BR boundaries, so
@@ -3740,6 +3765,7 @@ function readRenderedInputMapping(observation) {
             timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await waitForMasks(await readOpeningUi(),readOpeningUi,contextMatches);
           }
           const sameDestination=fresh=>contextMatches(fresh) && fresh.wizard.status==='absent' && !!targetNode(fresh)
+            &&(!preparedInput||!fresh.ui.dialogs.length)
             && fresh.navigation_context?.status==='observed'
             && same(fresh.navigation_context.path,workflowPath);
           const ready=fresh=>sameDestination(fresh) && !fresh.ui.masks.length;
@@ -3768,7 +3794,7 @@ function readRenderedInputMapping(observation) {
           const node=targetNode(observed);
           record(port?(inputPort?'input_port_finish_settled':'output_port_finish_settled'):finish.mode==='execute'?'wizard_execute_settled':'wizard_finish_settled',{quiet_samples:quietSamples,interval_ms:200,dom_epoch:observed.dom_epoch,node_ref:node.ref});
           if(port)record(inputPort?'input_port_finish_verified':'output_port_finish_verified',{wizard_root_ref:finish.root_ref,control_ref:task.action.ref,
-            port_path:inputPort?finishOwner.port_path:finishOwner.path.slice(0,-1).map(({tid,label})=>({tid,label})),node:node.graph_node,node_ref:node.ref,workflow_path:workflowPath,
+            port_path:preparedInput?null:inputPort?finishOwner.port_path:finishOwner.path.slice(0,-1).map(({tid,label})=>({tid,label})),...(preparedInput?{input_port:preparedInput.input_port,previous_owner:preparedInput.node}:{}),node:node.graph_node,node_ref:node.ref,workflow_path:workflowPath,
             reopen_required:true,settings_readback_verified:false,settings_applied:false,source_identity_verified:false,package_saved:false});
           else record(finish.mode==='execute'?'wizard_execute_graph_verified':'wizard_finish_graph_verified',{...(finish.mode==='execute'?{launch_gesture_verified:true,execution_completed:false}:{}),previous_owner:finish.owner.node,node:node.graph_node,node_ref:node.ref,
             label:finish.completion.fields.label.value,reopen_required:true,settings_readback_verified:false,package_saved:false});
