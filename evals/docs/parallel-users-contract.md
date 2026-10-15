@@ -2723,3 +2723,49 @@ qualification. This change grants none of those later stages.
 Joint verification199 source/pin/WAL hashes and both exact resource-absence
 checks: d84be043…/verification.json SHA256
 `5916de3c12158ab05adb13e8743fcc254bd8ba5287c2cc8537b6b6a7cdcafd8a`.
+
+
+### Durable paused agent prefix — 2026-10-16
+
+`pauseAgentProcessInventory` freezes the completed per-slot prefix without final
+run sealing. Under the existing producer exclusion it validates all closed
+process proofs, persists `state: paused`, writes a private immutable snapshot and
+publishes its reference in the live manifest. New CLI calls fail
+AGENT_PROCESS_INVENTORY_PAUSED. A snapshot publication failure leaves admission
+paused; repeat reuses/reconciles the same hash/path. An altered snapshot fails
+read-back and final sealing. Final sealing preserves the immutable source.
+
+`readAgentProcessBoundary` accepts a valid paused snapshot or a final sealed run.
+For a pause it returns the immutable `source` separately from the live `current`
+manifest reference. `readAgentSessionInventory` and combined accounting recheck
+both references, so a prefix cannot silently change during source validation.
+The existing resource inventory reader still requires whole-run sealing and gives
+no resource-completeness credit for a pause. The native selected-session driver
+accepts paused state with its existing process/user/native-frame/archive guards.
+
+TDD missing API RED → actual two-child prefix/pause/seal and filesystem fault
+controls5/52 PASS7.81s. The native text path first refused a paused inventory via
+the resource-only reader (9 assertions98.59s RED). Boundary wiring then passed
+both native variants2/56 assertions243.49s: the browser archive and targeted
+Count1 close occur before final sealing, and the empty invocation retains its
+committed SQLite family. Related50/263 PASS51.57s, typecheck/syntax/diff PASS.
+
+Private browser native-agent-replay-149f6bd8-52b3-456c-b5c5-0440bc65be28
+source-audit SHA256 `3abbca9bd164e3fc7cb97d1802ea5ee462e5165ebd3bdc35ab006ff5317ed3d6`
+checks1650 facts/108 sources/16 causal frames. Private text
+native-agent-replay-ae3518db-d41e-48bc-a904-3593e1a3d81f source-audit SHA256
+`9a8f9abb4cf943b7601bef85612662244d2151b6f4b68632840f92df12debbc5`
+checks91 facts/62 sources/6 frames, including DB/WAL/SHM and one committed SDK
+session. Both snapshots remain immutable after final sealing; both15 source/
+binary pins and exact own pair/network/controller-root absence are verified.
+Original histories remain private outside the deleted temporary roots.
+
+This provides a producer boundary, with no cleanup, deletion, release or next
+admission grant. A normal slot/attempt finalizer must use it, finish backend and
+storage/backup cleanup, then validate a separate transition out of pause. That
+unpause/recovery/orchestration path remains unimplemented; no caller may infer
+nextAdmissionAllowed from a paused prefix or sessions_closed alone.
+
+Joint verification200 source/pin read-backs and exact absence of both own pairs:
+149f6bd8…/verification.json SHA256
+`6d41ac70ca9623d75a2ca6d371d2cf6d293a40682f9b94b3627501dd0610b63d`.

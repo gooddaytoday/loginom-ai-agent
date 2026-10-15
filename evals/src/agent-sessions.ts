@@ -1,6 +1,6 @@
 import path from "node:path"
 import { EvalFailure } from "./fail"
-import { readAgentProcess, readAgentProcessInventory } from "./agent-process-evidence"
+import { readAgentProcess, readAgentProcessBoundary } from "./agent-process-evidence"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { archiveProfileEvidence } from "./profile-archive"
 import { readUserActivation, readUserOwnership, readUserPreparation } from "./user-environment"
@@ -33,7 +33,7 @@ export async function readAgentSessionInventory(file: SlotFile, lease: SlotLease
   if (lease.recoveryOnly || path.dirname(inventoryFile) !== file.controller.stateDir) throw new EvalFailure("AGENT_SESSION_INVENTORY_UNCONFIRMED", 2)
   const origin = object(await readLeaseReceipt(lease.receipt))
   if (typeof origin.commandId !== "string") throw new EvalFailure("AGENT_SESSION_INVENTORY_UNCONFIRMED", 2)
-  const inventory = await readAgentProcessInventory({ file: inventoryFile, commandId: origin.commandId, slotId: lease.slot.id, producerPid: process.pid })
+  const inventory = await readAgentProcessBoundary({ file: inventoryFile, commandId: origin.commandId, slotId: lease.slot.id, producerPid: process.pid })
   if (!Array.isArray(observations) || observations.length !== inventory.processes.length ||
     new Set(observations.map(source => source.process.id)).size !== observations.length ||
     observations.some(source => source.process.path !== inventoryFile)) throw new EvalFailure("AGENT_SESSION_INVENTORY_INCOMPLETE", 2)
@@ -42,8 +42,9 @@ export async function readAgentSessionInventory(file: SlotFile, lease: SlotLease
   const snapshots = await Promise.all(observations.flatMap(source => [source.before, ...source.during, source.after])
     .map(source => readAdminSessionInventory(file, lease.identity, source)))
   await lease.assertHeld()
-  if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256) throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
-  return { sessions, snapshots, processes: inventory.processes, source: inventory.source }
+  if (hash(await readLeaseReceipt(inventory.current.path)) !== inventory.current.sha256 ||
+    hash(await readLeaseReceipt(inventory.source.path)) !== inventory.source.sha256) throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+  return { sessions, snapshots, processes: inventory.processes, source: inventory.source, current: inventory.current }
 }
 
 export async function readAgentSession(file: SlotFile, lease: SlotLease, secretFile: string, id: string) {

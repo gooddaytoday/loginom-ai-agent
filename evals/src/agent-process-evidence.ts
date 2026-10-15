@@ -8,7 +8,7 @@ import { superviseProcess } from "./process-supervisor"
 export type AgentProcessEvidence = { file: string; commandId: string; slotId: string; assertHeld(): Promise<void> }
 type InventoryInput = { file: string; commandId: string; slotId: string; producerPid: number }
 type Inventory = { version: 2; kind: "eval-agent-processes"; commandId: string; slotId: string; producerPid: number;
-  state: "open" | "sealed"; processes: { id: string; directory: string; captureDirectory: string; owner: { kind: "slot"; id: string };
+  state: "open" | "paused" | "sealed"; boundary?: { path: string; sha256: string }; processes: { id: string; directory: string; captureDirectory: string; owner: { kind: "slot"; id: string };
     state: "planned" | "confirmed" | "unconfirmed"; proof?: { path: string; sha256: string } | null }[] }
 const activeInventories = new Set<string>()
 
@@ -19,6 +19,7 @@ export async function superviseAgentProcess(input: Parameters<typeof supervisePr
   try {
     await evidence.assertHeld()
     const inventory = await readInventory({ ...evidence, producerPid: process.pid })
+    if (inventory.state === "paused") throw new EvalFailure("AGENT_PROCESS_INVENTORY_PAUSED", 2)
     if (inventory.state !== "open") throw new EvalFailure("AGENT_PROCESS_INVENTORY_SEALED", 2)
     if (inventory.processes.some(entry => entry.state !== "confirmed")) throw new EvalFailure("AGENT_PROCESS_PROOF_UNCONFIRMED", 2)
     if (input.owner && (input.owner.kind !== "slot" || input.owner.id !== evidence.slotId)) throw new EvalFailure("AGENT_PROCESS_OWNER_MISMATCH", 2)
@@ -56,10 +57,58 @@ export async function sealAgentProcessInventory(evidence: AgentProcessEvidence) 
   try {
     await evidence.assertHeld()
     const input = { ...evidence, producerPid: process.pid }, inventory = await readInventory(input)
+    if (inventory.state === "paused") await readAgentProcessBoundary(input)
     await readProcesses(input, inventory)
     await writeLeaseReceipt(evidence.file, { ...inventory, state: "sealed" })
     return (await readAgentProcessInventory(input)).source
   } finally { activeInventories.delete(evidence.file) }
+}
+
+/** Stops new CLI admission before publishing an immutable completed-prefix snapshot. */
+export async function pauseAgentProcessInventory(evidence: AgentProcessEvidence) {
+  if (activeInventories.has(evidence.file)) throw new EvalFailure("AGENT_PROCESS_INVENTORY_BUSY", 2)
+  activeInventories.add(evidence.file)
+  try {
+    await evidence.assertHeld()
+    const input = { ...evidence, producerPid: process.pid }, inventory = await readInventory(input)
+    if (inventory.state === "sealed") throw new EvalFailure("AGENT_PROCESS_INVENTORY_SEALED", 2)
+    if (inventory.state === "paused" && inventory.boundary) return (await readAgentProcessBoundary(input)).source
+    await readProcesses(input, inventory)
+    const paused = { ...inventory, state: "paused" as const, boundary: undefined }
+    // A failed snapshot publication must leave admission durably paused.
+    if (inventory.state === "open") await writeLeaseReceipt(evidence.file, paused)
+    const source = { path: `${evidence.file}.boundary-${hash(paused)}.json`, sha256: hash(paused) }
+    const existing = await readLeaseReceipt(source.path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+    if (existing !== undefined && hash(existing) !== source.sha256) throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+    if (existing === undefined) await writeLeaseReceipt(source.path, paused)
+    await evidence.assertHeld()
+    if (hash(await readLeaseReceipt(evidence.file)) !== hash(inventory.state === "open" ? paused : inventory))
+      throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+    await writeLeaseReceipt(evidence.file, { ...paused, boundary: source })
+    return (await readAgentProcessBoundary(input)).source
+  } finally { activeInventories.delete(evidence.file) }
+}
+
+export async function readAgentProcessBoundary(input: InventoryInput) {
+  const inventory = await readInventory(input)
+  if (inventory.state === "sealed") {
+    const completed = await readAgentProcessInventory(input)
+    return { ...completed, state: "sealed" as const, current: completed.source }
+  }
+  const source = inventory.boundary
+  if (inventory.state !== "paused" || !source || Object.keys(source).length !== 2 || !/^[a-f0-9]{64}$/.test(source.sha256) ||
+    source.path !== `${input.file}.boundary-${source.sha256}.json`) throw new EvalFailure("AGENT_PROCESS_INVENTORY_UNSEALED", 2)
+  const snapshot = await readLeaseReceipt(source.path)
+  if (hash(snapshot) !== source.sha256 || hash(snapshot) !== hash({ ...inventory, boundary: undefined }))
+    throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+  const processes = await readProcesses(input, inventory)
+  if (hash(await readLeaseReceipt(input.file)) !== hash(inventory) || hash(await readLeaseReceipt(source.path)) !== source.sha256)
+    throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+  return { commandId: inventory.commandId, slotId: inventory.slotId, state: "paused" as const, processes, source,
+    current: { path: input.file, sha256: hash(inventory) } }
 }
 
 export async function readAgentProcessInventory(input: InventoryInput) {
@@ -87,7 +136,7 @@ async function readInventory(input: InventoryInput) {
     throw new EvalFailure("AGENT_PROCESS_INVENTORY_PRIVATE", 2)
   const inventory = await readLeaseReceipt(input.file) as Partial<Inventory> | null
   if (!inventory || inventory.version !== 2 || inventory.kind !== "eval-agent-processes" || inventory.commandId !== input.commandId ||
-    inventory.slotId !== input.slotId || inventory.producerPid !== input.producerPid || !["open", "sealed"].includes(String(inventory.state)) ||
+    inventory.slotId !== input.slotId || inventory.producerPid !== input.producerPid || !["open", "paused", "sealed"].includes(String(inventory.state)) ||
     !Array.isArray(inventory.processes) || inventory.processes.some(entry => !entry || typeof entry.id !== "string" ||
       !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(entry.id) || typeof entry.directory !== "string" ||
       path.dirname(entry.directory) !== root || !path.basename(entry.directory).startsWith("agent-process-") ||
