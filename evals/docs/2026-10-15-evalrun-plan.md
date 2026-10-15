@@ -10,9 +10,9 @@ Approved 2026-10-15. Branch `evalrun-runtime`, harness base `51459ab905d4151ee4c
 - [x] Install official CLI 0.2.0, own profile/catalog/auth, judge home, bwrap/AppArmor.
 - [x] Configure proxy/systemd using existing Multica registration and both existing providers.
 - [x] Qualify environment without product model calls; transfer EvalRunner and verify actor memory.
-- [ ] Two distinct smoke admissions: calc-data-double and crosstable-fixed-sum, repeat=1, infraRetries=0.
-- [ ] Verify actual product model, cleanup/history/release and curated delivery round trip.
-- [ ] Verify service restart/reboot with empty task queues; publish final runbook/checkpoint.
+- [x] Two distinct smoke admissions consumed: calc-data-double PASS100; crosstable-fixed-sum BLOCKED/recovery. Exactly one attempt each, infraRetries=0.
+- [ ] Acceptance remains BLOCKED: actual model verified in both; calc release/archive round trip PASS; node has no RELEASED. Separate BLOCKED diagnostic archive round trip PASS.
+- [x] Verify service restart/reboot with empty task queues; publish runbook/checkpoint and retained blocker.
 
 Target `kartai@10.200.9.134`; R=`/home/kartai/.local/share/loginom-evals-runtime`.
 Existing daemon `01a0f90f-27cd-723e-a37e-56bfa34b0e8d`, Codex runtime `9f8907d3-de44-4f7f-bfa3-a2a2f94db70b`.

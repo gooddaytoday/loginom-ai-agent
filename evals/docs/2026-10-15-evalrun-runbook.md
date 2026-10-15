@@ -1,5 +1,7 @@
 # EvalRunner на evalrun
 
+Текущий допуск LAB-76 — **BLOCKED**: node smoke завершился recovery/ambiguous native export, без RELEASED. Оператор восстановил профиль/storage, но исходный результат не изменял. Global stand.lease и оба admission сохранены; новых продуктовых запусков не делать. Проверенный code7abcba2717 (финальный docs-only pin см. runtime.json) ограничивает writer acquisition новым каталогом после собственного подтверждённого запуска CLI; измерения выполнены на708c72ebce. Ниже сохранён исторический контракт двух уже выполненных smoke, повторять команды запрещено. Следующий допуск требует исправления продукта и отдельного операторского решения.
+
 R=`/home/kartai/.local/share/loginom-evals-runtime`, host=`10.200.9.134`, user=`kartai`.
 Приёмка: LAB-76 (`01a13f4c-c8c5-7916-9c86-9cb302d38987`).
 План и результаты: [план](2026-10-15-evalrun-plan.md), [checkpoint](2026-10-15-evalrun-checkpoint.md).
@@ -28,7 +30,7 @@ Native Loginom check и sandbox предварительно квалифици�
 ## Измерение
 
 Карточка должна задавать конкретные case/collection/series/CLI/model/judge/timeout и разрешённый объём.
-Для LAB-76 допустимы ровно две команды, последовательно, одна попытка каждой:
+Исторический контракт LAB-76 разрешал ровно две команды последовательно, по одной попытке каждой. Обе попытки уже выполнены; команды ниже не запускать:
 
 ```sh
 R=/home/kartai/.local/share/loginom-evals-runtime

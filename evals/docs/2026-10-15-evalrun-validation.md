@@ -52,4 +52,30 @@ calc-data-double: one admitted attempt, infraRetries0, completed221498ms, judge1
 
 Calc curated delivery: attachment01a13f6d-f4a4-77eb-979c-fd5ab79e731c, SHA25664fe0314d6891cc1ba7ad48a6ab8639e2b85dfe19a5a54d712ebe7c161373af7. Agent upload→download→verify confirmed; operator additionally downloads and verifies independently. No env/auth/history/rawlogs in archive.
 
-Multica CLI produced explicit TLS handshake failures locally and in agent task, resolved by its recommended GODEBUG=tlsmlkem=0. This is set in EvalRunner custom env and future daemon runtime.env; apply daemon environment only at an empty queue after delivery. Product/Judge env pins are unchanged.
+Multica CLI produced explicit TLS handshake failures locally and in agent task, resolved by its recommended GODEBUG=tlsmlkem=0. This is set in EvalRunner custom env and daemon runtime.env; the environment was applied at an empty queue after delivery. Product/Judge env pins are unchanged.
+
+## Node smoke and retained blocker
+
+crosstable-fixed-sum consumed exactly one attempt: Session ses_ec09225a4ffepOXfUoLJr5JIlS, failed/recovery616s, LOGINOM_RECOVERY_REQUIRED, no package, node codeERROR2. Export operation export-result completed execution but could not confirm native download; AMBIGUOUS/effect_possible, no permitted recovery action. No measurement was retried.
+
+After product processes closed with2zero-remaining passes, management loginom status hit a writer acquisition observation race. Original cleanup stayedfailed and no RELEASED was written; stand lease/admission retained. TDD RED reproduced exact Writer owner identity changed during release; fix4a0835c1b91a642612e000794bfce72d65bcabc7 distinguishes initial bounded owner creation from replacement of an observed owner. Both profile/supervisor files77PASS/0FAIL,241assertions,133.29s; new test5/5repeats PASS; typecheckPASS.
+
+Original series/profile/global lease/config/gate copied privately to R/operations/incidents/lab76-node-20261015. Before retiring the exact stale process-group marker, privileged full/proc scans twice found no profile/bundled executable references. Marker UID/mode/dev/inode/hash/PID checked; no signals sent. Container UserStorage/SessionBackup captured before cleanup. A copy of pre-recovery closed SQLite verifies all20assistant model records openai/gpt-6.1-sol/medium with unchanged source hashes.
+
+Operator native recovery acknowledged existing recovery and passed status checks, but native check observed a separate short-lived pre-exec Bun→bwrap identity transition and failed closed (PID33781). Its failed receipt and exact marker are retained separately; two new privileged scans verify no remaining processes. This launch observation race is not treated as a successful ownership proof. A bounded native check after operator retirement is permitted; product smoke retry remains forbidden.
+
+Operator cleanup subsequently confirmed at12:22:14Z without model calls: native checkPASS, profile history archived at eval-profile.history/operator-recovery-lab76-node-XCtR9u, own marked storage emptied. Logical original stand lease/admissions remain intentionallyBLOCKED. Source snapshots and failed receipts were not rewritten. Active checkout/config advanced to tested writerfix4a0835c1b9 only after the failed cohort closed; original measurement SHA remains708c72ebce in raw pins/manifests.
+
+Node BLOCKED diagnostic delivery: attachment01a13f85-e812-7122-b5d9-a9d79bd368cb, SHA2562664c726b2e77a1c6b12b109ac017b958c8de1752b676ab8f617c91850cd42e1. Independent download verifies8curated files; manifest kind evalrunner-blocked-diagnostic, statusBLOCKED/releasefalse. It is not a regular released measurement archive. Env/auth/profileDB/rawtool logs excluded.
+
+Final daemon restart at empty queues applied GODEBUG=tlsmlkem=0, confirmed in the running process environment; both original runtime IDs online afterward. Neither product/Judge env pins nor old agent settings changed.
+
+## Narrowed writer acquisition boundary
+
+Full suite on intermediate4a0835c1b9 exposed two missed negative cases: replaced owner and owner-symlink (787PASS/2FAIL,4069assertions,789tests/61files,539.01s). The overbroad first fix was not accepted as final. Original failed log preserved as R/evidence/full-tests-postfix.log.
+
+Fix7abcba27174d5c90fa937499d0ee1c5297f81011 restores strict writerIdentity default. Bounded initial creation observation requires initial absence, a live exact owned CLI, no previous captured writer, a private/current-UID directory born after the timestamp immediately before spawn. New negative test rejects a pre-dispatch directory. Replacement/symlink/EACCES and cleanup guards remain strict. Target fullCLI/stand/sandbox/nativecheck passed with confirmed cleanup and archived history, without model calls; final full suite runs separately in R/evidence/full-tests-scoped-writer.log. Measured cohort pins remain unchanged.
+
+Final code7abc full suite: **790PASS/0FAIL,4072assertions,790tests/61files,539.85s**, typecheckPASS. Log R/evidence/full-tests-scoped-writer.log SHA256 `147eabee03afdbb7923bd9fbad74b9b0eee11e9a0cb7bcb3083983fb60d2550c`. Exact final targeted snapshot88PASS/0FAIL,259assertions,138.65s; acquisition5/5PASS. Final documentation deploy changes only the four evalrun Markdown files; runtime.json records its clean checkout SHA and original measured pins stay708c.
+
+After tests, unused installation archives/bundles, test fixture directories and the duplicate recovery worktree were removed after process/FD checks. Keep R/evidence/final-temp-cleanup.json and recovery-worktree-cleanup.json as cleanup receipts; current profiles/auth/providers, original product evidence/history, incident copies, logical stand lease and admissions remain. Operator-local fixture/import copies were also removed after two no-reference passes; logs and independently downloaded delivery archives retained.
