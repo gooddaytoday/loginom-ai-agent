@@ -55,7 +55,7 @@ Read-only signal audit: PID4086419 отсутствует в own/peer/unknown/ad
 origin/browser-binding всех двух admin и четырёх CLI proofs; UID/starttime не
 сохранены, сейчас PID отсутствует. Exec/exit/zombie/владелец не атрибутированы.
 
-## Native A/B setup: UID-change observation остаётся неквалифицированной
+## Native A/B setup: сохранённый неквалифицированный UID-change incident
 
 2026-10-15: новый per-slot seal native case остановился до самого seal, во время
 параллельных начальных setup. Оба CLI вернули exit0; A proof failed с
@@ -94,6 +94,15 @@ read-only PID1 negative с ложной historical claim: RED старое со�
 полей → GREEN1/5 (0.779s). Supervisor/writer suites34 PASS/2 nativeBusy SKIP/
 182 assertions148.47s, typecheck PASS. Это диагностические bookends, не атомарная
 identity и не объяснение старого frame; прежний failed source не изменён.
+
+Новый exact-source native run32685e3e66 прошёл1/19 (168.88s): A seal/archive/
+accounting/close при active B, fresh B check и общий finalizer. Private case
+`native-two-users-4a143678-dfcf-4a51-ae93-33db172b9b72` audit
+SHAdd7acfd3197a7164153e1acdf2ff884ddc41726794123191d861c1e20fb7684a:
+649 checks/192 sources, exact own pair/network/root absent. UID mismatch не
+повторился; это не устанавливает причину старого eR7Snq и не разрешает его
+release/удаление. Старые sources и reservations сохраняются.
+
 
 ## Архив после фактически прерванного check: текущий native gate закрыт, старые источники сохранены
 
