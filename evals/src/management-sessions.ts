@@ -35,8 +35,9 @@ export async function collectManagementSessions(file: SlotFile, lease: SlotLease
   const input = await managementInput(file, lease, inventoryFile)
   const inventory = await readManagementProcessInventory(input)
   const command = object(await readLeaseReceipt(input.journal))
-  if (command.kind !== "unactivated-preparation" || command.phase !== "finalizing" || !Array.isArray(command.managementSources) ||
-    !command.managementSources.some(value => { const source = object(value); return source.path === inventoryFile && source.sha256 === inventory.source.sha256 }))
+  if (command.kind !== "unactivated-preparation" || (command.phase === "cli_admitted" ? !inventory.seal :
+    command.phase !== "finalizing" || !Array.isArray(command.managementSources) ||
+    !command.managementSources.some(value => { const source = object(value); return source.path === inventoryFile && source.sha256 === inventory.source.sha256 })))
     throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
   const sessions: Awaited<ReturnType<typeof recordManagementSession>>[] = []
   for (const process of inventory.processes) {
@@ -71,7 +72,8 @@ export async function collectManagementSessions(file: SlotFile, lease: SlotLease
       session.binding.name === row.name && session.binding.createdAt === row.createdAt && row.packageCount === 0)))
     throw new EvalFailure("MANAGEMENT_SESSION_UNKNOWN", 2)
   await lease.assertHeld()
-  if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256 || hash(await readLeaseReceipt(input.journal)) !== hash(command))
+  if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256 || hash(await readLeaseReceipt(input.journal)) !== hash(command) ||
+    inventory.seal && hash(await readLeaseReceipt(inventory.seal.path)) !== inventory.seal.sha256)
     throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
   return { sessions, source: inventory.source, observation: current.source }
 }

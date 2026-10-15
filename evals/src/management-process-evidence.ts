@@ -216,7 +216,7 @@ export async function readManagementProcessInventory(input: InventoryInput) {
   if (sealed !== undefined && JSON.stringify(sealed) !== JSON.stringify({ version: 2, kind: "management-process-seal", journal: input.journal,
     commandId: input.commandId, identity: input.identity, leaseToken: input.leaseToken, slotId: input.slotId, profileDir: input.profileDir, inventory: source }))
     throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
-  return { processes, source }
+  return { processes, source, ...(sealed !== undefined ? { seal: { path: `${input.file}.sealed.json`, sha256: hash(sealed) } } : {}) }
 }
 
 export async function readManagementProcess(input: InventoryInput, entry: unknown) {
