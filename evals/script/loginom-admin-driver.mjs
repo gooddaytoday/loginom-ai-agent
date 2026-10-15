@@ -27,10 +27,20 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (request.deadline <= Date.now()) throw Error("ADMIN_DEADLINE")
     if (request.op === "dispose") {
       dispatched = Boolean(context)
+      const transportDisconnect = context && identity ? await bounded(request, page.evaluate(async () => {
+        const session = bg.app.Application.FInstance.FServerConnection.ServerContainer.FServerConnector.$FSession
+        if (!session || typeof session.Disconnect !== "function") throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+        // Connector.Dispose starts this Task without awaiting it; browser closure may cancel the flush.
+        const task = session.Disconnect()
+        if (!task || typeof task.then !== "function") throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+        await task
+        window.onpagehide = null
+        return "confirmed"
+      })) : undefined
       if (context) await bounded(request, context.close())
       context = undefined
       disposed = true
-      respond(id, "confirmed", { disposed: true })
+      respond(id, "confirmed", { disposed: true, ...(transportDisconnect ? { transportDisconnect } : {}) })
       continue
     }
     if (request.op === "init") {
