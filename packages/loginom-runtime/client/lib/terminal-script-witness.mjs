@@ -1,5 +1,6 @@
+import {terminalSourceIntegrityPins} from './terminal-source-integrity.mjs';
 import {terminalUserPublisherInspectorSource} from './terminal-user-publisher.mjs';
-export function terminalScriptWitnessArguments(id,account){return Object.freeze({id,account,inspector:terminalUserPublisherInspectorSource})}
+export function terminalScriptWitnessArguments(id,account){return Object.freeze({id,account,inspector:terminalUserPublisherInspectorSource,initialLoadPins:terminalSourceIntegrityPins()})}
 // Fixed same-Page evaluation only. Returned JSON is evidence, never original refs/authority.
 export function collectTerminalScriptWitness(expected){
  const own=(o,k)=>{const d=Object.getOwnPropertyDescriptor(o,k);if(!d||!('value'in d))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');return d.value};
@@ -49,7 +50,31 @@ export function collectTerminalScriptWitness(expected){
  if(own(requireFrozen(Reflect.apply(inspect,publisher,[])),'document')!==doc)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
  // The non-enumerable closure is retained only through the original JSHandle.
  // JSON retains evidence rows only; it cannot reconstruct this original custody.
+ let initialLoad,loadSummary;
+ const loadDescriptor=Object.getOwnPropertyDescriptor(defs,'initialLoad');
+ if(loadDescriptor){
+  if(!('value'in loadDescriptor))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');initialLoad=requireFrozen(loadDescriptor.value);
+  if(own(initialLoad,'complete')===true){
+   if(own(initialLoad,'document')!==doc||own(initialLoad,'sourceExecutionQualified')!==false||own(initialLoad,'closureIdentityQualified')!==false||own(initialLoad,'nativeAuthority')!==false)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   const loaded=requireFrozen(own(initialLoad,'records')),pins=expected.initialLoadPins;
+   if(own(loaded,'length')!==pins.length)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   const loadRows=[];
+   for(let i=0;i<loaded.length;i++){
+    const r=requireFrozen(own(loaded,String(i))),receipt=requireFrozen(own(r,'receipt')),url=own(r,'url'),integrity=own(r,'integrity'),node=own(r,'node');
+    const pin=pins.find(([u])=>new URL(url).origin+new URL(url).pathname===u);
+    if(!pin||pin[1]!==integrity||own(r,'loaded')!==true||own(r,'document')!==doc
+      ||own(receipt,'node')!==node||own(receipt,'document')!==doc||own(receipt,'url')!==url||own(receipt,'integrity')!==integrity)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+    loadRows.push(Object.freeze({url,integrity,loaded:true}));
+   }
+   if(new Set(loadRows.map(r=>new URL(r.url).origin+new URL(r.url).pathname)).size!==pins.length)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   if(own(defs,'applicationSourcesJoined')!==true)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   const acquisitionDefinition=requireFrozen(own(defs,'acquisitionDefinition')),userDefinition=requireFrozen(own(defs,'userDefinition'));
+   if(own(acquisitionDefinition,'originalGet')!==own(acquisition,'originalGet')||own(userDefinition,'originalSet')!==own(sample,'originalSet')||own(userDefinition,'originalInit')!==own(sample,'originalInit'))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   loadSummary=Object.freeze({records:Object.freeze(loadRows),definingExportsRetained:true,applicationSourcesJoined:true});
+  }
+ }
  const id=expected.id,account=expected.account,summary=Object.freeze({id,account,
+  ...(loadSummary?{initialLoad:loadSummary}:{}),initialLoadReason:loadSummary?undefined:(initialLoad&&Object.hasOwn(initialLoad,'reason')?own(initialLoad,'reason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),
   rows:Object.freeze(rows.map(row=>Object.freeze(row))),projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false});
  const descriptor=Object.getOwnPropertyDescriptor,apply=Reflect.apply,parent=Object.getPrototypeOf;
  const originalPublisher=publisher,originalInspect=inspect,originalStartup=startup,originalDefs=defs,originalInitializers=initializer;
@@ -63,6 +88,7 @@ export function collectTerminalScriptWitness(expected){
     ||own(current,'task')!==own(acquisition,'task')||own(current,'receiver')!==own(acquisition,'receiver')
     ||own(current,'loadedDefinitions')!==originalDefs||own(originalDefs,'bindings')!==bindings
     ||own(originalDefs,'initializers')!==originalInitializers)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  if(initialLoad&&own(originalDefs,'initialLoad')!==initialLoad)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
   for(const check of integrityChecks)check();
   const method=descriptor(capsule,'checkOriginal');if(!method||method.value!==checkOriginal||method.get||method.set
     ||method.writable||method.configurable||method.enumerable)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');

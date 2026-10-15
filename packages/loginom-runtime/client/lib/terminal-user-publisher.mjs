@@ -13,7 +13,7 @@ function installOriginalUserPublisher(origin) {
   const key='__loginomOriginalUserPublisherV1';
   if(descriptor(root,key))return; // Never replace a previous/foreign publisher.
   let sample,acquisition,failure,checks=[],sealed=false,pendingSS;
-  let initialScript,modifierScript;
+  let initialScript,modifierScript,acquisitionDefinition,userDefinition;
   let initializers=Object.freeze({complete:false,reason:'INITIAL_SS_NOT_OBSERVED',sourceExecutionQualified:false,closureIdentityQualified:false});
   const unavailable=()=>{throw Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE')};
   const remember=error=>{failure??={value:error}};
@@ -59,12 +59,13 @@ function installOriginalUserPublisher(origin) {
   };
   // Only the original private init script can supply this before publication.
   // Missing at birth remains missing; a late API is never adopted.
-  let originalIntegrity,inspectIntegrity;
+  let originalIntegrity,inspectIntegrity,inspectInitialLoad;
   const integrityDescriptor=descriptor(root,'__loginomOriginalScriptIntegrityV1');
   if(integrityDescriptor){
     if(!('value'in integrityDescriptor)||!Object.isFrozen(integrityDescriptor.value))unavailable();
     originalIntegrity=hold(root,'__loginomOriginalScriptIntegrityV1');
     inspectIntegrity=hold(originalIntegrity,'inspect');if(typeof inspectIntegrity!=='function')unavailable();
+    const loadReader=descriptor(originalIntegrity,'inspectLoad');if(loadReader){if(!('value'in loadReader))unavailable();inspectInitialLoad=hold(originalIntegrity,'inspectLoad');if(typeof inspectInitialLoad!=='function')unavailable();}
   }
   const captureScript=path=>{
     if(!scriptReaders)return Object.freeze({complete:false,reason:'ORIGINAL_SCRIPT_READERS_UNAVAILABLE'});
@@ -128,7 +129,24 @@ function installOriginalUserPublisher(origin) {
     capture('exceptionWrap',optional(ss,'Exception'),'wrap');capture('awaiter',root,'__awaiter');
     capture('selectAsync',bg,'selectAsync');capture('objectEquals',bg,'ObjectEquals');
     if(Object.values(bindings).some(value=>value==null))complete=false;
-    return Object.freeze({bindings:Object.freeze(bindings),complete,initializers,closureIdentityQualified:false});
+    const initialLoad=inspectInitialLoad?apply(inspectInitialLoad,originalIntegrity,[]):Object.freeze({complete:false,reason:'ORIGINAL_LOAD_SETTLEMENT_UNAVAILABLE'});
+    if(!Object.isFrozen(initialLoad)||typeof data(initialLoad,'complete')!=='boolean')unavailable();
+    if(data(initialLoad,'complete')===true){
+      const originals=data(initialLoad,'bindings');
+      for(const name of ['ss','bg','rpc','ObjectProxy','FileStorage','StreamPersistProxy','StreamPersist','GuidHelper','MessageDynamicData','HResult','query','connected','currentDirectory','ownDirectory','rootPath','persist','taskConstructor','mkdel','exceptionWrap','awaiter','selectAsync','objectEquals'])if(data(originals,name)!==bindings[name])unavailable();
+      checks.push(()=>{if(apply(inspectInitialLoad,originalIntegrity,[])!==initialLoad)unavailable()});
+    }
+    let applicationSourcesJoined=false;
+    if(data(initialLoad,'complete')===true){
+      const loaded=data(initialLoad,'records');
+      for(const origin of [acquisitionDefinition,userDefinition]){
+        if(!origin)unavailable();const execution=data(origin,'execution');
+        if(!loaded.some(r=>data(r,'node')===data(execution,'script')&&data(r,'receipt')===data(execution,'integrityReceipt')))unavailable();
+      }
+      applicationSourcesJoined=true;
+    }
+    return Object.freeze({bindings:Object.freeze(bindings),complete,initializers,initialLoad,applicationSourcesJoined,
+      acquisitionDefinition,userDefinition,closureIdentityQualified:false});
   };
   const guard=()=>{
     if(acquisition?.failed)throw acquisition.error;
@@ -178,6 +196,7 @@ function installOriginalUserPublisher(origin) {
     if(sealed)unavailable();sealed=true;
     const d=descriptor(current,'Set');if(!d||!('value'in d)||typeof d.value!=='function'||!d.writable)unavailable();
     const originalSet=d.value;
+    if(inspectInitialLoad)userDefinition=Object.freeze({execution:captureScript('bg/app/User.js'),originalSet,originalInit:hold(hold(hold(app,'User'),'prototype'),'Init')});
     function retainedSet(user) {
       if(sample)remember(Error('TERMINAL_USER_PUBLISHER_REENTERED'));
       else {
@@ -298,6 +317,7 @@ function installOriginalUserPublisher(origin) {
   };
   const bindAcquisition=(app,Connection)=>{
     const proto=data(Connection,'prototype'),d=descriptor(proto,'GetCurrentUser');
+    if(inspectInitialLoad)acquisitionDefinition=Object.freeze({execution:captureScript('bg/app/ServerConnection.js'),Connection,originalGet:d?.value});
     if(!d||!('value'in d)||typeof d.value!=='function'||!d.writable)unavailable();
     const originalGet=d.value;
     function retainedGetCurrentUser(){

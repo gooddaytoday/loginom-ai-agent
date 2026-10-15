@@ -82,6 +82,7 @@ const pins=Object.freeze([
   "sha256-iEZg2ZiQxZ+lpU8rJFJV35i4r/IKUQbBwv2qM3I4iOo="
  ]
 ].map(row=>Object.freeze(row)));
+export function terminalSourceIntegrityPins(){return pins}
 export function terminalSourceIntegrityScript(){return `(${installTerminalSourceIntegrity.toString()})(${JSON.stringify(pins)});`}
 function installTerminalSourceIntegrity(pins){
  if(location.origin!=='https://app.loginom.ai'||globalThis.top!==globalThis)return;
@@ -90,8 +91,8 @@ function installTerminalSourceIntegrity(pins){
  const fail=()=>{throw Error('TERMINAL_SOURCE_INTEGRITY_UNAVAILABLE')};
  if(descriptor(root,key))fail();
  const URLConstructor=root.URL,Script=root.HTMLScriptElement,Node=root.Node,scriptPrototype=Script.prototype,nodePrototype=Node.prototype;
- const originals=[],checks=[],records=new WeakMap(),expected=new Map(pins);let failure;
- const initialSlots=['document','HTMLScriptElement','Node','URL'].map(k=>[root,k,descriptor(root,k)]).concat([[Script,'prototype',descriptor(Script,'prototype')],[Node,'prototype',descriptor(Node,'prototype')]]);
+ const originals=[],checks=[],records=new WeakMap(),expected=new Map(pins);let failure,loadSnapshot;const loads=[],definitions={};
+ const initialSlots=['document','HTMLScriptElement','Node','URL','Event','EventTarget'].map(k=>[root,k,descriptor(root,k)]).concat([[Script,'prototype',descriptor(Script,'prototype')],[Node,'prototype',descriptor(Node,'prototype')]]);
  if(initialSlots.some(([, ,d])=>!d))fail();
  const remember=error=>{failure??={value:error};return failure.value};
  const accessor=(owner,name)=>{
@@ -101,6 +102,59 @@ function installTerminalSourceIntegrity(pins){
  };
  const method=(owner,name)=>{const d=descriptor(owner,name);if(!d||!('value'in d)||typeof d.value!=='function')fail();originals.push([owner,name,d,parent(owner)]);return d.value};
  const mapGet=method(Map.prototype,'get'),weakGet=method(WeakMap.prototype,'get'),weakSet=method(WeakMap.prototype,'set'),weakHas=method(WeakMap.prototype,'has');
+ const EventCtor=root.Event,eventPrototype=EventCtor.prototype,targetPrototype=root.EventTarget.prototype;
+ const listen=method(targetPrototype,'addEventListener'),unlisten=method(targetPrototype,'removeEventListener');
+ const eventType=accessor(eventPrototype,'type'),eventTarget=accessor(eventPrototype,'target');
+ const trustedGetter=descriptor(new EventCtor('terminal-initial-load'),'isTrusted')?.get;
+ if(typeof trustedGetter!=='function')fail();
+ const catalog={
+  '__awaiter.js':[['awaiter',['__awaiter']]],
+  'mscorlib.js':[['ss',['ss']],['taskConstructor',['ss','TaskCompletionSource']],['task',['ss','Task']],['mkdel',['ss','mkdel']],['exceptionWrap',['ss','Exception','wrap']]],
+  'bg.mscorlib.js':[['shallowCopy',['ss','shallowCopy']],['prepareProperties',['ss','prepareProperties']]],
+  'rpc.js':[['rpc',['rpc']],['ObjectProxy',['rpc','TBGObjectProxy']],['GuidHelper',['rpc','GuidHelper']],['MessageDynamicData',['rpc','TBGMessageDynamicData']],['HResult',['rpc','HResult']],['sessionConstructor',['rpc','TBGSession']],['query',['rpc','TBGObjectProxy','prototype','QueryInterface']]],
+  'bg.rtl.js':[['StreamPersist',['bg','IBGStreamPersist']]],
+  'bg.rtl.rpc.js':[['FileStorage',['bg','rpc','TIBGFileStorage_Proxy']],['StreamPersistProxy',['bg','rpc','TIBGStreamPersist_Proxy']],['connected',['bg','rpc','TIBGFileStorage_Proxy','prototype','get_Connected']],['currentDirectory',['bg','rpc','TIBGFileStorage_Proxy','prototype','get_CurrentDirectory']],['ownDirectory',['bg','rpc','TIBGFileStorage_Proxy','prototype','get_IsOwnCurrentDirectory']],['rootPath',['bg','rpc','TIBGFileStorage_Proxy','prototype','get_RootPath']],['persist',['bg','rpc','TIBGStreamPersist_Proxy','prototype','SaveToStream']]],
+  'PropertySelector.js':[['selectAsync',['bg','selectAsync']]],
+  'BG_System.js':[['bg',['bg']],['objectEquals',['bg','ObjectEquals']]],
+ };
+ function dataPath(path){
+  let value=root;
+  for(const key of path){
+   const object=value,d=descriptor(object,key),p=parent(object);if(!d||!('value'in d))throw Error('TERMINAL_SOURCE_DEFINITION_UNAVAILABLE:'+path.join('.'));
+   checks.push(()=>{const now=descriptor(object,key);if(parent(object)!==p||!now||Reflect.ownKeys(d).some(k=>now[k]!==d[k]))fail()});value=d.value;
+  }return value;
+ }
+ function captureDefinitions(state){
+  const file=state.url.pathname.split('/').at(-1),entries=catalog[file]??[];
+  for(const[name,path]of entries){
+   if(Object.hasOwn(definitions,name))fail();const value=dataPath(path);
+   if(value==null||(!['ss','bg','rpc'].includes(name)&&typeof value!=='function'))fail();
+   definitions[name]=Object.freeze({value,sourceReceipt:state.receipt});
+  }
+  if(file==='PropertySelector.js'&&definitions.selectAsync.value!==dataPath(['rpc','$imp','selectAsync']))fail();
+ }
+ function settle(state,event){
+  try{
+   guard();
+   if(this!==state.node||read(event,'target',eventTarget,eventPrototype)!==state.node
+     ||apply(trustedGetter,event,[])!==true||state.status!=='pending')fail();
+   const type=read(event,'type',eventType,eventPrototype);
+   if(type!=='load'||read(state.node,'isConnected',connected,nodePrototype)!==true)fail();
+   state.event=event;const eventChain=[];for(let p=event;p;p=parent(p))eventChain.push([p,parent(p)]);
+   const eventSlots=Reflect.ownKeys(event).map(k=>[k,descriptor(event,k)]);
+   checks.push(()=>{
+    let p=event;for(const[original,prototype]of eventChain){if(p!==original||parent(p)!==prototype)fail();p=parent(p)}
+    if(Reflect.ownKeys(event).length!==eventSlots.length)fail();
+    for(const[k,d]of eventSlots){const now=descriptor(event,k);if(!now||Reflect.ownKeys(d).some(key=>now[key]!==d[key]))fail()}
+   });
+   // Native dispatch may clear/retarget event internals after the callback.
+   // Retain the measured event fact, never reinterpret a later dispatch as load.
+   const nativeEvent=Object.freeze({target:state.node,type,trusted:true});
+   captureDefinitions(state);state.status='loaded';
+   state.loaded=Object.freeze({receipt:state.receipt,event,nativeEvent,node:state.node,document:doc,url:state.url.href,integrity:state.pin,loaded:true});
+   apply(unlisten,state.node,['load',state.listener]);apply(unlisten,state.node,['error',state.listener]);guard();
+  }catch(error){state.status='refused';state.refusedEvent=event;remember(error)}
+ }
  const src=accessor(scriptPrototype,'src'),integrity=accessor(scriptPrototype,'integrity');
  const owner=accessor(nodePrototype,'ownerDocument'),connected=accessor(nodePrototype,'isConnected'),base=accessor(nodePrototype,'baseURI');
  if(typeof src.set!=='function'||typeof integrity.set!=='function')fail();
@@ -125,6 +179,7 @@ function installTerminalSourceIntegrity(pins){
    if(!pin)return apply(src.set,this,[value]);
    if(url.hash||(url.search&&!/^\?_dc=\d+$/.test(url.search))||apply(weakHas,records,[this])
      ||read(this,'isConnected',connected,nodePrototype)!==false)fail();
+   if(loads.some(r=>r.url.origin+r.url.pathname===url.origin+url.pathname))fail();
    const existing=read(this,'integrity',integrity,scriptPrototype);
    if(existing!==''&&existing!==pin)fail();
    const node=this,chain=[];for(let p=node;p;p=parent(p))chain.push([p,parent(p)]);
@@ -132,6 +187,8 @@ function installTerminalSourceIntegrity(pins){
    const receipt=Object.freeze({node,document:doc,url:url.href,integrity:pin,armedBeforeSource:true,
     sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false});
    apply(weakSet,records,[node,receipt]);
+   const state={node,url,pin,receipt,status:'pending'};state.listener=function(event){return settle.call(this,state,event)};loads.push(state);
+   apply(listen,node,['load',state.listener]);apply(listen,node,['error',state.listener]);
    // The browser snapshots integrity metadata when it prepares this script.
    const result=apply(src.set,node,[value]);
    const nodeCheck=()=>{
@@ -143,6 +200,20 @@ function installTerminalSourceIntegrity(pins){
   }catch(error){throw remember(error)}
  }
  wrapped={...src,set:setSource};define(scriptPrototype,'src',wrapped);
- const api=Object.freeze({inspect(node){try{if(this!==api)fail();guard();const receipt=apply(weakGet,records,[node]);if(!receipt)fail();return receipt}catch(error){throw remember(error)}}});
+ const api=Object.freeze({
+  inspect(node){try{if(this!==api)fail();guard();const receipt=apply(weakGet,records,[node]);if(!receipt)fail();return receipt}catch(error){throw remember(error)}},
+  inspectLoad(){try{
+   if(this!==api)fail();guard();
+   for(const state of loads)if(state.status==='loaded'&&read(state.node,'isConnected',connected,nodePrototype)!==true)fail();
+   if(loadSnapshot)return loadSnapshot;
+   const complete=loads.length===pins.length&&loads.every(r=>r.status==='loaded')
+    &&Object.values(catalog).flat().every(([name])=>Object.hasOwn(definitions,name));
+   const bindings=Object.freeze(Object.fromEntries(Object.entries(definitions).map(([key,r])=>[key,r.value])));
+   loadSnapshot=Object.freeze({complete,reason:complete?undefined:'INITIAL_LOAD_INCOMPLETE',document:doc,
+    missing:Object.freeze(pins.filter(([url])=>!loads.some(r=>r.url.origin+r.url.pathname===url&&r.status==='loaded')).map(([url])=>url)),
+    records:Object.freeze(loads.filter(r=>r.loaded).map(r=>r.loaded)),bindings,
+    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false});return loadSnapshot;
+  }catch(error){throw remember(error)}}
+ });
  define(root,key,{value:api});guard();
 }

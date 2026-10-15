@@ -285,19 +285,19 @@ export async function bindTerminalScriptWitness(owner){
  sourceWitnesses.set(owner,Object.freeze({check,inspect:()=>bound??Object.freeze({complete:false,reason:'WITNESS_PENDING',...phases,projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false})}));
  try{
   phases.importTask=import('../client/lib/terminal-script-witness.mjs');const module=await load.observed(phases.importTask);
-  const id=loadData(owner,'id'),account=loadData(owner,'account');phases.phase='evaluate';
+  const id=loadData(owner,'id'),account=loadData(owner,'account'),witnessArguments=module.terminalScriptWitnessArguments(id,account);phases.phase='evaluate';
   // Missing handle support retains the old evidence-only projection. An accessor
   // or later substitution cannot silently downgrade an original handle binding.
   let summary;
   if(evaluateHandle){
    load.guard();
-   phases.realmHandleTask=Reflect.apply(evaluateHandle,page,[module.collectTerminalScriptWitness,module.terminalScriptWitnessArguments(id,account)]);
+   phases.realmHandleTask=Reflect.apply(evaluateHandle,page,[module.collectTerminalScriptWitness,witnessArguments]);
    originalHandle=await load.observed(phases.realmHandleTask);phases.realmHandle=originalHandle;
    originalHandleEvaluate=slot(originalHandle,'evaluate',handleChecks);if(typeof originalHandleEvaluate!=='function')fail();load.guard();
    phases.evaluateTask=Reflect.apply(originalHandleEvaluate,originalHandle,[module.projectTerminalScriptWitness]);
    summary=await load.observed(phases.evaluateTask);
   }else{
-   phases.evaluateTask=Reflect.apply(evaluate,page,[module.collectTerminalScriptWitness,module.terminalScriptWitnessArguments(id,account)]);
+   phases.evaluateTask=Reflect.apply(evaluate,page,[module.collectTerminalScriptWitness,witnessArguments]);
    summary=await load.observed(phases.evaluateTask);
   }
   summaryCheck=snapshot(summary);
@@ -323,6 +323,21 @@ export async function bindTerminalScriptWitness(owner){
   }
   if(integrityCount!==0&&integrityCount!==5)fail();
   const selectedInitialExecutionJoined=integrityCount===5;
+  let supportedInitialLoadJoined=false;
+  const loadDescriptor=Object.getOwnPropertyDescriptor(summary,'initialLoad');
+  if(loadDescriptor){
+   if(!('value'in loadDescriptor)||!originalHandle||!selectedInitialExecutionJoined)fail();
+   const catalog=loadData(summary,'initialLoad'),loaded=loadData(catalog,'records'),expected=witnessArguments.initialLoadPins;
+   if(loadData(catalog,'definingExportsRetained')!==true||loadData(catalog,'applicationSourcesJoined')!==true||loadData(loaded,'length')!==expected.length)fail();
+   const seen=new Set();
+   for(let i=0;i<expected.length;i++){
+    const row=loadData(loaded,String(i)),url=loadData(row,'url'),parsed=new URL(url),canonical=parsed.origin+parsed.pathname;
+    const pin=expected.find(([u])=>u===canonical);
+    if(!pin||seen.has(canonical)||parsed.hash||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search))
+      ||loadData(row,'integrity')!==pin[1]||loadData(row,'loaded')!==true)fail();seen.add(canonical);
+   }
+   supportedInitialLoadJoined=true;
+  }
   let pending,failed;
   function recheck(){
    if(pending)return pending;if(failed)return failed;
@@ -338,7 +353,7 @@ export async function bindTerminalScriptWitness(owner){
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
-   realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
+   realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,supportedInitialLoadJoined,initialLoadReason:supportedInitialLoadJoined?undefined:(Object.hasOwn(summary,'initialLoadReason')?loadData(summary,'initialLoadReason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
    recheck:originalHandle?()=>recheck():undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}
