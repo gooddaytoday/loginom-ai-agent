@@ -14,12 +14,12 @@ Baseline имеет4 правильных результата и2 отсутс�
 12normal releases/5manual releases. Политика отвергнутой версии не принята;
 приёмка исправленной версии ещё не выполнена.
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты17 candidate,
-policy PASS во всех17. Один итоговый расчёт правильный,16 результатов не получены.
-Одна сессия завершена штатно,16 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты18 candidate,
+policy PASS во всех18. Один итоговый расчёт правильный,17 результатов не получены.
+Одна сессия завершена штатно,17 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось8 candidate, включая текущую sales-by-category/3. Sequential
-runner3920472/exec93765 продолжил серию2026-10-15T00:37:37.706957+00:00;
+Осталось7 candidate, включая текущую abc-pareto-groups/3. Sequential
+runner4037418/exec4282 продолжил серию2026-10-15T00:49:10.416510+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -31,6 +31,23 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+Sales-by-category/3 closed00:44:03.141Z: policy PASS `cb4ef6bb…`, mandatory
+review `db69d67b…`;24messages/93parts/26tools/76events/2036runtime, nochildren/JS0.
+Std Import500→GroupCategory Count/SumTotal/AvgQty/AvgPrice→SortRevenueDESC SUCCEEDED3.
+NativeExportcompleted/readAMBIGscrollbudget; затем только same-opinspect/observations/
+blockedSave/recover/resume и честный блокер, новыхapply/JS нет. Invalidstorage_name
+scope observation отказала; invalidfield удалён, settlementExport не утверждается.
+CSV/LGP/oracle не получены; CLI1/cleanupfalse/PureAPPLY_MISMATCH сохранены.
+Own284closed00:47:01.220Z/admin285logout00:47:02.842Z/browserclosed00:47:04.049Z;
+9actualPIDgone/exactguardarchive00:47:34.131352Z, unknown280+283виднывдвухreadbacks.
+Unknown277 былвbeforeUI00:44:55, nativeAUTO1800s timeout/close00:44:59.145Z произошёл
+ДОRootownclose; Root277не закрывал и егоretention не утверждает.
+Root независимо проверилscope доclose;17original bytes unchanged,
+18case/26recovery readonly; descriptor `0bcbe1ea…`.
+Independent sales3 finalrelease review `85c97107…`/readback `7e675ce1…`
+approved; actualgate2026-10-15T00:49:05.489Z разрешил technical-failed.
+Originalattempt `4c49a5d1…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Tags/2 НОВОЙ версии closed00:31:35.503Z: policy PASS `4938ad14…`, mandatory
 failure/JS review `541416ea…`;29messages/115parts/34tools/94events/1020runtime,
