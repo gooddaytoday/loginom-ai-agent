@@ -137,6 +137,19 @@ function installOriginalUserPublisher(origin) {
       for(const name of ['ss','bg','rpc','ObjectProxy','FileStorage','StreamPersistProxy','StreamPersist','GuidHelper','MessageDynamicData','HResult','query','connected','currentDirectory','ownDirectory','rootPath','persist','taskConstructor','mkdel','exceptionWrap','awaiter','selectAsync','objectEquals'])if(data(originals,name)!==bindings[name])unavailable();
       checks.push(()=>{if(apply(inspectInitialLoad,originalIntegrity,[])!==initialLoad)unavailable()});
     }
+    let propertyOperands;
+    const operandSlot=descriptor(initialLoad,'propertyOperands');
+    if(operandSlot){
+      if(!('value'in operandSlot)||!Object.isFrozen(operandSlot.value))unavailable();
+      propertyOperands=operandSlot.value;
+      if(data(propertyOperands,'complete')===true){
+        const definitions=data(propertyOperands,'definitions'),session=hold(rpc,'TBGSession');
+        for(const name of ['SelectPropertyDescs','GetPropertyValues']){
+          if(data(data(definitions,'rpc.'+name),'value')!==hold(session,name))unavailable();
+        }
+        checks.push(()=>{if(data(initialLoad,'propertyOperands')!==propertyOperands)unavailable()});
+      }
+    }
     let applicationSourcesJoined=false;
     if(data(initialLoad,'complete')===true){
       const loaded=data(initialLoad,'records');
@@ -147,7 +160,7 @@ function installOriginalUserPublisher(origin) {
       applicationSourcesJoined=true;
     }
     return Object.freeze({bindings:Object.freeze(bindings),complete,initializers,initialLoad,applicationSourcesJoined,
-      acquisitionDefinition,userDefinition,closureIdentityQualified:false});
+      acquisitionDefinition,userDefinition,propertyOperands,closureIdentityQualified:false});
   };
   const guard=()=>{
     if(acquisition?.failed)throw acquisition.error;

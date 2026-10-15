@@ -82,16 +82,17 @@ const pins=Object.freeze([
   "sha256-iEZg2ZiQxZ+lpU8rJFJV35i4r/IKUQbBwv2qM3I4iOo="
  ]
 ].map(row=>Object.freeze(row)));
+const propertyPins=Object.freeze([["https://app.loginom.ai/app/bg/js/BitConverter.js", "sha256-A/BRKGwnZgjacCPtkcye9cPWH8ymn3XeOQ1LcgBfgQA="], ["https://app.loginom.ai/app/bg/ts/Int64.js", "sha256-1H32matGbAynfDVdtvNwj/yE/BWryDmiLyK1qq7MvIk="], ["https://app.loginom.ai/app/bg/ts/SysUtils.js", "sha256-2cnhPsadRnbUGmYYVcGOGb+wySijnYxVBDXxhjE2K9Q="]].map(row=>Object.freeze(row)));
 export function terminalSourceIntegrityPins(){return pins}
-export function terminalSourceIntegrityScript(){return `(${installTerminalSourceIntegrity.toString()})(${JSON.stringify(pins)});`}
-function installTerminalSourceIntegrity(pins){
+export function terminalSourceIntegrityScript(){return `(${installTerminalSourceIntegrity.toString()})(${JSON.stringify(pins)},${JSON.stringify(propertyPins)});`}
+function installTerminalSourceIntegrity(pins,propertyPins){
  if(location.origin!=='https://app.loginom.ai'||globalThis.top!==globalThis)return;
  const root=globalThis,doc=document,key='__loginomOriginalScriptIntegrityV1';
  const descriptor=Object.getOwnPropertyDescriptor,define=Object.defineProperty,parent=Object.getPrototypeOf,apply=Reflect.apply;
  const fail=()=>{throw Error('TERMINAL_SOURCE_INTEGRITY_UNAVAILABLE')};
  if(descriptor(root,key))fail();
  const URLConstructor=root.URL,Script=root.HTMLScriptElement,Node=root.Node,scriptPrototype=Script.prototype,nodePrototype=Node.prototype;
- const originals=[],checks=[],records=new WeakMap(),expected=new Map(pins);let failure,loadSnapshot;const loads=[],definitions={};
+ const originals=[],checks=[],records=new WeakMap(),expected=new Map([...pins,...propertyPins]);let failure,loadSnapshot;const loads=[],definitions={},propertyDefinitions={};let propertyArmed=false;const propertyChecks=[];
  const initialSlots=['document','HTMLScriptElement','Node','URL','Event','EventTarget'].map(k=>[root,k,descriptor(root,k)]).concat([[Script,'prototype',descriptor(Script,'prototype')],[Node,'prototype',descriptor(Node,'prototype')]]);
  if(initialSlots.some(([, ,d])=>!d))fail();
  const remember=error=>{failure??={value:error};return failure.value};
@@ -117,12 +118,20 @@ function installTerminalSourceIntegrity(pins){
   'PropertySelector.js':[['selectAsync',['bg','selectAsync']]],
   'BG_System.js':[['bg',['bg']],['objectEquals',['bg','ObjectEquals']]],
  };
- function dataPath(path){
+ const propertyCatalog={"mscorlib.js":[["ss.safeCast",["ss","safeCast"]],["ss.cast",["ss","cast"]],["ss.isValue",["ss","isValue"]],["ss.isNullOrUndefined",["ss","isNullOrUndefined"]],["ss.referenceEquals",["ss","referenceEquals"]],["ss.getMembers",["ss","getMembers"]],["ss.getInterfaces",["ss","getInterfaces"]],["ss.getBaseType",["ss","getBaseType"]],["ss.isInstanceOfType",["ss","isInstanceOfType"]],["ss.getEnumerator",["ss","getEnumerator"]],["ss.IteratorBlockEnumerable",["ss","IteratorBlockEnumerable"]],["ss.IteratorBlockEnumerator",["ss","IteratorBlockEnumerator"]]],"rtl.js":[["rtl.GetSelectorMembersDict",["rtl","RemoteMetaHelper","GetSelectorMembersDict"]],["rtl.$DoGetSelectorDict",["rtl","RemoteMetaHelper","$DoGetSelectorDict"]],["rtl.$_GetSelectorDict",["rtl","RemoteMetaHelper","$_GetSelectorDict"]],["rtl.$AddToSelectorDict",["rtl","RemoteMetaHelper","$AddToSelectorDict"]],["rtl.$GetSelectorPropInfo",["rtl","RemoteMetaHelper","$GetSelectorPropInfo"]],["rtl.$GetSelectorMethodInfo",["rtl","RemoteMetaHelper","$GetSelectorMethodInfo"]],["rtl.$GetCustomAttribute",["rtl","RemoteMetaHelper","$GetCustomAttribute"]],["rtl.SelectorMemberInfo",["rtl","SelectorMemberInfo"]]],"rpc.js":[["rpc.SelectPropertyDescs",["rpc","TBGSession","SelectPropertyDescs"]],["rpc.$DoSelectPropertyDescs$1",["rpc","TBGSession","$DoSelectPropertyDescs$1"]],["rpc.$GetSelectMemberDesc",["rpc","TBGSession","$GetSelectMemberDesc"]],["rpc.GetPropertyValues",["rpc","TBGSession","GetPropertyValues"]],["rpc.GetPropertyValues$1",["rpc","TBGSession","GetPropertyValues$1"]],["rpc.$WritePropertyDescs",["rpc","TBGSession","$WritePropertyDescs"]],["rpc.$SplitPropertyValuesMessage",["rpc","TBGSession","$SplitPropertyValuesMessage"]],["rpc.$ReadPropertyValues",["rpc","TBGSession","$ReadPropertyValues"]],["rpc.$ReadSimplePropertyValue",["rpc","TBGSession","$ReadSimplePropertyValue"]],["rpc.$ReadObjectIdPropertyValue",["rpc","TBGSession","$ReadObjectIdPropertyValue"]],["rpc.GetPropertyValueReader",["rpc","TBGMessageDynamicData","GetPropertyValueReader"]],["rpc.CheckConnected",["rpc","TBGObjectProxy","prototype","CheckConnected"]],["rpc.GetRemoteInterfaceID",["rpc","TBGMessageDynamicData","GetRemoteInterfaceID$1"]]],"bg.model.js":[["IBGBaseDeductorUser",["bg","IBGBaseDeductorUser"]],["IBGDeductorUser",["bg","IBGDeductorUser"]],["IBGBaseDeductorUser.metadata",["bg","IBGBaseDeductorUser","__metadata"]],["IBGDeductorUser.metadata",["bg","IBGDeductorUser","__metadata"]]],"bg.model.rpc.js":[["UserProxy",["bg","rpc","TIBGDeductorUser_Proxy"]],["UserProxy.interfaces",["bg","rpc","TIBGDeductorUser_Proxy","__interfaces"]],["reader.1973",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1973"]],["reader.1976",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1976"]],["reader.1978",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1978"]],["reader.1979",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1979"]],["reader.1980",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1980"]],["reader.1981",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1981"]],["reader.1985",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1985"]],["reader.1983",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1983"]],["reader.1987",["rpc","TBGMessageDynamicData","$FRegisteredPropertyValueReaders","1987"]]],"SysUtils.js":[["CreateDictionary",["bg","CreateDictionary"]]],"Int64.js":[["Int64",["Int64"]],["UInt64",["UInt64"]]],"BitConverter.js":[["BitConverter.FromInt32",["BitConverter","FromInt32"]],["BitConverter.ToInt32",["BitConverter","ToInt32"]],["BitConverter.FromUInt16",["BitConverter","FromUInt16"]],["BitConverter.ToUInt16",["BitConverter","ToUInt16"]],["BitConverter.FromUInt32",["BitConverter","FromUInt32"]],["BitConverter.ToUInt32",["BitConverter","ToUInt32"]],["BitConverter.FromUInt64",["BitConverter","FromUInt64"]],["BitConverter.ToUInt64",["BitConverter","ToUInt64"]],["BitConverter.FromString",["BitConverter","FromString"]],["BitConverter.ToString",["BitConverter","ToString"]]]};
+ function dataPath(path,sink=checks){
   let value=root;
   for(const key of path){
    const object=value,d=descriptor(object,key),p=parent(object);if(!d||!('value'in d))throw Error('TERMINAL_SOURCE_DEFINITION_UNAVAILABLE:'+path.join('.'));
-   checks.push(()=>{const now=descriptor(object,key);if(parent(object)!==p||!now||Reflect.ownKeys(d).some(k=>now[k]!==d[k]))fail()});value=d.value;
+   sink.push(()=>{const now=descriptor(object,key);if(parent(object)!==p||!now||Reflect.ownKeys(d).some(k=>now[k]!==d[k]))fail()});value=d.value;
   }return value;
+ }
+ function holdMetadata(value,seen=[]){
+  if(value===null||typeof value!=='object')return;
+  for(let i=0;i<seen.length;i++)if(seen[i]===value)return;seen[seen.length]=value;const p=parent(value),keys=Reflect.ownKeys(value),slots=keys.map(k=>[k,descriptor(value,k)]);
+  if(slots.some(([,d])=>!d||!('value'in d)))fail();
+  propertyChecks.push(()=>{if(parent(value)!==p||Reflect.ownKeys(value).length!==keys.length)fail();for(const[k,d]of slots){const now=descriptor(value,k);if(!now||Reflect.ownKeys(d).some(key=>now[key]!==d[key]))fail()}});
+  for(const[,d]of slots)holdMetadata(d.value,seen);
  }
  function captureDefinitions(state){
   const file=state.url.pathname.split('/').at(-1),entries=catalog[file]??[];
@@ -131,6 +140,13 @@ function installTerminalSourceIntegrity(pins){
    if(value==null||(!['ss','bg','rpc'].includes(name)&&typeof value!=='function'))fail();
    definitions[name]=Object.freeze({value,sourceReceipt:state.receipt});
   }
+  for(const[name,path]of propertyCatalog[file]??[]){
+   if(Object.hasOwn(propertyDefinitions,name))fail();const value=dataPath(path,propertyChecks);if(value==null)fail();
+   const valueParent=parent(value);propertyChecks.push(()=>{if(parent(value)!==valueParent)fail()});
+   if(name.endsWith('.metadata')||name.endsWith('.interfaces'))holdMetadata(value);
+   propertyDefinitions[name]=Object.freeze({value,sourceReceipt:state.receipt});
+  }
+  if(file==='BitConverter.js')propertyArmed=true;
   if(file==='PropertySelector.js'&&definitions.selectAsync.value!==dataPath(['rpc','$imp','selectAsync']))fail();
  }
  function settle(state,event){
@@ -166,7 +182,7 @@ function installTerminalSourceIntegrity(pins){
   if(failure)throw failure.value;
   for(const[o,k,d]of initialSlots){const now=descriptor(o,k);if(!now||Reflect.ownKeys(d).some(n=>now[n]!==d[n]))fail();}
   for(const[o,k,d,p]of originals){const now=descriptor(o,k),wanted=k==='src'?wrapped:d;if(parent(o)!==p||!now||Reflect.ownKeys(wanted).some(n=>now[n]!==wanted[n]))fail()}
-  for(const check of checks)check();
+  for(const check of checks)check();if(propertyArmed)for(const check of propertyChecks)check();
  }
  function setSource(value){
   try{
@@ -206,12 +222,16 @@ function installTerminalSourceIntegrity(pins){
    if(this!==api)fail();guard();
    for(const state of loads)if(state.status==='loaded'&&read(state.node,'isConnected',connected,nodePrototype)!==true)fail();
    if(loadSnapshot)return loadSnapshot;
-   const complete=loads.length===pins.length&&loads.every(r=>r.status==='loaded')
+   const core=loads.filter(r=>pins.some(([url])=>url===r.url.origin+r.url.pathname));
+   const complete=core.length===pins.length&&core.every(r=>r.status==='loaded')
     &&Object.values(catalog).flat().every(([name])=>Object.hasOwn(definitions,name));
    const bindings=Object.freeze(Object.fromEntries(Object.entries(definitions).map(([key,r])=>[key,r.value])));
    loadSnapshot=Object.freeze({complete,reason:complete?undefined:'INITIAL_LOAD_INCOMPLETE',document:doc,
     missing:Object.freeze(pins.filter(([url])=>!loads.some(r=>r.url.origin+r.url.pathname===url&&r.status==='loaded')).map(([url])=>url)),
-    records:Object.freeze(loads.filter(r=>r.loaded).map(r=>r.loaded)),bindings,
+    records:Object.freeze(core.filter(r=>r.loaded).map(r=>r.loaded)),bindings,
+    propertyOperands:Object.freeze({complete:propertyArmed&&Object.values(propertyCatalog).flat().every(([name])=>Object.hasOwn(propertyDefinitions,name)),
+      definitions:Object.freeze({...propertyDefinitions}),additionalRecords:Object.freeze(loads.filter(r=>!core.includes(r)&&r.loaded).map(r=>r.loaded)),
+      closureIdentityQualified:false,nativeAuthority:false}),
     sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false});return loadSnapshot;
   }catch(error){throw remember(error)}}
  });

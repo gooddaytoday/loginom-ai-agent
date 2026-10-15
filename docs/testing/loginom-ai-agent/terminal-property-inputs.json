@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    {
+      "url": "https://app.loginom.ai/app/bg/js/BitConverter.js",
+      "bytes": 22125,
+      "sha256": "03f051286c276608da7023ed91cc9ef5c3d61fcca69f75de390d4b72005f8100"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/ts/Int64.js",
+      "bytes": 31482,
+      "sha256": "d47df699ab466c0ca77c355db6f3708ffc84fc15abc839a22f22b5aaaeccbc89"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/ts/SysUtils.js",
+      "bytes": 24933,
+      "sha256": "d9c9e13ec69d4676d41a661855c18e19bfb0c928a39d8c550435f18631362bd4"
+    }
+  ]
+}
