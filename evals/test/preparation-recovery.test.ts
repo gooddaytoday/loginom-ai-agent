@@ -4,7 +4,7 @@ import os from "node:os"
 import { mkdtemp, rm } from "node:fs/promises"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { recoverPreparationLeases } from "../src/preparation-recovery"
+import { readPreparationRecoverySources, recoverPreparationLeases } from "../src/preparation-recovery"
 import { stageUserPreparation } from "../src/user-environment"
 import { openLoginomAdmin, sealAdminProcessInventory } from "../src/loginom-admin"
 
@@ -54,7 +54,7 @@ test("preparation recovery adopts the exited controller server and both slots wi
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("mixed preparation recovery preserves released A while adopting only retained B", async () => {
+for (const missingComposite of [false, true]) test(`mixed preparation recovery preserves released A while adopting only retained B${missingComposite ? " with a missing composite tombstone" : ""}`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-mixed-recovery-")), fixture = await parallelFixture(root)
   const journal = path.join(fixture.slots.controller.stateDir, "command.json"), inventory = path.join(fixture.slots.controller.stateDir, "processes.json")
   await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "mixed", identity,
@@ -64,10 +64,10 @@ test("mixed preparation recovery preserves released A while adopting only retain
   const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
     const {writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
     const environment=await acquireEnvironmentLeases(${JSON.stringify(fixture.slots)},2,${JSON.stringify(identity)},${JSON.stringify(journal)},${JSON.stringify(fixture.lockRoot)});
-    const lease=environment.slots[0],cleanup=lease.receipt+".cleanup.json";
+    const lease=environment.slots[0],cleanup=lease.receipt+".cleanup.json",manifest=await Bun.file(lease.receipt).json();
     await writeLeaseReceipt(cleanup,{status:"confirmed",slotId:lease.slot.id,leaseToken:lease.token,serverEpoch:lease.identity.serverEpoch,
       processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true});
-    await lease.release(cleanup);console.log(lease.receipt);
+    await lease.release(cleanup);if(${missingComposite})await writeLeaseReceipt(lease.receipt,manifest);console.log(lease.receipt);
     await Promise.all([environment.server.close(),...environment.slots.map(lease=>lease.close())]);`],
     { cwd: root, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
   try {
@@ -83,6 +83,13 @@ test("mixed preparation recovery preserves released A while adopting only retain
         slotRecoveries: recovered.slots.map(lease => lease.receipt) })
       await recovered.server.assertHeld()
       expect(recovered.server.reservation.state).toBe("recovery-only")
+      expect(await readPreparationRecoverySources(fixture.slots, recovered)).toHaveLength(1)
+      const command = await readLeaseReceipt(recovered.journal) as { completedSlots: { cleanup: { sha256: string } }[] }
+      const changed = structuredClone(command)
+      changed.completedSlots[0]!.cleanup.sha256 = "0".repeat(64)
+      await writeLeaseReceipt(recovered.journal, changed)
+      await expect(readPreparationRecoverySources(fixture.slots, recovered)).rejects.toThrow("PREPARATION_RECOVERY_LINEAGE_INVALID")
+      await writeLeaseReceipt(recovered.journal, command)
     } finally { await Promise.all([recovered.server.close(), ...recovered.slots.map(lease => lease.close())]) }
   } finally { await rm(root, { recursive: true, force: true }) }
 })

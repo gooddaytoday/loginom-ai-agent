@@ -866,4 +866,13 @@ cleanup, ready:false. Неопределённый исход — retained/uncon
 CAS/admin runtime. После release всех slots оставшийся server fence завершается отдельным
 recovery-only CAS с проверкой всех prior process proofs; user/profile rows
 сохраняются. Этот путь проверен late write fault и реальным SIGKILL controller.
-Active CLI incidents, mixed partial A/B и остальные crash windows ещё open. Offline judge recover сохранён.
+Mixed pre-CLI A released/B retained также поддержан: A проверяется без нового
+slot CAS, B проходит native closure/archive/root finalization. Прежний committed
+B archive переиспользуется. Missing composite A согласуется по обоим resource
+proofs; missing result/completion после mixed release восстанавливаются без
+admin runtime и изменения reservations. Native SIGKILL/retry18 assertions PASS,
+23 source hashes verified; временная пара штатно удалена. Active CLI incidents,
+partial user/profile release и остальные crash windows ещё open. Offline judge
+recover сохранён. Browser qualification запускать последовательно: неизвестный
+одновременно запущенный browser оставляет process proof quarantined; другой
+успешный запуск не исправляет его задним числом.
