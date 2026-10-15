@@ -60,9 +60,9 @@ def measures(fields):
 
 def generate():
     source = (ROOT / "data/grouping.csv").read_bytes()
-    schema, rows = goal_output(source, final=True)
+    schema, rows = goal_output(source)
     expected = {"outputs": [output(schema, rows)]}
-    initial = output(*goal_output(source))
+    reconfiguration = output(*goal_output(source, final=True))
     matrix = {}
     specs = [
         ("five-aggregates.csv", [("Region", "string"), ("Amount", "real"), ("RowID", "integer")],
@@ -87,7 +87,8 @@ def generate():
         matrix[name] = {"status": "not_checked", "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
                        "keys": keys, "measures": measures(fields),
                        "expected": output(*expected_grouping((ROOT/"data"/name).read_bytes(), columns(cols), keys, measures(fields)))}
-    return {"expected.json": expected, "initial.json": {"outputs": [initial]},
+    return {"expected.json": expected, "initial.json": expected,
+            "reconfiguration.json": {"outputs": [reconfiguration]},
             "fixtures/manifest.json": manifest, "fixtures/matrix.json": matrix}
 
 if __name__ == "__main__":

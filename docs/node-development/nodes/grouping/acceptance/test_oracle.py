@@ -52,8 +52,8 @@ class OracleTests(unittest.TestCase):
             actual = deepcopy(expected)
             change(actual)
             with self.assertRaises(ValueError): self.compare(expected, actual)
-        # Hidden Segment still creates two distinct A groups in the final task.
-        projected = generate()["expected.json"]["outputs"][0]
+        # The separate reconfiguration stage retains both A/Segment groups.
+        projected = generate()["reconfiguration.json"]["outputs"][0]
         actual = deepcopy(projected)
         actual["rows"] = list({r["Group"]: r for r in actual["rows"]}.values())
         with self.assertRaisesRegex(ValueError, "multiset"): self.compare(projected, actual)
@@ -85,7 +85,7 @@ class OracleTests(unittest.TestCase):
             (repo / "packages/loginom-runtime/tools/loginom-acceptance/fixtures/grouping/grouping.csv").read_bytes())
 
     def test_groups_and_null_are_not_collapsed(self):
-        output = generate()["expected.json"]["outputs"][0]
+        output = generate()["reconfiguration.json"]["outputs"][0]
         self.assertEqual([c["name"] for c in output["columns"]], ["Group", "OtherTotal", "MeanAmount", "TextRows"])
         self.assertEqual(output["rows"], [
             dict(Group="A", OtherTotal=30.0, MeanAmount=1.25, TextRows=2),
@@ -94,6 +94,13 @@ class OracleTests(unittest.TestCase):
             dict(Group="C", OtherTotal=7.0, MeanAmount=None, TextRows=2)])
         initial = generate()["initial.json"]["outputs"][0]
         self.assertEqual(initial["rows"][-1], dict(Group="C", Total=None, Rows=2, Average=None, Minimum=None, Maximum=None, TextRows=2))
+
+    def test_current_task_saves_first_summary_without_reconfiguration(self):
+        expected = generate()["expected.json"]
+        self.assertEqual(set(expected), {"outputs"})
+        self.assertEqual(expected, generate()["initial.json"])
+        self.assertEqual([c["name"] for c in expected["outputs"][0]["columns"]],
+                         ["Group", "Total", "Rows", "Average", "Minimum", "Maximum", "TextRows"])
 
     def test_matrix_covers_empty_and_five_aggregates(self):
         matrix = generate()["fixtures/matrix.json"]
