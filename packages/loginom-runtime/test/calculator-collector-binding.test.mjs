@@ -161,7 +161,7 @@ for(const kind of ['own-data','own-object','own-accessor','inherited-data','inhe
    inherited:kind.startsWith('own-')?'not_checked':kind==='inherited-data'?'data':kind==='inherited-accessor'?'accessor':kind==='depth-bound'?'depth_bound':'absent',
    own_value:kind==='own-data'?false:null,inherited_value:kind==='inherited-data'?false:null,
    inherited_type:kind==='inherited-data'?'boolean':null,depth:kind.startsWith('inherited-')?1:null};
-  for(const w of d.windows){assert.deepEqual(w.isBufferedStore_descriptor,expected);assert.equal(w.evaluated,kind==='own-data');}
+  for(const w of d.windows){assert.deepEqual(w.isBufferedStore_descriptor,expected);assert.equal(w.evaluated,kind==='own-data'||kind==='inherited-data');}
   assert.ok(!JSON.stringify(d).includes('never copy'));assert.ok(!JSON.stringify(d).includes('private'));
  }finally{reset();}
 });
@@ -287,5 +287,88 @@ test('saved native b7 windows retain absent/null and strict refusal after class 
   const {validateCapture}=await import(pathToFileURL(root+'/src/acceptance/calculator-grouped-before-done-v1.mjs'));
   assert.throws(()=>validateCapture(result,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'before'}}),/LOGINOM_CAPTURE_CACHED_WINDOW/);
   for(const w of factual.windows){assert.equal(w.isBufferedStore_descriptor.own_value,null);assert.equal(w.isBufferedStore_descriptor.inherited_value,null);assert.equal(w.evaluated,false);assert.equal(w.value,null)}
+ }finally{reset();}
+});
+
+function bufferingFixture(kind,guard){
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;let getters=0,stores=0,proxies=0;
+ globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+  stores++;const st=v.getStore();delete st.isBufferedStore;
+  let proto={isBufferedStore:['inherited-true','own-false'].includes(kind)};
+  if(kind==='depth-eight'||kind==='depth-nine')for(let i=0;i<(kind==='depth-eight'?7:8);i++)proto=Object.create(proto);
+  Object.setPrototypeOf(st,proto);
+  const accessor={get(){getters++;throw Error('buffering getter must not run')}};
+  if(kind==='own-false')st.isBufferedStore=false;
+  if(kind==='own-true')st.isBufferedStore=true;
+  if(kind==='own-accessor')Object.defineProperty(st,'isBufferedStore',accessor);
+  if(kind==='inherited-accessor'){const p=Object.create({isBufferedStore:false});Object.defineProperty(p,'isBufferedStore',accessor);Object.setPrototypeOf(st,p);}
+  const wrong={'wrong-string':'false','wrong-number':0,'wrong-null':null,'wrong-undefined':undefined,'wrong-object':{}};
+  if(Object.hasOwn(wrong,kind))st.isBufferedStore=wrong[kind];
+  if(kind==='absent')Object.setPrototypeOf(st,null);
+  const get=st.getProxy;st.getProxy=()=>{proxies++;return get()};
+  if(guard==='class')st.$className='UnknownStore';
+  if(guard==='loading')st.isLoading=()=>true;
+  if(guard==='page')st.currentPage=2;
+  if(guard==='filter')st.getRemoteFilter=()=>true;
+  if(guard==='sort')st.getRemoteSort=()=>true;
+  if(guard==='count')st.getCount=()=>2;
+  if(guard==='proxy')st.getProxy=()=>{proxies++;return {$className:'OtherProxy',pendingOperations:{}}};
+  if(guard==='pending')st.getProxy=()=>{proxies++;return {$className:'bg.ext.CollectionProxy',pendingOperations:{pending:true}}};
+  if(guard==='membership'){const getData=st.getData;st.getData=()=>({...getData(),getSource:()=>({items:[]})});}
+  return st;
+ }};};
+ if(guard==='rows')f.grids[1].querySelectorAll=()=>[];
+ return {...f,counts:()=>({getters,stores,proxies})};
+}
+const bufferingRead=f=>{
+ const input={owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS};
+ const code=parentClassSource?`async page=>page.evaluate(${classReader.toString()},${JSON.stringify(input)})`:makeCalculatorCaptureCode(input);
+ return new Function('page','return ('+code+')(page)')(f.page);
+};
+for(const kind of ['inherited-false','inherited-true','own-false','own-true','own-accessor','inherited-accessor','wrong-string','wrong-number','wrong-null','wrong-undefined','wrong-object','absent','depth-eight','depth-nine'])test('operative boolean serialized collector sanitizer validator '+kind,async()=>{
+ const f=bufferingFixture(kind);
+ try{
+  const result=await bufferingRead(f),d=captureWindowDiagnostic(result);
+  const known=['inherited-false','inherited-true','own-false','own-true','depth-eight'].includes(kind),pass=['inherited-false','own-false','depth-eight'].includes(kind);
+  for(const w of d.windows){assert.equal(w.evaluated,known);assert.equal(w.value,known?pass:null)}
+  for(const st of result.stores)assert.equal(typeof st.flags.isBufferedStore,known?'boolean':'object');
+  const validate=()=>validateCapture(result,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'before'}});
+  if(pass)assert.match(validate(),/^[a-f0-9]{64}$/);else assert.throws(validate,/LOGINOM_CAPTURE_CACHED_WINDOW/);
+  assert.deepEqual(f.counts(),{getters:0,stores:2,proxies:2});assert.equal(f.events.includes('exclude'),false);assert.equal(f.events.includes('fetch'),false);
+ }finally{reset();}
+});
+for(const guard of ['class','loading','page','filter','sort','count','proxy','pending','membership','rows'])test('inherited false retains prior cache/row guard '+guard,async()=>{
+ const f=bufferingFixture('inherited-false',guard);
+ try{
+  const r=await bufferingRead(f);assert.ok(captureWindowDiagnostic(r).windows.every(w=>w.evaluated));
+  assert.throws(()=>validateCapture(r,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'before'}}),/LOGINOM_CAPTURE_CACHED_WINDOW/);
+  assert.deepEqual(f.counts(),{getters:0,stores:2,proxies:2});assert.equal(f.events.includes('exclude'),false);
+ }finally{reset();}
+});
+for(const phase of ['descriptor','prototype'])for(const rejection of [Error('operative buffering failure'),null,false,0,'',undefined])test('operative boolean preserves exact '+phase+' '+String(rejection),async()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   const st=v.getStore();delete st.isBufferedStore;
+   return new Proxy(st,{getOwnPropertyDescriptor(o,k){if(k==='isBufferedStore'&&phase==='descriptor')throw rejection;return Reflect.getOwnPropertyDescriptor(o,k)},getPrototypeOf(o){if(phase==='prototype')throw rejection;return Reflect.getPrototypeOf(o)}});
+  }};};
+  let failed=false,caught;try{await bufferingRead(f)}catch(e){failed=true;caught=e}
+  assert.equal(failed,true);assert.equal(caught,rejection);assert.equal(f.events.includes('exclude'),false);
+  failed=false;caught=undefined;
+  try{await captureCalculator({binding:binding(),identity,browser:f.browser,record:async()=>{}})}catch(e){failed=true;caught=e}
+  assert.equal(failed,true);assert.equal(caught,rejection);assert.equal(f.events.includes('exclude'),false);assert.equal(f.events.filter(e=>e==='cancel').length,1);
+ }finally{reset();}
+});
+for(const kind of ['inherited-false','inherited-true','absent'])test('operative boolean actual serialized harness before exclusion '+kind,async()=>{
+ const f=bufferingFixture(kind);
+ try{
+  if(kind==='inherited-false'){
+   const r=await captureCalculator({binding:binding(),identity,browser:f.browser,record:async()=>{}});
+   assert.ok(r.before.predicates.cached_windows.every(w=>w.evaluated&&w.value));assert.equal(f.events.filter(e=>e==='exclude').length,1);
+  }else{
+   await assert.rejects(captureCalculator({binding:binding(),identity,browser:f.browser,record:async()=>{}}),/LOGINOM_CAPTURE_CACHED_WINDOW/);
+   assert.equal(f.events.includes('exclude'),false);
+  }
+  assert.equal(f.counts().getters,0);assert.equal(f.events.filter(e=>e==='cancel').length,1);
  }finally{reset();}
 });

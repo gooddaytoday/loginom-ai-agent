@@ -4104,6 +4104,19 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   }
   return {depth_bound:true};
  };
+ // Operative buffering flag: explicit boolean only, first descriptor wins.
+ const storeBoolean=store=>{
+  if(!store)return {missing:true};let current=store;
+  for(let depth=0;depth<=8;depth++){
+   const d=Object.getOwnPropertyDescriptor(current,'isBufferedStore');
+   if(d){if(!('value'in d))return {accessor_not_read:true};
+    return typeof d.value==='boolean'?d.value:{boolean_type:typeof d.value};}
+   if(depth===8)return {depth_bound:true};
+   current=Object.getPrototypeOf(current);
+   if(current===null)return {missing:true};
+  }
+  return {depth_bound:true};
+ };
  const rect=e=>{const r=e.getBoundingClientRect();if(![r.x,r.y,r.width,r.height,e.clientWidth,e.clientHeight,e.scrollWidth,e.scrollHeight,e.scrollLeft,e.scrollTop].every(Number.isFinite))fail('GEOMETRY');return {x:r.x,y:r.y,width:r.width,height:r.height,
   clientWidth:e.clientWidth,clientHeight:e.clientHeight,scrollWidth:e.scrollWidth,scrollHeight:e.scrollHeight,scrollLeft:e.scrollLeft,scrollTop:e.scrollTop};};
  const dom=[],stack=[root];while(stack.length){
@@ -4177,7 +4190,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
    isBufferedStore_descriptor:bufferedDescriptor(store),
    provenance_descriptors:Object.fromEntries(['$className','buffered'].map(key=>[key,provenanceDescriptor(store,key)])),
-   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,k==='$className'?classString(store):own(store,k)])),
+   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,k==='$className'?classString(store):k==='isBufferedStore'?storeBoolean(store):own(store,k)])),
    cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
     remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
    proxy_class:classString(proxy),pendingKeys:pendingKeys?.map(scalar)??null,
