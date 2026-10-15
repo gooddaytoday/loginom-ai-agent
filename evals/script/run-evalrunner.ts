@@ -1,6 +1,6 @@
 import path from "node:path"
 import { parseArgs } from "node:util"
-import { readEvalrunnerConfig, qualifyEvalrunner, executeEvalrunner } from "../src/evalrunner"
+import { readEvalrunnerConfig, qualifyEvalrunner, executeEvalrunner, checkEvalrunnerEvidence } from "../src/evalrunner"
 
 const { values, positionals } = parseArgs({ args: Bun.argv.slice(2), allowPositionals: true, options: {
   config: { type: "string" }, series: { type: "string" }, case: { type: "string" },
@@ -10,10 +10,7 @@ const command = positionals[0]
 try {
   if (command === "check") {
     if (!values.series) throw Error("--series required")
-    const receipt = await Bun.file(path.join(values.series, "release.json")).json() as { runDir: string; summarySha256: string }
-    const hash = new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(receipt.runDir, "summary.json")).bytes()).digest("hex")
-    if (hash !== receipt.summarySha256) throw Error("Evidence changed")
-    console.log(JSON.stringify(receipt))
+    console.log(JSON.stringify(await checkEvalrunnerEvidence(values.series)))
   } else {
     if (!values.config) throw Error("--config required")
     const config = await readEvalrunnerConfig(values.config)

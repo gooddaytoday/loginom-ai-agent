@@ -98,9 +98,32 @@ export async function executeEvalrunner(config: EvalrunnerConfig, input: { serie
   await checkIsolatedLoginom(parseArtifactSource("docker", { container: proof.env.LOGINOM_CONTAINER!, storageDir: proof.env.LOGINOM_STORAGE_DIR! }))
   const receipt = { status: "RELEASED", verdict: codeVerdict?.verdict ?? verdict, case: input.case, runDir, code,
     sessionId: attempt.session_id, summarySha256: await fileHash(path.join(runDir, "summary.json")),
+    evidence: await sealEvalrunnerEvidence(input.series),
     configSha256: proof.configSha256, comparison: "INCOMPARABLE", at: new Date().toISOString() }
   await writeFile(path.join(input.series, "release.json"), JSON.stringify(receipt, null, 2), { flag: "wx", mode: 0o600 })
   await admitted.release()
+  return receipt
+}
+
+export async function sealEvalrunnerEvidence(series: string) {
+  return Promise.all((await payloadFiles(series)).sort().map(async file => {
+    if ((await lstat(path.join(series, file))).isSymbolicLink()) throw new EvalFailure("Unsafe evidence link", 2)
+    return { path: file, sha256: await fileHash(path.join(series, file)) }
+  }))
+}
+
+export async function checkEvalrunnerEvidence(series: string) {
+  const receipt = await Bun.file(path.join(series, "release.json")).json() as {
+    status: string; evidence: { path: string; sha256: string }[]
+  }
+  if (receipt.status !== "RELEASED" || !receipt.evidence?.length) throw new EvalFailure("Release evidence required", 2)
+  const root = await realpath(series)
+  for (const item of receipt.evidence) {
+    const file = path.join(root, item.path)
+    if (path.isAbsolute(item.path) || path.resolve(file) !== file || !file.startsWith(root + path.sep) ||
+      await realpath(file) !== file || !(await lstat(file)).isFile() || await fileHash(file) !== item.sha256)
+      throw new EvalFailure("Evidence changed", 2)
+  }
   return receipt
 }
 

@@ -15,6 +15,11 @@ def create(series, target):
     series = pathlib.Path(series).resolve()
     receipt = json.loads((series / 'release.json').read_text())
     assert receipt['status'] == 'RELEASED', 'release required'
+    assert receipt.get('evidence'), 'raw evidence required'
+    for record in receipt['evidence']:
+        source = series / record['path']
+        assert source.resolve().is_relative_to(series) and not source.is_symlink(), 'unsafe evidence'
+        assert digest(source.read_bytes()) == record['sha256'], 'raw evidence changed'
     run = pathlib.Path(receipt['runDir']).resolve()
     assert run.is_relative_to(series), 'foreign run'
     assert digest((run / 'summary.json').read_bytes()) == receipt['summarySha256'], 'summary changed'

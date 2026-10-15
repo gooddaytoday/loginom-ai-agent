@@ -2,8 +2,21 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome } from "../src/evalrunner"
+import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence } from "../src/evalrunner"
 import type { RunSummary } from "../src/report"
+
+test("standalone release verifies raw artifact bytes, not only summary", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-evidence-"))
+  try {
+    await Bun.write(path.join(root, "runs/one/summary.json"), "summary")
+    await Bun.write(path.join(root, "runs/one/case/1/artifact/result.lgp"), "original")
+    const evidence = await sealEvalrunnerEvidence(root)
+    await Bun.write(path.join(root, "release.json"), JSON.stringify({ status: "RELEASED", evidence }))
+    await expect(checkEvalrunnerEvidence(root)).resolves.toHaveProperty("status", "RELEASED")
+    await Bun.write(path.join(root, "runs/one/case/1/artifact/result.lgp"), "changed")
+    await expect(checkEvalrunnerEvidence(root)).rejects.toThrow("Evidence changed")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("standalone outcome blocks infrastructure and missing cleanup, preserves measured product FAIL", () => {
   const summary = { interrupted: false, stopped_reason: null, storage_leftovers: [],

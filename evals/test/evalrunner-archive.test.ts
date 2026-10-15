@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { evalsRoot } from "../src/config"
+import { sealEvalrunnerEvidence } from "../src/evalrunner"
 
 test("standalone delivery archive excludes private logs and verifies round trip bytes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-export-"))
@@ -11,7 +12,7 @@ test("standalone delivery archive excludes private logs and verifies round trip 
     await Bun.write(path.join(root, "run/summary.json"), summary)
     await Bun.write(path.join(root, "run/report.md"), "report")
     await Bun.write(path.join(root, "run/events.jsonl"), "PRIVATE")
-    await Bun.write(path.join(root, "release.json"), JSON.stringify({ status: "RELEASED", runDir: path.join(root, "run"), summarySha256: new Bun.CryptoHasher("sha256").update(summary).digest("hex") }))
+    await Bun.write(path.join(root, "release.json"), JSON.stringify({ status: "RELEASED", runDir: path.join(root, "run"), summarySha256: new Bun.CryptoHasher("sha256").update(summary).digest("hex"), evidence: await sealEvalrunnerEvidence(root) }))
     const script = path.join(evalsRoot, "script/evalrunner-archive.py")
     const create = Bun.spawn(["python3", script, "create", root, path.join(root, "delivery.tar.gz")], { stdout: "pipe", stderr: "pipe" })
     expect(await create.exited).toBe(0)
