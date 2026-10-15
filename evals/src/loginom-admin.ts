@@ -40,6 +40,9 @@ export type AdminConnection = {
   identity: ServerIdentity
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
+  inspectUnactivatedUser(lease: SlotLease, secretFile: string): Promise<{ identity: ServerIdentity; username: string;
+    account: { objectId: string; name: string; blocked: boolean } | null; serverSessions: "absent";
+    source: { path: string; sha256: string } }>
   createBlockedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof readUserOwnership>>>
   configureOwnedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof recordUserConfiguration>>>
   reconcileOwnedAcl(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string; policy: SharedDirectoryPolicy;
@@ -102,8 +105,9 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     sequence = result.then(() => undefined, () => undefined)
     return result
   }
-  const observe = async () => {
-    const data = requireAdminReply(await request("inspect", {}))
+  const observe = async (beforeSend?: () => Promise<void>) => {
+    const reply = await request("inspect", {}, beforeSend)
+    const data = requireAdminReply(reply)
     if (jsonObject(data) && data.sessionIdentityQualified === false && Array.isArray(data.rawSessions)) {
       const own = jsonObject(data.ownSession) ? data.ownSession : {}
       if (JSON.stringify(data.identity) !== JSON.stringify(identity) || typeof own.guid !== "string" || !own.guid ||
@@ -135,20 +139,72 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
             pendingDisconnect: session.pendingDisconnect, packageCount: session.packageCount, activeOperations: null }
         }) })
     }
-    return data
+    return { data, reply }
   }
   let disposal: Promise<void> | undefined
   const connection: AdminConnection = {
     identity,
     async inspectPolicy() {
-      const data = await observe()
+      const data = (await observe()).data
       if (!jsonObject(data) || JSON.stringify(data.identity) !== JSON.stringify(identity)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
       return { identity, sharedDirectories: sharedPolicy(data.sharedDirectories) }
     },
     async inspect() {
-      const data = await observe()
+      const data = (await observe()).data
       if (!jsonObject(data) || data.sessionIdentityQualified !== true || !Array.isArray(data.sessions)) throw new EvalFailure("SESSION_IDENTITY_UNSUPPORTED", 2)
       return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
+    },
+    async inspectUnactivatedUser(lease, secretFile) {
+      const current = async () => {
+        await lease.assertHeld()
+        if (!options.serverLease || options.serverLease.reservation.key !== `server:${identity.containerId}` ||
+          JSON.stringify(options.serverLease.reservation.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
+        await options.serverLease.assertHeld()
+        const prepared = await readUserPreparation(file, lease, secretFile)
+        if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+        if (await lstat(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined
+          throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+        })) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+        const owned = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined
+          throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
+        }) ? await readUserOwnership(file, lease, secretFile) : null
+        return { prepared, owned }
+      }
+      const before = await current()
+      await verifyParallelPair(file, identity)
+      const observation = await observe(async () => {
+        if (JSON.stringify(await current()) !== JSON.stringify(before)) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+      })
+      const data = observation.data
+      if (!jsonObject(data) || data.sessionIdentityQualified !== false || !jsonObject(data.ownSession) || data.ownSession.isAdmin !== true ||
+        !Array.isArray(data.users) || !Array.isArray(data.rawSessions))
+        throw new EvalFailure("ADMIN_PROTOCOL", 2)
+      const matches = data.users.filter(user => jsonObject(user) && typeof user.name === "string" && user.name.toLowerCase() === lease.slot.username.toLowerCase())
+      const account = matches[0]
+      if (!before.owned && matches.length || before.owned && (matches.length !== 1 || !jsonObject(account) ||
+        account.objectId !== before.owned.objectId || account.name !== before.owned.username || account.userKind !== 0 || account.blocked !== true))
+        throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+      if (data.rawSessions.some(row => jsonObject(row) && typeof row.name === "string" &&
+        (row.name.toLowerCase() === lease.slot.username.toLowerCase() || row.name.toLowerCase().startsWith(lease.slot.username.toLowerCase() + ":"))))
+        throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+      if (JSON.stringify(await current()) !== JSON.stringify(before)) throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
+      const commandFile = path.join(directory, "commands", `${observation.reply.id}.json`)
+      const command = await readLeaseReceipt(commandFile)
+      if (!jsonObject(command) || command.version !== 1 || command.kind !== "loginom-admin-command" || command.op !== "inspect" ||
+        command.state !== "confirmed" || command.id !== observation.reply.id ||
+        JSON.stringify(command.expectedIdentity) !== JSON.stringify(identity) ||
+        command.desiredHash !== new Bun.CryptoHasher("sha256").update("{}").digest("hex") ||
+        command.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(observation.reply)).digest("hex")) throw new EvalFailure("ADMIN_PROTOCOL", 2)
+      const result = { identity, username: lease.slot.username, account: before.owned ? { objectId: before.owned.objectId,
+        name: before.owned.username, blocked: true } : null, serverSessions: "absent" as const }
+      const receipt = { version: 2, kind: "unactivated-user-observation", ...result, slotId: lease.slot.id, leaseToken: lease.token,
+        preparationNonce: before.prepared.nonce, ownership: before.owned?.source ?? null, observation: observation.reply,
+        command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") } }
+      const target = path.join(directory, `unactivated-${lease.slot.id}-${observation.reply.id}.json`)
+      await writeLeaseReceipt(target, receipt)
+      return { ...result, source: { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } }
     },
     async reconcileUser(lease, secretFile) {
       // Readiness activates the user only after storage and effective-access probes.
@@ -170,7 +226,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (owned?.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
       const reserved = !owned && options.serverLease ? await (async () => {
         await verifyParallelPair(file, identity)
-        const observed = await observe()
+        const observed = (await observe()).data
         if (!jsonObject(observed) || !Array.isArray(observed.users)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
         if (observed.users.some(user => jsonObject(user) && typeof user.name === "string" && user.name.toLowerCase() === lease.slot.username.toLowerCase())) return undefined
         return reserveUserStorage(file, lease, secretFile, options.serverLease!)
