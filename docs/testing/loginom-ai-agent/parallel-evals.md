@@ -852,3 +852,13 @@ prepare2→1→public prepare1→verify1:21 assertions PASS, protected markers
 неизменны, normal reservations released. Verify пока также возвращает
 ready:false/code2 SESSION_IDENTITY_UNSUPPORTED; неполные preparations и active
 accounts требуют дальнейшей finalization/recovery, автоматического исправления нет.
+
+Для pre-CLI incident с original journal kind unactivated-preparation доступен
+`bun script/parallel-env.ts recover --config <private-slots.json> --incident
+<original-prepare-command.json> --out <new-private-directory>`. Команда принимает
+server/user/profile ownership через recovery-only CAS, проверяет все prior
+admin/process sources и native blocked/absent state, архивирует history и
+выпускает доказанно чистые reservations. Exit0/status released — завершение
+cleanup, ready:false. Неопределённый исход — retained/unconfirmed/exit2.
+Active CLI incidents, fully terminal repeat и partial terminal reconciliation
+пока не покрываются этим путём. Offline judge recover сохранён.

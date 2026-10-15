@@ -32,9 +32,27 @@ try {
       throw new EvalFailure("PARALLEL_ENV_OUTPUT_PRIVATE", 2)
     await mkdir(out, { mode: 0o700 }).catch(() => { throw new EvalFailure("PARALLEL_ENV_OUTPUT_PRIVATE", 2) })
     if (command === "recover") {
-      const receipt = await recoverOfflineJudgeIncident({ slotsFile, journal: path.resolve(args.values.incident!) })
-      await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "offline-judge-recovery-result", ...receipt })
-      console.log(JSON.stringify(receipt))
+      const incident = path.resolve(args.values.incident!), original = await readLeaseReceipt(incident)
+      const preparation = original && typeof original === "object" && "kind" in original && original.kind === "unactivated-preparation"
+      if (preparation) {
+        const { recoverUnactivatedPreparation } = await import("../src/preparation-recovery")
+        const { EnvironmentFailure } = await import("../src/environment-preparation")
+        const receipt = await recoverUnactivatedPreparation({ slotsFile, incident }).catch(async error => {
+          const failure = error instanceof EnvironmentFailure ? await readLeaseReceipt(error.receipt) : { version: 2, kind: "preparation-recovery",
+            status: "failed", ready: false, reason: error instanceof EvalFailure ? error.message : "PREPARATION_RECOVERY_FAILED",
+            finalization: { status: "unconfirmed" } }
+          if (!failure || typeof failure !== "object" || Array.isArray(failure)) throw new EvalFailure("PREPARATION_RECEIPT_UNCONFIRMED", 2)
+          await writeLeaseReceipt(path.join(out, "receipt.json"), failure)
+          throw error
+        })
+        await writeLeaseReceipt(path.join(out, "receipt.json"), receipt)
+        console.log(JSON.stringify(receipt))
+      }
+      if (!preparation) {
+        const receipt = await recoverOfflineJudgeIncident({ slotsFile, journal: incident })
+        await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "offline-judge-recovery-result", ...receipt })
+        console.log(JSON.stringify(receipt))
+      }
     }
     if (command === "prepare" || command === "verify") {
       const { prepareEnvironment, verifyEnvironment, EnvironmentFailure } = await import("../src/environment-preparation")
