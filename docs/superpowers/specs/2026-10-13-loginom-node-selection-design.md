@@ -1,11 +1,11 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты16 candidate,
-policy PASS во всех16. Один итоговый расчёт правильный,15 результатов не получены.
-Одна сессия завершена штатно,15 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты17 candidate,
+policy PASS во всех17. Один итоговый расчёт правильный,16 результатов не получены.
+Одна сессия завершена штатно,16 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось9 candidate, включая текущую tags/2. Sequential
-runner3817370/exec67779 продолжил серию2026-10-15T00:27:05.703503+00:00;
+Осталось8 candidate, включая текущую sales-by-category/3. Sequential
+runner3920472/exec93765 продолжил серию2026-10-15T00:37:37.706957+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -17,6 +17,26 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+Tags/2 НОВОЙ версии closed00:31:35.503Z: policy PASS `4938ad14…`, mandatory
+failure/JS review `541416ea…`;29messages/115parts/34tools/94events/1020runtime,
+nochildren. Gap rationale и7knownstandard schemas ДОJS. StdNullFilter SUCCEEDED,
+soleJSsource/apply276B/9LF SHA499a469effa827c3d704fe0ead1a0a4b770998c40a913406c1f504d8e87d9af1,
+GUIDc8a4273f… SUCCEEDED/161rawrows. Только actualRowCount→Tags.split(';')→for-of
+ALLparts→Append unchangedRawTag. Нет Trim/empty/nullfilter/normalize/count/sort/
+hardcodes/callback; blanks+' red ' сохранены. Actual151segments/150red истрокиразной
+длины связаны inputSHA2c553370…; нет дополнительныхsessions. StdTrim заблокирован
+upstreamportAMBIG, новыхJScode/apply нет. Same raw-output refresh REFUSEDpending/
+0nativeevents/TOOL_ADMISSION_MISSING сохранён какruntimeanomaly, не второйJSapply.
+CSV/LGP/oracle не получены; CLI1/cleanupfalse/runtimefalse/incomplete неизменны.
+Own281closed00:35:02.947Z/admin282logout00:35:04.582Z/browserclosed00:35:05.795Z;
+9actualPIDgone/exactguardarchive00:35:32.306511Z, unknown277+280 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+19case(code+review)/26recovery readonly; descriptor `2e103265…`.
+Independent newtags2 finalrelease review `5e1b8c56…`/readback `9a73c0e4…`
+approved; actualgate2026-10-15T00:37:29.953Z разрешил technical-failed.
+Originalattempt `1bb27b08…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
+Прежний rejected tags/2 серии112452 не переименован и в эти17 не входит.
 
 Explicit-js/2 closed00:20:28.870Z: policy PASS `f930cba6…`, mandatory failure/JS
 review `00c361ac…`;24messages/95parts/26tools/77events/1905runtime, nochildren.
