@@ -162,7 +162,8 @@ export function collectTerminalScriptWitness(expected){
   const forwarders={};for(const key of ['toPromise','then','catch','finally']){const value=hold(prototype,key);if(typeof value!=='function')throw Error('TERMINAL_PROVIDER_TASK_FORWARDER');forwarders[key]=value}
   const promise=hold(globalThis,'Promise'),promisePrototype=hold(promise,'prototype'),promiseThen=hold(promisePrototype,'then');
   hold(promisePrototype,'catch');hold(promise,'resolve');
-  taskDefinition=Object.freeze({ctor,prototype,continuation,forwarders:Object.freeze(forwarders),promise,promisePrototype,promiseThen});
+  const object=hold(globalThis,'Object'),objectOps=Object.freeze(Object.fromEntries(['create','freeze','defineProperty','setPrototypeOf'].map(key=>{const method=hold(object,key);if(typeof method!=='function')throw Error('TERMINAL_PROVIDER_CALLEE_INTRINSIC');return[key,method]})));
+  taskDefinition=Object.freeze({ctor,prototype,continuation,forwarders:Object.freeze(forwarders),promise,promisePrototype,promiseThen,object,objectOps});
  }else providerChecks.push(()=>{if(descriptor(nativeSS,'Task')||parent(nativeSS)!==taskNamespacePrototype)throw Error('TERMINAL_PROVIDER_TASK_DEFINITION_CHANGED')});
  let birthWindow;const birthChain=[];
  if(taskDefinition){
@@ -180,21 +181,34 @@ export function collectTerminalScriptWitness(expected){
    if(descriptor(p,'task'))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');chain.push({p,prototype:parent(p)});
   }
   const checkChain=()=>{for(const x of chain)if(parent(x.p)!==x.prototype||x.p!==completionPrototype&&descriptor(x.p,'task'))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED')};
-  let source,born,returned,first;
+  let source,born,returned,first;const calleePatches=[];
+  // Probe the already retained function objects, not mutable namespace aliases.
+  // NewTarget.prototype is a data property: observe its unique instance marker.
+  const objectCall=(key,args)=>apply(taskDefinition.objectOps[key],taskDefinition.object,args);
+  const marker=prototype=>objectCall('freeze',[objectCall('create',[prototype])]);
+  const sourceMarker=marker(completionPrototype),taskMarker=marker(taskDefinition.prototype);
+  const replacePrototype=(ctor,originalPrototype,marker)=>{
+   const original=descriptor(ctor,'prototype');
+   if(!original||!('value'in original)||original.value!==originalPrototype||original.writable!==true)throw Error('TERMINAL_PROVIDER_CALLEE_PROTOTYPE');
+   const p={object:ctor,key:'prototype',prototype:parent(ctor),original,temporary:{...original,value:marker},active:true,calleePrototype:true};
+   objectCall('defineProperty',[ctor,'prototype',p.temporary]);providerPatches.push(p);calleePatches.push(p);
+  };
   const set=function(value){
    if(!descriptorEqual(descriptor(completionPrototype,'task'),temporary))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');
    checkChain();guard();
-   if(source||this===completionPrototype||parent(this)!==completionPrototype||descriptor(this,'task')
-     ||!value||typeof value!=='object'||value===task||parent(value)!==taskDefinition.prototype)throw Error('TERMINAL_PROVIDER_CONTINUATION_BIRTH');
+   if(source||this===completionPrototype||parent(this)!==sourceMarker||descriptor(this,'task')
+     ||!value||typeof value!=='object'||value===task||parent(value)!==taskMarker)throw Error('TERMINAL_PROVIDER_CALLEE_IDENTITY');
    source=this;born=value;
    Object.defineProperty(source,'task',{value,writable:true,enumerable:true,configurable:true});
   };
   const temporary={get:undefined,set,enumerable:false,configurable:true};
   Object.defineProperty(completionPrototype,'task',temporary);birthWindow=temporary;
   try{
+   replacePrototype(originalCompletionConstructor,completionPrototype,sourceMarker);
+   replacePrototype(taskDefinition.ctor,taskDefinition.prototype,taskMarker);guard();
    returned=apply(continuation,task,[callback]);
    checkChain();guard();
-   if(!source||source===lower.completion||returned!==born||born===task||parent(source)!==completionPrototype||parent(born)!==taskDefinition.prototype
+   if(!source||source===lower.completion||returned!==born||born===task||parent(source)!==sourceMarker||parent(born)!==taskMarker
      ||own(born,'status')!==3||own(source,'task')!==born)throw Error('TERMINAL_PROVIDER_CONTINUATION_BIRTH');
   }catch(value){first={value}}
   // Restore exactly our descriptor before returning to the native caller. The
@@ -203,12 +217,28 @@ export function collectTerminalScriptWitness(expected){
   try{if(!descriptorEqual(descriptor(completionPrototype,'task'),temporary))throw Error('TERMINAL_PROVIDER_BIRTH_SLOT_CHANGED');
    delete completionPrototype.task;
   }catch(value){first??={value}}
-  birthWindow=undefined;if(first)throw first.value;
+  birthWindow=undefined;
+  // Restore only our exact descriptors and marker prototypes, including throw.
+  // A foreign descriptor or instance prototype remains untouched and refuses.
+  for(const p of calleePatches.slice().reverse())try{
+   if(!p.active||!providerPatches.includes(p))throw Error('TERMINAL_PROVIDER_CALLEE_WINDOW_CHANGED');
+   patchCheck(p);objectCall('defineProperty',[p.object,p.key,p.original]);p.active=false;
+   providerPatches.splice(providerPatches.indexOf(p),1);
+  }catch(value){first??={value}}
+  for(const [object,marker,original]of [[source,sourceMarker,completionPrototype],[born,taskMarker,taskDefinition.prototype]])if(object)try{
+   if(parent(object)!==marker)throw Error('TERMINAL_PROVIDER_CALLEE_INSTANCE_CHANGED');
+   objectCall('setPrototypeOf',[object,original]);
+  }catch(value){first??={value}}
+  if(first)throw first.value;
+  guard();
+  if(parent(source)!==completionPrototype||parent(born)!==taskDefinition.prototype)throw Error('TERMINAL_PROVIDER_CALLEE_RESTORE');
   hold(source,'task');for(const key of ['setResult','setException'])hold(source,key);
   for(const key of ['continueWith','getAwaitedResult'])hold(born,key);
   lower.continuationBirth=Object.freeze({observed:true,source,task:born,primarySource:lower.completion,primaryTask:task,
    returnedTask:returned,continuation,sourcePrototype:completionPrototype,taskPrototype:taskDefinition.prototype,
-   statusAtReturn:3,assignmentObserved:true,prototypeRestored:true,lexicalCalleeIdentityQualified:false});
+   statusAtReturn:3,assignmentObserved:true,prototypeRestored:true,
+   sourceConstructor:originalCompletionConstructor,taskConstructor:taskDefinition.ctor,sourceMarker,taskMarker,
+   lexicalCalleeScope:'Task.continueWith:TaskCompletionSource/Task',lexicalCalleeIdentityQualified:true});
   for(const key of Reflect.ownKeys(lower.continuationBirth))hold(lower.continuationBirth,key);
   retainForwarders(lower,born);guard();return returned;
   }catch(value){providerFailure??={value};throw providerFailure.value}
@@ -268,7 +298,7 @@ export function collectTerminalScriptWitness(expected){
 
  function patchCheck(p){if(parent(p.object)!==p.prototype||!descriptorEqual(descriptor(p.object,p.key),p.active?p.temporary:p.original))throw Error('TERMINAL_PROVIDER_PATCH_CHANGED')}
  function suspendNative(check){
-  const selected=providerPatches.filter(p=>p.active&&(p.object===transport||p.object===nativeSS));
+  const selected=providerPatches.filter(p=>p.active&&(p.object===transport||p.object===nativeSS||p.calleePrototype));
   selected.forEach(patchCheck);
   for(const p of selected){if(p.original)Object.defineProperty(p.object,p.key,p.original);else delete p.object[p.key];p.active=false}
   try{return check()}finally{
