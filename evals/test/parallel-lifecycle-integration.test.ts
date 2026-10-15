@@ -415,7 +415,8 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
 }, 360_000)
 
 async function observeCliSession(inventoryFile: string, admitted: number, username: string) {
-  const raw = await readLeaseReceipt(inventoryFile) as { processes: { state: string; sessions?: { before: { path: string }; during?: { path: string }[] } }[] }
+  // This live cancellation hint can race atomic replacement; settled evidence is validated strictly below.
+  const raw = await Bun.file(inventoryFile).json() as { processes: { state: string; sessions?: { before: { path: string }; during?: { path: string }[] } }[] }
   const current = raw.processes.at(-1)
   if (raw.processes.length <= admitted || !current?.sessions?.during?.length) return
   const before = await readLeaseReceipt(current.sessions.before.path) as { sessions: { objectId: string }[] }
