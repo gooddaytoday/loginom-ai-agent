@@ -33,15 +33,15 @@ export async function verifyEvalrunnerModel(config: { root: string; profile: str
   const db = new Database(path.join(copy, path.basename(source)), { readonly: true })
   const messages = (() => {
     try {
-      return (db.query("SELECT id,data FROM message WHERE session_id=? ORDER BY id").all(input.sessionId) as { id: string; data: string }[])
-        .map(item => ({ id: item.id, ...JSON.parse(item.data) as { role?: string; providerID?: string; modelID?: string; variant?: string } }))
+      return (db.query("SELECT id,session_id,data FROM message ORDER BY id").all() as { id: string; session_id: string; data: string }[])
+        .map(item => ({ id: item.id, session: item.session_id, ...JSON.parse(item.data) as { role?: string; providerID?: string; modelID?: string; variant?: string } }))
         .filter(item => item.role === "assistant")
-        .map(item => ({ message: item.id, providerID: item.providerID, modelID: item.modelID, variant: item.variant }))
+        .map(item => ({ message: item.id, session: item.session, providerID: item.providerID, modelID: item.modelID, variant: item.variant }))
     } finally { db.close() }
   })()
   const after = await hashes()
   if (JSON.stringify(before) !== JSON.stringify(after)) throw new EvalFailure("History source changed", 2)
-  if (!messages.length || messages.some(item => item.providerID !== "openai" || item.modelID !== "gpt-6.1-sol" || item.variant !== "medium"))
+  if (!messages.some(item => item.session === input.sessionId) || messages.some(item => item.providerID !== "openai" || item.modelID !== "gpt-6.1-sol" || item.variant !== "medium"))
     throw new EvalFailure("Actual product model differs or has no assistant records", 2)
   return { kind: "evalrunner-actual-model-proof", status: "VERIFIED" as const, sessionId: input.sessionId,
     assistantMessages: messages.length, messages, archive, sourceHashesBefore: before, sourceHashesAfter: after,

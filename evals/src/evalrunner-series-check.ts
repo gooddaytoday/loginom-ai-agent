@@ -101,6 +101,7 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
     const model = record.model
     if (!config.profile || record.releaseSha256 !== evalrunnerHash(await readFile(path.join(selected, "release.json"))) ||
       model.status !== "VERIFIED" || model.sessionId !== release.sessionId || !model.assistantMessages ||
+      !model.messages.some(item => item.session === release.sessionId) ||
       model.messages.length !== model.assistantMessages || model.messages.some(item => item.providerID !== "openai" || item.modelID !== "gpt-6.1-sol" || item.variant !== "medium") ||
       !model.sourceHashesBefore.some(item => item.file === "loginom-ai-agent.db") ||
       JSON.stringify(model.sourceHashesBefore) !== JSON.stringify(model.sourceHashesAfter) ||
