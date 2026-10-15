@@ -61,6 +61,16 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>; processInventory?: string
 } = {}): Promise<AdminConnection> {
   if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
+  if (options.serverLease) {
+    const command = await readLeaseReceipt(options.serverLease.reservation.journal)
+    if (jsonObject(command) && command.kind === "unactivated-preparation") {
+      await options.serverLease.assertHeld()
+      if (options.processInventory !== command.processInventory || typeof options.processInventory !== "string" ||
+        command.commandId !== options.serverLease.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
+        throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+      if (command.phase !== "unactivated") throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
+    }
+  }
   const binary = options.binary ?? process.env.EVAL_CLI_BIN ?? Bun.which("loginom-ai-agent-cli")
   if (!binary) throw new EvalFailure("ADMIN_RUNTIME_UNAVAILABLE", 2)
   const runtime = await verifyAdminRuntime(binary)
@@ -85,14 +95,15 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     const inventory = options.processInventory, lease = options.serverLease
     if (!lease || lease.reservation.key !== `server:${identity.containerId}` || JSON.stringify(lease.reservation.identity) !== JSON.stringify(identity))
       throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
-    const pending = (inventoryWrites.get(inventory) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    await withAdminInventoryWrite(inventory, async () => {
       await lease.assertHeld()
       const current = await readAdminInventory(file, identity, { file: inventory, journal: lease.reservation.journal, commandId: lease.reservation.commandId })
+      const command = await readLeaseReceipt(lease.reservation.journal)
+      if (jsonObject(command) && command.kind === "unactivated-preparation" && command.phase !== "unactivated")
+        throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
       await writeLeaseReceipt(inventory, { ...current, connections: [...current.connections, { directory, producerPid: process.pid }] })
       await lease.assertHeld()
     })
-    inventoryWrites.set(inventory, pending)
-    try { await pending } finally { if (inventoryWrites.get(inventory) === pending) inventoryWrites.delete(inventory) }
   }
   let stopInput = (_error: EvalFailure) => {}, stopOutput = (_error: EvalFailure) => {}
   const input = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopInput = error => controller.error(error) } })
@@ -422,6 +433,32 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
 function requireAdminReply(reply: AdminReply): unknown {
   if (reply.outcome === "confirmed") return reply.data
   throw new EvalFailure(adminReplyCode(reply), 2)
+}
+
+export async function sealAdminProcessInventory(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, expectedHash: string) {
+  await server.assertHeld()
+  const initial = await readLeaseReceipt(server.reservation.journal)
+  const identity = server.reservation.identity
+  if (!identity || server.reservation.key !== `server:${identity.containerId}` || !jsonObject(initial) || typeof initial.processInventory !== "string")
+    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+  return withAdminInventoryWrite(initial.processInventory, async () => {
+    await readAdminInventory(file, identity, { file: initial.processInventory as string, journal: server.reservation.journal, commandId: server.reservation.commandId })
+    const command = await readLeaseReceipt(server.reservation.journal)
+    if (!jsonObject(command) || command.kind !== "unactivated-preparation" || command.phase !== "unactivated" ||
+      new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") !== expectedHash)
+      throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
+    const sealed = { ...command, phase: "finalizing" }
+    await server.assertHeld()
+    await writeLeaseReceipt(server.reservation.journal, sealed)
+    return sealed
+  })
+}
+
+async function withAdminInventoryWrite<T>(file: string, callback: () => Promise<T>) {
+  const pending = (inventoryWrites.get(file) ?? Promise.resolve()).then(callback)
+  const settled = pending.then(() => {}, () => {})
+  inventoryWrites.set(file, settled)
+  try { return await pending } finally { if (inventoryWrites.get(file) === settled) inventoryWrites.delete(file) }
 }
 
 export async function readAdminProcessInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {
