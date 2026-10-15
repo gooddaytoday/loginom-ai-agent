@@ -9,16 +9,19 @@ import { readEnvironmentStatus } from "../src/parallel-status"
 
 try {
   const args = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: {
-    config: { type: "string" }, incident: { type: "string" }, out: { type: "string" },
+    config: { type: "string" }, incident: { type: "string" }, out: { type: "string" }, parallel: { type: "string" },
   } })
   const command = args.positionals[0]
-  if (args.positionals.length !== 1 || !["status", "recover"].includes(command ?? "") || !args.values.config ||
-    command === "recover" && (!args.values.incident || !args.values.out) || command === "status" && (args.values.incident || args.values.out))
+  if (args.positionals.length !== 1 || !["status", "recover", "prepare"].includes(command ?? "") || !args.values.config ||
+    command === "recover" && (!args.values.incident || !args.values.out || args.values.parallel) ||
+    command === "prepare" && (!args.values.out || args.values.incident || args.values.parallel !== undefined &&
+      (!/^[1-9][0-9]*$/.test(args.values.parallel) || !Number.isSafeInteger(Number(args.values.parallel)))) ||
+    command === "status" && (args.values.incident || args.values.out || args.values.parallel))
     throw new EvalFailure("PARALLEL_ENV_ARGUMENTS", 2)
   const slotsFile = path.resolve(args.values.config)
   const file = await loadResourceSlots(slotsFile)
   if (command === "status") console.log(JSON.stringify(await readEnvironmentStatus(file)))
-  if (command === "recover") {
+  if (command !== "status") {
     const out = path.resolve(args.values.out!)
     if ([globalLockRoot, slotsFile, file.controller.stateDir, file.controller.adminCredentialsFile, file.judge.codexHome,
       ...(file.auth ? [file.auth.sharedDir] : []), ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])]
@@ -28,9 +31,22 @@ try {
     if (!parent.isDirectory() || parent.uid !== process.getuid?.() || (parent.mode & 0o777) !== 0o700 || await realpath(path.dirname(out)) !== path.dirname(out))
       throw new EvalFailure("PARALLEL_ENV_OUTPUT_PRIVATE", 2)
     await mkdir(out, { mode: 0o700 }).catch(() => { throw new EvalFailure("PARALLEL_ENV_OUTPUT_PRIVATE", 2) })
-    const receipt = await recoverOfflineJudgeIncident({ slotsFile, journal: path.resolve(args.values.incident!) })
-    await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "offline-judge-recovery-result", ...receipt })
-    console.log(JSON.stringify(receipt))
+    if (command === "recover") {
+      const receipt = await recoverOfflineJudgeIncident({ slotsFile, journal: path.resolve(args.values.incident!) })
+      await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "offline-judge-recovery-result", ...receipt })
+      console.log(JSON.stringify(receipt))
+    }
+    if (command === "prepare") {
+      const { prepareEnvironment } = await import("../src/environment-preparation")
+      const receipt = await prepareEnvironment({ slotsFile, parallel: Number(args.values.parallel ?? "1") }).catch(async error => {
+        await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "environment-preparation", status: "failed", ready: false,
+          reason: error instanceof EvalFailure ? error.message : "PREPARATION_FAILED" })
+        throw error
+      })
+      await writeLeaseReceipt(path.join(out, "receipt.json"), receipt)
+      console.log(JSON.stringify(receipt))
+      process.exitCode = receipt.code
+    }
   }
 } catch (error) {
   console.error(error instanceof EvalFailure ? error.message : "PARALLEL_ENV_COMMAND_FAILED")

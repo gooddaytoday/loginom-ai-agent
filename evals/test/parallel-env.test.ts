@@ -71,3 +71,36 @@ test("parallel environment CLI refuses incomplete recovery arguments before crea
     expect(await Bun.file(path.join(out, "receipt.json")).exists()).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("prepare CLI rejects output inside a slot before any preparation or runtime", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-prepare-output-")), fixture = await parallelFixture(root)
+  const config = path.join(root, "slots.json")
+  await writeLeaseReceipt(config, fixture.slots)
+  try {
+    const before = await readdir(fixture.slots.controller.stateDir)
+    const child = Bun.spawn([process.execPath, path.join(evalsRoot, "script/parallel-env.ts"), "prepare", "--config", config,
+      "--parallel", "1", "--out", path.join(fixture.slots.slots[0]!.profileDir, "output")],
+      { cwd: evalsRoot, env: { PATH: process.env.PATH ?? "", HOME: root }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "PARALLEL_ENV_OUTPUT_EXPOSED" })
+    expect(await readdir(fixture.slots.controller.stateDir)).toEqual(before)
+    expect(await readdir(fixture.lockRoot)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("prepare CLI records a private admission failure without a measured summary", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-prepare-failure-")), fixture = await parallelFixture(root)
+  const config = path.join(root, "slots.json"), out = path.join(root, "output")
+  await writeLeaseReceipt(config, fixture.slots)
+  try {
+    const child = Bun.spawn([process.execPath, path.join(evalsRoot, "script/parallel-env.ts"), "prepare", "--config", config, "--out", out],
+      { cwd: evalsRoot, env: { PATH: process.env.PATH ?? "", HOME: root }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "SLOT_PATH_PRIVATE" })
+    expect(await Bun.file(path.join(out, "receipt.json")).json()).toMatchObject({ version: 2, kind: "environment-preparation", ready: false,
+      status: "failed", reason: "SLOT_PATH_PRIVATE" })
+    expect(await readdir(out)).toEqual(["receipt.json"])
+    expect(await readdir(fixture.slots.controller.stateDir)).toEqual([])
+    expect(await readdir(fixture.lockRoot)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

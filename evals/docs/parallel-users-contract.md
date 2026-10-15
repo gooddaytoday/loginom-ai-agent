@@ -1016,3 +1016,23 @@ SHA256 `aba025a4c9c4aa7b9592dc9aac155b22f7701e610d658903b4e0f6dedeec1ff6`
 сохраняет command/admin inventory/server/slot cleanup/archive/observation sources.
 23 independent source/status checks совпали; exact own pair independently absent.
 Это не model N2→N1 acceptance и не full readiness.
+
+### Public prepare command
+
+`parallel-env prepare --config <private-slots.json> --out <new-private-dir>`
+использует default global fences; `--parallel N` выбирает первые N slots, default1.
+Output не пересекает configured roots/config/credentials/global lock root; parent
+canonical/UID700, directory новый0700, receipt600. Проверка output предшествует
+runtime и preparation. CLI пишет JSON/receipt с ready:false и exit2 при
+неквалифицированном admission; ошибка подготовки сохраняет failed receipt без
+measured summary. Status/offline judge recover продолжают прежние semantics.
+
+TDD unsupported command/unsafe output и missing error receipt RED→GREEN.
+97 unit PASS/430 (12.91s), native1 PASS/14 (75.44s), typecheck/diff PASS.
+Actual default global root API N2→N1→public CLI N1 сохраняет generation/native
+ID и пароль; все normal reservations released. Native public stdout совпал с
+receipt600, output содержит только receipt.json, exit2/ready:false с фактическим
+SESSION_IDENTITY_UNSUPPORTED. Private600 native-standalone-f5f14267-46e2-45c4-bc0d-248e35ddbd63
+receipt SHA256 `e09a44ce257ef8b960c043aa8e3fd27a9f01c2bf517219b694d98eafc48738cd`
+содержит все3 preparation/source sets;36 independent checks совпали, exact pair
+independently absent. Verify/full readiness и recovery не объявлены готовыми.
