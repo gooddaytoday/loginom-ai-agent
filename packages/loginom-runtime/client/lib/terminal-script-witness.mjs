@@ -1,6 +1,6 @@
-import {terminalSourceIntegrityPins} from './terminal-source-integrity.mjs';
+import {terminalSourceIntegrityPins,terminalPropertyIntegrityPins} from './terminal-source-integrity.mjs';
 import {terminalUserPublisherInspectorSource} from './terminal-user-publisher.mjs';
-export function terminalScriptWitnessArguments(id,account){return Object.freeze({id,account,inspector:terminalUserPublisherInspectorSource,initialLoadPins:terminalSourceIntegrityPins()})}
+export function terminalScriptWitnessArguments(id,account){return Object.freeze({id,account,inspector:terminalUserPublisherInspectorSource,initialLoadPins:terminalSourceIntegrityPins(),extraDependencyPins:terminalPropertyIntegrityPins()})}
 // Fixed same-Page evaluation only. Returned JSON is evidence, never original refs/authority.
 export function collectTerminalScriptWitness(expected){
  const own=(o,k)=>{const d=Object.getOwnPropertyDescriptor(o,k);if(!d||!('value'in d))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');return d.value};
@@ -75,8 +75,34 @@ export function collectTerminalScriptWitness(expected){
    loadSummary=Object.freeze({records:Object.freeze(loadRows),definingExportsRetained:true,applicationSourcesJoined:true});
   }
  }
+ // Additional property dependencies remain original in-realm load receipts.
+ // Project rows only after retaining exact record/node/SRI identity for recheck.
+ let extraRows;const operandSlot=Object.getOwnPropertyDescriptor(defs,'propertyOperands');
+ if(operandSlot){
+  if(!('value'in operandSlot))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  const operands=operandSlot.value;
+  if(operands&&own(operands,'complete')===true){
+   requireFrozen(operands);const extras=requireFrozen(own(operands,'additionalRecords')),pins=expected.extraDependencyPins;
+   if(own(extras,'length')!==pins.length)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   const seen=new Set();extraRows=[];
+   for(let i=0;i<pins.length;i++){
+    const r=requireFrozen(own(extras,String(i))),receipt=requireFrozen(own(r,'receipt')),node=own(r,'node'),url=own(r,'url'),integrity=own(r,'integrity');
+    if(typeof url!=='string'||typeof integrity!=='string')throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+    const parsed=new URL(url),canonical=parsed.origin+parsed.pathname,pin=pins.find(([u])=>u===canonical);
+    if(parsed.href!==url||!pin||seen.has(canonical)||parsed.hash||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search))||pin[1]!==integrity)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');seen.add(canonical);
+    const check=()=>{
+     if(own(defs,'propertyOperands')!==operands||own(initialLoad,'propertyOperands')!==operands||own(operands,'additionalRecords')!==extras
+       ||own(extras,String(i))!==r||own(r,'receipt')!==receipt||own(r,'loaded')!==true||own(r,'document')!==doc||own(r,'node')!==node
+       ||own(r,'url')!==url||own(r,'integrity')!==integrity||own(receipt,'node')!==node||own(receipt,'document')!==doc
+       ||own(receipt,'url')!==url||own(receipt,'integrity')!==integrity||own(receipt,'armedBeforeSource')!==true
+       ||own(receipt,'sourceExecutionQualified')!==false||own(receipt,'closureIdentityQualified')!==false||own(receipt,'nativeAuthority')!==false)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+    };check();integrityChecks.push(check);extraRows.push(Object.freeze({url,integrity,loaded:true,armedBeforeSource:true}));
+   }
+   Object.freeze(extraRows);
+  }
+ }
  const id=expected.id,account=expected.account,summary=Object.freeze({id,account,
-  ...(loadSummary?{initialLoad:loadSummary}:{}),initialLoadReason:loadSummary?undefined:(initialLoad&&Object.hasOwn(initialLoad,'reason')?own(initialLoad,'reason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),
+  ...(loadSummary?{initialLoad:loadSummary}:{}),...(extraRows?{extraDependencies:extraRows}:{}),initialLoadReason:loadSummary?undefined:(initialLoad&&Object.hasOwn(initialLoad,'reason')?own(initialLoad,'reason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),
   rows:Object.freeze(rows.map(row=>Object.freeze(row))),privatePrepareAvailable:true,projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false});
  const descriptor=Object.getOwnPropertyDescriptor,apply=Reflect.apply,parent=Object.getPrototypeOf;
  const originalPublisher=publisher,originalInspect=inspect,originalStartup=startup,originalDefs=defs,originalInitializers=initializer;
