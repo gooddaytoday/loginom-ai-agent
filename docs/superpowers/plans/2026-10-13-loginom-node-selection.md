@@ -1,11 +1,11 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты18 candidate,
-policy PASS во всех18. Один итоговый расчёт правильный,17 результатов не получены.
-Одна сессия завершена штатно,17 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты19 candidate,
+policy PASS во всех19. Один итоговый расчёт правильный,18 результатов не получены.
+Одна сессия завершена штатно,18 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось7 candidate, включая текущую abc-pareto-groups/3. Sequential
-runner4037418/exec4282 продолжил серию2026-10-15T00:49:10.416510+00:00;
+Осталось6 candidate, включая текущую monthly-demand/3. Sequential
+runner4185233/exec3686 продолжил серию2026-10-15T01:14:39.523345+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -21,6 +21,25 @@ unmet/ограничение выборки; нет extra models ради кво
 - [x] Закрепить отдельное итоговое уточнение доступности seeded выборки: target3,
   min(3,N)/reviewALLN при N<3, явная невыполненная квота без extra моделей;
   independent design/readback a6c54942/e2e714b8, исходные5b/f71/97 неизменны.
+
+ABC/Pareto/3 closed00:58:56.029Z: policy PASS `e9868668…`, mandatory
+review `c53c990b…`;42messages/151parts/45tools/132events/2895runtime, JS0/nochildren.
+Std Import200→Sort→Calculator CumulativeSum/StatSum/доля/IF→Group3 SUCCEEDED4.
+Это содержательное покрытие накопления, общей суммы и ABC-классификации.
+Пятый Calculator revenue_share_pct остановился в output_mapping/readiness timeout,
+затем OUTPUT_MAPPING_RECOVERY_UNVERIFIED; Export не применялся. Новых JS нет.
+CSV/LGP/oracle не получены; исходные CLI1/cleanupfalse/runtimefalse сохранены.
+Own287closed01:06:49.972Z/admin288logout01:07:03.853Z/browserclosed01:07:05.051Z;
+9actualPIDgone/exactguardarchive01:11:18.195553Z, unknown283+286 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+19case/26recovery readonly; descriptor `6de6c35d…`.
+Independent finalrelease review `d1035874…`/readback `15c04029…` approved;
+actualgate2026-10-15T01:14:39.330Z разрешил technical-failed.
+Originalattempt `b4d283dd…` неизменен; отдельный policyPASS не заменяет исходный FAIL.
+Modecomment уточнён standaloneerratum `949dd5b4…`, исходные записи не переписаны.
+В server.evidence сохранены старые auxiliary aliases двух снимков; фактические
+ui-own-absent-first/refreshed включены в descriptor SHA map и независимо проверены.
+Не утверждается, что alias mismatch исправлен или что APPLY_MISMATCH здесь был.
 
 Sales-by-category/3 closed00:44:03.141Z: policy PASS `cb4ef6bb…`, mandatory
 review `db69d67b…`;24messages/93parts/26tools/76events/2036runtime, nochildren/JS0.
