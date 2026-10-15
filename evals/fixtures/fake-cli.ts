@@ -1,6 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { appendFile, chmod, mkdir, rm, rmdir } from "node:fs/promises"
+import { appendFile, chmod, mkdir, rename, rm, rmdir } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 if (command === "providers" && sub === "status" && process.env.EVAL_FAKE_SHARED_AUTH_RECEIPT) {
@@ -153,8 +153,26 @@ if (command === "run" && /^parallel-/.test(process.env.EVAL_TASK_ID ?? "")) {
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), JSON.stringify({ task: process.env.EVAL_TASK_ID, workdir, profile, launch: launch ?? 1 }))
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db-wal"), "fixture WAL")
   await Bun.write(path.join(profile, "data/loginom-ai-agent.db-shm"), "fixture SHM")
-  await Bun.sleep(process.env.EVAL_TASK_ID === "parallel-slow" ? 3_000 : packageFixture ? 300 : 20)
-  await Bun.write(path.join(workdir, "parallel-trace.json"), JSON.stringify({ pid: process.pid, profile, startedAt, finishedAt: Date.now() }))
+  const crossing = process.env.EVAL_TASK_ID === "parallel-slow" && path.basename(workdir) === "1"
+    ? Bun.argv.find((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "parallel-round-crossing.json") : undefined
+  const peer = crossing ? await (async () => {
+    const roots = await Bun.file(crossing).json() as string[]
+    const files = roots.map(root => path.join(root, path.basename(path.dirname(path.dirname(workdir))), "parallel-fast/2/parallel-trace.json"))
+    const deadline = Date.now() + 10_000
+    while (Date.now() < deadline) {
+      const found = (await Promise.all(files.map(async file => await Bun.file(file).exists()
+        ? await Bun.file(file).json() as { pid: number } : undefined))).filter(trace => trace !== undefined)
+      if (found.length === 1) return found[0]!
+      if (found.length > 1) throw Error("Parallel peer trace is ambiguous")
+      await Bun.sleep(5)
+    }
+    throw Error("Parallel peer trace was not observed")
+  })() : undefined
+  if (!peer) await Bun.sleep(process.env.EVAL_TASK_ID === "parallel-slow" ? 3_000 : packageFixture ? 300 : 20)
+  const trace = path.join(workdir, "parallel-trace.json")
+  // The waiting peer must only observe a complete JSON document.
+  await Bun.write(trace + ".tmp", JSON.stringify({ pid: process.pid, profile, startedAt, finishedAt: Date.now(), peerPid: peer?.pid }))
+  await rename(trace + ".tmp", trace)
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))

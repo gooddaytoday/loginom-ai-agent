@@ -15,6 +15,10 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-main-"))
   try {
     const input = await parallelFixture(root)
+    const slow = path.join(root, "tasks/parallel-slow")
+    await Bun.write(path.join(slow, "parallel-round-crossing.json"), JSON.stringify(input.slots.slots.map(slot => slot.workspaceRoot)))
+    await Bun.write(path.join(slow, "task.json"), JSON.stringify({ ...await Bun.file(path.join(slow, "task.json")).json(),
+      inputs: ["parallel-round-crossing.json"] }))
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--repeat", "2", "--skip-judge"],
       input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
     expect(run.code).toBe(0)
@@ -30,6 +34,8 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
     }))
     expect(traces.find(item => item.task_id === "parallel-fast" && item.attempt === 2)!.startedAt)
       .toBeLessThan(traces.find(item => item.task_id === "parallel-slow" && item.attempt === 1)!.finishedAt)
+    expect(traces.find(item => item.task_id === "parallel-slow" && item.attempt === 1)!.peerPid)
+      .toBe(traces.find(item => item.task_id === "parallel-fast" && item.attempt === 2)!.pid)
     expect(new Set(traces.map(item => item.pid)).size).toBe(4)
     for (const slot of input.slots.slots) {
       expect(await Bun.file(path.join(slot.profileDir, "data/auth.json")).text()).toContain('"fixture"')
