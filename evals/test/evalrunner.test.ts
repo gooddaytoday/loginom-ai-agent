@@ -2,7 +2,25 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { admitEvalrunner, readEvalrunnerConfig } from "../src/evalrunner"
+import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli } from "../src/evalrunner"
+
+test("standalone CLI integrity rejects changed bytes and extra payload files", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-cli-"))
+  try {
+    await mkdir(path.join(root, "bin"))
+    await Bun.write(path.join(root, "bin/cli"), "product")
+    await chmod(path.join(root, "bin/cli"), 0o755)
+    const manifest = { format: "loginom-cli-artifact-v1", metadata: { version: "0.2.0", sourceCommit: "0c975a73676d9aba556085dbda97e1a9ceb23cc6", sourceDirty: false },
+      files: [{ path: "bin/cli", sha256: new Bun.CryptoHasher("sha256").update("product").digest("hex"), mode: 0o755 }] }
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).resolves.toHaveProperty("version", "0.2.0")
+    await Bun.write(path.join(root, "extra"), "hidden")
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).rejects.toThrow("payload")
+    await rm(path.join(root, "extra"))
+    await Bun.write(path.join(root, "bin/cli"), "changed")
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).rejects.toThrow("payload")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("standalone admission needs no historical baseline and rejects a second owner", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-"))

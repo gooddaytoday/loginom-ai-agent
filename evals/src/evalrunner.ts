@@ -1,5 +1,5 @@
 import path from "node:path"
-import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, readFile, rm, writeFile, readdir, readlink } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 
 export type EvalrunnerConfig = {
@@ -7,6 +7,44 @@ export type EvalrunnerConfig = {
   cliBin: string; cliManifestSha256: string; binarySha256: string; profile: string; workspace: string
   results: string; envFile: string; judgeHome: string; containerId: string; imageDigest: string
   endpoint: string; readinessIssue: string
+}
+
+export async function verifyEvalrunnerCli(binary: string) {
+  const root = path.dirname(path.dirname(binary))
+  const manifest = await Bun.file(path.join(root, "cli-manifest.json")).json() as {
+    format: string; metadata: { version: string; sourceCommit: string; sourceDirty: boolean }
+    files: { path: string; sha256: string; mode: number; link?: string }[]
+  }
+  if (manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata.version !== "0.2.0" || manifest.metadata.sourceDirty ||
+    manifest.metadata.sourceCommit !== "0c975a73676d9aba556085dbda97e1a9ceb23cc6") throw new EvalFailure("Unexpected CLI build", 2)
+  const actual = await payloadFiles(root)
+  if (actual.length !== manifest.files.length || new Set(manifest.files.map(item => item.path)).size !== actual.length)
+    throw new EvalFailure("CLI payload file set changed", 2)
+  for (const item of manifest.files) {
+    if (!actual.includes(item.path) || item.path.split("/").includes("..") || path.isAbsolute(item.path)) throw new EvalFailure("CLI payload path changed", 2)
+    const file = path.join(root, item.path)
+    const info = await lstat(file)
+    const link = info.isSymbolicLink() ? await readlink(file) : undefined
+    if ((info.mode & 0o7777) !== item.mode || link !== item.link ||
+      (link === undefined ? await fileHash(file) : hash(link)) !== item.sha256) throw new EvalFailure("CLI payload integrity changed", 2)
+  }
+  return manifest.metadata
+}
+
+async function payloadFiles(root: string, relative = ""): Promise<string[]> {
+  return (await Promise.all((await readdir(path.join(root, relative), { withFileTypes: true })).map(async item => {
+    const file = path.join(relative, item.name)
+    if (file === "cli-manifest.json") return []
+    return item.isDirectory() ? payloadFiles(root, file) : [file]
+  }))).flat()
+}
+
+const hash = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex")
+
+async function fileHash(file: string) {
+  const digest = new Bun.CryptoHasher("sha256")
+  for await (const chunk of Bun.file(file).stream()) digest.update(chunk)
+  return digest.digest("hex")
 }
 
 export async function readEvalrunnerConfig(file: string) {
