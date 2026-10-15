@@ -87,6 +87,12 @@ test("standalone admission needs no historical baseline and rejects a second own
     await Bun.write(path.join(root, "config.json"), JSON.stringify(config))
     await chmod(path.join(root, "config.json"), 0o600)
     const read = await readEvalrunnerConfig(path.join(root, "config.json"))
+    const versioned = { ...config, version: 2, cliVersion: "0.2.0", cliSourceSha: "f".repeat(40) }
+    await Bun.write(path.join(root, "config.json"), JSON.stringify(versioned))
+    await expect(readEvalrunnerConfig(path.join(root, "config.json"))).rejects.toThrow("Invalid runtime config")
+    await Bun.write(path.join(root, "config.json"), JSON.stringify({ ...versioned, judgeBin: path.join(root, "bin/codex"),
+      judgeVersion: "codex-cli 0.159.3", judgeSha256: "1".repeat(64), bunSha256: "2".repeat(64) }))
+    await expect(readEvalrunnerConfig(path.join(root, "config.json"))).resolves.toHaveProperty("version", 2)
     const first = await admitEvalrunner(read, { series: path.join(root, "results/first"), case: "calc-data-double", issue: "ready", task: "task-1" })
     expect(first.manifest.case).toBe("calc-data-double")
     expect(first.manifest.infraRetries).toBe(0)

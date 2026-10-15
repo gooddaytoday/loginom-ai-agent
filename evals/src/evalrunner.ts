@@ -9,6 +9,7 @@ export type EvalrunnerConfig = {
   results: string; envFile: string; judgeHome: string; containerId: string; imageDigest: string
   endpoint: string; readinessIssue: string
   cliVersion?: string; cliSourceSha?: string
+  judgeBin?: string; judgeVersion?: string; judgeSha256?: string; bunSha256?: string
 }
 
 export function checkEvalrunnerOutcome(summary: RunSummary, node = false) {
@@ -44,13 +45,21 @@ export async function qualifyEvalrunner(config: EvalrunnerConfig) {
     env.LOGINOM_URL !== config.endpoint || env.CODEX_HOME !== config.judgeHome || env.EVAL_AGENT_MODEL !== "openai/gpt-6.1-sol" ||
     env.EVAL_AGENT_VARIANT !== "medium" || env.JUDGE_MODEL !== "gpt-6-sol" || env.JUDGE_REASONING !== "xhigh")
     throw new EvalFailure("Runtime environment pins changed", 2)
+  const judge = config.version === 2 ? await (async () => {
+    if (await fileHash(process.execPath) !== config.bunSha256 || env.EVAL_JUDGE_COMMAND !== config.judgeBin ||
+      await fileHash(config.judgeBin!) !== config.judgeSha256) throw new EvalFailure("Management/judge binary pins changed", 2)
+    const { judgeEnvironment } = await import("./judge")
+    const version = await Bun.$`${config.judgeBin!} --version`.env(judgeEnvironment({ CODEX_HOME: config.judgeHome })).quiet()
+    if (version.text().trim() !== config.judgeVersion) throw new EvalFailure("Judge version changed", 2)
+    return { version: config.judgeVersion, binarySha256: config.judgeSha256, bunSha256: config.bunSha256 }
+  })() : undefined
   const inspected = await Bun.$`docker inspect ${config.containerId}`.quiet()
   const container = inspected.json()[0] as { Id: string; Image: string; State: { Running: boolean }; Mounts: unknown[] }
   if (container.Id !== config.containerId || container.Image !== config.imageDigest || !container.State.Running || container.Mounts.length)
     throw new EvalFailure("Loginom container pins changed", 2)
   return { version: 1, cli: metadata, configSha256: hash(JSON.stringify(config)), envSha256: await fileHash(config.envFile),
     manifestSha256: config.cliManifestSha256, binarySha256: config.binarySha256, harnessSha: config.harnessSha,
-    containerId: config.containerId, imageDigest: config.imageDigest, comparison: "INCOMPARABLE", env }
+    containerId: config.containerId, imageDigest: config.imageDigest, judge, comparison: "INCOMPARABLE", env }
 }
 
 export type EvalrunnerInput = { series: string; case: string; issue: string; task: string; collection?: string }
@@ -202,7 +211,9 @@ export async function readEvalrunnerConfig(file: string) {
   if (!value || typeof value !== "object") throw new EvalFailure("Invalid runtime config", 2)
   const config = value as EvalrunnerConfig
   if (config.kind !== "evalrunner-runtime" || ![1, 2].includes(config.version) ||
-    config.version === 2 && (!/^[a-f0-9]{40}$/.test(config.cliSourceSha ?? "") || !/^[\w.+-]+$/.test(config.cliVersion ?? "")) ||
+    config.version === 2 && (!/^[a-f0-9]{40}$/.test(config.cliSourceSha ?? "") || !/^[\w.+-]+$/.test(config.cliVersion ?? "") ||
+      !config.judgeBin || !path.isAbsolute(config.judgeBin) || path.resolve(config.judgeBin) !== config.judgeBin || !config.judgeVersion ||
+      ![config.judgeSha256, config.bunSha256].every(value => /^[a-f0-9]{64}$/.test(value ?? ""))) ||
     ![config.root, config.checkout, config.cliBin, config.profile, config.workspace, config.results, config.envFile, config.judgeHome]
       .every(item => typeof item === "string" && path.isAbsolute(item) && path.resolve(item) === item) ||
     !/^[a-f0-9]{40}$/.test(config.harnessSha) ||
