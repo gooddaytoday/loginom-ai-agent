@@ -157,7 +157,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       || !closing && state.ui.dialogs.some(d => !allowedDialog(d,tableDialog) && !allowedOutputEditor(d,state) && !allowedNodeEditor(d,state) && (!allowTransient || d.identity?.anchor_tid !== 'toast' && !pendingFilterDialog(d,state) && !pendingPreviewDialog(d,state)))
       || ['dialogs','masks'].some(key => state.ui.truncated?.[key] !== false)
       || state.scan?.complete !== true) {
-      throw new Error('Node procedure is blocked by a mask or dialog');
+      const blockers={scan_complete:state.scan?.complete,truncated:state.ui?.truncated,
+        masks:Array.isArray(state.ui?.masks)?state.ui.masks.slice(0,4).map(m=>({kind:m.kind,target_tid:m.target_tid})):null,
+        dialogs:Array.isArray(state.ui?.dialogs)?state.ui.dialogs.slice(0,4).map(d=>({anchor_tid:d.identity?.anchor_tid})):null};
+      throw new Error('Node procedure is blocked by a mask or dialog: '+JSON.stringify(blockers));
     }
   };
   const crossTableOwnedStep=async(verb,payload,makeCode)=>{

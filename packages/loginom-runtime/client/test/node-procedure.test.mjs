@@ -608,7 +608,13 @@ for(const mode of ['ready','loading','unverified_without_mask','foreign_dialog',
  assert.equal(records.some(r=>r.phase==='node_step_prepared'),false);
  if(['unverified_without_mask','foreign_dialog','foreign_mask'].includes(mode)){
   const refused=records.find(r=>r.phase==='node_observation_context_refused');
-  assert.equal(refused.reason,'Node procedure is blocked by a mask or dialog');
+  const prefix='Node procedure is blocked by a mask or dialog: ';
+  assert.ok(refused.reason.startsWith(prefix));
+  const blockers=JSON.parse(refused.reason.slice(prefix.length));
+  assert.equal(blockers.scan_complete,true);
+  assert.deepEqual(blockers.truncated,{dialogs:false,masks:false});
+  assert.deepEqual(blockers.dialogs,[{anchor_tid:mode==='foreign_dialog'?'foreign':root}]);
+  assert.deepEqual(blockers.masks,mode==='unverified_without_mask'?[]:[{kind:'busy',target_tid:mode==='foreign_mask'?'foreign':root+';PreviewForm'}]);
   assert.equal(refused.outcome.output.node_preview_schema.reason,'preview_visible_form');
   assert.deepEqual(refused.outcome.output.ui,state.ui);
   await assert.rejects(channel.act({verb:'click',ref:'preview'}),/fresh internal observation/);
