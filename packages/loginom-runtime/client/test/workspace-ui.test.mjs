@@ -1978,7 +1978,7 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
   for(const mode of ['bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
-    const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+    const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
     for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
       path+=(path?'>':'')+label;
@@ -2037,7 +2037,8 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       }
       return output;
     };
-    page.waitForTimeout=async()=>{
+    page.waitForTimeout=async ms=>{
+      clock.advance(ms);
       waits++;
       if(detached){page.document.body.append(detached);detached=null;}
       if(mode==='stale_origin')page.location.origin='https://other.invalid';
