@@ -229,7 +229,10 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     owner.page=(sourceLoad?sourceLoad.contextCall('pages'):owner.context.pages())[0]??await observed(sourceLoad?sourceLoad.contextCall('newPage'):owner.context.newPage())
     sourceLoad?.bindPage(owner.page)
     if(sourceLoad) await observed(prepareTerminalSourceResponses(owner))
-    const content=(sourceLoad?terminalSourceIntegrityScript()+"\n":"")+browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)
+    // Publisher capture belongs to the private source-load diagnostic. Ordinary
+    // login needs the download setup, not instrumentation of vendor publishers.
+    const content=(sourceLoad?terminalSourceIntegrityScript()+"\n":"")+browserDownloadScript(candidate.url)
+      +(sourceLoad?"\n"+terminalUserPublisherScript(candidate.url):"")
     await observed(sourceLoad?sourceLoad.init(content):owner.context.addInitScript({content}))
     const result=await observed(loginPage(owner.page,candidate,owner))
     if(sourceLoad) await observed(bindTerminalScriptWitness(owner))
