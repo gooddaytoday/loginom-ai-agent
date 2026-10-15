@@ -2,7 +2,7 @@ import {terminalManagedCallForBridge} from './terminal-managed-call.mjs';
 import {terminalSourceForManagedCall} from './terminal-root-association.mjs';
 // Private fixed managed→bridge channel. No configuration, IPC or tool field can
 // register a Page here. Request/deadline admission belongs to the later H0 cut.
-const sessions=new WeakMap(),bridges=new WeakMap();
+const sessions=new WeakMap(),bridges=new WeakMap(),originals=new WeakMap();
 export function retainOriginalPrepareStartup(session,{startup,owner,readiness,assertStartup}) {
   if(sessions.has(session) || !startup || !Object.isFrozen(startup) || startup.owner!==owner
       || !owner?.page || !owner.context || typeof assertStartup!=='function')
@@ -45,7 +45,7 @@ export function retainOriginalPrepareStartup(session,{startup,owner,readiness,as
     // deadline/typed creation operand. Never infer either from timeout_ms.
     requireInvocation(){guard();throw Error('LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE')},
   });
-  guard();sessions.set(session,lender);return lender;
+  guard();sessions.set(session,lender);originals.set(lender,facts);return lender;
 }
 export function originalPrepareLenderForSession(session){const lender=sessions.get(session);lender?.guard();return lender}
 export function originalPrepareLenderForBridge(bridge){const lender=bridges.get(bridge);lender?.guard();return lender}
@@ -57,11 +57,14 @@ export function requireTerminalPrepareProvider(bridge){
  const call=terminalManagedCallForBridge(bridge),lender=bridges.get(bridge);
  const unavailable=reason=>{throw Object.assign(Error('LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE'),{cause:reason})};
  if(!call||!lender)unavailable('ORIGINAL_CALL_OR_STARTUP_NOT_BOUND');
- call.guard();lender.guard();
+ call.guard();
  const previous=invocations.get(call);if(previous)return previous;
- const original=lender.original(),load=terminalSourceForManagedCall(original.owner,call.facts.message);
+ // The private fact lookup precedes the legacy lender guard. The load's
+ // descriptor guards must reject foreign owner accessors without reading them.
+ const original=originals.get(lender),load=terminalSourceForManagedCall(original.owner,call.facts.message);
+ lender.guard();
  const initial=load.inspect(),witness=initial.scriptWitness;
- const check=()=>{call.guard();lender.guard();load.guard();
+ const check=()=>{call.guard();load.guard();lender.guard();
   if(lender.original()!==original||load.inspect().page!==original.page||load.inspect().context!==original.context
     ||call.facts.session!==original.session||load.facts.deadline!==call.facts.rootAssociation.wire.deadline)
    unavailable('ORIGINAL_PROVIDER_IDENTITY_CHANGED');

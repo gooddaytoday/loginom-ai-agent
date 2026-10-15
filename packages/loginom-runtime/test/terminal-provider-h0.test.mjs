@@ -58,6 +58,14 @@ test('owner Page substitution during initial microtask refuses without new looku
  const f=fixture(),c=call(f);await c.ready();const work=requireTerminalPrepareProvider(f.bridge);f.owner.page={};
  await assert.rejects(work,/OWNER_CHANGED|LOAD_CHANGED/);assert.equal(f.load.inspect().page,f.page);
 });
+for(const pending of [false,true])test('H0 foreign owner Page accessor getter0 '+(pending?'after':'before')+' initial await',async()=>{
+ const f=fixture(),c=call(f);await c.ready();let gets=0;
+ const work=pending?requireTerminalPrepareProvider(f.bridge):undefined;
+ Object.defineProperty(f.owner,'page',{get(){gets++;throw Error('SECONDARY')}});
+ if(pending)await assert.rejects(work,/LOAD_CHANGED/);
+ else assert.throws(()=>requireTerminalPrepareProvider(f.bridge),/LOAD_CHANGED/);
+ assert.equal(gets,0);
+});
 for(const reason of [false,0,null,'',undefined,Error('first',{cause:0})])test('original child abort '+String(reason)+' precedes foreign owner accessor',async()=>{
  const f=fixture(),c=call(f);await c.ready();let gets=0;f.state.controller.abort(reason);
  Object.defineProperty(f.owner,'page',{get(){gets++;throw Error('SECONDARY')}});
