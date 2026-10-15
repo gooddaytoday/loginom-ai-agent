@@ -2157,3 +2157,21 @@ Occupied-home/skip-judge/unused-model-admission controls3/9 PASS15.20s,
 typecheck/diff PASS. Logs judge-version-lease-{red,green}. Version/exec process
 inventory binding is the next step; lease ordering alone does not qualify the
 complete judge runtime census.
+
+Fixture --version and every judge execution now share the existing protected
+pre-spawn judge process producer under the acquired home lease. The inventory
+is created in private controller state before profile preparation; run passes
+that capability to both judgeInfo and task settings. Finalization reads every
+canonical entry with readJudgeProcessInventory and the continuous closure
+qualifier, instead of globbing only attempt outputs. Its release receipt thus
+includes --version as well as all measured/retry judge launches. Failed cleanup
+still retains the home fence; source paths remain outside agent mounts.
+
+Actual main RED: successful run had no judge-processes.json. GREEN returned two
+distinct qualified births, actual version stdout and a canonical exec source
+whose SHA matches the original attempt capture; both sources occur in release.
+Inventory/occupied-home/unknown-cleanup controls3/17 PASS29.90s, typecheck/diff
+PASS. Logs judge-runtime-inventory-{red,green}. The reused schema keeps its
+historical offline-judge-processes kind; this synthetic fixture grants no native
+admission or recovery authority. Sealed census consumption by the resource
+coordinator and other runtime actor classes remain unfinished.
