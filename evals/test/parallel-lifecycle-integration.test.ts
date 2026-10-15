@@ -17,7 +17,7 @@ import { openLoginomAdmin } from "../src/loginom-admin"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 
-test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("mixed native recovery: released A survives B failure and B reuses its committed history", async () => {
+for (const partialRelease of [false, true]) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)(`mixed native recovery: released A survives B ${partialRelease ? "partial release and recovery SIGKILL" : "dirty root"} and B reuses its committed history`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-recover-mixed-")), fixture = await parallelFixture(root)
   const name = `evals-mixed-${crypto.randomUUID().slice(0, 8)}`
@@ -37,16 +37,21 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("mixed native recovery: release
   const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases,loadSlots}=await import("./src/slots");
     const {openLoginomAdmin}=await import("./src/loginom-admin");const {stageUserPreparation}=await import("./src/user-environment");
     const {prepareUserStorage}=await import("./src/parallel-pair");const {finalizeUnactivatedEnvironment}=await import("./src/environment-finalization");
+    const {mkdir,rmdir}=await import("node:fs/promises");
     const file=await loadSlots(process.argv[1],2),identity=JSON.parse(process.argv[2]);
     const environment=await acquireEnvironmentLeases(file,2,identity,process.argv[3]);
     const admin=await openLoginomAdmin(file,identity,{serverLease:environment.server,processInventory:process.argv[4]});
     for(const lease of environment.slots){const prepared=await stageUserPreparation(file,lease,"e".repeat(64));
       await admin.reconcileUser(lease,prepared.secretFile);await prepareUserStorage(file,lease,prepared.secretFile,environment.server);
       await Bun.write(lease.slot.profileDir+"/data/mixed-history","history-"+lease.slot.id)}
-    const fault=Bun.spawn(["docker","exec",identity.containerId,"sh","-c",'printf blocked > "$1"',"mixed-fault","/workdir/UserStorage/eval-b/blocked"]);
-    if(await fault.exited!==0)throw Error("fault creation failed");
+    const b=environment.slots[1],manifest=await Bun.file(b.receipt).json();
+    const faultPath=b.receipt+"."+new Bun.CryptoHasher("sha256").update(manifest.resources[1].key).digest("hex")+".released.json";
+    if(${partialRelease})await mkdir(faultPath);
+    if(!${partialRelease}){const fault=Bun.spawn(["docker","exec",identity.containerId,"sh","-c",'printf blocked > "$1"',"mixed-fault","/workdir/UserStorage/eval-b/blocked"]);
+      if(await fault.exited!==0)throw Error("fault creation failed")}
     try{await finalizeUnactivatedEnvironment(file,environment,admin);throw Error("fault not reached")}
-    catch(error){if(error.message!=="USER_STORAGE_NOT_EMPTY")throw error}
+    catch(error){if(${partialRelease}?error.code!=="EISDIR":error.message!=="USER_STORAGE_NOT_EMPTY")throw error}
+    if(${partialRelease})await rmdir(faultPath);
     if((await Bun.file(environment.slots[0].receipt).json()).state!=="released"||(await Bun.file(environment.slots[1].receipt).json()).state!=="retained")throw Error("wrong mixed boundary");
     await Bun.write(Bun.stdout,JSON.stringify(environment.slots.map(lease=>lease.receipt))+"\\n");process.kill(process.pid,"SIGKILL");`,
     slotsFile, JSON.stringify(pair.identity), journal, inventory], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
@@ -67,13 +72,30 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("mixed native recovery: release
   }
   const completed = { released: false }
   try {
-    const failed = await fromCLI(path.join(root, "failed-recovery"))
-    expect({ code: failed.code, stdout: failed.stdout, stderr: failed.stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "USER_STORAGE_NOT_EMPTY" })
+    if (partialRelease) {
+      const manifestB = await readLeaseReceipt(incidents[1]!) as { resources: { receipt: string }[] }
+      expect(await Promise.all(manifestB.resources.map(async resource => (await readLeaseReceipt(resource.receipt) as { state: string }).state)))
+        .toEqual(["released", "retained"])
+      const adopter = Bun.spawn([process.execPath, "-e", `const {loadSlots}=await import("./src/slots");
+        const {recoverPreparationLeases}=await import("./src/preparation-recovery");
+        const environment=await recoverPreparationLeases(await loadSlots(process.argv[1],2),JSON.parse(process.argv[2]),process.argv[3]);
+        if(environment.slots.length!==1||environment.slots[0].slot.id!=="b")throw Error("wrong adoption");
+        await environment.server.assertHeld();await environment.slots[0].assertHeld();process.kill(process.pid,"SIGKILL");`,
+        slotsFile, JSON.stringify(pair.identity), journal], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+      const [code, stdout, stderr] = await Promise.all([adopter.exited, new Response(adopter.stdout).text(), new Response(adopter.stderr).text()])
+      expect({ code, stdout, stderr }).toEqual({ code: 137, stdout: "", stderr: "" })
+      expect(await Promise.all(manifestB.resources.map(async resource => readLeaseReceipt(resource.receipt))))
+        .toMatchObject([{ state: "recovery-only", revision: 2 }, { state: "recovery-only", revision: 2 }])
+    }
+    if (!partialRelease) {
+      const failed = await fromCLI(path.join(root, "failed-recovery"))
+      expect({ code: failed.code, stdout: failed.stdout, stderr: failed.stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "USER_STORAGE_NOT_EMPTY" })
+      expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/blocked`.quiet()).text()).toBe("blocked")
+      // Remove only the test-injected canary from this never-activated account; production cleanup must have refused it.
+      await Bun.$`docker exec ${pair.identity.containerId} rm -- /workdir/UserStorage/eval-b/blocked`.quiet()
+    }
     expect(await Promise.all(originalA.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(beforeA)
     expect(await readResourceReservation({ key: `server:${pair.identity.containerId}` })).toMatchObject({ state: "recovery-only" })
-    expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/blocked`.quiet()).text()).toBe("blocked")
-    // Remove only the test-injected canary from this never-activated account; production cleanup must have refused it.
-    await Bun.$`docker exec ${pair.identity.containerId} rm -- /workdir/UserStorage/eval-b/blocked`.quiet()
     const retried = await fromCLI(path.join(root, "retried-recovery"))
     expect({ code: retried.code, stderr: retried.stderr, output: retried.code ? retried.stdout : "" }).toEqual({ code: 0, stderr: "", output: "" })
     const result = JSON.parse(retried.stdout) as Awaited<ReturnType<typeof recoverUnactivatedPreparation>>
@@ -99,7 +121,7 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("mixed native recovery: release
     const completion = await readLeaseReceipt(`${journal}.completion.json`) as { proofs: { path: string; sha256: string }[] }
     const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-mixed-${crypto.randomUUID()}`)
     await mkdir(evidence, { mode: 0o700 })
-    await writeLeaseReceipt(path.join(evidence, "mixed.json"), { version: 2, identity: pair.identity, child: { pid: child.pid, code: 137 }, incidents,
+    await writeLeaseReceipt(path.join(evidence, "mixed.json"), { version: 2, identity: pair.identity, partialRelease, child: { pid: child.pid, code: 137 }, incidents,
       originalA, releasedASnapshots: beforeA.map(value => JSON.parse(value)), archiveB, result, completion,
       sources: await Promise.all(completion.proofs.map(async source => ({ ...source, value: await readLeaseReceipt(source.path) }))), liveQualified: false })
   } catch (error) { if (!completed.released) console.error(`mixed recovery fixture retained: ${root}`); throw error }

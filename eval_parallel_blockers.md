@@ -12,9 +12,17 @@ final00 для своих процессов, но supervisor сохранил f
 Одновременно ошибочно запущена другая собственная native recovery проверка
 izBc4f. Она штатно завершена/удалена, её источники сохранены в private
 `research/evidence/native-mixed-red-resume-20261015/qualified-mixed.json`.
-Сопоставление unknown PID с этими источниками проверяется отдельно. Старый
-quarantined proof не переписывается, ручной release/delete не выполняется.
+Read-only сопоставление подтверждено: все8 unknown tuples PID/starttime/UID/
+executable/device/inode точно совпали с owned+allowed identities чужого для
+этого supervisor собственного admin-OQw8sM из saved source[2]. Producer PID
+2141109 и2143590 различны, lifetime overlap1.325s. Peer registry process-local,
+поэтому отдельный controller не был признан peer. Старый quarantined proof не
+переписывается, ручной release/delete не выполняется.
 Последующие native browser проверки выполняются последовательно.
+Текущего API additive peer-source qualification нет: qualifier требует
+confirmed/capture-complete proof без unknown; writer-settlement exception также
+запрещает unknown. Для dyI2ST нужен отдельный проверяемый контракт reconciliation
+с immutable foreign sources; диагностическое совпадение не заменяет release proof.
 
 ## Положительная SessionBackup policy остаётся неквалифицированной
 
