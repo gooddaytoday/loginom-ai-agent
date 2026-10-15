@@ -1730,16 +1730,22 @@ History, DB/WAL/SHM and inputs move before server close; credentials remain in
 the profile. Replay preserves both receipts, and later all-slot finalization
 reuses the same archive. Server sessions and reservations stay held, with
 storageDeletionAllowed=false and nextAdmissionAllowed=false. The fake CLI and
-actual OS peer barrier qualify local composition; native A/B qualification is
-still blocked before this step by the retained process-identity incident.
+actual OS peer barrier qualify local composition. Native A/B also qualifies
+seal/archive/accounting/close A inside active B lifetime and preserves B for a
+fresh successful check; the earlier failed UID observation remains retained.
 
 Management session accounting also accepts a separately sealed slot while the
 command remains cli_admitted. The inventory reader exposes the validated seal
 source; the collector rechecks it before returning. An unsealed slot still
 refuses accounting, unknown same-user rows still refuse closure, and peer-user
 rows remain outside that slot's claims. The finalizing all-slot path is retained.
-Data-only snapshot tests qualify this source gate; positive native session
-accounting under active B remains unqualified.
+Data-only snapshot tests qualify the source gate. Exact-source native A/B
+passed1/19 (168.88s); independent read-back verifies649 checks over192 source
+files, all four CLI and admin continuous closures, same A archive reuse and exact
+own pair/network/root absence. Private native-two-users-4a143678... audit SHA
+dd7acfd3197a7164153e1acdf2ff884ddc41726794123191d861c1e20fb7684a.
+This covers normal Count0 management sessions; full attempt cleanup/recovery,
+SessionBackup, storage deletion, release and live admission remain open.
 
 UID-change refusals retain the sampled `/proc/PID` directory UID and a best-effort
 stat birth/state without exposing argv. Failed diagnostic reads stay unknown;
