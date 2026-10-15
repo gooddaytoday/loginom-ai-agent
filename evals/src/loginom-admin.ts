@@ -32,7 +32,7 @@ import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation } from "./user-environment"
 
-export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
+export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "confirm-session-absent" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
 export type AdminReply = { v: 1; id: string; outcome: "confirmed" | "not_applied" | "unknown"; data: unknown }
 const frameLimit = 1024 * 1024
@@ -56,8 +56,8 @@ export type AdminConnection = {
     source: { path: string; id: string; sha256: string } }>
   observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown, mode?: "retained-package"): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
-  closeManagementSession(lease: SlotLease, secretFile: string, id: string): Promise<void>
-  closeAgentSession(lease: SlotLease, secretFile: string, id: string, archive: { path: string; sha256: string }): Promise<void>
+  closeManagementSession(lease: SlotLease, secretFile: string, id: string, mode?: "confirm-absent"): Promise<void>
+  closeAgentSession(lease: SlotLease, secretFile: string, id: string, archive: { path: string; sha256: string }, mode?: "confirm-absent"): Promise<void>
   activateOwnedUser(lease: SlotLease, secretFile: string): Promise<{ activated: boolean; userKey: string; source: { path: string; id: string; sha256: string } }>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
@@ -134,7 +134,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     const result = sequence.then(async () => {
       if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       if (op === "reconcile-user") await verifyParallelPair(file, identity)
-      if (op === "reconcile-user" || op === "close-session") {
+      if (op === "reconcile-user" || op === "close-session" || op === "confirm-session-absent") {
         if (!options.serverLease || options.serverLease.reservation.key !== `server:${identity.containerId}` ||
           JSON.stringify(options.serverLease.reservation.identity) !== JSON.stringify(identity) ||
           op === "reconcile-user" && options.serverLease.reservation.state !== "retained") throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
@@ -452,14 +452,14 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       requireAdminReply(reply)
       await recordServerSessionClosed(file, lease, secretFile, proofId, path.join(directory, "commands", `${reply.id}.json`), reply)
     },
-    async closeManagementSession(lease, secretFile, id) {
+    async closeManagementSession(lease, secretFile, id, mode) {
       const entry = await readManagementSession(file, lease, secretFile, id)
       if (entry.state === "closed") return
       if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
         throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       const adopt = { receipt: path.join(file.controller.stateDir, `management-session-${id}.json`),
         sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex") }
-      const reply = await request("close-session", { proofId: id, session: entry.binding, adopt }, async () => {
+      const reply = await request(mode === "confirm-absent" ? "confirm-session-absent" : "close-session", { proofId: id, session: entry.binding, adopt }, async () => {
         if (JSON.stringify(await readManagementSession(file, lease, secretFile, id)) !== JSON.stringify(entry))
           throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
         await verifyParallelPair(file, identity)
@@ -467,7 +467,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       requireAdminReply(reply)
       await recordManagementSessionClosed(file, lease, secretFile, id, path.join(directory, "commands", `${reply.id}.json`), reply)
     },
-    async closeAgentSession(lease, secretFile, id, archive) {
+    async closeAgentSession(lease, secretFile, id, archive, mode) {
       const entry = await readAgentSession(file, lease, secretFile, id)
       if (entry.state === "closed") {
         if (JSON.stringify(entry.archive) !== JSON.stringify(archive)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
@@ -478,7 +478,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       const adopt = { receipt: path.join(file.controller.stateDir, `agent-session-${id}.json`),
         sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex"),
         archive: await readAgentArchive(file, lease, secretFile, id, archive) }
-      const reply = await request("close-session", { proofId: id, session: entry.binding, adopt }, async () => {
+      const reply = await request(mode === "confirm-absent" ? "confirm-session-absent" : "close-session", { proofId: id, session: entry.binding, adopt }, async () => {
         if (JSON.stringify(await readAgentSession(file, lease, secretFile, id)) !== JSON.stringify(entry))
           throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
         await readAgentArchive(file, lease, secretFile, id, archive)
@@ -706,7 +706,7 @@ export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, o
     request(input: unknown) {
       const result = sequence.then(async () => {
         const request = requireAdminRequest(input)
-        if (unresolved && request.op !== "inspect" && request.op !== "dispose")
+        if (unresolved && request.op !== "inspect" && request.op !== "confirm-session-absent" && request.op !== "dispose")
           return { v: 1 as const, id: request.id, outcome: "not_applied" as const, data: { code: "ADMIN_RECONCILIATION_REQUIRED" } }
         const info = await lstat(journalDir).catch(() => { throw new EvalFailure("ADMIN_JOURNAL_PRIVATE", 2) })
         if (!path.isAbsolute(journalDir) || await realpath(journalDir) !== journalDir || !info.isDirectory() || info.isSymbolicLink() ||
@@ -727,7 +727,7 @@ export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, o
           }))).some(Boolean)
           reconciled = true
         }
-        if (unresolved && request.op !== "inspect" && request.op !== "dispose")
+        if (unresolved && request.op !== "inspect" && request.op !== "confirm-session-absent" && request.op !== "dispose")
           return { v: 1 as const, id: request.id, outcome: "not_applied" as const, data: { code: "ADMIN_RECONCILIATION_REQUIRED" } }
         const file = path.join(journalDir, `${request.id}.json`)
         const journal = { version: 1, kind: "loginom-admin-command", id: request.id, op: request.op, expectedIdentity: request.expectedIdentity,
@@ -819,7 +819,7 @@ export function createAdminChannel(input: ReadableStream<Uint8Array>, output: Wr
 
 function requireAdminRequest(value: unknown): AdminRequest {
   if (!jsonObject(value) || Object.keys(value).length !== 6 || value.v !== 1 || typeof value.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(value.id) ||
-    typeof value.op !== "string" || !["init", "inspect", "reconcile-user", "close-session", "dispose"].includes(value.op) ||
+    typeof value.op !== "string" || !["init", "inspect", "reconcile-user", "close-session", "confirm-session-absent", "dispose"].includes(value.op) ||
     typeof value.deadline !== "number" || !Number.isSafeInteger(value.deadline) || !Object.hasOwn(value, "payload") ||
     !jsonObject(value.expectedIdentity) || Object.keys(value.expectedIdentity).length !== 6)
     throw new EvalFailure("ADMIN_REQUEST_INVALID", 2)

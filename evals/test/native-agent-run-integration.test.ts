@@ -136,6 +136,9 @@ for (const finalizer of [false, true]) for (const browser of [true, false]) test
           const untouched = await admin.inspectSessionInventory()
           expect(untouched.sessions.filter(row => row.name.startsWith(credentials.username + ":")).map(row => JSON.stringify([row.name, row.createdAt])).sort())
             .toEqual(after!.sessions.filter(row => row.name.startsWith(credentials.username + ":")).map(row => JSON.stringify([row.name, row.createdAt])).sort())
+          const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, untouched.source)
+          const absenceOnly = await admin.closeManagementSession(lease, prepared.secretFile, accounted.management[0]!.id, "confirm-absent")
+            .then(() => "unexpected confirmation", (error: Error) => error.message)
           const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
           expect(completed.sessions).toHaveLength(browser ? 2 : 1)
           expect(completed.sessions.every(session => session.state === "closed")).toBe(true)
@@ -148,6 +151,30 @@ for (const finalizer of [false, true]) for (const browser of [true, false]) test
           expect(await archivedSession(completed.archived.archive, run.sessionId!)).toBe(true)
           expect((await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)).source).toEqual(completed.source)
           await writeLeaseReceipt(path.join(evidence, "attempt-finalization.json"), { inputs, completed, after: closed })
+          expect(absenceOnly).toBe("SESSION_STILL_PRESENT")
+          const original = path.join(evidence, "original-finalization.json")
+          await cp(completed.source.path, original)
+          await rm(completed.source.path)
+          const selected = completed.sessions.find(session => session.kind === (browser ? "agent" : "management"))!
+          const previousClose = path.join(evidence, "original-session-close.json")
+          await cp(selected.closed.path, previousClose)
+          await rm(selected.closed.path)
+          try {
+            await expect(finalizeSlotAttempt(file, environment.server, lease, inputs, admin)).rejects.toThrow("ATTEMPT_FINALIZATION_PENDING")
+            if (selected.kind === "agent") await admin.closeAgentSession(lease, prepared.secretFile, selected.id,
+              (await readLeaseReceipt(original) as { archives: { source: { path: string; sha256: string } }[] }).archives[0]!.source, "confirm-absent")
+            if (selected.kind === "management") await admin.closeManagementSession(lease, prepared.secretFile, selected.id, "confirm-absent")
+            const confirmed = await readLeaseReceipt(selected.closed.path) as { source: { path: string }; reply: { data: { disposition: string } } }
+            expect(confirmed.reply.data.disposition).toBe("observed_absent")
+            expect(await readLeaseReceipt(confirmed.source.path)).toMatchObject({ op: "confirm-session-absent", state: "confirmed" })
+          } finally {
+            if (!await Bun.file(selected.closed.path).exists()) await cp(previousClose, selected.closed.path)
+          }
+          const reconciled = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+          expect(reconciled.sessions.every(session => session.state === "closed")).toBe(true)
+          expect((await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)).source).toEqual(reconciled.source)
+          await writeLeaseReceipt(path.join(evidence, "attempt-finalization.json"), { inputs, completed: reconciled, after: await admin.inspectSessionInventory(),
+            recovery: { absenceOnly, original: { path: original, sha256: completed.source.sha256 }, selected: selected.id, previousClose } })
           await sealAgentProcessInventory(agentEvidence)
           expect(await readServerIdentity(file)).toEqual(pair.identity)
           expect(await Promise.all(sources.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
@@ -275,7 +302,7 @@ for (const finalizer of [false, true]) for (const browser of [true, false]) test
       }
       if (!historyArchived) console.error(`native agent history retained: ${root}`)
     }
-  }, 180_000,
+  }, finalizer ? 240_000 : 180_000,
 )
 
 async function archivedSession(archive: string, id: string) {

@@ -2811,3 +2811,42 @@ preserves the root and pair if profile history remains unarchived.
 Joint verification220 read-backs/exact absence checks:
 477594c6…/verification.json SHA256
 `f5ef36009f7cf4496780ded2c656431c7bcc9d6efee89b25063efb6803b95ba8`.
+
+
+### Native read-only session absence confirmation — 2026-10-16
+
+`confirm-session-absent` validates the same adopted session, protected user,
+server generation and frozen process/archive sources as normal close. A matching
+live row returns SESSION_STILL_PRESENT before the CloseSession branch. An absent
+row returns confirmed/observed_absent. Agent and management closure readers accept
+this operation only for that disposition. `closeAgentSession` and
+`closeManagementSession` expose the explicit `confirm-absent` mode; normal mode
+remains unchanged. The journal permits this read-only operation after an unknown
+mutation, while subsequent mutations remain blocked. Transport failure still
+requires a working/reconnected channel; this operation does not clear quarantine.
+
+Channel TDD REQUEST_INVALID RED →1/8 GREEN0.752s. Native old-driver refusal RED
+18 assertions117.00s → browser/text2/50 PASS297.29s. Each case refuses a real live
+management target, completes normal archival/close, then explicitly reconstructs
+loss of one close sidecar and the final receipt. Pending normal finalization
+refuses; native read-only confirmation reconstructs the sidecar, and finalization
+publishes/reuses a terminal without another CloseSession. The browser selects an
+agent sidecar; text selects management. This is filesystem receipt-loss fault
+injection after actual native RPC, with preserved original receipts. It is not a
+SIGKILL, lost wire-response or active recovery-lineage qualification. Automatic
+pending-finalizer integration remains separate. Only the expanded native fixture
+budget changes180→240s; ordinary native cases and production deadlines stay fixed.
+
+Related50/266 PASS60.53s, typecheck/syntax/diff PASS. Browser6e3edf07-a831-4687-bc0a-edbaf3340ac3
+audit `45845c1addb479a0b28f511edce1286f2d5bd5111ea966544349285580b80ee6`
+checks1782/116 sources/17 causal frames; text19bc4ebe-6f54-4526-8793-7345ef14e49b
+audit `d9c562fc91fab122019f51be0b18aabfeff0802425abbeea5d5a5caaf59941c1`
+checks229/92/5. Both16 pins, original archived SDK session and exact own pair,
+network/controller-root absence pass. Archive inspection leaves originals intact;
+SQLite families can have one DB or DB/WAL/SHM depending on the actual run.
+Storage deletion, backend operations/locks, backups, release, unpause and next
+admission remain unqualified. Old incidents are unchanged.
+
+Joint verification252 source/pin/exact absence checks:
+6e3edf07…/verification.json SHA256
+`0c20af3738a43d0861c56bb3086a724ea258f136ed0b3b515a354e67f10cdcf3`.
