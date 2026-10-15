@@ -2175,3 +2175,19 @@ PASS. Logs judge-runtime-inventory-{red,green}. The reused schema keeps its
 historical offline-judge-processes kind; this synthetic fixture grants no native
 admission or recovery authority. Sealed census consumption by the resource
 coordinator and other runtime actor classes remain unfinished.
+
+Judge process inventories now expose a stable source SHA and sealed flag.
+sealJudgeProcessInventory requires the held home guard, qualifies every entry,
+checks the complete inventory stayed unchanged, durably writes sealed and reads
+it back. Concurrent launch/seal and late launch are refused before spawn.
+Undefined state on historical offline snapshots remains unsealed and does not
+rewrite the source; other unknown states are invalid in both reader/producer.
+The closed census is evidence only, without standalone cleanup/release authority.
+
+Actual short judge observed its planned entry before its own work; concurrency,
+late-dispatch/source-preservation and historical timeline controls passed.
+An additional RED state=unknown actually dispatched a child; GREEN refuses before
+the child marker. Judge/process/offline environment related57/267 PASS111.48s
+across3 files, typecheck/diff PASS. Logs judge-inventory-seal-{red,green,related}
+and judge-inventory-state-red. Fixture finalization still needs to call seal;
+resource admission does not yet consume this closed census.
