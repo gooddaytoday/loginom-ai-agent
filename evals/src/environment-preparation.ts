@@ -2,11 +2,15 @@ import path from "node:path"
 import { lstat } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { finalizeUnactivatedEnvironment } from "./environment-finalization"
-import { globalLockRoot, writeLeaseReceipt } from "./lease"
+import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { openLoginomAdmin } from "./loginom-admin"
 import { prepareUserStorage, readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { acquireEnvironmentLeases, loadSlots } from "./slots"
 import { readUserConfiguration, readUserOwnership, readUserPreparation, stageUserPreparation } from "./user-environment"
+
+export class EnvironmentFailure extends EvalFailure {
+  constructor(message: string, readonly receipt: string) { super(message, 2) }
+}
 
 export async function prepareEnvironment(input: { slotsFile: string; parallel: number }, lockRoot = globalLockRoot) {
   return checkEnvironment(input, lockRoot, "prepare")
@@ -24,13 +28,15 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number }, 
   const processInventory = path.join(file.controller.stateDir, `processes-${commandId}.json`)
   const receipt = path.join(file.controller.stateDir, `${operation === "prepare" ? "preparation" : "verification"}-${commandId}.json`)
   const kind = operation === "prepare" ? "environment-preparation" : "environment-verification"
+  const failure = { finalization: { status: "unconfirmed" as const } as { status: "unconfirmed"; reason?: string } |
+    Awaited<ReturnType<typeof finalizeUnactivatedEnvironment>> }
   await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity,
     slotIds: file.slots.slice(0, input.parallel).map(slot => slot.id), phase: "unactivated", processInventory })
   await writeLeaseReceipt(processInventory, { version: 2, kind: "admin-processes", commandId, journal, identity, connections: [] })
   const failed = async (error: unknown): Promise<never> => {
-    await writeLeaseReceipt(receipt, { version: 2, kind, commandId, identity, journal,
-      status: "failed", ready: false, reason: error instanceof EvalFailure ? error.message : "PREPARATION_FAILED" })
-    throw error
+    await writeLeaseReceipt(receipt, { version: 2, kind, commandId, identity, journal, receipt,
+      status: "failed", ready: false, reason: error instanceof EvalFailure ? error.message : "PREPARATION_FAILED", finalization: failure.finalization })
+    throw new EnvironmentFailure(error instanceof EvalFailure ? error.message : "PREPARATION_FAILED", receipt)
   }
   const environment = await acquireEnvironmentLeases(file, input.parallel, identity, journal, lockRoot).catch(failed)
   try {
@@ -64,6 +70,12 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number }, 
         reason, slots, changedUsers, changedPasswords, finalization }
       await writeLeaseReceipt(receipt, result)
       return { ...result, receipt, code: 2 as const }
+    } catch (error) {
+      const command = await readLeaseReceipt(journal)
+      if (command !== null && typeof command === "object" && "phase" in command && command.phase === "unactivated")
+        failure.finalization = await finalizeUnactivatedEnvironment(file, environment, admin).catch(error =>
+          ({ status: "unconfirmed" as const, reason: error instanceof EvalFailure ? error.message : "ENVIRONMENT_FINALIZATION_FAILED" }))
+      throw error
     } finally { await admin.dispose() }
   } catch (error) { return failed(error) }
   finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
