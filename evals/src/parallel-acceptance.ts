@@ -61,6 +61,9 @@ export async function checkResourceEvidence(input: {
             window.launcher.pid === launcher.pid && window.launcher.starttime === launcher.starttime)
         })
       }) ? { status: "incomplete" as const, codes: ["RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE"] }
+      : manifest && processWindows.some(window => Date.parse(window.startedAt) < Date.parse(input.startedAt) ||
+        Date.parse(window.finishedAt) > Date.parse(input.finishedAt))
+      ? { status: "failed" as const, codes: ["RESOURCE_PROCESS_RUN_WINDOW_MISMATCH"] }
       : processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
       processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
         window.launcher.pid === owner.launcher.pid && window.launcher.starttime === owner.launcher.starttime).length === 1) &&

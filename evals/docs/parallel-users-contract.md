@@ -1972,3 +1972,14 @@ artifacts; audit154 checks/read-back passed. Terminal SHA256
 owned session closes, durable archive before close, fresh absence, five confirmed
 CLI closures and one admin closure, with no storage/admission grant. Same-daemon
 Docker listings and lstat confirm exact pair and temporary root absent.
+
+
+Frozen process windows are contained by the declared run window. A qualified
+proof whose dispatch precedes run startedAt or whose exit follows finishedAt
+returns failed RESOURCE_PROCESS_RUN_WINDOW_MISMATCH. Source integrity and exact
+owner/producer/launcher checks remain mandatory. The real two-supervisor test
+previously passed after narrowing the declared run to its final timestamp; it
+now rejects that temporal mismatch and accepts the complete window. Target1/13
+PASS4.92s, related86/606 PASS26.47s with runner30s, typecheck/diff PASS. Component
+declared-only subwindow behavior is unchanged; full runtime actor journal and
+pre-spawn admission remain separate unfinished gates.
