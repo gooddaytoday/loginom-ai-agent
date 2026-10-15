@@ -1710,6 +1710,14 @@ closure, session identity, archive, deletion or release by itself. Legacy
 source readers remain compatible; future finalization must independently
 validate every registered source and refuse unknown sessions.
 
+`sealManagementProcessInventory` seals one normal slot under its held server and
+slot leases, serialized with producer registration. Its private sidecar binds
+the exact inventory SHA and command/epoch/token/profile. A live producer refuses
+sealing; repeat preserves the receipt, and inventory drift refuses all readers.
+Further commands for that slot stop before CLI dispatch while peers retain
+admission. This local producer fence grants no storage deletion or release;
+the all-slot finalizer and SessionBackup gate remain mandatory.
+
 The actual OS child independently reads its registration before executing.
 Missing registration RED→GREEN1 PASS/27 (3.54s); parallel owners2 PASS/30
 (5.10s), related69 PASS/358 (16.61s), typecheck/diff PASS. Cold native1 PASS/56 (193.44s),181 source/closure/cleanup audit checks;
