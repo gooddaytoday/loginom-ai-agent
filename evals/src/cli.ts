@@ -194,7 +194,10 @@ export async function runAgent(input: {
     interrupted: processRun.interrupted,
     startedAt: processRun.startedAt,
     durationMs: processRun.durationMs,
-    ...redactKnownSecrets(parsed, input.command.cleanupSecrets ?? []),
+    // Session/artifact/revision bindings are used by cleanup and evidence readers.
+    ...parsed,
+    ...redactKnownSecrets({ finalText: parsed.finalText, errors: parsed.errors, errorTexts: parsed.errorTexts }, input.command.cleanupSecrets ?? []),
+    tools: parsed.tools.map(tool => ({ ...tool, error: redactKnownSecrets(tool.error, input.command.cleanupSecrets ?? []) })),
     processCleanup: processRun.processCleanup,
     sandboxError: processRun.sandboxError,
     failureKind: failureKind({ exitCode, errors: parsed.errors, errorTexts: parsed.errorTexts, stderr }),

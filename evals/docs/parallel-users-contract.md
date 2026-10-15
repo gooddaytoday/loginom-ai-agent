@@ -311,6 +311,18 @@ Known-output masking (2026-10-15): `runAgent` передаёт только яв
 или credentials неактивных слотов. Полный native сбор секретов активных слотов
 и admin остаётся отдельным незавершённым gate.
 
+Operational binding regression (2026-10-15): `148d40e4de` применял masking ко всем
+parsed strings; короткий synthetic credential совпал с частью публичного SDK
+session ID, и `[redacted]` сделал archive ID недопустимым. Existing text-import
+runner отказал стабильно 3/3. `AgentRun` сохраняет исходные session/artifact paths,
+revision и manifest hash для fetch/archive/readers, маскирует finalText,
+errors/errorTexts, node receipts и tools.error. Public binding RED→GREEN и
+исходный runner GREEN; полная связанная CLI/run/node/calibrate/diagnostics проверка
+87 PASS/592 (189.32s), typecheck/diff PASS. Private output-composition-ca741207
+audit SHA cf6d0929aff36faa062308901fb562e02c6563df3b32905dcac978b6b20ef0d0
+содержит первоначальный 109 PASS/1 FAIL и 3 stable воспроизведения; полный package
+regression и native admission этим не подтверждены.
+
 Новые eval-прогоны: агент `openai/gpt-6-luna/high`, судья `gpt-6-sol/xhigh`.
 Приёмка на lg-pc-75: новая acceptance pair и отдельная research pair, затем
 немодельные ACL/crash/cleanup/supervisor/backup gates, полный LLM N=2 → N=1
