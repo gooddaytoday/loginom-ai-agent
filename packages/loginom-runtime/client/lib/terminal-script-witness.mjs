@@ -81,6 +81,112 @@ export function collectTerminalScriptWitness(expected){
  const descriptor=Object.getOwnPropertyDescriptor,apply=Reflect.apply,parent=Object.getPrototypeOf;
  const originalPublisher=publisher,originalInspect=inspect,originalStartup=startup,originalDefs=defs,originalInitializers=initializer;
  const capsule={...summary},capsuleParent=parent(capsule);
+ // Fixed same-realm provider. Native refs stay here, never in the projection.
+ // Its only production host entry below inspects custody; it cannot dispatch.
+ const providerChecks=[];
+ function hold(object,key){
+  const chain=[];let value;
+  for(let p=object;p;p=parent(p)){
+   const d=descriptor(p,key);chain.push({p,prototype:parent(p),d});
+   if(d){if(!('value'in d))throw Error('TERMINAL_PROVIDER_ACCESSOR');value=d.value;break}
+  }
+  if(!chain.at(-1)?.d)throw Error('TERMINAL_PROVIDER_MISSING_'+key);
+  providerChecks.push(()=>{let p=object;for(const x of chain){const d=descriptor(p,key);
+   if(p!==x.p||parent(p)!==x.prototype||(!x.d?d!==undefined:!d||Reflect.ownKeys(x.d).some(k=>!Object.is(d[k],x.d[k]))))throw Error('TERMINAL_PROVIDER_CHANGED');p=parent(p)}});
+  return value;
+ }
+ let provider,providerFailure;
+ try{
+ const MapCtor=hold(globalThis,'Map'),mapPrototype=hold(MapCtor,'prototype'),mapGet=hold(mapPrototype,'get');
+ const storeKey='__loginomDockPreparationV1';
+ let storeDescriptor=descriptor(globalThis,storeKey),preparation;
+ // Same fixed preparation store as workspace. Birth precedes any reservation or
+ // effect; creating bookkeeping does not create a package or native permission.
+ if(!storeDescriptor){
+  Object.defineProperty(globalThis,storeKey,{value:{document:doc,id,receipts:new MapCtor()},writable:true,configurable:true,enumerable:true});
+  storeDescriptor=descriptor(globalThis,storeKey);
+ }
+ preparation=hold(globalThis,storeKey);
+ if(hold(preparation,'document')!==doc||typeof hold(preparation,'id')!=='string')throw Error('TERMINAL_PROVIDER_DOCUMENT');
+ const preparationId=hold(preparation,'id'),receipts=hold(preparation,'receipts');
+ if(hold(receipts,'get')!==mapGet)throw Error('TERMINAL_PROVIDER_READER');
+ const transport=own(own(sample,'bindings'),'transport'),originalQuery=own(bindings,'query'),streamType=own(bindings,'StreamPersist');
+ if(typeof originalQuery!=='function'||!transport||!streamType)throw Error('TERMINAL_PROVIDER_DEFINITION');
+ const connection=own(acquisition,'receiver'),applicationSession=hold(connection,'FSession');
+ const main=hold(hold(hold(hold(globalThis,'bg'),'app'),'Application'),'FInstance');
+ const form=hold(main,'FMainForm'),mapTree=hold(form,'FMapTree'),urlUtils=hold(form,'FUrlUtils'),storage=hold(urlUtils,'FFileStorage');
+ if(hold(mapTree,'FServerConnection')!==connection||applicationSession!==own(acquisition,'session')
+   ||hold(applicationSession,'$S')!==transport||hold(connection,'FUsername')!==account||hold(storage,'$S')!==transport
+   ||hold(storage,'QueryInterface')!==originalQuery)throw Error('TERMINAL_PROVIDER_NATIVE_REFS');
+ const messages=hold(transport,'$M');hold(messages,'GetDynamicData');hold(transport,'$R');hold(transport,'DispatchMessageAsync');
+ let armed;
+ function guard(){if(providerFailure)throw providerFailure.value;
+  try{checkOriginal.call(capsule);for(const check of providerChecks)check()}catch(value){providerFailure??={value};throw providerFailure.value}
+ }
+ function readReceipt(operationId){guard();return apply(mapGet,receipts,[operationId])}
+ function retainRequest(request){
+  const keys=Reflect.ownKeys(request),prototype=parent(request),entries=keys.map(k=>[k,descriptor(request,k)]);
+  if(keys.length!==3||!['operationId','sessionId','intent'].every(k=>keys.includes(k))||entries.some(([,d])=>!('value'in d))
+   ||typeof own(request,'operationId')!=='string'||!own(request,'operationId')||typeof own(request,'sessionId')!=='string'||!own(request,'sessionId')||own(request,'intent')!=='new_draft')throw Error('TERMINAL_PROVIDER_REQUEST');
+  const check=()=>{if(parent(request)!==prototype||Reflect.ownKeys(request).length!==keys.length||entries.some(([k,d])=>{const n=descriptor(request,k);return !n||Reflect.ownKeys(d).some(p=>!Object.is(n[p],d[p]))}))throw Error('TERMINAL_PROVIDER_REQUEST_CHANGED')};
+  return {request,operationId:own(request,'operationId'),sessionId:own(request,'sessionId'),check};
+ }
+ provider=Object.freeze({
+  inspect(){if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();return Object.freeze({preparation,receipts,document:doc,documentId:preparationId,
+   currentUser:own(sample,'user'),acquisition,transport,connection,storage,query:originalQuery,streamType,armed:!!armed,
+   nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false})},
+  arm(request){
+   if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();
+   if(armed){if(armed.request!==request)throw Error('TERMINAL_PROVIDER_REPLAY');armed.check();return armed.binding}
+   const entry=retainRequest(request),prior=readReceipt(entry.operationId);
+   if(prior&&(own(prior,'phase')!=='reserved'||Object.hasOwn(prior,'terminalOriginalCreation')))throw Error('TERMINAL_PROVIDER_LATE');
+   let creation,receipt,proxy,task,work,failed,support;
+   const check=()=>{guard();entry.check();if(creation){
+    if(readReceipt(entry.operationId)!==receipt||own(receipt,'terminalOriginalCreation')!==creation||own(receipt,'phase')!=='verified'
+      ||own(creation,'packageProxy')!==proxy||own(receipt,'tab')!==own(creation,'tab')||own(receipt,'packageNode')!==own(creation,'packageNode'))throw Error('TERMINAL_PROVIDER_CREATION_CHANGED');
+   }};
+   let binding;
+   binding=Object.freeze({
+    query(){
+     if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');
+     if(work){if(!failed)check();return work}check();
+     receipt=readReceipt(entry.operationId);if(!receipt||own(receipt,'phase')!=='verified'||prior&&receipt!==prior)throw Error('TERMINAL_PROVIDER_CREATION_REQUIRED');
+     creation=own(receipt,'terminalOriginalCreation');
+     if(!Object.isFrozen(creation)||own(creation,'document')!==doc||own(creation,'documentId')!==preparationId
+       ||own(creation,'operationId')!==entry.operationId||own(creation,'sessionId')!==entry.sessionId
+       ||own(creation,'nativeSession')!==transport||own(creation,'account')!==account||own(creation,'path')!==null)throw Error('TERMINAL_PROVIDER_FOREIGN_CREATION');
+     proxy=hold(creation,'packageProxy');if(hold(proxy,'$S')!==transport||hold(proxy,'QueryInterface')!==originalQuery)throw Error('TERMINAL_PROVIDER_PROXY');
+     const identity=hold(proxy,'$'),w=hold(identity,'$OW'),o=hold(identity,'$O');
+     if(!Number.isInteger(w)||w<0||!Number.isInteger(o)||o<0||hold(own(creation,'packageNode'),'Package')!==proxy
+       ||own(creation,'connection')!==connection)throw Error('TERMINAL_PROVIDER_PROXY');
+     for(const key of Reflect.ownKeys(creation))hold(creation,key);for(const key of ['terminalOriginalCreation','phase','tab','packageNode'])hold(receipt,key);
+     // One original task, original receiver and original returned completion.
+     // Only a private in-realm consumer can invoke this; stock H0 still refuses.
+     let resolve,reject;work=new Promise((yes,no)=>{resolve=yes;reject=no});
+     const rejectFirst=value=>{failed??={value};reject(failed.value)};
+     try{
+      check();task=apply(originalQuery,proxy,[streamType]);
+      const continuation=hold(task,'continueWith'),reader=hold(task,'getAwaitedResult');let completed=false;
+      if(typeof continuation!=='function'||typeof reader!=='function')throw Error('TERMINAL_PROVIDER_TASK');
+      apply(continuation,task,[()=>{if(completed)return;completed=true;
+       try{for(const fn of providerChecks)fn();support=apply(reader,task,[]);
+        if(hold(support,'$S')!==transport||hold(support,'SaveToStream')!==own(bindings,'persist'))throw Error('TERMINAL_PROVIDER_SUPPORT');
+        const identity=hold(support,'$'),w=hold(identity,'$OW'),o=hold(identity,'$O');if(!Number.isInteger(w)||w<0||!Number.isInteger(o)||o<0)throw Error('TERMINAL_PROVIDER_SUPPORT');
+        check();resolve(support)}catch(error){rejectFirst(error)}
+      }]);
+     }catch(error){rejectFirst(error)}return work;
+    },
+    inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType})},
+   });
+   armed={...entry,check,binding};return binding;
+  },
+ });
+ }catch(value){
+  // Existing partial source witnesses remain evidence-only. Missing original
+  // native slots cannot be repaired by a late lookup on this capsule.
+  providerFailure={value};provider=Object.freeze({inspect(){throw providerFailure.value},arm(){throw providerFailure.value}});
+ }
+ Object.defineProperty(capsule,'originalProvider',{value:provider});
  function checkOriginal(){
   if(this!==capsule||parent(capsule)!==capsuleParent||own(globalThis,'__loginomOriginalUserPublisherV1')!==originalPublisher
     ||own(originalPublisher,'inspect')!==originalInspect||own(globalThis,'__loginomStartupV1')!==originalStartup
@@ -94,6 +200,7 @@ export function collectTerminalScriptWitness(expected){
   for(const check of integrityChecks)check();
   const method=descriptor(capsule,'checkOriginal');if(!method||method.value!==checkOriginal||method.get||method.set
     ||method.writable||method.configurable||method.enumerable)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  const p=descriptor(capsule,'originalProvider');if(!p||p.value!==provider||p.get||p.set||p.writable||p.configurable||p.enumerable)throw Error('TERMINAL_PROVIDER_RECEIVER');
   return summary;
  }
  Object.defineProperty(capsule,'checkOriginal',{value:checkOriginal});Object.freeze(capsule);
@@ -106,4 +213,17 @@ export function projectTerminalScriptWitness(capsule){
  const d=Object.getOwnPropertyDescriptor(capsule,'checkOriginal');
  if(!Object.isFrozen(capsule)||!d||!('value'in d)||typeof d.value!=='function'||d.writable||d.configurable||d.enumerable)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
  return Reflect.apply(d.value,capsule,[]);
+}
+
+// Fixed production host entry: custody evidence only, no arm/query dispatch.
+export function inspectTerminalOriginalProvider(capsule){
+ const check=Object.getOwnPropertyDescriptor(capsule,'checkOriginal');
+ if(!Object.isFrozen(capsule)||!check||!('value'in check)||typeof check.value!=='function'||check.writable||check.configurable||check.enumerable)throw Error('TERMINAL_PROVIDER_RECEIVER');
+ Reflect.apply(check.value,capsule,[]);
+ const d=Object.getOwnPropertyDescriptor(capsule,'originalProvider');
+ if(!d||!('value'in d)||d.writable||d.configurable||d.enumerable)throw Error('TERMINAL_PROVIDER_RECEIVER');
+ const p=d.value,m=Object.getOwnPropertyDescriptor(p,'inspect');
+ if(!Object.isFrozen(p)||!m||!('value'in m)||typeof m.value!=='function')throw Error('TERMINAL_PROVIDER_RECEIVER');
+ const r=Reflect.apply(m.value,p,[]);
+ return {providerRetained:true,creationArmed:r.armed,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false};
 }
