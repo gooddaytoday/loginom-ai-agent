@@ -33,7 +33,7 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
   const s=await channel.observe({condition:'filter ready for validation',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
   await channel.perform({condition:'validate filter conditions',initialObservation:s,ready:s=>s.wizard?.stage==='row_filter',identity:s=>s.prepared_node_context,
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Filter Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'done'};}});
-  const done=await channel.observe({condition:'filter accepted by Loginom',ready:s=>s.wizard?.stage==='done'});
+  const done=await channel.observe({condition:'filter accepted by Loginom',settleFilterValidation:true,ready:s=>s.wizard?.stage==='done'});
   return {...changed,validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
  },configureAllOutputs:configureFilterOutputs,readOutputs:readFilterOutputs,
 });}

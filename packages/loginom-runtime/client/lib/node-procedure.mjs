@@ -64,6 +64,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let snapshotTableDialog = null;
   let tableFormatCompletion = null;
   let viewerAddCompletion = null;
+  let filterValidationCompletion = null;
   let snapshotWizardConfirmation = null;
   if(preparedNodeContext)validatePreparedNodeContext(preparedNodeContext);
   const boundOptions=preparedNodeContext?{prepared_node_context:structuredClone(preparedNodeContext)}:{};
@@ -217,8 +218,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, settleTableFormat = false, settleViewerAdd = false, wizardConfirmation } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, settleTableFormat = false, settleViewerAdd = false, settleFilterValidation = false, wizardConfirmation } = {}) {
       checkBudget();
+      if(typeof settleFilterValidation!=='boolean')throw Error('Filter validation settlement must be explicit');
+      let validatedFilter;
+      if(settleFilterValidation){
+        if(!filterValidationCompletion)throw Error('Filter validation settlement requires its confirmed Next receipt');
+        validatedFilter=filterValidationCompletion;filterValidationCompletion=null;
+        timeoutMs=Math.max(1,operation.deadline-now());
+      }
       if(typeof settleViewerAdd!=='boolean')throw Error('Viewer add settlement must be explicit');
       let addedViewer;
       if(settleViewerAdd) {
@@ -235,7 +243,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         timeoutMs=Math.max(1,operation.deadline-now());
       }
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
-        || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || !settleTableFormat && !settleViewerAdd && timeoutMs > (readProcesses || tableFormatPage && tableDialog?.kind==='format' ? 60000 : 15000)) {
+        || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || !settleTableFormat && !settleViewerAdd && !settleFilterValidation && timeoutMs > (readProcesses || tableFormatPage && tableDialog?.kind==='format' ? 60000 : 15000)) {
         throw new Error('A named, bounded readiness condition is required');
       }
       readOutputs ||= !!tablePage || !!tableDialog;
@@ -257,7 +265,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
       let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
-      for (let sample = 0; settleTableFormat || settleViewerAdd || sample < 80; sample++) {
+      for (let sample = 0; settleTableFormat || settleViewerAdd || settleFilterValidation || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
@@ -394,6 +402,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             condition, reason:error.message, outcome:structuredClone(result)});
           throw error;
         }
+        if(validatedFilter && (result.output.wizard?.status!=='observed' || result.output.wizard.root_tid!==validatedFilter.root_tid || result.output.wizard.root_ref!==validatedFilter.root_ref || !['row_filter','done'].includes(result.output.wizard.stage)))throw Error('Filter validation wizard owner changed');
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
         if(readNavigation)result.output.node_navigation_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
@@ -486,8 +495,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ?snapshot.ui.elements.find(e=>e.ref===action.ref&&e.viewer_card?.kind==='add'):null;
       const completingViewerAdd=addCard&&snapshot.node_outputs.port_panels?.some(p=>p.port_guid===addCard.viewer_card.port_guid)
         ?{port_guid:addCard.viewer_card.port_guid,before:snapshot.node_outputs.tables.map(t=>t.view_guid)}:null;
+      const completingFilterValidation=action.verb==='wizard_step'&&action.expected_stage==='done'
+        &&snapshot.wizard?.status==='observed'&&snapshot.wizard.stage==='row_filter'&&snapshot.node_filter?.verified===true
+        &&snapshot.ui.elements.filter(e=>e.ref===action.ref&&e.tid===snapshot.wizard.root_tid+';btnNext').length===1
+        ?{root_tid:snapshot.wizard.root_tid,root_ref:snapshot.wizard.root_ref}:null;
       tableFormatCompletion=null;
       viewerAddCompletion=null;
+      filterValidationCompletion=null;
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot]);
       // This write must be durable before the browser receives the mutation.
@@ -530,6 +544,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
       tableFormatCompletion=completingTableFormat;
       viewerAddCompletion=result.effect_possible===true&&result.trace?.some(e=>e.event==='ui_gesture_applied')?completingViewerAdd:null;
+      filterValidationCompletion=completingFilterValidation&&result.effect_possible===true
+        &&result.trace?.some(e=>e.event==='ui_gesture_applied'&&e.verb==='wizard_step')
+        &&result.trace?.some(e=>e.event==='wizard_step_verified'&&e.from_stage==='row_filter'&&e.to_stage==='done'&&e.root_ref===completingFilterValidation.root_ref)
+        ?completingFilterValidation:null;
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);
     },

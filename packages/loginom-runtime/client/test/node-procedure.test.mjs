@@ -791,6 +791,34 @@ test('confirmed Table add waits through the parent remainder without replay',asy
  }
 });
 
+test('confirmed filter Next settles its same wizard through the original parent remainder',async()=>{
+ for(const mode of ['slow','slow_journal','expired','foreign','no_next','other_action','next_then_other','wrong_button','no_gesture','no_verified','transport','cancel']){
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const node={...binding.node,verified:true,surface:'wizard',tid:'MF;TF-1;WizrdMCF'};
+  const root_tid=node.tid,root_ref='ui-wizard';let time=1,applied=false,mutations=0,reads=0;const records=[];
+  const signal=new AbortController();const operation={id:'filter-settle',deadline:mode==='expired'?12000:65000,action:{action_key:'node.apply',revision:'1'}};
+  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},
+   wizard:{status:'observed',root_tid,root_ref:applied&&mode==='foreign'?'ui-foreign':root_ref,stage:applied&&(!['slow','expired'].includes(mode)||time>=31000)?'done':'row_filter'},node_filter:{verified:true},
+   ui:{elements:[{ref:'ui-next',tid:root_tid+(mode==='wrong_button'?';btnOther':';btnNext'),allowed_actions:['wizard_step','click']}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}});
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',signal:signal.signal,now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms},record:async e=>{records.push(e);if(mode==='slow_journal'&&applied&&e.phase==='node_observation_sample')time+=21000;return structuredClone(e);},wrapMutation:(code,receipt)=>({code,receipt}),execute:async code=>{
+   if(typeof code==='string'){reads++;time+=20;return {status:'SUCCEEDED',output:state()};}
+   mutations++;if(mode==='transport')throw Error('transport');applied=true;
+   return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state(),trace:[...(mode==='no_gesture'?[]:[{event:'ui_gesture_applied',verb:'wizard_step'}]),...(mode==='no_verified'?[]:[{event:'wizard_step_verified',from_stage:'row_filter',to_stage:'done',root_ref}])]};
+  }});
+  const settle=()=>channel.observe({condition:'filter accepted by Loginom',settleFilterValidation:true,ready:s=>s.wizard.stage==='done'});
+  if(mode==='no_next'){await assert.rejects(settle(),/confirmed Next receipt/);assert.equal(records.length,0);continue;}
+  await channel.observe({condition:'filter Next ready',ready:()=>true});
+  if(mode==='transport'){await assert.rejects(channel.act({verb:'wizard_step',ref:'ui-next',expected_stage:'done'}),/transport/);await assert.rejects(settle(),/confirmed Next receipt/);continue;}
+  await channel.act({verb:mode==='other_action'?'click':'wizard_step',ref:'ui-next',...(mode==='other_action'?{}:{expected_stage:'done'})});
+  if(mode==='next_then_other'){await channel.observe({condition:'other action',ready:()=>true});await channel.act({verb:'click',ref:'ui-next'});}
+  if(mode==='cancel')signal.abort(new Error('cancelled'));
+  if(['slow','slow_journal'].includes(mode)){await settle();assert.ok(time>=21000);if(mode==='slow')assert.ok(reads>160);await assert.rejects(settle(),/confirmed Next receipt/);}
+  else await assert.rejects(settle(),mode==='expired'?/timeout|budget/:mode==='foreign'?/owner changed/:mode==='cancel'?/cancelled/:/confirmed Next receipt/);
+  assert.equal(mutations,mode==='next_then_other'?2:1);assert.equal(operation.deadline,mode==='expired'?12000:65000);
+ }
+});
+
 test('node views opening receives the original parent remainder while wizard opening stays capped',async()=>{
  for(const verb of ['open_node_views','begin_wizard']) {
   const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
