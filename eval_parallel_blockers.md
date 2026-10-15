@@ -1,5 +1,21 @@
 # Блокеры parallel evals
 
+## Mixed recovery: quarantine после пересечения собственных browser-проверок
+
+2026-10-15: `/tmp/evals-recover-mixed-dyI2ST`, собственная disposable pair
+`evals-mixed-9d88eeeb-server` / `evals-mixed-9d88eeeb-studio` (точные container
+identity читать из private pair.json). Original controller завершён SIGKILL137 после release A и отказа
+на B canary. Первый recovery подтвердил native disconnect/dispose ACK и две
+final00 для своих процессов, но supervisor сохранил failed process proof:
+`Unexplained browser/helper PID 2146151` и ещё7 unknown identities. Connection
+`controller/admin-mRkj6y/connection.json` quarantined; resources остаются fenced.
+Одновременно ошибочно запущена другая собственная native recovery проверка
+izBc4f. Она штатно завершена/удалена, её источники сохранены в private
+`research/evidence/native-mixed-red-resume-20261015/qualified-mixed.json`.
+Сопоставление unknown PID с этими источниками проверяется отдельно. Старый
+quarantined proof не переписывается, ручной release/delete не выполняется.
+Последующие native browser проверки выполняются последовательно.
+
 ## Положительная SessionBackup policy остаётся неквалифицированной
 
 2026-10-15 research: native PackageAutoSavePeriod=5000 read-back + named package
