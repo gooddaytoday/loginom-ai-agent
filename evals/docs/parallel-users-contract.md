@@ -1597,3 +1597,19 @@ Native1 PASS/47 (69.85s), typecheck/diff PASS. Private600
 native-cli-sessions-1c1a6e34-8600-4dbb-a3d2-0078e9044f9c/cli.json SHA256
 5f8fdbeef7a76e078a1bc305d287c1551e6ba0cc8d0d3fa6f6595b0302883619,
 with readonly.json;295 source/close/cleanup audit checks, own pair/root absent.
+
+### Management cancellation transport
+
+`management` accepts an optional AbortSignal and forwards it to the existing
+process supervisor, including the durable inventory path. An actual OS probe
+waits for its own readiness marker before cancellation; confirmed process
+closure and immutable interrupted:true/timedOut:false result are required.
+Signal forwarding does not grant session ownership, readiness or full-run SIGINT
+orchestration. Native interrupted-check ownership remains the next gate.
+
+RED ignored signal reached timeout; forwarding makes the target pass1/23
+(3.41s). The first combined run timed out because the cooperative probe handled
+only SIGTERM while the supervisor starts with SIGINT and a30s grace period.
+The probe now explicitly handles SIGINT; its10s limit and all assertions remain.
+Final combined75 PASS/239 (51.58s), five isolated repeats PASS/115 (15.27s),
+typecheck/diff PASS. No supervisor timing or ownership predicates changed.
