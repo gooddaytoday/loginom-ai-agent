@@ -197,7 +197,10 @@ test("journaled admin: an unknown mutation forbids replay while permitting read-
     expect((await peer.channel.request(request)).outcome).toBe("unknown")
     expect(await peer.channel.request({ ...request, id: "replay" })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_RECONCILIATION_REQUIRED" } })
     expect((await peer.channel.request({ ...request, id: "read-back", op: "inspect", deadline: Date.now() + 2000 })).outcome).toBe("confirmed")
-    expect(peer.events).toEqual(["write-lost", "write-read-back"])
+    expect((await peer.channel.request({ ...request, id: "confirm-absence", op: "confirm-session-absent", deadline: Date.now() + 2000 })).outcome).toBe("confirmed")
+    expect(await peer.channel.request({ ...request, id: "still-forbidden" })).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_RECONCILIATION_REQUIRED" } })
+    expect(peer.events).toEqual(["write-lost", "write-read-back", "write-confirm-absence"])
+    expect((await Bun.file(path.join(root, "confirm-absence.json")).json()).op).toBe("confirm-session-absent")
     expect((await Bun.file(path.join(root, "lost.json")).json()).state).toBe("unknown")
   } finally { await peer.close(); await rm(root, { recursive: true, force: true }) }
 })

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { createRequire } from "node:module"
 import { createInterface } from "node:readline"
 
-const operations = ["init", "inspect", "reconcile-user", "close-session", "dispose"]
+const operations = ["init", "inspect", "reconcile-user", "close-session", "confirm-session-absent", "dispose"]
 let context
 let page
 let identity
@@ -107,7 +107,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (!context || !identity) throw Error("ADMIN_NOT_INITIALIZED")
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
-    if (request.op === "close-session") {
+    if (request.op === "close-session" || request.op === "confirm-session-absent") {
       if (typeof request.payload?.proofId !== "string") throw Error("SESSION_IDENTITY_UNSUPPORTED")
       const binding = request.payload.adopt === undefined ? sessionBindings.get(request.payload.proofId)
         : await readSessionBinding(request.payload, identity)
@@ -148,6 +148,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           if (retained.some(row => row.name !== binding.session.name || row.createdAt !== binding.session.createdAt))
             return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } }
           if (retained.length) {
+            if (binding.absenceOnly) return { outcome: "not_applied", data: { code: "SESSION_STILL_PRESENT" } }
             // Agent closure requires its archived history and the frozen post-CLI package count.
             if (retained[0].packageCount !== binding.retainedPackageCount || retained[0].pendingDisconnect !== true)
               return { outcome: "not_applied", data: { code: "SESSION_NOT_IDLE" } }
@@ -170,7 +171,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           // The qualified writer is closed; fresh server absence completes this bound observation.
           return { outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } }
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "SESSION_CLOSE_UNKNOWN" } } }
-      }, { ...binding, deadline: request.deadline }))
+      }, { ...binding, deadline: request.deadline, absenceOnly: request.op === "confirm-session-absent" }))
       respond(id, result.outcome, result.data)
       continue
     }
