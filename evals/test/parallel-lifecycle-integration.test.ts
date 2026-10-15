@@ -12,7 +12,7 @@ import { storageCodecFixture } from "./helpers/storage-codec-fixture"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
-import { archiveManagementEnvironment, finalizeUnactivatedEnvironment } from "../src/environment-finalization"
+import { archiveManagementEnvironment, archiveManagementSlot, finalizeUnactivatedEnvironment } from "../src/environment-finalization"
 import { openLoginomAdmin, readAdminFinalization, readAdminSessionInventory, sealAdminProcessInventory } from "../src/loginom-admin"
 
 import { readManagementProcessInventory, sealManagementProcessInventory } from "../src/management-process-evidence"
@@ -609,8 +609,7 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         await expect(management(a.command, ["loginom", "status", "--format", "json"]))
           .rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_SEALED")
         expect(await Bun.file(a.inventoryFile).text()).toBe(sealedInventory)
-        const { archiveProfileEvidence } = await import("../src/profile-archive")
-        const archived = await archiveProfileEvidence(a.lease.slot.profileDir, await mkdtemp(path.join(a.lease.slot.historyDir, "before-close-")), path.join(file.controller.stateDir, "a-before-close.archive.json"))
+        const archived = await archiveManagementSlot(file, environment.server, a.lease, a.inventoryFile)
         await admin.closeManagementSession(a.lease, a.secretFile, sessions[0]!.id)
         const after = await admin.inspectSessionInventory()
         expect(after.sessions.some(row => row.name.startsWith(a.credentials.username + ":"))).toBe(false)
