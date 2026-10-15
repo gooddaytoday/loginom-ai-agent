@@ -1515,8 +1515,8 @@ row can close; ambiguity or changed identity refuses the operation.
 An immutable observed ledger remains separate from its private close receipt.
 The latter binds the original ledger semantic SHA and actual confirmed close
 command/reply. Reading reconstructs both chains. A confirmed repeat performs
-no RPC and preserves terminal bytes. This currently covers successful setup
-and check, normal ownership only; recovery, failed CLI and active attempts
+no RPC and preserves terminal bytes. This covers successful setup/check and explicitly interrupted check after a
+verified setup (see below), normal ownership only; recovery, failed CLI and active attempts
 remain open. SessionBackup and production readiness are not qualified.
 
 Native source-adoption RED→GREEN1 PASS/37 (53.17s): closing check preserves
@@ -1613,3 +1613,33 @@ only SIGTERM while the supervisor starts with SIGINT and a30s grace period.
 The probe now explicitly handles SIGINT; its10s limit and all assertions remain.
 Final combined75 PASS/239 (51.58s), five isolated repeats PASS/115 (15.27s),
 typecheck/diff PASS. No supervisor timing or ownership predicates changed.
+
+### Interrupted native check ownership and close
+
+A check interrupted after its newly created own native row is observed can
+leave a pending Count0 session despite confirmed local process closure. Its
+ledger may now qualify ownership using a preceding verified setup of the same
+protected profile/user/endpoint, continuous process evidence and exactly one
+stable new native row. The narrow path requires interrupted:true and
+timedOut:false. Successful setup/check requirements remain intact; ordinary
+failed results, timed-out checks and failed setup do not enter this path.
+Ownership authorizes the existing exact pending Count0 native close only and
+grants no readiness, storage deletion or release authority.
+
+The native fixture watches immutable during snapshots, aborts only after a new
+own row appears and settles both the child and observer. Actual exit130 has
+reply:null and confirmed local closure; the server row remains pending.
+RecordManagementSession initially rejected this source (RED). Final GREEN1
+PASS/57 (92.23s) closes that row while preserving both earlier setup/check rows.
+The two original sessions then close normally. Data-only result controls around
+the actual frozen sources refuse interrupted:false and timedOut:true; original
+producer receipts are restored before real ownership and close.68 related unit
+PASS/351 (9.06s), typecheck/Node syntax/diff PASS.
+
+Private600 native-cli-sessions-a0b79119-6a44-4835-9d0c-fc6527b61503:
+cli.json SHA256 95d81ad09927e5a4a7283fa5827afec861518dd1046bd08d1f64ac1324ceab65;
+cancelled-check.json SHA256 6475d81993cb19d96cb97b95740d4adc2a6e2f65e502a61b3d7291991b898aaa.
+The audit retains semantic hash links to authority/readonly/cancelled/terminal
+artifacts and performs346 source/process/close/peer/cleanup checks; own pair and
+root are absent. Recovery-only lineage, failed setup, timeout, pending recovery,
+active attempts and SessionBackup remain separate gates. Model/judge calls0.

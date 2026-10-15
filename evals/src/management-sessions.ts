@@ -89,14 +89,16 @@ async function managementSession(file: SlotFile, lease: SlotLease, secretFile: s
   const activation = await readUserActivation(file, lease, secretFile)
   if (!activation) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
   const command = await readManagementProcess(input, source.command), connection = await readManagementProcess(input, source.connection)
+  // A cancelled check can still leave an owned server session; it does not attest readiness.
+  const interruptedCheck = command.operation.join(" ") === "loginom check" && command.result?.interrupted === true && command.result.timedOut === false
   if (connection.operation.join(" ") !== "loginom setup" || connection.result?.exitCode !== 0 || connection.result.timedOut || connection.result.interrupted ||
     connection.result.reply?.browser !== "verified" || connection.result.reply.url !== prepared.endpoint || connection.result.reply.username !== owned.username ||
-    connection.result.reply.hasApiKey !== true || !command.sessions?.during.length || command.result?.exitCode !== 0 || command.result.timedOut ||
-    command.result.interrupted || command.result.reply?.browser !== "verified" ||
+    connection.result.reply.hasApiKey !== true || !command.sessions?.during.length || !command.result ||
+    !interruptedCheck && (command.result.exitCode !== 0 || command.result.timedOut || command.result.interrupted || command.result.reply?.browser !== "verified") ||
     !["loginom setup", "loginom check"].includes(command.operation.join(" ")) ||
     command.operation[1] === "setup" && JSON.stringify(command.source) !== JSON.stringify(connection.source) ||
     command.operation[1] === "check" && Date.parse(connection.finishedAt) > Date.parse(command.startedAt) || command.operation[1] === "check" &&
-      (command.result.reply.code !== "LOGINOM_CONNECTION_VALID" || command.result.reply.ok !== true))
+      !interruptedCheck && (command.result.reply?.code !== "LOGINOM_CONNECTION_VALID" || command.result.reply.ok !== true))
     throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
   const rows = command.sessions.during.flatMap(snapshot => snapshot.sessions.filter(row => row.name.startsWith(owned.username + ":") &&
     !command.sessions!.before.sessions.some(previous => previous.objectId === row.objectId)))
