@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { evalsRoot } from "../src/config"
@@ -52,6 +52,27 @@ test("writer-release settlement refuses cyclic ancestry even with zero old final
       via: "parent" as const, parent_pid: processes[(i + 1) % processes.length]!.pid,
       parent_starttime: processes[(i + 1) % processes.length]!.starttime, observed_at: new Date().toISOString() })) }
     await expect(observeWriterReleaseSettlement(f.profile, original, f.acquired)).rejects.toThrow("ancestry")
+  } finally { await f.dispose() }
+})
+
+test.skipIf((await stat("/proc/1")).uid === process.getuid?.())("writer-release refusal records the foreign proc UID and birth without signaling it", async () => {
+  const f = await fixture()
+  try {
+    const info = await stat("/proc/1"), raw = await readFile("/proc/1/stat", "utf8")
+    const birth = raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]!
+    expect(info.uid).not.toBe(process.getuid!())
+    // A false historical claim must be refused by this read-only API; PID 1 is never signaled.
+    const foreign = { ...f.original.processes[0]!, pid: 1, starttime: birth, parent: 0, group: 1, session: 1 }
+    const source = { ...f.original, processes: [...f.original.processes, foreign],
+      admissions: [...f.original.admissions!, { pid: 1, starttime: birth, status: "allowed" as const }],
+      origins: [...f.original.origins!, { pid: 1, starttime: birth, via: "parent" as const,
+        parent_pid: f.original.launcher!.pid, parent_starttime: f.original.processes.find(p => p.pid === f.original.launcher!.pid)!.starttime,
+        observed_at: new Date().toISOString() }] }
+    const before = JSON.stringify(source)
+    await expect(observeWriterReleaseSettlement(f.profile, source, f.acquired)).rejects.toThrow(new RegExp(
+      `Cannot inspect process identity PID 1: Process UID changed \\(proc_uid=${info.uid}, starttime=${birth}, state=[A-Z]\\)`))
+    expect(JSON.stringify(source)).toBe(before)
+    expect((await stat("/proc/1")).uid).toBe(info.uid)
   } finally { await f.dispose() }
 })
 

@@ -1741,6 +1741,11 @@ rows remain outside that slot's claims. The finalizing all-slot path is retained
 Data-only snapshot tests qualify this source gate; positive native session
 accounting under active B remains unqualified.
 
+UID-change refusals retain the sampled `/proc/PID` directory UID and a best-effort
+stat birth/state without exposing argv. Failed diagnostic reads stay unknown;
+the refusal still fails process qualification. These samples do not establish
+an atomic identity or retrospectively qualify an earlier failed process proof.
+
 The actual OS child independently reads its registration before executing.
 Missing registration RED→GREEN1 PASS/27 (3.54s); parallel owners2 PASS/30
 (5.10s), related69 PASS/358 (16.61s), typecheck/diff PASS. Cold native1 PASS/56 (193.44s),181 source/closure/cleanup audit checks;
