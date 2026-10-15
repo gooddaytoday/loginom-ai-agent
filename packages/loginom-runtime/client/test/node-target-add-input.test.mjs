@@ -4,19 +4,19 @@ import {runInNewContext} from 'node:vm';
 import {mutateGraph} from '../lib/node-target-browser.mjs';
 import {nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 
-function fixture({covered=false,changed=false,foreign=false,contextLost=false,toggleCount=1,toggleVisible=true,zoomCount=1,wrongTip=false,stuck=false,interactive=true,addOffset=692,input=3,create=false}={}){
+function fixture({covered=false,changed=false,foreign=false,contextLost=false,toggleCount=1,toggleVisible=true,zoomCount=1,wrongTip=false,stuck=false,interactive=true,addOffset=692,input=3,create=false,scrollable=false}={}){
  const prefix='MF;TF-1',tid=prefix+';Graph;Слияние',events=[];
- let scale=1,outline=false,clicks=0,toggleClicks=0;
+ let scale=1,outline=false,clicks=0,toggleClicks=0,scroll=0;
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:'tab'}};
  const node={ref:{document_id:'doc',workflow_id:'wf',node_id:'union'},position:{x:80,y:592},dom_epoch:2,inputs:Array.from({length:input},(_,i)=>i),outputs:[0]};
  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,dom_epoch:1,interaction_ready:true,
   nodes:create?[]:[node],links:[]};
  const rectangle=(x,y,width,height)=>({x,y,width,height,right:x+width,bottom:y+height});
- const body={getAttribute:()=>tid,getBoundingClientRect:()=>rectangle(324+80*scale,100+592*scale,88*scale,120*scale)};
- const add={getAttribute:()=>tid+';Input_Add',getBoundingClientRect:()=>rectangle(324+100*scale,100+addOffset*scale,16*scale,16*scale),contains:()=>false};
+ const body={getAttribute:()=>tid,getBoundingClientRect:()=>rectangle(324+80*scale,100+592*scale-scroll,88*scale,120*scale)};
+ const add={getAttribute:()=>tid+';Input_Add',getBoundingClientRect:()=>rectangle(324+100*scale,100+addOffset*scale-scroll,16*scale,16*scale),contains:()=>false};
  const palette={getBoundingClientRect:()=>rectangle(0,0,100,50),contains:()=>false};
  const covering={getAttribute:name=>name==='data-tid'?'MF;footer;covered':null};
- const root={getBoundingClientRect:()=>rectangle(324,100,950,694),contains:e=>[body,add].includes(e),querySelectorAll:()=>[body,add],scrollLeft:0,scrollTop:0};
+ const root={getBoundingClientRect:()=>rectangle(324,100,950,694),contains:e=>[body,add].includes(e),querySelectorAll:()=>[body,add],scrollLeft:0,get scrollTop(){return scroll;},clientWidth:950,scrollWidth:950,clientHeight:694,scrollHeight:scrollable?1100:694,scrollTo:({top})=>{events.push('scroll');scroll=top;}};
  const tab={classList:{contains:()=>true}},epochs=new WeakMap([[root,1]]);
  const document={querySelectorAll:s=>s==='[data-tid="tab"]'?[tab]:s==='[data-tid="MF;TF-1;ModelForm;cmpDiagram"]'?[root]:[],
   elementFromPoint:(x)=>{events.push('point');if(create&&!graph.nodes.length)return x<200?palette:root;return covered?covering:add;}};
@@ -89,4 +89,11 @@ test('uninteractive add-input target still refuses without a click when outline 
 for(const options of [{stuck:true},{zoomCount:2},{wrongTip:true}])test('unverified zoom does not fall through to add-input point: '+JSON.stringify(options),async()=>{
  const f=fixture(options),r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(f.stats().clicks,0);assert.equal(f.events.includes('point'),false);
  if(options.stuck)assert.equal(r.error,'Input-add node and ports are not fully visible');
+});
+
+for(const covered of [false,true])test('Eight133 offscreen input scroll precedes the unchanged point guard: '+covered,async()=>{
+ const f=fixture({scrollable:true,toggleCount:1,toggleVisible:false,zoomCount:0,addOffset:692,covered}),r=await f.run();
+ assert.equal(r.status,covered?'NOT_APPLIED':'SUCCEEDED');assert.equal(f.stats().clicks,covered?0:1);
+ assert.ok(f.events.indexOf('scroll')<f.events.indexOf('point'));assert.equal(f.stats().toggleClicks,0);assert.deepEqual(f.graph.nodes[0].position,{x:80,y:592});
+ if(covered){assert.equal(r.error,'Target is covered');assert.equal(r.input_add_point_refusal.covering_data_tid,'MF;footer;covered');}
 });

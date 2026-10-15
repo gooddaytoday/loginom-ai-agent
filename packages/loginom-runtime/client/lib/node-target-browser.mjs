@@ -387,16 +387,26 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       signal?.throwIfAborted();
       if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))throw Error('Graph changed before automatic placement');
       const tid=value.workflow_ref.prefix+';ModelForm;cmpDiagram';
+      // Reserve room for the requested growing Union, not just its drop point.
+      // This estimate chooses a position; rendered footprint and hit guards
+      // remain authoritative after creation and before every added input.
+      const ports=Math.max(2,...value.inputs.map(input=>input.input+1));
+      const reserve=value.target.type==='transform.union_data'?{left:24,top:32,right:104,bottom:128+32*(ports-2)}:null;
       return call(`async page=>page.locator('[data-tid='+${JSON.stringify(JSON.stringify(tid))}+']').evaluate(e=>{
         const b=e.getBoundingClientRect(),width=Math.min(b.right,innerWidth)-b.x,height=Math.min(b.bottom,innerHeight)-b.y;
         const view=(${nodePlacementViewport.toString()})(e);
         const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
-        for(let y=80;y<height-80;y+=128)for(let x=80;x<width-96;x+=160){
+        const reserve=${JSON.stringify(reserve)};
+        for(let y=80;y<height-80;y+=reserve?16:128)for(let x=80;x<width-96;x+=reserve?16:160){
           const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
           if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
-          if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
+          if(reserve){
+            const r={left:px-reserve.left*view.scale,top:py-reserve.top*view.scale,right:px+reserve.right*view.scale,bottom:py+reserve.bottom*view.scale};
+            if(r.left<Math.max(b.x,0)+8||r.top<Math.max(b.y,0)+8||r.right>=Math.min(b.right,innerWidth)-8||r.bottom>=Math.min(b.bottom,innerHeight)-8)continue;
+            if(occupied.some(o=>r.left<o.right+8&&r.right>o.left-8&&r.top<o.bottom+8&&r.bottom>o.top-8))continue;
+          }else if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
         const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000);

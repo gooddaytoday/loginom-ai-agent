@@ -21,7 +21,8 @@ export function nodePlacementViewport(element,nodeId) {
   nodeBounds={x,y,width:Math.max(...boxes.map(r=>r.x+r.width))-x,height:Math.max(...boxes.map(r=>r.y+r.height))-y};
  }
  return {...(nodeBounds?{node_bounds:nodeBounds}:{}),x:b.x,y:b.y,width:b.width,height:b.height,viewportWidth:innerWidth,viewportHeight:innerHeight,
-  scale:g.view.scale,translate:{x:g.view.translate.x,y:g.view.translate.y},scroll:{x:element.scrollLeft,y:element.scrollTop}};
+  scale:g.view.scale,translate:{x:g.view.translate.x,y:g.view.translate.y},scroll:{x:element.scrollLeft,y:element.scrollTop},
+  scroll_extent:{x:Math.max(0,element.scrollWidth-element.clientWidth),y:Math.max(0,element.scrollHeight-element.clientHeight)}};
 }
 export function nodePlacementPoint(view,position) {
  if(![view.x,view.y,view.scale,view.translate?.x,view.translate?.y,view.scroll?.x,view.scroll?.y,position?.x,position?.y].every(Number.isFinite)||view.scale<=0)throw Error('Invalid native canvas transform');
@@ -62,6 +63,23 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  try {
   if(!within(view,point)) {
    await guard();remaining();
+   // Scroll only this verified native canvas. Never replace an offscreen target
+   // with a clamped click point, pan the model, or move unrelated nodes.
+   if(nodeId!==undefined&&view.scroll_extent&&Object.values(view.scroll_extent).every(Number.isFinite)){
+    const bounds=view.node_bounds;
+    const left=Math.max(view.x,0)+16,top=Math.max(view.y,0)+16;
+    const right=Math.min(view.x+view.width,view.viewportWidth)-16,bottom=Math.min(view.y+view.height,view.viewportHeight)-16;
+    if(bounds.width<right-left&&bounds.height<bottom-top){
+     const dx=bounds.x<left?bounds.x-left:Math.max(0,bounds.x+bounds.width-right);
+     const dy=bounds.y<top?bounds.y-top:Math.max(0,bounds.y+bounds.height-bottom);
+     const scroll={x:Math.max(0,Math.min(view.scroll_extent.x,view.scroll.x+dx)),y:Math.max(0,Math.min(view.scroll_extent.y,view.scroll.y+dy))};
+     if(scroll.x!==view.scroll.x||scroll.y!==view.scroll.y){
+      await root.evaluate((element,scroll)=>element.scrollTo({left:scroll.x,top:scroll.y,behavior:'instant'}),scroll);
+      remaining();await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+     }
+    }
+   }
+   if(within(view,point))return {view,point,zoom_steps:0,outline_closed:false,fully_visible:true};
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');
    if(await owner.count()!==1||!await owner.isVisible())throw Error('Owned canvas outline container unavailable');
    zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');

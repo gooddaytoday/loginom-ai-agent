@@ -128,3 +128,36 @@ test('created node without verified rendered bounds cannot silently use a point'
  const f=fixture();f.args.nodeId='missing';
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
+
+for(const height of [129,157,297])test('owned canvas scroll reveals the full Eight133 footprint: '+height,async()=>{
+ const f=fixture();f.args.nodeId='union';f.args.position={x:80,y:592};let scroll=0,scrolls=0;
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(arg&&typeof arg==='object'){scrolls++;assert.equal(arg.x,0);scroll=arg.y;return;}
+  return {...view(),width:950,height:694,viewportWidth:1280,viewportHeight:800,scroll:{x:0,y:scroll},scroll_extent:{x:0,y:400},node_bounds:{x:388,y:671-scroll,width:88,height}};
+ };
+ const r=await revealNodePlacement(f.args);assert.equal(r.fully_visible,true);assert.equal(scrolls,1);assert.equal(f.state().clicks,0);
+ assert.equal(r.view.node_bounds.y+r.view.node_bounds.height,778);assert.deepEqual(f.args.position,{x:80,y:592});
+});
+test('canvas scroll cannot accept changed graph or expired deadline',async()=>{
+ for(const expired of [false,true]){
+  const f=fixture();f.args.nodeId='union';let scrolled=false;
+  f.args.root.evaluate=async(_fn,arg)=>{if(typeof arg==='object'){scrolled=true;return;}return {...view(),scroll_extent:{x:0,y:400},node_bounds:{x:388,y:671,width:88,height:297}};};
+  f.args.guard=async()=>{if(scrolled&&!expired)throw Error('Graph changed');};
+  f.args.remaining=()=>{if(scrolled&&expired)throw Error('Deadline exceeded');return 10000;};
+  await assert.rejects(revealNodePlacement(f.args),expired?/Deadline exceeded/:/Graph changed/);assert.equal(f.state().clicks,0);
+ }
+});
+test('Union automatic position reserves the requested growing footprint',async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'transform.union_data'},inputs:Array.from({length:8},(_,input)=>({input}))};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const rect=(x,y,width,height)=>({x,y,left:x,top:y,right:x+width,bottom:y+height,width,height});
+ const occupied=[[240,80],[560,80],[400,208],[720,208],[80,336],[560,336],[240,464],[720,464],[16,164]].map(([x,y])=>rect(324+x-16,100+y-21,88,129));
+ const canvas={getBoundingClientRect:()=>rect(324,100,950,694),querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>r})),scrollLeft:0,scrollTop:0,scrollWidth:950,clientWidth:950,scrollHeight:694,clientHeight:694};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
+ const context={innerWidth:1280,innerHeight:800,document:{elementFromPoint:()=>canvas},
+  bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+ const p=structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000));assert.notDeepEqual(p,{x:80,y:592});
+ const r=rect(324+p.x-24,100+p.y-32,128,352);assert.ok(r.bottom<786);assert.ok(r.right<1266);
+ assert.ok(occupied.every(o=>!(r.left<o.right+8&&r.right>o.left-8&&r.top<o.bottom+8&&r.bottom>o.top-8)));
+});
