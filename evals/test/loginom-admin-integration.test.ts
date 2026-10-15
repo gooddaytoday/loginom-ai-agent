@@ -777,6 +777,60 @@ liveIntegration("standalone preparation: repeated two-to-one preparation preserv
   await rm(root, { recursive: true, force: true })
 }, 120_000)
 
+liveIntegration("unused preparation: staged credentials without an account or root archive and release normally", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-unused-prepare-")), fixture = await parallelFixture(root)
+  const name = `evals-unused-${crypto.randomUUID().slice(0, 8)}`
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${listener.port}/app/`
+  listener.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
+  const pair = await createPair(file, options)
+  const journal = path.join(file.controller.stateDir, "command.json"), inventory = path.join(file.controller.stateDir, "processes-admin.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "unused-prepare", identity: pair.identity,
+    slotIds: ["a"], phase: "unactivated", processInventory: inventory })
+  await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "unused-prepare", journal, identity: pair.identity, connections: [] })
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
+  try {
+    const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
+    const secret = await Bun.file(prepared.secretFile).text()
+    await Bun.write(path.join(lease.slot.profileDir, "data", "unused-history"), "archive-before-dispose")
+    await Bun.$`docker exec ${pair.identity.containerId} sh -c ${'mkdir /workdir/UserStorage/eval-b; printf preserve > /workdir/UserStorage/eval-b/control'}`.quiet()
+    const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: inventory })
+    try {
+      const result = await finalizeUnactivatedEnvironment(file, environment, admin)
+      expect(result).toMatchObject({ status: "released", slots: [{ slotId: "a" }] })
+      const cleanup = await readLeaseReceipt(result.slots[0]!.cleanup.path) as { storage: { kind: string }; profileArchive: { journal: string; archive: string };
+        observation: { path: string } }
+      expect(cleanup.storage.kind).toBe("absent-user-storage")
+      const observation = await readLeaseReceipt(cleanup.observation.path) as { command: { path: string } }
+      expect(observation).toMatchObject({ account: null, serverSessions: "absent" })
+      expect(await Bun.file(path.join(cleanup.profileArchive.archive, "data", "unused-history")).text()).toBe("archive-before-dispose")
+      expect(await Bun.file(prepared.secretFile).text()).toBe(secret)
+      expect(await Bun.file(path.join(file.controller.stateDir, "user-a.json")).exists()).toBe(false)
+      expect(await Bun.file(path.join(file.controller.stateDir, "storage-a.json")).exists()).toBe(false)
+      expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/control`.quiet()).text()).toBe("preserve")
+      const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-unused-${crypto.randomUUID()}`)
+      await mkdir(evidence, { mode: 0o700 })
+      const processes = await readAdminProcessInventory(file, pair.identity, { file: inventory, journal, commandId: "unused-prepare", producerPid: process.pid })
+      await writeLeaseReceipt(path.join(evidence, "finalization.json"), { version: 2, identity: pair.identity, result, command: await readLeaseReceipt(journal),
+        inventory: await readLeaseReceipt(inventory), processes,
+        admins: await Promise.all(processes.connections.map(async connection => {
+          const receipt = await readLeaseReceipt(connection.source.path) as { finalization: { command: { path: string } } }
+          return { receipt, command: await readLeaseReceipt(receipt.finalization.command.path) }
+        })),
+        cleanup, observation, observationCommand: await readLeaseReceipt(observation.command.path),
+        archive: await readLeaseReceipt(cleanup.profileArchive.journal), slot: await readLeaseReceipt(lease.receipt),
+        server: await readLeaseReceipt(result.server.path), liveQualified: false })
+    } finally { await admin.dispose() }
+    await destroyPair(file, options)
+    await rm(root, { recursive: true, force: true })
+  } finally { await Promise.all([environment.server.close(), lease.close()]) }
+}, 120_000)
+
 liveIntegration("parent preparation: blocked account, configuration, ACL and physical root compose without password rotation", async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-parent-prepare-"))
