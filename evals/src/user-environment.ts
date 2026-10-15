@@ -283,9 +283,9 @@ export async function recordServerSession(file: SlotFile, lease: SlotLease, secr
     if (error.code === "ENOENT") return undefined
     throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
   })
-  if (existing && JSON.stringify(existing) !== JSON.stringify(entry)) throw new EvalFailure("SESSION_IDENTITY_CHANGED", 2)
+  if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(entry)) throw new EvalFailure("SESSION_IDENTITY_CHANGED", 2)
   await lease.assertHeld()
-  if (!existing) await writeLeaseReceipt(target, entry)
+  if (existing === undefined) await writeLeaseReceipt(target, entry)
   return entry
 }
 

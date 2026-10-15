@@ -181,6 +181,12 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     expect((await stat(sessionFile)).mode & 0o777).toBe(0o600)
     expect(await recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed)).toEqual(session)
     expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toEqual(session)
+    await Bun.write(sessionFile, "null")
+    try {
+      await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed))
+        .rejects.toThrow("SESSION_IDENTITY_CHANGED")
+      expect(await Bun.file(sessionFile).text()).toBe("null")
+    } finally { await writeLeaseReceipt(sessionFile, session) }
     // Data-only codec control; native Count1 qualification is exercised separately.
     const retainedRow = { ...row, objectId: "managed-retained-74", name: "eval-a:3" }
     const retainedBinding = { ...binding, remoteKey: retainedRow.objectId, name: retainedRow.name }
