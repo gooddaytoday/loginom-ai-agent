@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
+import { createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -10,6 +10,37 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 const owned = { remoteKey: "session-41", userKey: "user-a", username: "eval-a", serverEpoch: "epoch-1", pendingDisconnect: true, activeOperations: 0 }
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("session inventory reader preserves unqualified snapshots and refuses changed sources", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-session-inventory-")), fixture = await parallelFixture(root)
+  const directory = path.join(fixture.slots.controller.stateDir, "admin-codec")
+  await mkdir(path.join(directory, "commands"), { recursive: true, mode: 0o700 })
+  const hash = (value: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
+  // Data-only native codec; no Loginom ownership, server mutation or cleanup claim.
+  const command = { version: 1, kind: "loginom-admin-command", id: "baseline", op: "inspect", expectedIdentity: identity,
+    desiredHash: hash({}), replyHash: "e".repeat(64), state: "confirmed", at: "2026-10-15T07:00:00Z", settledAt: "2026-10-15T07:00:01Z" }
+  const commandFile = path.join(directory, "commands/baseline.json"), target = path.join(directory, "session-inventory-baseline.json")
+  const receipt = { version: 2, kind: "admin-session-inventory", identity, sessionIdentityQualified: false,
+    sessions: [{ objectId: "managed-1", sessionGuid: null, name: "eval-a:1", createdAt: "2026-10-15T06:59:00Z",
+      pendingDisconnect: false, packageCount: 0, activeOperations: null }],
+    command: { path: commandFile, sha256: hash(command) }, reply: { id: command.id, sha256: command.replyHash } }
+  await writeLeaseReceipt(commandFile, command)
+  await writeLeaseReceipt(target, receipt)
+  const source = { path: target, sha256: hash(receipt) }
+  try {
+    expect(await readAdminSessionInventory(fixture.slots, identity, source)).toEqual({ identity, sessionIdentityQualified: false, sessions: receipt.sessions, source })
+    await writeLeaseReceipt(target, { ...receipt, sessions: [] })
+    await expect(readAdminSessionInventory(fixture.slots, identity, source)).rejects.toThrow("SESSION_INVENTORY_UNCONFIRMED")
+    await writeLeaseReceipt(target, receipt)
+    await writeLeaseReceipt(commandFile, { ...command, state: "unknown" })
+    await expect(readAdminSessionInventory(fixture.slots, identity, source)).rejects.toThrow("SESSION_INVENTORY_UNCONFIRMED")
+    await writeLeaseReceipt(commandFile, command)
+    await expect(readAdminSessionInventory(fixture.slots, { ...identity, serverEpoch: "f".repeat(64) }, source)).rejects.toThrow("SESSION_INVENTORY_UNCONFIRMED")
+    const invalid = { ...receipt, sessions: [{ ...receipt.sessions[0]!, packageCount: -1 }] }
+    await writeLeaseReceipt(target, invalid)
+    await expect(readAdminSessionInventory(fixture.slots, identity, { ...source, sha256: hash(invalid) })).rejects.toThrow("SESSION_INVENTORY_UNCONFIRMED")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("admin inventory sealing admits one transition under its held server fence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-seal-")), fixture = await parallelFixture(root)
