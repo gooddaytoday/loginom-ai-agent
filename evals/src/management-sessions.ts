@@ -4,6 +4,7 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { readManagementProcess, readManagementProcessInventory } from "./management-process-evidence"
 import { readUserActivation, readUserOwnership, readUserPreparation } from "./user-environment"
 import type { SlotFile, SlotLease } from "./slots"
+import type { AdminReply } from "./loginom-admin"
 
 export async function recordManagementSession(file: SlotFile, lease: SlotLease, secretFile: string, inventoryFile: string, ownerId: string) {
   const input = await managementInput(file, lease, inventoryFile)
@@ -37,7 +38,49 @@ export async function readManagementSession(file: SlotFile, lease: SlotLease, se
   if (typeof source.inventoryFile !== "string" || Object.keys(source).length !== 3) throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
   const expected = await managementSession(file, lease, secretFile, { inventoryFile: source.inventoryFile, command: source.command, connection: source.connection })
   if (expected.id !== id || JSON.stringify(saved) !== JSON.stringify(expected)) throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
-  return expected
+  const terminal = await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${id}.closed.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (terminal === undefined) return expected
+  const closed = object(terminal), sourceClosed = object(closed.source)
+  if (typeof sourceClosed.path !== "string") throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const closure = await managementClosure(file, lease, expected, sourceClosed.path, closed.reply as AdminReply)
+  if (JSON.stringify(closed) !== JSON.stringify(closure)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  return { ...expected, state: "closed" as const, close: closure.source }
+}
+
+export async function recordManagementSessionClosed(file: SlotFile, lease: SlotLease, secretFile: string, id: string, commandFile: string, reply: AdminReply) {
+  const entry = await readManagementSession(file, lease, secretFile, id)
+  const closure = await managementClosure(file, lease, entry, commandFile, reply)
+  const target = path.join(file.controller.stateDir, `management-session-${id}.closed.json`)
+  const existing = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(closure)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  if (existing === undefined) await writeLeaseReceipt(target, closure)
+  return readManagementSession(file, lease, secretFile, id)
+}
+
+async function managementClosure(file: SlotFile, lease: SlotLease, entry: Pick<Awaited<ReturnType<typeof managementSession>>, "id" | "binding">, commandFile: string, reply: AdminReply) {
+  const data = object(reply.data), directory = path.dirname(path.dirname(commandFile))
+  if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
+    commandFile !== path.join(directory, "commands", `${reply.id}.json`) || Object.keys(data).length !== 2 || data.closed !== true ||
+    !["rpc_closed", "observed_absent"].includes(String(data.disposition))) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const authority = { receipt: path.join(file.controller.stateDir, `management-session-${entry.id}.json`),
+    sha256: hash(await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${entry.id}.json`))) }
+  const source = object(await readLeaseReceipt(commandFile))
+  if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
+    source.op !== "close-session" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    source.desiredHash !== hash({ proofId: entry.id, session: entry.binding, adopt: authority }) || source.replyHash !== hash(reply) ||
+    typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
+    !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.at) > Date.parse(source.settledAt)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  return { version: 2, kind: "management-session-close", id: entry.id, slotId: lease.slot.id, identity: lease.identity,
+    binding: entry.binding, authority, source: { path: commandFile, id: reply.id, sha256: hash(source) }, reply }
 }
 
 async function managementSession(file: SlotFile, lease: SlotLease, secretFile: string, source: { inventoryFile: string; command: unknown; connection: unknown }) {
@@ -63,7 +106,7 @@ async function managementSession(file: SlotFile, lease: SlotLease, secretFile: s
     command.sessions.after.sessions.some(current => current.objectId === row.objectId && (current.name !== row.name || current.createdAt !== row.createdAt)))
     throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
   await lease.assertHeld()
-  return { version: 2, kind: "owned-management-session", id: hash({ owner: command.owner, remoteKey: row.objectId }), state: "observed",
+  return { version: 2, kind: "owned-management-session", id: hash({ owner: command.owner, remoteKey: row.objectId }), state: "observed" as const,
     slotId: lease.slot.id, identity: lease.identity, leaseToken: lease.token, preparationNonce: prepared.nonce, userObjectId: owned.objectId,
     activationNonce: activation.nonce, actor: { kind: "management", runId: input.commandId, attemptId: null, owner: command.owner, operation: command.operation },
     binding: { remoteKey: row.objectId, userKey: owned.userKey, username: owned.username, serverEpoch: lease.identity.serverEpoch, name: row.name, createdAt: row.createdAt }, source }
