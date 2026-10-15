@@ -2,7 +2,7 @@ import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, open, readFile, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { acquireResourceLease, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, withResourceReservationGuards, writeLeaseReceipt } from "./lease"
+import { acquireResourceLease, acquireResourceSet, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, withResourceReservationGuards, writeLeaseReceipt } from "./lease"
 import type { Reservation } from "./lease"
 
 export type SlotDefinition = {
@@ -109,6 +109,35 @@ export async function loadResourceSlots(file: string) {
   return canonical
 }
 
+export async function acquireEnvironmentLeases(file: SlotFile, parallel: number, identity: ServerIdentity, journal: string, lockRoot = globalLockRoot) {
+  const canonical = await canonicalSlots(parseSlots(file, parallel))
+  if (JSON.stringify(canonical) !== JSON.stringify(file)) throw new EvalFailure("SLOT_PATH_CANONICAL", 2)
+  if (!journal.startsWith(file.controller.stateDir + path.sep) || path.resolve(journal) !== journal || await canonicalPath(journal) !== journal)
+    throw new EvalFailure("LEASE_JOURNAL", 2)
+  const commandId = text(record(await readLeaseReceipt(journal)).commandId)
+  const selected = file.slots.slice(0, parallel)
+  const resources = await acquireResourceSet([`server:${identity.containerId}`,
+    ...selected.flatMap(slot => [`user:${identity.containerId}:${slot.username}:0`, `profile:${slot.profileDir}`])]
+    .map(key => ({ key, lockRoot, journal, commandId, identity })), requireFinalizedSlotRelease)
+  try {
+    const slots: SlotLease[] = []
+    for (const slot of selected) {
+      const owned = resources.filter(resource => resource.reservation.key === `user:${identity.containerId}:${slot.username}:0` ||
+        resource.reservation.key === `profile:${slot.profileDir}`)
+      const token = crypto.randomUUID()
+      const receipt = path.join(file.controller.stateDir, `slot-${slot.id}-${token}.lease.json`)
+      const manifest = { version: 2, token, slot, identity, commandId, journal, resources: owned.map(resource => ({ receipt: resource.receipt,
+        key: resource.reservation.key, token: resource.reservation.token, revision: resource.reservation.revision })) }
+      await writeLeaseReceipt(receipt, { ...manifest, state: "retained" })
+      slots.push(slotLease(receipt, manifest, owned))
+    }
+    return { server: resources.find(resource => resource.reservation.key === `server:${identity.containerId}`)!, slots }
+  } catch (error) {
+    await Promise.all(resources.map(resource => resource.close()))
+    throw error
+  }
+}
+
 export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease> {
   if (!file.slots.some(candidate => candidate.id === slot.id && candidate.username === slot.username && candidate.profileDir === slot.profileDir &&
     candidate.workspaceRoot === slot.workspaceRoot && candidate.historyDir === slot.historyDir)) throw new EvalFailure("SLOT_NOT_CONFIGURED", 2)
@@ -117,30 +146,7 @@ export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, ide
   const resources = [] as Awaited<ReturnType<typeof acquireResourceLease>>[]
   try {
     for (const key of [`user:${identity.containerId}:${slot.username}:0`, `profile:${await canonicalPath(slot.profileDir)}`].sort())
-      resources.push(await acquireResourceLease({ key, lockRoot, journal, commandId, identity }, async previous => {
-        if (previous?.state !== "released") return
-        const proof = record(await readLeaseReceipt(previous.releaseEvidence!.path))
-        if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== previous.releaseEvidence!.sha256)
-          throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-        if (proof.kind !== "slot-resource-release") return
-        if (typeof proof.slotReceipt !== "string" || typeof proof.cleanupReceipt !== "string" || typeof proof.cleanupReceiptHash !== "string")
-          throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-        const composite = record(await readLeaseReceipt(proof.slotReceipt))
-        if (composite.version !== 2 || composite.state !== "released" || composite.cleanupReceipt !== proof.cleanupReceipt ||
-          composite.commandId !== previous.commandId || JSON.stringify(composite.identity) !== JSON.stringify(previous.identity) ||
-          !Array.isArray(composite.resources) || !composite.resources.some(value => {
-            const resource = record(value)
-            return resource.key === previous.key && resource.token === previous.token && resource.revision === previous.revision
-          }) || new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(proof.cleanupReceipt))).digest("hex") !== proof.cleanupReceiptHash)
-          throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-        if (composite.kind === "slot-recovery") {
-          if (typeof composite.incident !== "string") throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-          const incident = record(await readLeaseReceipt(composite.incident))
-          if (incident.state !== "released" || incident.token !== composite.incidentToken || incident.releaseReceipt !== proof.slotReceipt ||
-            incident.cleanupReceipt !== proof.cleanupReceipt || JSON.stringify(incident.identity) !== JSON.stringify(composite.identity) ||
-            JSON.stringify(incident.slot) !== JSON.stringify(composite.slot)) throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-        }
-      }))
+      resources.push(await acquireResourceLease({ key, lockRoot, journal, commandId, identity }, requireFinalizedSlotRelease))
     const token = crypto.randomUUID()
     const receipt = path.join(file.controller.stateDir, `slot-${slot.id}-${token}.lease.json`)
     const manifest = { version: 2, token, slot, identity, commandId, resources: resources.map(resource => ({ receipt: resource.receipt,
@@ -161,6 +167,31 @@ export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, ide
   }
 }
 
+async function requireFinalizedSlotRelease(previous: Reservation | undefined) {
+  if (previous?.state !== "released") return
+  const proof = record(await readLeaseReceipt(previous.releaseEvidence!.path))
+  if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== previous.releaseEvidence!.sha256)
+    throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+  if (proof.kind !== "slot-resource-release") return
+  if (typeof proof.slotReceipt !== "string" || typeof proof.cleanupReceipt !== "string" || typeof proof.cleanupReceiptHash !== "string")
+    throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+  const composite = record(await readLeaseReceipt(proof.slotReceipt))
+  if (composite.version !== 2 || composite.state !== "released" || composite.cleanupReceipt !== proof.cleanupReceipt ||
+    composite.commandId !== previous.commandId || JSON.stringify(composite.identity) !== JSON.stringify(previous.identity) ||
+    !Array.isArray(composite.resources) || !composite.resources.some(value => {
+      const resource = record(value)
+      return resource.key === previous.key && resource.token === previous.token && resource.revision === previous.revision
+    }) || new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(proof.cleanupReceipt))).digest("hex") !== proof.cleanupReceiptHash)
+    throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+  if (composite.kind === "slot-recovery") {
+    if (typeof composite.incident !== "string") throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+    const incident = record(await readLeaseReceipt(composite.incident))
+    if (incident.state !== "released" || incident.token !== composite.incidentToken || incident.releaseReceipt !== proof.slotReceipt ||
+      incident.cleanupReceipt !== proof.cleanupReceipt || JSON.stringify(incident.identity) !== JSON.stringify(composite.identity) ||
+      JSON.stringify(incident.slot) !== JSON.stringify(composite.slot)) throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+  }
+}
+
 export async function recoverSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, incident: string, lockRoot: string): Promise<SlotLease> {
   if (path.dirname(incident) !== file.controller.stateDir || path.resolve(incident) !== incident)
     throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
@@ -170,8 +201,7 @@ export async function recoverSlotLease(file: SlotFile, slot: SlotDefinition, ide
     JSON.stringify(original.slot) !== JSON.stringify(slot) || JSON.stringify(original.identity) !== JSON.stringify(identity) ||
     !file.slots.some(candidate => JSON.stringify(candidate) === JSON.stringify(slot)) || !Array.isArray(original.resources) || original.resources.length !== 2)
     throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
-  const journal = path.join(file.controller.stateDir, "run-journal.json")
-  if (record(await readLeaseReceipt(journal)).commandId !== original.commandId) throw new EvalFailure("SLOT_RECOVERY_LINEAGE_INVALID", 2)
+  const journal = await requireSlotJournal(file, original)
   const keys = [`user:${identity.containerId}:${slot.username}:0`, `profile:${await canonicalPath(slot.profileDir)}`].sort()
   const inventory = await Promise.all(original.resources.map(async (value, index) => {
     const source = record(value)
@@ -224,6 +254,14 @@ export async function recoverSlotLease(file: SlotFile, slot: SlotDefinition, ide
   }
 }
 
+async function requireSlotJournal(file: SlotFile, original: Record<string, unknown>) {
+  const journal = original.journal === undefined ? path.join(file.controller.stateDir, "run-journal.json") : original.journal
+  if (typeof journal !== "string" || !journal.startsWith(file.controller.stateDir + path.sep) || path.resolve(journal) !== journal ||
+    await canonicalPath(journal) !== journal || record(await readLeaseReceipt(journal)).commandId !== original.commandId)
+    throw new EvalFailure("SLOT_RECOVERY_LINEAGE_INVALID", 2)
+  return journal
+}
+
 async function requireReleasedSlotResource(current: Reservation, incident: string, original: Record<string, unknown>, mode: "recover" | "finalize" = "recover") {
   if (!current.releaseEvidence) throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
   const proof = record(await readLeaseReceipt(current.releaseEvidence.path))
@@ -259,9 +297,9 @@ export async function finalizeReleasedSlot(file: SlotFile, slot: SlotDefinition,
     const original = record(await readLeaseReceipt(incident))
     if (original.version !== 2 || !["retained", "released"].includes(String(original.state)) || typeof original.token !== "string" ||
       path.basename(incident) !== `slot-${slot.id}-${original.token}.lease.json` || JSON.stringify(original.slot) !== JSON.stringify(slot) ||
-      JSON.stringify(original.identity) !== JSON.stringify(identity) || !Array.isArray(original.resources) || original.resources.length !== keys.length ||
-      record(await readLeaseReceipt(path.join(file.controller.stateDir, "run-journal.json"))).commandId !== original.commandId)
+      JSON.stringify(original.identity) !== JSON.stringify(identity) || !Array.isArray(original.resources) || original.resources.length !== keys.length)
       throw new EvalFailure("SLOT_RECOVERY_INCIDENT_INVALID", 2)
+    const journal = await requireSlotJournal(file, original)
     const proofs = await Promise.all(rows.map(async (row, index) => {
       const source = record((original.resources as unknown[])[index])
       const current = row.reservation
@@ -269,7 +307,7 @@ export async function finalizeReleasedSlot(file: SlotFile, slot: SlotDefinition,
       const position = chain?.findIndex(entry => entry.token === source.token && entry.revision === source.revision)
       if (source.key !== row.key || source.receipt !== path.join(lockRoot, `${new Bun.CryptoHasher("sha256").update(row.key).digest("hex")}.reservation.json`) ||
         !current || current.state !== "released" || position === undefined || position < 0 ||
-        chain![position]!.commandId !== original.commandId || chain![position]!.journal !== path.join(file.controller.stateDir, "run-journal.json") ||
+        chain![position]!.commandId !== original.commandId || chain![position]!.journal !== journal ||
         chain!.slice(position).some(entry => JSON.stringify(entry.identity) !== JSON.stringify(identity)))
         throw new EvalFailure("SLOT_RELEASE_UNCONFIRMED", 2)
       for (const entry of chain!.slice(position + 1)) {
