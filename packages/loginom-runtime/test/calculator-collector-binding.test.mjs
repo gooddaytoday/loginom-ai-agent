@@ -116,3 +116,28 @@ test('bounded per-store rows cannot bypass the final UTF-8 byte bound',async()=>
   await assert.rejects(new Function('page','return ('+makeCalculatorCaptureCode({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS})+')(page)')(f.page),/BYTE_BOUND/);
  }finally{reset();}
 });
+
+const {captureWindowDiagnostic}=await import(pathToFileURL(root+'/src/acceptance/calculator-grouped-before-done-v1.mjs'));
+for(const key of ['count','loading','remoteFilter','remoteSort','source_membership','pendingKeys','isBufferedStore'])test('actual collector exposes bounded unavailable input type: '+key,async()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   const st=v.getStore();
+   const methods={count:'getCount',loading:'isLoading',remoteFilter:'getRemoteFilter',remoteSort:'getRemoteSort'};
+   if(methods[key])st[methods[key]]=()=>undefined;
+   if(key==='isBufferedStore')delete st.isBufferedStore;
+   if(key==='source_membership'){const get=st.getData;st.getData=()=>({...get(),getSource:()=>null});}
+   if(key==='pendingKeys')st.getProxy=()=>({$className:'bg.ext.CollectionProxy'});
+   return st;
+  }};};
+  const r=await new Function('page','return ('+makeCalculatorCaptureCode({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS})+')(page)')(f.page);
+  const d=captureWindowDiagnostic(r);assert.equal(d.length,2);
+  for(const w of d.windows){
+   assert.equal(w.evaluated,false);assert.equal(w.reason,'cached_flags_unavailable');
+   assert.deepEqual(Object.keys(w.available_inputs),['count','loading','remoteFilter','remoteSort','source_membership','pendingKeys','isBufferedStore']);
+   assert.deepEqual(w.available_inputs[key],{type:['source_membership','pendingKeys'].includes(key)?'null':'object',isArray:false,length:null});
+   for(const array of ['source_membership','pendingKeys'].filter(k=>k!==key))assert.deepEqual(w.available_inputs[array],{type:'object',isArray:true,length:array==='pendingKeys'?0:1});
+  }
+  assert.ok(!JSON.stringify(d).includes('before'));assert.ok(!JSON.stringify(d).includes('record_id'));
+ }finally{reset();}
+});

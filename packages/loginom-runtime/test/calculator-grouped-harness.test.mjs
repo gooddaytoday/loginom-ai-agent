@@ -111,3 +111,13 @@ test('cached-window diagnostic bounds list and reason, retaining actual length a
  assert.equal(r.windows[0].reason.length,256);assert.equal(r.windows[0].evaluated,null);assert.equal(r.windows[0].value,null);
  assert.deepEqual(captureWindowDiagnostic({}),{length:null,truncated:false,windows:[]});
 });
+
+test('cached-window type telemetry whitelists seven inputs and never copies array members',()=>{
+ const raw={type:'object',isArray:true,length:2,items:['private-id'],value:'private-value'};
+ const r=captureWindowDiagnostic({predicates:{cached_windows:[{available_inputs:{source_membership:raw,pendingKeys:{...raw,length:-1},foreign:raw,count:{type:'private'}}}]}});
+ assert.equal(Object.keys(r.windows[0].available_inputs).length,7);
+ assert.deepEqual(r.windows[0].available_inputs.source_membership,{type:'object',isArray:true,length:2});
+ assert.deepEqual(r.windows[0].available_inputs.pendingKeys,{type:'object',isArray:true,length:null});
+ assert.deepEqual(r.windows[0].available_inputs.count,{type:null,isArray:null,length:null});
+ assert.ok(!JSON.stringify(r).includes('private'));assert.ok(!JSON.stringify(r).includes('foreign'));
+});

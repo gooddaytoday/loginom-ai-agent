@@ -4130,7 +4130,12 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const available=typeof c.count==='number'&&typeof c.loading==='boolean'
    &&typeof c.remoteFilter==='boolean'&&typeof c.remoteSort==='boolean'&&Array.isArray(s.source_membership)
    &&Array.isArray(s.pendingKeys)&&typeof f.isBufferedStore==='boolean';
-  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable'};
+  const inputType=value=>({type:value===null?'null':typeof value,isArray:Array.isArray(value),
+   length:Array.isArray(value)?value.length:null});
+  const available_inputs=Object.fromEntries(Object.entries({count:c.count,loading:c.loading,
+   remoteFilter:c.remoteFilter,remoteSort:c.remoteSort,source_membership:s.source_membership,
+   pendingKeys:s.pendingKeys,isBufferedStore:f.isBufferedStore}).map(([key,value])=>[key,inputType(value)]));
+  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable',available_inputs};
   const cache=f.$className==='Ext.data.Store'&&f.isBufferedStore===false&&c.loading===false
    &&f.currentPage===1&&c.remoteFilter===false&&c.remoteSort===false&&s.pendingKeys.length===0
    &&s.proxy_class==='bg.ext.CollectionProxy'&&c.count===s.records.length
@@ -4140,7 +4145,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const rows=s.rows.length===s.records.length&&s.rows.every((r,i)=>
    r.record_index===String(i)&&r.record_id===String(s.records[i].internalId)
    &&r.bound_view===dom.find(e=>e.id===s.element_id)?.attrs.id);
-  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows};
+  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows,available_inputs};
  });
  const result={owner,root_tid,root_ref,dom,stores,collector_revision:1,
   predicates:{status:'partial',evaluated:false,cached_windows:window,

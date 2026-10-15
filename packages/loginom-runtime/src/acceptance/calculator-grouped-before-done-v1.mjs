@@ -166,10 +166,16 @@ export async function captureDraft({owner,current,observe,observeCancellation=ob
 export function captureWindowDiagnostic(capture) {
  const windows=capture?.predicates?.cached_windows;
  const flag=value=>typeof value==='boolean'?value:null;
+ const inputs=p=>Object.fromEntries(['count','loading','remoteFilter','remoteSort','source_membership','pendingKeys','isBufferedStore'].map(key=>{
+  const d=p?.available_inputs?.[key];
+  return [key,{type:['undefined','null','boolean','number','string','object','function','symbol','bigint'].includes(d?.type)?d.type:null,
+   isArray:flag(d?.isArray),length:d?.isArray===true&&Number.isSafeInteger(d?.length)&&d.length>=0?d.length:null}];
+ }));
  return {length:Array.isArray(windows)?windows.length:null,truncated:Array.isArray(windows)&&windows.length>2,
   windows:Array.isArray(windows)?windows.slice(0,2).map(p=>({evaluated:flag(p?.evaluated),value:flag(p?.value),
    reason:typeof p?.reason==='string'?p.reason.slice(0,256):null,
-   cache_complete:flag(p?.cache_complete),rows_complete:flag(p?.rows_complete)})):[]};
+   cache_complete:flag(p?.cache_complete),rows_complete:flag(p?.rows_complete),
+   ...(p?.available_inputs?{available_inputs:inputs(p)}:{})})):[]};
 }
 
 export function validateCapture(capture,owner,state) {
