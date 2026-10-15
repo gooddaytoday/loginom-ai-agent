@@ -193,6 +193,10 @@ const sourceResponsePins=Object.freeze([
   5094119,
   "53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f"
  ]
+,
+["https://app.loginom.ai/app/bg/js/BitConverter.js", 22125, "03f051286c276608da7023ed91cc9ef5c3d61fcca69f75de390d4b72005f8100"],
+["https://app.loginom.ai/app/bg/ts/Int64.js", 31482, "d47df699ab466c0ca77c355db6f3708ffc84fc15abc839a22f22b5aaaeccbc89"],
+["https://app.loginom.ai/app/bg/ts/SysUtils.js", 24933, "d9c9e13ec69d4676d41a661855c18e19bfb0c928a39d8c550435f18631362bd4"]
 ].map(row=>Object.freeze(row)));
 
 const sourceRoutes=new WeakMap();
@@ -218,7 +222,7 @@ export async function prepareTerminalSourceResponses(owner){
  const receipt=Object.freeze({
   ready(){return installed},
   check(){for(const check of checks)check()},
-  inspect(){return Object.freeze({installed,routeTask,records:Object.freeze(retained.map(r=>r.receipt)),responseBytesComplete:retained.length===expected.size&&retained.every(r=>r.phase==='fulfilled'),sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false})},
+  inspect(){return Object.freeze({installed,routeTask,records:Object.freeze(retained.filter(r=>r.phase==='fulfilled').map(r=>r.receipt)),responseBytesComplete:sourceResponsePins.slice(0,20).every(([url])=>retained.some(r=>r.phase==='fulfilled'&&r.receipt.pinUrl===url)),extraResponseBytesComplete:sourceResponsePins.slice(20).every(([url])=>retained.some(r=>r.phase==='fulfilled'&&r.receipt.pinUrl===url)),sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false})},
  });
  sourceRoutes.set(owner,receipt);
  async function handle(routeObject){
@@ -347,6 +351,24 @@ export async function bindTerminalScriptWitness(owner){
    }
    supportedInitialLoadJoined=true;
   }
+  let extraDependenciesJoined=false;const extraMatches=[];
+  const extraDescriptor=Object.getOwnPropertyDescriptor(summary,'extraDependencies');
+  if(extraDescriptor){
+   if(!('value'in extraDescriptor)||!originalHandle||!supportedInitialLoadJoined)fail();
+   const extras=extraDescriptor.value,pins=witnessArguments.extraDependencyPins;
+   if(loadData(extras,'length')!==pins.length)fail();const seen=new Set();
+   for(let i=0;i<pins.length;i++){
+    const row=loadData(extras,String(i)),url=loadData(row,'url');if(typeof url!=='string')fail();
+    const parsed=new URL(url);if(parsed.href!==url)fail();const pinUrl=parsed.origin+parsed.pathname,pin=pins.find(([u])=>u===pinUrl);
+    if(!pin||seen.has(pinUrl)||parsed.hash||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search))
+      ||loadData(row,'integrity')!==pin[1]||loadData(row,'loaded')!==true||loadData(row,'armedBeforeSource')!==true)fail();seen.add(pinUrl);
+    const matching=responses.records.filter(r=>loadData(r,'url')===url&&loadData(r,'pinUrl')===pinUrl);if(matching.length!==1)fail();
+    const responseReceipt=matching[0],sha=loadData(responseReceipt,'sha256');
+    if(loadData(row,'integrity')!=='sha256-'+Buffer.from(sha,'hex').toString('base64'))fail();
+    extraMatches.push(Object.freeze({url,pinUrl,integrity:pin[1],responseReceipt}));
+   }
+   extraDependenciesJoined=true;
+  }
   let pending,failed;
   function recheck(){
    if(pending)return pending;if(failed)return failed;
@@ -463,7 +485,7 @@ export async function bindTerminalScriptWitness(owner){
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
-   realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,supportedInitialLoadJoined,initialLoadReason:supportedInitialLoadJoined?undefined:(Object.hasOwn(summary,'initialLoadReason')?loadData(summary,'initialLoadReason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
+   realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,supportedInitialLoadJoined,extraDependenciesJoined,extraDependencies:Object.freeze(extraMatches),extraDependenciesReason:extraDependenciesJoined?undefined:'ORIGINAL_EXTRA_DEPENDENCIES_UNAVAILABLE',initialLoadReason:supportedInitialLoadJoined?undefined:(Object.hasOwn(summary,'initialLoadReason')?loadData(summary,'initialLoadReason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
    recheck:originalHandle?()=>recheck():undefined,
    createWorkspace:originalHandle?createWorkspace:undefined,
    continueComponent:originalHandle?continueComponent:undefined,
