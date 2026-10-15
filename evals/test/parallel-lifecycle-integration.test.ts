@@ -22,7 +22,7 @@ import { readManagementSession, recordManagementSession } from "../src/managemen
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 
-for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(`native CLI setup and check retain session observations during their own process lifetimes${mode === "manual" ? "" : mode === "finalizer" ? " with finalizer" : " with unknown session"}`, async () => {
+for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] as const) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(`native CLI setup and check retain session observations during their own process lifetimes${mode === "manual" ? "" : mode === "finalizer" ? " with finalizer" : mode === "reconnected-finalizer" ? " with reconnected finalizer" : " with unknown session"}`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-cli-sessions-")), fixture = await parallelFixture(root)
   const name = `evals-cli-${crypto.randomUUID().slice(0, 8)}`
@@ -44,9 +44,10 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
   const prepared = await stageUserPreparation(file, lease, "e".repeat(64)), secretFile = prepared.secretFile
   const credentials = await readLeaseReceipt(secretFile) as { username: string; password: string }
-  const settlement = { cli: true, admin: false }
+  const settlement = { cli: true, admin: false, preserve: false }
   try {
     const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
+    const peer = { admin: undefined as Awaited<ReturnType<typeof openLoginomAdmin>> | undefined }
     try {
       const claimed = await admin.createBlockedUser(lease, secretFile)
       const configured = await admin.configureOwnedUser(lease, secretFile)
@@ -72,7 +73,7 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       const command = { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, "captures"), cleanupSecrets: [credentials.password, config.dock.apiKey],
         managementEvidence: { file: inventoryFile, lease, admin } }
       const captures = []
-      for (const operation of ["setup", "check"] as const) {
+      for (const operation of mode === "reconnected-finalizer" ? ["setup"] as const : ["setup", "check"] as const) {
         settlement.cli = false
         const result = await management(command, ["loginom", operation, ...(operation === "setup" ? ["--stdin-json"] : []), "--format", "json"],
           operation === "setup" ? JSON.stringify({ url, ...credentials, apiKey: config.dock.apiKey }) : undefined, 60_000)
@@ -99,7 +100,7 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
           })) })
       }
       const readonly = []
-      for (const operation of ["status", "recover"] as const) {
+      for (const operation of mode === "reconnected-finalizer" ? [] : ["status", "recover"] as const) {
         settlement.cli = false
         const result = await management(command, ["loginom", operation, "--format", "json"], undefined, 60_000)
         settlement.cli = result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete
@@ -128,22 +129,19 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       settlement.cli = false
       const interrupted = management(command, ["loginom", "check", "--format", "json"], undefined, 60_000, abort.signal)
         .finally(() => { stopped.value = true })
-      const observed = (async () => {
+      const observed = (mode === "reconnected-finalizer" ? interrupted.then(async () => {
+        const current = await observeCliSession(inventoryFile, admitted, credentials.username)
+        if (!current) throw Error("CHECK_ROW_NOT_OBSERVED")
+        return current
+      }) : (async () => {
         const deadline = Date.now() + 30_000
         while (!stopped.value && Date.now() < deadline) {
-          const raw = await readLeaseReceipt(inventoryFile) as { processes: { state: string; sessions?: { before: { path: string }; during?: { path: string }[] } }[] }
-          const current = raw.processes.at(-1)
-          if (raw.processes.length > admitted && current?.state === "planned" && current.sessions?.during?.length) {
-            const before = await readLeaseReceipt(current.sessions.before.path) as { sessions: { objectId: string }[] }
-            const source = current.sessions.during.at(-1)!
-            const snapshot = await readLeaseReceipt(source.path) as { sessions: { objectId: string; name: string }[] }
-            const row = snapshot.sessions.find(row => row.name.startsWith(credentials.username + ":") && !before.sessions.some(previous => previous.objectId === row.objectId))
-            if (row) { abort.abort(); return { source, row } }
-          }
+          const current = await observeCliSession(inventoryFile, admitted, credentials.username)
+          if (current?.state === "planned") { abort.abort(); return current }
           await Bun.sleep(25)
         }
         throw Error("CANCELLED_CHECK_ROW_NOT_OBSERVED")
-      })().catch(error => { abort.abort(); throw error })
+      })()).catch(error => { abort.abort(); throw error })
       const cancelled = await Promise.allSettled([interrupted, observed])
       if (cancelled[0].status === "rejected") throw cancelled[0].reason
       settlement.cli = cancelled[0].value.processCleanup.status === "confirmed" && cancelled[0].value.processCleanup.capture_complete
@@ -151,7 +149,7 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       const inventory = await readManagementProcessInventory({ file: inventoryFile, journal, commandId: "native-cli-sessions", identity: pair.identity,
         leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
       const current = inventory.processes.at(-1)!, snapshots = current.sessions!
-      const cancelledEvidence = { cancelRequested: true, observed: cancelled[1].value, inventory, manifest: await readLeaseReceipt(inventoryFile), processes: cancelled[0].value.processCleanup,
+      const cancelledEvidence = { cancelRequested: mode !== "reconnected-finalizer", observed: cancelled[1].value, inventory, manifest: await readLeaseReceipt(inventoryFile), processes: cancelled[0].value.processCleanup,
         resultReceipt: await readLeaseReceipt(current.result!.source.path), sources: await Promise.all([snapshots.before, ...snapshots.during, snapshots.after].map(async snapshot => {
           const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
           return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
@@ -160,6 +158,7 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       expect({ timedOut: cancelled[0].value.timedOut, settled: settlement.cli }).toEqual({ timedOut: false, settled: true })
       expect([cancelled[0].value.stdout, cancelled[0].value.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
       expect(current.result).toMatchObject({ interrupted: cancelled[0].value.interrupted, timedOut: false })
+      if (mode === "reconnected-finalizer") expect(cancelled[0].value.interrupted).toBe(false)
       if (!current.result?.interrupted) expect(current.result).toMatchObject({ exitCode: 0,
         reply: { browser: "verified", ok: true, code: "LOGINOM_CONNECTION_VALID" } })
       // A completed check may win the abort race; an observed interruption grants no readiness.
@@ -186,6 +185,10 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
         source: { path: journal, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex") },
         inventories: [{ value: registeredInventory, source: { path: inventoryFile,
           sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") } }] })
+      if (mode === "reconnected-finalizer") {
+        await admin.dispose()
+        peer.admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
+      }
       const sealed = await sealAdminProcessInventory(file, environment.server,
         new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex"), environment.slots)
       expect(sealed).toMatchObject({ phase: "finalizing", managementSources: [{ path: inventoryFile,
@@ -221,9 +224,10 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       expect(await Bun.file(path.join(archived.profiles[0]!.archive, "archive-order-probe")).text()).toBe("native-archive-order")
       const archiveManifest = await readLeaseReceipt(archived.profiles[0]!.journal)
       expect(archiveManifest).toMatchObject({ status: "committed", profile: lease.slot.profileDir })
-      const beforeClose = await admin.inspectSessionInventory()
+      const beforeClose = await (peer.admin ?? admin).inspectSessionInventory()
       expect([...captures.map(capture => capture.session), cancelledSession].every(session =>
-        beforeClose.sessions.some(row => row.objectId === session.binding.remoteKey))).toBe(true)
+        beforeClose.sessions.some(row => row.name === session.binding.name && row.createdAt === session.binding.createdAt &&
+          (mode === "reconnected-finalizer" || row.objectId === session.binding.remoteKey)))).toBe(true)
       if (mode === "unknown") {
         const known = [...captures.map(capture => capture.session), cancelledSession]
         const unknown = beforeClose.sessions.filter(row => row.name.startsWith(credentials.username + ":") && !known.some(session => session.binding.remoteKey === row.objectId))
@@ -256,7 +260,7 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       expect(accounted.source).toEqual({ path: inventoryFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") })
       const beforeCloseReceipt = await readLeaseReceipt(beforeClose.source.path) as { command: { path: string }; sessions: typeof beforeClose.sessions }
       // Data-only snapshot controls around genuine native sources; restore before any server close.
-      const ownRow = beforeClose.sessions.find(row => row.objectId === cancelledSession.binding.remoteKey)!
+      const ownRow = beforeClose.sessions.find(row => row.name === cancelledSession.binding.name && row.createdAt === cancelledSession.binding.createdAt)!
       for (const changed of [
         { ...beforeCloseReceipt, sessions: [...beforeCloseReceipt.sessions, { ...ownRow, objectId: "unaccounted", name: credentials.username + ":999" }] },
         { ...beforeCloseReceipt, sessions: beforeCloseReceipt.sessions.map(row => row.objectId === ownRow.objectId ? { ...row, packageCount: 1 } : row) },
@@ -273,9 +277,28 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
       await writeLeaseReceipt(path.join(evidence, "archived.json"), { source: archived.source, value: await readLeaseReceipt(archived.source.path),
         profiles: [{ source: { path: archived.profiles[0]!.journal, sha256: archived.profiles[0]!.sha256 }, value: archiveManifest }],
         beforeClose: { value: beforeClose, receipt: beforeCloseReceipt, command: await readLeaseReceipt(beforeCloseReceipt.command.path) } })
-      if (mode === "finalizer") {
+      if (mode === "finalizer" || mode === "reconnected-finalizer") {
         const { finalizeManagementEnvironment } = await import("../src/environment-finalization")
-        const finalized = await finalizeManagementEnvironment(file, environment, admin)
+        if (peer.admin) {
+          const current = await peer.admin.inspectSessionInventory()
+          const receipt = await readLeaseReceipt(current.source.path) as { command: { path: string }; sessions: typeof current.sessions }
+          await writeLeaseReceipt(path.join(evidence, "reconnected-before-finalizer.json"), { accounted, current, receipt,
+            command: await readLeaseReceipt(receipt.command.path) })
+          expect(accounted.sessions.every(session => current.sessions.some(row => row.name === session.binding.name &&
+            row.createdAt === session.binding.createdAt && row.packageCount === 0))).toBe(true)
+          expect(accounted.sessions.some(session => current.sessions.some(row => row.name === session.binding.name &&
+            row.createdAt === session.binding.createdAt && row.objectId !== session.binding.remoteKey))).toBe(true)
+          const duplicate = { ...receipt, sessions: [...receipt.sessions,
+            { ...current.sessions.find(row => row.name === accounted.sessions[0]!.binding.name)!, objectId: "duplicate" }] }
+          await writeLeaseReceipt(current.source.path, duplicate)
+          try { await expect(collectManagementSessions(file, lease, secretFile, inventoryFile, { path: current.source.path,
+            sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(duplicate)).digest("hex") })).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN") }
+          finally { await writeLeaseReceipt(current.source.path, receipt) }
+          await writeLeaseReceipt(path.join(evidence, "reconnected-duplicate.json"), { dataOnly: true, rejected: true,
+            original: current.source, changed: duplicate })
+          expect((await collectManagementSessions(file, lease, secretFile, inventoryFile, current.source)).sessions).toEqual(accounted.sessions)
+        }
+        const finalized = await finalizeManagementEnvironment(file, environment, peer.admin ?? admin)
         expect(finalized).toMatchObject({ status: "sessions_closed", slots: [{ slotId: lease.slot.id, sessions: expect.arrayContaining(
           accounted.sessions.map(session => expect.objectContaining({ id: session.id, state: "closed" }))) }] })
         await environment.server.assertHeld()
@@ -360,24 +383,47 @@ for (const mode of ["manual", "finalizer", "unknown"] as const) test.skipIf(!pro
         return { observed: capture.session, closed, terminal: await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${capture.session.id}.closed.json`)),
           command: await readLeaseReceipt(closed.close.path) }
       })) })
+    } catch (error) {
+      settlement.preserve = error instanceof Error && error.message === "ARCHIVE_TOPOLOGY"
+      await writeLeaseReceipt(path.join(evidence, "native-primary-failure.json"), {
+        code: error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : "NATIVE_ASSERTION_FAILED",
+        location: error instanceof Error ? error.stack?.match(/parallel-lifecycle-integration\.test\.ts:\d+:\d+/)?.[0] ?? null : null })
+      throw error
     } finally {
+      await peer.admin?.dispose()
       await admin.dispose()
-      settlement.admin = true
       const connections = await readLeaseReceipt(adminInventory) as { connections: { directory: string }[] }
       const directory = connections.connections[0]!.directory
       const finalization = await readAdminFinalization(file, pair.identity, directory, process.pid)
       const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
-      await writeLeaseReceipt(path.join(evidence, "admin.json"), { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) })
+      const peers = await Promise.all(connections.connections.slice(1).map(async entry => {
+        const finalization = await readAdminFinalization(file, pair.identity, entry.directory, process.pid)
+        const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
+        return { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) }
+      }))
+      await writeLeaseReceipt(path.join(evidence, "admin.json"), { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path), peers })
+      settlement.admin = true
     }
   } finally {
     await Promise.all([environment.server.close(), lease.close()])
-    if (settlement.cli && settlement.admin) {
+    if (settlement.cli && settlement.admin && !settlement.preserve) {
       await destroyPair(file, options)
       await rm(root, { recursive: true, force: true })
     } else console.error(`native CLI session fixture retained: ${root}`)
   }
-  // Five bounded CLI calls plus native provisioning/teardown and durable evidence writes.
+  // Bounded CLI calls plus native provisioning/teardown and durable evidence writes.
 }, 360_000)
+
+async function observeCliSession(inventoryFile: string, admitted: number, username: string) {
+  const raw = await readLeaseReceipt(inventoryFile) as { processes: { state: string; sessions?: { before: { path: string }; during?: { path: string }[] } }[] }
+  const current = raw.processes.at(-1)
+  if (raw.processes.length <= admitted || !current?.sessions?.during?.length) return
+  const before = await readLeaseReceipt(current.sessions.before.path) as { sessions: { objectId: string }[] }
+  const source = current.sessions.during.at(-1)!
+  const snapshot = await readLeaseReceipt(source.path) as { sessions: { objectId: string; name: string }[] }
+  const row = snapshot.sessions.find(row => row.name.startsWith(username + ":") && !before.sessions.some(previous => previous.objectId === row.objectId))
+  if (row) return { source, row, state: current.state }
+}
 
 for (const partialRelease of [false, true]) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)(`mixed native recovery: released A survives B ${partialRelease ? "partial release and recovery SIGKILL" : "dirty root"} and B reuses its committed history`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
