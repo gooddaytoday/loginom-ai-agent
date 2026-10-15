@@ -22,7 +22,7 @@ const methods=Object.fromEntries(['get_Connected','get_CurrentDirectory','get_Is
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 async function fixture() {
  const dir=await mkdtemp(join(tmpdir(),'terminal-interface-'));const ipc=new MessageChannel();
- const calls=[],waiting=new Map();let sequence=0,hold=false,error,hasError=false,responseMutation;
+ const calls=[],waiting=new Map();let sequence=0,hold=false,error,hasError=false,responseMutation,beforeDispatch;
  let ownership=true,connected=true,root='/personal',currentDirectory='/personal';
  const completionTasks=[];
  class TaskCompletionSource {
@@ -39,6 +39,7 @@ async function fixture() {
  const session={$M:{GetDynamicData(){const request={Release(){},set_StaticDataSize(){},InitializeMethodCallMessage(w,o,m){request.method=m;},set_Signature(){},set_MessageType(){},set_ObjectOwnerID(w){request.owner=w;},set_ObjectID(o){request.object=o;},set_MethodID(m){request.method=m;},WriteParameter$8(_,g){request.guid=g;}};return request;}},
   $R(w,o,type){assert.equal(type,1291);assert.deepEqual([w,o],[11,73]);return responseMutation?responseMutation(support):support;},
   DispatchMessageAsync(request){
+   beforeDispatch?.(request);
    calls.push(request.method);const id=++sequence;let result;
    const task={continueWith(fn){waiting.set(id,{fn,task});ipc.port1.postMessage({id,method:request.method,guid:request.guid});},
     getAwaitedResult(){if(hasError)throw error;return result;},
@@ -67,7 +68,7 @@ async function fixture() {
  const scope=build();
  return {scope,build,current,original,definitions,calls,abort,dir,packageProxy,storage,support,closureContext:context,inputs,session,completionTasks,
   writes:()=>writes,clock:v=>clock=v,own:v=>ownership=v,connected:v=>connected=v,root:v=>root=v,
-  queryReply:f=>responseMutation=f,fail:v=>{hasError=true;error=v;},writeFail:v=>writeRefusal=v,
+  beforeDispatch:f=>beforeDispatch=f,queryReply:f=>responseMutation=f,fail:v=>{hasError=true;error=v;},writeFail:v=>writeRefusal=v,
   hold(){hold=true;},async drain(){hold=false;for(const [id,w]of waiting){waiting.delete(id);w.task.deliver();w.fn();}await Promise.resolve();},
   cleanup:async()=>{ipc.port1.close();ipc.port2.close();await rm(dir,{recursive:true});}};
 }
