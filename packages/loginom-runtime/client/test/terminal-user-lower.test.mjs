@@ -10,7 +10,7 @@ let start=model.indexOf('\t\tget_CurrentUser: function() {'),end=model.indexOf('
 const lower=model.slice(start+'\t\tget_CurrentUser: '.length,end).trim().replace(/,$/,'');
 assert.equal(createHash('sha256').update(lower).digest('hex'),'e7d959448a2b1a8030f3511caf44768b4ee4e1c918aa9b3791a897022026738a');
 let get;function walk(n){if(!n||typeof n!=='object')return;if(n.type==='AssignmentExpression'&&server.slice(n.left.start,n.left.end)==='ServerConnection.prototype.GetCurrentUser')get=server.slice(n.right.start,n.right.end);for(const v of Object.values(n)){if(Array.isArray(v))v.forEach(walk);else if(v&&typeof v==='object')walk(v)}}walk(parse(server,{ecmaVersion:'latest'}));
-export async function fixture({forward=false,realm,initializeSS,initializeDOM}={}){
+export async function fixture({forward=false,realm,initializeSS,initializeDOM,originalCompletion}={}){
  let deliver,dispatches=0,reads=0,resolvers=0,error,failed=false;const tasks=[],continuations=[];
  class TaskCompletionSource{constructor(){let yes,no;const promise=new Promise((a,b)=>{yes=a;no=b});let done=false,outcome,rejected=false;
   promise.then(v=>{done=true;outcome=v},e=>{done=true;rejected=true;outcome=e});
@@ -23,7 +23,7 @@ export async function fixture({forward=false,realm,initializeSS,initializeDOM}={
  if(realm)Object.assign(c,{crypto:webcrypto,TextEncoder,Debug:{assert:assert.ok},__awaiter(self,a,b,generator){
   const it=generator.call(self);return new Promise((yes,no)=>{const step=(key,v)=>{let r;try{r=it[key](v)}catch(e){no(e);return}if(r.done)yes(r.value);else Promise.resolve(r.value).then(v=>step('next',v),e=>step('throw',e))};step('next')})}
  });
- if(realm)Object.assign(c.ss,{TaskCompletionSource});
+ if(realm)Object.assign(c.ss,{TaskCompletionSource:originalCompletion??TaskCompletionSource});
  if(initializeDOM)initializeDOM(c);
  if(initializeSS){const ss=c.ss;initializeSS(ss,c);delete c.ss;
  runInContext(terminalUserPublisherScript(realm?'http://loginom.example/app':'https://app.loginom.ai/app'),c);
