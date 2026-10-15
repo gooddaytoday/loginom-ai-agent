@@ -73,7 +73,7 @@ test('new output tables reveal exact cards through a shared owned scroll surface
      control('node',{graph_node:{part:'body'},...(fault==='already_selected'?{allowed_actions:[],interaction:{state:'obscured'}}:{})}),...(fault!=='selected_without_controls'||nodeClicked?[control('views',{allowed_actions:['open_node_views']})]:[])]},
    node_outputs:{verified:true,node_selected:['already_selected','selected_without_controls'].includes(fault),surface:views?'views':'graph',ports:[{index:0,port_guid:'port',active:true}],
     tables:[{view_guid:'old',port_guid:fault==='shared_owner'?'other':'port',active:false},...(added?[{view_guid:'new',port_guid:'port',active,table_tid:active?'table':null}]:[])]}});
-  const channel={observe:async o=>{const s=snapshot();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
+  const channel={observe:async o=>{if(o.condition==='new Table card bound to output')assert.equal(o.settleViewerAdd,true);const s=snapshot();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
    const s=snapshot();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);actions.push(a);
    if(a.ref==='node')nodeClicked=true;if(a.ref==='views')views=true;if(a.ref==='vendor')selected=true;
    if(a.verb==='scroll'){assert.ok(['anchor','add'].includes(a.ref));if(fault!=='stalled')top+=400;}

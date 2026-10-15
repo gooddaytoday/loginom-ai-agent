@@ -761,6 +761,36 @@ test('Table format Apply settlement retains the original deadline and exact owne
  }
 });
 
+test('confirmed Table add waits through the parent remainder without replay',async()=>{
+ for(const mode of ['slow','confirmation_pause','expired','foreign','no_add','other_click','add_then_other','wrong_vendor','wrong_panel','transport','no_gesture']){
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const node={...binding.node,verified:true,surface:'views',tid:'MF;TF-1;ViewsForm'};
+  let time=1,applied=false,mutations=0,reads=0,paused=false;const records=[];
+  const operation={id:'viewer-settle',deadline:mode==='expired'?12000:65000,action:{action_key:'node.apply',revision:'1'}};
+  const added=()=>applied&&(mode==='confirmation_pause'||time>=31000);
+  const native=()=>({verified:true,surface:'views',node_context:node,port_panels:[{port_guid:mode==='wrong_panel'?'foreign':'port'}],tables:[{view_guid:'old',port_guid:'port'},...(added()?[{view_guid:'new',port_guid:mode==='foreign'?'foreign':'port'}]:[])]});
+  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[
+   {ref:'ui-vendor',allowed_actions:['click'],viewer_vendor:{kind:mode==='wrong_vendor'?'chart':'table',selected:true}},
+   {ref:'ui-add',allowed_actions:['click'],viewer_card:{kind:'add',port_guid:'port',port_panel_ref:'ui-panel'}}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}});
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;},
+   record:async e=>{records.push(e);if(mode==='confirmation_pause'&&!paused&&applied&&e.phase==='node_observation_sample'&&e.readiness.satisfied){paused=true;time+=30000;}return structuredClone(e);},wrapMutation:(code,receipt)=>({code,receipt}),execute:async code=>{
+    if(typeof code!=='string'){mutations++;if(mode==='transport')throw Error('transport');applied=true;return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,trace:mode==='no_gesture'?[]:[{event:'ui_gesture_applied'}],output:state()};}
+    reads++;time+=20;return code.includes('function workspaceUiCapability')?{status:'SUCCEEDED',output:state()}:native();
+   }});
+  const settle=()=>channel.observe({condition:'new owned Table card confirmed',settleViewerAdd:true,readOutputs:true,ready:s=>s.node_outputs.tables.some(t=>t.view_guid==='new'),confirmIdentity:s=>s.node_outputs.tables});
+  if(mode==='no_add'){await assert.rejects(settle(),/confirmed add receipt/);assert.equal(records.length,0);continue;}
+  await channel.observe({condition:'selected Table vendor and add card',readOutputs:true,ready:()=>true});
+  if(mode==='transport'){await assert.rejects(channel.act({verb:'click',ref:'ui-add'}),/transport/);await assert.rejects(settle(),/confirmed add receipt/);continue;}
+  await channel.act({verb:'click',ref:mode==='other_click'?'ui-vendor':'ui-add'});
+  if(mode==='add_then_other'){await channel.observe({condition:'unrelated control',readOutputs:true,ready:()=>true});await channel.act({verb:'click',ref:'ui-vendor'});}
+  if(['slow','confirmation_pause'].includes(mode)){await settle();assert.ok(time>=30000);if(mode==='slow')assert.ok(reads>160);}
+  else await assert.rejects(settle(),mode==='expired'?/readiness timeout|budget/:mode==='foreign'?/authorized port/:/confirmed add receipt/);
+  if(mode!=='expired')await assert.rejects(settle(),/confirmed add receipt/);
+  assert.equal(mutations,mode==='add_then_other'?2:1);assert.equal(operation.deadline,mode==='expired'?12000:65000);
+ }
+});
+
 test('node views opening receives the original parent remainder while wizard opening stays capped',async()=>{
  for(const verb of ['open_node_views','begin_wizard']) {
   const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
