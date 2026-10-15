@@ -6,50 +6,27 @@ const methods=['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory
 const ids=[907,909,910,911];
 export function observeStorageBound({provider,context,guard,onPause,alterLocal,fullScriptSha256,skipBreakpoint=false}){
  if(typeof guard!=='function')throw Error('BOUND_INSPECTOR_CONTROL_UNAVAILABLE');guard();
- const session=new Session();session.connect();let first,closed=false,active;
- const records=[],breakpoints=new Map(),pending=new WeakMap(),ready=new WeakSet(),restorations=new Set(),locations=new Map(),tracked=new Set(),observedRequests=new WeakSet(),scripts=new Map();
+ const session=new Session();session.connect();let first,closed=false;
+ const breakpoints=new Map(),pending=new WeakMap(),locations=new Map(),tracked=new Set(),observedRequests=new WeakSet(),scripts=new Map();
  const post=(method,params={})=>{let called=false,result,error;session.post(method,params,(e,r)=>{called=true;error=e;result=r});if(!called)throw Error('BOUND_INSPECTOR_ASYNC_POST');if(error)throw error;return result};
  const checkControl=()=>{try{return guard()}catch(value){first??={value};throw value}};
  const own=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('BOUND_INSPECTOR_ACCESSOR');return d.value};
- const before=provider.inspect(),storage=before.storage,witnessGate=typeof Object.getOwnPropertyDescriptor(provider,'retainBoundPause')?.value==='function';
+ const before=provider.inspect(),storage=before.storage;
+ if(typeof Object.getOwnPropertyDescriptor(provider,'retainBoundPause')?.value!=='function'){session.disconnect();throw Error('BOUND_INSPECTOR_WITNESS_UNAVAILABLE')}
  const root={methods:Object.fromEntries(methods.map(name=>[name,own(Object.getPrototypeOf(storage),name)])),
   pause(callee,receiver,lower,name){
    if(first)throw first.value;checkControl();
    const call=lower.mkdelCall,completion=lower.mkdelCompletion;
    if(receiver!==storage||callee!==completion?.returned||call?.receiver!==storage||completion.call!==call
      ||call.storageCall!==lower.storageCall||call.storageCall.method!==root.methods[name]
-     ||pending.has(lower)||active)throw Error('BOUND_INSPECTOR_CALL_CHANGED');
-   if(witnessGate){
-    const token=Reflect.apply(own(provider,'retainBoundPause'),provider,[lower,callee,receiver,name,locations.get(name)]);
-    pending.set(lower,token);tracked.add(lower);onPause?.({callee,receiver,lower,name,delegate:call.delegate,token});return true;
-   }
-   const delegate=call.delegate,prototype=Object.getPrototypeOf(delegate),original=Object.getOwnPropertyDescriptor(delegate,'apply');
-   if(original)throw Error('BOUND_INSPECTOR_APPLY_SHADOW');
-   const base=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(delegate),'apply');
-   if(!base||typeof base.value!=='function')throw Error('BOUND_INSPECTOR_APPLY_UNAVAILABLE');
-   const token=Object.freeze({callee,delegate,receiver,lower,call,completion,name,operator:locations.get(name)});
-   pending.set(lower,token);let entered=false;
-   const cleanup=()=>{const current=Object.getOwnPropertyDescriptor(delegate,'apply');if(current?.value===overlay&&current.writable===true&&current.configurable===true&&current.enumerable===false){delete delegate.apply;restorations.delete(cleanup)}else first??={value:Error('BOUND_INSPECTOR_APPLY_CHANGED')}};
-   const overlay=function(target,args){
-    if(first)throw first.value;
-    if(entered||this!==delegate||target!==storage||Object.getPrototypeOf(delegate)!==prototype)throw Error('BOUND_INSPECTOR_DELEGATE_CHANGED');
-    if(!ready.has(token))throw Error('BOUND_INSPECTOR_TOKEN_UNAVAILABLE');
-    ready.delete(token);entered=true;active={token,dispatches:0};
-    try{return Reflect.apply(base.value,this,[target,args])}
-    catch(value){first??={value};throw value}
-    finally{
-     const state=active;active=undefined;
-     cleanup();
-     if(!state||state.dispatches!==1)first??={value:Error('BOUND_INSPECTOR_DISPATCH_MISSING')};
-    }
-   };
-   Object.defineProperty(delegate,'apply',{value:overlay,writable:true,configurable:true,enumerable:false});restorations.add(cleanup);
-   onPause?.({callee,receiver,lower,name,delegate,token});
-   return true;
+     ||pending.has(lower))throw Error('BOUND_INSPECTOR_CALL_CHANGED');
+   const token=Reflect.apply(own(provider,'retainBoundPause'),provider,[lower,callee,receiver,name,locations.get(name)]);
+   pending.set(lower,token);tracked.add(lower);onPause?.({callee,receiver,lower,name,delegate:call.delegate,token});return true;
   },
   arm(lower){const token=pending.get(lower);
-   if(witnessGate){try{checkControl();return Reflect.apply(own(provider,'armBoundPause'),provider,[token])}catch(value){if(token)Reflect.apply(own(provider,'refuseBoundPause'),provider,[token,value]);throw value}}
-   checkControl();if(!token||first||own(lower,'mkdelCompletion')!==token.completion||own(token.completion,'returned')!==token.callee)throw Error('BOUND_INSPECTOR_CALL_CHANGED');ready.add(token);return true}
+   try{checkControl();return Reflect.apply(own(provider,'armBoundPause'),provider,[token])}
+   catch(value){if(token)Reflect.apply(own(provider,'refuseBoundPause'),provider,[token,value]);throw value}
+  }
  };
  const scriptContexts=new Map();session.on('Debugger.scriptParsed',({params})=>scriptContexts.set(params.scriptId,params.executionContextId));
  post('Runtime.enable');post('Debugger.enable');
@@ -81,7 +58,7 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,f
    let compiled=scripts.get(location.scriptId);
    if(!compiled){
     const script=post('Debugger.getScriptSource',{scriptId:location.scriptId}).scriptSource,hash=createHash('sha256').update(script).digest('hex');
-    if(witnessGate&&(!fullScriptSha256||hash!==fullScriptSha256))throw Error('BOUND_INSPECTOR_FULL_SCRIPT_REQUIRED');
+    if(!fullScriptSha256||hash!==fullScriptSha256)throw Error('BOUND_INSPECTOR_FULL_SCRIPT_REQUIRED');
     const ast=parse(script,{ecmaVersion:'latest',locations:true}),functions=new Map(),lines=[0];
     for(let i=0;i<script.length;i++)if(script.charCodeAt(i)===10)lines.push(i+1);
     function visit(node){if(!node||typeof node!=='object')return;
@@ -109,16 +86,13 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,f
   beforeDispatch(request){
    checkControl();const index=ids.indexOf(own(request,'method'));if(index<0)return;
    if(first)throw first.value;
-   if(witnessGate){const row=[...tracked].map(lower=>({lower,receipt:Object.getOwnPropertyDescriptor(lower,'boundReceipt')?.value})).find(x=>x.receipt?.request===request&&x.lower.boundActivation);if(!row||observedRequests.has(request))throw Error('BOUND_INSPECTOR_TOKEN_UNAVAILABLE');observedRequests.add(request);return}
-   const state=active,token=state?.token;
-   if(!token||token.name!==methods[index]||pending.get(token.lower)!==token||state.dispatches)throw Error('BOUND_INSPECTOR_TOKEN_UNAVAILABLE');
-   if(token.callee!==token.completion.returned||token.delegate!==token.call.delegate||token.receiver!==storage)throw Error('BOUND_INSPECTOR_CALL_CHANGED');
-   state.dispatches++;pending.delete(token.lower);
-   records.push(Object.freeze({scope:'FileStorage.'+token.name+':bound',callee:token.callee,delegate:token.delegate,receiver:token.receiver,
-    mkdelCall:token.call,mkdelCompletion:token.completion,initial:token.call.initial,packet:token.call.packet,request,
-    activationToken:token,operator:token.operator,boundCallQualified:true,closureIdentityQualified:false,nativeReceiversQualified:false}));
+   // Diagnostic verification only. Production witness already consumed the
+   // token before reaching the original transport; this hook mints no receipt.
+   const row=[...tracked].map(lower=>({lower,receipt:Object.getOwnPropertyDescriptor(lower,'boundReceipt')?.value})).find(x=>x.receipt?.request===request&&x.lower.boundActivation);
+   if(!row||observedRequests.has(request))throw Error('BOUND_INSPECTOR_TOKEN_UNAVAILABLE');observedRequests.add(request);
+
   },
-  inspect(){if(first)throw first.value;return Object.freeze(witnessGate?[...tracked].map(lower=>Object.getOwnPropertyDescriptor(lower,'boundReceipt')?.value).filter(Boolean):records.slice())},
-  close(){if(closed)return;closed=true;for(const cleanup of restorations)cleanup();for(const id of breakpoints.keys())post('Debugger.removeBreakpoint',{breakpointId:id});post('Runtime.releaseObjectGroup',{objectGroup:key});session.disconnect()}
+  inspect(){if(first)throw first.value;return Object.freeze([...tracked].map(lower=>Object.getOwnPropertyDescriptor(lower,'boundReceipt')?.value).filter(Boolean))},
+  close(){if(closed)return;closed=true;for(const id of breakpoints.keys())post('Debugger.removeBreakpoint',{breakpointId:id});post('Runtime.releaseObjectGroup',{objectGroup:key});post('Debugger.disable');post('Runtime.disable');session.disconnect();session.removeAllListeners();scripts.clear();scriptContexts.clear();breakpoints.clear();locations.clear();tracked.clear();root.methods={}}
  });
 }
