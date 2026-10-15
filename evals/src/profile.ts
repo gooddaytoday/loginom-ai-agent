@@ -97,7 +97,7 @@ const exists = (file: string) =>
     () => false,
   )
 
-export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
+export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000, signal?: AbortSignal) {
   if (command.managementEvidence) {
     await command.managementEvidence.lease.assertHeld()
     if (!command.cleanupDir || command.env.LOGINOM_AI_AGENT_CLI_PROFILE !== command.managementEvidence.lease.slot.profileDir)
@@ -112,7 +112,7 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir, env: command.env }) : undefined
   const input = { cmd: [...command.cmd, ...args], cwd: boundary?.cwd ?? command.cwd,
     env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
-    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs }
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
   const result = command.managementEvidence ? await superviseManagementProcess(input,
     { ...command.managementEvidence, directory: out!, operation: args.slice(0, 2) }) : await superviseProcess(input)
   if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))

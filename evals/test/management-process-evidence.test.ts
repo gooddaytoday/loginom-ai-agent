@@ -81,6 +81,19 @@ test("management process inventory precedes dispatch and binds actual continuous
     expect(setup.processes).toHaveLength(3)
     expect(await Bun.file(setup.processes[2]!.result!.source.path).text()).not.toContain("private-management-canary")
     expect(await Bun.file(file).text()).not.toContain("private-management-canary")
+    // Actual OS cancellation probe; it does not simulate a native Loginom reply.
+    const marker = path.join(root, "cancel-ready"), abort = new AbortController()
+    const cancelling = management({ ...command, cmd: [process.execPath, "-e",
+      `process.on("SIGINT",()=>process.exit(0));await Bun.write(${JSON.stringify(marker)},"ready");await Bun.sleep(10000)`],
+      env: { ...command.env, LOGINOM_AI_AGENT_CLI_BUNDLE: bundle } }, ["loginom", "status", "--format", "json"], undefined, 3000, abort.signal)
+    const deadline = Date.now() + 2000
+    while (!await Bun.file(marker).exists() && Date.now() < deadline) await Bun.sleep(10)
+    expect(await Bun.file(marker).exists()).toBe(true)
+    abort.abort()
+    const cancelled = await cancelling
+    expect({ interrupted: cancelled.interrupted, timedOut: cancelled.timedOut, cleanup: cancelled.processCleanup.status })
+      .toEqual({ interrupted: true, timedOut: false, cleanup: "confirmed" })
+    expect((await readManagementProcessInventory(input)).processes.at(-1)!.result).toMatchObject({ interrupted: true, timedOut: false })
     const admitted = await Bun.file(file).text()
     await expect(superviseManagementProcess({ cmd: [process.execPath, "-e", "throw Error('must not dispatch')"], cwd: root,
       env: {}, profileDir: lease.slot.profileDir, timeoutMs: 3000 }, { file, lease, directory,
