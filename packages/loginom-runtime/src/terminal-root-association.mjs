@@ -260,16 +260,40 @@ export async function bindTerminalScriptWitness(owner){
  let evaluate,definer,d;const chain=[];
  for(let p=page;p;p=Object.getPrototypeOf(p)){chain.push([p,Object.getPrototypeOf(p)]);d=Object.getOwnPropertyDescriptor(p,'evaluate');if(d){definer=p;break}}
  if(!d||!('value'in d)||typeof d.value!=='function')fail();evaluate=d.value;
- let summaryCheck=()=>{},bound;
+ let summaryCheck=()=>{},bound;const handleChecks=[];
+ let originalHandleEvaluate,originalHandle;
  const check=()=>{let p=page;for(const[value,parent]of chain){if(p!==value||Object.getPrototypeOf(p)!==parent)fail();if(Object.hasOwn(p,'evaluate'))break;p=Object.getPrototypeOf(p)}
-  const now=Object.getOwnPropertyDescriptor(p,'evaluate');if(p!==definer||!now||Reflect.ownKeys(d).some(k=>!Object.is(now[k],d[k])))fail();summaryCheck()};
- const phases={phase:'import',importTask:undefined,evaluateTask:undefined};
+  const now=Object.getOwnPropertyDescriptor(p,'evaluate');if(p!==definer||!now||Reflect.ownKeys(d).some(k=>!Object.is(now[k],d[k])))fail();for(const guard of handleChecks)guard();summaryCheck()};
+ // Qualify method/absence before the first import await, not by late lookup.
+ let handleDescriptor,evaluateHandle;
+ try{
+ for(let p=page;p;p=Object.getPrototypeOf(p)){handleDescriptor=Object.getOwnPropertyDescriptor(p,'evaluateHandle');if(handleDescriptor)break}
+ if(handleDescriptor){evaluateHandle=slot(page,'evaluateHandle',handleChecks);if(typeof evaluateHandle!=='function')fail()}
+ else{
+  const chain=[];for(let p=page;p;p=Object.getPrototypeOf(p))chain.push([p,Object.getPrototypeOf(p)]);
+  handleChecks.push(()=>{let p=page;for(const[value,parent]of chain){if(p!==value||Object.getPrototypeOf(p)!==parent||Object.hasOwn(p,'evaluateHandle'))fail();p=Object.getPrototypeOf(p)}});
+ }
+ }catch(error){throw load.reject(error)}
+ const phases={phase:'import',importTask:undefined,evaluateTask:undefined,realmHandleTask:undefined,realmHandle:undefined};
  sourceWitnesses.set(owner,Object.freeze({check,inspect:()=>bound??Object.freeze({complete:false,reason:'WITNESS_PENDING',...phases,projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false})}));
  try{
   phases.importTask=import('../client/lib/terminal-script-witness.mjs');const module=await load.observed(phases.importTask);
   const id=loadData(owner,'id'),account=loadData(owner,'account');phases.phase='evaluate';
-  phases.evaluateTask=Reflect.apply(evaluate,page,[module.collectTerminalScriptWitness,module.terminalScriptWitnessArguments(id,account)]);
-  const summary=await load.observed(phases.evaluateTask);summaryCheck=snapshot(summary);
+  // Missing handle support retains the old evidence-only projection. An accessor
+  // or later substitution cannot silently downgrade an original handle binding.
+  let summary;
+  if(evaluateHandle){
+   load.guard();
+   phases.realmHandleTask=Reflect.apply(evaluateHandle,page,[module.collectTerminalScriptWitness,module.terminalScriptWitnessArguments(id,account)]);
+   originalHandle=await load.observed(phases.realmHandleTask);phases.realmHandle=originalHandle;
+   originalHandleEvaluate=slot(originalHandle,'evaluate',handleChecks);if(typeof originalHandleEvaluate!=='function')fail();load.guard();
+   phases.evaluateTask=Reflect.apply(originalHandleEvaluate,originalHandle,[module.projectTerminalScriptWitness]);
+   summary=await load.observed(phases.evaluateTask);
+  }else{
+   phases.evaluateTask=Reflect.apply(evaluate,page,[module.collectTerminalScriptWitness,module.terminalScriptWitnessArguments(id,account)]);
+   summary=await load.observed(phases.evaluateTask);
+  }
+  summaryCheck=snapshot(summary);
   if(loadData(summary,'id')!==id||loadData(summary,'account')!==account||loadData(summary,'projectionOnly')!==true
     ||loadData(summary,'sourceExecutionQualified')!==false||loadData(summary,'closureIdentityQualified')!==false)fail();
   const rows=loadData(summary,'rows');if(loadData(rows,'length')!==5)fail();
@@ -279,9 +303,23 @@ export async function bindTerminalScriptWitness(owner){
    const matching=responses.records.filter(record=>record.url===url&&record.pinUrl===pinUrl);if(matching.length!==1)fail();
    matches.push(Object.freeze({kind:kinds[i],url,pinUrl,responseReceipt:matching[0]}));
   }
+  let pending,failed;
+  function recheck(){
+   if(pending)return pending;if(failed)return failed;
+   try{load.guard()}catch(error){failed=Promise.reject(load.reject(error));return failed}
+   pending=(async()=>{try{
+    const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.projectTerminalScriptWitness]);
+    const current=await load.observed(task);const guard=snapshot(current);
+    const same=(a,b)=>{if(a===b)return true;if(!a||!b||typeof a!=='object'||typeof b!=='object'||Object.getPrototypeOf(a)!==Object.getPrototypeOf(b))return false;const keys=Reflect.ownKeys(a);return keys.length===Reflect.ownKeys(b).length&&keys.every(k=>{if(!Object.hasOwn(b,k))return false;const x=Object.getOwnPropertyDescriptor(a,k),y=Object.getOwnPropertyDescriptor(b,k);return x.writable===y.writable&&x.enumerable===y.enumerable&&x.configurable===y.configurable&&same(loadData(a,k),loadData(b,k))})};
+    if(!same(current,summary))fail();guard();load.guard();return bound;
+   }catch(error){throw load.reject(error)}})();
+   const work=pending;work.then(()=>{if(pending===work)pending=undefined},()=>{failed=work;if(pending===work)pending=undefined});return work;
+  }
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
+   realmOriginalAssociation:!!originalHandle,realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
+   recheck:originalHandle?()=>recheck():undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}
 }

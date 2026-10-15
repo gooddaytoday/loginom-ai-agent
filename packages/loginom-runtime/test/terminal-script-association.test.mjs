@@ -21,3 +21,93 @@ test('nodebind pending evaluate retains original task; drift refuses and second 
 
 test('nodebind genuine Loader cache-busted node URLs join the exact same full request URLs',async()=>{const x=await joined({cacheBust:true,nodeCacheBust:true}),result=await api.bindTerminalScriptWitness(x.f.owner);assert.equal(result.complete,true);assert(result.matches.every(r=>r.url.endsWith('?_dc=1234')));assert.equal(result.matches[3].responseReceipt,result.matches[4].responseReceipt);assert.deepEqual(x.r.counts(),[1,1,1])});
 for(const kind of['summaryGetter','summaryFlags','summaryUrl','summaryOwner'])test('nodebind foreign '+kind+' never mints authority',async()=>{const x=await joined({evaluate({fn,args,r}){r.c.__witnessArguments=JSON.parse(JSON.stringify(args));const summary=JSON.parse(JSON.stringify(runInContext('('+fn.toString()+')(__witnessArguments)',r.c)));if(kind==='summaryGetter')Object.defineProperty(summary,'rows',{get(){throw Error('must not invoke summary getter')}});if(kind==='summaryFlags')summary.sourceExecutionQualified=true;if(kind==='summaryUrl')summary.rows[0].url='https://foreign';if(kind==='summaryOwner')summary.id='foreign';return Promise.resolve(summary)}});await assert.rejects(api.bindTerminalScriptWitness(x.f.owner),/CHANGED/);assert.equal(x.evaluations,1);assert.deepEqual(x.r.counts(),[1,1,1])});
+
+// Original JSHandle is a labelled double here; it retains the same real VM object.
+function originalHandle(x,{evaluate}={}){
+ let capsule,calls=0,handleCalls=0;
+ const handle={evaluate(fn){calls++;if(evaluate)return evaluate({fn,capsule,x});x.r.c.__retainedCapsule=capsule;return Promise.resolve(JSON.parse(JSON.stringify(runInContext('('+fn.toString()+')(__retainedCapsule)',x.r.c))))}};
+ x.f.page.evaluateHandle=function(fn,args){handleCalls++;x.r.c.__witnessArguments=JSON.parse(JSON.stringify(args));capsule=runInContext('('+fn.toString()+')(__witnessArguments)',x.r.c);return Promise.resolve(handle)};
+ return{handle,get calls(){return calls},get handleCalls(){return handleCalls},get capsule(){return capsule}};
+}
+test('loadbind original handle retains realm capsule and exact response receipts; recheck never reacquires',async()=>{
+ const x=await joined(),h=originalHandle(x),r=await api.bindTerminalScriptWitness(x.f.owner);
+ assert.equal(r.realmOriginalAssociation,true);assert.equal(r.realmHandle,h.handle);assert.equal(await r.realmHandleTask,h.handle);assert.equal(x.evaluations,0);assert.equal(h.handleCalls,1);assert.equal(h.calls,1);
+ assert.equal(r.matches[3].responseReceipt,r.matches[4].responseReceipt);assert.equal(await r.recheck(),r);assert.equal(h.calls,2);assert.equal(h.handleCalls,1);assert.deepEqual(x.r.counts(),[1,1,1]);
+ assert.equal(r.sourceExecutionQualified,false);assert.equal(r.closureIdentityQualified,false);assert.equal(r.nativeAuthority,false);
+});
+test('loadbind serialized or copied capsule cannot replace original receiver',async()=>{
+ const x=await joined(),h=originalHandle(x);await api.bindTerminalScriptWitness(x.f.owner);
+ const dto=JSON.parse(JSON.stringify(h.capsule));x.r.c.__copy=dto;
+ assert.throws(()=>runInContext('('+witness.projectTerminalScriptWitness.toString()+')(__copy)',x.r.c),/UNAVAILABLE/);
+ const copy=Object.create(Object.getPrototypeOf(h.capsule),Object.getOwnPropertyDescriptors(h.capsule));Object.freeze(copy);x.r.c.__copy=copy;
+ assert.throws(()=>runInContext('('+witness.projectTerminalScriptWitness.toString()+')(__copy)',x.r.c),/UNAVAILABLE/);assert.equal(h.handleCalls,1);
+});
+for(const drift of ['method','node','account'])test('loadbind retained realm '+drift+' drift refuses next recheck with no reacquire/reader replay',async()=>{
+ const x=await joined(),h=originalHandle(x),r=await api.bindTerminalScriptWitness(x.f.owner);
+ if(drift==='method')x.r.constructors.FileStorage.prototype.get_Connected=()=>true;
+ if(drift==='node')x.s.state(x.s.node('bg/js/rpc.js')).connected=false;
+ if(drift==='account')x.r.c.__loginomStartupV1.account='foreign';
+ await assert.rejects(r.recheck(),/UNAVAILABLE/);await assert.rejects(r.recheck(),/UNAVAILABLE/);assert.equal(h.handleCalls,1);assert.equal(h.calls,2);assert.deepEqual(x.r.counts(),[1,1,1]);
+});
+for(const target of ['page','handle'])test('loadbind '+target+' accessor substitution refuses getter0',async()=>{
+ const x=await joined(),h=originalHandle(x);let gets=0;
+ if(target==='page'){Object.defineProperty(x.f.page,'evaluateHandle',{get(){gets++;return ()=>h.handle},configurable:true});await assert.rejects(api.bindTerminalScriptWitness(x.f.owner),/LOAD_CHANGED/);assert.equal(h.handleCalls,0)}
+ else{const r=await api.bindTerminalScriptWitness(x.f.owner);Object.defineProperty(h.handle,'evaluate',{get(){gets++;return ()=>({})},configurable:true});await assert.rejects(r.recheck(),/LOAD_CHANGED/);assert.equal(h.calls,1)}
+ assert.equal(gets,0);assert.deepEqual(x.r.counts(),[1,1,1]);
+});
+for(const reason of [undefined,null,false,0,'',Error('original handle rejection',{cause:0})])test('loadbind raw handle failure '+String(reason)+' wins secondary owner drift',async()=>{
+ const x=await joined();x.f.page.evaluateHandle=()=>{x.f.owner.page={};return Promise.reject(reason)};
+ let failed=false,error;try{await api.bindTerminalScriptWitness(x.f.owner)}catch(e){failed=true;error=e}assert(failed);assert.equal(error,reason);assert.deepEqual(x.r.counts(),[1,1,1]);
+});
+test('loadbind pending recheck shares one task, then raw failure defeats drift without another evaluate',async()=>{
+ const x=await joined(),h=originalHandle(x),r=await api.bindTerminalScriptWitness(x.f.owner);let reject,calls=0;const task=new Promise((_,no)=>reject=no);
+ // The retained method remains identical; only this test-double settlement changes.
+ const y=await joined();let pending=false;const second=originalHandle(y,{evaluate({fn,capsule,x}){calls++;if(pending)return task;x.r.c.__retainedCapsule=capsule;return Promise.resolve(JSON.parse(JSON.stringify(runInContext('('+fn.toString()+')(__retainedCapsule)',x.r.c))))}});
+ const bound=await api.bindTerminalScriptWitness(y.f.owner);pending=true;const a=bound.recheck(),b=bound.recheck();assert.equal(a,b);assert.equal(calls,2);const raw=Error('primary',{cause:0});y.f.owner.page={};reject(raw);let caught;try{await a}catch(e){caught=e}assert.equal(caught,raw);assert.equal(bound.recheck(),a);assert.equal(second.handleCalls,1);assert.equal(h.handleCalls,1);assert.equal(await r.recheck(),r);
+});
+
+for(const mode of ['abort','expiry'])test('loadbind '+mode+' priority beats foreign Page getter before recheck dispatch',async()=>{
+ const x=await joined(),h=originalHandle(x),r=await api.bindTerminalScriptWitness(x.f.owner);let getterCalls=0;
+ Object.defineProperty(x.f.owner,'page',{get(){getterCalls++;throw Error('foreign Page getter')},configurable:true});
+ const now=Date.now;
+ try{
+  if(mode==='abort')api.receiveManagedRootCall({id:'interrupt',operation:'interrupt',input:{},rootOrigin:{...x.f.message.rootOrigin,requestId:'interrupt',parentRequestId:'parent:interrupt',aborted:true,rejection:{kind:'value',value:false}}},x.f.state);
+  else Date.now=()=>x.f.message.rootOrigin.deadline+1;
+  let failed=false,error;try{await r.recheck()}catch(e){failed=true;error=e}assert(failed);
+  if(mode==='abort')assert.equal(error,false);else assert.equal(error.message,'LOGINOM_ORIGINAL_RUN_EXPIRED');
+  assert.equal(getterCalls,0);assert.equal(h.calls,1);assert.equal(h.handleCalls,1);
+ }finally{Date.now=now}
+});
+test('loadbind pending initial handle preserves its exact task and rejects post-await owner drift',async()=>{
+ const x=await joined(),h=originalHandle(x),original=x.f.page.evaluateHandle;let resolve,entered;
+ const task=new Promise(yes=>resolve=yes),started=new Promise(yes=>entered=yes);
+ x.f.page.evaluateHandle=function(fn,args){original.call(this,fn,args);entered();return task};
+ const work=api.bindTerminalScriptWitness(x.f.owner);await started;
+ assert.equal(x.f.load.inspect().scriptWitness.realmHandleTask,task);x.f.owner.page={};resolve(h.handle);
+ await assert.rejects(work,/LOAD_CHANGED/);assert.equal(h.handleCalls,1);assert.equal(h.calls,0);assert.deepEqual(x.r.counts(),[1,1,1]);
+});
+test('loadbind recheck foreign serialized result refuses without toJSON/accessor invocation',async()=>{
+ const x=await joined();let next=false,gets=0;
+ originalHandle(x,{evaluate({fn,capsule,x}){if(next){const foreign={};Object.defineProperty(foreign,'id',{get(){gets++;return 'original'}});return Promise.resolve(foreign)}x.r.c.__retainedCapsule=capsule;return Promise.resolve(JSON.parse(JSON.stringify(runInContext('('+fn.toString()+')(__retainedCapsule)',x.r.c))))}});
+ const r=await api.bindTerminalScriptWitness(x.f.owner);next=true;await assert.rejects(r.recheck(),/ASSOCIATION_CHANGED/);assert.equal(gets,0);
+});
+
+for(const initial of ['present','missing'])test('loadbind '+initial+' Page handle method cannot be replaced/published during first import await',async()=>{
+ const x=await joined();const h=initial==='present'?originalHandle(x):undefined;let calls=0;
+ const work=api.bindTerminalScriptWitness(x.f.owner);
+ x.f.page.evaluateHandle=()=>{calls++;return h?.handle};
+ await assert.rejects(work,/LOAD_CHANGED/);assert.equal(calls,0);if(h)assert.equal(h.handleCalls,0);assert.equal(x.evaluations,0);
+});
+
+test('loadbind initial handle accessor refusal is sticky, not repaired by later data method',async()=>{
+ const x=await joined(),h=originalHandle(x),original=x.f.page.evaluateHandle;let getters=0;
+ Object.defineProperty(x.f.page,'evaluateHandle',{get(){getters++;return original},configurable:true});
+ let first;try{await api.bindTerminalScriptWitness(x.f.owner)}catch(e){first=e}assert.equal(first.message,'LOGINOM_ORIGINAL_LOAD_CHANGED');
+ Object.defineProperty(x.f.page,'evaluateHandle',{value:original,writable:true,configurable:true});let next;try{await api.bindTerminalScriptWitness(x.f.owner)}catch(e){next=e}
+ assert.equal(next,first);assert.equal(getters,0);assert.equal(h.handleCalls,0);
+});
+test('loadbind foreign projection descriptor flags refuse even with equal data',async()=>{
+ const x=await joined();let next=false;
+ originalHandle(x,{evaluate({fn,capsule,x}){x.r.c.__retainedCapsule=capsule;const value=JSON.parse(JSON.stringify(runInContext('('+fn.toString()+')(__retainedCapsule)',x.r.c)));if(next)Object.defineProperty(value,'id',{writable:false});return Promise.resolve(value)}});
+ const r=await api.bindTerminalScriptWitness(x.f.owner);next=true;await assert.rejects(r.recheck(),/LOAD_CHANGED/);
+});

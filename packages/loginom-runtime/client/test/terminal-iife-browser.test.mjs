@@ -6,6 +6,7 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 const runtime=process.env.TERMINAL_IIFE_RUNTIME_ROOT?new URL('file://'+process.env.TERMINAL_IIFE_RUNTIME_ROOT+'/'):new URL('../../',import.meta.url);
 const {chromium}=await import(new URL('client/node_modules/playwright/index.mjs',runtime));
+const witness=await import(new URL('client/lib/terminal-script-witness.mjs',runtime));
 const {terminalUserPublisherScript}=await import(new URL('client/lib/terminal-user-publisher.mjs',runtime));
 const pins=JSON.parse(await readFile(new URL('../../../../docs/testing/loginom-ai-agent/terminal-iife-inputs.json',import.meta.url),'utf8')).inputs;
 const input=process.env.TERMINAL_IIFE_INPUT_DIR;
@@ -16,7 +17,7 @@ const order=['__extends.js','__awaiter.js','__helpers.js','mscorlib.js','rtl.imp
 const html='<!doctype html><meta charset="utf-8"><script>globalThis.Debug=globalThis.debug={assert(){}}</script>'+order.map(name=>'<script src="'+pins.find(p=>p.url.endsWith('/'+name)).url+'"></script>').join('');
 const browser=await chromium.launch({headless:true});
 try{
-for(const mode of ['genuine','method-drift','script-drift','missing-body'])test('full-IIFE local browser '+mode,{concurrency:false},async t=>{
+for(const mode of ['genuine','method-drift','script-drift','missing-body','loadbind'])test((mode==='loadbind'?'loadbind real browser original capsule':'full-IIFE local browser '+mode),{concurrency:false},async t=>{
  const context=await browser.newContext({serviceWorkers:'block'});let unexpected=0;const delivered=[],errors=[];
  try{
   const page=await context.newPage();page.on('pageerror',e=>errors.push(String(e)));
@@ -39,6 +40,7 @@ for(const mode of ['genuine','method-drift','script-drift','missing-body'])test(
    // its actual work through browser tasks, without replaying Get/Set or readers.
    let sample;for(let i=0;i<100;i++){try{sample=__loginomOriginalUserPublisherV1.inspect();break}catch{}await new Promise(r=>setTimeout(r,1))}
    if(!sample)throw Error('publisher did not qualify original application functions');
+   if(mode==='loadbind')globalThis.__loginomStartupV1={document,id:'original',account:'account'};
    const defs=sample.acquisition.loadedDefinitions,initial=defs.initializers;
    const before={complete:defs.complete,initializerComplete:initial.complete,scriptComplete:initial.scriptIdentityComplete,
     sameUser:sample.user===user&&sample.acquisition.user===user,sameGet:sample.acquisition.task===getTask,sameSet:sample.task===setTask,
@@ -52,7 +54,7 @@ for(const mode of ['genuine','method-drift','script-drift','missing-body'])test(
    let refused=false,getterCalls=0;
    if(mode==='method-drift')Object.defineProperty(rpc.TBGObjectProxy.prototype,'QueryInterface',{get(){getterCalls++;throw Error('foreign getter')},configurable:true});
    if(mode==='script-drift')initial.records[0].execution.script.remove();
-   if(mode!=='genuine'){try{__loginomOriginalUserPublisherV1.inspect()}catch{refused=true}}
+   if(mode!=='genuine'&&mode!=='loadbind'){try{__loginomOriginalUserPublisherV1.inspect()}catch{refused=true}}
    return {before,refused,getterCalls};
   },mode).catch(error=>({error:String(error)}));
   t.diagnostic(JSON.stringify({browser:browser.version(),mode,delivered:delivered.length,unexpected,errors,result}));
@@ -63,7 +65,17 @@ for(const mode of ['genuine','method-drift','script-drift','missing-body'])test(
   assert.equal(b.selectorCalls,1);assert.deepEqual(b.constructors,[true,true,true]);
   assert.deepEqual(b.nodes.map(n=>n.kind),['ObjectProxy','FileStorage','StreamPersist']);assert(b.nodes.every(n=>n.tag==='SCRIPT'&&n.document));
   for(const key of ['closureIdentityQualified','sourceExecutionQualified','nativeReceiversQualified','rpcCompletionVerified'])assert.equal(b[key],false,key);
-  assert.equal(result.getterCalls,0);assert.equal(result.refused,mode!=='genuine');
+  assert.equal(result.getterCalls,0);assert.equal(result.refused,mode!=='genuine'&&mode!=='loadbind');
+  if(mode==='loadbind'){
+   const handle=await page.evaluateHandle(witness.collectTerminalScriptWitness,witness.terminalScriptWitnessArguments('original','account'));
+   try{
+    const summary=await handle.evaluate(witness.projectTerminalScriptWitness);assert.equal(summary.rows.length,5);assert.equal(summary.sourceExecutionQualified,false);
+    const dto=await handle.jsonValue();assert.equal(Object.hasOwn(dto,'checkOriginal'),false);
+    await assert.rejects(page.evaluate(witness.projectTerminalScriptWitness,dto),/UNAVAILABLE/);
+    await handle.evaluate(capsule=>{globalThis.__loginomStartupV1.account='foreign'});
+    await assert.rejects(handle.evaluate(witness.projectTerminalScriptWitness),/UNAVAILABLE/);
+   }finally{await handle.dispose()}
+  }
  }finally{await context.close()}
 });
 }finally{test.after(async()=>{await browser.close()})}

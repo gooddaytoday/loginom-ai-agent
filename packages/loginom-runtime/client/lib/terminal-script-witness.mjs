@@ -26,5 +26,34 @@ export function collectTerminalScriptWitness(expected){
  if(nodes[3]!==nodes[4]||nodes[0]===nodes[1]||nodes[2]===nodes[3])throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
  // Re-run the original guard after projection. Never return a node/receiver/closure as DTO.
  if(own(requireFrozen(Reflect.apply(inspect,publisher,[])),'document')!==doc)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
- return {id:expected.id,account:expected.account,rows,projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false};
+ // The non-enumerable closure is retained only through the original JSHandle.
+ // JSON retains evidence rows only; it cannot reconstruct this original custody.
+ const id=expected.id,account=expected.account,summary=Object.freeze({id,account,
+  rows:Object.freeze(rows.map(row=>Object.freeze(row))),projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false});
+ const descriptor=Object.getOwnPropertyDescriptor,apply=Reflect.apply,parent=Object.getPrototypeOf;
+ const originalPublisher=publisher,originalInspect=inspect,originalStartup=startup,originalDefs=defs,originalInitializers=initializer;
+ const capsule={...summary},capsuleParent=parent(capsule);
+ function checkOriginal(){
+  if(this!==capsule||parent(capsule)!==capsuleParent||own(globalThis,'__loginomOriginalUserPublisherV1')!==originalPublisher
+    ||own(originalPublisher,'inspect')!==originalInspect||own(globalThis,'__loginomStartupV1')!==originalStartup
+    ||own(originalStartup,'document')!==doc||own(originalStartup,'id')!==id||own(originalStartup,'account')!==account)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  const now=requireFrozen(apply(originalInspect,originalPublisher,[])),current=requireFrozen(own(now,'acquisition'));
+  if(own(now,'document')!==doc||own(now,'user')!==own(sample,'user')||own(now,'task')!==own(sample,'task')
+    ||own(current,'task')!==own(acquisition,'task')||own(current,'receiver')!==own(acquisition,'receiver')
+    ||own(current,'loadedDefinitions')!==originalDefs||own(originalDefs,'bindings')!==bindings
+    ||own(originalDefs,'initializers')!==originalInitializers)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  const method=descriptor(capsule,'checkOriginal');if(!method||method.value!==checkOriginal||method.get||method.set
+    ||method.writable||method.configurable||method.enumerable)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  return summary;
+ }
+ Object.defineProperty(capsule,'checkOriginal',{value:checkOriginal});Object.freeze(capsule);
+ checkOriginal.call(capsule);return capsule;
+}
+
+// Fixed original-handle evaluation. A JSON/copy receiver has no original closure.
+export function projectTerminalScriptWitness(capsule){
+ if(!capsule||typeof capsule!=='object')throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+ const d=Object.getOwnPropertyDescriptor(capsule,'checkOriginal');
+ if(!Object.isFrozen(capsule)||!d||!('value'in d)||typeof d.value!=='function'||d.writable||d.configurable||d.enumerable)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+ return Reflect.apply(d.value,capsule,[]);
 }
