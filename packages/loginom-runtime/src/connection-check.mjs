@@ -34,7 +34,9 @@ export async function loginPage(page, candidate, owner) {
   sourceLoad?.admitPage(page,candidate)
   const observed=work=>sourceLoad?sourceLoad.observed(work):work
   if(owner) owner.navigationStarted=true
-  await observed(page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 }))
+  // A direct Chromium response on the stand can arrive after 60 seconds.
+  // This per-navigation cap remains inside the unchanged outer call deadline.
+  await observed(page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 120_000 }))
   if(owner) {
     await observed(page.evaluate(o=>{
       if(location.origin!==o.origin||globalThis.__loginomStartupV1) throw Error('LOGINOM_STARTUP_IDENTITY_REQUIRED')
