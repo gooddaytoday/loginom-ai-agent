@@ -12,13 +12,13 @@ import { storageCodecFixture } from "./helpers/storage-codec-fixture"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
-import { archiveManagementEnvironment, archiveManagementSlot, finalizeUnactivatedEnvironment } from "../src/environment-finalization"
+import { archiveManagementEnvironment, finalizeManagementSlot, finalizeUnactivatedEnvironment } from "../src/environment-finalization"
 import { openLoginomAdmin, readAdminFinalization, readAdminSessionInventory, sealAdminProcessInventory } from "../src/loginom-admin"
 
 import { readManagementProcessInventory, sealManagementProcessInventory } from "../src/management-process-evidence"
 import { management } from "../src/profile"
 import { readUserActivation, stageUserPreparation } from "../src/user-environment"
-import { collectManagementSessions, readManagementSession, recordManagementSession } from "../src/management-sessions"
+import { readManagementSession, recordManagementSession } from "../src/management-sessions"
 import { signalProcess, supervisedProcesses, type ProcessIdentity } from "../src/process-supervisor"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
@@ -609,16 +609,15 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         await expect(management(a.command, ["loginom", "status", "--format", "json"]))
           .rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_SEALED")
         expect(await Bun.file(a.inventoryFile).text()).toBe(sealedInventory)
-        const archived = await archiveManagementSlot(file, environment.server, a.lease, a.inventoryFile)
-        const beforeClose = await admin.inspectSessionInventory()
-        const accounted = await collectManagementSessions(file, a.lease, a.secretFile, a.inventoryFile, beforeClose.source)
-        expect(accounted.sessions.map(session => session.id)).toEqual([sessions[0]!.id])
-        for (const session of accounted.sessions) await admin.closeManagementSession(a.lease, a.secretFile, session.id)
-        const after = await admin.inspectSessionInventory()
+        const finalizedSlot = await finalizeManagementSlot(file, environment.server, a.lease, a.inventoryFile, admin)
+        expect(finalizedSlot.sessions.map(session => ({ id: session.id, state: session.state }))).toEqual([{ id: sessions[0]!.id, state: "closed" }])
+        expect(await readLeaseReceipt(finalizedSlot.source.path)).toMatchObject({ kind: "management-slot-finalization", status: "sessions_closed",
+          slotId: "a", leaseToken: a.lease.token, storageDeletionAllowed: false, nextAdmissionAllowed: false })
+        const after = await readAdminSessionInventory(file, pair.identity, finalizedSlot.after)
         expect(after.sessions.some(row => row.name.startsWith(a.credentials.username + ":"))).toBe(false)
         expect(after.sessions.some(row => row.name === sessions[1]!.binding.name && row.createdAt === sessions[1]!.binding.createdAt)).toBe(true)
         expect(running.done).toBe(false)
-        await writeLeaseReceipt(path.join(evidence, "addressed-close.json"), { archived, seal, accounted, source: after.source, held: held.cli,
+        await writeLeaseReceipt(path.join(evidence, "addressed-close.json"), { finalizedSlot, archived: finalizedSlot.archived, seal, source: after.source, held: held.cli,
           a: await readManagementSession(file, a.lease, a.secretFile, sessions[0]!.id), b: sessions[1], storageDeletionAllowed: false, nextAdmissionAllowed: false })
       } finally {
         if (held.cli) await signalProcess(held.cli, "SIGCONT")
