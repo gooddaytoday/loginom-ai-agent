@@ -56,7 +56,7 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
 liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
-liveIntegration("native components: evaluated user imports and exports its own CSV", () => nativeUserCapability("components"), 120_000)
+liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
 async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
@@ -136,41 +136,66 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
       expect(await request("reconcile-user", activation)).toMatchObject({ outcome: "confirmed", data: { activated: false,
         user: { objectId: user.objectId, name: user.name, userKind: 0, blocked: false } } })
+      async function preparePeer() {
+        const neighbor = { username: file.slots[1]!.username, password: "E-" + crypto.randomUUID() + "!" }
+        const neighborSecret = path.join(root, "neighbor-secret.json")
+        await writeLeaseReceipt(neighborSecret, neighbor)
+        const neighborPayload = { ...payload, slot: file.slots[1]!, secretFile: neighborSecret, preparationNonce: crypto.randomUUID(),
+          secretHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(neighbor)).digest("hex") }
+        const created = await request("reconcile-user", neighborPayload)
+        expect(created.outcome).toBe("confirmed")
+        const peer = (created.data as { user: typeof user }).user
+        const peerOwned = { objectId: peer.objectId, name: peer.name, userKind: 0, preparationNonce: neighborPayload.preparationNonce, secretHash: null }
+        expect(await request("reconcile-user", { ...neighborPayload, phase: "configure", owned: peerOwned }))
+          .toMatchObject({ outcome: "confirmed", data: { user: { name: neighbor.username, blocked: true, isAdmin: false, isDesigner: true } } })
+        const peerActivation = { ...neighborPayload, owned: { ...peerOwned, secretHash: neighborPayload.secretHash }, expectedPolicy: after }
+        expect(await request("reconcile-user", { ...peerActivation, phase: "activate" })).toMatchObject({ outcome: "confirmed" })
+        return { user: peer, activation: peerActivation }
+      }
       if (mode === "components") {
-        const storage = `${file.server.storageRoot}/${credentials.username}`
-        const input = path.join(root, "sales.csv")
-        await writeFile(input, "Item,Qty\nA,2\nA,7\nB,11\n", { mode: 0o600 })
-        await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${storage}/data`}`.quiet()
-        await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")} ${`${pair.identity.containerId}:${storage}/component-probe.lgp`}`.quiet()
-        await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/data/sales.csv`}`.quiet()
+        const neighbor = await preparePeer()
+        const peer = neighbor.user
+        const peerActivation = neighbor.activation
+        for (const [actor, csv] of [[user, "Item,Qty\nA,2\nA,7\nB,11\n"], [peer, "Item,Qty\nA,3\nA,8\nB,19\n"]] as const) {
+          const storage = `${file.server.storageRoot}/${actor.name}`
+          const input = path.join(root, `sales-${actor.name}.csv`)
+          await writeFile(input, csv, { mode: 0o600 })
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${storage}/data`}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")} ${`${pair.identity.containerId}:${storage}/component-probe.lgp`}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/data/sales.csv`}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/component-input.csv`}`.quiet()
+        }
         const shared = after.map(directory => directory.name).sort()
         expect(shared).toEqual(["common", "temp"])
-        const baseline = await Promise.all(shared.map(async name => {
-          await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()
-          return { name, hash: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()).text(),
-            entries: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text() }
-        }))
-        const probe = await request("reconcile-user", { ...activation, phase: "session-component-probe" })
-        await writeLeaseReceipt(path.join(evidence, "component-probe-reply.json"), probe)
-        expect(probe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: credentials.username }, components: { finished: true, failed: false } } })
-        const components = (probe.data as { components: { continued: boolean;
-          denials: { pathKind: string; operation: string; finished: boolean; failed: boolean; targetStatus: number; denied: boolean }[] } }).components
-        expect(components.continued).toBe(true)
-        expect(components.denials.map(row => [row.pathKind, row.operation])).toEqual(shared.flatMap(name =>
-          ["virtual", "absolute", "traversal"].flatMap(kind => ["import", "export"].map(operation => [`shared:${name}:${kind}`, operation]))))
-        expect(components.denials.every(row => row.denied)).toBe(true)
-        expect(components.denials.map(row => [row.finished, row.failed, row.targetStatus])).toEqual(Array.from({ length: 12 }, () => [true, true, 3]))
-        for (const before of baseline) {
-          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${before.name}/component-input.csv`}`.quiet()).text()).toBe(before.hash)
-          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${before.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(before.entries)
+        for (const name of shared) await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.join(root, `sales-${user.name}.csv`)} ${`${pair.identity.containerId}:${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()
+        const actors = []
+        for (const [owner, target, payload, expected] of [[user, peer, activation, "Item\tQty|Сумма\nA\t9\nB\t11\n"],
+          [peer, user, peerActivation, "Item\tQty|Сумма\nA\t11\nB\t19\n"]] as const) {
+          const baseline = await Promise.all([target.name, ...shared].map(async name => ({ name,
+            hash: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${name}`} -type f -exec sha256sum -z -- ${"{}"} +`.quiet()).text(),
+            entries: (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text() })))
+          const probe = await request("reconcile-user", { ...payload, phase: "session-component-probe", peer: { name: target.name, objectId: target.objectId } })
+          await writeLeaseReceipt(path.join(evidence, `component-probe-${owner.name}.json`), probe)
+          expect(probe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: owner.name }, components: { finished: true, failed: false } } })
+          const components = (probe.data as { components: { continued: boolean;
+            denials: { pathKind: string; operation: string; finished: boolean; failed: boolean; targetStatus: number; denied: boolean }[] } }).components
+          expect(components.continued).toBe(true)
+          expect(components.denials.map(row => [row.pathKind, row.operation])).toEqual(
+            ["neighbor", ...shared.map(name => `shared:${name}`)].flatMap(scope =>
+              ["virtual", "absolute", "traversal"].flatMap(kind => ["import", "export"].map(operation => [`${scope}:${kind}`, operation]))))
+          expect(components.denials.every(row => row.denied)).toBe(true)
+          expect(components.denials.map(row => [row.finished, row.failed, row.targetStatus])).toEqual(Array.from({ length: 18 }, () => [true, true, 3]))
+          for (const before of baseline) {
+            expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${before.name}`} -type f -exec sha256sum -z -- ${"{}"} +`.quiet()).text()).toBe(before.hash)
+            expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${before.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(before.entries)
+          }
+          const csv = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cat ${`${file.server.storageRoot}/${owner.name}/group_sum_qty.result.csv`}`.quiet()).text()
+          expect(csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")).toBe(expected)
+          expect(await request("close-session", { proofId: probe.id, session: (probe.data as { binding: unknown }).binding }))
+            .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+          actors.push({ username: owner.name, peer: target.name, ...components, csvSha256: new Bun.CryptoHasher("sha256").update(csv).digest("hex") })
         }
-        const csv = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cat ${`${storage}/group_sum_qty.result.csv`}`.quiet()).text()
-        // This package's native exporter defaults to TSV and the aggregate column caption.
-        expect(csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")).toBe("Item\tQty|Сумма\nA\t9\nB\t11\n")
-        expect(await request("close-session", { proofId: probe.id, session: (probe.data as { binding: unknown }).binding }))
-          .toMatchObject({ outcome: "confirmed", data: { closed: true } })
-        await writeLeaseReceipt(path.join(evidence, "component-probe.json"), { version: 1, identity: pair.identity, username: credentials.username,
-          finished: true, failed: false, ...components, csvSha256: new Bun.CryptoHasher("sha256").update(csv).digest("hex"), liveQualified: false })
+        await writeLeaseReceipt(path.join(evidence, "component-probe.json"), { version: 1, kind: "native-component-isolation", identity: pair.identity, actors, liveQualified: false })
         complete = true
         return
       }
@@ -191,21 +216,11 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         expect(digests[1]).toBe(digests[0])
         expect(await request("close-session", { proofId: probe.id, session: data.binding }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true } })
-        const neighbor = { username: file.slots[1]!.username, password: "E-" + crypto.randomUUID() + "!" }
-        const neighborSecret = path.join(root, "neighbor-secret.json")
-        await writeLeaseReceipt(neighborSecret, neighbor)
-        const neighborPayload = { ...payload, slot: file.slots[1]!, secretFile: neighborSecret, preparationNonce: crypto.randomUUID(),
-          secretHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(neighbor)).digest("hex") }
-        const created = await request("reconcile-user", neighborPayload)
-        expect(created.outcome).toBe("confirmed")
-        const peer = (created.data as { user: typeof user }).user
-        const peerOwned = { objectId: peer.objectId, name: peer.name, userKind: 0, preparationNonce: neighborPayload.preparationNonce, secretHash: null }
-        expect(await request("reconcile-user", { ...neighborPayload, phase: "configure", owned: peerOwned }))
-          .toMatchObject({ outcome: "confirmed", data: { user: { name: neighbor.username, blocked: true, isAdmin: false, isDesigner: true } } })
-        const peerActivation = { ...neighborPayload, owned: { ...peerOwned, secretHash: neighborPayload.secretHash }, expectedPolicy: after }
-        expect(await request("reconcile-user", { ...peerActivation, phase: "activate" })).toMatchObject({ outcome: "confirmed" })
+        const neighbor = await preparePeer()
+        const peer = neighbor.user
+        const peerActivation = neighbor.activation
         const peerProbe = await request("reconcile-user", { ...peerActivation, phase: "session-storage-probe" })
-        expect(peerProbe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: neighbor.username }, storage: { readConfirmed: true } } })
+        expect(peerProbe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: peer.name }, storage: { readConfirmed: true } } })
         expect(await request("close-session", { proofId: peerProbe.id, session: (peerProbe.data as { binding: unknown }).binding }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true } })
         const shared = after.map(directory => directory.name).sort()
@@ -425,8 +440,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(mode === "storage" ? 2 : 1)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(mode === "storage" ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(["storage", "components"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(["storage", "components"].includes(mode) ? 2 : 1)
       }
     }
   } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }

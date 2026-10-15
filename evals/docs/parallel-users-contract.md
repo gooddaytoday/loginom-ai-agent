@@ -756,3 +756,27 @@ own execution успешен; shared input bytes/SHA и NUL-safe entries про�
 `research/evidence/native-user-29beba5b-138e-4c0a-bef8-1f60ee981ece/component-probe.json`,
 SHA256 `36529410d2723843c24a84b306f62e666c21b4f37b1d5df72c8cbeb2392bfe78`.
 Neighbor component operations, live concurrency и parent readiness остаются open.
+
+### Bilateral component isolation
+
+`session-component-probe` теперь принимает тот же необязательный exact peer,
+что FileStorage probe. В trusted native context до evaluated login проверяются
+peer Name/UserKind0/objectId/Blocked=false; arbitrary paths/JS не принимаются.
+Для peer и shared roots проверяются virtual/absolute/../ import/export paths,
+используется тот же Finished/Failed/target node status3 gate.
+
+Два настоящих non-admin designer accounts выполняют разные datasets: A2/A7/B11
+даёт A9/B11, B3/B8/B19 даёт A11/B19. Own positive и continued pipeline каждого
+успешны. На каждого actor18 negatives, всего36; перед/после матрицы independent
+Docker observer сверяет NUL-safe SHA всех файлов и состав всего target/shared
+root. Проверка включает существующие ненулевые корректные peer/shared CSV и
+не пропускает частично созданный forbidden output. Accounts готовятся общим
+real-native fixture helper, без fake administrator и ротации первого account.
+
+Private600 receipt:
+`research/evidence/native-user-bf9b3dfc-4a72-4614-87f5-e46ec7fd10aa/component-probe.json`,
+SHA256 `ae86e6f17a70c3d9ee4759d98fbfc48d377825253f5d0a31e3ad9cf76665ca73`.
+Там actors A/B с отдельными output SHA, peer и native activation/status evidence.
+Native process/dispose confirmed; exact pair independently absent.
+Это sequential isolation control, `liveQualified=false`. Unusual filenames,
+concurrent heartbeat, production lease/readiness/cleanup integration ещё открыты.

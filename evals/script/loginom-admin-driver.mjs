@@ -177,7 +177,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (request.op === "reconcile-user") {
       const payload = request.payload
       if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe", "session-component-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (payload.peer !== undefined && (payload.phase !== "session-storage-probe" || !payload.peer || Object.keys(payload.peer).length !== 2 ||
+      if (payload.peer !== undefined && (!["session-storage-probe", "session-component-probe"].includes(payload.phase) || !payload.peer || Object.keys(payload.peer).length !== 2 ||
         typeof payload.peer.name !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(payload.peer.name) || payload.peer.name === payload.slot?.username ||
         typeof payload.peer.objectId !== "string" || !payload.peer.objectId)) throw Error("ADMIN_REQUEST_INVALID")
       if (!payload || Object.keys(payload).length !== (payload.peer !== undefined ? 9 :
@@ -389,7 +389,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             }, payload.phase))
             try {
               const withPackage = await snapshot()
-              const components = payload.phase === "session-component-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline, shared }) => {
+              const components = payload.phase === "session-component-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline, shared, peer }) => {
                 const finish = async activation => {
                   try {
                     while (!await activation.Finished && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25))
@@ -414,8 +414,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 if (await importer.FileName !== "data/sales.csv" || await exporter.FileName !== "group_sum_qty.result.csv")
                   throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
                 const denials = []
-                for (const name of shared) {
-                  for (const [kind, root] of [["virtual", `/${name}`], ["absolute", `/workdir/UserStorage/${name}`], ["traversal", `../${name}`]]) {
+                for (const resource of [...(peer ? [{ scope: "neighbor", name: peer.name }] : []), ...shared.map(name => ({ scope: `shared:${name}`, name }))]) {
+                  for (const [kind, root] of [["virtual", `/${resource.name}`], ["absolute", `/workdir/UserStorage/${resource.name}`], ["traversal", `../${resource.name}`]]) {
                     for (const operation of ["import", "export"]) {
                       console.info("ADMIN_USER_STAGE_COMPONENT_NEGATIVE")
                       const deactivated = await finish(await workflow.DeactivateAllAsync())
@@ -429,7 +429,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                       if (await importer.FileName !== source || await exporter.FileName !== target) throw Error("ADMIN_COMPONENT_READBACK_UNCONFIRMED")
                       const activation = await finish(await item.Activate(0))
                       const targetStatus = await (operation === "import" ? input : output).Status
-                      denials.push({ pathKind: `shared:${name}:${kind}`, operation, ...activation, targetStatus,
+                      denials.push({ pathKind: `${resource.scope}:${kind}`, operation, ...activation, targetStatus,
                         denied: activation.finished && activation.failed && targetStatus === bg.TBGModelNodeStatus.mnsInactiveError })
                     }
                   }
@@ -443,7 +443,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 await output.UpdateConfiguration()
                 const continued = await finish(await item.Activate(0))
                 return { ...positive, continued: continued.finished && !continued.failed, denials }
-              }, { item: handle, deadline: request.deadline, shared: payload.expectedPolicy.map(directory => directory.name).sort() })) : null
+              }, { item: handle, deadline: request.deadline, shared: payload.expectedPolicy.map(directory => directory.name).sort(), peer: payload.peer ?? null })) : null
               const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer, shared }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 const source = peer ? "access-peer-probe.lgp" : "access-probe.lgp"
