@@ -378,16 +378,20 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const artifactError = fetched && "error" in fetched ? fetched.error : undefined
   const artifact = fetched && !("error" in fetched) ? fetched : undefined
   const { status, stop } = artifactError ? { status: "harness_error" as const, stop: false } : statusFor(run, artifact !== undefined || task.outputMode === "diagnostic")
-  const cleanupError =
-    !config.keepStorage && (artifact || !config.dryRun)
+  const deferredCleanupError = artifact && input.slot
+    ? await Bun.write(path.join(outDir, "storage-cleanup.json"), JSON.stringify({ status: "pending", removed: false,
+        verified_absent: false, deletion_deferred: true, files: artifact.cleanupFiles }, null, 2)).then(() => null, (error: unknown) => describe(error))
+    : null
+  const cleanupError = deferredCleanupError ?? (
+    !config.keepStorage && !(artifact && input.slot) && (artifact || !config.dryRun)
       ? await (artifact ? cleanupArtifact(input.source, artifact) : cleanupOrphanResult({
           source: input.source, name: `${name}.result.csv`, outDir, existingNames: storageBefore,
-          processesConfirmed: run.processCleanup.status === "confirmed",
+          processesConfirmed: run.processCleanup.status === "confirmed", deferDeletion: Boolean(input.slot),
         })).then(
           () => null,
           (error: unknown) => describe(error),
         )
-      : null
+      : null)
   const noJudge = status === "harness_error" || status === "interrupted" || status === "infra_error"
   const judged =
     artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
@@ -452,7 +456,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         : null),
   }
   Object.assign(base, result)
-  await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup }, null, 2))
+  await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup,
+    ...(input.slot ? { slotId: input.slot.lease.slot.id, serverEpoch: input.slot.lease.identity.serverEpoch,
+      serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) }, null, 2))
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
   return { result, stop: stop || run.processCleanup.status === "failed" || Boolean(judgeCleanupFailed) }
 }
@@ -477,12 +483,18 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand, runId: 
 }
 
 export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {
-  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string; path?: string }[] } = { stages: [] }
+  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string; path?: string }[];
+    slotId?: string; serverEpoch?: string; serverSessions?: "unknown"; storageDeletionAllowed?: false; nextAdmissionAllowed?: false } = { stages: [] }
   try {
     if (!outDir) throw Error("Attempt cleanup evidence directory required")
-    evidence.processes = (await Bun.file(path.join(outDir, "cleanup.json")).json()).processes as ProcessCleanup
+    const stored = await Bun.file(path.join(outDir, "cleanup.json")).json()
+    evidence.processes = stored.processes as ProcessCleanup
+    if (config.slotsFile || stored.storageDeletionAllowed === false) Object.assign(evidence, { slotId: result.slot_id,
+      serverEpoch: typeof stored.serverEpoch === "string" && /^[a-f0-9]{64}$/.test(stored.serverEpoch) ? stored.serverEpoch : undefined,
+      serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false })
     if (evidence.processes?.status !== "confirmed") throw Error(evidence.processes?.error ?? "Process cleanup unconfirmed")
     evidence.stages.push({ stage: "processes", status: "confirmed" })
+    if (evidence.storageDeletionAllowed === false) throw Error("SLOT_CLEANUP_REQUIRED")
     if (result.environment_cleanup?.status === "failed") throw Error(result.environment_cleanup.error ?? "Attempt persistence failed")
     await archiveDiagnostics(config.profileDir, evidence.processes.runtimeDirectories, outDir,
       [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
