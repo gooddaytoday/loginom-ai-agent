@@ -166,3 +166,34 @@ test('file sync crosses same initial clock deadline without publishing ready; ne
   assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+test('pending memory advances to next observe without a duplicate atomic write',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'initial-single-write-'));let now=1000000,armed=false,reads=0;
+ const events=[],writes=[];
+ const timedOpen=async(...args)=>{const file=await open(...args);const directory=args[0]===root;return {
+  writeFile:async bytes=>{if(armed){events.push('write');writes.push(JSON.parse(bytes))}return file.writeFile(bytes)},
+  close:file.close.bind(file),async sync(){await file.sync();if(armed){events.push(directory?'directory_sync':'file_sync');if(!directory)now+=17;}}
+ };};
+ const f=fixture(root,undefined,undefined,{clock:()=>now,open:timedOpen});
+ try{
+  await f.functions.loginBrowser({...f.options,keepOpen:true});
+  delete f.owner.initialReadiness;f.owner.evidence={stages:[]};f.owner.phaseTiming=[];f.owner.phaseTimingTruncated=false;armed=true;
+  f.page.onGuard=async()=>{
+   reads++;events.push('observe'+reads);
+   if(reads===2){
+    assert.deepEqual(events,['observe1','write','file_sync','directory_sync','observe2']);
+    assert.equal(writes.length,1);assert.equal(f.owner.evidence.initial_readiness.status,'pending');assert.equal(f.owner.evidence.initial_readiness.observations,1);
+    const disk=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));assert.equal(disk.initial_readiness.status,'not_ready');
+    assert.ok(f.owner.phaseTiming.some(x=>x.name==='post_guard'&&x.at_ms===17));
+   }
+   f.pageState.bg.app.Application.FInstance.FMainForm.FMapTree.HasRunningNodes=()=>reads===1?undefined:false;
+  };
+  const result=await f.functions.startupReadiness(f.owner);assert.equal(result.authenticated,true);assert.equal(reads,2);assert.equal(writes.length,2);
+  assert.equal(writes[1].initial_readiness.status,'ready');assert.equal(writes[1].guard_observations.length,2);
+  assert.equal(writes[1].guard_observations[0].result.reason,'STARTUP_NOT_OWN_EMPTY_IDLE');
+  assert.equal(writes[1].phase_timing.find(x=>x.name==='file_sync').duration_ms,17);
+  assert.equal(writes[1].phase_timing.find(x=>x.name==='directory_sync').duration_ms,0);
+  assert.equal(writes[1].phase_timing.filter(x=>x.name==='post_guard').length,2);
+  assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+ }finally{await rm(root,{recursive:true,force:true})}
+});

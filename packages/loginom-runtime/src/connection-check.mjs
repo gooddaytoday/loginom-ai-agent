@@ -339,7 +339,6 @@ async function startupReadiness(owner, initial=true, persist=true) {
       &&(unknown(x.count)||unknown(x.running));
     if(!pending)return observed;
     owner.evidence.initial_readiness={...budget,status:'pending',observations:++iteration};
-    await startupEvidence(owner);
     try {guard()} finally {startupPhaseTiming(owner,'post_guard')}
     const delay=Math.min(10*2**Math.min(iteration-1,4),budget.effective_deadline-Date.now());
     await new Promise((resolve,reject)=>{
