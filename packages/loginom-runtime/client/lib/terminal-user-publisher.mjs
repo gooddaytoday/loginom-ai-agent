@@ -14,7 +14,9 @@ function installOriginalUserPublisher(origin) {
   if(descriptor(root,key))return; // Never replace a previous/foreign publisher.
   let sample,acquisition,failure,checks=[],sealed=false,pendingSS;
   let initialScript,modifierScript,acquisitionDefinition,userDefinition;
-  const modifierReads={};
+  const modifierReads={};let lowerInitializer,pendingRPC;
+  let lowerDefinition=Object.freeze({complete:false,reason:'ORIGINAL_LOWER_DEFINITION_NOT_OBSERVED',closureIdentityQualified:false});
+  const expectedInitializer=original=>lowerInitializer?.active&&lowerInitializer.original===original?lowerInitializer.wrapper:original;
   let initializers=Object.freeze({complete:false,reason:'INITIAL_SS_NOT_OBSERVED',sourceExecutionQualified:false,closureIdentityQualified:false});
   const unavailable=()=>{throw Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE')};
   const remember=error=>{failure??={value:error}};
@@ -160,7 +162,7 @@ function installOriginalUserPublisher(origin) {
       applicationSourcesJoined=true;
     }
     return Object.freeze({bindings:Object.freeze(bindings),complete,initializers,initialLoad,applicationSourcesJoined,
-      acquisitionDefinition,userDefinition,propertyOperands,closureIdentityQualified:false});
+      acquisitionDefinition,userDefinition,propertyOperands,lowerSessionDefinition:lowerDefinition,closureIdentityQualified:false});
   };
   const guard=()=>{
     if(acquisition?.failed)throw acquisition.error;
@@ -189,7 +191,7 @@ function installOriginalUserPublisher(origin) {
         loadedDefinitions:acquisition.loadedDefinitions,
         rpcCompletionVerified:!!(acquisition.lower?.completed&&acquisition.lower.sourceVerified),
         lower:acquisition.lower?.completed?Object.freeze({session:acquisition.lower.session,transport:acquisition.lower.transport,
-          method:acquisition.lower.originalMethod,task:acquisition.lower.task,dispatchTask:acquisition.lower.dispatchTask,
+          definition:acquisition.lower.definition,method:acquisition.lower.originalMethod,task:acquisition.lower.task,dispatchTask:acquisition.lower.dispatchTask,
           response:acquisition.lower.response,user:acquisition.lower.user,w:acquisition.lower.w,o:acquisition.lower.o,type:703,
           originalResultReader:acquisition.lower.originalResultReader,continuation:acquisition.lower.continuation,
           taskReader:acquisition.lower.taskReader,taskContinuation:acquisition.lower.taskContinuation,
@@ -248,7 +250,13 @@ function installOriginalUserPublisher(origin) {
     if(!('value'in methodDescriptor)||typeof methodDescriptor.value!=='function')unavailable();
     const transport=hold(session,'$S'),originalMethod=methodDescriptor.value;
     const ss=hold(root,'ss'),taskConstructor=hold(ss,'TaskCompletionSource'),mkdel=hold(ss,'mkdel'),exceptionWrap=hold(hold(ss,'Exception'),'wrap');
-    const record={session,transport,originalMethod,ss,taskConstructor,mkdel,exceptionWrap,patches:[],restored:false,used:false,sourceVerified:false,completed:false};
+    let definition;
+    if(lowerDefinition.complete){
+      if(originalMethod!==lowerDefinition.method)unavailable();
+      let p=session;while(p&&p!==lowerDefinition.prototype)p=prototype(p);if(!p)unavailable();
+      definition=lowerDefinition;
+    }
+    const record={definition,session,transport,originalMethod,ss,taskConstructor,mkdel,exceptionWrap,patches:[],restored:false,used:false,sourceVerified:false,completed:false};
     const patch=(object,name,make)=>{
       const own=descriptor(object,name),original=data(object,name);
       if(typeof original!=='function'||(own&&(!own.configurable&&!own.writable)))unavailable();
@@ -262,11 +270,22 @@ function installOriginalUserPublisher(origin) {
       const entry={object,name,own,original,temporary,chain,owner,originalDescriptor};record.patches.push(entry);
       return entry;
     };
+    const patchPublicReader=wrapped=>{
+      const expected=definition.publicDescriptor,owner=definition.prototype;
+      if(descriptor(session,'CurrentUser')||!expected||expected.get!==originalMethod)unavailable();
+      let p=prototype(session);while(p&&p!==owner){if(descriptor(p,'CurrentUser'))unavailable();p=prototype(p)}
+      const current=descriptor(p,'CurrentUser');if(p!==owner||!current||Reflect.ownKeys(expected).some(k=>current[k]!==expected[k]))unavailable();
+      const temporary={...expected,get:wrapped,configurable:true},chain=[];
+      for(let p=prototype(session);p;p=prototype(p)){chain.push(p);if(p===owner)break}
+      const entry={accessor:true,object:session,name:'CurrentUser',own:undefined,original:originalMethod,temporary,chain,owner,originalDescriptor:expected};
+      record.publicReader=entry;acquisition.lower=record; // Available to the original reader's guard before installation.
+      record.patches.push(entry);define(session,'CurrentUser',temporary);
+    };
     const check=()=>{for(const entry of record.patches){const now=descriptor(entry.object,entry.name);
       const expected=record.restored?entry.own:entry.temporary;
       if(!expected){if(now)unavailable();let owner=prototype(entry.object);for(const expectedOwner of entry.chain){if(owner!==expectedOwner)unavailable();if(descriptor(owner,entry.name))break;owner=prototype(owner)}
         const original=descriptor(owner,entry.name);if(owner!==entry.owner||!original||Reflect.ownKeys(entry.originalDescriptor).some(k=>original[k]!==entry.originalDescriptor[k]))unavailable();
-        if(data(entry.object,entry.name)!==entry.original)unavailable()}
+        if(!entry.accessor&&data(entry.object,entry.name)!==entry.original)unavailable()}
       else if(!now||Reflect.ownKeys(expected).some(k=>now[k]!==expected[k]))unavailable();
     }};
     checks.push(check);
@@ -312,12 +331,14 @@ function installOriginalUserPublisher(origin) {
           }]);
         });return task;
       });
-      patch(session,'get_CurrentUser',original=>function(){
+      const invokeOriginal=original=>function(){
         guard();if(this!==session||record.used)unavailable();record.used=true;invoking=true;
         try{const task=apply(original,this,arguments);record.task=task;
           record.taskContinuation=hold(task,'continueWith');record.taskReader=hold(task,'getAwaitedResult');return task;
         }finally{invoking=false}
-      });
+      };
+      if(definition){hold(session,'get_CurrentUser');patchPublicReader(invokeOriginal(originalMethod))}
+      else patch(session,'get_CurrentUser',invokeOriginal);
       (async()=>{guard();const value=await hash(originalMethod);guard();
         if(value!=='e7d959448a2b1a8030f3511caf44768b4ee4e1c918aa9b3791a897022026738a'){
           if(value!=='07380ada53b9b8eba218bf876f7b30b40a9076a954b07755c68fc745f1f72a5c')unavailable();
@@ -346,7 +367,15 @@ function installOriginalUserPublisher(origin) {
           readerChain.push(p);reader=descriptor(p,'CurrentUser');if(reader){readerOwner=p;break}
         }
         if(!reader)unavailable();
-        checks.push(()=>{let p=session;for(const expected of readerChain){
+        checks.push(()=>{
+          const active=acquisition?.lower;
+          if(active?.publicReader&&!active.restored){
+            const e=active.publicReader,shadow=descriptor(session,'CurrentUser');
+            if(!shadow||Reflect.ownKeys(e.temporary).some(k=>shadow[k]!==e.temporary[k]))unavailable();
+            let p=session;for(const expected of readerChain){if(p!==expected)unavailable();if(p===readerOwner)break;p=prototype(p)}
+            const original=descriptor(p,'CurrentUser');if(p!==readerOwner||p!==e.owner||!original||Reflect.ownKeys(reader).some(k=>original[k]!==reader[k]))unavailable();return;
+          }
+          let p=session;for(const expected of readerChain){
           if(p!==expected)unavailable();if(descriptor(p,'CurrentUser'))break;p=prototype(p)}
           const now=descriptor(p,'CurrentUser');if(p!==readerOwner||!now
             ||Reflect.ownKeys(reader).some(k=>now[k]!==reader[k]))unavailable();
@@ -390,7 +419,10 @@ function installOriginalUserPublisher(origin) {
     const original=d.value,records=[],methods={ObjectProxy:['QueryInterface'],
       FileStorage:['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'],StreamPersist:['SaveToStream']};
     const lookup=(object,key)=>{
-      for(let p=object;p;p=prototype(p)){const d=descriptor(p,key);if(d){if(!('value'in d))unavailable();return d.value}}
+      for(let p=object;p;p=prototype(p)){const d=descriptor(p,key);if(d){if(!('value'in d)){
+          if(key==='rpc'&&p===pendingRPC?.object&&Reflect.ownKeys(pendingRPC.descriptor).every(k=>d[k]===pendingRPC.descriptor[k]))return undefined;
+          unavailable();
+        }return d.value}}
     };
     const snapshot=object=>{
       const parent=prototype(object),entries=Reflect.ownKeys(object).map(key=>{
@@ -434,7 +466,7 @@ function installOriginalUserPublisher(origin) {
         records.push(record);
         if(records.length===3){
           const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'?now.value!==retainedInitClass:now[key]!==d[key]))unavailable();
-          define(ss,'initClass',d);restored=true;hold(root,'ss');hold(ss,'initClass');
+          define(ss,'initClass',d);restored=true;hold(root,'ss');
           const scriptIdentityComplete=!!(initialScript?.complete&&modifierScript?.complete&&records.every(r=>r.execution.complete));
           if(scriptIdentityComplete&&records.find(r=>r.kind==='FileStorage').execution.script!==records.find(r=>r.kind==='StreamPersist').execution.script)unavailable();
           initializers=Object.freeze({complete:true,records:Object.freeze(records.slice()),initialScript,modifierScript,scriptIdentityComplete,
@@ -446,7 +478,7 @@ function installOriginalUserPublisher(origin) {
     }
     define(ss,'initClass',{...d,value:retainedInitClass});
     checks.push(()=>{const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'
-      ?now.value!==(restored?original:retainedInitClass):now[key]!==d[key]))unavailable()});
+      ?now.value!==(restored?expectedInitializer(original):retainedInitClass):now[key]!==d[key]))unavailable()});
   };
   // Witness the actual read consumed by the fixed modifier, before assignment.
   // The original function is returned unwrapped: the IIFE captures that exact ref.
@@ -518,17 +550,70 @@ function installOriginalUserPublisher(origin) {
     define(ss,'initClass',{get,set,enumerable:initial.enumerable,configurable:true});
     checks.push(()=>{if(waiting){const d=descriptor(ss,'initClass');if(!d||d.get!==get||d.set!==set||d.enumerable!==initial.enumerable||!d.configurable)unavailable()}});
   };
+  // A separate one-use initializer witness for the original lower session class.
+  // It is armed by the initial constructor publication, never a late lookup.
+  const bindLowerDefinition=(namespace,ctor)=>{
+    const birth=captureScript('bg/js/bg.model.rpc.js'),ss=hold(root,'ss');
+    const d=descriptor(ss,'initClass');
+    if(!initializers.complete||lowerInitializer||!d||!('value'in d)||typeof d.value!=='function'||!d.writable)unavailable();
+    hold(namespace,'TIBGBaseDeductorServerSession_Proxy');hold(ctor,'__typeName');
+    const original=d.value;let used=false;
+    function retainedLowerInitializer(target,assembly,members,baseType,interfaces){
+      if(target!==ctor)return apply(original,this,arguments);
+      let pending;
+      try{
+        if(this!==ss||used)unavailable();used=true;guard();
+        const execution=captureScript('bg/js/bg.model.rpc.js');
+        if(execution.script!==birth.script||execution.integrityReceipt!==birth.integrityReceipt)unavailable();
+        const method=hold(members,'get_CurrentUser'),memberDescriptor=Object.freeze({...descriptor(members,'get_CurrentUser')});
+        if(typeof method!=='function')unavailable();
+        const memberParent=prototype(members),methodParent=prototype(method);
+        checks.push(()=>{if(prototype(members)!==memberParent||prototype(method)!==methodParent)unavailable()});
+        hold(assembly,'__types');hold(assembly,'name');
+        const basePrototype=baseType?hold(baseType,'prototype'):undefined;
+        if(interfaces){const p=prototype(interfaces),keys=Reflect.ownKeys(interfaces),slots=keys.map(k=>[k,descriptor(interfaces,k)]);
+          if(slots.some(([,d])=>!d||!('value'in d)))unavailable();
+          checks.push(()=>{if(prototype(interfaces)!==p||Reflect.ownKeys(interfaces).length!==keys.length)unavailable();for(const[k,d]of slots){const now=descriptor(interfaces,k);if(!now||Reflect.ownKeys(d).some(key=>now[key]!==d[key]))unavailable()}});
+        }
+        const dependencies=Object.freeze({initializer:original,taskConstructor:hold(ss,'TaskCompletionSource'),mkdel:hold(ss,'mkdel'),exceptionWrap:hold(hold(ss,'Exception'),'wrap')});
+        pending={birth,execution,ctor,assembly,members,memberDescriptor,baseType,basePrototype,interfaces,method,dependencies,receiver:this};
+      }catch(error){remember(error)}
+      let value,failed=false,first;
+      try{value=apply(original,this,arguments)}catch(error){failed=true;first=error;remember(error)}
+      // Restore only our exact slot, including flags. Never overwrite foreign state.
+      try{const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(k=>k==='value'?now.value!==retainedLowerInitializer:now[k]!==d[k]))unavailable();
+        define(ss,'initClass',d);lowerInitializer.active=false;
+        if(pending&&!failed){const proto=hold(ctor,'prototype');
+          if(hold(proto,'get_CurrentUser')!==pending.method||hold(ctor,'__assembly')!==assembly)unavailable();
+          const publicDescriptor=descriptor(proto,'CurrentUser');
+          if(!publicDescriptor||publicDescriptor.get!==pending.method||'value'in publicDescriptor)unavailable();
+          const publicSnapshot=Object.freeze({...publicDescriptor});
+          checks.push(()=>{const now=descriptor(proto,'CurrentUser');if(!now||Reflect.ownKeys(publicSnapshot).some(k=>now[k]!==publicSnapshot[k]))unavailable()});
+          guard();lowerDefinition=Object.freeze({...pending,prototype:proto,publicDescriptor:publicSnapshot,complete:true,sourceExecutionQualified:false,closureIdentityQualified:false});
+        }
+      }catch(error){remember(error)}
+      if(failed)throw first;return value;
+    }
+    lowerInitializer={original,wrapper:retainedLowerInitializer,active:true};
+    define(ss,'initClass',{...d,value:retainedLowerInitializer});
+    checks.push(()=>{const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(k=>k==='value'?now.value!==expectedInitializer(original):now[k]!==d[k]))unavailable()});
+  };
   // Only a namespace born after this init script can witness initializers.
   // Existing ss is deliberately left alone; no late reflection can repair it.
   try{if(!descriptor(root,'ss')){arm(root,'ss',ss=>{pendingSS=undefined;initialScript=captureScript('bg/js/mscorlib.js');awaitShallowCopy(ss);awaitFinalInitializer(ss)});pendingSS=descriptor(root,'ss');}
     else initializers=Object.freeze({complete:false,reason:'INITIAL_SS_ALREADY_PRESENT',sourceExecutionQualified:false,closureIdentityQualified:false});
   }catch(error){remember(error)}
-  try{arm(root,'bg',bg=>arm(bg,'app',app=>{
+  try{arm(root,'bg',bg=>{
+    if(originalIntegrity){arm(bg,'rpc',namespace=>{pendingRPC=undefined;
+      if(descriptor(namespace,'TIBGBaseDeductorServerSession_Proxy'))return; // Late definitions remain missing.
+      arm(namespace,'TIBGBaseDeductorServerSession_Proxy',ctor=>bindLowerDefinition(namespace,ctor));
+    });const d=descriptor(bg,'rpc');if(d&&!('value'in d))pendingRPC={object:bg,descriptor:d};}
+    arm(bg,'app',app=>{
     if(descriptor(app,'CurrentUser'))unavailable(); // Late installation cannot recover Set's argument.
     if(descriptor(app,'ServerConnection'))unavailable();
     arm(app,'ServerConnection',Connection=>bindAcquisition(app,Connection));
     arm(app,'CurrentUser',current=>bind(bg,app,current));
-  }))}catch(error){remember(error)}
+  })})}catch(error){remember(error)}
 }
 
 // Expected text comes from this fixed internal implementation, never from a caller.
