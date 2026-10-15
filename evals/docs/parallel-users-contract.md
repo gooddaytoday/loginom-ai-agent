@@ -1065,3 +1065,31 @@ TDD operation dispatch guard RED→GREEN;146 related unit PASS/552 assertions
 after exact PID/starttime absence and continuous proof checks; private audit
 `research/evidence/management-native-draft-cleanup-20261015.json` SHA256
 `7ddeac08523dfd1a8e3fcfed0d6fb29e01c5f828413e4bdb54ea545d91e51c6b`.
+
+
+### Read-only standalone verification
+
+`verifyEnvironment({slotsFile, parallel})` и public `parallel-env verify --config
+<private-slots.json> --out <new-private-directory> [--parallel N]` используют
+тот же command/admin inventory и grouped leases, что prepare. Verify перечитывает
+protected preparation, ownership/configuration sources; reconcile-user, password
+rotation и user-root publication не вызываются. Native observation/finalization
+проверяет owned blocked account, отсутствие sessions, private profile archive
+и published empty root, затем выпускает normal slot/server reservations.
+
+Текущий verify предназначен для уже подготовленного never-activated окружения;
+он сохраняет ready:false/code2, пока actual session/backup/effective-access/CLI
+readiness не квалифицированы. Отсутствующие/неполные sources или activated owner
+не исправляются; uncertainty сохраняет reservations для recovery. Выходной
+receipt kind environment-verification; ошибки до runtime создают private failed
+receipt без measured summary. Это ещё не full readiness и не recovery.
+
+TDD missing API/unsupported CLI RED→GREEN.98 unit PASS/418 (6.52s),8 CLI
+PASS/41 (0.415s), native1 PASS/21 (88.08s), typecheck/diff PASS. Actual
+prepare2→prepare1→public prepare1→public verify1 сохранил10 protected markers
+byte-SHA; native verify operations только init/inspect/dispose, changed users
+и passwords пусты, normal reservations released. Private600 evidence
+`native-standalone-9dfdd704-9c20-48a5-b339-5138d29fedea/preparation.json`
+SHA256 `112b6df4398d2232e5c48b5b9c62f286f757d6166c257b92708be6d789011307`
+содержит4 source sets;34 independent hash/status checks и exact pair absence
+PASS. Ready:false/code2 с фактическим SESSION_IDENTITY_UNSUPPORTED.
