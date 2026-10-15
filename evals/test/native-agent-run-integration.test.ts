@@ -4,6 +4,7 @@ import path from "node:path"
 import { tmpdir } from "node:os"
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { agentCommand, runAgent } from "../src/cli"
+import { finalizeSlotAttempt } from "../src/attempt-finalization"
 import { loadConfig } from "../src/config"
 import { pauseAgentProcessInventory, readAgentProcess, readAgentProcessInventory, sealAgentProcessInventory } from "../src/agent-process-evidence"
 import { readAgentArchive, readAgentSession, recordAgentSessions } from "../src/agent-sessions"
@@ -14,13 +15,13 @@ import { collectManagementSessions, collectSlotSessions } from "../src/managemen
 import { sealManagementProcessInventory } from "../src/management-process-evidence"
 import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { archiveProfileEvidence } from "../src/profile-archive"
-import { ensureProfile, releaseStaleWriter } from "../src/profile"
+import { ensureProfile, profileHistory, releaseStaleWriter } from "../src/profile"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { stageUserPreparation } from "../src/user-environment"
 import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
 
-for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(
-  `native agent replay: actual sandboxed CLI ${browser ? "activates Loginom through a local provider" : "finishes without a browser"}`, async () => {
+for (const finalizer of [false, true]) for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(
+  `native agent replay: actual sandboxed CLI ${browser ? "activates Loginom through a local provider" : "finishes without a browser"}${finalizer ? " with slot finalizer" : ""}`, async () => {
     const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
     const root = await mkdtemp(path.join(tmpdir(), "evals-native-agent-"))
     const history = await mkdtemp(path.join(tmpdir(), "evals-native-history-"))
@@ -41,7 +42,7 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
     await mkdir(evidence, { mode: 0o700 })
     console.error(`native agent replay evidence: ${evidence}`)
     const sources = await Promise.all(["native-agent-run-integration.test.ts", "helpers/loginom-replay-provider.ts", "../src/cli.ts",
-      "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/management-sessions.ts", "../src/management-process-evidence.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
+      "../src/attempt-finalization.ts", "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/management-sessions.ts", "../src/management-process-evidence.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
       "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", process.env.EVAL_CLI_BIN!].map(async file => {
       const source = path.resolve(import.meta.dir, file)
       return { path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }
@@ -124,6 +125,35 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
         const references = { process: entry.entrySource, before: before.source, after: after!.source,
           during: during.filter(snapshot => Date.parse(snapshot.observation.startedAt) <= Date.parse(qualified!.finishedAt) &&
             Date.parse(snapshot.observation.finishedAt) >= Date.parse(qualified!.startedAt)).map(snapshot => snapshot.source) }
+        if (finalizer) {
+          const inputs = { management, agents: { file: agents, observations: [references] } }
+          await expect(finalizeSlotAttempt(file, environment.server, { ...lease, recoveryOnly: true }, inputs, admin))
+            .rejects.toThrow("SLOT_RECOVERY_ONLY")
+          await expect(finalizeSlotAttempt(file, environment.server, lease, { ...inputs, agents: { file: agents, observations: [] } }, admin))
+            .rejects.toThrow("AGENT_SESSION_INVENTORY_INCOMPLETE")
+          expect(await Bun.file(path.join(lease.slot.profileDir, "data/loginom-ai-agent.db")).exists()).toBe(true)
+          expect(await Bun.file(path.join(file.controller.stateDir, `agent-archive-${entry.entrySource.id}.json`)).exists()).toBe(false)
+          const untouched = await admin.inspectSessionInventory()
+          expect(untouched.sessions.filter(row => row.name.startsWith(credentials.username + ":")).map(row => JSON.stringify([row.name, row.createdAt])).sort())
+            .toEqual(after!.sessions.filter(row => row.name.startsWith(credentials.username + ":")).map(row => JSON.stringify([row.name, row.createdAt])).sort())
+          const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+          expect(completed.sessions).toHaveLength(browser ? 2 : 1)
+          expect(completed.sessions.every(session => session.state === "closed")).toBe(true)
+          expect(await readLeaseReceipt(completed.source.path)).toMatchObject({ status: "sessions_closed", slotId: lease.slot.id,
+            leaseToken: lease.token, storageDeletionAllowed: false, nextAdmissionAllowed: false })
+          const closed = await admin.inspectSessionInventory()
+          expect(closed.sessions.some(row => row.name.startsWith(credentials.username + ":"))).toBe(false)
+          expect((await Bun.file(agents).json()).state).toBe("paused")
+          expect(run.sessionId).toBeDefined()
+          expect(await archivedSession(completed.archived.archive, run.sessionId!)).toBe(true)
+          expect((await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)).source).toEqual(completed.source)
+          await writeLeaseReceipt(path.join(evidence, "attempt-finalization.json"), { inputs, completed, after: closed })
+          await sealAgentProcessInventory(agentEvidence)
+          expect(await readServerIdentity(file)).toEqual(pair.identity)
+          expect(await Promise.all(sources.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
+            .toEqual(sources.map(source => source.sha256))
+          return
+        }
         if (!browser) {
           expect(run.tools).toEqual([])
           expect(run.processCleanup.browserBindings).toEqual([])
@@ -235,13 +265,15 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
       provider.server.stop(true)
       await cp(file.controller.stateDir, path.join(evidence, "controller"), { recursive: true, filter: source =>
         !source.endsWith(".secret.json") && !path.relative(file.controller.stateDir, source).split(path.sep).includes("profile") })
-      await writeLeaseReceipt(path.join(evidence, "settlement.json"), { settlement, identity: pair.identity, resources: pair.resources, root, historyDir: history,
+      const historyArchived = await profileHistory(lease.slot.profileDir).then(files => files.length === 0, () => false)
+      await writeLeaseReceipt(path.join(evidence, "settlement.json"), { settlement, historyArchived, identity: pair.identity, resources: pair.resources, root, historyDir: history,
         liveQualified: false, normalRelease: false, deletionAllowed: false })
       await Promise.all([...environment.slots.map(slot => slot.close()), environment.server.close()])
-      if (settlement.cli && settlement.admin) {
+      if (settlement.cli && settlement.admin && historyArchived) {
         await destroyPair(file, options)
         await rm(root, { recursive: true })
       }
+      if (!historyArchived) console.error(`native agent history retained: ${root}`)
     }
   }, 180_000,
 )
