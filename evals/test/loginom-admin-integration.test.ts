@@ -541,6 +541,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
       await lease.close()
       await expect(connection.createBlockedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.configureOwnedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
+      await expect(connection.activateOwnedUser(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.reconcileOwnedAcl(lease, path.join(root, "never-read.json"))).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.observeOwnedSession(lease, path.join(root, "never-read.json"), [])).rejects.toThrow("LEASE_NOT_HELD")
       await expect(connection.closeOwnedSession(lease, path.join(root, "never-read.json"), "never-read")).rejects.toThrow("LEASE_NOT_HELD")
@@ -560,6 +561,7 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
         const secretFile = path.join(recoveryRoot, "never-read.json")
         await expect(connection.createBlockedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.configureOwnedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
+        await expect(connection.activateOwnedUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.reconcileOwnedAcl(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.reconcileUser(recovered, secretFile)).rejects.toThrow("SLOT_RECOVERY_ONLY")
         await expect(connection.observeOwnedSession(recovered, secretFile, [])).rejects.toThrow("SLOT_RECOVERY_ONLY")
@@ -863,6 +865,76 @@ liveIntegration("unused preparation: staged credentials without an account or ro
     await destroyPair(file, options)
     await rm(root, { recursive: true, force: true })
   } finally { await Promise.all([environment.server.close(), lease.close()]) }
+}, 120_000)
+
+liveIntegration("parent activation requires prepared storage and retains generation on repeat", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-parent-activate-")), fixture = await parallelFixture(root)
+  const name = `evals-activate-${crypto.randomUUID().slice(0, 8)}`
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${listener.port}/app/`
+  listener.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: globalLockRoot }
+  const pair = await createPair(file, options)
+  const journal = path.join(file.controller.stateDir, "activate-command.json"), inventory = path.join(file.controller.stateDir, "processes-admin.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "parent-activate", identity: pair.identity,
+    slotIds: [file.slots[0]!.id], phase: "unactivated", processInventory: inventory })
+  await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "parent-activate", journal, identity: pair.identity, connections: [] })
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const { prepareUserStorage } = await import("../src/parallel-pair")
+  const { readUserActivation, readUserConfiguration, readUserOwnership } = await import("../src/user-environment")
+  const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
+  const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-parent-activation-${crypto.randomUUID()}`)
+  await mkdir(evidence, { mode: 0o700 })
+  const settled = { admin: false }
+  try {
+    const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
+    const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: inventory })
+    try {
+      await expect(admin.activateOwnedUser(lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_UNCONFIRMED")
+      await admin.createBlockedUser(lease, prepared.secretFile)
+      await expect(admin.activateOwnedUser(lease, prepared.secretFile)).rejects.toThrow("USER_CONFIGURATION_UNCONFIRMED")
+      await admin.reconcileUser(lease, prepared.secretFile)
+      const configuration = await readUserConfiguration(file, lease, prepared.secretFile)
+      await expect(admin.activateOwnedUser(lease, prepared.secretFile)).rejects.toThrow("USER_STORAGE_OWNERSHIP")
+      expect(await readUserActivation(file, lease, prepared.secretFile)).toBeUndefined()
+      const storage = await prepareUserStorage(file, lease, prepared.secretFile, environment.server)
+      await Bun.$`docker exec ${pair.identity.containerId} sh -c ${'printf hold > /workdir/UserStorage/eval-a/activation-control'}`.quiet()
+      await expect(admin.activateOwnedUser(lease, prepared.secretFile)).rejects.toThrow("USER_STORAGE_OWNERSHIP")
+      expect(await readUserActivation(file, lease, prepared.secretFile)).toBeUndefined()
+      await Bun.$`docker exec ${pair.identity.containerId} rm /workdir/UserStorage/eval-a/activation-control`.quiet()
+      const first = await admin.activateOwnedUser(lease, prepared.secretFile)
+      expect(first).toMatchObject({ activated: true, userKey: (await readUserOwnership(file, lease, prepared.secretFile)).userKey })
+      const activation = await readUserActivation(file, lease, prepared.secretFile)
+      expect(activation).toMatchObject({ kind: "user-activation-intent", preparationNonce: prepared.nonce })
+      const second = await admin.activateOwnedUser(lease, prepared.secretFile)
+      expect(second).toMatchObject({ activated: false, userKey: first.userKey })
+      expect(await readUserActivation(file, lease, prepared.secretFile)).toEqual(activation)
+      expect(await readUserConfiguration(file, lease, prepared.secretFile)).toEqual(configuration)
+      const command = await readLeaseReceipt(journal) as Record<string, unknown>
+      expect(command.phase).toBe("unactivated")
+      await writeLeaseReceipt(path.join(evidence, "activation.json"), { identity: pair.identity, prepared, configuration, storage, activation,
+        first, second, ownership: await readUserOwnership(file, lease, prepared.secretFile),
+        receipt: await readLeaseReceipt(path.join(file.controller.stateDir, "activate-a.receipt.json")),
+        published: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
+        commands: await Promise.all([first, second].map(async result => ({ source: result.source, value: await readLeaseReceipt(result.source.path) }))),
+        adminCommands: await Promise.all((await readdir(path.dirname(first.source.path))).map(async name => ({ name,
+          value: await readLeaseReceipt(path.join(path.dirname(first.source.path), name)) }))) })
+    } finally {
+      await admin.dispose()
+      const entries = await readLeaseReceipt(inventory) as { connections: { directory: string }[] }
+      const finalization = await readAdminFinalization(file, pair.identity, entries.connections[0]!.directory, process.pid)
+      const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
+      await writeLeaseReceipt(path.join(evidence, "admin.json"), { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) })
+      settled.admin = true
+    }
+  } finally {
+    await Promise.all([environment.server.close(), lease.close()])
+    if (settled.admin) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+    else console.error(`native activation fixture retained: ${root}`)
+  }
 }, 120_000)
 
 liveIntegration("parent preparation: blocked account, configuration, ACL and physical root compose without password rotation", async () => {

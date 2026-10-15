@@ -26,10 +26,10 @@ import { constants } from "node:fs"
 import { lstat, mkdir, mkdtemp, open, readdir, realpath } from "node:fs/promises"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
-import { readServerIdentity, reserveUserStorage, verifyParallelPair } from "./parallel-pair"
+import { inspectUserStorage, readServerIdentity, reserveUserStorage, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
-import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration } from "./user-environment"
+import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
@@ -56,6 +56,7 @@ export type AdminConnection = {
   observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
   closeManagementSession(lease: SlotLease, secretFile: string, id: string): Promise<void>
+  activateOwnedUser(lease: SlotLease, secretFile: string): Promise<{ activated: boolean; userKey: string; source: { path: string; id: string; sha256: string } }>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
@@ -361,6 +362,54 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       await lease.assertHeld()
       return { userKey: owned.userKey, aclHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(normalizedPolicy(policy))).digest("hex"), policy,
         source: { path: commandFile, id: reply.id, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") } }
+    },
+    async activateOwnedUser(lease, secretFile) {
+      await lease.assertHeld()
+      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
+      const sources = async () => {
+        const prepared = await readUserPreparation(file, lease, secretFile), owned = await readUserOwnership(file, lease, secretFile)
+        const configured = await readUserConfiguration(file, lease, secretFile)
+        if (!configured) throw new EvalFailure("USER_CONFIGURATION_UNCONFIRMED", 2)
+        const published = await readLeaseReceipt(path.join(file.controller.stateDir, `storage-${lease.slot.id}.json`)).catch(() => null)
+        if (!jsonObject(published) || published.kind !== "owned-user-storage" || published.state !== "published" ||
+          published.preparationNonce !== prepared.nonce || published.userKey !== owned.userKey || published.ownerSource !== owned.source.sha256 ||
+          published.slotId !== lease.slot.id || published.username !== owned.username || JSON.stringify(published.identity) !== JSON.stringify(identity))
+          throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+        const storage = await inspectUserStorage(file, identity, lease.slot, prepared.nonce)
+        if (published.root !== storage.root || storage.entries.length || ["device", "inode", "uid", "gid"].some(key => published[key] !== storage[key as keyof typeof storage]))
+          throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+        return { prepared, owned, configured, published, storage }
+      }
+      const before = await sources()
+      const policy = (await connection.inspectPolicy()).sharedDirectories
+      if (policy.some(directory => directory.permissions.length)) throw new EvalFailure("ADMIN_USER_POLICY_CHANGED", 2)
+      const activation = await stageUserActivation(file, lease, secretFile)
+      const expected = { ...before, owned: { ...before.owned, everActivated: true } }
+      const payload = { phase: "activate", slot: lease.slot, secretFile, preparationNonce: before.prepared.nonce,
+        desiredHash: before.prepared.desiredHash, secretHash: before.prepared.secretHash, owned: { objectId: before.owned.objectId,
+          name: before.owned.username, userKind: before.owned.userKind, preparationNonce: before.prepared.nonce, secretHash: before.configured.secretHash }, expectedPolicy: policy }
+      const reply = await request("reconcile-user", payload, async () => {
+        if (JSON.stringify(await sources()) !== JSON.stringify(expected) ||
+          JSON.stringify(await readUserActivation(file, lease, secretFile)) !== JSON.stringify(activation))
+          throw new EvalFailure("USER_ACTIVATION_CONFLICT", 2)
+      })
+      const data = requireAdminReply(reply)
+      if (!jsonObject(data) || Object.keys(data).length !== 2 || typeof data.activated !== "boolean" || !jsonObject(data.user) ||
+        Object.keys(data.user).length !== 4 || data.user.objectId !== before.owned.objectId || data.user.name !== before.owned.username ||
+        data.user.userKind !== 0 || data.user.blocked !== false) throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+      const commandFile = path.join(directory, "commands", `${reply.id}.json`), command = await readLeaseReceipt(commandFile)
+      if (!jsonObject(command) || command.id !== reply.id || command.op !== "reconcile-user" || command.state !== "confirmed" ||
+        JSON.stringify(command.expectedIdentity) !== JSON.stringify(identity) ||
+        command.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(payload)).digest("hex") ||
+        command.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex")) throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+      await lease.assertHeld()
+      const source = { path: commandFile, id: reply.id, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") }
+      const receipt = { version: 2, kind: "owned-user-activation", identity, slotId: lease.slot.id, preparationNonce: before.prepared.nonce,
+        activationNonce: activation.nonce, userKey: before.owned.userKey, objectId: before.owned.objectId, source, observation: { payload, reply } }
+      const target = path.join(file.controller.stateDir, `activate-${lease.slot.id}.receipt.json`)
+      await writeLeaseReceipt(target, receipt)
+      if (JSON.stringify(await readLeaseReceipt(target)) !== JSON.stringify(receipt)) throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+      return { activated: data.activated, userKey: before.owned.userKey, source }
     },
     async observeOwnedSession(lease, secretFile, policy) {
       await lease.assertHeld()
