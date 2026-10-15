@@ -854,3 +854,33 @@ Final adjacent regression:2 native PASS/215 (93.43s),60 admin/user/slots PASS/26
 проверены вместе. Три superseded own green logs удалены; private600 audit
 `native-user-5135776a-763c-45a0-a4c9-fb5330826961/superseded-logs-cleanup.json`
 сохраняет их SHA и replacement log. Старые retained incidents не менялись.
+
+### Unactivated user observation
+
+`AdminConnection.inspectUnactivatedUser(lease, secretFile)` — read-only input для
+будущей standalone finalization. До secret read требуется held slot + exact server
+fence; protected preparation/ownership и отсутствие любого activation marker
+перечитываются перед serialized inspect и после него. Fresh pair/epoch и native
+admin role обязательны. Допускается account absence без ownership claim либо
+exact native Name/UserKind0/objectId с Blocked=true по protected creation claim.
+Foreign/missing/drifted claimed account и возможные matching user-session names
+дают отказ. Generic `inspect()` сохраняет SESSION_IDENTITY_UNSUPPORTED: этот
+метод не квалифицирует ownership произвольной серверной сессии.
+
+Private observation связывает slot/token/preparation nonce/ownership source,
+полный whitelisted native inspect reply и private confirmed command (version,
+kind, ID, op, expected identity, desiredHash/replyHash/semantic source SHA). Return
+содержит только account summary и source path/SHA. Команда не изменяет users,
+не открывает evaluated-user session и не выдаёт readiness/delete/release rights.
+Reader, local-writer/archive/admin-finalization и terminal cleanup binding ещё open.
+
+Native RED missing method→GREEN: account absent до creation и exact owned blocked
+после повторной preparation; server fence refusal до secret/inspect, foreign
+bootstrap account refusal, invalid activation canary refusal без нового RPC.
+Canary не dispatches activation и удаляется самим тестом до native preparation.
+Reply/command/receipt SHA проверены independently; native3 PASS/69 (59.24s),
+unit60 PASS/260, typecheck/diff PASS. Private600 evidence:
+`research/evidence/native-parent-061bb77b-fc50-4dff-a0f5-acb5e4da571b/blocked-preparation.json`,
+SHA256 `3b57d1ebbb10111a592e0d430ada84cd2ba4ac168bfe5735fa4e354532e3c638`.
+Admin transport/process completion confirmed; exact pair independently absent.
+Existing native parent test всё ещё использует явно test-only unactivated release.

@@ -32,11 +32,15 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
     const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
     const connection = await openLoginomAdmin(file, identity)
     try {
+      await expect(connection.inspectUnactivatedUser(lease, "/unreadable-secret"))
+        .rejects.toThrow("SERVER_FENCE_UNCONFIRMED")
       await expect(connection.createBlockedUser(lease, prepared.secretFile)).rejects.toThrow("PAIR_OWNERSHIP")
       await writeLeaseReceipt(path.join(file.controller.stateDir, "pair.json"), await readLeaseReceipt(path.join(source.controller.stateDir, "pair.json")) as object)
       await expect(connection.createBlockedUser(lease, prepared.secretFile)).rejects.toThrow("SERVER_FENCE_UNCONFIRMED")
       const directory = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
       const commands = path.join(file.controller.stateDir, directory, "commands")
+      expect((await Promise.all((await readdir(commands)).map(name => Bun.file(path.join(commands, name)).json())))
+        .some(command => command.op === "inspect")).toBe(false)
       expect((await Promise.all((await readdir(commands)).map(name => Bun.file(path.join(commands, name)).json())))
         .some(command => command.op === "reconcile-user")).toBe(false)
     } finally { await connection.dispose() }
@@ -45,6 +49,7 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
     try {
       const fenced = await openLoginomAdmin(file, identity, { serverLease })
       try {
+        await expect(fenced.inspectUnactivatedUser(lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
         await expect(fenced.reconcileUser(lease, prepared.secretFile)).rejects.toThrow("ADMIN_USER_OWNERSHIP_CONFLICT")
         expect(await Bun.file(path.join(file.controller.stateDir, "user-a.json")).exists()).toBe(false)
       } finally { await fenced.dispose() }
@@ -702,10 +707,31 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot)
   const lease = environment.slots[0]!
   let verified = false
+  const observations: unknown[] = []
   try {
     const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
     const connection = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server })
     try {
+      const inspect = () => (async () => {
+        const value = await connection.inspectUnactivatedUser(lease, prepared.secretFile)
+        const receipt = await readLeaseReceipt(value.source.path) as { command: { path: string; sha256: string }; observation: unknown }
+        const command = await readLeaseReceipt(receipt.command.path) as { replyHash: string; op: string; state: string }
+        expect(value.source.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex"))
+        expect(receipt.command.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex"))
+        expect(command).toMatchObject({ op: "inspect", state: "confirmed" })
+        expect(command.replyHash).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt.observation)).digest("hex"))
+        return { ...value, receipt, command }
+      })().then(value => ({ value }), error => ({ error: error instanceof Error ? error.message : String(error) }))
+      observations.push(await inspect())
+      const admin = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
+      const commands = path.join(file.controller.stateDir, admin, "commands")
+      const before = await readdir(commands)
+      const activation = path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)
+      // An invalid marker must fence observation too; this canary never dispatches activation.
+      await writeLeaseReceipt(activation, { kind: "negative-activation-canary" })
+      try { observations.push(await inspect()) }
+      finally { await rm(activation) }
+      expect(await readdir(commands)).toEqual(before)
       const first = await connection.reconcileUser(lease, prepared.secretFile)
       const { readUserOwnership, readUserConfiguration } = await import("../src/user-environment")
       const firstConfiguration = await readUserConfiguration(file, lease, prepared.secretFile)
@@ -724,6 +750,7 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
       expect(credential).toEqual(prepared)
       expect(await readdir(lease.slot.profileDir)).toEqual(["data"])
       expect(await Bun.file(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)).exists()).toBe(false)
+      observations.push(await inspect())
       verified = true
     } finally { await connection.dispose() }
     // No evaluated-user login is admitted: native read-back requires Blocked=true throughout.
@@ -736,7 +763,7 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
     await mkdir(evidence, { mode: 0o700 })
     await writeLeaseReceipt(path.join(evidence, "blocked-preparation.json"), { version: 2, kind: "native-parent-blocked-preparation", identity: pair.identity,
       slotId: lease.slot.id, accountBlockedThroughout: true, repeatedWithoutPasswordRotation: true, physicalRoot: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
-      admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes }, liveQualified: false })
+      admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes }, observations, liveQualified: false })
     const cleanup = path.join(file.controller.stateDir, "unactivated-test-cleanup.json")
     await writeLeaseReceipt(cleanup, { version: 2, kind: "native-unactivated-test-finalization", status: "confirmed", slotId: lease.slot.id,
       leaseToken: lease.token, serverEpoch: pair.identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed", archive: "committed",
@@ -748,5 +775,12 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
     await environment.server.release(release)
     await destroyPair(file, options)
     await rm(root, { recursive: true, force: true })
+    expect(observations).toMatchObject([
+      { value: { identity: pair.identity, username: lease.slot.username, account: null, serverSessions: "absent",
+        receipt: { kind: "unactivated-user-observation", slotId: lease.slot.id, leaseToken: lease.token } } },
+      { error: "USER_IDLE_UNCONFIRMED" },
+      { value: { identity: pair.identity, username: lease.slot.username, account: { name: lease.slot.username, blocked: true }, serverSessions: "absent",
+        receipt: { kind: "unactivated-user-observation", slotId: lease.slot.id, leaseToken: lease.token } } },
+    ])
   } finally { await Promise.all([environment.server.close(), lease.close()]) }
 }, 120_000)
