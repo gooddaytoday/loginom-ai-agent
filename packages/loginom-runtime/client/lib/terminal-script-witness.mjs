@@ -121,9 +121,11 @@ export function collectTerminalScriptWitness(expected){
  if(hold(mapTree,'FServerConnection')!==connection||applicationSession!==own(acquisition,'session')
    ||hold(applicationSession,'$S')!==transport||hold(connection,'FUsername')!==account||hold(storage,'$S')!==transport
    ||hold(storage,'QueryInterface')!==originalQuery)throw Error('TERMINAL_PROVIDER_NATIVE_REFS');
+ const storageReaders=Object.freeze(Object.fromEntries([['get_Connected','connected'],['get_CurrentDirectory','currentDirectory'],['get_IsOwnCurrentDirectory','ownDirectory'],['get_RootPath','rootPath']].map(([key,binding])=>{const method=hold(storage,key);if(typeof method!=='function'||method!==own(bindings,binding))throw Error('TERMINAL_PROVIDER_STORAGE_METHOD');return [key,method]})));
+ const storageIdentity=hold(storage,'$');for(const key of ['$OW','$O']){const value=hold(storageIdentity,key);if(!Number.isInteger(value)||value<0)throw Error('TERMINAL_PROVIDER_STORAGE_IDENTITY')}
  const messages=hold(transport,'$M');hold(messages,'GetDynamicData');hold(transport,'$R');hold(transport,'DispatchMessageAsync');
  const nativeSS=own(bindings,'ss');hold(nativeSS,'TaskCompletionSource');hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
- let armed,creationState;
+ let armed,creationState;const storageStates=[];
  function patchCheck(p){if(parent(p.object)!==p.prototype||!descriptorEqual(descriptor(p.object,p.key),p.active?p.temporary:p.original))throw Error('TERMINAL_PROVIDER_PATCH_CHANGED')}
  function suspendNative(check){
   const selected=providerPatches.filter(p=>p.active&&p.object===transport);
@@ -146,13 +148,13 @@ export function collectTerminalScriptWitness(expected){
  }
  function restore(){providerPatches.forEach(patchCheck);for(const p of providerPatches.slice().reverse())if(p.active){
   if(p.original)Object.defineProperty(p.object,p.key,p.original);else delete p.object[p.key];p.active=false;
- }providerPatches.forEach(patchCheck)}
- function startLower(proxy,type,rejectWork){
+ }providerPatches.forEach(patchCheck);providerPatches.length=0}
+ function startLower(proxy,type,rejectWork,readMethod){
   const r={proxy,type,transport,observed:false,completed:false,restored:false};let invoking=false;
   const first=value=>{r.primary??={value};return r.primary.value};
   const stop=value=>{r.stopped=true;providerFailure??={value};rejectWork(r.primary?r.primary.value:providerFailure.value)};
   try{
-   r.resolverPatch=patch(transport,'$R',original=>function(w,o,type){
+   if(!readMethod)r.resolverPatch=patch(transport,'$R',original=>function(w,o,type){
     if(!r.completing)return apply(original,this,arguments);
     guard();if(this!==transport||w!==r.w||o!==r.o||!Number.isInteger(type)||type<0)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
     r.returnedType=type;
@@ -169,7 +171,14 @@ export function collectTerminalScriptWitness(expected){
      if(this!==task||!r.observed||r.delivered)throw Error('TERMINAL_PROVIDER_QUERY_READER_REPLAY');
      r.delivered=true;if(r.primary)throw r.primary.value;guard();r.response=r.outcome;
      hold(r.response,'set_StaticDataSize');
-     patch(r.response,'ReadParameterInt32',read=>function(offset){
+     if(readMethod){
+      const key=['get_Connected','get_IsOwnCurrentDirectory'].includes(readMethod)?'ReadParameterBoolean':'ReadString';
+      patch(r.response,key,read=>function(){
+       guard();if(this!==r.response||r.valueRead)throw Error('TERMINAL_PROVIDER_STORAGE_READER_REPLAY');
+       r.valueRead=true;try{r.value=apply(read,this,arguments)}catch(value){throw first(value)}
+       guard();r.completed=true;return r.value;
+      });
+     }else patch(r.response,'ReadParameterInt32',read=>function(offset){
       guard();if(this!==r.response||![0,4,8].includes(offset))throw Error('TERMINAL_PROVIDER_QUERY_RESPONSE');
       const value=apply(read,this,arguments);guard();if(offset===0)r.w=value;else if(offset===4)r.o=value;else r.hresult=value;return value;
      });
@@ -178,6 +187,7 @@ export function collectTerminalScriptWitness(expected){
     });
     r.continuationPatch=patch(task,'continueWith',continuation=>function(callback){
      if(this!==task||r.originalContinuation)throw Error('TERMINAL_PROVIDER_QUERY_REPLAY');r.originalContinuation=callback;
+     const callbackPrototype=parent(callback);providerChecks.push(()=>{if(parent(callback)!==callbackPrototype)throw Error('TERMINAL_PROVIDER_CONTINUATION_CHANGED')});
      return apply(continuation,this,[function(){
       if(r.observed){r.replayed=true;stop(Error('TERMINAL_PROVIDER_QUERY_CONTINUATION_REPLAY'));return}
       // Qualify the original reader before reading it; unrelated post-await
@@ -190,7 +200,7 @@ export function collectTerminalScriptWitness(expected){
      }]);
     });return task;
    });
-   guard();invoking=true;try{r.task=apply(originalQuery,proxy,[type])}finally{invoking=false}
+   guard();invoking=true;try{r.task=readMethod?apply(storageReaders[readMethod],storage,[]):apply(originalQuery,proxy,[type])}finally{invoking=false}
    if(!r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_DISPATCH_UNAVAILABLE');
    return r;
   }catch(value){first(value);try{restore();r.restored=true}catch{}throw r.primary.value}
@@ -259,6 +269,33 @@ export function collectTerminalScriptWitness(expected){
      ||packet.completion!==creationState.completion||own(packet.completion,'packageProxy')!==packet.proxy)throw Error('TERMINAL_PROVIDER_CREATION_CHANGED');
    return true},
   queryPacket(packet){if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');provider.checkPacket(packet);return armed.binding.query()},
+  readStoragePacket(packet,method){
+   if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');
+   const names=['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'],index=names.indexOf(method);
+   if(index<0)throw Error('TERMINAL_PROVIDER_STORAGE_METHOD');
+   if(packet!==creationState?.packet)throw Error('TERMINAL_PROVIDER_PACKET_FOREIGN');
+   const prior=storageStates[index];if(prior){if(!prior.failed)provider.checkPacket(packet);return prior.work}
+   provider.checkPacket(packet);
+   // The original query must already be settled; no implicit query/reacquire.
+   const query=armed.binding.inspect();if(!query.lower?.completed||!query.support)throw Error('TERMINAL_PROVIDER_STORAGE_QUERY_REQUIRED');
+   if(index!==storageStates.length||index&&storageStates[index-1].settled!==true)throw Error('TERMINAL_PROVIDER_STORAGE_ORDER');
+   let resolve,reject;const state={work:new Promise((yes,no)=>{resolve=yes;reject=no})};storageStates.push(state);
+   const rejectFirst=value=>{state.failed??={value};reject(state.failed.value)};
+   try{
+    const lower=startLower(storage,undefined,rejectFirst,method);state.lower=lower;
+    const task=lower.task,continuation=hold(task,'continueWith'),begin=providerChecks.length,reader=hold(task,'getAwaitedResult'),checks=providerChecks.slice(begin);let completed=false;
+    apply(continuation,task,[()=>{if(completed)return;completed=true;
+     try{for(const fn of checks)fn();const value=apply(reader,task,[]);restore();lower.restored=true;
+      if(!lower.completed||value!==lower.value)throw Error('TERMINAL_PROVIDER_STORAGE_COMPLETION');
+      provider.checkPacket(packet);
+      if(method==='get_Connected'&&value!==true)throw Error('TERMINAL_INTERFACE_DISCONNECTED');
+      if(method==='get_IsOwnCurrentDirectory'&&value!==true)throw Error('TERMINAL_INTERFACE_NON_PERSONAL');
+      if(['get_CurrentDirectory','get_RootPath'].includes(method)&&(typeof value!=='string'||!value))throw Error('TERMINAL_INTERFACE_ROOT_UNKNOWN');
+      state.value=value;state.settled=true;resolve(value);
+     }catch(error){const first=lower.primary?lower.primary.value:error;try{restore();lower.restored=true}catch{}providerFailure??={value:first};rejectFirst(first)}
+    }]);
+   }catch(error){providerFailure??={value:error};rejectFirst(error)}return state.work;
+  },
   arm(request){
    if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();
    if(armed){if(armed.request!==request)throw Error('TERMINAL_PROVIDER_REPLAY');armed.check();return armed.binding}
@@ -310,7 +347,7 @@ export function collectTerminalScriptWitness(expected){
    const initial=Object.freeze({request,document:doc,documentId:preparationId,account,preparation,receipts,
     currentUser:own(sample,'user'),userTask:own(sample,'task'),acquisition,acquisitionTask:own(acquisition,'task'),
     acquisitionReceiver:own(acquisition,'receiver'),connection,applicationSession,storage,transport,
-    definitions:originalDefs,bindings,query:originalQuery,streamType,controlLocation:'host'});
+    definitions:originalDefs,bindings,storageReaders,query:originalQuery,streamType,controlLocation:'host'});
    for(const key of Reflect.ownKeys(initial))hold(initial,key);
    armed={...entry,initial,check,binding};return binding;
   },

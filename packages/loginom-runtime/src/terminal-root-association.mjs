@@ -431,6 +431,35 @@ export async function bindTerminalScriptWitness(owner){
     return Object.freeze({...result,originalManagedControlRetained:true,parentSignalSameReference:false});
    }catch(error){componentFailed=true;throw load.reject(error)}})();return componentWork;
   }
+  let storageWork,storageFailed=false;
+  function continueStorage(bridge){
+   const checkControl=()=>{
+    prepareCall?.guard();load.guard();check();
+    if(bridge!==prepareBridge||terminalManagedCallForBridge(bridge)!==prepareCall||!prepareControl)fail();
+    const now=prepareCall.inspect();
+    if(!prepareControl.sdkTask||prepareControl.phase!=='dispatched'||['controller','signal','handleTask','sdkTask'].some(k=>now[k]!==prepareControl[k]))fail();
+    if(typeof creationCheck!=='function')throw Error('LOGINOM_ORIGINAL_COMPONENT_CREATION_UNAVAILABLE');creationCheck();
+   };
+   if(storageWork){if(!storageFailed)checkControl();return storageWork}
+   checkControl();
+   storageWork=(async()=>{try{
+    await continueComponent(bridge);checkControl();
+    const module=await load.observed(import('../client/lib/terminal-original-interfaces.mjs'));checkControl();
+    const values={};
+    for(const method of ['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath']){
+     checkControl();const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.readTerminalRealmStorage,method]);
+     const result=await load.observed(task);checkControl();snapshot(result)();
+     if(loadData(result,'method')!==method||loadData(result,'readonlyStepVerified')!==true||['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'].some(k=>loadData(result,k)!==false))fail();
+     const value=loadData(result,'value');
+     if(['get_Connected','get_IsOwnCurrentDirectory'].includes(method)?value!==true:typeof value!=='string'||!value)fail();values[method]=value;
+    }
+    return Object.freeze({status:'PARTIAL',readonlyStorageVerified:true,interface_reply:'original_proxy_observed',connected:true,
+     isOwnCurrentDirectory:true,currentDirectory:values.get_CurrentDirectory,rootPath:values.get_RootPath,
+     componentReady:false,reason:'NATIVE_LEXICAL_QUALIFICATION_MISSING',sourceBytesVerified:false,originalManagedControlRetained:true,parentSignalSameReference:false,
+     sourceExecutionQualified:false,closureIdentityQualified:false,nativeReceiversQualified:false,
+     nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
+   }catch(error){storageFailed=true;throw load.reject(error)}})();return storageWork;
+  }
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
@@ -438,6 +467,7 @@ export async function bindTerminalScriptWitness(owner){
    recheck:originalHandle?()=>recheck():undefined,
    createWorkspace:originalHandle?createWorkspace:undefined,
    continueComponent:originalHandle?continueComponent:undefined,
+   continueStorage:originalHandle?continueStorage:undefined,
    retainPrepare:originalHandle&&Object.hasOwn(summary,'privatePrepareAvailable')&&loadData(summary,'privatePrepareAvailable')===true?retainPrepare:undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}

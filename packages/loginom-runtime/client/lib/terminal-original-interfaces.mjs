@@ -147,3 +147,16 @@ export async function continueTerminalRealmComponent(capsule){
   sourceExecutionQualified:false,closureIdentityQualified:false,nativeReceiversQualified:false,
   nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
 }
+
+// One fixed readonly step per original-handle call. The host checks its original
+// managed control on both sides of each await; no signal/controller DTO enters
+// the realm. The existing query is reused, and no writer/end authority is minted.
+export async function readTerminalRealmStorage(capsule,method){
+ const data=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('TERMINAL_INTERFACE_ACCESSOR');return d.value};
+ Reflect.apply(data(capsule,'checkOriginal'),capsule,[]);
+ const provider=data(capsule,'originalProvider'),packet=Reflect.apply(data(provider,'packet'),provider,[]),check=data(provider,'checkPacket');
+ Reflect.apply(check,provider,[packet]);
+ const value=await Reflect.apply(data(provider,'readStoragePacket'),provider,[packet,method]);
+ Reflect.apply(check,provider,[packet]);
+ return Object.freeze({method,value,readonlyStepVerified:true,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
+}

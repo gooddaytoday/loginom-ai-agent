@@ -12,13 +12,13 @@ async function control(fn,instrument=false){const realm=await setup(60000,'retai
  const s=scripts(),f=await fresh({realm,scriptContext:s});
  for(const kind of ['ObjectProxy','FileStorage','StreamPersist']){s.select(kind==='ObjectProxy'?'bg/js/rpc.js':'bg/js/bg.rtl.rpc.js');const ctor=f.constructors[kind];f.ss.initClass(ctor,f.asm,ctor.prototype)}
  f.receiver.FUsername='test-account';f.c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection=f.receiver;
- const probe={tasks:[],readers:0,resolvers:0,continuations:0,releases:0};
+ const probe={tasks:[],requests:[],readers:0,resolvers:0,continuations:0,releases:0};
  if(instrument){
   const transport=realm.native.session,dispatch=transport.DispatchMessageAsync,resolver=transport.$R;
   transport.$R=function(){probe.resolvers++;return Reflect.apply(resolver,this,arguments)};
   transport.DispatchMessageAsync=function(request){
    const task=Reflect.apply(dispatch,this,arguments),reader=task.getAwaitedResult,continuation=task.continueWith,deliver=task.deliver;
-   probe.tasks.push(task);task.getAwaitedResult=function(){probe.readers++;return Reflect.apply(reader,this,arguments)};
+   probe.tasks.push(task);probe.requests.push(request);task.getAwaitedResult=function(){probe.readers++;return Reflect.apply(reader,this,arguments)};
    task.continueWith=function(callback){probe.callback=callback;return Reflect.apply(continuation,this,[function(){probe.continuations++;return Reflect.apply(callback,this,arguments)}])};
    task.deliver=function(){Reflect.apply(deliver,this,arguments);if(probe.response)probe.response(Reflect.apply(reader,task,[]))};return task;
   };
@@ -167,7 +167,7 @@ for(const mode of ['accessor','copy','wrong-intent','late'])test('capsule fixed 
  assert.throws(()=>runInContext(entry+'(__capsule,__request)',x.f.c),/REQUEST|UNAVAILABLE|LATE/);assert.equal(x.f.c.getterCalls,0);assert.equal(x.realm.native.calls.length,0);
 }));
 
-async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invokeSdk=false}={}){return control(async x=>{
+async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invokeSdk=false,instrument=false}={}){return control(async x=>{
  x.f.c.__capsule=x.capsule;
  if(pageFailure){x.realm.page.page.evaluate=async()=>{pageFailure(x);throw pageFailure.value}}
  const host=await joined({pageOverride:x.realm.page.page,account:'test-account',sessionId:'own-session',originalSdk,
@@ -178,7 +178,7 @@ async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invok
  await host.witness.retainPrepare(request,host.f.bridge);
  const options={loginomUrl:'http://loginom.example/app?testable=true',compatibility:{profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'},platform:'darwin',sessionId:'own-session',operationId:'original',timeoutMs:1};
  await fn({...x,host,options});
-})}
+},instrument)}
 test('creation continuation original armed request drives fixed workspace reserve/effect/verify and same query once',()=>creationControl(async x=>{
  assert.equal(x.realm.preparation.receipts.size,0);assert.equal(x.realm.native.calls.length,0);
  const work=x.host.witness.createWorkspace(x.options,x.host.f.bridge);assert.equal(x.host.witness.createWorkspace(x.options,x.host.f.bridge),work);
@@ -279,4 +279,90 @@ test('packet continuation waits original pending creation while SDK task remains
  const work=x.host.witness.continueComponent(x.host.f.bridge);assert.equal(x.host.witness.continueComponent(x.host.f.bridge),work);
  assert.equal((await work).packetQueryContinuationVerified,true);assert.equal((await creation).status,'READY');
  assert.equal(x.host.c.token.inspect().sdkTask,original);assert.equal(x.realm.page.events.filter(e=>e==='create_draft').length,1);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true,invokeSdk:true}));
+
+
+test('storage continuation fixed reads reuse original query and same packet/control, no writer authority',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+ const initial=x.provider.packet().initial;assert(Object.isFrozen(initial.storageReaders));
+ const work=x.host.witness.continueStorage(x.host.f.bridge);assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);
+ const result=await work;assert.equal(result.readonlyStorageVerified,true);assert.equal(result.status,'PARTIAL');assert.equal(result.componentReady,false);
+ assert.equal(result.connected,true);assert.equal(result.isOwnCurrentDirectory,true);assert.equal(typeof result.currentDirectory,'string');assert.equal(typeof result.rootPath,'string');
+ for(const key of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority','nativeReceiversQualified','sourceExecutionQualified','closureIdentityQualified'])assert.equal(result[key],false);
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);
+ assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);
+},{originalSdk:true,invokeSdk:true}));
+
+for(const [label,configure,expected,calls] of [
+ ['disconnected',n=>n.connected(false),/DISCONNECTED/,[0,907]],
+ ['nonpersonal',n=>n.own(false),/NON_PERSONAL/,[0,907,909,910]],
+ ['unknown root',n=>n.root(''),/ROOT_UNKNOWN/,[0,907,909,910,911]],
+])test('storage continuation '+label+' refuses without later native calls',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);configure(x.realm.native);
+ const work=x.host.witness.continueStorage(x.host.f.bridge);await assert.rejects(work,expected);assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);
+ assert.deepEqual(x.realm.native.calls,calls);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true}));
+for(const method of ['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'])test('storage continuation original '+method+' accessor refuses getter0 before dispatch',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);let gets=0;
+ Object.defineProperty(x.realm.native.storage,method,{get(){gets++;throw Error('foreign')},configurable:true});
+ await assert.rejects(x.host.witness.continueStorage(x.host.f.bridge));assert.equal(gets,0);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true,invokeSdk:true}));
+// Each pending control starts the actual fixed 909 read, then changes an
+// original operand before delivering the original dispatch task. No timer/poll.
+for(const drift of ['reader','continuation','request release','response reader','transport','factory','Map reader','storage identity'])test('storage continuation pending '+drift+' refuses getter0 no 910/911 or reader replay',()=>{
+ let held,gets=0;const ready=new Promise(resolve=>held=resolve);
+ return creationControl(async x=>{
+  await x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+  const work=x.host.witness.continueStorage(x.host.f.bridge);work.catch(()=>{});await ready;
+  const task=x.probe.tasks.at(-1);const accessor=(object,key)=>Object.defineProperty(object,key,{get(){gets++;throw Error('foreign')},configurable:true});
+  if(drift==='reader')accessor(task,'getAwaitedResult');
+  if(drift==='continuation')accessor(task,'continueWith');
+  if(drift==='transport')accessor(x.realm.native.session,'DispatchMessageAsync');
+  if(drift==='factory')accessor(x.f.ss,'TaskCompletionSource');
+  if(drift==='Map reader')accessor(x.realm.preparation.receipts,'get');
+  if(drift==='storage identity')accessor(x.realm.native.storage.$,'$O');
+  if(drift==='request release')accessor(x.probe.requests.at(-1),'Release');
+  if(drift==='response reader')x.probe.response=response=>accessor(response,'ReadString');
+  const before=x.probe.readers;await x.realm.native.drain();await assert.rejects(work);
+  assert.equal(gets,0);assert.deepEqual(x.realm.native.calls,[0,907,909]);assert.equal(x.realm.native.writes(),0);
+  assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);
+  if(drift==='reader')assert.equal(x.probe.readers,before);
+ },{originalSdk:true,invokeSdk:true,instrument:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_CurrentDirectory'){x.realm.native.hold();queueMicrotask(held)}}});
+});
+for(const reason of [false,0,null,undefined,'',Error('first storage',{cause:0})])test('storage continuation raw '+String(reason)+' wins secondary realm drift without next dispatch',()=>{
+ let held;const ready=new Promise(resolve=>held=resolve);
+ return creationControl(async x=>{
+  await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const work=x.host.witness.continueStorage(x.host.f.bridge);work.catch(()=>{});await ready;
+  x.realm.native.fail(reason);x.f.c.__loginomStartupV1.document={};await x.realm.native.drain();let caught=false;
+  try{await work}catch(value){caught=true;assert.equal(value,reason)}assert(caught);
+  assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0,907,909]);assert.equal(x.realm.native.writes(),0);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_CurrentDirectory'){x.realm.native.hold();queueMicrotask(held)}}});
+});
+for(const mode of ['abort','controller'])test('storage continuation post-read '+mode+' stops before next handle/native dispatch getter0',()=>{
+ let host,gets=0;return creationControl(async x=>{
+  host=x.host;await host.witness.createWorkspace(x.options,host.f.bridge);
+  const work=host.witness.continueStorage(host.f.bridge);let caught=false;
+  try{await work}catch(value){caught=true;if(mode==='abort')assert.equal(value,false)}assert(caught);assert.equal(gets,0);
+  assert.deepEqual(x.realm.native.calls,[0,907]);assert.equal(x.realm.native.writes(),0);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_Connected'){
+  return (async()=>{x.f.c.__creationPhase=method;const value=await runInContext('('+fn.toString()+')(__capsule,__creationPhase)',x.f.c);
+   if(mode==='abort')host.f.state.controller.abort(false);else Object.defineProperty(host.f.state,'controller',{get(){gets++;throw Error('foreign controller')},configurable:true});return value;})();
+ }}});
+});
+
+test('storage continuation exact original lower readers/callbacks once and owned overlays restored',()=>creationControl(async x=>{
+ const transport=x.realm.native.session,dispatch=Object.getOwnPropertyDescriptor(transport,'DispatchMessageAsync'),resolver=Object.getOwnPropertyDescriptor(transport,'$R');
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);await x.host.witness.continueStorage(x.host.f.bridge);
+ assert.equal(x.probe.readers,5);assert.equal(x.probe.resolvers,1);assert.equal(x.probe.continuations,5);
+ assert.deepEqual(Object.getOwnPropertyDescriptor(transport,'DispatchMessageAsync'),dispatch);assert.deepEqual(Object.getOwnPropertyDescriptor(transport,'$R'),resolver);
+ const packet=x.provider.packet();const work=x.provider.readStoragePacket(packet,'get_RootPath');assert.equal(x.provider.readStoragePacket(packet,'get_RootPath'),work);await work;
+ assert.throws(()=>x.provider.readStoragePacket({...packet},'get_RootPath'),/FOREIGN/);
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);
+},{originalSdk:true,invokeSdk:true,instrument:true}));
+test('storage continuation direct realm rejects copied packet, order and arbitrary method before dispatch',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const packet=x.provider.packet();
+ assert.throws(()=>x.provider.readStoragePacket({...packet},'get_Connected'),/FOREIGN/);
+ assert.throws(()=>x.provider.readStoragePacket(packet,'get_RootPath'),/ORDER/);
+ assert.throws(()=>x.provider.readStoragePacket(packet,'SaveToStream'),/METHOD/);
+ assert.deepEqual(x.realm.native.calls,[0]);
 },{originalSdk:true,invokeSdk:true}));

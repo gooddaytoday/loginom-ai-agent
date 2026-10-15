@@ -89,7 +89,7 @@ async function joined({afterFirst,preparation,pageOverride,account='account',ses
   initialLoad:{records:pins.map(([url,integrity])=>({url,integrity,loaded:true})),definingExportsRetained:true,applicationSourcesJoined:true},
   rows:paths.map((p,i)=>{const url='https://app.loginom.ai/app/'+p;return{kind:kinds[i],url,integrity:pins.find(([u])=>u===url)[1],armedBeforeSource:true,initialExecutionObserved:true}})};
  if(preparation)summary.privatePrepareAvailable=true;
- let calls=0;const f=fixture({pageOverride,account,sessionId,originalSdk,handleEvaluate(fn,input){calls++;if(['continueTerminalCreationOnCapsule','inspectWorkspaceRealm','inspectTerminalRealmPacket','continueTerminalRealmComponent'].includes(fn.name)&&continuation)return continuation(fn,input);if(fn.name==='retainTerminalPrepareOnCapsule'&&preparation)return preparation(f,input);if(calls>1&&afterFirst)return afterFirst(f);return Promise.resolve(structuredClone(summary))}});
+ let calls=0;const f=fixture({pageOverride,account,sessionId,originalSdk,handleEvaluate(fn,input){calls++;if(['continueTerminalCreationOnCapsule','inspectWorkspaceRealm','inspectTerminalRealmPacket','continueTerminalRealmComponent','readTerminalRealmStorage'].includes(fn.name)&&continuation)return continuation(fn,input);if(fn.name==='retainTerminalPrepareOnCapsule'&&preparation)return preparation(f,input);if(calls>1&&afterFirst)return afterFirst(f);return Promise.resolve(structuredClone(summary))}});
  await roots.prepareTerminalSourceResponses(f.owner);
  const inputs=process.env.TERMINAL_SOURCE_INPUT_DIR?new URL('file://'+process.env.TERMINAL_SOURCE_INPUT_DIR+'/'):new URL('../../../../publisher-source/',import.meta.url);
  const docs=new URL('../../../docs/testing/loginom-ai-agent/',import.meta.url);
