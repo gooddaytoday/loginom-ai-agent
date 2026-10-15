@@ -60,6 +60,42 @@ integration("research pair: real create qualifies private route and epoch withou
     }
     expect(await verifyParallelPair(file, created.identity)).toEqual(created.identity)
     expect(await Bun.file(`${root}/controller/pair.json`).text()).toBe(journalBytes)
+    // Read-only storage observation: synthetic inventory binding, actual Docker filesystem.
+    // This does not qualify user creation, ACL, cleanup or model admission.
+    const { inspectUserStorage } = await import("../src/parallel-pair")
+    await Bun.$`docker exec ${created.identity.containerId} mkdir -- /workdir/UserStorage/eval-a`.quiet()
+    await expect(inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)).rejects.toThrow("USER_STORAGE_OWNERSHIP")
+    const storageMarker = { ...JSON.parse(marker), inventory: [{ username: "eval-a", storage_dir: "/workdir/UserStorage/eval-a", owner_nonce: created.nonce }] }
+    await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/.loginom-evals-isolated.json'} sh ${JSON.stringify(storageMarker)}`.quiet()
+    try {
+      const observed = await inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)
+      expect(observed).toMatchObject({ identity: created.identity, username: "eval-a", root: "/workdir/UserStorage/eval-a", ownerNonce: created.nonce, entries: [] })
+      expect(observed.inode).toBeGreaterThan(0)
+      expect(observed.uid).toBeGreaterThanOrEqual(0)
+      await expect(inspectUserStorage(file, created.identity, file.slots[0]!, crypto.randomUUID())).rejects.toThrow("USER_STORAGE_OWNERSHIP")
+      const names = ["white space", "tab\tfile", "line\nfile", "Юникод", "-leading", ".hidden", "draft.lgp.autosave", "nested/ordinary"]
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'mkdir -p /workdir/UserStorage/eval-a/nested /workdir/UserStorage/eval-b; printf B > /workdir/UserStorage/eval-b/control; for name do printf A > "/workdir/UserStorage/eval-a/$name"; done; ln -s ../eval-b /workdir/UserStorage/eval-a/neighbor'} user-storage ${names}`.quiet()
+      const neighbor = (await Bun.$`docker exec ${created.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()
+      const listed = await inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)
+      expect(listed.entries.map(entry => entry.name).sort()).toEqual([...names, "nested", "neighbor"].sort())
+      expect(listed.entries.find(entry => entry.name === "neighbor")).toMatchObject({ type: "l" })
+      await Bun.$`docker exec ${created.identity.containerId} ln /workdir/UserStorage/eval-b/control /workdir/UserStorage/eval-a/hardlink`.quiet()
+      try {
+        await expect(inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)).rejects.toThrow("USER_STORAGE_TOPOLOGY")
+      } finally { await Bun.$`docker exec ${created.identity.containerId} rm -- /workdir/UserStorage/eval-a/hardlink`.quiet() }
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'mv /workdir/UserStorage/eval-a /workdir/UserStorage/eval-a.control; ln -s eval-b /workdir/UserStorage/eval-a'}`.quiet()
+      try {
+        await expect(inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)).rejects.toThrow("USER_STORAGE_UNVERIFIED")
+      } finally { await Bun.$`docker exec ${created.identity.containerId} sh -c ${'rm /workdir/UserStorage/eval-a; mv /workdir/UserStorage/eval-a.control /workdir/UserStorage/eval-a'}`.quiet() }
+      await Bun.$`docker exec ${created.identity.containerId} chown ${String(observed.uid + 1)} /workdir/UserStorage/eval-a`.quiet()
+      try {
+        await expect(inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)).rejects.toThrow("USER_STORAGE_UNVERIFIED")
+      } finally { await Bun.$`docker exec ${created.identity.containerId} chown ${String(observed.uid)} /workdir/UserStorage/eval-a`.quiet() }
+      expect((await Bun.$`docker exec ${created.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()).toBe(neighbor)
+      expect((await inspectUserStorage(file, created.identity, file.slots[0]!, created.nonce)).inode).toBe(observed.inode)
+    } finally {
+      await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/.loginom-evals-isolated.json'} sh ${marker}`.quiet()
+    }
     const conflict = { ...file, server: { ...file.server, container: `${name}-conflict-server`, studioContainer: `${name}-conflict-studio`, network: `${name}-conflict` },
       controller: { ...file.controller, stateDir: `${root}/conflict-controller` } }
     await expect(createPair(conflict, options)).rejects.toThrow("PAIR_PORT_BUSY")
