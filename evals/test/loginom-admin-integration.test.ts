@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
 import { createJournaledAdminChannel, openLoginomAdmin, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
-import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
+import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease, type SlotFile, type ServerIdentity } from "../src/slots"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
@@ -209,6 +209,46 @@ async function nativeUserCapability(mode: "sessions" | "backup") {
       await writeLeaseReceipt(path.join(evidence, "session-crash-close.json"), { version: 1, identity: pair.identity, ...terminated })
       expect(terminated).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
       expect(await request("close-session", { proofId: disconnected.id, session: disconnectedData.binding })).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
+      const reconnectProbe = await request("reconcile-user", { ...activation, phase: "session-crash-probe" })
+      expect(reconnectProbe.outcome).toBe("confirmed")
+      const reconnectData = reconnectProbe.data as typeof observed
+      const reconnectSource = path.join(journal, `${reconnectProbe.id}.json`)
+      // Native wire observation in the same private codec shape consumed by the parent ledger.
+      const claim = { version: 2, kind: "owned-server-session", state: "observed", identity: pair.identity,
+        binding: reconnectData.binding, source: { id: reconnectProbe.id, path: reconnectSource,
+          sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(reconnectSource))).digest("hex") },
+        observation: { payload: { ...activation, phase: "session-crash-probe" }, reply: reconnectProbe } }
+      const claimFile = path.join(evidence, `session-${reconnectProbe.id}.json`)
+      await writeLeaseReceipt(claimFile, claim)
+      const reconnected = await nativeAdminPeer(runtime, file, pair.identity, root, evidence)
+      try {
+        expect(await reconnected.request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url: file.server.url,
+          credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(reconnected.profile, "loginom/runtime/admin/attempts/context/browser-profile") }))
+          .toMatchObject({ outcome: "confirmed" })
+        expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding }))
+          .toMatchObject({ outcome: "not_applied", data: { code: "SESSION_OWNERSHIP_UNCONFIRMED" } })
+        const adopt = { receipt: claimFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(claim)).digest("hex") }
+        expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding,
+          adopt: { ...adopt, sha256: "0".repeat(64) } })).toMatchObject({ outcome: "not_applied", data: { code: "SESSION_SOURCE_UNCONFIRMED" } })
+        expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: { ...reconnectData.binding, name: "eval-b:1" }, adopt }))
+          .toMatchObject({ outcome: "not_applied", data: { code: "SESSION_SOURCE_UNCONFIRMED" } })
+        await chmod(claimFile, 0o644)
+        try {
+          expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding, adopt }))
+            .toMatchObject({ outcome: "not_applied", data: { code: "SESSION_SOURCE_UNCONFIRMED" } })
+        } finally { await chmod(claimFile, 0o600) }
+        const originalCommand = await readLeaseReceipt(reconnectSource) as Record<string, unknown>
+        await writeLeaseReceipt(reconnectSource, { ...originalCommand, settledAt: new Date(Date.parse(String(originalCommand.settledAt)) + 1).toISOString() })
+        try {
+          expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding, adopt }))
+            .toMatchObject({ outcome: "not_applied", data: { code: "SESSION_SOURCE_UNCONFIRMED" } })
+        } finally { await writeLeaseReceipt(reconnectSource, originalCommand) }
+        const resumed = await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding, adopt })
+        await writeLeaseReceipt(path.join(evidence, "reconnected-session-close.json"), resumed)
+        expect(resumed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+        expect(await reconnected.request("close-session", { proofId: reconnectProbe.id, session: reconnectData.binding, adopt }))
+          .toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
+      } finally { await reconnected.dispose() }
       const pendingPackage = await request("reconcile-user", { ...activation, phase: "session-package-crash-probe" })
       expect(pendingPackage.outcome).toBe("confirmed")
       const pendingPackageData = pendingPackage.data as typeof observed
@@ -411,3 +451,33 @@ integration("real Node driver: missing or malformed private credentials fail bef
     expect(await Bun.file(`${root}/profile`).exists()).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
+
+async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRuntime>>, file: SlotFile, identity: ServerIdentity, root: string, evidence: string) {
+  const directory = path.join(evidence, "reconnected")
+  await mkdir(directory, { mode: 0o700 })
+  await mkdir(path.join(directory, "commands"), { mode: 0o700 })
+  const profile = path.join(root, "reconnected-profile")
+  await mkdir(profile, { mode: 0o700 })
+  const input = new TransformStream<Uint8Array, Uint8Array>(), output = new TransformStream<Uint8Array, Uint8Array>()
+  const abort = new AbortController()
+  const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
+    env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
+    timeoutMs: 30_000, profileDir: profile, outDir: directory, stdin: input.readable, stdout: output.writable, signal: abort.signal,
+    owner: { kind: "admin", id: directory } })
+  const channel = createJournaledAdminChannel(output.readable, input.writable, path.join(directory, "commands"))
+  const request = async (op: AdminOperation, payload: unknown) => {
+    if (op !== "dispose") expect(await readServerIdentity(file)).toEqual(identity)
+    return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + 20_000, payload })
+  }
+  return { request, profile, async dispose() {
+    const disposed = await request("dispose", {}).catch(() => undefined)
+    if (disposed?.outcome !== "confirmed") abort.abort()
+    await channel.end().catch(() => abort.abort())
+    const result = await pending
+    await writeLeaseReceipt(path.join(directory, "native-driver-result.json"), { exitCode: result.exitCode, processCleanup: result.processCleanup, stderr: result.stderr })
+    await channel.close().catch(() => undefined)
+    expect(result.exitCode).toBe(0)
+    expect(result.processCleanup.status).toBe("confirmed")
+    expect(result.processCleanup.capture_complete).toBe(true)
+  } }
+}

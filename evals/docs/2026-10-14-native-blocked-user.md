@@ -216,3 +216,28 @@ Final current native/admin/slots/lease/user/preflight107 PASS/504 (135.67s),
 typecheck/diff PASS. Latest successful autosave/empty-backup evidence:
 `research/evidence/native-user-4e84ecb4-b1ee-4197-85d6-d2fdae1d7512` (actual bytes/SHA,
 current identity/user/session/period, shutdown backup copy, process proof).
+
+Native reconnect close 2026-10-15: второй independently supervised Node/browser
+admin context без volatile binding сначала получает SESSION_OWNERSHIP_UNCONFIRMED.
+Private persisted probe claim + canonical command source/SHA восстанавливают
+только bound Count0/pending target. Fresh native account ID и managed tuple
+сохранились между contexts; native CloseSession→fresh absence и повтор
+observed_absent прошли. Changed claim SHA/binding, public0644 claim и изменённый
+command source refused до RPC; последующий rpc_closed подтверждает сохранение
+цели при отрицательных controls. Первый admin продолжил package probe после
+завершения второго; оба process owners подтвердили cleanup. Full parent
+composition пока не квалифицирована этим wire test; codec отдельно проверяет
+cross-context closure journal/mandatory adopt SHA. Recovery-only и active Count1
+adoption остаются закрытыми.
+
+Следующий отдельный gate — finalization собственных administrator sessions.
+Pinned bg/ts/CustomClient.js:39–43 вызывает FServerConnector.Disconnect() из
+Finalize без await; bg/js/rpc.js:6234–6299 возвращает Task из Disconnect.
+Это наблюдение исходников, не установленная причина прежнего retained incident.
+Нужен bounded native контроль awaited own disconnect и независимый managed
+read-back; browser/process exit сам по себе не подтверждает server closure.
+
+Последний reconnect evidence: research/evidence/native-user-104a011e-bbee-422f-bd5d-a28f5abd36aa
+(reconnected-session-close.json, reconnected/native-driver-result.json,
+original/reconnected command hashes и оба local process proofs). Native target
+1 PASS/108 (41.63s),103 unit/codec/preflight/lease PASS/342 (10.67s), typecheck/diff PASS.
