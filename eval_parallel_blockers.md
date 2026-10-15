@@ -43,6 +43,26 @@ Read-only signal audit: PID4086419 отсутствует в own/peer/unknown/ad
 origin/browser-binding всех двух admin и четырёх CLI proofs; UID/starttime не
 сохранены, сейчас PID отсутствует. Exec/exit/zombie/владелец не атрибутированы.
 
+## Архив после фактически прерванного check: topology source не сохранён
+
+Native evidence `native-cli-sessions-f5bf5146-1c6a-4f01-8fc5-ef5b733f8cae`
+сохраняет exit130/interrupted=true/timedOut=false и confirmed continuous CLI proof,
+затем ARCHIVE_TOPOLOGY до publication первого archive manifest (35 assertions,
+177.44s). Тогдашний teardown удалил root dPGRg7 до metadata capture: конкретные
+path/type/UID/nlink не установлены. Symlink разрешён архиватором и сам по себе
+не объясняет отказ. Hardlink producer connectionStore.stage обнаружен в runtime,
+но check его не вызывает; причинная связь не доказана. Новая fixture сохраняет
+root при ARCHIVE_TOPOLOGY для lstat без следования symlink.
+
+Повтор 2026-10-15 `native-cli-sessions-70a965d2-d5ad-4a7e-a08c-867e05d4e394`
+прошёл1/53 (174.94s), archive→three closes→fresh absence→admin closure подтверждены
+private audit154/11/read-back. Но check выиграл abort race: exit0/interrupted=false.
+Это положительный completed-check control, не воспроизведение interruption.
+Предыдущий повтор cdf7dba0... остановился на strict reading живого manifest;
+test-only hint исправлен после real-fs rename/nlink0 control, frozen readers не
+ослаблены. До сохранения failing metadata причина ARCHIVE_TOPOLOGY остаётся
+неразрешённой; admission/release из этих результатов не следуют.
+
 ## Mixed recovery: quarantine после пересечения собственных browser-проверок
 
 2026-10-15: `/tmp/evals-recover-mixed-dyI2ST`, собственная disposable pair
