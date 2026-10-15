@@ -26,7 +26,7 @@ export function loginomAddress(value) {
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate) {
-  await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
+  await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 120_000 })
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
   await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })

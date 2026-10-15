@@ -1,0 +1,193 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.sorting"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.sorting",
+      "output_node_label": "Ключ вверх",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Key",
+          "type": "real"
+        },
+        {
+          "name": "Text",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 7,
+          "Key": -2.5,
+          "Text": "B"
+        },
+        {
+          "Id": 6,
+          "Key": 1.125,
+          "Text": "a"
+        },
+        {
+          "Id": 5,
+          "Key": null,
+          "Text": "z"
+        },
+        {
+          "Id": 4,
+          "Key": 0.0,
+          "Text": "B"
+        },
+        {
+          "Id": 3,
+          "Key": null,
+          "Text": "a"
+        },
+        {
+          "Id": 2,
+          "Key": 1.125,
+          "Text": "A"
+        },
+        {
+          "Id": 2,
+          "Key": 1.125,
+          "Text": "A"
+        },
+        {
+          "Id": 1,
+          "Key": -2.5,
+          "Text": "b"
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.sorting",
+      "output_node_label": "Ключ вниз",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Key",
+          "type": "real"
+        },
+        {
+          "name": "Text",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 2,
+          "Key": 1.125,
+          "Text": "A"
+        },
+        {
+          "Id": 2,
+          "Key": 1.125,
+          "Text": "A"
+        },
+        {
+          "Id": 6,
+          "Key": 1.125,
+          "Text": "a"
+        },
+        {
+          "Id": 4,
+          "Key": 0.0,
+          "Text": "B"
+        },
+        {
+          "Id": 1,
+          "Key": -2.5,
+          "Text": "b"
+        },
+        {
+          "Id": 7,
+          "Key": -2.5,
+          "Text": "B"
+        },
+        {
+          "Id": 3,
+          "Key": null,
+          "Text": "a"
+        },
+        {
+          "Id": 5,
+          "Key": null,
+          "Text": "z"
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.sorting",
+      "output_node_label": "Текст",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Key",
+          "type": "real"
+        },
+        {
+          "name": "Text",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 2,
+          "Key": 1.125,
+          "Text": "A"
+        },
+        {
+          "Id": 2,
+          "Key": 1.125,
+          "Text": "A"
+        },
+        {
+          "Id": 3,
+          "Key": null,
+          "Text": "a"
+        },
+        {
+          "Id": 6,
+          "Key": 1.125,
+          "Text": "a"
+        },
+        {
+          "Id": 1,
+          "Key": -2.5,
+          "Text": "b"
+        },
+        {
+          "Id": 4,
+          "Key": 0.0,
+          "Text": "B"
+        },
+        {
+          "Id": 7,
+          "Key": -2.5,
+          "Text": "B"
+        },
+        {
+          "Id": 5,
+          "Key": null,
+          "Text": "z"
+        }
+      ]
+    }
+  ]
+}
