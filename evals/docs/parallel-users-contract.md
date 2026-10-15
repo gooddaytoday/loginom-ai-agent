@@ -1036,3 +1036,32 @@ SESSION_IDENTITY_UNSUPPORTED. Private600 native-standalone-f5f14267-46e2-45c4-bc
 receipt SHA256 `e09a44ce257ef8b960c043aa8e3fd27a9f01c2bf517219b694d98eafc48738cd`
 содержит все3 preparation/source sets;36 independent checks совпали, exact pair
 independently absent. Verify/full readiness и recovery не объявлены готовыми.
+
+
+### Management process inventory
+
+`AgentCommand.managementEvidence` связывает управляющие команды с held normal
+slot lease и private journal phase `cli_admitted`. Inventory публикует planned
+entry до запуска; owner содержит command/slot/уникальный запуск. После supervisor
+сохраняется private continuous process proof с producer PID, launcher identity
+и двумя final absence passes. Reader повторно проверяет metadata/source SHA и
+все предыдущие proofs; unconfirmed/planned/source drift не дают closure.
+
+Сохраняются только whitelist operation pairs: loginom setup/status/check/recover
+и providers status. Аргументы и stdin не входят в inventory; произвольная
+operation отвергается до dispatch и записи. Закрытый/recovery-only lease, чужой
+profile и capture directory внутри profile не дают admission. Legacy management
+без нового evidence сохраняет прежний путь. Process closure не означает server
+session closure и не разрешает storage deletion/release.
+
+Installed pinned CLI status на собственном пустом профиле:1 PASS/5 assertions
+(2.86s), unconfigured/hasApiKey=false, continuous capture confirmed. Это control
+реального CLI процесса с data-only slot authority; Loginom login, модель и судья
+не запускались. Общая fixture с auth.json без cli-profile marker исправлена в
+нативном тесте: CLI сам создаёт marker в пустом fresh profile.
+
+TDD operation dispatch guard RED→GREEN;146 related unit PASS/552 assertions
+(60.94s), typecheck/diff PASS. Five obsolete own native fixture roots removed
+after exact PID/starttime absence and continuous proof checks; private audit
+`research/evidence/management-native-draft-cleanup-20261015.json` SHA256
+`7ddeac08523dfd1a8e3fcfed0d6fb29e01c5f828413e4bdb54ea545d91e51c6b`.
