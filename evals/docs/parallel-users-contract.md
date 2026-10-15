@@ -1348,3 +1348,20 @@ SHA256 `d71d7ca4d91e05b5ab5edd5a98bd3dfb79f4c735681bfc3ce0a229839a6ad8b9`:
 Один concurrent own browser run получил unknown-process quarantine; incident
 dyI2ST сохранён в blockers, его proof не переписан. Partial resource release,
 active CLI sessions и остальные readiness gates остаются открытыми.
+
+### Partial resource release и падение recovery controller
+
+Native B release проверен реальным EISDIR при записи второго resource proof:
+profile row уже released, user row retained, A полностью released. Original
+controller завершён SIGKILL137. Новый recovery-only owner принял оба ресурса B
+с revision2 и завершён вторым SIGKILL137 до admin dispatch. Public retry от
+original journal прошёл существующий production путь: оба B rows released с
+revision3/lineage2, A bytes неизменны, original committed history-b reused.
+Последующее missing result/completion reconciliation не потребовало runtime.
+
+Native1 PASS/19 (62.30s), typecheck/diff PASS. Новый сценарий квалифицирует
+существующее поведение, production edits для него не потребовались. Private600
+`native-mixed-55aff707-20d5-4974-bfc8-8cb944c4e825/mixed.json` SHA256
+`5d6342704929af7ef91a1052c5e0ae39ededce88f5a92a6406d82a04615015f1`:
+21 source hashes,31 независимая проверка в partial-audit.json, exact pair absent.
+Active CLI writers/сессии/backup и остальные crash windows этим не проверены.

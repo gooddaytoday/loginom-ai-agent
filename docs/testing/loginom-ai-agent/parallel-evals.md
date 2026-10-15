@@ -872,7 +872,11 @@ B archive переиспользуется. Missing composite A согласуе
 proofs; missing result/completion после mixed release восстанавливаются без
 admin runtime и изменения reservations. Native SIGKILL/retry18 assertions PASS,
 23 source hashes verified; временная пара штатно удалена. Active CLI incidents,
-partial user/profile release и остальные crash windows ещё open. Offline judge
+остальные crash windows ещё open. Native partial user/profile release также
+проверен: EISDIR на втором proof → original SIGKILL137 → recovery CAS обоих B
+resources → recovery SIGKILL137 → public retry,19 assertions PASS. B released
+revision3/lineage2, A bytes/archive preserved,21 source hashes/31 audit checks и
+exact pair absence PASS. Offline judge
 recover сохранён. Browser qualification запускать последовательно: неизвестный
 одновременно запущенный browser оставляет process proof quarantined; другой
 успешный запуск не исправляет его задним числом.
