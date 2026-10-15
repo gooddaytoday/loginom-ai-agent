@@ -1247,3 +1247,29 @@ CLI runtime не создаёт controller state files; изменённый ser
 `f8a75284863bf67c3d30bc2072bb99449628ca7d1ec4ef22dad68fad38b9b9f9`;14
 retained source hashes и exact pair absence PASS. Superseded own green log
 удалён после private audit/read-back; RED и current qualified logs сохранены.
+
+
+### Released-server reconciliation before completion receipt
+
+При отсутствии completion recovery берёт только server resource guard и
+проверяет current released row. Его identity/token/revision/release evidence
+связываются с original command либо его recovery lineage, sealed journal и
+server finalization. Все slot resource proofs/tombstones проверяются через
+finalizeReleasedSlot, admin inventory — через continuous-proof reader. Затем
+восстанавливаются result/completion; CAS, Loginom runtime и новый slot ownership
+не нужны. Fully completed normal preparation также получает historical
+already_released. Corrupt evidence не допускает восстановления metadata.
+
+Этот путь требует current released server cohort; server-retained и mixed
+partial releases пока требуют дальнейшей reconciliation. После durable
+completion исторический repeat по-прежнему не зависит от нового владельца.
+
+TDD native persisted boundary (удалены только result/completion после actual
+release) RED→GREEN.100 unit PASS/433 (6.79s), native1 PASS/23 (56.50s),
+typecheck/diff PASS. Public CLI с unreadable runtime восстановил оба byte-identical;
+corrupt released-server proof не восстановил ни один. Normal completed prepare
+и repeat, unchanged next3 reservations qualified. Private600
+`native-recovery-c45ef966-a344-45b0-bb97-6190863f4d05/recovery.json` SHA256
+`d14762e0820b27b24b617e5488eb53fcd110be2a2692fb96e87c39e8c997e0fd`:14
+closure source hashes + original/result hashes совпали; exact own pair absent.
+Это не реальный SIGKILL в данном окне; такой crash case остаётся открытым.
