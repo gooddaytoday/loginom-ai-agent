@@ -2213,3 +2213,20 @@ no journal is created. Full archive11/69 PASS18.02s, typecheck/diff PASS; logs
 archive-topology-metadata-{red,green}. The historical missing native topology is
 still unknown; this instrumentation is for the next actual failure, without
 weakening hardlink/foreign/special-file refusal.
+
+Actual strict interruption control47d5228b... now observed exit130/interrupted=true,
+confirmed continuous cleanup, and the same-lstat cause identifies an AF_UNIX
+socket at profile/cache/tmp/org.chromium.Chromium.55uJMQ/SingletonSocket
+(type0140000/UID1001/nlink1), rather than a symlink or regular hardlink. Root
+jothVh and exact disposable pair remain retained. The older f5bf... topology
+was lost and is not retrospectively attributed to this object.
+
+The durable archive now recognizes socket objects after its existing settled
+profile gate. Rename preserves device/inode/type/mode/size; socket objects have
+no file payload to read/fsync, so the containing directory persists their name.
+Regular files and sockets still require nlink1, ownership and existing frozen
+identity checks; unsupported special files still refuse. A real child creates
+a Unix socket and is SIGKILLed before archival: RED ARCHIVE_TOPOLOGY→GREEN
+committed move/replay, original name absent, identical socket inode/metadata,
+symlink object/DB/auth preservation. Full archive12/78 PASS17.29s, typecheck/diff
+PASS. Native archive/finalizer qualification is pending a fresh exclusive probe.
