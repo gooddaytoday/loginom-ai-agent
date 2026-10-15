@@ -34,7 +34,7 @@ export async function sandboxCommand(input: {
     cmd.push("--ro-bind", await realpath(file), file)
   cmd.push("--", binary, ...input.cmd.slice(1))
   const inherited = Object.fromEntries(Object.entries(input.env).flatMap(([name, value]) =>
-    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT))$/.test(name)
+    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT|STRICT_RECOVERY|DISABLE_EXTERNAL_SKILLS|DISABLE_CLAUDE_CODE_SKILLS|EXPERIMENTAL_WEBSOCKETS))$/.test(name)
       ? [[name, value]] : []))
   // Bundled Node needs this startup switch to use the inherited proxy settings.
   if (Object.entries(inherited).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))

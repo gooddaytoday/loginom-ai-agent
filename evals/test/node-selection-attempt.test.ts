@@ -99,6 +99,8 @@ test("empty stdout recovers only the exact own Session created during the CLI li
   const filename = path.join(root, "snapshot.db")
   const database = new Database(filename)
   try {
+    // One durable fixture transaction avoids one filesystem sync per inserted row.
+    database.exec("BEGIN")
     database.exec("CREATE TABLE session (id TEXT, parent_id TEXT, title TEXT, time_created INTEGER); " +
       "CREATE TABLE message (id TEXT, session_id TEXT, data TEXT, time_created INTEGER); " +
       "CREATE TABLE part (id TEXT, message_id TEXT, session_id TEXT, data TEXT, time_created INTEGER)")
@@ -107,6 +109,7 @@ test("empty stdout recovers only the exact own Session created during the CLI li
       [message.id, refreshIncident.sessionID, JSON.stringify(message), message.time.created])
     for (const part of refreshIncident.parts) database.run("INSERT INTO part VALUES (?, ?, ?, ?, ?)",
       [part.id, part.messageID, refreshIncident.sessionID, JSON.stringify(part), 1791885819742])
+    database.exec("COMMIT")
     database.close()
     const window = { title: "own-exact-title", startedAt: 1791885807486, finishedAt: 1791885821184 }
     expect(readSelectionSnapshot(filename, "", window).sessionID).toBe(refreshIncident.sessionID)

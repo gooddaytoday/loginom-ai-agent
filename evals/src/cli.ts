@@ -100,7 +100,7 @@ export type FailureKind = ReturnType<typeof failureKind>
 const droppedChildEnv = /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/
 
 export function agentCommand(config: EvalConfig, env: Record<string, string | undefined> = process.env): {
-  mode: EvalConfig["agent"]["cliMode"]; cmd: string[]; cwd: string; env: Record<string, string>
+  mode: EvalConfig["agent"]["cliMode"]; cmd: string[]; cwd: string; env: Record<string, string>; managementTimeoutMs?: number
 } {
   const inherited = Object.entries(env).flatMap(([key, value]) =>
     value === undefined || droppedChildEnv.test(key) ? [] : [[key, value] as const],
@@ -111,6 +111,12 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
     LOGINOM_AI_AGENT_PURE: "1",
     LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
     LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT: "1",
+    ...(config.executionPolicy === "evalrunner-v1" ? {
+      LOGINOM_AI_AGENT_STRICT_RECOVERY: "1",
+      LOGINOM_AI_AGENT_DISABLE_EXTERNAL_SKILLS: "1",
+      LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS: "1",
+      LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false",
+    } : {}),
   }
   if (config.agent.cliMode === "source")
     return {
@@ -119,8 +125,10 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
       cwd: path.join(repoRoot, "packages", "agent"),
       env: { ...isolated, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle },
     }
-  if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
-  return { mode: "fake" as const, cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
+  if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated,
+    managementTimeoutMs: config.executionPolicy === "evalrunner-v1" ? 600_000 : undefined }
+  return { mode: "fake" as const, cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated,
+    managementTimeoutMs: config.executionPolicy === "evalrunner-v1" ? 600_000 : undefined }
 }
 export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[] }
 

@@ -4,6 +4,18 @@ import os from "node:os"
 import path from "node:path"
 import { writerIdentity } from "../src/process-supervisor"
 
+test("a new owner in a pre-dispatch directory cannot use fresh acquisition observation", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-old-"))
+  try {
+    await mkdir(path.join(profile, ".writer"), { mode: 0o700 })
+    await Bun.sleep(25)
+    const pending = writerIdentity(profile, Date.now()).then(value => value, error => error)
+    await Bun.sleep(20)
+    await Bun.write(path.join(profile, ".writer/owner"), "foreign-owner")
+    expect(String(await pending)).toContain("identity changed")
+  } finally { await rm(profile, { recursive: true, force: true }) }
+})
+
 test("writer identity observes the real unlink-owner then rmdir release window", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-release-"))
   const directory = path.join(profile, ".writer")

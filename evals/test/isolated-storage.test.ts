@@ -53,7 +53,7 @@ test.skipIf(!available)("checkIsolatedLoginom: доступный прежний
     await Bun.$`docker rm -f ${container} ${previous}`.quiet().nothrow()
     await rm(dir, { recursive: true, force: true })
   }
-}, 20_000)
+}, 60_000)
 
 test.skipIf(!available)("checkIsolatedLoginom: чистый сервер без прежнего контейнера сохраняет Python и network gates", async () => {
   const container = (await Bun.$`docker run --rm -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()

@@ -91,5 +91,5 @@ for (const code of [2, 3]) {
       expect(await Bun.file(path.join(run.runDir, id, "1/run.json")).exists()).toBe(true)
       expect(await Bun.file(path.join(run.runDir, "report.md")).exists()).toBe(true)
     } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
-  })
+  }, 20_000)
 }

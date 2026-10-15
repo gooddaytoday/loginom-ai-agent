@@ -163,7 +163,7 @@ export type RunSummary = {
   task_ids: string[]
   config: {
     repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean
-    tasks_dir?: string; task_timeout_ms?: Record<string, number>
+    tasks_dir?: string; task_timeout_ms?: Record<string, number>; infra_retries?: number
   }
   metrics: Metrics
   tasks: { id: string; rubric_snapshot?: RubricSnapshot; metrics: TaskMetrics; attempts: AttemptResult[] }[]

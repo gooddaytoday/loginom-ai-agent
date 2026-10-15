@@ -1,0 +1,19 @@
+# Evalrun checkpoint
+- Status: runtime configured; LAB-76 acceptance BLOCKED. No new product calls or smoke retries.
+- Host kartai@10.200.9.134; R=/home/kartai/.local/share/loginom-evals-runtime.
+- Qualified code7abcba27174d5c90fa937499d0ee1c5297f81011; final docs-only deployment pin is in runtime.json. Measured cohort frozen on708c72ebce60690d91d1b51137974bd6aa123209.
+- Branch evalrun-runtime, base51459ab9. Original daemon/runtime IDs and old «Спамиель»/«Cursor» settings/auth retained; EvalRunner moved to target.
+- CLI0.2.0/source0c975a73676d9aba556085dbda97e1a9ceb23cc6; product openai/gpt-6.1-sol/medium; judge gpt-6-sol/xhigh.
+- Docker/Loginom7.4.2 prepared from verified LOCAL images, no mounts; full CLI6015-file integrity/nativecheck/bwrap/AppArmor qualified.
+- Tests: final code7abc full790PASS/0FAIL,4072assertions,61files,539.85s; typecheck/nativecheckPASS. Targeted88PASS+5repeatPASS. Intermediate4a full2FAIL retained.
+- Actual agent OpenViking health/actorfindPASS after timeout60/120s; original15s BLOCKED receipt retained. GODEBUG=tlsmlkem=0 configured after proven TLS failures.
+- Exactly2product admissions. Calc PASS100/RELEASED/cleanup/history, exact11assistant models verified; curated archive roundtrip independentlyverified.
+- Node Session ses_ec09225a4ffepOXfUoLJr5JIlS: failed/recovery616s, native export download AMBIGUOUS, no package, nodeERROR2/noRELEASED; exact20assistant models verified.
+- Original node series/profile/config/lease/container storage preserved privately in R/operations/incidents/lab76-node-20261015.
+- Operator cleanup confirmed with tested writerfix; nativecheckPASS, profile/history/storage cleaned. A separate pre-exec observation failure remains documented, with original receipt preserved.
+- Logical stand.lease and both immutable admissions retained; current readiness gate BLOCKED. Never reinterpret operator cleanup as original node RELEASED.
+- Calc attachment01a13f6d-f4a4-77eb-979c-fd5ab79e731c; node BLOCKED diagnostic01a13f85-e812-7122-b5d9-a9d79bd368cb; both download/SHA verified.
+- Reboot and final TLS service restart verified; both providers online, same2containerIDs, HTTP200; no active/queued agent work.
+- Obsolete old artifacts/releases removed4636948KiB; auth/current providers retained. Final installation/test temporary cleanup recorded in R/evidence/final-temp-cleanup.json; current evidence/auth retained.
+- Next: fix product native export recovery and review pre-exec observation; new explicit readiness/admission needed. No full corpus/baseline promotion; historicalINCOMPARABLE; judge uncalibrated.
+- Runbook/validation alongside this file; private controller/evidence /home/kiselev/storage/tmp/evalrun-20261015.

@@ -9,6 +9,23 @@ import { evalsRoot, loadConfig } from "../src/config"
 const fixture = (name: string) => Bun.file(path.join(evalsRoot, "fixtures", name)).text()
 const fakeCommand = () => agentCommand(loadConfig(["--dry-run"], {}))
 
+test("agentCommand: standalone policy pins recovery and excludes external skills", () => {
+  const command = agentCommand(loadConfig(["--dry-run"], { EVAL_EXECUTION_POLICY: "evalrunner-v1" }))
+  expect(command.env.LOGINOM_AI_AGENT_STRICT_RECOVERY).toBe("1")
+  expect(command.env.LOGINOM_AI_AGENT_DISABLE_EXTERNAL_SKILLS).toBe("1")
+  expect(command.env.LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS).toBe("1")
+  expect(command.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBe("false")
+  expect(command.managementTimeoutMs).toBe(600_000)
+})
+
+test("agentCommand: installed standalone CLI gets the same management budget", () => {
+  const command = agentCommand(loadConfig(["--skip-judge"], {
+    EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/installed/bin/cli", LOGINOM_DOCK_API_KEY: "key",
+    EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_EXECUTION_POLICY: "evalrunner-v1",
+  }))
+  expect(command.managementTimeoutMs).toBe(600_000)
+})
+
 test("parseEvents: квитанция сохранения читается из последовательности JSON-документов", () => {
   const output = '{"output":{"package_ref":{"path":"/user/eval-run-task-1.lgp"}}}\n{"status":"ok"}\n{"trace":{"note":"literal } and \\\" quote"}}'
   const parsed = parseEvents(JSON.stringify({ type: "tool_use", part: {
