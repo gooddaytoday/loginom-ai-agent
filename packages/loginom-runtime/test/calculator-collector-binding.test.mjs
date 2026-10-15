@@ -165,3 +165,40 @@ for(const kind of ['own-data','own-object','own-accessor','inherited-data','inhe
   assert.ok(!JSON.stringify(d).includes('never copy'));assert.ok(!JSON.stringify(d).includes('private'));
  }finally{reset();}
 });
+
+const {validateCapture}=await import(pathToFileURL(root+'/src/acceptance/calculator-grouped-before-done-v1.mjs'));
+for(const kind of ['own-data','inherited-data','own-accessor','inherited-accessor','absent','depth-eight','depth-bound','long-strings','diagnostic-error'])test('bounded store provenance uses same cache, never grants missing buffered flag: '+kind,async()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;let getters=0,storeReads=0;
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   storeReads++;let st=v.getStore();delete st.isBufferedStore;
+   const accessor={get(){getters++;throw Error('provenance getter must not run')}};
+   if(kind==='own-data')st.buffered=false;
+   if(kind==='inherited-data'){delete st.$className;Object.setPrototypeOf(st,{$className:'Ext.data.Store',buffered:false})}
+   if(kind==='own-accessor'){Object.defineProperty(st,'$className',accessor);Object.defineProperty(st,'buffered',accessor)}
+   if(kind==='inherited-accessor'){delete st.$className;const proto={};for(const key of ['$className','buffered'])Object.defineProperty(proto,key,accessor);Object.setPrototypeOf(st,proto)}
+   if(kind==='absent')delete st.$className;
+   if(['depth-eight','depth-bound'].includes(kind)){delete st.$className;let proto={$className:'Ext.data.Store',buffered:false};for(let i=0;i<(kind==='depth-eight'?7:8);i++)proto=Object.create(proto);Object.setPrototypeOf(st,proto)}
+   if(kind==='long-strings'){st.$className='C'.repeat(300);st.buffered='false';const get=st.getProxy;st.getProxy=()=>({...get(),$className:'P'.repeat(300)})}
+   if(kind==='diagnostic-error')st=new Proxy(st,{getOwnPropertyDescriptor(target,key){if(key==='buffered')throw 0;return Reflect.getOwnPropertyDescriptor(target,key)}});
+   return st;
+  }};};
+  const r=await new Function('page','return ('+makeCalculatorCaptureCode({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS})+')(page)')(f.page);
+  const diagnostic=captureWindowDiagnostic(r);assert.equal(storeReads,2);assert.equal(getters,0);
+  for(const w of diagnostic.windows){
+   assert.equal(w.evaluated,false);assert.equal(w.value,null);assert.equal(w.reason,'cached_flags_unavailable');
+   assert.equal(w.isBufferedStore_descriptor.own,'absent');assert.equal(w.isBufferedStore_descriptor.own_value,null);assert.equal(w.isBufferedStore_descriptor.inherited_value,null);
+   const p=w.store_provenance,d=p.descriptors;assert.equal(p.currentPage.value,1);
+   if(kind==='own-data'){assert.equal(d.buffered.own,'data');assert.equal(d.buffered.own_value,false);assert.equal(p.$className.value,'Ext.data.Store')}
+   if(kind==='inherited-data'){assert.equal(d.buffered.inherited,'data');assert.equal(d.buffered.inherited_value,false);assert.equal(d.buffered.depth,1);assert.equal(d.$className.inherited_value,'Ext.data.Store');assert.equal(p.$className.value,null)}
+   if(kind.endsWith('accessor'))for(const key of ['$className','buffered']){const where=kind.startsWith('own-')?'own':'inherited';assert.equal(d[key][where],'accessor');assert.equal(d[key][where+'_value'],null)}
+   if(kind==='absent')for(const key of ['$className','buffered']){assert.equal(d[key].own,'absent');assert.equal(d[key].inherited,'absent');assert.equal(d[key].depth,null)}
+   if(kind==='depth-eight')for(const key of ['$className','buffered']){assert.equal(d[key].inherited,'data');assert.equal(d[key].depth,8)}
+   if(kind==='depth-bound')for(const key of ['$className','buffered']){assert.equal(d[key].inherited,'depth_bound');assert.equal(d[key].inherited_value,null);assert.equal(d[key].depth,null)}
+   if(kind==='long-strings'){assert.equal(p.$className.value.length,128);assert.equal(p.$className.truncated,true);assert.equal(p.proxy_class.value.length,128);assert.equal(d.$className.own_value.length,128);assert.equal(d.$className.own_truncated,true);assert.equal(d.buffered.own_type,'string');assert.equal(d.buffered.own_value,null)}
+   if(kind==='diagnostic-error'){assert.equal(d.buffered.diagnostic_error,true);assert.equal(d.buffered.own_value,null);assert.equal(d.buffered.inherited_value,null)}
+  }
+  assert.throws(()=>validateCapture(r,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'before'}}),/LOGINOM_CAPTURE_CACHED_WINDOW/);
+  assert.equal(f.events.includes('fetch'),false);assert.equal(f.events.includes('exclude'),false);
+ }finally{reset();}
+});

@@ -182,12 +182,47 @@ export function captureWindowDiagnostic(capture) {
    inherited_value:d?.inherited==='data'&&d.inherited_type==='boolean'?flag(d.inherited_value):null,
    depth:['data','accessor'].includes(d?.inherited)&&Number.isInteger(d?.depth)&&d.depth>=1&&d.depth<=8?d.depth:null};
  };
+ const provenance=p=>{
+  try{
+   const own=Object.getOwnPropertyDescriptor(p,'store_provenance');
+   if(!own)return {};
+   if(!('value'in own))return {store_provenance:{unavailable:true}};
+   const read=(o,key)=>{const d=o&&Object.getOwnPropertyDescriptor(o,key);return d&&'value'in d?d.value:undefined;};
+   const type=t=>['undefined','boolean','number','string','object','function','symbol','bigint'].includes(t)?t:null;
+   const scalar=(d,expected)=>{
+    const t=type(read(d,'type')),value=read(d,'value');
+    return {type:t,value:t===expected&&typeof value===expected&&(expected==='string'||Number.isFinite(value))
+     ?(expected==='string'?value.slice(0,128):value):null,
+     truncated:read(d,'truncated')===true||(typeof value==='string'&&value.length>128)};
+   };
+   const data=(d,key)=>{
+    const out={},failed=read(d,'diagnostic_error')===true;
+    for(const where of ['own','inherited']){
+     const kind=read(d,where),t=read(d,where+'_type'),value=read(d,where+'_value');
+     out[where]=(where==='own'?['absent','accessor','data','unavailable']:['absent','accessor','data','unavailable','not_checked','depth_bound']).includes(kind)?kind:null;
+     out[where+'_type']=kind==='data'?type(t):null;
+     out[where+'_value']=!failed&&kind==='data'&&(key==='buffered'?t==='boolean'&&typeof value==='boolean':t==='string'&&typeof value==='string')
+      ?(key==='buffered'?value:value.slice(0,128)):null;
+     out[where+'_truncated']=kind==='data'&&key==='$className'&&t==='string'
+      &&(read(d,where+'_truncated')===true||(typeof value==='string'&&value.length>128));
+    }
+    const depth=read(d,'depth');
+    out.depth=['data','accessor'].includes(out.inherited)&&Number.isInteger(depth)&&depth>=1&&depth<=8?depth:null;
+    if(out.depth===null){out.inherited_value=null;out.inherited_truncated=false;}
+    if(read(d,'diagnostic_error')===true)out.diagnostic_error=true;
+    return out;
+   };
+   const v=own.value,descriptors=read(v,'descriptors');
+   return {store_provenance:{$className:scalar(read(v,'$className'),'string'),currentPage:scalar(read(v,'currentPage'),'number'),
+    proxy_class:scalar(read(v,'proxy_class'),'string'),descriptors:Object.fromEntries(['$className','buffered'].map(key=>[key,data(read(descriptors,key),key)]))}};
+  }catch{return {store_provenance:{unavailable:true}};}
+ };
  return {length:Array.isArray(windows)?windows.length:null,truncated:Array.isArray(windows)&&windows.length>2,
   windows:Array.isArray(windows)?windows.slice(0,2).map(p=>({evaluated:flag(p?.evaluated),value:flag(p?.value),
    reason:typeof p?.reason==='string'?p.reason.slice(0,256):null,
    cache_complete:flag(p?.cache_complete),rows_complete:flag(p?.rows_complete),
    ...(p?.available_inputs?{available_inputs:inputs(p)}:{}),
-   ...(p?.isBufferedStore_descriptor?{isBufferedStore_descriptor:descriptor(p)}:{})})):[]};
+   ...(p?.isBufferedStore_descriptor?{isBufferedStore_descriptor:descriptor(p)}:{}),...provenance(p)})):[]};
 }
 
 export function validateCapture(capture,owner,state) {

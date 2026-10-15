@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
+import {readFile} from 'node:fs/promises';
 
 const path=process.env.CALCULATOR_HARNESS??new URL('../src/acceptance/calculator-grouped-before-done-v1.mjs',import.meta.url).pathname;
 const {captureCalculator,captureDraft,validateCapture,captureWindowDiagnostic,CAPTURE_LIMITS}=await import(pathToFileURL(path));
@@ -135,4 +136,37 @@ for(const location of ['own','inherited'])for(const [tag,type,value,expected] of
  const d={[location]:tag,[location+'_type']:type,[location+'_value']:value};
  const r=captureWindowDiagnostic({predicates:{cached_windows:[{isBufferedStore_descriptor:d}]}});
  assert.equal(r.windows[0].isBufferedStore_descriptor[location+'_value'],expected);
+});
+
+test('new provenance keeps two factual absent/null windows and original strict refusal',async()=>{
+ const {drivers,events}=fixture(),snapshot=drivers.snapshot;
+ const factual=JSON.parse(await readFile(new URL('./fixtures/calculator-cached-windows-5f20ab86.json',import.meta.url),'utf8'));
+ const absent=factual.windows[0].isBufferedStore_descriptor;
+ drivers.snapshot=async()=>{const capture=await snapshot();capture.predicates.cached_windows=structuredClone(factual.windows);
+  assert.deepEqual(captureWindowDiagnostic(capture),factual);
+  for(const w of capture.predicates.cached_windows)w.store_provenance={$className:{type:'string',value:'Ext.data.Store'},currentPage:{type:'number',value:1},proxy_class:{type:'string',value:'bg.ext.CollectionProxy'},descriptors:{buffered:{own:'data',own_type:'boolean',own_value:false}}};return capture};
+ await assert.rejects(captureDraft(drivers),/LOGINOM_CAPTURE_CACHED_WINDOW/);
+ assert.equal(events.includes('exclude'),false);assert.equal(events.filter(x=>x==='cancel').length,1);
+ const d=captureWindowDiagnostic(await drivers.snapshot());assert.equal(d.length,2);
+ assert.deepEqual({...d,windows:d.windows.map(({store_provenance,...window})=>window)},factual);
+ for(const w of d.windows){assert.deepEqual(w.isBufferedStore_descriptor,absent);assert.equal(w.evaluated,false);assert.equal(w.value,null);assert.equal(w.store_provenance.descriptors.buffered.own_value,false)}
+});
+test('provenance read failure cannot replace cached-window refusal or invoke getter',async()=>{
+ const {drivers,events}=fixture(),snapshot=drivers.snapshot;let getters=0;
+ const broken=new Proxy({},{getOwnPropertyDescriptor(){throw Error('diagnostic-only')}});
+ drivers.snapshot=async()=>{const c=await snapshot();c.predicates.cached_windows=[{evaluated:false,value:null,store_provenance:broken},{evaluated:false,value:null}];return c};
+ const raw=await drivers.snapshot();assert.deepEqual(captureWindowDiagnostic(raw).windows[0].store_provenance,{unavailable:true});
+ const getterWindow={};Object.defineProperty(getterWindow,'store_provenance',{get(){getters++;throw Error('getter')}});
+ assert.deepEqual(captureWindowDiagnostic({predicates:{cached_windows:[getterWindow]}}).windows[0].store_provenance,{unavailable:true});assert.equal(getters,0);
+ await assert.rejects(captureDraft(drivers),/LOGINOM_CAPTURE_CACHED_WINDOW/);assert.equal(events.includes('exclude'),false);assert.equal(events.filter(x=>x==='cancel').length,1);
+});
+test('store provenance sanitizer limits fixed scalar fields, strings and descriptor depth',()=>{
+ const raw={store_provenance:{$className:{type:'string',value:'C'.repeat(300)},proxy_class:{type:'object',value:{private:'secret'}},currentPage:{type:'number',value:Infinity},descriptors:{
+  $className:{own:'data',own_type:'string',own_value:'N'.repeat(300),inherited:'data',inherited_type:'string',inherited_value:'P'.repeat(300),depth:99},
+  buffered:{own:'accessor',own_type:'boolean',own_value:false,inherited:'data',inherited_type:'object',inherited_value:false,depth:0},foreign:{private:'secret'}},records:['secret'],dom:'secret'}};
+ const p=captureWindowDiagnostic({predicates:{cached_windows:[raw]}}).windows[0].store_provenance;
+ assert.equal(p.$className.value.length,128);assert.equal(p.$className.truncated,true);assert.equal(p.proxy_class.value,null);assert.equal(p.currentPage.value,null);
+ assert.equal(p.descriptors.$className.own_value.length,128);assert.equal(p.descriptors.$className.inherited_value,null);assert.equal(p.descriptors.$className.depth,null);
+ assert.equal(p.descriptors.buffered.own_value,null);assert.equal(p.descriptors.buffered.inherited_value,null);assert.equal(p.descriptors.buffered.depth,null);
+ assert.ok(!JSON.stringify(p).includes('secret'));assert.ok(!JSON.stringify(p).includes('foreign'));assert.ok(!JSON.stringify(p).includes('records'));
 });

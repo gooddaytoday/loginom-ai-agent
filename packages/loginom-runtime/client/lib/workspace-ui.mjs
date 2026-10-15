@@ -4120,6 +4120,32 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
    result.inherited='depth_bound';return result;
   }catch{return result;}
  };
+ // Diagnostic-only fixed properties. Never use these values as cache proof.
+ const provenanceDescriptor=(store,key)=>{
+  const result={own:'unavailable',own_type:null,own_value:null,own_truncated:false,
+   inherited:'not_checked',inherited_type:null,inherited_value:null,inherited_truncated:false,depth:null};
+  const copy=(descriptor,where)=>{
+   result[where]='value'in descriptor?'data':'accessor';
+   if(!('value'in descriptor))return;
+   const value=descriptor.value;result[where+'_type']=typeof value;
+   if(key==='buffered'&&typeof value==='boolean')result[where+'_value']=value;
+   if(key==='$className'&&typeof value==='string'){
+    result[where+'_value']=value.slice(0,128);result[where+'_truncated']=value.length>128;
+   }
+  };
+  try{
+   const d=Object.getOwnPropertyDescriptor(store,key);
+   if(d){copy(d,'own');return result;}
+   result.own='absent';result.inherited='unavailable';let p=store;
+   for(let depth=1;depth<=8;depth++){
+    p=Object.getPrototypeOf(p);
+    if(p===null){result.inherited='absent';return result;}
+    const d=Object.getOwnPropertyDescriptor(p,key);
+    if(d){copy(d,'inherited');result.depth=depth;return result;}
+   }
+   result.inherited='depth_bound';return result;
+  }catch{return {...result,diagnostic_error:true};}
+ };
  const stores=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(suffix=>{
   const candidates=root.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']');
   if(candidates.length!==1)fail('GRID');const element=candidates[0],view=globalThis.Ext?.getCmp?.(element.id);
@@ -4137,6 +4163,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   if(pendingKeys&&pendingKeys.length>limits.records)fail('PENDING_BOUND');
   return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
    isBufferedStore_descriptor:bufferedDescriptor(store),
+   provenance_descriptors:Object.fromEntries(['$className','buffered'].map(key=>[key,provenanceDescriptor(store,key)])),
    flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,own(store,k)])),
    cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
     remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
@@ -4155,7 +4182,12 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const available_inputs=Object.fromEntries(Object.entries({count:c.count,loading:c.loading,
    remoteFilter:c.remoteFilter,remoteSort:c.remoteSort,source_membership:s.source_membership,
    pendingKeys:s.pendingKeys,isBufferedStore:f.isBufferedStore}).map(([key,value])=>[key,inputType(value)]));
-  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable',available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor};
+  const diagnosticScalar=(value,type)=>({type:typeof value,
+   value:typeof value===type&&(type==='string'||Number.isFinite(value))?(type==='string'?value.slice(0,128):value):null,
+   truncated:typeof value==='string'&&value.length>128});
+  const store_provenance={$className:diagnosticScalar(f.$className,'string'),currentPage:diagnosticScalar(f.currentPage,'number'),
+   proxy_class:diagnosticScalar(s.proxy_class,'string'),descriptors:s.provenance_descriptors};
+  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable',available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor,store_provenance};
   const cache=f.$className==='Ext.data.Store'&&f.isBufferedStore===false&&c.loading===false
    &&f.currentPage===1&&c.remoteFilter===false&&c.remoteSort===false&&s.pendingKeys.length===0
    &&s.proxy_class==='bg.ext.CollectionProxy'&&c.count===s.records.length
@@ -4165,7 +4197,7 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   const rows=s.rows.length===s.records.length&&s.rows.every((r,i)=>
    r.record_index===String(i)&&r.record_id===String(s.records[i].internalId)
    &&r.bound_view===dom.find(e=>e.id===s.element_id)?.attrs.id);
-  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows,available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor};
+  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows,available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor,store_provenance};
  });
  const result={owner,root_tid,root_ref,dom,stores,collector_revision:1,
   predicates:{status:'partial',evaluated:false,cached_windows:window,

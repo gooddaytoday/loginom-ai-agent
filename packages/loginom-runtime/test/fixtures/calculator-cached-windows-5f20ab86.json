@@ -1,0 +1,112 @@
+{
+  "length": 2,
+  "truncated": false,
+  "windows": [
+    {
+      "evaluated": false,
+      "value": null,
+      "reason": "cached_flags_unavailable",
+      "cache_complete": null,
+      "rows_complete": null,
+      "available_inputs": {
+        "count": {
+          "type": "number",
+          "isArray": false,
+          "length": null
+        },
+        "loading": {
+          "type": "boolean",
+          "isArray": false,
+          "length": null
+        },
+        "remoteFilter": {
+          "type": "boolean",
+          "isArray": false,
+          "length": null
+        },
+        "remoteSort": {
+          "type": "boolean",
+          "isArray": false,
+          "length": null
+        },
+        "source_membership": {
+          "type": "object",
+          "isArray": true,
+          "length": 6
+        },
+        "pendingKeys": {
+          "type": "object",
+          "isArray": true,
+          "length": 0
+        },
+        "isBufferedStore": {
+          "type": "object",
+          "isArray": false,
+          "length": null
+        }
+      },
+      "isBufferedStore_descriptor": {
+        "own": "absent",
+        "own_type": null,
+        "own_value": null,
+        "inherited": "absent",
+        "inherited_type": null,
+        "inherited_value": null,
+        "depth": null
+      }
+    },
+    {
+      "evaluated": false,
+      "value": null,
+      "reason": "cached_flags_unavailable",
+      "cache_complete": null,
+      "rows_complete": null,
+      "available_inputs": {
+        "count": {
+          "type": "number",
+          "isArray": false,
+          "length": null
+        },
+        "loading": {
+          "type": "boolean",
+          "isArray": false,
+          "length": null
+        },
+        "remoteFilter": {
+          "type": "boolean",
+          "isArray": false,
+          "length": null
+        },
+        "remoteSort": {
+          "type": "boolean",
+          "isArray": false,
+          "length": null
+        },
+        "source_membership": {
+          "type": "object",
+          "isArray": true,
+          "length": 6
+        },
+        "pendingKeys": {
+          "type": "object",
+          "isArray": true,
+          "length": 0
+        },
+        "isBufferedStore": {
+          "type": "object",
+          "isArray": false,
+          "length": null
+        }
+      },
+      "isBufferedStore_descriptor": {
+        "own": "absent",
+        "own_type": null,
+        "own_value": null,
+        "inherited": "absent",
+        "inherited_type": null,
+        "inherited_value": null,
+        "depth": null
+      }
+    }
+  ]
+}
