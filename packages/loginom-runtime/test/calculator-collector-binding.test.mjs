@@ -190,7 +190,7 @@ for(const kind of ['own-data','inherited-data','own-accessor','inherited-accesso
    assert.equal(w.isBufferedStore_descriptor.own,'absent');assert.equal(w.isBufferedStore_descriptor.own_value,null);assert.equal(w.isBufferedStore_descriptor.inherited_value,null);
    const p=w.store_provenance,d=p.descriptors;assert.equal(p.currentPage.value,1);
    if(kind==='own-data'){assert.equal(d.buffered.own,'data');assert.equal(d.buffered.own_value,false);assert.equal(p.$className.value,'Ext.data.Store')}
-   if(kind==='inherited-data'){assert.equal(d.buffered.inherited,'data');assert.equal(d.buffered.inherited_value,false);assert.equal(d.buffered.depth,1);assert.equal(d.$className.inherited_value,'Ext.data.Store');assert.equal(p.$className.value,null)}
+   if(kind==='inherited-data'){assert.equal(d.buffered.inherited,'data');assert.equal(d.buffered.inherited_value,false);assert.equal(d.buffered.depth,1);assert.equal(d.$className.inherited_value,'Ext.data.Store');assert.equal(p.$className.value,'Ext.data.Store')}
    if(kind.endsWith('accessor'))for(const key of ['$className','buffered']){const where=kind.startsWith('own-')?'own':'inherited';assert.equal(d[key][where],'accessor');assert.equal(d[key][where+'_value'],null)}
    if(kind==='absent')for(const key of ['$className','buffered']){assert.equal(d[key].own,'absent');assert.equal(d[key].inherited,'absent');assert.equal(d[key].depth,null)}
    if(kind==='depth-eight')for(const key of ['$className','buffered']){assert.equal(d[key].inherited,'data');assert.equal(d[key].depth,8)}
@@ -200,5 +200,92 @@ for(const kind of ['own-data','inherited-data','own-accessor','inherited-accesso
   }
   assert.throws(()=>validateCapture(r,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'before'}}),/LOGINOM_CAPTURE_CACHED_WINDOW/);
   assert.equal(f.events.includes('fetch'),false);assert.equal(f.events.includes('exclude'),false);
+ }finally{reset();}
+});
+
+// Optional exact parent source provides a before-control without a second tree.
+const parentClassSource=process.env.CALCULATOR_CAPTURE_CLASS_SOURCE
+ ?await (await import('node:fs/promises')).readFile(process.env.CALCULATOR_CAPTURE_CLASS_SOURCE,'utf8'):null;
+const classReader=parentClassSource
+ ?new Function(parentClassSource.slice(parentClassSource.indexOf('export function readCalculatorCaptureSurface')).replace('export function','return function'))()
+ :(await import(lib('workspace-ui.mjs'))).readCalculatorCaptureSurface;
+for(const target of ['store','proxy'])for(const kind of ['inherited','own-shadow','own-accessor','inherited-accessor','wrong-type','inherited-wrong-type','absent','depth-eight','depth-nine','long-string','byte-bound','utf8-bound'])test('operative class lookup '+target+' '+kind,async()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;let getters=0,storeReads=0,proxyReads=0;
+ const expected=target==='store'?'Ext.data.Store':'bg.ext.CollectionProxy';
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   storeReads++;const st=v.getStore(),getProxy=st.getProxy;let proxy=getProxy();
+   st.getProxy=()=>{proxyReads++;return proxy;};
+   const object=target==='store'?st:proxy;delete object.$className;
+   let proto={$className:expected};
+   if(kind==='depth-eight'||kind==='depth-nine')for(let i=0;i<(kind==='depth-eight'?7:8);i++)proto=Object.create(proto);
+   Object.setPrototypeOf(object,proto);
+   const accessor={get(){getters++;throw Error('class getter must not run')}};
+   if(kind==='own-shadow')object.$className='OwnClass';
+   if(kind==='own-accessor')Object.defineProperty(object,'$className',accessor);
+   if(kind==='inherited-accessor')Object.defineProperty(proto,'$className',accessor);
+   if(kind==='wrong-type')object.$className=false;
+   if(kind==='inherited-wrong-type')Object.defineProperty(proto,'$className',{value:{$className:expected}});
+   if(kind==='absent')Object.setPrototypeOf(object,null);
+   if(kind==='long-string')object.$className='C'.repeat(300);
+   if(kind==='byte-bound')object.$className='C'.repeat(513);
+   if(kind==='utf8-bound')object.$className='я'.repeat(257);
+   return st;
+  }};};
+  const read=()=>classReader({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS});
+  if(['byte-bound','utf8-bound'].includes(kind))assert.throws(read,/STRING_BOUND/);
+  else {
+   const result=read();assert.equal(result.stores.length,2);
+   for(const st of result.stores){const value=target==='store'?st.flags.$className:st.proxy_class;
+    if(['inherited','depth-eight'].includes(kind))assert.equal(value,expected);
+    else if(kind==='own-shadow')assert.equal(value,'OwnClass');
+    else if(kind==='long-string')assert.equal(value,'C'.repeat(300));
+    else assert.equal(typeof value,'object');
+   }
+   if(['inherited','depth-eight'].includes(kind))assert.ok(result.predicates.cached_windows.every(w=>w.value===true));
+   if(kind==='long-string')assert.ok(result.predicates.cached_windows.every(w=>w.value===false));
+  }
+  assert.equal(storeReads,['byte-bound','utf8-bound'].includes(kind)?1:2);assert.equal(proxyReads,storeReads);assert.equal(getters,0);
+ }finally{reset();}
+});
+for(const target of ['store','proxy'])for(const phase of ['descriptor','prototype'])for(const failure of [Error('operative class failure'),null,false,0,'',undefined])test('operative class lookup preserves exact rejection '+target+' '+phase+' '+String(failure),()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   let st=v.getStore();
+   const trap={getOwnPropertyDescriptor(o,k){if(k==='$className'&&phase==='descriptor')throw failure;return Reflect.getOwnPropertyDescriptor(o,k)},getPrototypeOf(o){if(phase==='prototype')throw failure;return Reflect.getPrototypeOf(o)}};
+   if(target==='store'){if(phase==='prototype')delete st.$className;st=new Proxy(st,trap);}
+   else {const get=st.getProxy;st.getProxy=()=>{const p=get();if(phase==='prototype')delete p.$className;return new Proxy(p,trap)};}
+   return st;
+  }};};
+  let threw=false,caught;try{classReader({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS})}catch(e){threw=true;caught=e}
+  assert.equal(threw,true);assert.equal(caught,failure);
+ }finally{reset();}
+});
+test('operative inherited class metadata cannot admit actual b7 absent/null boolean windows',async()=>{
+ const f=pageDouble('success'),native=globalThis.Ext.getCmp;
+ try{
+  globalThis.Ext.getCmp=id=>{const v=native(id);return {...v,getStore:()=>{
+   const st=v.getStore();delete st.$className;delete st.isBufferedStore;Object.setPrototypeOf(st,{$className:'Ext.data.Store'});
+   const get=st.getProxy;st.getProxy=()=>{const p=get();delete p.$className;Object.setPrototypeOf(p,{$className:'bg.ext.CollectionProxy'});return p};return st;
+  }};};
+  const result=classReader({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS});
+  for(const w of result.predicates.cached_windows){assert.equal(w.evaluated,false);assert.equal(w.value,null);assert.equal(w.isBufferedStore_descriptor.own_value,null);assert.equal(w.isBufferedStore_descriptor.inherited_value,null)}
+  await assert.rejects(captureCalculator({binding:binding(),identity,browser:f.browser,record:async()=>{}}),/CACHED_WINDOW/);
+  assert.equal(f.events.includes('exclude'),false);assert.equal(f.events.filter(e=>e==='cancel').length,1);
+ }finally{reset();}
+});
+
+test('saved native b7 windows retain absent/null and strict refusal after class lookup fix',async()=>{
+ const f=pageDouble('success');
+ try{
+  const {readFile}=await import('node:fs/promises');
+  const factual=JSON.parse(await readFile(new URL('./fixtures/calculator-cached-windows-b7e68c0d.json',import.meta.url),'utf8'));
+  const result=classReader({owner,root_tid:'root',root_ref:'ref',limits:CAPTURE_LIMITS});
+  result.predicates.cached_windows=structuredClone(factual.windows);
+  assert.deepEqual(captureWindowDiagnostic(result),factual);
+  const {validateCapture}=await import(pathToFileURL(root+'/src/acceptance/calculator-grouped-before-done-v1.mjs'));
+  assert.throws(()=>validateCapture(result,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'before'}}),/LOGINOM_CAPTURE_CACHED_WINDOW/);
+  for(const w of factual.windows){assert.equal(w.isBufferedStore_descriptor.own_value,null);assert.equal(w.isBufferedStore_descriptor.inherited_value,null);assert.equal(w.evaluated,false);assert.equal(w.value,null)}
  }finally{reset();}
 });

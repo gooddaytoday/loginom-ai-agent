@@ -4091,6 +4091,19 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   if(typeof v==='number'){if(!Number.isFinite(v))fail('FINITE');return v;}
   if(typeof v==='string'){if(new TextEncoder().encode(v).length>limits.string)fail('STRING_BOUND');return v;}return {object_id:id(v)};};
  const own=(o,k)=>{const d=o&&Object.getOwnPropertyDescriptor(o,k);return !d?{missing:true}:!('value'in d)?{accessor_not_read:true}:scalar(d.value);};
+ // Operative class metadata: first descriptor wins; never invoke accessors.
+ const classString=o=>{
+  if(!o)return {missing:true};let current=o;
+  for(let depth=0;depth<=8;depth++){
+   const d=Object.getOwnPropertyDescriptor(current,'$className');
+   if(d){if(!('value'in d))return {accessor_not_read:true};
+    return typeof d.value==='string'?scalar(d.value):{class_type:typeof d.value};}
+   if(depth===8)return {depth_bound:true};
+   current=Object.getPrototypeOf(current);
+   if(current===null)return {missing:true};
+  }
+  return {depth_bound:true};
+ };
  const rect=e=>{const r=e.getBoundingClientRect();if(![r.x,r.y,r.width,r.height,e.clientWidth,e.clientHeight,e.scrollWidth,e.scrollHeight,e.scrollLeft,e.scrollTop].every(Number.isFinite))fail('GEOMETRY');return {x:r.x,y:r.y,width:r.width,height:r.height,
   clientWidth:e.clientWidth,clientHeight:e.clientHeight,scrollWidth:e.scrollWidth,scrollHeight:e.scrollHeight,scrollLeft:e.scrollLeft,scrollTop:e.scrollTop};};
  const dom=[],stack=[root];while(stack.length){
@@ -4164,10 +4177,10 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
    isBufferedStore_descriptor:bufferedDescriptor(store),
    provenance_descriptors:Object.fromEntries(['$className','buffered'].map(key=>[key,provenanceDescriptor(store,key)])),
-   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,own(store,k)])),
+   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,k==='$className'?classString(store):own(store,k)])),
    cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
     remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
-   proxy_class:own(proxy,'$className'),pendingKeys:pendingKeys?.map(scalar)??null,
+   proxy_class:classString(proxy),pendingKeys:pendingKeys?.map(scalar)??null,
    source_membership:source?.items.map(id)??null,cache_membership:data.items.map(id),records,rows,geometry:rect(element)};
  });
  // These are diagnostic cache/row predicates, not the observer's ordinary
