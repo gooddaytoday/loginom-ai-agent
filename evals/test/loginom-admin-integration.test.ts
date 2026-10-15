@@ -68,11 +68,15 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
 }, 90_000)
 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
+liveIntegration("native targeted close preserves a different user's active browser and autosave", async () => {
+  const result = await nativeUserCapability("peer-close")
+  expect(result).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: "eval-b" }, backup: { periodMs: 5000, modified: true } } })
+}, 180_000)
 liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components") {
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -100,7 +104,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     const abort = new AbortController()
     const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
       env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
-      timeoutMs: 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
+      timeoutMs: mode === "peer-close" ? 90_000 : 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
     const channel = createJournaledAdminChannel(output.readable, input.writable, journal)
     const request = async (op: AdminOperation, payload: unknown) => {
       if (op !== "dispose") expect(await readServerIdentity(file)).toEqual(pair.identity)
@@ -165,6 +169,68 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         const peerActivation = { ...neighborPayload, owned: { ...peerOwned, secretHash: neighborPayload.secretHash }, expectedPolicy: after }
         expect(await request("reconcile-user", { ...peerActivation, phase: "activate" })).toMatchObject({ outcome: "confirmed" })
         return { user: peer, activation: peerActivation }
+      }
+      if (mode === "peer-close") {
+        const neighbor = await preparePeer()
+        const writer = await request("reconcile-user", { ...activation, phase: "session-package-crash-probe" })
+        expect(writer.outcome).toBe("confirmed")
+        const binding = (writer.data as { binding: { remoteKey: string; name: string; createdAt: string } }).binding
+        const peer = await nativeAdminPeer(runtime, file, pair.identity, root, evidence, "active-user")
+        try {
+          expect(await peer.request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
+            credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(peer.profile, "loginom/runtime/admin/attempts/context/browser-profile") }))
+            .toMatchObject({ outcome: "confirmed" })
+          const canary = crypto.randomUUID(), canaryRoot = `${file.server.storageRoot}/${neighbor.user.name}`, canaryPath = `${canaryRoot}/peer-preserve.txt`
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${canaryRoot}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sh -c ${'printf %s "$1" > "$2"'} sh ${canary} ${canaryPath}`.quiet()
+          const canaryBefore = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${canaryPath}`.quiet()).text()
+          expect(canaryBefore.split(" ")[0]).toBe(new Bun.CryptoHasher("sha256").update(canary).digest("hex"))
+          const pending = peer.request("reconcile-user", { ...neighbor.activation, phase: "session-backup-probe" })
+          try {
+            const before = await (async () => {
+              const deadline = Date.now() + 15_000
+              while (Date.now() < deadline) {
+                const observed = await request("inspect", {})
+                if ((observed.data as { rawSessions: { name: string; packageCount: number; pendingDisconnect: boolean }[] }).rawSessions
+                  .some(row => row.name.startsWith(neighbor.user.name + ":") && row.packageCount === 1 && !row.pendingDisconnect)) return observed
+                await Bun.sleep(100)
+              }
+              throw Error("ACTIVE_PEER_SESSION_UNOBSERVED")
+            })()
+            const row = (before.data as { rawSessions: { objectId: string; name: string; createdAt: string; packageCount: number; pendingDisconnect: boolean }[] })
+              .rawSessions.filter(row => row.name.startsWith(neighbor.user.name + ":"))
+            expect(row).toHaveLength(1)
+            expect(row[0]).toMatchObject({ packageCount: 1, pendingDisconnect: false })
+            const closed = await request("close-session", { proofId: writer.id, session: binding })
+            expect(closed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+            const after = await request("inspect", {})
+            const remaining = (after.data as { rawSessions: typeof row }).rawSessions
+            expect(remaining.find(current => current.objectId === row[0]!.objectId)).toEqual(row[0])
+            expect(remaining.some(current => current.objectId === binding.remoteKey || current.name === binding.name && current.createdAt === binding.createdAt)).toBe(false)
+            const canaryAfter = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${canaryPath}`.quiet()).text()
+            expect(canaryAfter).toBe(canaryBefore)
+            const continued = await pending
+            await writeLeaseReceipt(path.join(evidence, "peer-close-observations.json"), { writer, before, closed, after, continued, canaryBefore, canaryAfter })
+            // Native managed-row proxy IDs differ across admin contexts; the qualified tuple remains exact.
+            expect(continued).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: neighbor.user.name, userObjectId: neighbor.user.objectId },
+              binding: { username: neighbor.user.name, serverEpoch: pair.identity.serverEpoch, name: row[0]!.name, createdAt: row[0]!.createdAt },
+              backup: { modified: true, periodMs: 5000 } } })
+            const autosave = `${canaryRoot}/backup-probe.lgp.autosave`
+            const copy = path.join(evidence, "peer-autosave.lgp.autosave")
+            await Bun.$`docker --host unix:///var/run/docker.sock cp ${`${pair.identity.containerId}:${autosave}`} ${copy}`.quiet()
+            await chmod(copy, 0o600)
+            const bytes = await Bun.file(copy).bytes()
+            expect(bytes.length).toBeGreaterThan(0)
+            await writeLeaseReceipt(path.join(evidence, "peer-survival.json"), { identity: pair.identity, writer, before, closed, after, continued,
+              commands: await Promise.all([writer, before, closed, after].map(async reply => ({ id: reply.id, command: await readLeaseReceipt(path.join(journal, `${reply.id}.json`)) }))),
+              peerCommand: await readLeaseReceipt(path.join(evidence, "reconnected", "commands", `${continued.id}.json`)),
+              canary: { path: canaryPath, before: canaryBefore, after: canaryAfter },
+              autosave: { path: copy, bytes: bytes.length, sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") },
+              sessionBackupQualified: false, storageDeletionAllowed: false, nextAdmissionAllowed: false })
+            complete = true
+            return continued
+          } finally { await pending.catch(() => undefined) }
+        } finally { expect(await peer.dispose()).toMatchObject({ outcome: "confirmed", data: { transportDisconnect: "confirmed" } }) }
       }
       if (mode === "components") {
         const neighbor = await preparePeer()
@@ -480,6 +546,11 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       expect(await request("close-session", { proofId: pendingPackage.id, session: pendingPackageData.binding }))
         .toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } })
       complete = true
+    } catch (error) {
+      await writeLeaseReceipt(path.join(evidence, "native-primary-failure.json"), {
+        code: error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : "NATIVE_ASSERTION_FAILED",
+        location: error instanceof Error ? error.stack?.match(/loginom-admin-integration\.test\.ts:\d+:\d+/)?.[0] ?? null : null })
+      throw error
     } finally {
       const disposed = await request("dispose", {}).catch(() => undefined)
       if (disposed?.outcome !== "confirmed") abort.abort()
@@ -494,8 +565,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(["storage", "components"].includes(mode) ? 2 : 1)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(["storage", "components"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(["storage", "components", "peer-close"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(["storage", "components", "peer-close"].includes(mode) ? 2 : 1)
       }
     }
   } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
@@ -687,7 +758,7 @@ integration("real Node driver: missing or malformed private credentials fail bef
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
-async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRuntime>>, file: SlotFile, identity: ServerIdentity, root: string, evidence: string) {
+async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRuntime>>, file: SlotFile, identity: ServerIdentity, root: string, evidence: string, mode?: "active-user") {
   const directory = path.join(evidence, "reconnected")
   await mkdir(directory, { mode: 0o700 })
   await mkdir(path.join(directory, "commands"), { mode: 0o700 })
@@ -697,12 +768,12 @@ async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRun
   const abort = new AbortController()
   const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
     env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
-    timeoutMs: 30_000, profileDir: profile, outDir: directory, stdin: input.readable, stdout: output.writable, signal: abort.signal,
+    timeoutMs: mode === "active-user" ? 60_000 : 30_000, profileDir: profile, outDir: directory, stdin: input.readable, stdout: output.writable, signal: abort.signal,
     owner: { kind: "admin", id: directory } })
   const channel = createJournaledAdminChannel(output.readable, input.writable, path.join(directory, "commands"))
   const request = async (op: AdminOperation, payload: unknown) => {
     if (op !== "dispose") expect(await readServerIdentity(file)).toEqual(identity)
-    return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + 20_000, payload })
+    return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: identity, deadline: Date.now() + (mode === "active-user" ? 30_000 : 20_000), payload })
   }
   return { request, profile, async dispose() {
     const disposed = await request("dispose", {}).catch(() => undefined)
