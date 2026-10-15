@@ -53,6 +53,14 @@ export async function checkResourceEvidence(input: {
     processTimeline: manifest && (!input.processProofs || manifest.slots.some(slot =>
       !processWindows.some(window => window.kind === "slot" && window.id === slot.id)))
       ? { status: "incomplete" as const, codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] }
+      : manifest && evidence.samples.some(value => {
+        const processes = acceptanceObject(acceptanceObject(value).processes)
+        return Array.isArray(processes.scopes) && processes.scopes.some(value => {
+          const scope = acceptanceObject(value), owner = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
+          return !processWindows.some(window => window.producerPid === processes.producer_pid && window.kind === owner.kind && window.id === owner.id &&
+            window.launcher.pid === launcher.pid && window.launcher.starttime === launcher.starttime)
+        })
+      }) ? { status: "incomplete" as const, codes: ["RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE"] }
       : processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
       processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
         window.launcher.pid === owner.launcher.pid && window.launcher.starttime === owner.launcher.starttime).length === 1) &&

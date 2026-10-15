@@ -36,9 +36,13 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       if (Date.now() > deadline) throw Error("Lifetime baseline frame did not arrive")
       await Bun.sleep(10)
     }
-    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
-      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "slot", id: "a" } })
-    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    await mkdir(path.join(root, "observed-judge"), { mode: 0o700 })
+    const runs = await Promise.all([superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner: { kind: "slot", id: "a" } }),
+    superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(2600)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: path.join(root, "observed-judge"), owner: { kind: "judge", id: "resource-judge" } })])
+    const run = runs[0]!
+    confirmed = runs.every(run => run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete)
     expect(confirmed).toBe(true)
     const lifetime = (await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime
     expect(lifetime).toEqual(run.processCleanup.lifetime)
@@ -64,7 +68,13 @@ test("resource evidence covers the actual persisted launcher lifetime from dispa
       view: samples[0].host.collector_cgroup.view, budget: budget.source }
     expect(await checkResourceEvidence(request)).toMatchObject({ status: "passed", codes: [] })
     expect((await checkResourceEvidence({ ...request, manifest: manifests[0]!.source })).checks.processTimeline)
-      .toEqual({ status: "passed", codes: [] })
+      .toEqual({ status: "incomplete", codes: ["RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE"] })
+    const judgeProof = await Bun.file(path.join(root, "observed-judge/process-cleanup.json")).json()
+    const judgeSource = { file: path.join(root, "observed-judge/process-cleanup.json"), producerPid: process.pid, owner: judgeProof.lifetime.owner,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(judgeProof)).digest("hex") }
+    expect((await checkResourceEvidence({ ...request, manifest: manifests[0]!.source,
+      coverage: { ...request.coverage, owners: [...request.coverage.owners, { ...judgeProof.lifetime.owner, launcher: judgeProof.lifetime.launcher }] },
+      processProofs: [source, judgeSource] })).checks.processTimeline).toEqual({ status: "passed", codes: [] })
     expect((await checkResourceEvidence({ ...request, manifest: manifests[1]!.source })).checks.processTimeline)
       .toEqual({ status: "incomplete", codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] })
     await expect(readResourceProcessWindows([{ ...source, producerPid: process.pid + 1 }])).rejects.toThrow("RESOURCE_PROCESS_PROOF_UNCONFIRMED")
