@@ -1733,6 +1733,14 @@ storageDeletionAllowed=false and nextAdmissionAllowed=false. The fake CLI and
 actual OS peer barrier qualify local composition; native A/B qualification is
 still blocked before this step by the retained process-identity incident.
 
+Management session accounting also accepts a separately sealed slot while the
+command remains cli_admitted. The inventory reader exposes the validated seal
+source; the collector rechecks it before returning. An unsealed slot still
+refuses accounting, unknown same-user rows still refuse closure, and peer-user
+rows remain outside that slot's claims. The finalizing all-slot path is retained.
+Data-only snapshot tests qualify this source gate; positive native session
+accounting under active B remains unqualified.
+
 The actual OS child independently reads its registration before executing.
 Missing registration RED→GREEN1 PASS/27 (3.54s); parallel owners2 PASS/30
 (5.10s), related69 PASS/358 (16.61s), typecheck/diff PASS. Cold native1 PASS/56 (193.44s),181 source/closure/cleanup audit checks;

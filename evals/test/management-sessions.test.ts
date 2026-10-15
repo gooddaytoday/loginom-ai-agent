@@ -5,15 +5,16 @@ import path from "node:path"
 import { acquireEnvironmentLeases } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { collectManagementSessions } from "../src/management-sessions"
+import { sealManagementProcessInventory } from "../src/management-process-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
 
-test.each(["EVAL-A:9", "eval-a", "eval-a:9"])("management accounting refuses an unowned same-user row %s", async name => {
+test.each([["finalizing", "EVAL-A:9"], ["finalizing", "eval-a"], ["finalizing", "eval-a:9"], ["cli_admitted", "EVAL-A:9"]])("management accounting at %s refuses an unowned same-user row %s", async (phase, name) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-accounting-")), fixture = await parallelFixture(root)
   const journal = path.join(fixture.slots.controller.stateDir, "command.json"), inventoryFile = path.join(fixture.slots.controller.stateDir, "management.json")
-  const command = { version: 2, kind: "unactivated-preparation", commandId: "accounting", identity, phase: "finalizing" }
+  const command = { version: 2, kind: "unactivated-preparation", commandId: "accounting", identity, phase, slotIds: ["a"] }
   await writeLeaseReceipt(journal, command)
   const environment = await acquireEnvironmentLeases(fixture.slots, 1, identity, journal, fixture.lockRoot), lease = environment.slots[0]!
   try {
@@ -21,7 +22,9 @@ test.each(["EVAL-A:9", "eval-a", "eval-a:9"])("management accounting refuses an 
     const inventory = { version: 2, kind: "management-processes", commandId: command.commandId, journal, identity,
       leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] }
     await writeLeaseReceipt(inventoryFile, inventory)
-    await writeLeaseReceipt(journal, { ...command, managementSources: [{ path: inventoryFile, sha256: hash(inventory) }] })
+    await writeLeaseReceipt(journal, { ...command, ...(phase === "finalizing"
+      ? { managementSources: [{ path: inventoryFile, sha256: hash(inventory) }] }
+      : { managementInventories: [{ file: inventoryFile, slotId: lease.slot.id, leaseToken: lease.token, profileDir: lease.slot.profileDir }] }) })
     const directory = path.join(fixture.slots.controller.stateDir, "admin-codec")
     await mkdir(path.join(directory, "commands"), { recursive: true, mode: 0o700 })
     const inspected = { version: 1, kind: "loginom-admin-command", id: "unknown", op: "inspect", expectedIdentity: identity,
@@ -33,6 +36,11 @@ test.each(["EVAL-A:9", "eval-a", "eval-a:9"])("management accounting refuses an 
         pendingDisconnect: true, packageCount: 0, activeOperations: null }],
       command: { path: commandFile, sha256: hash(inspected) }, reply: { id: inspected.id, sha256: inspected.replyHash } }
     await writeLeaseReceipt(target, snapshot)
+    if (phase === "cli_admitted") {
+      await expect(collectManagementSessions(fixture.slots, lease, path.join(root, "unused-secret"), inventoryFile,
+        { path: target, sha256: hash(snapshot) })).rejects.toThrow("MANAGEMENT_SESSION_UNCONFIRMED")
+      await sealManagementProcessInventory(fixture.slots, environment.server, lease, inventoryFile)
+    }
     await expect(collectManagementSessions(fixture.slots, lease, path.join(root, "unused-secret"), inventoryFile,
       { path: target, sha256: hash(snapshot) })).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN")
     const peer = { ...snapshot, sessions: [{ ...snapshot.sessions[0]!, name: "eval-b:9" }] }
