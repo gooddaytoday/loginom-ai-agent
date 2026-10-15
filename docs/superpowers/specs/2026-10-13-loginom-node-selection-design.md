@@ -1,11 +1,11 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты23 candidate,
-policy PASS во всех23. Один итоговый расчёт правильный,22 результата не получены.
-Одна сессия завершена штатно,22 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты24 candidate,
+policy PASS во всех24. Один итоговый расчёт правильный,23 результата не получены.
+Одна сессия завершена штатно,23 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось2 candidate, включая текущую explicit-js/3. Sequential
-runner238969/exec40520 продолжил серию2026-10-15T02:13:14.879128+00:00;
+Остался1 candidate, текущая tags/3. Sequential
+runner264196/exec84159 продолжил серию2026-10-15T02:26:33.670903+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -17,6 +17,27 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+Explicit-js/3 closed02:19:24.618Z: policy PASS `806bc279…`, mandatory JS/failure
+review `7f7f3f7a…`;24messages/92parts/25tools/75events/1925runtime, nochildren.
+Actualuserrequest JScategoryaggregation подтверждён. Один JSapply/source1024B/25LF
+SHA118871bae6234b49fe32f7d8f8ee51a47da3c9714a353c750e2b49491e97f393,
+GUIDfc1e301a… SUCCEEDED5rows: dynamicactualRowCount/categorykeys/categories/count/
+centsSUM/means. Нет fixed500/category/outputvalues/IO/callback/sort/filter.
+Std Import500→JS→Sort5rows→ExportExecutecompleted; JS→Sortpreflight/inventorycomplete/
+settingsunchanged и actualsource/draft/finish связаны. Exportfile-search budget отказал,
+новыхapply/JS после ошибки нет. CSV/LGP/oracle не получены; CLI1/cleanupfalse/runtimefalse/
+APPLY_MISMATCH сохранены. JAVASCRIPT_NODE_REQUIRED означает unknown savedLGPcount,
+а не отсутствие реально выполненного JS.
+Own302closed02:23:45.804Z/admin303logout02:23:47.406Z/browserclosed02:23:48.613Z;
+9actualPIDgone/exactguardarchive02:23:49.570962Z, unknown298+301 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+19case/27recovery readonly; descriptor `674bd205…`.
+Independent finalrelease review `2abebb72…`/readback `904d16e3…` approved;
+actualgate2026-10-15T02:26:33.475Z разрешил technical-failed.
+Originalattempt `2a56705b…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
+Native-row-count erratum `1c8f401b…` связан: все9rawrows полны, JSdeactivation actual1,
+исходный auxiliarycounter0 не переписан. Дополнительной JSsourceversion из этого не выводится.
 
 First-last-touch/3 closed02:05:52.193Z: policy PASS `5235ac00…`, mandatory
 review `7096df41…`;29messages/107parts/31tools/90events/2476runtime, JS0/nochildren.
