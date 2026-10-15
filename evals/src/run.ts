@@ -318,7 +318,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const { config, task, attempt } = input
   const outDir = path.join(input.runDir, task.id, String(attempt))
   const workdir = path.join(config.agent.workspaceRoot, input.runId, task.id, String(attempt))
-  await mkdir(outDir, { recursive: true })
+  await mkdir(outDir, { recursive: true, mode: 0o700 })
   if (!config.dryRun && (config.agent.cliMode === "binary" || input.slot)) {
     if (config.agent.cliMode === "binary" && config.slotsFile && !input.slot) throw new SandboxFailure("SLOT_CONTEXT_REQUIRED")
     if (input.slot && (config.profileDir !== input.slot.lease.slot.profileDir || path.resolve(config.agent.workspaceRoot) !== input.slot.lease.slot.workspaceRoot ||
@@ -466,7 +466,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
 async function archiveInfraAttempt(outDir: string) {
   const files = await readdir(outDir)
   const archive = path.join(outDir, "infra-error")
-  await mkdir(archive)
+  await mkdir(archive, { mode: 0o700 })
   // Корневой результат нужен и при прерывании до повторного запуска.
   await Promise.all(files.map((file) => file === "result.json"
     ? cp(path.join(outDir, file), path.join(archive, file))

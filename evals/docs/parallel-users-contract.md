@@ -1983,3 +1983,19 @@ now rejects that temporal mismatch and accepts the complete window. Target1/13
 PASS4.92s, related86/606 PASS26.47s with runner30s, typecheck/diff PASS. Component
 declared-only subwindow behavior is unchanged; full runtime actor journal and
 pre-spawn admission remain separate unfinished gates.
+
+
+New attempt directories and infra-error archives are created0700 so the normal
+private resource proof reader can qualify both the original CLI call and its
+retry in place. Existing directories and historical runs are not chmodded. An
+actual fixture main retry first failed RESOURCE_OUTPUT_PRIVATE, then passed the
+public readResourceProcessWindows for two distinct launcher births of slot a
+(target1/11,19.59s; typecheck/diff PASS). This qualifies those persisted process
+sources; it does not yet supply a complete pre-spawn run actor inventory.
+
+Related main/parallel/resource run:55 PASS/2 FAIL/459 assertions341.77s; the retry
+case also passed15.70s. Remaining failures are the historical fixed-sleep
+round-crossing assertion and an explicit30s slot-listing test timeout. The
+former assumes complete fast recovery/archive/receipts within the slow CLI's3s
+sleep; queue execute includes that durable cleanup and promises no such3s bound.
+No production queue/deadline change or successful full regression is claimed.
