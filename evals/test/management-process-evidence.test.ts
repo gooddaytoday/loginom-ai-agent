@@ -53,7 +53,7 @@ test("one management slot seals before further dispatch while its peer continues
       slotId: a.lease.slot.id, profileDir: a.lease.slot.profileDir, producerPid: process.pid })).rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_CHANGED")
     expect(await Bun.file(sealed.source.path).text()).toBe(seal)
   } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]); await rm(root, { recursive: true, force: true }) }
-}, 30_000)
+})
 
 test("management process inventory precedes dispatch and binds actual continuous process closure to its slot", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-evidence-")), fixture = await parallelFixture(root)
