@@ -14,6 +14,7 @@ function installOriginalUserPublisher(origin) {
   if(descriptor(root,key))return; // Never replace a previous/foreign publisher.
   let sample,acquisition,failure,checks=[],sealed=false,pendingSS;
   let initialScript,modifierScript,acquisitionDefinition,userDefinition;
+  const modifierReads={};
   let initializers=Object.freeze({complete:false,reason:'INITIAL_SS_NOT_OBSERVED',sourceExecutionQualified:false,closureIdentityQualified:false});
   const unavailable=()=>{throw Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE')};
   const remember=error=>{failure??={value:error}};
@@ -424,6 +425,7 @@ function installOriginalUserPublisher(origin) {
           const scriptIdentityComplete=!!(initialScript?.complete&&modifierScript?.complete&&records.every(r=>r.execution.complete));
           if(scriptIdentityComplete&&records.find(r=>r.kind==='FileStorage').execution.script!==records.find(r=>r.kind==='StreamPersist').execution.script)unavailable();
           initializers=Object.freeze({complete:true,records:Object.freeze(records.slice()),initialScript,modifierScript,scriptIdentityComplete,
+            modifierReads:Object.freeze({...modifierReads}),
             sourceExecutionQualified:false,closureIdentityQualified:false});
         }
       }catch(error){remember(error)}
@@ -433,17 +435,71 @@ function installOriginalUserPublisher(origin) {
     checks.push(()=>{const now=descriptor(ss,'initClass');if(!now||Reflect.ownKeys(d).some(key=>key==='value'
       ?now.value!==(restored?original:retainedInitClass):now[key]!==d[key]))unavailable()});
   };
+  // Witness the actual read consumed by the fixed modifier, before assignment.
+  // The original function is returned unwrapped: the IIFE captures that exact ref.
+  // This is a bounded read/transition receipt, not access to an opaque closure.
+  const modifierRead=(ss,name,initial)=>{
+    if(!scriptReaders)return undefined;
+    const script=readScriptSlot(scriptReaders.current,originalDocument);
+    if(!script)return undefined;
+    const url=readScriptSlot(scriptReaders.src,script);
+    if(typeof url!=='string')unavailable();
+    const parsed=new scriptReaders.URL(url);
+    if(parsed.origin+parsed.pathname!==origin+'/app/bg/js/bg.mscorlib.js')return undefined;
+    if(modifierReads[name])unavailable();
+    const execution=captureScript('bg/js/bg.mscorlib.js');
+    return Object.freeze({receiver:ss,name,original:initial.value,execution,
+      descriptor:Object.freeze({...initial}),beforeAssignment:true});
+  };
+  const finishModifierRead=(ss,name,read,value)=>{
+    if(!read)return undefined;
+    const execution=captureScript('bg/js/bg.mscorlib.js');
+    if(read.receiver!==ss||execution.script!==read.execution.script
+      ||execution.integrityReceipt!==read.execution.integrityReceipt)unavailable();
+    const receipt=Object.freeze({read,replacement:value,execution,
+      sameScriptTransition:true,closureIdentityQualified:false});
+    modifierReads[name]=receipt;return receipt;
+  };
+  const awaitShallowCopy=ss=>{
+    if(!originalIntegrity)return; // Ordinary login keeps its existing data slot.
+    const initial=descriptor(ss,'shallowCopy');
+    if(!initial||!('value'in initial)||typeof initial.value!=='function'||!initial.configurable)return;
+    const parent=prototype(ss),functionParent=prototype(initial.value);
+    checks.push(()=>{if(prototype(ss)!==parent||prototype(initial.value)!==functionParent)unavailable()});
+    let waiting=true,read;
+    const get=()=>{try{const next=modifierRead(ss,'shallowCopy',initial);if(next){if(read)unavailable();read=next}}catch(error){remember(error)}return initial.value};
+    const set=value=>{
+      const current=descriptor(ss,'shallowCopy');
+      if(!current||current.get!==get||current.set!==set||current.enumerable!==initial.enumerable||!current.configurable){remember(Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE'));return}
+      define(ss,'shallowCopy',{...initial,value});waiting=false;
+      try{
+        if(typeof value!=='function'||apply(toString,value,[]).replace(/\r\n/g,'\n')!=="function bg$shallowCopy(source, target) {\n    // \u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c, \u0447\u0442\u043e source != null && source != undefined\n    if (source) ss_shallowCopy(source, target);\n}")unavailable();
+        finishModifierRead(ss,'shallowCopy',read,value);
+        if(originalIntegrity&&!read)unavailable();
+        hold(ss,'shallowCopy');
+      }catch(error){remember(error)}
+    };
+    define(ss,'shallowCopy',{get,set,enumerable:initial.enumerable,configurable:true});
+    checks.push(()=>{if(waiting){const d=descriptor(ss,'shallowCopy');if(!d||d.get!==get||d.set!==set||d.enumerable!==initial.enumerable||!d.configurable)unavailable()}});
+  };
   const awaitFinalInitializer=ss=>{
     const initial=descriptor(ss,'initClass');
     if(!initial||!('value'in initial)||typeof initial.value!=='function'||!initial.configurable)return;
-    let waiting=true;
-    const get=()=>initial.value;
+    const parent=prototype(ss),functionParent=prototype(initial.value);
+    checks.push(()=>{if(prototype(ss)!==parent||prototype(initial.value)!==functionParent)unavailable()});
+    let waiting=true,read;
+    const get=()=>{try{const next=modifierRead(ss,'initClass',initial);if(next){if(read)unavailable();read=next}}catch(error){remember(error)}return initial.value};
     const set=value=>{
+      const current=descriptor(ss,'initClass');
+      if(!current||current.get!==get||current.set!==set||current.enumerable!==initial.enumerable||!current.configurable){remember(Error('TERMINAL_USER_PUBLISHER_UNAVAILABLE'));return}
       define(ss,'initClass',{...initial,value});waiting=false;
       try{
         // Shape only: this does not qualify the executing module/lexical environment.
         if(typeof value!=='function'||apply(toString,value,[]).replace(/\r\n/g,'\n')!=="function bg$initClass(ctor, asm, members, baseType, interfaces, __options) {\n    if (baseType === undefined && arguments.length >= 4)\n        console.warn(\"BaseType for \" + ctor.__typeName + \" class is undefined\");\n    ss_initClass(ctor, asm, members, baseType, interfaces);\n\n    var xForcePrepareProperties = false;\n    var xDisablePrepareProperties = false;\n    if (typeof __options !== \"undefined\") {\n        var xForcePrepareProperties = !!__options.forcePrepareProperties;\n        var xDisablePrepareProperties = !!__options.disablePrepareProperties;\n    }\n\n    // \u041f\u0440\u043e\u043f\u0443\u0441\u043a\u0430\u0435\u043c \u0434\u0436\u0435\u043d\u0435\u0440\u0438\u043a\u0438\n    if (typeof ctor.__genericTypeDefinition === \"undefined\" || xForcePrepareProperties) {\n        if (!xDisablePrepareProperties/* && xForcePrepareProperties*/) {\n            ss.prepareProperties(ctor);\n        }\n    }\n}")unavailable();
-        modifierScript=captureScript('bg/js/bg.mscorlib.js');bindInitializers(ss,initial.value);
+        modifierScript=captureScript('bg/js/bg.mscorlib.js');
+        finishModifierRead(ss,'initClass',read,value);
+        if(originalIntegrity&&!read)unavailable();
+        bindInitializers(ss,initial.value);
       }catch(error){remember(error)}
     };
     define(ss,'initClass',{get,set,enumerable:initial.enumerable,configurable:true});
@@ -451,7 +507,7 @@ function installOriginalUserPublisher(origin) {
   };
   // Only a namespace born after this init script can witness initializers.
   // Existing ss is deliberately left alone; no late reflection can repair it.
-  try{if(!descriptor(root,'ss')){arm(root,'ss',ss=>{pendingSS=undefined;initialScript=captureScript('bg/js/mscorlib.js');awaitFinalInitializer(ss)});pendingSS=descriptor(root,'ss');}
+  try{if(!descriptor(root,'ss')){arm(root,'ss',ss=>{pendingSS=undefined;initialScript=captureScript('bg/js/mscorlib.js');awaitShallowCopy(ss);awaitFinalInitializer(ss)});pendingSS=descriptor(root,'ss');}
     else initializers=Object.freeze({complete:false,reason:'INITIAL_SS_ALREADY_PRESENT',sourceExecutionQualified:false,closureIdentityQualified:false});
   }catch(error){remember(error)}
   try{arm(root,'bg',bg=>arm(bg,'app',app=>{
