@@ -486,26 +486,28 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                   const roots = [["virtual", `/${peer.name}`], ["absolute", `/workdir/UserStorage/${peer.name}`], ["traversal", `../${peer.name}`],
                     ...shared.flatMap(name => [[`shared:${name}:virtual`, `/${name}`], [`shared:${name}:absolute`, `/workdir/UserStorage/${name}`], [`shared:${name}:traversal`, `../${name}`]])]
                   for (const [pathKind, root] of roots) {
-                    for (const operation of ["read", "write", "copy-out", "copy-in"]) {
-                      const denied = await (async () => {
-                        try {
-                          if (operation === "read") {
-                            const stream = await storage.OpenFile(`${root}/access-probe.lgp`, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
-                            try { await stream.ReadBuffer(new Uint8Array(1)) }
-                            finally { await ReleaseObject(stream, true) }
-                            return false
-                          }
-                          if (operation === "write") {
-                            const stream = await storage.CreateFile(`${root}/access-forbidden.txt`)
-                            try { await stream.WriteBuffer(new Uint8Array([65])) }
-                            finally { await ReleaseObject(stream, true) }
-                            return false
-                          }
-                          if (operation === "copy-out") return !await storage.CopyFile(`${root}/access-probe.lgp`, `access-stolen-${pathKind.replaceAll(":", "-")}.lgp`, false, false)
-                          return !await storage.CopyFile(source, `${root}/access-forbidden.lgp`, false, false)
-                        } catch { return true }
-                      })()
-                      denials.push({ pathKind, operation, denied })
+                    for (const [index, file] of ["access-probe.lgp", ...unusual.map(row => `access-positive/${row.name}`)].entries()) {
+                      for (const operation of ["read", "write", "copy-out", "copy-in"]) {
+                        const denied = await (async () => {
+                          try {
+                            if (operation === "read") {
+                              const stream = await storage.OpenFile(`${root}/${file}`, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
+                              try { await stream.ReadBuffer(new Uint8Array(1)) }
+                              finally { await ReleaseObject(stream, true) }
+                              return false
+                            }
+                            if (operation === "write") {
+                              const stream = await storage.CreateFile(`${root}/${file}.forbidden-write.write`)
+                              try { await stream.WriteBuffer(new Uint8Array([65])) }
+                              finally { await ReleaseObject(stream, true) }
+                              return false
+                            }
+                            if (operation === "copy-out") return !await storage.CopyFile(`${root}/${file}`, `access-stolen-${pathKind.replaceAll(":", "-")}-${index}.lgp`, false, false)
+                            return !await storage.CopyFile(source, `${root}/${file}.forbidden-copy.lgp`, false, false)
+                          } catch { return true }
+                        })()
+                        denials.push({ pathKind, file, operation, denied })
+                      }
                     }
                   }
                 }

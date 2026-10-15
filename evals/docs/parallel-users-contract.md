@@ -799,3 +799,18 @@ Native1 PASS/118 (38.29s), admin/user/slots60 PASS/260, typecheck/diff PASS;
 process/dispose confirmed и exact pair independently absent.
 Это positive filename capability; unusual neighbor/shared negatives и native
 component filename matrix ещё открыты, `liveQualified=false`.
+
+Unusual FileStorage negative matrix расширена на normal +7 native-qualified
+filenames:576 operations (2 actors×9 path scopes×8 filenames×4 operations).
+Peer/shared trees содержат реальные копии own native positive files. Read и
+copy-out используют соответствующий существующий basename; write/copy-in
+пишут новые sibling targets с теми же `.write`/`.lgp` extensions, что positive
+controls. Copy-out target — валидный собственный basename. Independent Docker
+observer сравнивает NUL SHA всех файлов и NUL-safe entries всего peer/shared root,
+включая partial output; line splitting для filenames не используется. После
+negative matrix own OpenFile продолжает работать. Private600 final receipt:
+`research/evidence/native-user-f3ff04ae-7e83-4f90-91b7-e0361c798628/storage-probe.json`,
+SHA256 `c912749eea012da5e1f50dbdad79560545b4f450f6a65565f9bae5651bb6357e`.
+Native2 PASS/197 (71.73s), unit60 PASS/260, typecheck/diff PASS; process/dispose
+confirmed, exact pair independently absent. Autosave suffix, unusual component
+paths, concurrency/cleanup и production binding остаются отдельными gates.
