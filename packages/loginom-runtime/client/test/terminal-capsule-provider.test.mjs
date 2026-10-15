@@ -633,3 +633,57 @@ test('initializer call copied receipts or host DTO cannot replace original packe
  const dto=witness.projectTerminalScriptWitness(x.capsule);assert.equal(Object.hasOwn(dto,'initializerCalls'),false);assert.equal(Object.hasOwn(dto,'initializerCompletions'),false);
  assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
 },{originalSdk:true,invokeSdk:true,realCompletion:true}));
+
+test('storage receiver original four dispatches retain exact precreation FileStorage, method and packet',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+ const packet=x.provider.packet(),initial=packet.initial;
+ assert.equal(x.provider.inspect().storageDispatches.length,0);
+ const result=await x.host.witness.continueStorage(x.host.f.bridge);
+ const receipts=x.provider.inspect().storageDispatches;
+ assert(Object.isFrozen(receipts));assert.equal(receipts.length,4);
+ for(const [i,name] of ['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'].entries()){
+  const receipt=receipts[i],call=receipt.call;
+  assert(Object.isFrozen(receipt));assert(Object.isFrozen(call));
+  assert.equal(call.receiver,initial.storage);assert.equal(receipt.receiver,initial.storage);
+  assert.equal(call.method,initial.storageReaders[name]);assert.equal(receipt.method,call.method);
+  assert.equal(call.initial,initial);assert.equal(receipt.initial,initial);assert.equal(call.packet,packet);assert.equal(receipt.packet,packet);
+  assert.equal(receipt.scope,'FileStorage.'+name+':dispatch');assert.equal(receipt.nativeReceiversQualified,true);
+  assert.equal(call.nativeReceiversQualified,false);assert.equal(receipt.closureIdentityQualified,false);
+ }
+ assert.equal(result.nativeReceiversQualified,false);assert.equal(result.closureIdentityQualified,false);
+ assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');assert.equal(result.componentReady,false);
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);
+ const again=x.provider.inspect().storageDispatches;assert.deepEqual([...again],[...receipts]);
+ await x.host.witness.continueStorage(x.host.f.bridge);assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
+for(const mode of ['provider copy','packet copy','storage copy','identity copy'])test('storage receiver '+mode+' refuses before storage dispatch',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);await x.host.witness.continueComponent(x.host.f.bridge);
+ const packet=x.provider.packet();
+ if(mode==='provider copy')assert.throws(()=>Reflect.apply(x.provider.readStoragePacket,{...x.provider},[packet,'get_Connected']),/RECEIVER/);
+ if(mode==='packet copy')assert.throws(()=>x.provider.readStoragePacket({...packet},'get_Connected'),/PACKET_FOREIGN/);
+ if(mode==='storage copy'){
+  const owner=x.f.c.bg.app.Application.FInstance.FMainForm.FUrlUtils;
+  owner.FFileStorage={...packet.initial.storage};
+  assert.throws(()=>x.provider.readStoragePacket(packet,'get_Connected'));
+ }
+ if(mode==='identity copy'){
+  const storage=packet.initial.storage;storage.$={...storage.$};
+  assert.throws(()=>x.provider.readStoragePacket(packet,'get_Connected'));
+ }
+ assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true}));
+test('storage receiver pending accessor drift refuses without next dispatch or foreign getter',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);let gets=0;
+ x.probe.onDispatch=(request)=>{if(x.realm.native.calls.at(-1)===909)Object.defineProperty(x.provider.packet().initial.storage,'get_RootPath',{configurable:true,get(){gets++;throw Error('foreign')}})};
+ await assert.rejects(x.host.witness.continueStorage(x.host.f.bridge));assert.equal(gets,0);
+ assert.deepEqual(x.realm.native.calls,[0,907,909]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true,instrument:true}));
+for(const reason of [false,0,null,undefined,'',Error('receiver first',{cause:0})])test('storage receiver raw '+String(reason)+' remains first over receiver drift',()=>{
+ let held;const ready=new Promise(resolve=>held=resolve);
+ return creationControl(async x=>{
+  await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const work=x.host.witness.continueStorage(x.host.f.bridge);work.catch(()=>{});await ready;
+  x.realm.native.fail(reason);x.f.c.bg.app.Application.FInstance.FMainForm.FUrlUtils.FFileStorage={...x.realm.native.storage};
+  await x.realm.native.drain();let caught=false;try{await work}catch(value){caught=true;assert.equal(value,reason)}assert(caught);
+  assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0,907,909]);assert.equal(x.realm.native.writes(),0);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_CurrentDirectory'){x.realm.native.hold();queueMicrotask(held)}}});
+});
