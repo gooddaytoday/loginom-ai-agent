@@ -75,7 +75,8 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const inputsHash = await agentInputsHash(tasks)
   const rubric = await rubricHash(tasks)
   const contexts = fixture && !config.dryRun ? await prepareFixture(config, fixture, runId, runDir) : undefined
-  const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal).catch(async (error: unknown) => {
+  const processEvidence = contexts?.[0]?.judgeEvidence ?? config.judge.processEvidence
+  const judge = config.skipJudge ? null : await judgeInfo({ judge: { ...config.judge, processEvidence } }, controller.signal).catch(async (error: unknown) => {
     if (contexts) await Promise.all([...contexts.map(context => context.lease.close()), contexts[0]!.judgeLease?.close()])
     throw error
   })
@@ -87,6 +88,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
         timeoutMs: config.judgeTimeoutMs,
         passThreshold: config.passThreshold,
         env: config.judge.env,
+        processEvidence,
       }
     : undefined
   const judgeGate = createJudgeGate()
