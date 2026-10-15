@@ -182,9 +182,9 @@ export async function storageEntryExists(source: ArtifactSource, name: string) {
   return found.exitCode === 0
 }
 
-export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null; processesConfirmed: boolean }) {
+export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null; processesConfirmed: boolean; deferDeletion?: boolean }) {
   const evidence: { status: string; name: string; existed_before: boolean | null; removed: boolean;
-    verified_absent: boolean; archived?: { path: string; bytes: number; sha256: string }; error?: string } = {
+    verified_absent: boolean; deletion_deferred?: boolean; archived?: { path: string; bytes: number; sha256: string }; error?: string } = {
     status: "failed", name: input.name, existed_before: input.existingNames?.includes(input.name) ?? null,
     removed: false, verified_absent: false,
   }
@@ -208,12 +208,19 @@ export async function cleanupOrphanResult(input: { source: ArtifactSource; name:
       const bytes = await Bun.file(local).arrayBuffer()
       evidence.archived = { path: `storage-outputs/${input.name}`, bytes: bytes.byteLength,
         sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") }
-      if (input.source.kind === "dir") await rm(path.join(input.source.dir, input.name))
-      else {
-        const removed = await Bun.$`docker exec ${input.source.container} rm -f -- ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
-        if (removed.exitCode !== 0) throw Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
+      if (!input.deferDeletion) {
+        if (input.source.kind === "dir") await rm(path.join(input.source.dir, input.name))
+        if (input.source.kind === "docker") {
+          const removed = await Bun.$`docker exec ${input.source.container} rm -f -- ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
+          if (removed.exitCode !== 0) throw Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
+        }
+        evidence.removed = true
       }
-      evidence.removed = true
+    }
+    if (input.deferDeletion) {
+      evidence.status = "pending"
+      evidence.deletion_deferred = true
+      return
     }
     if (await storageEntryExists(input.source, input.name)) throw Error("Result storage cleanup unconfirmed")
     evidence.verified_absent = true
