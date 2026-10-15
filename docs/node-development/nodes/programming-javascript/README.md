@@ -1,5 +1,15 @@
 # JavaScript
 
+## Аудит общего runtime 2026-10-15
+
+[Заключение по 36 случаям](shared-runtime-review-2026-10-15.md) ·
+[адресные сценарии агента и операторские проверки](shared-runtime-agent-scenarios-2026-10-15.md) ·
+[снимок 132 веток origin](shared-runtime-origin-snapshot-2026-10-15.json).
+
+Исследование относится к `a00e00eb72ba`; production-код не менялся. Отдельно
+оценены необходимость, безопасность, альтернативы в origin и уверенность.
+Сценарии подготовлены, новые live/модельные процессы не запускались.
+
 ## История обучения и прежняя приёмка
 
 [Архив и происхождение переноса](../../history/programming-javascript/README.md) · [матрица J01–J27/G1–G7](completion-audit.md) · [автономная pair13](completion-phase6.md).
