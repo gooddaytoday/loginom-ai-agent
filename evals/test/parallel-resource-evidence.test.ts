@@ -7,6 +7,7 @@ import { freezeResourceManifest, readFrozenResourceManifest, freezeResourceBudge
 import { superviseProcess } from "../src/process-supervisor"
 import { checkResourceEvidence } from "../src/parallel-acceptance"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { resourceBudgetFixture } from "./helpers/resource-budget-fixture"
 import { writeLeaseReceipt } from "../src/lease"
 import { readLeaseReceipt } from "../src/lease"
 
@@ -19,8 +20,37 @@ test("resource manifest freezes all selected slot paths and both container gener
       image: "sha256:" + String(index + 3).repeat(64), startedAt: "2026-10-14T10:00:00.000Z", name: fixture.slots.server[role === "server" ? "container" : "studioContainer"],
       nonce: crypto.randomUUID(), purpose: "research" }))
     const view = { namespace: "cgroup:[123]", root: { device: 1, inode: 2 } }
-    const budget = await freezeResourceBudget({ out: path.join(root, "budget.json"), runId: "manifest-smoke",
+    const weak = await freezeResourceBudget({ out: path.join(root, "weak-budget.json"), runId: "manifest-smoke",
       bounds: [{ scope: "host", metric: "memory.available_bytes", minimum: 1, maximum: null }] })
+    while (Date.now() <= Date.parse(weak.budget.fixed_at)) await Bun.sleep(1)
+    const rejected = path.join(root, "incomplete-manifest.json")
+    await expect(freezeResourceManifest({ out: rejected, slotsFile, parallel: 2, runId: "manifest-smoke", containers, view, budget: weak.source }))
+      .rejects.toThrow("RESOURCE_BUDGET_SCOPES_INCOMPLETE")
+    expect(await Bun.file(rejected).exists()).toBe(false)
+    const budget = await freezeResourceBudget({ out: path.join(root, "budget.json"), runId: "manifest-smoke",
+      bounds: resourceBudgetFixture([fixture.slots.controller.stateDir, ...fixture.slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])], containers) })
+    for (const [index] of budget.budget.bounds.entries()) {
+      const partial = await freezeResourceBudget({ out: path.join(root, `partial-budget-${index}.json`), runId: "manifest-smoke",
+        bounds: budget.budget.bounds.filter((_, position) => position !== index) })
+      while (Date.now() <= Date.parse(partial.budget.fixed_at)) await Bun.sleep(1)
+      await expect(freezeResourceManifest({ out: rejected, slotsFile, parallel: 2, runId: "manifest-smoke", containers, view, budget: partial.source }))
+        .rejects.toThrow("RESOURCE_BUDGET_SCOPES_INCOMPLETE")
+      expect(await Bun.file(rejected).exists()).toBe(false)
+    }
+    const invalid = [
+      budget.budget.bounds.map(bound => ({ ...bound, minimum: bound.maximum, maximum: bound.minimum })),
+      budget.budget.bounds.map(bound => bound.metric === "available_bytes" || bound.metric === "available_inodes" || bound.metric === "memory.available_bytes"
+        ? { ...bound, minimum: 0 } : bound),
+      budget.budget.bounds.map(bound => bound.metric === "cpu.utilization_percent" ? { ...bound, maximum: 101 } : bound),
+      budget.budget.bounds.map(bound => bound.scope.startsWith("container:") ? { ...bound, scope: bound.scope.replace(containers[0]!.startedAt, "2026-10-14T11:00:00.000Z") } : bound),
+    ]
+    for (const [index, bounds] of invalid.entries()) {
+      const source = await freezeResourceBudget({ out: path.join(root, `invalid-thresholds-${index}.json`), runId: "manifest-smoke", bounds })
+      while (Date.now() <= Date.parse(source.budget.fixed_at)) await Bun.sleep(1)
+      await expect(freezeResourceManifest({ out: rejected, slotsFile, parallel: 2, runId: "manifest-smoke", containers, view, budget: source.source }))
+        .rejects.toThrow("RESOURCE_BUDGET_SCOPES_INCOMPLETE")
+      expect(await Bun.file(rejected).exists()).toBe(false)
+    }
     while (Date.now() <= Date.parse(budget.budget.fixed_at)) await Bun.sleep(1)
     const suppliedView = { ...view, privateData: "manifest-private-canary" }
     const frozen = await freezeResourceManifest({ out, slotsFile, parallel: 2, runId: "manifest-smoke",
@@ -38,6 +68,12 @@ test("resource manifest freezes all selected slot paths and both container gener
     while (Date.now() <= Date.parse(frozen.manifest.fixed_at)) await Bun.sleep(1)
     const request = { ...frozen.source, runId: "manifest-smoke", startedAt: new Date().toISOString() }
     expect(await readFrozenResourceManifest(request)).toEqual(frozen.manifest)
+    const thin = path.join(root, "thin-manifest.json")
+    await writeLeaseReceipt(thin, { ...frozen.manifest, budget: weak.source })
+    const thinBytes = await Bun.file(thin).text()
+    await expect(readFrozenResourceManifest({ ...request, file: thin, sha256: new Bun.CryptoHasher("sha256").update(thinBytes).digest("hex") }))
+      .rejects.toThrow("RESOURCE_BUDGET_SCOPES_INCOMPLETE")
+    expect(await Bun.file(thin).text()).toBe(thinBytes)
     const samplesFile = path.join(root, "manifest-samples.jsonl"), receipt = path.join(root, "manifest-summary.json")
     const abort = new AbortController()
     const pending = collectHostResources({ out: samplesFile, paths: frozen.manifest.coverage.paths, intervalMs: 1000,
@@ -73,11 +109,19 @@ test("resource manifest freezes all selected slot paths and both container gener
     expect(await Bun.file(forbiddenOut).exists()).toBe(false)
     await expect(readFrozenResourceManifest({ ...request, runId: "foreign" })).rejects.toThrow("RESOURCE_MANIFEST_RUN_MISMATCH")
     await expect(readFrozenResourceManifest({ ...request, startedAt: frozen.manifest.fixed_at })).rejects.toThrow("RESOURCE_MANIFEST_NOT_FIXED_BEFORE_RUN")
+    const singleBudget = await freezeResourceBudget({ out: path.join(root, "single-budget.json"), runId: "manifest-smoke",
+      bounds: resourceBudgetFixture([fixture.slots.controller.stateDir,
+        ...fixture.slots.slots.slice(0, 1).flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])], frozen.manifest.coverage.containers) })
+    while (Date.now() <= Date.parse(singleBudget.budget.fixed_at)) await Bun.sleep(1)
     const single = await freezeResourceManifest({ out: path.join(root, "single.json"), slotsFile, parallel: 1,
-      runId: "manifest-smoke", containers: frozen.manifest.coverage.containers, view: frozen.manifest.view, budget: budget.source })
+      runId: "manifest-smoke", containers: frozen.manifest.coverage.containers, view: frozen.manifest.view, budget: singleBudget.source })
     expect(single.manifest.slots).toEqual(fixture.slots.slots.slice(0, 1))
     expect(single.manifest.coverage.paths).toEqual([fixture.slots.controller.stateDir,
       ...fixture.slots.slots.slice(0, 1).flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])])
+    await expect(freezeResourceManifest({ out: rejected, slotsFile, parallel: 2, runId: "manifest-smoke",
+      containers: frozen.manifest.coverage.containers, view: frozen.manifest.view, budget: singleBudget.source }))
+      .rejects.toThrow("RESOURCE_BUDGET_SCOPES_INCOMPLETE")
+    expect(await Bun.file(rejected).exists()).toBe(false)
     for (const containers of [[], frozen.manifest.coverage.containers.slice(0, 1),
       frozen.manifest.coverage.containers.map(container => ({ ...container, id: frozen.manifest.coverage.containers[0]!.id })),
       frozen.manifest.coverage.containers.map(container => ({ ...container, name: "foreign-container" }))]) {

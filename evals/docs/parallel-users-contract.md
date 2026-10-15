@@ -18,8 +18,8 @@ Docker primitive использует immutable full ID и фиксирован�
 smoke не подтверждает live Loginom/resource acceptance. CLI связывает Server/Studio
 с private ready pair journal и повторно проверяет selected inspect identity/owner
 labels перед проекцией counters; Config.Env не читается. Missing journal означает
-неизвестный scope, invalid journal запрещает output. Зафиксированный до run бюджет,
-owned-process/cgroup coverage и итоговый acceptance gate ещё требуют реализации.
+неизвестный scope, invalid journal запрещает output. Полнота owned-process/cgroup
+coverage и итоговый live acceptance gate ещё требуют квалификации.
 CLI закрывает raw JSONL перед exclusive private summary с source SHA,
 min/peak/delta и missing/reset counts; исходные frames сохраняются. Summary
 разделяет container epochs/process births и не складывает shared ancestors;
@@ -114,6 +114,14 @@ source SHA ранее сохранённого бюджета. Private exclusive
 содержит только разрешённые metadata. readFrozenResourceManifest сверяет
 schema/run/time/hash и budget source. checkResourceEvidence с manifest берёт
 paths/containers/view/budget из него; inline caller не сокращает required scopes.
+Freeze и повторное чтение manifest требуют явные статические пороги: максимум
+host CPU (0 < maximum ≤ 100), минимум available RAM и swap, максимумы CPU cores
+и current RAM каждой container generation, минимумы bytes/inodes каждого
+выбранного host path и обоих server storage roots. RAM/disk headroom положительный;
+swap minimum=0 допустим для системы без swap. Порог с неправильным направлением,
+пропущенным scope или другой epoch не заменяет требуемый bound. Неполный бюджет
+даёт RESOURCE_BUDGET_SCOPES_INCOMPLETE до публикации manifest. Эти проверки не
+выбирают live значения и не заменяют budgets/limits динамических actors/cgroups.
 Это frozen resource contract: input container metadata требуют независимой
 runtime qualification, полный actor inventory/thresholds/quotas и production
 binding ещё открыты. Полный immutable live manifest включает также pins и другие
