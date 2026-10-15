@@ -565,6 +565,7 @@ Baseline описательный: один замер каждой задачи
 - [x] Реализовать узкое baseline reuse по TDD, проверить независимое ревью и заморозить новый protocol до первой модели.
 - [x] Подтвердить итоговый prospective admission и начать новую последовательную серию после strict own release.
 - [x] Выполнить25candidate новой версии с first9 gate, обязательным review и strict own release; подтвердить достаточность policy coverage отдельно от analytics/runtime. Итог25/25policyPASS,18standard+3explicit+3gap+1recovery, summary506f0cb0;31positions завершены без новых моделей finalcontroller.
+- [x] Завершить обязательное ревью всех JS-исключений, recovery, отказов и аномалий и всей доступной seeded выборки standard successes: selectiona031863d/review4895fbc4, eligibleN=reviewedN=1. Историческая квота3НЕ выполнена/targetFulfilledfalse; доступный объём проверен по frozen final-review-v1, новых моделей/oracle/live повторов0.
 
 Новая серия запущена19:23:22.539Z, runner2840711/exec86264; ABC/1 CLI2841168
 с19:23:31.436Z. Independent admission `e7ba5561…`, final execution lock
