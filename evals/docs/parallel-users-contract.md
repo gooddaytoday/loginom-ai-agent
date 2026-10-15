@@ -1383,4 +1383,26 @@ PASS/57 (15.48s), typecheck/diff PASS. Два immutable snapshots и command has
 проверены с continuous native admin closure; research pair не изменялась.
 Private600 `native-session-inventory-6cfbb015-71ba-493d-b20c-adb94d632330/snapshots.json`
 SHA256 `354e282c8e435279c017a08655ee81a195904962c357651a77564b68fea801b3`.
-Actual CLI before/after correlation и durable runtime session ledger ещё open.
+Actual CLI user-session correlation и durable runtime session ledger ещё open.
+
+### Management process и before/after observations
+
+При переданном trusted admin `superviseManagementProcess` получает immutable
+before snapshot до dispatch и сохраняет его ref в planned entry. After snapshot
+добавляется только после qualified continuous local process closure. Reader
+проверяет обе native source chains с exact controller root/ServerIdentity,
+сравнивает command interval с actual process lifetime и отказывает при обратном
+порядке либо изменённом source. Snapshot поле optional для прежних process-only
+records; sessionIdentityQualified остаётся false, release grants не добавлены.
+
+TDD actual installed CLI status не имел snapshots RED→GREEN; native2 PASS/16
+(17.10s), final source-complete native target1 PASS/12 (14.67s),166 unit PASS/612
+(72.67s), typecheck/diff PASS. Native installed controls находятся в
+parallel-lifecycle-integration.test.ts. У неподготовленного CLI status нет
+пользовательской Loginom session: это проверка wiring/process/native observations,
+а setup/check/recover session attribution, parent activation и active cleanup
+остаются открытыми. Research admin process closure confirmed, own fixture removed.
+Private600 `native-management-sessions-5a141ba0-0109-4bd0-97f3-80dc8f980d64/management.json`
+SHA256 `65b242b94c7379ef1df3b0a167117b8e2859faf63ae39c7e83874591a34bc745`:
+16 independent checks связывают manifest/process proof, both snapshots/commands,
+intervals и admin connection/dispose/continuous closure. Нет model/judge calls.
