@@ -3,7 +3,8 @@ import { evalsRoot } from "../src/config"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { loadEvalrunnerCorpus, buildEvalrunnerSlots, createEvalrunnerManifest, reserveEvalrunnerSeries, readEvalrunnerSeries, admitEvalrunnerSlot } from "../src/evalrunner-series"
+import { watch, readFileSync } from "node:fs"
+import { loadEvalrunnerCorpus, buildEvalrunnerSlots, createEvalrunnerManifest, reserveEvalrunnerSeries, readEvalrunnerSeries, admitEvalrunnerSlot, durableEvalrunnerJson } from "../src/evalrunner-series"
 import { inspectEvalrunnerSeries } from "../src/evalrunner-series-check"
 
 test("full series freezes only 48 accepted cases and orders three rounds regular, analytic, node", async () => {
@@ -22,6 +23,25 @@ test("full series freezes only 48 accepted cases and orders three rounds regular
   expect(corpus.files.length).toBeGreaterThan(48)
   expect(corpus.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256))).toBe(true)
   expect((await loadEvalrunnerCorpus(evalsRoot)).sha256).toBe(corpus.sha256)
+})
+
+test("durable JSON becomes visible atomically as a complete document", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-atomic-"))
+  const file = path.join(root, "admission.json"), payload = { value: "x".repeat(16 * 1024 * 1024) }
+  let observed = false, complete = false
+  const watcher = watch(root, (event, name) => {
+    if (name !== "admission.json" || observed) return
+    observed = true
+    try { complete = JSON.parse(readFileSync(file, "utf8")).value.length === payload.value.length } catch { complete = false }
+  })
+  try {
+    await durableEvalrunnerJson(file, payload)
+    await Bun.sleep(20)
+    expect(observed).toBe(true)
+    expect(complete).toBe(true)
+    await expect(durableEvalrunnerJson(file, { value: "replacement" })).rejects.toThrow()
+    expect((await Bun.file(file).json()).value.length).toBe(payload.value.length)
+  } finally { watcher.close(); await rm(root, { recursive: true, force: true }) }
 })
 
 test("versioned series reservation survives another directory and task, and a consumed slot cannot dispatch again", async () => {

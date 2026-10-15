@@ -1,5 +1,5 @@
 import path from "node:path"
-import { lstat, readdir, readFile, realpath, mkdir, open } from "node:fs/promises"
+import { lstat, readdir, readFile, realpath, mkdir, open, link, unlink } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { loadTasks } from "./task"
 
@@ -99,10 +99,33 @@ export async function admitEvalrunnerSlot(config: SeriesRoots, manifest: Evalrun
 }
 
 export async function durableEvalrunnerJson(file: string, data: unknown) {
-  const handle = await open(file, "wx", 0o600)
-  try { await handle.writeFile(JSON.stringify(data, null, 2)); await handle.sync() } finally { await handle.close() }
-  const directory = await open(path.dirname(file), "r")
-  try { await directory.sync() } finally { await directory.close() }
+  return durableEvalrunnerBytes(file, JSON.stringify(data, null, 2))
+}
+
+/** A complete fsynced inode is linked without replacement before dispatch is possible. */
+export async function durableEvalrunnerBytes(file: string, bytes: string | Uint8Array) {
+  const parent = path.dirname(file)
+  if (await realpath(parent) !== parent) throw new EvalFailure("Persistence parent is not canonical", 2)
+  const directory = await open(parent, "r"), parentIdentity = await directory.stat()
+  const temporary = path.join(parent, `.evalrunner-atomic-${path.basename(file)}-${crypto.randomUUID()}`)
+  const handle = await open(temporary, "wx", 0o600)
+  const identity = await handle.stat()
+  try {
+    try { await handle.writeFile(bytes); await handle.sync() } finally { await handle.close() }
+    await link(temporary, file)
+    await directory.sync()
+    const current = await lstat(parent)
+    if (current.isSymbolicLink() || current.dev !== parentIdentity.dev || current.ino !== parentIdentity.ino)
+      throw new EvalFailure("Persistence parent identity changed", 2)
+  } finally {
+    try {
+      const current = await lstat(temporary)
+      if (current.isSymbolicLink() || current.dev !== identity.dev || current.ino !== identity.ino)
+        throw new EvalFailure("Persistence journal identity changed; preserve it", 2)
+      await unlink(temporary)
+      await directory.sync()
+    } finally { await directory.close() }
+  }
 }
 
 function registryPath(config: SeriesRoots, manifest: Pick<EvalrunnerSeriesManifest, "issue" | "scope">) {

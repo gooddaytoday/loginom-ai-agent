@@ -1,7 +1,7 @@
 import path from "node:path"
 import { lstat, mkdir, readFile, unlink, rmdir, writeFile } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { durableEvalrunnerJson, evalrunnerHash, createEvalrunnerManifest, loadEvalrunnerCorpus, reserveEvalrunnerSeries,
+import { durableEvalrunnerJson, durableEvalrunnerBytes, evalrunnerHash, createEvalrunnerManifest, loadEvalrunnerCorpus, reserveEvalrunnerSeries,
   readEvalrunnerSeries, admitEvalrunnerSlot, type EvalrunnerSeriesManifest, type EvalrunnerSeriesScope, type EvalrunnerSlot } from "./evalrunner-series"
 import { qualifyEvalrunner, dispatchEvalrunner, sealEvalrunnerEvidence, checkEvalrunnerEvidence, type EvalrunnerConfig } from "./evalrunner"
 import { inspectEvalrunnerSeries, verifyEvalrunnerSlot } from "./evalrunner-series-check"
@@ -21,8 +21,8 @@ export async function prepareEvalrunnerSeries(config: EvalrunnerConfig, input: {
   const series = path.join(config.results, input.scope === "full" ? `v02-full-${input.issue}` : `v02-${input.scope}-${input.issue}`)
   const manifest = createEvalrunnerManifest({ ...input, series, pins: { ...proof, env: undefined }, corpus })
   await reserveEvalrunnerSeries(config, manifest)
-  await writeFile(path.join(series, "cli-manifest.json"), await readFile(path.join(path.dirname(path.dirname(config.cliBin)), "cli-manifest.json")), { flag: "wx", mode: 0o600 })
-  await writeFile(path.join(series, "qualification.json"), await readFile(config.qualificationFile!), { flag: "wx", mode: 0o600 })
+  await durableEvalrunnerBytes(path.join(series, "cli-manifest.json"), await readFile(path.join(path.dirname(path.dirname(config.cliBin)), "cli-manifest.json")))
+  await durableEvalrunnerBytes(path.join(series, "qualification.json"), await readFile(config.qualificationFile!))
   return { status: "PREPARED", series, expected: manifest.slots.length, manifestSha256: evalrunnerHash(JSON.stringify(manifest, null, 2)) }
 }
 
