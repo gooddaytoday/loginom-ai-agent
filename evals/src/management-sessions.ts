@@ -30,6 +30,44 @@ export async function recordManagementSession(file: SlotFile, lease: SlotLease, 
   return readManagementSession(file, lease, secretFile, session.id)
 }
 
+/** Accounts for every same-user row without closing sessions or granting cleanup. */
+export async function collectManagementSessions(file: SlotFile, lease: SlotLease, secretFile: string, inventoryFile: string, observation: { path: string; sha256: string }) {
+  const input = await managementInput(file, lease, inventoryFile)
+  const inventory = await readManagementProcessInventory(input)
+  const command = object(await readLeaseReceipt(input.journal))
+  if (command.kind !== "unactivated-preparation" || command.phase !== "finalizing" || !Array.isArray(command.managementSources) ||
+    !command.managementSources.some(value => { const source = object(value); return source.path === inventoryFile && source.sha256 === inventory.source.sha256 }))
+    throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
+  const sessions: Awaited<ReturnType<typeof recordManagementSession>>[] = []
+  for (const process of inventory.processes) {
+    if (!process.result || !process.sessions) throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
+    if (["loginom setup", "loginom check"].includes(process.operation.join(" "))) {
+      sessions.push(await recordManagementSession(file, lease, secretFile, inventoryFile, process.owner.id))
+      continue
+    }
+    if (process.result.exitCode !== 0 || process.result.timedOut || process.result.interrupted)
+      throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
+  }
+  if (new Set(sessions.map(session => session.id)).size !== sessions.length || new Set(sessions.map(session => session.binding.remoteKey)).size !== sessions.length)
+    throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
+  const { readAdminSessionInventory } = await import("./loginom-admin")
+  const current = await readAdminSessionInventory(file, lease.identity, observation)
+  if (inventory.processes.some(process => Date.parse(process.finishedAt) > Date.parse(current.observation.startedAt)))
+    throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
+  const username = lease.slot.username.toLowerCase()
+  const sameUser = (name: string) => name.toLowerCase() === username || name.toLowerCase().startsWith(username + ":")
+  const snapshots = inventory.processes.flatMap(process => process.sessions ? [process.sessions.before, ...process.sessions.during, process.sessions.after] : [])
+  if (snapshots.some(snapshot => snapshot.sessions.some(row => sameUser(row.name) && !sessions.some(session =>
+    session.binding.remoteKey === row.objectId && session.binding.name === row.name && session.binding.createdAt === row.createdAt && row.packageCount === 0))) ||
+    current.sessions.some(row => sameUser(row.name) && !sessions.some(session => session.state !== "closed" &&
+      session.binding.remoteKey === row.objectId && session.binding.name === row.name && session.binding.createdAt === row.createdAt && row.packageCount === 0)))
+    throw new EvalFailure("MANAGEMENT_SESSION_UNKNOWN", 2)
+  await lease.assertHeld()
+  if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256 || hash(await readLeaseReceipt(input.journal)) !== hash(command))
+    throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
+  return { sessions, source: inventory.source, observation: current.source }
+}
+
 export async function readManagementSession(file: SlotFile, lease: SlotLease, secretFile: string, id: string) {
   await lease.assertHeld()
   if (!/^[a-f0-9]{64}$/.test(id)) throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)

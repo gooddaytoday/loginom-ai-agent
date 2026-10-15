@@ -258,3 +258,29 @@ retained. Inventory bytes SHA256
 No ad hoc release/destroy: recovery-only lineage plus native unactivated
 observation, archived profile and complete command process inventory are needed
 from the pending production finalizer. Missing account/PID alone is insufficient.
+
+## Management setup writer-release proof — 2026-10-15
+
+Native accounting GREEN attempt stopped before collectManagementSessions:
+setup exit0 but continuous process proof failed `Writer owner unavailable`.
+Unknown processes0; all18 admissions allowed,13 peers exactly match the admin
+proof. Own/admin exact PID/starttime identities are now absent; admin disposal,
+transport and continuous closure are confirmed. Historical error cause remains
+unproven; absence now does not repair the original failed proof.
+
+Own retained root `/home/kiselev/storage/tmp/evals-cli-sessions-aEnKx5`, pair nonce
+`cc6c3b5b-2593-4e04-87d5-d3593c784c76`, server
+`8e1d435a0c87955199ebe8239d01feba6f68ec4a9997790d2a29e052a630073a`,
+studio `18625dd4d2b3c30e00e7730bbd8494cab0c80192fdff9e13780c30aba9f1ff4e`.
+Original proof SHA256
+`033b9eabef82fe608c14c4d9007d59be29bf823aae4f6fcadaf4a51174b56d14`.
+Private source copy: `management-registry-20261015/accounting-writer-source.json`;
+log `accounting-green-final.log` (0 PASS/1 FAIL,2 assertions,90.23s).
+
+Public observeWriterReleaseSettlement admitted the original proof shape but
+refused `Writer-release processes busy or foreign`; no destroy/delete/release
+was performed. Do not stop foreign processes or rewrite the normal failed
+inventory. One-shot helper remains in
+`/home/kiselev/storage/tmp/evals-accounting-writer-cleanup.ts`; its nonce/source
+guards run before any archive or factory teardown. A separate cold accounting
+qualification does not resolve this observer/recovery gate.
