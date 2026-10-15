@@ -1456,3 +1456,22 @@ Native сравнивает stdout SHA с actual returned bytes и получа�
 result source/process SHA links и192 full source/closure audit checks PASS;
 own pair/root absent. Это prerequisite для ownership ledger; production
 activation, positive targeted close и full readiness ещё открыты.
+
+### Protected sources в native CLI fixture
+
+Fixture получает staged secret/nonce через production preparation API, связывает
+actual native blocked creation с `claimUserOwnership`, configure reply с
+`recordUserConfiguration`, пишет activation intent до wire activation. Native
+command journal лежит внутри controller root; после closure его exact receipts
+копируются в private evidence вместе с authority metadata (без raw credential).
+Existing APIs прошли эту композицию без production edits. Temp slot locks и
+external wire adapter здесь не заявляют production activation/active release.
+
+Native1 PASS/22 (53.97s), typecheck/diff PASS. Private600
+`native-cli-sessions-f7fddcee-1366-4627-bbbe-289510420cf6/authority.json` SHA256
+`390717aa9e0de0490e14f57c8ea98c50ff77bd7b4b3d4010537d7061bc7d78e7`:
+19 source/generation/user-ID checks PASS. CLI SHA256
+`7d4a85d976fb3702de8344fa72ee4bd6c4ba32795c5b67bab98458a46bb0af7f`,
+195 full source/closure checks PASS, exact own pair/root absent. Следующий
+ledger должен сохранять frozen descriptor каждой management-команды: mutable
+whole-inventory SHA меняется при append и не должен инвалидировать старую сессию.
