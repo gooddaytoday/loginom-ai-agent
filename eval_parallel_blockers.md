@@ -26,6 +26,23 @@ profile unit negative с prctl(PR_SET_DUMPABLE,0); точная атрибуци
 canonical journals/proofs не синтезировать, контейнеры вручную не удалять.
 Новые проверочные логи сохраняются в private research evidence вне `/tmp`.
 
+2026-10-15 reconnect fixture: `/home/kiselev/storage/tmp/evals-cli-sessions-MKHklA`
+сохранён после `ADMIN_DISPOSE_UNKNOWN`. Primary admin-nldUb7 получил confirmed
+dispose/transport ACK, но continuous proof failed на EACCES
+`/proc/4086419/exe`; unknown=[]/final00 не устраняют observation gap.
+Peer admin-EKfKGR disposed/continuous closure confirmed. Целевой reconnect collector
+ещё не вызывался. Private600 `native-cli-sessions-f0c6bd9e-b63c-4a69-a291-5189645ebf27/failed-dispose-sources.json`
+SHA256 `d01144198e5d314353a82fbc4021f0246f44af278e81c3ec6dea6774d4b9383a`
+сохраняет original pair/journal/management snapshots/results/process proofs и оба
+admin receipts. Nonce `930bbeb6-91a2-4648-8988-46ce11e81eb4`, server
+`6c165db687399ab27d81bdbadb82f8dd68233c898a2840490cbb5d684fd5792d`, Studio
+`d2f64573b00a4781eab8cd14e1a0937496853d0519241d69c136307bde783846`.
+Failed proof не изменён, writer-release exception для EACCES не применим;
+normal qualification/release/delete из этого результата не следуют.
+Read-only signal audit: PID4086419 отсутствует в own/peer/unknown/admission/
+origin/browser-binding всех двух admin и четырёх CLI proofs; UID/starttime не
+сохранены, сейчас PID отсутствует. Exec/exit/zombie/владелец не атрибутированы.
+
 ## Mixed recovery: quarantine после пересечения собственных browser-проверок
 
 2026-10-15: `/tmp/evals-recover-mixed-dyI2ST`, собственная disposable pair
