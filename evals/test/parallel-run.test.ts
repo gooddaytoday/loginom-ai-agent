@@ -13,6 +13,36 @@ import { readJudgeProcessInventory } from "../src/judge-process-evidence"
 
 
 
+test("fixture main: every active slot masks configured credentials in results and diagnostics", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-output-secrets-"))
+  try {
+    const input = await parallelFixture(root)
+    const secrets = ["slot-loginom-private-canary", "slot-dock-private-canary", "slot-provider-private-canary"]
+    for (const slot of input.slots.slots) await writeLeaseReceipt(path.join(input.slots.controller.stateDir, `fixture-${slot.id}.json`),
+      { state: "ready", hasApiKey: true, url: input.slots.server.url, username: slot.username, outputCanary: secrets.join("|") })
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
+      { ...input.env, LOGINOM_PASSWORD: secrets[0], LOGINOM_DOCK_API_KEY: secrets[1], EVAL_AGENT_PROVIDER_ID: "fake",
+        EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: secrets[2], EVAL_AGENT_PROVIDER_MODEL_ID: "model" },
+      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(run.code).toBe(0)
+    expect(summary.slots?.map(slot => slot.state)).toEqual(["closed", "closed"])
+    const attempts = summary.tasks.flatMap(task => task.attempts)
+    expect(attempts.map(attempt => attempt.slot_id)).toEqual(["a", "b"])
+    for (const attempt of attempts) {
+      const directory = path.join(run.runDir!, attempt.task_id, String(attempt.attempt))
+      expect(await Bun.file(path.join(directory, "stderr.txt")).text()).toBe("[redacted]|[redacted]|[redacted]")
+      expect(await Bun.file(path.join(directory, "events.jsonl")).text()).toContain("[redacted]")
+    }
+    const leaked: string[] = []
+    for await (const name of new Bun.Glob("**/*").scan({ cwd: run.runDir!, onlyFiles: true, dot: true })) {
+      const text = await Bun.file(path.join(run.runDir!, name)).text()
+      if (secrets.some(secret => text.includes(secret))) leaked.push(name)
+    }
+    expect(leaked).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
 test("fixture main: independent slot pipelines cross rounds and archive evidence before reuse", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-main-"))
   let passed = false

@@ -79,6 +79,7 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
       await writeLeaseReceipt(agentInventory, { version: 2, kind: "eval-agent-processes", commandId: runId, slotId: slot.id,
         producerPid: process.pid, state: "open", processes: [] })
       const command = { ...base, cleanupDir: path.join(runDir, "preparation", slot.id),
+        cleanupSecrets: [own.loginom.password, own.dock.apiKey, own.agent.provider?.apiKey ?? ""],
         agentEvidence: { file: agentInventory, commandId: runId, slotId: slot.id, assertHeld: lease.assertHeld },
         env: { ...base.env, EVAL_FAKE_STATE_FILE: stateFile, EVAL_FAKE_SLOT_STORAGE: path.join(input.storage, slot.id) } }
       await ensureProfile(own, command)
