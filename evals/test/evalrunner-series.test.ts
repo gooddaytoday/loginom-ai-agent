@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { loadEvalrunnerCorpus, buildEvalrunnerSlots, createEvalrunnerManifest, reserveEvalrunnerSeries, readEvalrunnerSeries, admitEvalrunnerSlot } from "../src/evalrunner-series"
+import { inspectEvalrunnerSeries } from "../src/evalrunner-series-check"
 
 test("full series freezes only 48 accepted cases and orders three rounds regular, analytic, node", async () => {
   const corpus = await loadEvalrunnerCorpus(evalsRoot)
@@ -33,9 +34,11 @@ test("versioned series reservation survives another directory and task, and a co
       series: path.join(config.results, "v02-full-LAB-77"), pins: { configSha256: "a".repeat(64) }, corpus })
     await reserveEvalrunnerSeries(config, manifest)
     expect((await readEvalrunnerSeries(config, manifest.series)).slots.length).toBe(144)
+    expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "READY", completed: 0, expected: 144, next: manifest.slots[0] })
     await expect(reserveEvalrunnerSeries(config, { ...manifest, series: path.join(config.results, "another"), task: "task-2" })).rejects.toThrow()
     const first = manifest.slots[0]!
     await admitEvalrunnerSlot(config, manifest, first, "task-1")
+    expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "BLOCKED", completed: 0, expected: 144, blockedSlot: first.id })
     await expect(admitEvalrunnerSlot(config, manifest, first, "task-2")).rejects.toThrow("already admitted")
     await Bun.write(path.join(manifest.series, "manifest.json"), JSON.stringify({ ...manifest, slots: manifest.slots.slice(1) }))
     await expect(readEvalrunnerSeries(config, manifest.series)).rejects.toThrow("Manifest changed")
