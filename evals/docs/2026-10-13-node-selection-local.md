@@ -14,17 +14,20 @@ Baseline имеет4 правильных результата и2 отсутс�
 12normal releases/5manual releases. Политика отвергнутой версии не принята;
 приёмка исправленной версии ещё не выполнена.
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: все25 candidate закрыты,
-policy PASS во всех25; содержательно покрыты18 стандартных попыток (6задач×3),
-3 явных запросаJS,3 functional-gap и1 recovery. Необоснованных JS-попыток0.
-Один итоговый расчёт правильный,24 результата не получены; доказанных неверных0.
-Одна сессия завершена штатно,24 адресно освобождены после отказа. Это три разные оценки.
-Матрица31 завершена:25новых candidate+6 сопоставимых baseline references.
-Finalcontroller290801/exec2620 завершился02:36:39.292296Z/exit0:
-machine-complete-review-required, dispatched0,31unique latestledger alladvance.
-Активных моделей нет; собственные writer и serieslease отсутствуют.
-Aggregate `506f0cb0…`, available successreview `4895fbc4…`; финальное ревью
-агрегирования и итоговый отчёт оформляются. Runtime/model/input прежние, без пересборки.
+Итог новой серии `20261014T185528Z-ad0f2b`: **политика выбора узлов принята**
+по node-selection-policy-v2 и отдельному final-review-v1. Все25candidate policyPASS,
+необоснованных JS-попыток0; покрыты6стандартныхсценариев×3,explicit3,gap3,recovery1.
+Независимое итоговое ревью `529d269d…`, окончательный вердикт `1730900f…`;
+aggregate `506f0cb0…`. Исходные attempt-файлы, FAIL и замороженные условия сохранены.
+Расчёты:1/25 подтверждён (Sales/1),24 результата не получены; доказанных неверных0.
+Runtime:1 штатное завершение,24 первоначальных отказа с отдельным strict manualrelease.
+Вся матрица31 завершена:25новых candidate+6сопоставимых baseline references.
+Finalcontroller290801 завершился02:36:39.292296Z/exit0,dispatched0,31unique alladvance.
+Все обязательные ревью выполнены; available seeded sample1/1 прошёл,
+историческая квота3НЕ выполнена/targetFulfilledfalse, слабость выборки раскрыта.
+Активных моделей, собственного writer и serieslease нет. Runtime/model/input прежние.
+Полная функциональная успешность, штатная надёжность runtime и превосходство над baseline
+не утверждаются. Финальный отчёт: docs/testing/loginom-ai-agent/reports/2026-10-13-node-selection-local.md.
 
 Итоговое ревью: отдельное уточнение `node-selection-final-review-v1` закреплено
 2026-10-14T23:48:53.959864+00:00 до следующей новой попытки; [критерии](../../docs/superpowers/specs/2026-10-15-loginom-node-selection-final-review-v1.md)
