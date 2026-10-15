@@ -2439,3 +2439,20 @@ read-back verified, then removed. This is management/session independence, with
 storageDeletionAllowed=false and nextAdmissionAllowed=false. Storage deletion,
 normal release, global readiness, full resources/licence and SessionBackup
 qualification remain open; no model/live judge calls. Old incidents are retained.
+
+Private configuration/bootstrap (2026-10-15): both persistent slots.json already
+existed0600. Acceptance matches the approved JSON; research names/network/port/
+roots and bootstrap-file inode are distinct. Public loadSlots(...,2) validates
+both without reading credentials/auth stores. Initial canonical-path audit found
+12 absent profile/work/history leaf directories under existing private parents.
+Under4 actual global profile OS guards, with every durable reservation absent,
+operator bootstrap created12 empty0700 directories and fsynced their parents.
+Reacquiring the same guards confirms empty/inode stability,26 existing private
+paths, unchanged configuration bytes and no reservation changes. Fixed global
+guard files remain. No Server/user/CLI or authentication state was changed.
+Private slot-directories-postcheck.json SHA78d0039f40e7b3b5cf8ad5b00db120322e8ae9692a1fd85b1629be918a40a4ce
+and post-bootstrap config audit3310afcc3b55f865db96a5f1b5c1bf5df2e101b815c2a0b622107f3d4ff7dde2
+retain before/after hashes and three archived helpers in native-two-users-6ebb9781.
+Acceptance pair journal is still absent; readiness=false. This records initial
+private filesystem preparation, with no new public command or auth/licence/
+SessionBackup qualification. Existing data and retained incidents are preserved.
