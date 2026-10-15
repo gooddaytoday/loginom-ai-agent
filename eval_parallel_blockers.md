@@ -43,6 +43,10 @@ native process proof, committed archive) через lifecycle API. Native wire C
 реальными exited Bun controllers; native parent admission guards также PASS.
 Этот конкретный incident ещё не принят/освобождён: адресные process/archive/unused
 proofs и terminal cleanup producer остаются необходимыми.
+Normal staged-only/account-absent finalization primitive теперь реализован и
+проверен на новой disposable pair; для этого старого incident всё ещё необходимы
+recovery-only ownership и совместимая исходная provenance. Его reservations/данные
+не изменялись.
 
 ## Незавершённый live admin dispose — причина пока не воспроизведена
 

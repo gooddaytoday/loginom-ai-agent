@@ -129,6 +129,24 @@ export async function verifyParallelPair(file: SlotFile, expected: ServerIdentit
   return current
 }
 
+export async function inspectAbsentUserStorage(file: SlotFile, identity: ServerIdentity, slot: SlotDefinition) {
+  if (!file.slots.some(configured => JSON.stringify(configured) === JSON.stringify(slot))) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  await verifyParallelPair(file, identity)
+  const markerFile = "/workdir/.loginom-evals-isolated.json"
+  const bytes = await dockerText(["exec", identity.containerId, "cat", markerFile])
+  const marker = JSON.parse(bytes) as ReturnType<typeof usersMarker>
+  if (marker.inventory.some(row => row.username === slot.username)) throw new EvalFailure("USER_STORAGE_NOT_ABSENT", 2)
+  const root = `${file.server.storageRoot}/${slot.username}`
+  const result = await docker(["exec", identity.containerId, "env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C", "sh", "-c",
+    'set -eu; for dir in / /workdir /workdir/UserStorage; do test -d "$dir" && ! test -L "$dir" && test "$(readlink -f -- "$dir")" = "$dir" || exit 1; done; ' +
+    'test ! -e "$1" && ! test -L "$1"', "absent-user-storage", root])
+  if (result.code !== 0) throw new EvalFailure("USER_STORAGE_NOT_ABSENT", 2)
+  if (await dockerText(["exec", identity.containerId, "cat", markerFile]) !== bytes) throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+  if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+  return { version: 2, kind: "absent-user-storage", identity, username: slot.username, root,
+    markerHash: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") }
+}
+
 export async function inspectUserStorage(file: SlotFile, identity: ServerIdentity, slot: SlotDefinition, owner: string) {
   if (!ownerNonce.test(owner) || !file.slots.some(configured => JSON.stringify(configured) === JSON.stringify(slot)))
     throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
