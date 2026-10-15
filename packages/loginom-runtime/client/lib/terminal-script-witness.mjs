@@ -77,7 +77,7 @@ export function collectTerminalScriptWitness(expected){
  }
  const id=expected.id,account=expected.account,summary=Object.freeze({id,account,
   ...(loadSummary?{initialLoad:loadSummary}:{}),initialLoadReason:loadSummary?undefined:(initialLoad&&Object.hasOwn(initialLoad,'reason')?own(initialLoad,'reason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),
-  rows:Object.freeze(rows.map(row=>Object.freeze(row))),projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false});
+  rows:Object.freeze(rows.map(row=>Object.freeze(row))),privatePrepareAvailable:true,projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false});
  const descriptor=Object.getOwnPropertyDescriptor,apply=Reflect.apply,parent=Object.getPrototypeOf;
  const originalPublisher=publisher,originalInspect=inspect,originalStartup=startup,originalDefs=defs,originalInitializers=initializer;
  const capsule={...summary},capsuleParent=parent(capsule);
@@ -301,4 +301,22 @@ export function inspectTerminalOriginalProvider(capsule){
  if(!Object.isFrozen(p)||!m||!('value'in m)||typeof m.value!=='function')throw Error('TERMINAL_PROVIDER_RECEIVER');
  const r=Reflect.apply(m.value,p,[]);
  return {providerRetained:true,creationArmed:r.armed,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false};
+}
+
+// Fixed private same-handle H0 entry. The argument is operational data in this
+// realm, not the physical parent request/control and never native permission.
+export function retainTerminalPrepareOnCapsule(capsule,input){
+ const descriptor=Object.getOwnPropertyDescriptor,apply=Reflect.apply;
+ const data=(object,key)=>{const d=descriptor(object,key);if(!d||!('value'in d))throw Error('TERMINAL_PROVIDER_REQUEST');return d.value};
+ const check=data(capsule,'checkOriginal');apply(check,capsule,[]);
+ if(!input||Reflect.ownKeys(input).length!==3||Object.getPrototypeOf(input)!==Object.prototype
+   ||typeof data(input,'operationId')!=='string'||!data(input,'operationId')
+   ||typeof data(input,'sessionId')!=='string'||!data(input,'sessionId')||data(input,'intent')!=='new_draft')throw Error('TERMINAL_PROVIDER_REQUEST');
+ const provider=data(capsule,'originalProvider'),arm=data(provider,'arm');
+ Object.freeze(input);const binding=apply(arm,provider,[input]);
+ const retained=apply(data(binding,'inspect'),binding,[]);apply(check,capsule,[]);
+ if(data(retained,'request')!==input||data(retained,'creation')!==undefined||data(retained,'task')!==undefined)throw Error('TERMINAL_PROVIDER_LATE');
+ return Object.freeze({operationId:input.operationId,sessionId:input.sessionId,intent:input.intent,creationArmed:true,
+  originalRequestRetained:true,queryDispatched:false,sourceExecutionQualified:false,closureIdentityQualified:false,nativeReceiversQualified:false,
+  nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
 }

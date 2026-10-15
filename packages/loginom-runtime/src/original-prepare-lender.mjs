@@ -70,6 +70,15 @@ export function requireTerminalPrepareProvider(bridge){
    unavailable('ORIGINAL_PROVIDER_IDENTITY_CHANGED');
  };
  check();
+ // Retain the actual child input/argument descriptors before any await. These
+ // are not parsed SDK params or extra.signal. Realm arguments are evidence only.
+ const argsDescriptor=Object.getOwnPropertyDescriptor(call.facts.input,'arguments');
+ if(!argsDescriptor||!('value'in argsDescriptor)||!argsDescriptor.value||typeof argsDescriptor.value!=='object')unavailable('ORIGINAL_TYPED_CREATION_UNAVAILABLE');
+ const args=argsDescriptor.value,argumentKeys=Reflect.ownKeys(args),argumentPrototype=Object.getPrototypeOf(args);
+ const descriptors=argumentKeys.map(key=>[key,Object.getOwnPropertyDescriptor(args,key)]);
+ const argumentCheck=()=>{call.guard();if(Object.getPrototypeOf(args)!==argumentPrototype||Reflect.ownKeys(args).length!==argumentKeys.length
+   ||descriptors.some(([key,d])=>{const n=Object.getOwnPropertyDescriptor(args,key);return !d||!n||!('value'in d)||!('value'in n)||Reflect.ownKeys(d).some(k=>!Object.is(d[k],n[k]))}))unavailable('ORIGINAL_TYPED_REQUEST_CHANGED')};
+ argumentCheck();
  const work=Promise.resolve().then(async()=>{
   check();
   if(!witness?.complete||!witness.realmOriginalAssociation||!witness.supportedInitialLoadJoined
@@ -80,6 +89,14 @@ export function requireTerminalPrepareProvider(bridge){
   if(result!==witness)unavailable('ORIGINAL_WITNESS_CHANGED');
   // This accepted producer still promises literal false. No success branch is
   // inferred from a future flag or caller-provided function/DTO.
+  if(typeof witness.retainPrepare==='function'){
+   argumentCheck();const value=key=>{const d=Object.getOwnPropertyDescriptor(args,key);return d&&'value'in d?d.value:undefined};
+   if(typeof value('operation_id')!=='string'||!value('operation_id')||value('intent')!=='new_draft'
+     ||value('package_path')!=null||value('workflow_ref')!=null)unavailable('ORIGINAL_TYPED_CREATION_UNAVAILABLE');
+   const request=Object.freeze({operationId:value('operation_id'),sessionId:original.sessionId,intent:'new_draft'});
+   const task=witness.retainPrepare(request);await task;check();argumentCheck();
+   unavailable('ORIGINAL_CREATION_BOUND_NATIVE_QUALIFICATION_MISSING');
+  }
   unavailable('LOADED_NATIVE_PROVIDER_NOT_BOUND');
  });
  invocations.set(call,work);return work;

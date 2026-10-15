@@ -144,3 +144,24 @@ for(const reason of [false,0,null,undefined,'',Error('lower-first',{cause:0})])t
  const rejected=assert.rejects(work,e=>Object.is(e,reason));await x.realm.native.drain();await rejected;
  assert.equal(gets,0);assert.equal(x.probe.readers,1);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
 },true));
+
+test('capsule fixed entry retains realm request before creation and reaches existing same-realm packet/query',()=>control(async x=>{
+ x.f.c.__capsule=x.capsule;
+ const entry='('+witness.retainTerminalPrepareOnCapsule.toString()+')';
+ runInContext("globalThis.__request={operationId:'own-prepare',sessionId:'own-session',intent:'new_draft'}",x.f.c);
+ const summary=runInContext(entry+'(__capsule,__request)',x.f.c);
+ assert.equal(summary.creationArmed,true);assert.equal(summary.queryDispatched,false);assert.equal(x.realm.preparation.receipts.size,0);assert.equal(x.realm.native.calls.length,0);
+ const b=x.provider.arm(x.f.c.__request);assert.equal(b.inspect().request,x.f.c.__request);
+ await x.prepare();assert.equal(await b.query(),x.realm.native.support);assert.deepEqual(x.realm.native.calls,[0]);
+ for(const k of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'])assert.equal(summary[k],false);
+}));
+for(const mode of ['accessor','copy','wrong-intent','late'])test('capsule fixed entry '+mode+' refuses before native dispatch getter0',()=>control(async x=>{
+ x.f.c.__capsule=x.capsule;x.f.c.getterCalls=0;
+ const entry='('+witness.retainTerminalPrepareOnCapsule.toString()+')';
+ runInContext("globalThis.__request={operationId:'own-prepare',sessionId:'own-session',intent:'new_draft'}",x.f.c);
+ if(mode==='accessor')runInContext("Object.defineProperty(__request,'intent',{get(){getterCalls++;throw Error('foreign')}})",x.f.c);
+ if(mode==='wrong-intent')x.f.c.__request.intent='open_package';
+ if(mode==='copy')runInContext('globalThis.__capsule=Object.freeze(Object.create(Object.getPrototypeOf(__capsule),Object.getOwnPropertyDescriptors(__capsule)))',x.f.c);
+ if(mode==='late')await x.prepare();
+ assert.throws(()=>runInContext(entry+'(__capsule,__request)',x.f.c),/REQUEST|UNAVAILABLE|LATE/);assert.equal(x.f.c.getterCalls,0);assert.equal(x.realm.native.calls.length,0);
+}));

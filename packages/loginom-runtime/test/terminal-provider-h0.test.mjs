@@ -79,7 +79,7 @@ test('root expiry is original absolute deadline and precedes foreign Page getter
 
 // The retained handle below deliberately returns a labelled summary double.
 // It tests the production consumer and original route receipts, not realm proof.
-async function joined({afterFirst}={}){
+async function joined({afterFirst,preparation}={}){
  const {terminalScriptWitnessArguments}=await import(new URL('client/lib/terminal-script-witness.mjs',root));
  const pins=terminalScriptWitnessArguments('original','account').initialLoadPins;
  const paths=['bg/js/mscorlib.js','bg/js/bg.mscorlib.js','bg/js/rpc.js','bg/js/bg.rtl.rpc.js','bg/js/bg.rtl.rpc.js'];
@@ -87,7 +87,8 @@ async function joined({afterFirst}={}){
  const summary={id:'original',account:'account',projectionOnly:true,sourceExecutionQualified:false,closureIdentityQualified:false,
   initialLoad:{records:pins.map(([url,integrity])=>({url,integrity,loaded:true})),definingExportsRetained:true,applicationSourcesJoined:true},
   rows:paths.map((p,i)=>{const url='https://app.loginom.ai/app/'+p;return{kind:kinds[i],url,integrity:pins.find(([u])=>u===url)[1],armedBeforeSource:true,initialExecutionObserved:true}})};
- let calls=0;const f=fixture({handleEvaluate(){calls++;if(calls>1&&afterFirst)return afterFirst(f);return Promise.resolve(structuredClone(summary))}});
+ if(preparation)summary.privatePrepareAvailable=true;
+ let calls=0;const f=fixture({handleEvaluate(fn,input){calls++;if(fn.name==='retainTerminalPrepareOnCapsule'&&preparation)return preparation(f,input);if(calls>1&&afterFirst)return afterFirst(f);return Promise.resolve(structuredClone(summary))}});
  await roots.prepareTerminalSourceResponses(f.owner);
  const inputs=process.env.TERMINAL_SOURCE_INPUT_DIR?new URL('file://'+process.env.TERMINAL_SOURCE_INPUT_DIR+'/'):new URL('../../../../publisher-source/',import.meta.url);
  const docs=new URL('../../../docs/testing/loginom-ai-agent/',import.meta.url);
@@ -113,4 +114,33 @@ for(const reason of [false,0,null,undefined,'',Error('first recheck',{cause:0})]
  const x=await joined({afterFirst(){entered();return task}}),work=requireTerminalPrepareProvider(x.f.bridge);
  await started;x.f.owner.page={};no(reason);let caught,failed=false;try{await work}catch(e){failed=true;caught=e}
  assert(failed);assert.equal(caught,reason);assert.equal(x.calls,2);assert.equal(x.witness.realmHandleTask instanceof Promise,true);
+});
+
+const prepareEvidence=input=>({...input,creationArmed:true,originalRequestRetained:true,queryDispatched:false,
+ sourceExecutionQualified:false,closureIdentityQualified:false,nativeReceiversQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
+test('H0 fixed same-handle binding consumes retained typed operands and refuses native qualification',async()=>{
+ let original;const x=await joined({preparation(f,input){original=input;return Promise.resolve(prepareEvidence(input))}});
+ const work=requireTerminalPrepareProvider(x.f.bridge);assert.equal(requireTerminalPrepareProvider(x.f.bridge),work);
+ await assert.rejects(work,e=>e.cause==='ORIGINAL_CREATION_BOUND_NATIVE_QUALIFICATION_MISSING');
+ assert.equal(x.calls,3);assert.equal(original.operationId,'original');assert.equal(original.sessionId,'session');assert(Object.isFrozen(original));
+ assert.equal(requireTerminalPrepareProvider(x.f.bridge),work);assert.equal(x.calls,3);
+});
+test('H0 fixed binding retains original pending evaluate and rejects operand accessor getter0 after await',async()=>{
+ let finish,entered;const pending=new Promise(r=>finish=r),started=new Promise(r=>entered=r);let original;
+ const x=await joined({preparation(f,input){original=input;entered();return pending}}),work=requireTerminalPrepareProvider(x.f.bridge);
+ await started;let gets=0;Object.defineProperty(x.c.message.input.arguments,'intent',{get(){gets++;throw Error('foreign')}});
+ finish(prepareEvidence(original));await assert.rejects(work,/ASSOCIATION_CHANGED|INVOCATION_UNAVAILABLE/);assert.equal(gets,0);assert.equal(x.calls,3);
+});
+for(const reason of [false,0,null,undefined,'',Error('first bind',{cause:0})])test('H0 fixed binding raw '+String(reason)+' survives secondary owner drift',async()=>{
+ const x=await joined({preparation(f){f.owner.page={};return Promise.reject(reason)}});
+ const work=requireTerminalPrepareProvider(x.f.bridge);let caught=false;
+ try{await work}catch(value){caught=true;assert.equal(value,reason)}assert(caught);assert.equal(x.calls,3);
+});
+
+for(const mode of ['mixed-session','accessor','authority'])test('H0 fixed binding '+mode+' evidence refuses getter0 without another evaluate',async()=>{
+ let gets=0;const x=await joined({preparation(f,input){const result=prepareEvidence(input);
+  if(mode==='mixed-session')result.sessionId='foreign';if(mode==='authority')result.nativeAuthority=true;
+  if(mode==='accessor')Object.defineProperty(result,'creationArmed',{get(){gets++;throw Error('foreign getter')}});
+  return Promise.resolve(result);
+ }});await assert.rejects(requireTerminalPrepareProvider(x.f.bridge));assert.equal(gets,0);assert.equal(x.calls,3);
 });

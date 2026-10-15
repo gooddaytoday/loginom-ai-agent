@@ -358,11 +358,29 @@ export async function bindTerminalScriptWitness(owner){
    }catch(error){throw load.reject(error)}})();
    const work=pending;work.then(()=>{if(pending===work)pending=undefined},()=>{failed=work;if(pending===work)pending=undefined});return work;
   }
+  // One original JSHandle/evaluator; no proxy or function is reconstructed from
+  // the returned evidence. Cache the exact pending/rejected prepare task.
+  let prepareTask,prepareInput,prepareCheck;
+  function retainPrepare(input){
+   if(prepareTask){if(input!==prepareInput)fail();prepareCheck();return prepareTask}
+   load.guard();check();prepareInput=input;prepareCheck=snapshot(input);prepareCheck();
+   prepareTask=(async()=>{try{
+    load.guard();check();prepareCheck();
+    const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.retainTerminalPrepareOnCapsule,input]);
+    const result=await load.observed(task);load.guard();check();prepareCheck();
+    const retained=snapshot(result);
+    if(loadData(result,'operationId')!==loadData(input,'operationId')||loadData(result,'sessionId')!==loadData(input,'sessionId')
+      ||loadData(result,'intent')!=='new_draft'||loadData(result,'creationArmed')!==true||loadData(result,'originalRequestRetained')!==true
+      ||loadData(result,'queryDispatched')!==false||['sourceExecutionQualified','closureIdentityQualified','nativeReceiversQualified','nativeAuthority','contentAuthority','saveAuthority','closeAuthority'].some(k=>loadData(result,k)!==false))fail();
+    retained();return result;
+   }catch(error){throw load.reject(error)}})();return prepareTask;
+  }
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
    realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,supportedInitialLoadJoined,initialLoadReason:supportedInitialLoadJoined?undefined:(Object.hasOwn(summary,'initialLoadReason')?loadData(summary,'initialLoadReason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
    recheck:originalHandle?()=>recheck():undefined,
+   retainPrepare:originalHandle&&Object.hasOwn(summary,'privatePrepareAvailable')&&loadData(summary,'privatePrepareAvailable')===true?retainPrepare:undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}
 }
