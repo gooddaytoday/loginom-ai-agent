@@ -1,4 +1,5 @@
 import {outputMappingOrigin,outputMappingState,outputRecoveryCalculatorState,verifyOutputMappingFinish,outputRecoveryBoundary,sameOutputRecovery} from './node-output-mapping-recovery.mjs';
+import {readCalculatorOutputMapping} from './calculator-output-source.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {inputMappingOrigin,inputMappingState,inputMappingGraph,verifyInputMappingFinish,inputRecoveryBoundary,sameInputRecovery} from './node-input-mapping-recovery.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
@@ -254,7 +255,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      const finish=await finishWizard('done',true,definition);return verified({...result,effect_possible:true,definition,finish,source_identity_verified:true});
     }
     const sources=calculatorOutputSources(configured);
-    let s=await channel.observe({condition:'calculator native output mapping',readMappings:true,ready});
+    let s=await readCalculatorOutputMapping(channel);
     resolveConfiguredOutputMapping({direction:'output',port:0},sources,s.node_mapping);
     const changes=[];
     if(mappings.length) {
@@ -385,9 +386,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      requireValue(sameOutputRecovery(calculator,outputCheckpoint.calculator),'Committed calculator configuration differs');
      try{
       await channel.openOutputPort(0);opened=true;
-      const s=await channel.observe({condition:'recovery reads committed output mapping without edits',readMappings:true,
-       ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});observed=s.node_mapping;
-     }finally{if(opened){cancelled=await closePreparedWizard(channel);outputCheckpoint.probe_pending=false;}}
+      const s=await readCalculatorOutputMapping(channel);observed=s.node_mapping;
+     }finally{if(opened&&observed){cancelled=await closePreparedWizard(channel);outputCheckpoint.probe_pending=false;}}
      await recordInput('node_output_mapping_recovery_checked',{observed,cancelled,calculator,expected:outputCheckpoint.mapping});
      requireValue(sameOutputRecovery(outputMappingState(observed,outputCheckpoint.node),outputCheckpoint.mapping),'Committed output mapping differs');
      requireValue(sameOutputRecovery(await graphForInput(),outputCheckpoint.graph),'Output graph changed during verification');
