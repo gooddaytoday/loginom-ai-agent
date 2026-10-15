@@ -1173,3 +1173,22 @@ related50/266 PASS54.90s, typecheck/diff PASS. Privateeda67412… audit2a2c433b�
 pins and original history/SDK rows; own pairs/networks/controller roots absent.
 Joint249 read-backs SHA2fd4cc4a…. Backend operations/locks, storage/backup cleanup,
 release, validated unpause, active recovery and production admission remain open.
+
+
+Native package tree (2026-10-16): readonly driver `inspect({packages:true})` now
+returns all Dispatcher collections and their package paths, readOnly,
+referenceCount and nullable Progress. Default inspect is unchanged. Actual
+sessionType0/1/2/3 user/admin/shared/pool groups were observed; Shared/Pool were
+empty in this trial. The native referenceCount=-1 sentinel is preserved.
+
+Missing tree RED47 assertions50.05s→invalid nonnegative oracle RED52/51.35s→
+native1/63 PASS51.41s; admin/preflight48/140 PASS16.60s, typecheck/syntax/diff PASS.
+Privatee8c84277… auditefc2a9e1…42/13 sources+5 pins preserves original named
+LGP/autosave and command/reply/continuous closure sources. Before target close,
+`/eval-a/backup-probe.lgp` is writable and idle; afterward it is absent across
+all collections. Exact own pair/network/root absence verified for all3 trials.
+Primary installed sources: native-package-schema-7ba115e0… SHA c32bff0e….
+
+Parent durable reader and cleanup consumption, positive running/shared/pool
+controls and actual operation/lock quiescence remain separate work. No cleanup,
+backup, release, unpause or admission grant is issued by this descriptor mode.

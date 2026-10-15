@@ -74,10 +74,11 @@ liveIntegration("native targeted close preserves a different user's active brows
 }, 180_000)
 liveIntegration("native backup research: observes real autosave and unqualified backup after daemon restart", () => nativeUserCapability("backup"), 120_000)
 liveIntegration("native backup research: captures a hard daemon crash and restart", () => nativeUserCapability("backup", true), 120_000)
+liveIntegration("native package inventory: named package is observed before close and absent afterward", () => nativeUserCapability("packages"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close", hardCrash = false) {
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages", hardCrash = false) {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -89,12 +90,18 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
   const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
   const pair = await createPair(file, options)
+  const settlement = { admin: false }
   try {
     const runtime = await verifyAdminRuntime(process.env.EVAL_CLI_BIN!)
     const profile = path.join(root, "admin-profile")
     const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-user-${crypto.randomUUID()}`)
     await mkdir(evidence, { mode: 0o700 })
     console.error(`native user evidence: ${evidence}`)
+    const pins = mode === "packages" ? await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs"),
+      path.resolve(import.meta.dir, "../src/loginom-admin.ts"), path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!]
+      .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
+    if (mode === "packages") await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
+      resources: pair.resources, root, pairNonce: pair.nonce })
     const journal = path.join(evidence, "commands")
     await mkdir(profile, { mode: 0o700 })
     await mkdir(journal, { mode: 0o700 })
@@ -392,7 +399,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         complete = true
         return
       }
-      if (mode === "backup") {
+      if (mode === "backup" || mode === "packages") {
         const backupProbe = await request("reconcile-user", { ...activation, phase: "session-backup-probe" })
         await writeLeaseReceipt(path.join(evidence, "session-backup-reply.json"), backupProbe)
         const files = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", pair.identity.containerId,
@@ -413,6 +420,37 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await writeLeaseReceipt(path.join(evidence, "autosave-evidence.json"), { identity: pair.identity, username: credentials.username,
           sessionGuid: backupData.ownSession.guid, periodMs: backupData.backup.periodMs, bytes: bytes.length,
           sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"), sessionBackupQualified: false })
+        if (mode === "packages") {
+          const packageFile = path.join(evidence, "backup-probe.lgp")
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${`${pair.identity.containerId}:${file.server.storageRoot}/${credentials.username}/backup-probe.lgp`} ${packageFile}`.quiet().nothrow()).exitCode).toBe(0)
+          const before = await request("inspect", { packages: true })
+          await writeLeaseReceipt(path.join(evidence, "packages-before.json"), before)
+          expect(before).toMatchObject({ outcome: "confirmed", data: { identity: pair.identity } })
+          type Collection = { objectId: string; name: string; sessionType: number; packageCount: number; packages: {
+            objectId: string; name: string; path: string; readOnly: boolean; referenceCount: number; progress: null | { percent: number; startedAt: string } }[] }
+          const collections = (before.data as { collections: Collection[] }).collections
+          expect(collections).toBeArray()
+          expect(collections.every(row => row.packageCount === row.packages.length)).toBe(true)
+          const owned = collections.find(row => row.objectId === backupData.binding.remoteKey && row.name === backupData.binding.name)!
+          expect(owned.packages).toHaveLength(1)
+          expect(owned.packages[0]).toMatchObject({ readOnly: false, progress: null })
+          expect(owned.packages[0]!.path.endsWith("/backup-probe.lgp")).toBe(true)
+          expect(owned.packages[0]!.referenceCount).toBe(-1)
+          expect(owned.packages[0]!.objectId.length).toBeGreaterThan(0)
+          const closed = await request("close-session", { proofId: backupProbe.id, session: backupData.binding })
+          expect(closed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+          const after = await request("inspect", { packages: true })
+          expect(after.outcome).toBe("confirmed")
+          expect((after.data as { collections: Collection[] }).collections.flatMap(row => row.packages)
+            .some(item => item.path === owned.packages[0]!.path || item.objectId === owned.packages[0]!.objectId)).toBe(false)
+          await writeLeaseReceipt(path.join(evidence, "package-inventory.json"), { identity: pair.identity, before, closed, after,
+            artifact: { path: packageFile, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(packageFile).bytes()).digest("hex") },
+            cleanupAllowed: false, operationsQualified: false })
+          expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
+            .toEqual(pins.map(source => source.sha256))
+          complete = true
+          return
+        }
         if (hardCrash) {
           const beforeCrash = await request("inspect", {})
           await writeLeaseReceipt(path.join(evidence, "server-before-crash.json"), beforeCrash)
@@ -619,6 +657,10 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       expect(run.processCleanup.status).toBe("confirmed")
       expect(run.processCleanup.capture_complete).toBe(true)
       expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+      settlement.admin = disposed?.outcome === "confirmed" && (mode !== "packages" ||
+        (disposed.data as { transportDisconnect?: string })?.transportDisconnect === "confirmed")
+      if (mode === "packages") await writeLeaseReceipt(path.join(evidence, "package-settlement.json"), { identity: pair.identity, resources: pair.resources,
+        root, admin: settlement.admin, disposed, processCleanup: run.processCleanup, cleanupAllowed: false })
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
@@ -626,7 +668,10 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(["storage", "components", "peer-close"].includes(mode) ? 2 : 1)
       }
     }
-  } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+  } finally {
+    if (mode !== "packages" || settlement.admin) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+    else console.error(`native package inventory fixture retained: ${root}`)
+  }
 }
 
 liveIntegration("trusted bridge: configured research admin login reads the role and disposes its native browser", async () => {

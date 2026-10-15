@@ -598,6 +598,36 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       continue
     }
     if (request.op === "inspect") {
+      if (request.payload?.packages === true) {
+        if (Object.keys(request.payload).length !== 1) throw Error("ADMIN_REQUEST_INVALID")
+        dispatched = true
+        const collections = await bounded(request, page.evaluate(async () => {
+          const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+          const manager = await (await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)).GetSessionsManager()
+          await manager.UpdateSessionInfos()
+          const collections = []
+          const count = await manager.Count
+          for (let index = 0; index < count; index++) {
+            const row = await manager.SessionInfo(index)
+            const packages = []
+            const packageCount = await row.Count
+            for (let index = 0; index < packageCount; index++) {
+              const item = await row.PackageInfo(index)
+              const progress = await item.Progress
+              packages.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(item)).toString(), name: await item.Name,
+                path: await item.Path, readOnly: await item.ReadOnly, referenceCount: await item.ReferenceCount,
+                progress: progress ? { percent: await progress.Percent, startedAt: await progress.StartTime } : null })
+            }
+            if (await row.Count !== packageCount) throw Error("changed")
+            collections.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(row)).toString(), name: await row.Name,
+              sessionType: await row.SessionType, packageCount, packages })
+          }
+          if (await manager.Count !== count) throw Error("changed")
+          return collections
+        }))
+        respond(id, "confirmed", { identity, collections })
+        continue
+      }
       dispatched = true
       const observation = await bounded(request, page.evaluate(async () => {
         const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session

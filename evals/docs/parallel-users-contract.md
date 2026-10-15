@@ -2880,3 +2880,44 @@ checks227/93/6. Both16 pins, no additional close RPC, retained archived SDK sess
 and exact own pair/network/controller-root absence pass. Joint249 source/pin/
 absence checks: eda67412…/verification.json SHA256
 `2fd4cc4ae1111efd11933479192fc16a3060724032f48b5ddb56b772f15e5fb3`.
+
+
+### Read-only native package descriptor tree — 2026-10-16
+
+The installed Studio Dispatcher queries `SessionInfo.PackageInfo` for each
+manager collection. The [official Dispatcher documentation](https://help.loginom.ru/userguide/admin/dispatcher.html)
+distinguishes user sessions, shared packages and the package pool; user-session
+absence alone is therefore insufficient to describe all open package entries.
+Primary installed UI/model RPC sources are preserved privately in
+native-package-schema-7ba115e0-327c-4a3e-b82d-4c50c7ababf0/source.json SHA256
+`c32bff0e8f70849ebaa7e878d195209b2f4c0464a1afdc8e6f30dbb5b259fb6a`.
+
+The driver accepts read-only `inspect` payload `{packages:true}` and returns
+`identity` plus `collections`: objectId/name/sessionType/packageCount and package
+objectId/name/path/readOnly/referenceCount/progress. Nullable progress preserves
+native Percent/StartTime when present. Collection and package counts are read
+again after enumeration; drift fails the request. Ordinary inspect remains
+unchanged. No package/session is opened, stopped, closed or removed by this mode.
+
+TDD missing collections RED47 assertions50.05s. The first populated response
+revealed an invalid test assumption: a user package reports referenceCount=-1.
+The installed Dispatcher renderer suppresses negative reference counts. The
+wire/test preserve the actual sentinel; it grants no zero-reference credit.
+Corrected native1/63 PASS51.41s, admin/preflight48/140 PASS16.60s,
+typecheck/node syntax/diff PASS. Named writable `/eval-a/backup-probe.lgp`, idle
+Progress=null and real autosave are captured before targeted CloseSession; the
+package is absent by path/objectId across all collections afterward.
+
+Private native-user-e8c84277-de3e-434b-af1d-32c80eac870e/source-audit.json SHA256
+`efc2a9e1e13630d6d290b311f1ca39af227c61d751869536fb3574ae397c47a1`
+checks42 facts/13 sources and5 tested source/binary pins. Original LGP/autosave,
+native command/reply hashes, continuous admin closure/transport ACK and exact
+own pair/network/root absence pass. Both RED cases retain their actual test
+source and native data; their own pairs/roots are absent too.
+
+This qualifies descriptor delivery for an idle named package. Running Progress,
+nonempty shared/pool populations, stable root ownership mapping, backend lock/
+operation quiescence, durable parent consumption and cleanup admission remain
+open. The probe retains cleanupAllowed=false and operationsQualified=false.
+The new fixture retains its root/pair if admin closure/transport is unconfirmed;
+production and existing native deadlines are unchanged.
