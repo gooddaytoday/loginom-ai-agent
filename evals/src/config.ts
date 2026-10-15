@@ -45,8 +45,10 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   const providerId = env.EVAL_AGENT_PROVIDER_ID
   const infraRetries = env.EVAL_INFRA_RETRIES ?? "1"
   if (!["0", "1"].includes(infraRetries)) throw new EvalFailure("EVAL_INFRA_RETRIES: ожидается 0|1", 2)
+  if (env.EVAL_EXECUTION_POLICY && env.EVAL_EXECUTION_POLICY !== "evalrunner-v1") throw new EvalFailure("Unknown EVAL_EXECUTION_POLICY", 2)
   return {
     infraRetries: Number(infraRetries),
+    executionPolicy: env.EVAL_EXECUTION_POLICY,
     dryRun,
     calibrate,
     judgeOnly,
