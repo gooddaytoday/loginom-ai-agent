@@ -37,6 +37,7 @@ export async function configureOutputAutosync(channel,value) {
     ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===value});
   if(!same(schema(before),schema(after)))throw new Error('Output definition changed while setting autosync');
   return {verified:true,cleanup_complete:true,effect_possible:option.value!==value,
+    ...(option.value!==value?{mutation:{verb:'click',control:'autosync',wizard_root_ref:root}}:{}),
     autosync:{before:option.value,value},rendered_definition_preserved:true,source_identity_verified:false,definition:after,
     settings_applied:false,package_saved:false};
 }
@@ -130,7 +131,7 @@ export async function configureOutputField(channel,field) {
   const expected={...baseline,target_fields:baseline.target_fields.map(t=>t.record_id===original.record_id?{...t,name:field.name,label:field.label,...(baseline.mapping_wizard==='TuneDataSourceMappingWizard'?{origin_type:1}:{})}:t)};
   const semantic=({rendered_indices,...rest})=>rest;
   if(!same(semantic(after.node_mapping),semantic(expected)))throw new Error('Output field edit changed unrelated native mapping state');
-  return {verified:true,cleanup_complete:true,effect_possible:true,field:find(after.node_mapping)[0],source_identity_verified:true,settings_applied:false};
+  return {verified:true,cleanup_complete:true,effect_possible:true,mutation:{verb:'apply_output_column',wizard_root_ref:root},field:find(after.node_mapping)[0],source_identity_verified:true,settings_applied:false};
 }
 
 export async function reorderOutputFields(channel,recordIds) {
@@ -244,7 +245,7 @@ export async function configureOutputFields(channel,mapping,configured) {
     const current=expected.target_fields.find(f=>f.record_id===step.record_id);
     const result=await configureOutputField(channel,{current,source:current.source,name:step.name,label:step.label});
     expected.target_fields=expected.target_fields.map(f=>f.record_id===step.record_id?{...f,name:step.name,label:step.label,...(expected.mapping_wizard==='TuneDataSourceMappingWizard'?{origin_type:1}:{})}:f);
-    edits.push({...step,verified:result.verified,effect_possible:result.effect_possible});
+    edits.push({...step,verified:result.verified,effect_possible:result.effect_possible,...(result.mutation?{mutation:result.mutation}:{})});
   }
   return {verified:true,cleanup_complete:true,effect_possible:edits.some(e=>e.effect_possible),edits,
     source_identity_verified:true,definition:expected,settings_applied:false};

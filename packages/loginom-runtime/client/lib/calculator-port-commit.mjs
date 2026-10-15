@@ -1,6 +1,13 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 
 const need=(ok,message)=>{if(!ok)throw Error('Calculator port commit: '+message);};
+export function verifyCalculatorOutputMutation(changes,wizardRoot) {
+ const allowed=mutation=>typeof wizardRoot==='string'&&wizardRoot.length>0&&mutation?.wizard_root_ref===wizardRoot
+  &&(mutation.verb==='apply_output_column'||mutation.verb==='click'&&mutation.control==='autosync');
+ need(changes.some(change=>change.verified===true&&change.effect_possible===true
+  &&(allowed(change.mutation)||(change.edits??[]).some(edit=>edit.verified===true&&edit.effect_possible===true&&allowed(edit.mutation)))),
+  'output mapping has no applied column or autosync change; Done withheld');
+}
 export function verifyCalculatorPortCommit(proof,node) {
  need(proof?.verified===true&&proof.modified===true&&proof.observation==='after_output_port_done'
   &&proof.package_saved===false&&proof.persisted_content_verified===false

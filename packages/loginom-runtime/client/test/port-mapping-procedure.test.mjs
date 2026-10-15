@@ -16,10 +16,10 @@ function fixture(initial=true) {
 
 test('output autosync toggles once and preserves the full definition',async()=>{
  for(const value of [false,true]){const f=fixture(!value),r=await configureOutputAutosync(f.channel,value);
-  assert.equal(f.mutations(),1);assert.equal(r.autosync.value,value);assert.equal(r.rendered_definition_preserved,true);assert.equal(r.settings_applied,false);}
+  assert.equal(f.mutations(),1);assert.deepEqual(r.mutation,{verb:'click',control:'autosync',wizard_root_ref:'root'});assert.equal(r.autosync.value,value);assert.equal(r.rendered_definition_preserved,true);assert.equal(r.settings_applied,false);}
 });
 test('already requested autosync value does not issue another toggle',async()=>{
- const f=fixture(false),r=await configureOutputAutosync(f.channel,false);assert.equal(f.mutations(),0);assert.equal(r.effect_possible,false);
+ const f=fixture(false),r=await configureOutputAutosync(f.channel,false);assert.equal(f.mutations(),0);assert.equal(r.effect_possible,false);assert.equal(r.mutation,undefined);
 });
 test('autosync refuses changed fields and foreign wizard after an effect without retrying',async()=>{
  for(const kind of ['change','foreign']){const f=fixture();f.channel.afterMutation=f[kind];
@@ -81,7 +81,7 @@ function fieldFixture() {
 }
 test('output field driver edits name and label once and proves native source preservation',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');
- const f=fieldFixture(),r=await configureOutputField(f.channel,f.field);assert.equal(r.verified,true);assert.equal(r.field.name,'Mapped');assert.equal(r.field.source.record_id,'s');assert.equal(f.mutations(),4);
+ const f=fieldFixture(),r=await configureOutputField(f.channel,f.field);assert.equal(r.verified,true);assert.deepEqual(r.mutation,{verb:'apply_output_column',wizard_root_ref:'wizard'});assert.equal(r.field.name,'Mapped');assert.equal(r.field.source.record_id,'s');assert.equal(f.mutations(),4);
 });
 test('output field driver rejects changed identity and unexpected post-Apply state',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');

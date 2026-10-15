@@ -10,7 +10,7 @@ import {configureCalculator} from './calculator-procedure.mjs';
 import {rejectUnchangedCalculatorDraft,verifiedCalculatorSyntaxFailure} from './calculator-request-refusal.mjs';
 import {calculatorConfigurationReadback} from './calculator-readback.mjs';
 import {calculatorParametersSchema} from './node-api.mjs';
-import {makeCalculatorPortCommitCode,verifyCalculatorPortCommit} from './calculator-port-commit.mjs';
+import {makeCalculatorPortCommitCode,verifyCalculatorPortCommit,verifyCalculatorOutputMutation} from './calculator-port-commit.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
@@ -278,6 +278,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     const active=mapping.target_fields.filter(f=>!f.excluded),definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
     requireValue(definition.fields.length===mapping.target_fields.length&&definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapping.target_fields[i][k])),
      'Rendered calculator output mapping differs from native fields');columns=active;
+    verifyCalculatorOutputMutation(changes,s.wizard.root_ref);
     outputCheckpoint={node:structuredClone(ctx.node),origin:outputMappingOrigin(targetOrigin),build:targetBuild,graph:outputRecoveryGraph,
      mapping:outputMappingState(mapping,ctx.node),calculator:outputRecoveryCalculatorState(configured,ctx.node),
      value:structuredClone({native_mapping:mapping,definition,changes,source_identity_verified:true}),attempts:0};
