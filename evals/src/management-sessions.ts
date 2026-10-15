@@ -93,7 +93,8 @@ export async function collectSlotSessions(file: SlotFile, lease: SlotLease, secr
   await lease.assertHeld()
   if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256 || hash(await readLeaseReceipt(input.journal)) !== hash(command) ||
     inventory.seal && hash(await readLeaseReceipt(inventory.seal.path)) !== inventory.seal.sha256 ||
-    agents && hash(await readLeaseReceipt(agents.source.path)) !== agents.source.sha256)
+    agents && (hash(await readLeaseReceipt(agents.source.path)) !== agents.source.sha256 ||
+      hash(await readLeaseReceipt(agents.current.path)) !== agents.current.sha256))
     throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
   return { management: sessions, agents: agents?.sessions ?? [], sources: { management: inventory.source, agents: agents?.source ?? null }, observation: current.source }
 }

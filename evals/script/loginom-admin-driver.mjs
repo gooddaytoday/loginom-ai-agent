@@ -808,7 +808,7 @@ async function readAgentBinding(payload, identity, claim, lease) {
   const inventory = await readSessionReceipt(source.process.path)
   const entry = inventory.processes?.find(entry => entry.id === source.process.id)
   if (inventory.version !== 2 || inventory.kind !== "eval-agent-processes" || inventory.commandId !== claim.actor.runId ||
-    inventory.slotId !== claim.slotId || !["open", "sealed"].includes(inventory.state) || !entry || entry.state !== "confirmed" ||
+    inventory.slotId !== claim.slotId || !["open", "paused", "sealed"].includes(inventory.state) || !entry || entry.state !== "confirmed" ||
     hash(entry) !== source.process.sha256 || !same(entry.owner, claim.actor.owner) || entry.owner.kind !== "slot" || entry.owner.id !== claim.slotId ||
     path.dirname(entry.directory ?? "") !== root || !path.basename(entry.directory).startsWith("agent-process-") ||
     entry.proof?.path !== path.join(entry.directory, "process-cleanup.json")) throw Error("SESSION_SOURCE_UNCONFIRMED")

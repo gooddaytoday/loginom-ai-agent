@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { agentCommand, runAgent } from "../src/cli"
 import { loadConfig } from "../src/config"
-import { readAgentProcess, readAgentProcessInventory, sealAgentProcessInventory } from "../src/agent-process-evidence"
+import { pauseAgentProcessInventory, readAgentProcess, readAgentProcessInventory, sealAgentProcessInventory } from "../src/agent-process-evidence"
 import { readAgentArchive, readAgentSession, recordAgentSessions } from "../src/agent-sessions"
 import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
@@ -134,15 +134,16 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
             path.join(file.controller.stateDir, `agent-archive-${entry.entrySource.id}.json`))
           await writeLeaseReceipt(path.join(evidence, "empty-agent.json"), { references, archived })
           expect(await recordAgentSessions(file, lease, prepared.secretFile, references)).toEqual([])
-          const sealed = await sealAgentProcessInventory(agentEvidence)
+          const boundary = await pauseAgentProcessInventory(agentEvidence)
           const inputs = { management, agents: { file: agents, observations: [references] } }
           const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, after!.source)
           expect(accounted.management).toHaveLength(1)
           expect(accounted.agents).toEqual([])
-          expect(accounted.sources.agents).toEqual(sealed)
+          expect(accounted.sources.agents).toEqual(boundary)
           expect(run.sessionId).toBeDefined()
           expect(await archivedSession(archived.archive, run.sessionId!)).toBe(true)
           await writeLeaseReceipt(path.join(evidence, "slot-sessions.json"), { inputs, accounted })
+          await sealAgentProcessInventory(agentEvidence)
           expect(await readServerIdentity(file)).toEqual(pair.identity)
           expect(await Promise.all(sources.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
             .toEqual(sources.map(source => source.sha256))
@@ -163,13 +164,7 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
         expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(sessions[0]!)
         const inputs = { management, agents: { file: agents, observations: [references] } }
         await expect(collectSlotSessions(file, lease, prepared.secretFile, inputs, after!.source)).rejects.toThrow("AGENT_PROCESS_INVENTORY_UNSEALED")
-        const sealed = await sealAgentProcessInventory(agentEvidence)
-        const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, after!.source)
-        expect(accounted.management).toHaveLength(1)
-        expect(accounted.agents).toEqual(sessions)
-        await expect(collectManagementSessions(file, lease, prepared.secretFile, management, after!.source)).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN")
-        await expect(collectSlotSessions(file, lease, prepared.secretFile, { ...inputs, agents: { file: agents, observations: [] } }, after!.source))
-          .rejects.toThrow("AGENT_SESSION_INVENTORY_INCOMPLETE")
+        const boundary = await pauseAgentProcessInventory(agentEvidence)
         const archiveFile = path.join(file.controller.stateDir, `agent-archive-${entry.entrySource.id}.json`)
         await expect(admin.closeAgentSession(lease, prepared.secretFile, sessions[0]!.id, { path: archiveFile, sha256: "0".repeat(64) }))
           .rejects.toThrow("AGENT_ARCHIVE_UNCONFIRMED")
@@ -186,6 +181,13 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
         expect(await readAgentArchive(file, lease, prepared.secretFile, sessions[0]!.id, archive)).toEqual(archive)
         expect(run.sessionId).toBeDefined()
         expect(await archivedSession(archived.archive, run.sessionId!)).toBe(true)
+        const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, after!.source)
+        expect(accounted.management).toHaveLength(1)
+        expect(accounted.agents).toEqual(sessions)
+        expect(accounted.sources.agents).toEqual(boundary)
+        await expect(collectManagementSessions(file, lease, prepared.secretFile, management, after!.source)).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN")
+        await expect(collectSlotSessions(file, lease, prepared.secretFile, { ...inputs, agents: { file: agents, observations: [] } }, after!.source))
+          .rejects.toThrow("AGENT_SESSION_INVENTORY_INCOMPLETE")
         const directory = await mkdtemp(path.join(file.controller.stateDir, "agent-process-no-browser-"))
         const omittedProof = { ...run.processCleanup, browserBindings: [], runtimeDirectories: [] }
         const proofFile = path.join(directory, "process-cleanup.json"), negativeFile = path.join(file.controller.stateDir, "agents-no-browser.json")
@@ -219,6 +221,7 @@ for (const browser of [true, false]) test.skipIf(!process.env.EVAL_CLI_BIN || !p
         await expect(recordAgentSessions(file, lease, prepared.secretFile, { ...references, after: before.source }))
           .rejects.toThrow("AGENT_SESSION_WINDOW_INVALID")
         await writeLeaseReceipt(path.join(evidence, "agent-sessions.json"), { sessions, references })
+        const sealed = await sealAgentProcessInventory(agentEvidence)
         expect((await readAgentProcessInventory({ ...agentEvidence, producerPid: process.pid })).source).toEqual(sealed)
         expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(closed)
         expect(await readServerIdentity(file)).toEqual(pair.identity)
