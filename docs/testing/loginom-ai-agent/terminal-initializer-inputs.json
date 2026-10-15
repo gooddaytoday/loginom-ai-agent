@@ -1,0 +1,24 @@
+{
+  "purpose": "static initial-runtime defining inputs, not actual loaded Page identity",
+  "sourceExecutionQualified": false,
+  "inputs": [
+    {
+      "url": "https://app.loginom.ai/app/bg/js/mscorlib.js",
+      "path": "mscorlib.js",
+      "bytes": 114158,
+      "sha256": "9b2b59bb2f7d3765526c3530e752fe8aeef57360a7bdafb39c6eb8468f7ee555"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/bg.mscorlib.js",
+      "path": "bg.mscorlib.js",
+      "bytes": 38176,
+      "sha256": "a5b62e7dff9920b13b02b9affad6995316df6c6ae191fc078648a987950c4550"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/Task.js",
+      "path": "Task.js",
+      "bytes": 3494,
+      "sha256": "3dd8c5dbd20e1e45978a0d127c852bf5920fb2d00a87f13270ea0b9d3505726b"
+    }
+  ]
+}

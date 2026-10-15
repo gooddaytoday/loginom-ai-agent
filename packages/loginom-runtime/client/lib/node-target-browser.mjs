@@ -19,7 +19,45 @@ export async function readGraph(page, task) {
     const active = exact(request.workflow_ref.tab_tid);
     if (!record || active.length !== 1 || active[0] !== record.tab || !active[0].classList.contains('x-tab-active')) fail('Prepared workflow changed');
     const crumbs = [...document.querySelectorAll('[data-tid^=' + JSON.stringify(request.workflow_ref.prefix + ';cnrNaviMode;b.s_') + ']')].map(e => ({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-    if (crumbs.length!==request.workflow_ref.navigation_path.length || crumbs.some((c,i)=>c.tid!==request.workflow_ref.navigation_path[i].tid||c.label!==request.workflow_ref.navigation_path[i].label)) fail('Workflow navigation changed');
+    // A save can rekey Package1 only when the original rendered/native path
+    // was bound before the transition. Labels alone never establish ownership.
+    const verifyNavigation = (wf, receipt, observed, capture=false) => {
+      const expected=wf.navigation_path, samePath=(a,b)=>Array.isArray(a)&&a.length===b.length
+        &&a.every((c,i)=>c.tid===b[i].tid&&c.label===b[i].label);
+      if(!Array.isArray(expected)||!expected.length||expected.length>32||observed.length!==expected.length
+        ||new Set(observed.map(c=>c.tid)).size!==observed.length)return null;
+      const peers=[...globalThis.__loginomDockPreparationV1.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
+      if(peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
+        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode)
+        ||receipt.crumbs&&!samePath(receipt.crumbs,expected))return null;
+      const native=observed.map(c=>{const es=exact(c.tid),e=es.length===1&&es[0],cmp=e&&globalThis.Ext?.getCmp?.(e.id);
+        return cmp?.el?.dom===e?cmp?._node?.data?.node:null;});
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      const account=main?.FMapTree?.FServerConnection?.UserName;
+      const packagePath=receipt.packageNode?.PackageFileName;
+      const baseline=receipt.nodeNavigationBinding;
+      if(baseline) {
+        if(!samePath(expected,baseline.path)||baseline.tab!==receipt.tab||baseline.packageNode!==receipt.packageNode
+          ||baseline.workflow!==receipt.nodeTargetWorkflowNode||baseline.account!==account||baseline.connection!==main?.FMapTree?.FServerConnection||baseline.packagePath!==packagePath
+          ||native.length!==baseline.native.length||native.some((n,i)=>!n||n!==baseline.native[i]||n.FGuid!==baseline.guids[i]||i>0&&n.ParentNode!==native[i-1]))return null;
+      }
+      if(samePath(expected,observed)) {
+        if(capture&&!baseline&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
+          &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
+          &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
+          receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,
+            workflow:receipt.nodeTargetWorkflowNode,account,connection:main.FMapTree.FServerConnection,packagePath};
+        return {verified:true};
+      }
+      if(!baseline)return null;
+      const index=native.indexOf(receipt.packageNode),old=expected[index],current=observed[index];
+      if(index<1||!old||current.label!==old.label||receipt.packageNode.PackageName!==old.label
+        ||current.tid!==expected[index-1].tid+'>'+receipt.packageNode.PackageName)return null;
+      if(observed.some((c,i)=>c.label!==expected[i].label||c.tid!==(i<index?expected[i].tid:
+        i===index?current.tid:expected[i].tid.startsWith(old.tid+'>')?current.tid+expected[i].tid.slice(old.tid.length):null)))return null;
+      return {verified:true,rebinding:{prepared_path:expected.map(c=>({...c})),observed_path:observed.map(c=>({...c}))}};
+    };
+    if(!verifyNavigation(request.workflow_ref,record,crumbs))fail('Workflow navigation changed');
     const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden';
     const blockers = [...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
     if (blockers.length) fail('Graph is blocked');
@@ -118,6 +156,7 @@ export async function readGraph(page, task) {
     }
     links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));foreign_links.sort();
     if(links.length+foreign_links.length>400)fail('Graph link bound exceeded');
+    if(!verifyNavigation(request.workflow_ref,record,crumbs,true))fail('Workflow navigation changed');
     return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(read_bindings?{native_bindings:nativeBindings}:{}),
       interaction_ready:model.FCreateDraggedNodeStarted===false && model.FDraggingOverGraph===false && !model.FDraggedNode};
   },task);

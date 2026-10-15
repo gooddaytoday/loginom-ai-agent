@@ -1,5 +1,9 @@
+import {receiveHostRootStart,receiveHostRootCall,bindRootHostOptions} from './original-root-association'
+import {retainFPStartup,bindFPHostStartup} from "./fp-startup-control"
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
+import { join } from "node:path"
+import { writeFile } from "node:fs/promises"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { createLoginomHost } from "./host"
@@ -12,11 +16,16 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
 const state: {
+  rootOrigin?: ReturnType<typeof receiveHostRootStart>
+  fpStartup?: ReturnType<typeof retainFPStartup>
   starting?: Promise<void>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
   port?: ReturnType<typeof loginomHostPort>
   stopping?: Promise<void>
   closed: boolean
+  root?: string
+  shutdown?: { stages: object[], primaryFailure?:unknown, persistenceFailure?:unknown }
+  closeFailure?: unknown
 } = { closed: false }
 const port: HostPort = {
   postMessage: (value) => reply(value),
@@ -46,7 +55,7 @@ process.on("disconnect", () => {
 })
 process.on("SIGTERM", () => {
   void stop()
-    .finally(() => {
+    .then(() => {
       if (process.connected) process.disconnect()
     })
     .catch(() => {
@@ -67,6 +76,10 @@ async function dispatch(message: unknown) {
   const input = "input" in message ? message.input : undefined
   try {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+    if(message.method==='readonly.preReady.cancel' && input && typeof input==='object' && 'phase' in input && input.phase==='startup') {
+      if(!state.fpStartup?.cancel(input))throw Error('LOGINOM_HANDSHAKE_INVALID');
+      reply({id:message.id,result:{accepted:true,pending:state.fpStartup.pending,nativeCancellationConfirmed:false}});return
+    }
     if (message.method === "start") {
       if (state.starting || state.host) throw new Error("LOGINOM_HANDSHAKE_INVALID")
       if (
@@ -82,27 +95,57 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
-        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("acceptanceCleanupPackage" in input && (typeof input.acceptanceCleanupPackage !== "string" ||
+          input.acceptanceCleanupPackage.length > 1024 ||
+          !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(input.acceptanceCleanupPackage) ||
+          input.acceptanceCleanupPackage.split("/").some(segment => segment === "." || segment === "..")))
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      state.rootOrigin=receiveHostRootStart(message);
+      const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
+      if (capture !== undefined && (!capture || typeof capture !== "object"
+          || Object.keys(capture).sort().join(",") !== "authorization,harness,packagePath"
+          || !("harness" in capture) || !["sorting-before-close-v1","field-parameters-preservation-v1"].includes(capture.harness as string)
+          || !("authorization" in capture) || typeof capture.authorization !== "string" || !/^[a-f0-9]{64}$/.test(capture.authorization)
+          || !("packagePath" in capture) || typeof capture.packagePath !== "string" || capture.packagePath.length > 1024
+          || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
+          || capture.packagePath.split("/").some(x => x === "." || x === "..")))
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
+      if('amountStartup' in input)throw Error('LOGINOM_HANDSHAKE_INVALID');
+      const fpStartup=capture && typeof capture==='object' && 'harness' in capture && capture.harness==='field-parameters-preservation-v1'
+        ? retainFPStartup(message as unknown as Parameters<typeof retainFPStartup>[0],input as unknown as Parameters<typeof retainFPStartup>[1]) : undefined;
+      state.fpStartup=fpStartup;fpStartup?.guard();
       const options = {
         root: input.root,
+        acceptanceCapture: capture as { authorization: string; packagePath: string; harness: "sorting-before-close-v1" | "field-parameters-preservation-v1" } | undefined,
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        acceptanceCleanupPackage: "acceptanceCleanupPackage" in input ? input.acceptanceCleanupPackage as string : undefined,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }
+      const guardFPStartup=()=>{fpStartup?.guard();if(fpStartup && (options.root!==input.root || options.resources!==input.resources
+        || options.headless!==input.headless || options.acceptanceCapture!==capture
+        || options.strictRecovery!==('strictRecovery' in input && input.strictRecovery===true)
+        || options.acceptanceCleanupPackage!==('acceptanceCleanupPackage' in input?input.acceptanceCleanupPackage:undefined)))throw Error('LOGINOM_HANDSHAKE_INVALID')};
+      guardFPStartup();if(fpStartup)bindFPHostStartup(options,fpStartup);
+      if(state.rootOrigin)bindRootHostOptions(options,state.rootOrigin);
+      state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
+        guardFPStartup()
         state.port = loginomHostPort(port, host)
-        await host.settled()
-      })
-      await state.starting
+        try{await host.settled()}catch(error){throw fpStartup?fpStartup.reject(error):error}
+        guardFPStartup()
+      },fpStartup ? error=>{throw fpStartup.reject(error)} : undefined)
+      let accepted=false;try{await state.starting;guardFPStartup();if(state.closed)throw Error("LOGINOM_HOST_CLOSED");accepted=true}finally{fpStartup?.settle(accepted)}
       if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
     }
+    if(state.fpStartup && !state.fpStartup.accepted)throw Error("LOGINOM_HOST_NOT_READY");
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "close") {
       // Stop admission now, but exclude this close request from its own drain.
@@ -110,19 +153,22 @@ async function dispatch(message: unknown) {
       void closing.then(
         () => reply({ id: message.id, result: { closed: true } }, true),
         () => {
-          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" }, true)
+          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" })
         },
       )
       return
     }
     if (!message.method.startsWith("connection.")) {
+      receiveHostRootCall(message,state.rootOrigin);
       events.emit("message", { data: message })
       return
     }
     const result = await management(message.method, input, state.host)
     reply({ id: message.id, result })
   } catch (error) {
-    reply({ id: message.id, error: hostError(error) })
+    if(message.method==='start' && state.fpStartup)reply({id:message.id,rejection:closeRejection(error),
+      ...(state.fpStartup.secondary?{secondaryRejection:closeRejection(state.fpStartup.secondary.value)}:{})});
+    else reply({ id: message.id, error: hostError(error) })
   }
 }
 
@@ -153,19 +199,58 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   throw new Error("LOGINOM_METHOD_INVALID")
 }
 
+function closeRejection(value: unknown): unknown {
+  return value instanceof Error ? {kind:"Error",name:value.name,message:value.message,
+    ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
+    {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+}
+async function recordClose(stage: string, detail: object) {
+  state.shutdown ??= {stages:[]}
+  state.shutdown.stages.push({stage,...detail})
+  if(state.root) await writeFile(join(state.root,"host-shutdown.json"),JSON.stringify(state.shutdown,null,2)+"\n",{mode:0o600})
+}
 function stop() {
   if (state.stopping) return state.stopping
-  state.closed = true
-  events.emit("close")
   state.stopping = (async () => {
     await state.starting
-    const cancellation = Promise.allSettled([state.host?.interruptAll()])
+    await recordClose("interrupt",{status:"started"})
+    let primary: {stage:string,error:Error} | undefined
+    try {
+    const cancellation = await Promise.allSettled([Promise.resolve().then(()=>state.host?.interruptAll())])
+    const interrupted=cancellation[0]
+    if(interrupted.status==="rejected") primary={stage:"interrupt",error:new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:interrupted.reason})}
+    await recordClose("interrupt",{status:interrupted.status,
+      ...(interrupted.status==="rejected"?{rejection:closeRejection(interrupted.reason)}:{})})
     await Promise.all([...operations])
+    await recordClose("host_close",{status:"started"})
+    const results = await Promise.allSettled([Promise.resolve().then(()=>state.host?.close())])
+    const closed=results[0]
+    if(closed.status==="rejected" && !primary) primary={stage:"host_close",error:new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:closed.reason})}
+    await recordClose("host_close",{status:closed.status,
+      ...(closed.status==="rejected"?{rejection:closeRejection(closed.reason)}:{})})
+    const refused=[...cancellation,...results].find(result=>result.status==="rejected")
+    if (refused) throw primary?.error??new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:refused.reason})
+    // Durable native/transport completion precedes the port's lease release.
+    // "prepared" is not a claim that an outer acknowledgement was delivered.
+    await recordClose("outer_acknowledgement",{status:"prepared"})
     await state.port?.close()
-    const results = await Promise.allSettled([state.host?.close()])
-    if ([...(await cancellation), ...results].some((result) => result.status === "rejected"))
-      throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
+    state.closed = true
+    events.emit("close")
+    } catch(error) {
+      const rejection=primary?.error??error
+      state.closeFailure=rejection
+      const shutdown=state.shutdown??={stages:[]}
+      if(primary) shutdown.primaryFailure={stage:primary.stage,rejection:closeRejection(rejection)}
+      if(primary && error!==rejection) shutdown.persistenceFailure=closeRejection(error)
+      try { await recordClose("refused",{rejection:closeRejection(rejection)}) } catch(persistenceFailure) { shutdown.persistenceFailure=closeRejection(persistenceFailure) }
+      throw rejection
+    }
   })()
+  const attempt = state.stopping
+  void attempt.catch(error => {
+    state.closeFailure=error
+    if (state.stopping === attempt) state.stopping = undefined
+  })
   return state.stopping
 }
 

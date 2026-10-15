@@ -2,19 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSorting} from '../lib/sorting-procedure.mjs';
 
-function fixture({newNode=false,locale=true}={}) {
- const fields=[{name:'Amount',label:'Сумма',type:'real'},{name:'Name',label:'Имя',type:'string'}];
- const configuration={verified:true,input_fields:fields,keys:[{...fields[0],record_id:'a',order:0,direction:'ASC'}],selections:{selected:[]},options:{chkLocaleAware:{value:locale,switch_pressed:false},chkBufferWhole:{value:false},cbxMaxThreadCount:{value:0}}};
+function fixture({newNode=false,locale=true,numeric=false}={}) {
+ const fields=numeric?['Amount','Count','RowID'].map(name=>({name,label:name,type:name==='Amount'?'real':'integer'})):[{name:'Amount',label:'Сумма',type:'real'},{name:'Name',label:'Имя',type:'string'}];
+ const configuration={verified:true,input_fields:fields,keys:(numeric?fields:[fields[0]]).map((f,order)=>({...f,record_id:'key-'+f.name,order,direction:'ASC'})),selections:{selected:[]},options:{chkLocaleAware:{value:locale,switch_pressed:false},chkBufferWhole:{value:false},cbxMaxThreadCount:{value:0}}};
  const gestures=[];const flags={};
  const snapshot=()=>({wizard:{stage:'sorting',root_tid:'root'},node_sorting:structuredClone(configuration),ui:{elements:[
   ...configuration.keys.flatMap(k=>['field','direction','delete'].map(part=>({ref:k.name+':'+part,tid:part,sorting_field:{field_key:k.name,record_id:k.record_id,role:'selected',part},allowed_actions:['click']}))),
   ...configuration.input_fields.filter(f=>!configuration.keys.some(k=>k.name===f.name)).map(f=>({ref:f.name+':available',tid:'available',sorting_field:{field_key:f.name,record_id:'input-'+f.name,role:'available',part:'field'},allowed_actions:['click']})),
-  {ref:'locale',tid:'root;SortingWizard;SortingColumnCollection;chkLocaleAware;ValueControl;DisplayEl',allowed_actions:['set_checked']}
+  {ref:'locale',tid:'root;SortingWizard;SortingColumnCollection;chkLocaleAware;ValueControl;DisplayEl',allowed_actions:['set_checked']},
+  {ref:'up',tid:'root;SortingWizard;SortingColumnCollection;btnMoveUp',allowed_actions:['click']}
  ]}});
  const channel={observe:async()=>snapshot(),perform:async spec=>{
   const action=spec.resolve(snapshot());gestures.push(action);
   if(flags.failBeforeGesture)throw Error('ownership changed before gesture');
   if(action.ref==='locale')configuration.options.chkLocaleAware.value=action.checked;
+  if(action.ref==='up'){
+   const index=configuration.keys.findIndex(k=>configuration.selections.selected.includes(k.record_id));assert.ok(index>0);
+   if(!flags.lostMove){[configuration.keys[index-1],configuration.keys[index]]=[configuration.keys[index],configuration.keys[index-1]];configuration.keys.forEach((k,i)=>k.order=i)}
+   if(flags.lostReply)throw Error('unknown move reply');
+  }
   const key=configuration.keys.find(k=>action.ref.startsWith(k.name+':'));
   if(action.ref===key?.name+':field')configuration.selections.selected=[key.record_id];
   if(action.ref===key?.name+':direction'&&!flags.lostChange)key.direction=key.direction==='ASC'?'DESC':'ASC';
@@ -66,4 +72,24 @@ test('foreign ownership and changes to unrelated options cannot succeed',async()
 test('new node uses explicit locale default and variable-driven locale fails closed',async()=>{
  const f=fixture({newNode:true,locale:false});await f.run({});assert.equal(f.gestures[0].checked,true);
  const g=fixture();g.configuration.options.chkLocaleAware.switch_pressed=true;await assert.rejects(g.run({}),/Variable-driven/);assert.deepEqual(g.gestures,[]);
+});
+
+const permutations=[['Amount','Count','RowID'],['Amount','RowID','Count'],['Count','Amount','RowID'],['Count','RowID','Amount'],['RowID','Amount','Count'],['RowID','Count','Amount']];
+for(const names of permutations)test('existing complete numeric priority '+names.join('/'),async()=>{
+ const f=fixture({numeric:true}),before=structuredClone(f.configuration.options),ids=new Map(f.configuration.keys.map(k=>[k.name,k.record_id]));
+ const p={keys:names.map((name,i)=>({field:{kind:'input_field',name},direction:i%2?'ASC':'DESC'}))};
+ const r=await f.run(p);assert.deepEqual(r.configuration.keys.map(k=>[k.name,k.order,k.direction]),names.map((n,i)=>[n,i,i%2?'ASC':'DESC']));
+ assert.deepEqual(r.configuration.options,before);assert.ok(r.configuration.keys.every(k=>ids.get(k.name)===k.record_id));
+ const previous=f.gestures.length;await f.run(p);assert.equal(f.gestures.slice(previous).filter(g=>g.ref==='up'||g.ref.endsWith(':direction')).length,0);
+});
+test('existing key list replacement removes unrequested keys and keeps native IDs',async()=>{
+ const f=fixture({numeric:true}),id=f.configuration.keys[2].record_id;
+ const r=await f.run({keys:[{field:{kind:'input_field',name:'RowID'},direction:'DESC'}]});
+ assert.deepEqual(r.configuration.keys.map(k=>[k.name,k.record_id]),[['RowID',id]]);
+ assert.equal(f.gestures.filter(g=>g.ref.endsWith(':delete')).length,2);
+});
+for(const flag of ['lostMove','lostReply'])test('priority '+flag+' never repeats unknown move',async()=>{
+ const f=fixture({numeric:true});f.flags[flag]=true;
+ await assert.rejects(f.run({keys:['RowID','Amount','Count'].map(name=>({field:{kind:'input_field',name},direction:'DESC'}))}));
+ assert.equal(f.gestures.filter(g=>g.ref==='up').length,1);
 });

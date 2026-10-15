@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';import vm from 'node:vm';
+export function fake(mode){
+ class Workflow{} class Package{};const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
+ const node={FGuid:'n',data:{},FStatus:1,FRunning:false},port={parent:node,FGuid:'p',FType:1,FSubType:1,FParam:0,FStatus:1};
+ const process={data:{id:'2.1',Status:3,ErrorDetails:'',ModelNode:node.data},internalId:3,childNodes:[]},group={data:{id:'2',Status:3,ErrorDetails:'',loaded:true},internalId:2,childNodes:[process]},root={data:{loaded:true},internalId:1,childNodes:[group]};
+ const counters={sent:0,released:0};let finish;const bytes=new Uint8Array(60);new DataView(bytes.buffer).setInt16(12,5,true);new DataView(bytes.buffer).setFloat64(14,1,true);
+ const response={$FData:bytes,$FDataSize:60,get_MessageType:()=>1,get_MessageID:()=>mode==='stale-response'?999:101,set_StaticDataSize:()=>{},Release:()=>counters.released++};
+ const request={set_StaticDataSize:()=>{},InitializeMethodCallMessage:(o,id,m,t)=>assert.deepEqual([o,id,m,t],[0,9,321,0]),WriteParameter:(o,r)=>assert.deepEqual([o,r],[0,0]),WriteParameter$a:(o,c)=>assert.deepEqual([o,c],[8,0]),get_MessageID:()=>101,Release:()=>counters.released++};
+ const helper={$FCacheInitialized:true,$FData:{},$FDataChangeCookie:{},$FStateChangeCookie:{},$FRowCount:1};
+ const session={$M:{GetDynamicData:()=>request},DispatchMessageAsync:(r,exceptions)=>{assert.equal(exceptions,false);counters.sent++;return {continueWith:callback=>{if(mode==='deferred'){finish=error=>callback({getAwaitedResult:()=>{if(error)throw Error('transport error');return response;}});return;}if(mode==='changed-cache')helper.$FData={};if(mode==='new-execution')root.childNodes.push({internalId:4,data:{id:'3.1',Status:3,ErrorDetails:'',ModelNode:node.data},childNodes:[]});callback({getAwaitedResult:()=>response});}};}};
+ const ds={$:{'$I':116,'$OW':0,'$O':9},$S:session,$FHelper:helper};helper.FBaseProxy=ds;
+ const schema=[{Name:'Scalar',DisplayName:'Scalar',DataType:6}];const store={proxy:{dataSource:ds},loading:false};
+ const dt={FDataSource:ds,FDataSourceStore:store,FTotalRowCount:1};const dc={FModelNode:node.data,FDataSource:ds,FDataTable:dt,FColumnInfosStore:{data:{items:schema.map(data=>({data}))}}};
+ const tab={getAttribute:()=> 'tab',classList:{contains:()=>true}},preview={id:'preview',checkVisibility:()=>true},tree={id:'tree'};
+ const document={querySelectorAll:q=>[q.includes('DataSetForm')?preview:tab],querySelector:q=>q.includes('ConsoleForm')?tree:q.includes('DataSetForm')?preview:tab};
+ const manager={FPreviewVisible:true,FPreviewForm:{FCurrentPreviewNode:node,FCurrentPreviewPort:port},FShowDataLastCall:{Node:node,Port:port}};
+ const sourceNode={FGuid:'source',data:{},FStatus:1,FRunning:false,FIconCls:'bg-vendor-icon-importtextfile',FLabel:{FRawValue:'Source'}};
+ node.FLabel={FRawValue:'Target'};node.FIconCls='bg-vendor-icon-columnflipping';
+ const sourcePort={parent:sourceNode,FGuid:'sp',FType:1,FSubType:1,FParam:0,FPortIndex:0},inputPort={parent:node,FGuid:'ip',FType:0,FSubType:1,FParam:0,FPortIndex:0};
+ sourceNode.FPorts=[{FCollection:[]},{FCollection:[sourcePort]}];node.FPorts=[{FCollection:[inputPort]},{FCollection:[port]}];
+ const links=[{FGuid:'edge',FSourcePort:sourcePort,FTargetPort:inputPort}];
+ root.childNodes.unshift({internalId:0,data:{id:'1',Status:3,ErrorDetails:'',loaded:true},childNodes:[{internalId:10,data:{id:'1.1',Status:3,ErrorDetails:'',ModelNode:sourceNode.data},childNodes:[]}]});
+ const card={Controller:{Node:{data:{node:workflow}},FController:{FPreviewManager:manager,FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FNodes:{FCollection:[node,sourceNode]},FLinks:{FCollection:links},FmxGraph:{container:{querySelectorAll:()=>[{dataset:{tid:'TF;Graph;Source|Output_Data-0|Target|Input_Data-0'}}]}}}}}};
+ const env={document,location:{origin:'http://test'},bg:{app:{Version:'7.4.2',WorkFlowTreeNode:Workflow,PackageTreeNode:Package,Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'account'}},Items:{Workspace:{getActiveTab:()=>card}}}}}}},Ext:{getCmp:id=>id==='preview'?{Controller:dc}:{getStore:()=>({getRoot:()=>root,isLoading:()=>false})}},Uint8Array,DataView,TextDecoder,TextEncoder,setTimeout,clearTimeout};
+ env.__loginomDockPreparationV1={document,id:'d',receipts:new Map([['r',{phase:'verified',workflowId:'w',tab,nodeTargetWorkflowNode:workflow,packageNode:pack}]])};
+ const b={runtime_binding_id:'test-binding_id',package_id:'pkg',static_source:{node_id:'source',execution_id:'d:1:1'},method:321,interface:116,port:0,offset:0,rows:1,columns:[0],execution:{status:'completed',execution_id:'d:1:2'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',source:{owner:0,object:9},schema:[{name:'Scalar',label:'Scalar',type:6}],row_count:1};
+ env.__loginomDockCollapseRuntimeV1={document,binding_id:'test-binding_id',check:s=>assert.equal(s,session)};
+ const context=vm.createContext(env);
+ return {page:{evaluate:(fn,arg)=>{context.arg=arg;return vm.runInContext('('+fn.toString()+')(arg)',context);}},b,counters,nodes:card.Controller.FController.FDiagram.FNodes.FCollection,sourceNode,node,links,sourcePort,inputPort,root,helper,dc,dt,store,env,context,finish:error=>finish(error)};
+}

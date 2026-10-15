@@ -1,32 +1,125 @@
-// Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
-async function prepareWorkspace(page, options) {
-  const deadline = Date.now() + options.timeoutMs;
-  let phase = 'page', createdDraft = false, effectPossible = options.recoverOnly === true, target = null;
-  const trace = [];
-  let authenticated = false;
-  const remaining = () => {
-    if (Date.now() >= deadline) throw new Error('DEADLINE');
-    return deadline - Date.now();
-  };
-  const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
-  const wait = async (name, probe) => {
-    phase = name;
-    while (remaining()) {
-      const value = await probe();
-      if (value) { trace.push({ condition: name, satisfied: true }); return value; }
-      await page.waitForTimeout(Math.min(100, remaining()));
-    }
-  };
-  const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
-    authenticated, created_draft: createdDraft, effect_possible: effectPossible,
-    operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
-  // Only cached, read-only Loginom getters; never execute package or server methods.
-  const inspect = async mode => page.evaluate(({ mode, options }) => {
+import {checkTerminalWorkspaceCreation,evaluateTerminalWorkspaceCreation,terminalWorkspaceCreationAccount} from '../../src/terminal-root-association.mjs';
+import {terminalUserPublisherInspectorSource} from './terminal-user-publisher.mjs';
+import {checkTerminalInitialCustody,terminalInitialDeadline,terminalInitialAccount} from './terminal-original-packet.mjs';
+export function inspectWorkspaceRealm(capsuleOrInput,originalInput){
+  const {mode,options,retainOriginalRealm,expectedAccount,expectedUserPublisherInspectorSource}=originalInput===undefined?capsuleOrInput:originalInput;
+  let originalProvider;
+  if(originalInput!==undefined){
+    const read=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('TERMINAL_PROVIDER_RECEIVER');return d.value};
+    const capsule=capsuleOrInput;Reflect.apply(read(capsule,'checkOriginal'),capsule,[]);originalProvider=read(capsule,'originalProvider');
+    const proof=Reflect.apply(read(originalProvider,'continueCreation'),originalProvider,['check']);
+    if(options.operationId!==proof.operationId||options.sessionId!==proof.sessionId||options.intent!=='new_draft')throw Error('TERMINAL_PROVIDER_REQUEST');
+  }
     const key = '__loginomDockPreparationV1';
     let state = globalThis[key];
     if (!state || state.document !== document) state = globalThis[key] = {
       document, id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`, receipts: new Map(),
     };
+    if(retainOriginalRealm) {
+      // Runs in the original browser realm before reserve/effect/creation. Only
+      // cached data properties are read; no GetFileStorage/QueryInterface/RPC.
+      const slots=[];
+      const ref=(object,key)=>{
+        const chain=[];
+        for(let current=object;current;current=Object.getPrototypeOf(current)) {
+          chain.push(current);
+          const d=Object.getOwnPropertyDescriptor(current,key);
+          if(d){if(!('value' in d))throw Error('TERMINAL_REALM_ACCESSOR');
+            slots.push({object,key,owner:current,chain:Object.freeze(chain),prototype:Object.getPrototypeOf(object),value:d.value,
+              writable:d.writable,enumerable:d.enumerable,configurable:d.configurable});return d.value;}
+        }
+        throw Error('TERMINAL_REALM_MISSING_'+key);
+      };
+      const root=globalThis,app=ref(ref(root,'bg'),'app'),main=ref(ref(ref(app,'Application'),'FInstance'),'FMainForm');
+      const mapTree=ref(main,'FMapTree'),connection=ref(mapTree,'FServerConnection');
+      // Verified application publisher fields, not public Session/UserName getters.
+      const applicationSession=ref(connection,'FSession'),nativeSession=ref(applicationSession,'$S');
+      const urlUtils=ref(main,'FUrlUtils'),fileStorage=ref(urlUtils,'FFileStorage');
+      const storageSession=ref(fileStorage,'$S'),storageId=ref(fileStorage,'$');
+      if(!nativeSession||storageSession!==nativeSession||storageId==null)throw Error('TERMINAL_REALM_STORAGE_REPRESENTATION');
+      const account=ref(connection,'FUsername');if(account!==expectedAccount)throw Error('TERMINAL_REALM_ACCOUNT_CHANGED');
+      const rpc=ref(root,'rpc'),bg=ref(root,'bg'),bgRpc=ref(bg,'rpc');
+      const bindings={document,preparation:state,receipts:ref(state,'receipts'),main,mapTree,connection,
+        applicationSession,urlUtils,fileStorage,storageSession,storageId,nativeSession,account,
+        ObjectProxy:ref(rpc,'TBGObjectProxy'),FileStorage:ref(bgRpc,'TIBGFileStorage_Proxy'),
+        StreamPersistProxy:ref(bgRpc,'TIBGStreamPersist_Proxy'),StreamPersist:ref(bg,'IBGStreamPersist'),
+        ss:ref(root,'ss'),GuidHelper:ref(rpc,'GuidHelper'),MessageDynamicData:ref(rpc,'TBGMessageDynamicData'),HResult:ref(rpc,'HResult')};
+      Object.assign(bindings,{ObjectProxyPrototype:ref(bindings.ObjectProxy,'prototype'),
+        FileStoragePrototype:ref(bindings.FileStorage,'prototype'),StreamPersistPrototype:ref(bindings.StreamPersistProxy,'prototype'),
+        sessionMessages:ref(nativeSession,'$M'),sessionCompletion:ref(nativeSession,'$R'),sessionDispatch:ref(nativeSession,'DispatchMessageAsync')});
+      bindings.messageReader=ref(bindings.sessionMessages,'GetDynamicData');
+      Object.assign(bindings,{query:ref(bindings.ObjectProxyPrototype,'QueryInterface'),
+        connected:ref(bindings.FileStoragePrototype,'get_Connected'),currentDirectory:ref(bindings.FileStoragePrototype,'get_CurrentDirectory'),
+        ownDirectory:ref(bindings.FileStoragePrototype,'get_IsOwnCurrentDirectory'),rootPath:ref(bindings.FileStoragePrototype,'get_RootPath'),
+        persist:ref(bindings.StreamPersistPrototype,'SaveToStream')});
+      if(ref(fileStorage,'get_Connected')!==bindings.connected||ref(fileStorage,'QueryInterface')!==bindings.query)
+        throw Error('TERMINAL_REALM_STORAGE_REPRESENTATION');
+      const userPublisherDescriptor=Object.getOwnPropertyDescriptor(root,'__loginomOriginalUserPublisherV1');
+      if(userPublisherDescriptor){
+        const userPublisher=ref(root,'__loginomOriginalUserPublisherV1'),userPublisherInspect=ref(userPublisher,'inspect');
+        if(!Object.isFrozen(userPublisher)||typeof userPublisherInspect!=='function'
+          ||Function.prototype.toString.call(userPublisherInspect)!==expectedUserPublisherInspectorSource)throw Error('TERMINAL_REALM_USER_PUBLISHER');
+        const userReceipt=Reflect.apply(userPublisherInspect,userPublisher,[]);
+        const receiptRef=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);
+          if(!d||!('value'in d))throw Error('TERMINAL_REALM_USER_PUBLISHER');return d.value;};
+        if(!Object.isFrozen(userReceipt)||receiptRef(userReceipt,'document')!==document
+          ||receiptRef(receiptRef(userReceipt,'bindings'),'transport')!==nativeSession)throw Error('TERMINAL_REALM_USER_PUBLISHER');
+        // Preserve references only, never serialize the receiver or its task.
+        Object.assign(bindings,{userPublisher,userPublisherInspect,user:receiptRef(userReceipt,'user'),
+          userTask:receiptRef(userReceipt,'task'),userReceiver:receiptRef(userReceipt,'receiver'),
+          originalUserSet:receiptRef(userReceipt,'originalSet'),originalUserInit:receiptRef(userReceipt,'originalInit')});
+        const acquisition=receiptRef(userReceipt,'acquisition');
+        if(acquisition){
+          if(receiptRef(acquisition,'user')!==bindings.user
+            ||ref(receiptRef(acquisition,'session'),'$S')!==nativeSession)throw Error('TERMINAL_REALM_USER_ACQUISITION');
+          Object.assign(bindings,{userAcquisitionReceiver:receiptRef(acquisition,'receiver'),
+            userAcquisitionTask:receiptRef(acquisition,'task'),userAcquisitionSession:receiptRef(acquisition,'session'),
+            originalUserGet:receiptRef(acquisition,'originalGet')});
+          const loadedDefinitions=receiptRef(acquisition,'loadedDefinitions');
+          if(!loadedDefinitions||!Object.isFrozen(loadedDefinitions)||receiptRef(loadedDefinitions,'complete')!==true
+            ||receiptRef(loadedDefinitions,'closureIdentityQualified')!==false)throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          const initialExports=receiptRef(loadedDefinitions,'bindings');
+          if(!Object.isFrozen(initialExports))throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          for(const key of ['ObjectProxy','FileStorage','StreamPersistProxy','StreamPersist','ss','GuidHelper','MessageDynamicData','HResult',
+            'ObjectProxyPrototype','FileStoragePrototype','StreamPersistPrototype','query','connected','currentDirectory','ownDirectory','rootPath','persist']){
+            if(receiptRef(initialExports,key)!==bindings[key])throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          }
+          const userInitializers=receiptRef(loadedDefinitions,'initializers');
+          if(!Object.isFrozen(userInitializers)||receiptRef(userInitializers,'sourceExecutionQualified')!==false
+            ||receiptRef(userInitializers,'closureIdentityQualified')!==false)throw Error('TERMINAL_REALM_LOADED_DEFINITIONS');
+          Object.assign(bindings,{userLoadedDefinitions:loadedDefinitions,userInitializers});
+          const lower=receiptRef(acquisition,'lower');
+          if(lower){
+            if(receiptRef(acquisition,'rpcCompletionVerified')!==true||receiptRef(lower,'user')!==bindings.user
+              ||receiptRef(lower,'transport')!==nativeSession||receiptRef(lower,'type')!==703)throw Error('TERMINAL_REALM_USER_RPC');
+            Object.assign(bindings,{userRpcTask:receiptRef(lower,'task'),userDispatchTask:receiptRef(lower,'dispatchTask'),
+              userResponse:receiptRef(lower,'response'),userRpcMethod:receiptRef(lower,'method'),
+              userRpcContinuation:receiptRef(lower,'originalContinuation')});
+          }
+        }
+      }
+      const descriptor=Object.getOwnPropertyDescriptor(state,'terminalOriginalRealm');
+      if(descriptor&&!('value' in descriptor))throw Error('TERMINAL_REALM_ACCESSOR');
+      if(descriptor) {
+        const retained=descriptor.value;
+        const retainedSlots=Object.getOwnPropertyDescriptor(retained,'slots');
+        if(!retainedSlots||!('value' in retainedSlots))throw Error('TERMINAL_REALM_ACCESSOR');
+        const originalSlots=retainedSlots.value;
+        if(!Array.isArray(originalSlots))throw Error('TERMINAL_REALM_REPLACED');
+        if(!Object.isFrozen(retained)||Object.keys(bindings).some(k=>Object.getOwnPropertyDescriptor(retained,k)?.value!==bindings[k])
+          ||originalSlots.length!==slots.length||slots.some((slot,i)=>Object.keys(slot).some(k=>k==='chain'
+            ?slot.chain.length!==originalSlots[i].chain.length||slot.chain.some((v,j)=>v!==originalSlots[i].chain[j])
+            :!Object.is(slot[k],originalSlots[i][k]))))
+          throw Error('TERMINAL_REALM_REPLACED');
+      } else {
+        if(mode!=='lookup')throw Error('TERMINAL_REALM_LATE_CAPTURE');
+        // FileStorage backing slots are retained; the projected UI User still
+        // cannot supply the original argument of CurrentUser.Set.
+        Object.defineProperty(state,'terminalOriginalRealm',{value:Object.freeze({...bindings,
+          slots:Object.freeze(slots.map(slot=>Object.freeze(slot))),
+          nativeReceiversQualified:false,reason:bindings.user?'LOADED_NATIVE_PROVIDER_NOT_BOUND':'ORIGINAL_USER_BEFORE_PROJECTION_NOT_RETAINED'})});
+      }
+    }
     const visible = e => !!e && !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height
       && getComputedStyle(e).visibility !== 'hidden';
     const allTabs = [...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')];
@@ -71,9 +164,10 @@ async function prepareWorkspace(page, options) {
         return diagrams.length===1 ? {tab:t,graph:diagrams[0],html:diagrams[0].innerHTML} : null;
       }).filter(Boolean);
       state.receipts.set(options.operationId,{request,before:tabs,preserved,phase:'reserved'});
+      if(originalProvider)originalProvider.continueCreation('reserve');
     }
     const current = state.receipts.get(options.operationId);
-    if (mode==='effect') current.phase='effect_possible';
+    if (mode==='effect') {current.phase='effect_possible';if(originalProvider)originalProvider.continueCreation('effect')}
     if (mode==='lookup') {
       if (!receipt) return {exists:false,document_id:state.id};
       if (receipt.tab) {
@@ -101,9 +195,29 @@ async function prepareWorkspace(page, options) {
       if (options.intent==='new_draft' && path) return {error:'EXPECTED_UNSAVED_DRAFT'};
       if (options.intent==='open_package' && path!==options.packagePath) return null;
       if (!current) return {error:'RECEIPT_MISSING'};
+      // Borrow only cached data references at the first creation completion.
+      // This stays in the Page receipt: no proxy crosses the serialized reply.
+      const dataRef=(object,key)=>{
+        for(let value=object;value;value=Object.getPrototypeOf(value)) {
+          const descriptor=Object.getOwnPropertyDescriptor(value,key);
+          if(descriptor)return 'value' in descriptor?descriptor.value:undefined;
+        }
+      };
+      const connection=app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection;
+      const creation={document,documentId:state.id,request:current.request,
+        operationId:options.operationId,sessionId:options.sessionId,
+        tab,packageNode,packageProxy:dataRef(packageNode,'Package'),connection,
+        nativeSession:retainOriginalRealm?state.terminalOriginalRealm.nativeSession:dataRef(connection,'Session'),
+        account:retainOriginalRealm?state.terminalOriginalRealm.account:connection?.UserName,path};
+      if(current.terminalOriginalCreation) {
+        if(Object.keys(creation).some(key=>!Object.is(creation[key],current.terminalOriginalCreation[key])))
+          return {error:'WORKFLOW_CHANGED'};
+      } else current.terminalOriginalCreation=Object.freeze(creation);
       current.tab=tab;current.packageNode=packageNode;current.crumbs=crumbs;current.phase='verified';
       current.workflowId ??= knownWorkflow?.workflowId ?? state.id+'-'+(state.sequence=(state.sequence??0)+1);
-      return {document_id:state.id,loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
+      if(originalProvider)originalProvider.continueCreation('verify');
+      return {document_id:state.id,loginom_account:retainOriginalRealm?state.terminalOriginalRealm.account:
+        app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
         workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:current.workflowId},
         package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},preserved_workflows:preserved,
         ownership_verified:options.intent==='new_draft',target_verified:true,
@@ -112,75 +226,108 @@ async function prepareWorkspace(page, options) {
           available_width:screen.availWidth,available_height:screen.availHeight}};
     }
     return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid};
-  }, {mode, options});
+}
+// Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
+export async function prepareWorkspace(page, options, terminal, creationToken) {
+  const assertOriginal=()=>{if(terminal!==undefined)checkTerminalInitialCustody(terminal,page);if(creationToken!==undefined)checkTerminalWorkspaceCreation(creationToken,page)};
+  assertOriginal();
+  const checked=async action=>{assertOriginal();const value=await action();assertOriginal();return value};
+  const deadline = creationToken!==undefined?checkTerminalWorkspaceCreation(creationToken,page):terminal===undefined?Date.now()+options.timeoutMs:terminalInitialDeadline(terminal,page);
+  let phase = 'page', createdDraft = false, effectPossible = options.recoverOnly === true, target = null;
+  const trace = [];
+  let authenticated = false;
+  const remaining = () => {
+    if (Date.now() >= deadline) throw new Error('DEADLINE');
+    return deadline - Date.now();
+  };
+  const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
+  const wait = async (name, probe) => {
+    phase = name;
+    while (remaining()) {
+      const value = await checked(()=>(probe()));
+      if (value) { trace.push({ condition: name, satisfied: true }); return value; }
+      await checked(()=>(page.waitForTimeout(Math.min(100, remaining()))));
+    }
+  };
+  const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
+    authenticated, created_draft: createdDraft, effect_possible: effectPossible,
+    operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
+  // Only cached, read-only Loginom getters; never execute package or server methods.
+  const inspect = mode => {
+    const input={mode,options,retainOriginalRealm:terminal!==undefined||creationToken!==undefined,
+      expectedAccount:creationToken!==undefined?terminalWorkspaceCreationAccount(creationToken,page):terminal===undefined?undefined:terminalInitialAccount(terminal,page),
+      expectedUserPublisherInspectorSource:terminal===undefined&&creationToken===undefined?undefined:terminalUserPublisherInspectorSource};
+    return creationToken===undefined?page.evaluate(inspectWorkspaceRealm,input):evaluateTerminalWorkspaceCreation(creationToken,page,input);
+  };
   try {
-    const current = page.url() === 'about:blank' ? null : await page.evaluate(() => ({origin:location.origin,pathname:location.pathname}));
+    const current = page.url() === 'about:blank' ? null : await checked(()=>(page.evaluate(() => ({origin:location.origin,pathname:location.pathname}))));
     if (page.url() !== 'about:blank' && (current.origin !== options.origin || current.pathname !== options.pathname)) {
       return result('NOT_READY','FOREIGN_PAGE');
     }
     if (page.url()==='about:blank') {
       if (options.recoverOnly) return result('NOT_READY','DOCUMENT_LOST');
-      await page.goto(options.url,{waitUntil:'domcontentloaded',timeout:remaining()});
+      await checked(()=>(page.goto(options.url,{waitUntil:'domcontentloaded',timeout:remaining()})));
     }
-    const build=await wait('ui_build',()=>page.evaluate(()=>globalThis.bg?.app?.Version??null));
+    const build=await checked(()=>(wait('ui_build',()=>page.evaluate(()=>globalThis.bg?.app?.Version??null))));
     target={profile_id:options.profileId,loginom_build:build,platform:options.platform,browser:'chromium'};
     if (build!==options.expectedBuild) return result('INCOMPATIBLE','UI_BUILD_MISMATCH');
     const avatar=tid('MF;cntMain;tlbMainToolbar;btnAvatar'), login=tid('LoginForm;Login;edtUsername');
-    await wait('login_or_workspace',async()=>await avatar.isVisible() || await login.isVisible());
-    if (!(await avatar.isVisible())) {
+    await checked(()=>(wait('login_or_workspace',async()=>await checked(()=>(avatar.isVisible())) || await checked(()=>(login.isVisible())))));
+    if (!(await checked(()=>(avatar.isVisible())))) {
       if (!options.allowTestLogin) return result('LOGIN_REQUIRED','AUTHENTICATION_REQUIRED');
-      await login.locator('input').fill(options.testLoginUser,{timeout:remaining()});
-      await tid('LoginForm;Login;edtPassword').locator('input').fill('',{timeout:remaining()});
-      await tid('LoginForm;Login;btnLogin').click({timeout:remaining()});
-      const authenticated=await wait('login_result',async()=>await avatar.isVisible() ? 'authenticated'
-        : await page.locator('.x-form-invalid-under:visible').count() ? 'rejected' : null);
+      await checked(()=>(login.locator('input').fill(options.testLoginUser,{timeout:remaining()})));
+      await checked(()=>(tid('LoginForm;Login;edtPassword').locator('input').fill('',{timeout:remaining()})));
+      await checked(()=>(tid('LoginForm;Login;btnLogin').click({timeout:remaining()})));
+      const authenticated=await checked(()=>(wait('login_result',async()=>await checked(()=>(avatar.isVisible())) ? 'authenticated'
+        : await checked(()=>(page.locator('.x-form-invalid-under:visible').count())) ? 'rejected' : null)));
       if (authenticated==='rejected') return result('LOGIN_REQUIRED','LOGIN_REJECTED');
     }
     authenticated=true;
-    const old=await inspect('lookup');
+    const old=await checked(()=>(inspect('lookup')));
     if (old.error) return result('NOT_READY',old.error,{authenticated:true});
     if (old.exists) {
-      if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
+      if (old.tab_tid) await checked(()=>(tid(old.tab_tid).click({timeout:remaining()})));
       else if (old.phase==='reserved') return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
       effectPossible=old.phase!=='reserved';
     } else {
       if (options.recoverOnly) return result('NOT_READY','RECEIPT_LOST',{authenticated:true});
-      const before=await wait('workspace_entry_ready',async()=>{const state=await inspect('observe');return state.hard_blocked || (!state.blocked && (state.ready || state.home_ready
-        || options.intent==='existing_workflow'&&state.requested_tab_present)) ? state : null;});
+      const before=await checked(()=>(wait('workspace_entry_ready',async()=>{const state=await checked(()=>(inspect('observe')));return state.hard_blocked || (!state.blocked && (state.ready || state.home_ready
+        || options.intent==='existing_workflow'&&state.requested_tab_present)) ? state : null;})));
       if (before.blocked) return result('NOT_READY',before.unsaved?'UNSAVED_CHANGES':'UI_BLOCKED',{authenticated:true});
       if(options.intent==='existing_workflow' && (before.document_id!==options.workflowRef.document_id || !before.requested_tab_present)) return result('NOT_READY','WORKFLOW_LOST',{authenticated:true});
-      const reserved=await inspect('reserve');
+      const reserved=await checked(()=>(inspect('reserve')));
       if (reserved.error) return result('NOT_READY',reserved.error,{authenticated:true});
       if (options.intent==='existing_workflow') {
-        await inspect('effect');effectPossible=true;
-        await tid(options.workflowRef.tab_tid).click({timeout:remaining()});
+        await checked(()=>(inspect('effect')));effectPossible=true;
+        await checked(()=>(tid(options.workflowRef.tab_tid).click({timeout:remaining()})));
       } else if (!(options.intent==='open_package' && before.ready && before.package_path===options.packagePath)) {
       // Home-page and menu are the two pinned E2E entry points. Do not reuse the active workflow.
-      await tid('MF;cntMain;tlbMainToolbar;btnPackagesMenu').click({timeout:remaining()});
+      await checked(()=>(tid('MF;cntMain;tlbMainToolbar;btnPackagesMenu').click({timeout:remaining()})));
       const button=tid('MF;MainMenuForm;'+(options.intent==='new_draft'?'btnCreateUnsavedPackage':'btnOpenPackage'));
-      await wait('package_menu_ready',()=>button.isVisible());
-      await inspect('effect');effectPossible=true;
-      await button.click({timeout:remaining()});
+      await checked(()=>(wait('package_menu_ready',()=>button.isVisible())));
+      await checked(()=>(inspect('effect')));effectPossible=true;
+      await checked(()=>(button.click({timeout:remaining()})));
       if (options.intent==='new_draft') createdDraft=true;
       else {
         const field=tid('OpenDialogForm;edtFileName').locator('input');
-        await wait('open_package_dialog',()=>field.isVisible());
-        await field.fill(options.packagePath,{timeout:remaining()});
-        await tid('OpenDialogForm;btnOpen').click({timeout:remaining()});
+        await checked(()=>(wait('open_package_dialog',()=>field.isVisible())));
+        await checked(()=>(field.fill(options.packagePath,{timeout:remaining()})));
+        await checked(()=>(tid('OpenDialogForm;btnOpen').click({timeout:remaining()})));
       }
       }
     }
-    const verified=await wait('exact_workflow_ready',()=>inspect('verify'));
+    const verified=await checked(()=>(wait('exact_workflow_ready',()=>inspect('verify'))));
     if (verified.error) return result('NOT_READY',verified.error,{authenticated:true});
     createdDraft=options.intent==='new_draft';
     return result('READY',null,{authenticated:true,...verified,replayed:old.exists===true});
   } catch (error) {
+    if(terminal!==undefined||creationToken!==undefined)throw error;
     return result('NOT_READY',error.message==='DEADLINE'?'DEADLINE':'PREPARATION_INTERRUPTED',
       {created_draft:createdDraft,verification_required:effectPossible});
   }
 }
 
-export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, timeoutMs = 120000, recoverOnly = false }) {
+export function workspacePreparationOptions({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, timeoutMs = 120000, recoverOnly = false }) {
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash
       || [...url.searchParams.keys()].some(key => /token|password|secret|auth|api.?key/i.test(key))) {
@@ -211,7 +358,12 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   if (compatibility?.platform !== options.platform || compatibility?.browser !== 'chromium') {
     throw new Error('The pinned Loginom compatibility profile does not support this platform/browser');
   }
-  return `async (page) => (${prepareWorkspace.toString()})(page, ${JSON.stringify(options)})`;
+  return options;
+}
+
+export function makeWorkspacePrepareCode(input) {
+  const options=workspacePreparationOptions(input);
+  return `async (page) => {const inspectWorkspaceRealm=${inspectWorkspaceRealm.toString()};return (${prepareWorkspace.toString()})(page, ${JSON.stringify(options)})}`;
 }
 
 export function parseWorkspacePreparation(response) {
@@ -308,12 +460,22 @@ export const workspaceObserveTool = {
 
 function bootstrapWorkspace(page, expected) {
   return (async () => {
-    let origin = null;
-    try { origin = new URL(page.url()).origin; } catch { /* No open application. */ }
-    let output = { bootstrap: true, target_state: 'not_open', origin, authenticated: null,
+    if (page.isClosed?.()) throw new Error('Bootstrap page is closed');
+    const url = page.url();
+    if (typeof url !== 'string' || !url) throw new Error('Bootstrap page URL is unavailable');
+    // URL belongs to the browser realm, not the unsafe VM executing this helper.
+    const origin = url === 'about:blank' ? null : await page.evaluate(url => {
+      try {
+        const parsed = new URL(url);
+        return ['http:', 'https:'].includes(parsed.protocol) ? parsed.origin : null;
+      } catch { return null; }
+    }, url);
+    let output = { bootstrap: true, target_state: url === 'about:blank' ? 'not_open' : 'indeterminate', origin, authenticated: null,
       login_required: null, compatible_build: null, observation_only: true };
     if (origin === expected.origin) {
-      output = await page.evaluate(({ expectedBuild }) => {
+      output = await page.evaluate(({ expectedBuild, expectedOrigin }) => {
+        if (location.origin !== expectedOrigin) return { bootstrap: true, target_state: 'indeterminate',
+          origin: location.origin, authenticated: null, login_required: null, compatible_build: null, observation_only: true };
         const started = Date.now(), walker = document.createTreeWalker(document.documentElement, 1);
         let visited = 0, element, exhausted = false, avatar = false, login = false, dialogs = 0, masks = 0;
         const visible = element => {
@@ -348,7 +510,7 @@ function bootstrapWorkspace(page, expected) {
           compatible_build: compatible, blockers: { visible_dialogs: dialogs, visible_masks: masks },
           scan: { visited_elements: visited, complete: exhausted, max_elements: 4000, max_ms: 75 },
           observation_only: true };
-      }, { expectedBuild: expected.build });
+      }, { expectedBuild: expected.build, expectedOrigin: expected.origin });
     }
     return { status: 'SUCCEEDED', action_key: 'workspace.observe', action_revision: '1', operation_id: null,
       phase: 'observed', effect_possible: false, cleanup_complete: true, error: null, trace: [], output };

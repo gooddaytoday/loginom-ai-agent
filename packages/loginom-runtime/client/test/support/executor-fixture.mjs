@@ -72,6 +72,7 @@ class Locator {
 }
 
 class Page {
+  url() { return "https://loginom.invalid/?testable=true"; }
   constructor() {
     this.clock = 1000;
     this.prefix = 'MF;TF-1'; this.tabTid = 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';

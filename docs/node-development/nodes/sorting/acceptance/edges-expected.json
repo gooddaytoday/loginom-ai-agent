@@ -1,0 +1,191 @@
+{
+  "profile": {
+    "loginom_build": "7.4.2",
+    "null_order_source": "live ASC observation sort-edges-null-1789026941899; DESC verified independently afterwards",
+    "locale": "Russian (Russia)",
+    "binary_case_insensitivity": "latin_only"
+  },
+  "columns": [
+    {
+      "name": "Id",
+      "type": "integer"
+    },
+    {
+      "name": "Key",
+      "type": "real"
+    },
+    {
+      "name": "Text",
+      "type": "string"
+    }
+  ],
+  "input_rows": [
+    [
+      1,
+      "-2.5",
+      "b"
+    ],
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      3,
+      null,
+      "a"
+    ],
+    [
+      4,
+      "0",
+      "B"
+    ],
+    [
+      5,
+      null,
+      "z"
+    ],
+    [
+      6,
+      "1.125",
+      "a"
+    ],
+    [
+      7,
+      "-2.5",
+      "B"
+    ]
+  ],
+  "key_asc_id_desc": [
+    [
+      5,
+      null,
+      "z"
+    ],
+    [
+      3,
+      null,
+      "a"
+    ],
+    [
+      7,
+      "-2.5",
+      "B"
+    ],
+    [
+      1,
+      "-2.5",
+      "b"
+    ],
+    [
+      4,
+      "0",
+      "B"
+    ],
+    [
+      6,
+      "1.125",
+      "a"
+    ],
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      2,
+      "1.125",
+      "A"
+    ]
+  ],
+  "key_desc_id_asc": [
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      6,
+      "1.125",
+      "a"
+    ],
+    [
+      4,
+      "0",
+      "B"
+    ],
+    [
+      1,
+      "-2.5",
+      "b"
+    ],
+    [
+      7,
+      "-2.5",
+      "B"
+    ],
+    [
+      3,
+      null,
+      "a"
+    ],
+    [
+      5,
+      null,
+      "z"
+    ]
+  ],
+  "text_case_insensitive_id_asc": [
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      2,
+      "1.125",
+      "A"
+    ],
+    [
+      3,
+      null,
+      "a"
+    ],
+    [
+      6,
+      "1.125",
+      "a"
+    ],
+    [
+      1,
+      "-2.5",
+      "b"
+    ],
+    [
+      4,
+      "0",
+      "B"
+    ],
+    [
+      7,
+      "-2.5",
+      "B"
+    ],
+    [
+      5,
+      null,
+      "z"
+    ]
+  ],
+  "empty": []
+}

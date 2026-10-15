@@ -227,7 +227,7 @@ try {
     const runtime = rows.find((row) => row.pid === browsers[0].pid)?.parent
     if (killRuntime) {
       const command = runtime ? await processCommand(runtime) : ""
-      if (!runtime || !ids.has(runtime) || !hasArgument(command, "/src/managed-entry.mjs"))
+      if (!runtime || !ids.has(runtime) || !(hasArgument(command, "/src/managed-entry.mjs") || hasArgument(command, "/src/managed-entry.cjs")))
         throw Error("CRASH_RUNTIME_IDENTITY_INVALID")
       await killTracked(runtime)
     }

@@ -1,0 +1,111 @@
+{
+  "sourceOrigin": "https://app.loginom.ai/app/",
+  "versionDeclared": "7.4.2",
+  "retrieval": "unauthenticated public static GET, no cookies/auth/JS execution",
+  "rpcInputsParity": true,
+  "records": [
+    {
+      "path": "bg/app/Application.js",
+      "bytes": 45243,
+      "sha256": "1b922bfff58f5d71ab08bc25b3198da17ae2a4d2a7ce4c034265aca9de15bc78",
+      "url": "https://app.loginom.ai/app/bg/app/Application.js"
+    },
+    {
+      "path": "bg/ts/BG_Interfaces.js",
+      "url": "https://app.loginom.ai/app/bg/ts/BG_Interfaces.js",
+      "bytes": 13573,
+      "sha256": "86dffca2aff50fbc2a272139c63e8302d81d6dffcd7cd753c071453ac8fd6fbb"
+    },
+    {
+      "path": "bg/app/Client.js",
+      "bytes": 7856,
+      "sha256": "197b1efbee4aa846bdb91a15cc25b025181c35166da2f2c1408c071480873ee1",
+      "url": "https://app.loginom.ai/app/bg/app/Client.js"
+    },
+    {
+      "path": "bg/ts/CustomClient.js",
+      "bytes": 9592,
+      "sha256": "feb12b9040f155e581531b9796066de0c2fc65d23cfaa19fcbb7028af27e58de",
+      "url": "https://app.loginom.ai/app/bg/ts/CustomClient.js"
+    },
+    {
+      "path": "bg/lib/Loader.js",
+      "bytes": 14073,
+      "sha256": "543fc4c07ef270ab55f1055fcaf97f8f471d308a0877a3b3aef029ac0fa61f3b",
+      "url": "https://app.loginom.ai/app/bg/lib/Loader.js",
+      "headers": {
+        "Last-Modified": "Thu, 24 Sep 2026 13:23:05 GMT",
+        "ETag": "\"36f9-65c3a7ff6c040\""
+      }
+    },
+    {
+      "path": "bg/app/MainForm.js",
+      "url": "https://app.loginom.ai/app/bg/app/MainForm.js",
+      "bytes": 112459,
+      "sha256": "d0b2324d7162816d675e52adc5a5674b46b635d516157ced799ea33690a3c42e"
+    },
+    {
+      "path": "bg/app/MapTree.js",
+      "url": "https://app.loginom.ai/app/bg/app/MapTree.js",
+      "bytes": 252920,
+      "sha256": "5ff56cec4f2111534c4c7b04233d3f79c044ec4372d691d79612a11bb98f822b"
+    },
+    {
+      "path": "bg/app/ServerConnection.js",
+      "url": "https://app.loginom.ai/app/bg/app/ServerConnection.js",
+      "bytes": 16418,
+      "sha256": "4c8203aa04050c45f55f2dfec76ef65d93b056a9cbe092419a9bbea821e0c5a6"
+    },
+    {
+      "path": "bg/app/User.js",
+      "url": "https://app.loginom.ai/app/bg/app/User.js",
+      "bytes": 4083,
+      "sha256": "884660d99890c59fa5a54f2b245255df98b8aff20a5106c1c2fdaa33723888ea"
+    },
+    {
+      "path": "bg/app/Uses.js",
+      "bytes": 5070,
+      "sha256": "2b8598cddfd5f224b9e75806c9ba475cf1ff2ed6c37b599feb5b035be9a3dfb8",
+      "url": "https://app.loginom.ai/app/bg/app/Uses.js",
+      "headers": {
+        "Last-Modified": "Thu, 24 Sep 2026 13:23:07 GMT",
+        "ETag": "\"13ce-65c3a801544c0\""
+      }
+    },
+    {
+      "path": "bg/app/Version.js",
+      "bytes": 2090,
+      "sha256": "10d0272c12fac8be8ee8a673273601d6c8ac89ee49e48344bbca420b87126a5e",
+      "url": "https://app.loginom.ai/app/bg/app/Version.js"
+    },
+    {
+      "path": "app.js",
+      "bytes": 227,
+      "sha256": "4190d2937a41a610a6653bc9ac6632fc1bc06d568a46ace8ceb086382f4bbdd1",
+      "url": "https://app.loginom.ai/app/app.js"
+    },
+    {
+      "path": "bg/js/bg.rtl.js",
+      "bytes": 619372,
+      "sha256": "052ec6039e68de03f2e34fea56c3e3ed8b7b0dddadb03281ff8d9a816e6e5dc9",
+      "url": "https://app.loginom.ai/app/bg/js/bg.rtl.js"
+    },
+    {
+      "path": "bg/js/bg.rtl.rpc.js",
+      "bytes": 4418862,
+      "sha256": "11ac2c63d2e8162b974f57d14e0f4f57b19cc80d3d39797be377e22eced6a973",
+      "url": "https://app.loginom.ai/app/bg/js/bg.rtl.rpc.js"
+    },
+    {
+      "path": "bg/js/rpc.js",
+      "bytes": 296240,
+      "sha256": "afeb91811a02da1f7841fb8c03e3003686c98a051f09186af082a3c44a12b4cc",
+      "url": "https://app.loginom.ai/app/bg/js/rpc.js"
+    }
+  ],
+  "missingPathResult": {
+    "bg/app/CurrentUser.js": 404,
+    "actualPublisher": "bg/app/User.js"
+  },
+  "native": false
+}

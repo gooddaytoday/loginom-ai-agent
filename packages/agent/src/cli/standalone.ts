@@ -45,7 +45,8 @@ export async function standalone(
       options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
     )
   )
-    return withStandaloneCancellation(() => executeProfile(args, execute))
+    return withStandaloneCancellation(() => executeProfile(args, execute),
+      options.filter((value) => !["--headless", "--no-headless"].includes(value))[0] === "run")
   return executeProfile(args, execute)
 }
 

@@ -1,0 +1,105 @@
+{
+  "purpose": "bounded local-browser full-IIFE execution control, never runtime permission",
+  "inputs": [
+    {
+      "url": "https://app.loginom.ai/app/bg/core/__extends.js",
+      "bytes": 2686,
+      "sha256": "276d947e3958f6fb973e74eaeb76610fc50028fbae79e14feab8fea00052be8c"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/core/__awaiter.js",
+      "bytes": 1992,
+      "sha256": "47cb3c54cca524962d5976241bf4f47b7b04af46ebc2c3f1b749479401a4209a"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/core/__helpers.js",
+      "bytes": 16098,
+      "sha256": "f84f280ee81474238b9b141cb1d3d83058e947aab4904f96ec8daea34385235d"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/core/__virtual.js",
+      "bytes": 13912,
+      "sha256": "3bb23cf8f404ccbc4ec7022b730fd297c531f6bdeee3183c416c9b97b8b84ba9"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/ts/rtl.imp.js",
+      "bytes": 9779,
+      "sha256": "aea6bd0329c89ed085071b097f1b39470f50536258dc3a3ffbdff928ee8640b1"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/ts/PropertySelector.js",
+      "bytes": 55817,
+      "sha256": "f630266cafcbb6559e6a7f521ff9e6c807b88be13e18e0d546e939c8f14c7b55"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/ts/BG_System.js",
+      "bytes": 3846,
+      "sha256": "efbe59222ee37daf8e84b429f0acc4ebbdb0dcece46c42fb72d45f5f2429aa50"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/ts/BG_Interfaces.js",
+      "bytes": 13573,
+      "sha256": "86dffca2aff50fbc2a272139c63e8302d81d6dffcd7cd753c071453ac8fd6fbb"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/mscorlib.js",
+      "bytes": 114158,
+      "sha256": "9b2b59bb2f7d3765526c3530e752fe8aeef57360a7bdafb39c6eb8468f7ee555"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/bg.mscorlib.js",
+      "bytes": 38176,
+      "sha256": "a5b62e7dff9920b13b02b9affad6995316df6c6ae191fc078648a987950c4550"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/CustomProxyClassBuilder.js",
+      "bytes": 4315,
+      "sha256": "9a28a3686efff3e2b4904994d876f43b0cb592da7f8e2f051a2fd68d15b6d18b"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/Task.js",
+      "bytes": 3494,
+      "sha256": "3dd8c5dbd20e1e45978a0d127c852bf5920fb2d00a87f13270ea0b9d3505726b"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/rtl.js",
+      "bytes": 24908,
+      "sha256": "a471d01e553ee6d233576da9a2e976a952e8536cbaeebce7db4a4b68188b274d"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/rpc.js",
+      "bytes": 296240,
+      "sha256": "afeb91811a02da1f7841fb8c03e3003686c98a051f09186af082a3c44a12b4cc"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/bg.rtl.js",
+      "bytes": 619372,
+      "sha256": "052ec6039e68de03f2e34fea56c3e3ed8b7b0dddadb03281ff8d9a816e6e5dc9"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/bg.rtl.rpc.js",
+      "bytes": 4418862,
+      "sha256": "11ac2c63d2e8162b974f57d14e0f4f57b19cc80d3d39797be377e22eced6a973"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/bg.model.js",
+      "bytes": 749000,
+      "sha256": "d3ab87a3aca82985d41a8b9d4b3502c9d8d662204c67c07fb3ff2156d802407a"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/js/bg.model.rpc.js",
+      "bytes": 5094119,
+      "sha256": "53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/app/ServerConnection.js",
+      "bytes": 16418,
+      "sha256": "4c8203aa04050c45f55f2dfec76ef65d93b056a9cbe092419a9bbea821e0c5a6"
+    },
+    {
+      "url": "https://app.loginom.ai/app/bg/app/User.js",
+      "bytes": 4083,
+      "sha256": "884660d99890c59fa5a54f2b245255df98b8aff20a5106c1c2fdaa33723888ea"
+    }
+  ]
+}

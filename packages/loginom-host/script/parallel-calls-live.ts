@@ -38,7 +38,7 @@ await store.activate(1)
 const host = await createLoginomHost({ root, resources, codec: credentials("linux"), headless: true })
 const child = supervise({
   node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-  entry: join(resources, "runtime/src/managed-entry.mjs"),
+  entry: join(resources, "runtime/src/managed-entry.cjs"),
   resources,
   stateDir: directory,
   generation: 1,

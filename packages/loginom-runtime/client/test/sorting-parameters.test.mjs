@@ -57,3 +57,17 @@ test('sorting input validation rejects text flags against effective types before
 test('sorting input validation is a no-op when keys are not being replaced',()=>{
  for(const p of [{},{compare_with_locale:false}])assert.doesNotThrow(()=>validateSortingInputParameters(p,null,null));
 });
+
+test('contract rejects numeric case flags and accepts explicit string flags for both directions',()=>{
+ for(const direction of ['ASC','DESC'])for(const case_sensitive of [false,true]){
+  const p={keys:[{field:field('Amount'),direction,case_sensitive}]};
+  validateSortingParameters(p,'keys',req);assert.throws(()=>resolveSortingParameters(p,schema),/omit for real/);
+  const text={keys:[{field:field('Name'),direction,case_sensitive}]};
+  validateSortingParameters(text,'keys',req);assert.equal(resolveSortingParameters(text,schema)[0].case_sensitive,case_sensitive);
+ }
+});
+test('contract rejects duplicate case-folded keys, missing direction and nonboolean string flags',()=>{
+ for(const keys of [[{field:field('Amount'),direction:'ASC'},{field:field('amount'),direction:'DESC'}],[{field:field('Amount')}],[{field:field('Name'),direction:'ASC',case_sensitive:0}],[{field:field('Amount'),direction:'UP'}]]){
+  assert.throws(()=>validateSortingParameters({keys},'keys',req));
+ }
+});

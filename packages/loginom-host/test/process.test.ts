@@ -83,8 +83,8 @@ test("runtime cleanup requires both a close acknowledgement and a clean exit", a
         endpoint: "https://example.test",
         connection: { apiKey: "fixture", password: "", url: "https://example.test", username: "test" },
       })
-      await expect(child.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      await expect(child.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await expect(child.close()).rejects.toThrow(mode === "missing-ack" ? "LOGINOM_RUNTIME_DISCONNECTED" : "LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await expect(child.close()).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
     }
   } finally {
     await rm(directory, { recursive: true, force: true })
@@ -134,7 +134,7 @@ test("IPC disconnect rejects in-flight requests even while the runtime stays ali
     await expect(child.request("future")).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
   } finally {
     clearTimeout(timer)
-    await expect(child.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    await expect(child.close()).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
     await rm(directory, { recursive: true, force: true })
   }
 }, 12000)
