@@ -275,9 +275,11 @@ release с прежними quarantine/intent journals. Offline CLI:
 Команда выводит только status/journal/proof и сохраняет private receipt; выбирает
 актуальный CAS через original incident lineage, без token/revision в argv.
 Global lock root фиксирован; out требует canonical parent700 и новый каталог700,
-пересечения с protected roots запрещены. Принимаются только offline command
-incidents с qualified closed proofs. Slot/admin recovery, prepare/verify/status
-и active-child recovery ещё открыты.
+пересечения с protected roots запрещены. Эта offline-ветка принимает command
+incidents с qualified closed proofs. Общая команда также принимает ограниченные
+pre-CLI unactivated preparation incidents по отдельному контракту lineage и
+finalization ниже. Readonly status и blocked prepare/verify реализованы;
+active eval-slot/admin recovery, readiness и production dispatch ещё открыты.
 
 Score/oracle/denominator/compare не меняются. Новые runs добавляют optional
 `config.parallel`, `attempt.slot_id` (также initial retry) и `slots`; legacy
