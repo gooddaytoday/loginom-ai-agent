@@ -10,7 +10,17 @@ const text=await readFile(new URL('terminal-script-load.test.mjs',import.meta.ur
 const scripts=runInThisContext('('+text.slice(node.start,node.end)+')');
 async function control(fn,instrument=false,realCompletion=false){const realm=await setup(60000,'retain-only');try{
  let originalCompletion;const originalSources=[];
- if(realCompletion){const c=realm.page.context;runInContext('window=globalThis',c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/mscorlib.js','utf8'),c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/Task.js','utf8'),c);originalCompletion=c.ss.TaskCompletionSource;
+ if(realCompletion){const c=realm.page.context;runInContext('window=globalThis',c);
+  if(realCompletion.fullStorage){
+   const oldRpc={...c.rpc},oldBgRpc={...c.bg.rpc},oldStream=c.bg.IBGStreamPersist;
+   const order=['__extends.js','__awaiter.js','__helpers.js','SysUtils.js','mscorlib.js','Int64.js','rtl.imp.js','bg.mscorlib.js','BitConverter.js','CustomProxyClassBuilder.js','Task.js','rtl.js','rpc.js','bg.rtl.js','bg.rtl.rpc.js'];
+   for(const name of order)runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/'+name,'utf8'),c,{filename:'terminal-pinned/'+name});
+   const full=c.bg.rpc.TIBGFileStorage_Proxy.prototype;
+   for(const key of ['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'])realm.native.definitions.FileStoragePrototype[key]=full[key];
+   // Other receivers/constructors remain the existing labelled doubles.
+   c.rpc=oldRpc;c.bg.rpc=oldBgRpc;c.bg.IBGStreamPersist=oldStream;
+  }else{runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/mscorlib.js','utf8'),c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/Task.js','utf8'),c)}
+  originalCompletion=c.ss.TaskCompletionSource;
   if(realCompletion.trackSources){const ctor=originalCompletion;originalCompletion=new Proxy(ctor,{construct(target,args){const source=Reflect.construct(target,args,target);originalSources.push(source);return source}})}
   if(realCompletion.continuation){const original=c.ss.Task.prototype.continueWith;c.ss.Task.prototype.continueWith=function(callback){return realCompletion.continuation({primary:this,callback,original,sourcePrototype:originalCompletion.prototype,ss:c.ss})}}
  }
