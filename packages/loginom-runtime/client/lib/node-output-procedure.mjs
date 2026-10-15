@@ -32,8 +32,13 @@ async function revealViewerCard(channel,state,select,verb){
     const target=one(s.ui.elements.filter(select),'Exact output viewer card required');
     if(target.allowed_actions.includes(verb)&&target.interaction?.state==='point_observed')return s;
     const scroll=target.scroll;
-    const anchors=s.ui.elements.filter(e=>e.viewer_card?.port_guid===target.viewer_card.port_guid
-      &&e.viewer_card.port_panel_ref===target.viewer_card.port_panel_ref&&e.scroll?.ref===scroll?.ref
+    // Native output panels can share one scrolling ViewsForm. The target's
+    // entire port may be below the viewport; use a visible owned Table card
+    // from either port only when it attests that same observed scroll owner.
+    const anchors=s.ui.elements.filter(e=>e.viewer_card
+      &&(e.viewer_card.port_guid===target.viewer_card.port_guid&&e.viewer_card.port_panel_ref===target.viewer_card.port_panel_ref
+        ||e.viewer_card.kind==='enter'&&s.node_outputs.tables.some(t=>t.view_guid===e.viewer_card.view_guid&&t.port_guid===e.viewer_card.port_guid))
+      &&e.scroll?.ref===scroll?.ref
       &&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
     requireValue(scroll&&anchors.length,'Owned viewer scroll anchor unavailable');
     const anchor=anchors[Math.floor(anchors.length/2)],direction=target.bounding_box.y<anchor.bounding_box.y?-1:1;
