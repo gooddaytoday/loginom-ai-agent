@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { createAdminChannel, createJournaledAdminChannel, readAdminFinalization, selectOwnedSessions } from "../src/loginom-admin"
+import { createAdminChannel, createJournaledAdminChannel, readAdminFinalization, readAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
 import { writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -35,6 +35,29 @@ test("admin finalization reader requires the persisted disconnect command and co
     expect(await readAdminFinalization(fixture.slots, identity, directory, process.pid)).toMatchObject({ status: "confirmed", processes: "confirmed",
       transportDisconnect: "confirmed", source: { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } })
     expect(await Bun.file(target).text()).toBe(bytes)
+    const journal = path.join(fixture.slots.controller.stateDir, "prepare-command.json"), inventoryFile = path.join(fixture.slots.controller.stateDir, "processes-admin.json")
+    await writeLeaseReceipt(journal, { version: 2, commandId: "prepare" })
+    const inventory = { version: 2, kind: "admin-processes", commandId: "prepare", journal, identity, connections: [{ directory, producerPid: process.pid }] }
+    await writeLeaseReceipt(inventoryFile, inventory)
+    const input = { file: inventoryFile, journal, commandId: "prepare", producerPid: process.pid }
+    const processInventory = { file: inventoryFile, journal, commandId: "prepare" }
+    await writeLeaseReceipt(target, { ...receipt, processInventory })
+    expect((await readAdminProcessInventory(fixture.slots, identity, input)).connections).toHaveLength(1)
+    await writeLeaseReceipt(target, { ...receipt, processInventory: { ...processInventory, commandId: "foreign" } })
+    await expect(readAdminProcessInventory(fixture.slots, identity, input)).rejects.toThrow("ADMIN_PROCESS_INVENTORY_UNCONFIRMED")
+    await writeLeaseReceipt(target, { ...receipt, processInventory })
+    for (const changed of [
+      { ...inventory, connections: [...inventory.connections, ...inventory.connections] },
+      { ...inventory, connections: [{ directory, producerPid: process.pid + 1 }] },
+      { ...inventory, journal: inventoryFile },
+    ]) {
+      await writeLeaseReceipt(inventoryFile, changed)
+      await expect(readAdminProcessInventory(fixture.slots, identity, input)).rejects.toThrow("ADMIN_PROCESS_INVENTORY_UNCONFIRMED")
+    }
+    await writeLeaseReceipt(inventoryFile, inventory)
+    await writeLeaseReceipt(target, { ...receipt, status: "starting" })
+    await expect(readAdminProcessInventory(fixture.slots, identity, input)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
+    await writeLeaseReceipt(target, receipt)
     await expect(readAdminFinalization(fixture.slots, identity, directory, process.pid + 1)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
     await writeLeaseReceipt(commandFile, { ...command, state: "unknown" })
     await expect(readAdminFinalization(fixture.slots, identity, directory, process.pid)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")

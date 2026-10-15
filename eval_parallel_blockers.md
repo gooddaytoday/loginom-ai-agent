@@ -186,3 +186,21 @@ running codex-real outside the network policy is not an acceptable fix. The
 retained status incident also needs a qualified cleanup/recovery producer before
 release. Other non-model work continues; user action is deferred until only
 external blockers remain.
+
+## Retained admin-inventory test incident
+
+2026-10-15: `/tmp/evals-parent-prepare-jkdzDM`, pair nonce
+`add08c97-e003-4fa9-997c-80e14739cc07`, server
+`a4f9d2e0ade391b5caad83fe584b3c3a259ba7a55a879e9bbe671b83a3fd0490`, Studio
+`31ce622a1ea4da1890f971ad1c4188af497ec02ccc1de861a146a7c8b0302ca6`.
+A new inventory basename `admin-processes.json` collided with a test-only
+admin-directory prefix search; ENOTDIR before account creation. The basename
+is corrected to `processes-admin.json`. This incident remains preserved: no
+account ownership or activation marker, admin-QJYDop dispose/disconnect and
+continuous process cleanup confirmed (producer PID1037271), original slot
+`slot-a-38f77afe-a38e-4005-a575-7737133e0670.lease.json` and server reservations
+retained. Inventory bytes SHA256
+`04ded8ad15f9a4482eb6710e4f095892db02ed3dec8794694d7041721890f3fc`.
+No ad hoc release/destroy: recovery-only lineage plus native unactivated
+observation, archived profile and complete command process inventory are needed
+from the pending production finalizer. Missing account/PID alone is insufficient.
