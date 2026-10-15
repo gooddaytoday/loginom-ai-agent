@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
 import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
+import { wizardCloseBinding, boundWizardCloseConfirmation } from '../lib/node-wizard-close.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
@@ -5159,5 +5160,105 @@ test('fractional Reform rows retain complete definitions and native record bindi
   const s=await page.observe();
   assert.equal(s.wizard.reform_columns.definition_coverage.status,'complete_configured_fields',String(scale));
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
+ }
+});
+
+
+async function preparedInputCloseFixture() {
+ const f=await inputPortContextFixture(),{page,wizard,crumbs}=f,base='MF;TF-5;';
+ for(const c of crumbs.slice(5))c.remove();
+ const workflowPath=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.ownText.replace(/\s+/g,' ').trim()}));
+ const prepared={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-5',navigation_path:workflowPath},node:{node_id:'node'}};
+ const native={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'wizard',tid:base+'WizrdMCF',
+  input_port:{direction:'input',port:0,native_index:0,port_guid:'port0',opening_operation_id:'open0'}};
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ const title=page.add('h1',null,'Подтвердить',undefined,dialog);title.attrs.role='heading';
+ const question=page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:prepared,...options},async()=>structuredClone(native)));
+ page.waitForTimeout=async()=>{};
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{
+  await click(...args);dialog.remove();wizard.remove();
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),node=page.add('g',base+'Graph;Revenue','',undefined,graph);
+  page.add('span',base+'Graph;Revenue;Label;Label','Revenue',undefined,node);
+  Object.assign(native,{surface:'graph',tid:base+'Graph;Revenue',locked:false});delete native.input_port;
+ };
+ return {...f,prepared,native,dialog,title,question};
+}
+
+test('prepared input-port Close admits the Edit116 unrendered owner and verifies the same returned node',async()=>{
+ const {page}=await preparedInputCloseFixture(),snapshot=await page.observe();
+ assert.equal(snapshot.wizard.stage,'input_mapping');
+ assert.equal(snapshot.wizard.owner_context.status,'unobserved');
+ assert.equal(snapshot.wizard.input_port_context.status,'unobserved');
+ assert.equal(snapshot.wizard.input_port_context.node_path,undefined);
+ const binding=wizardCloseBinding(snapshot);assert.equal(boundWizardCloseConfirmation(snapshot,binding),true);
+ const yes=snapshot.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');assert.ok(yes.allowed_actions.includes('confirm_wizard_close'));
+ assert.deepEqual(yes.wizard_close_confirmation.input_port,binding.owner.input_port);
+ assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+ const result=await page.act({verb:'confirm_wizard_close',ref:yes.ref},snapshot);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),true);
+});
+
+test('prepared input-port Close rejects foreign bindings roots and dialogs before any click',async()=>{
+ for(const fault of ['document','workflow','node','direction','port','native_index','port_guid','opening_operation','root','dialog','question']) {
+  const {page,native,question,title}=await preparedInputCloseFixture(),snapshot=await page.observe();
+  const yes=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));assert.ok(yes,fault);
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='direction')native.input_port.direction='output';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=1;
+  if(fault==='port_guid')native.input_port.port_guid='foreign';
+  if(fault==='opening_operation')native.input_port.opening_operation_id='foreign';
+  if(fault==='root')native.tid='MF;TF-5;ForeignWizard';
+  if(fault==='dialog')title.ownText='Foreign';
+  if(fault==='question')question.ownText='Удалить узел?';
+  const result=await page.act({verb:'confirm_wizard_close',ref:yes.ref},snapshot);
+  assert.equal(result.status,'NOT_APPLIED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,0,fault);
+ }
+});
+
+test('prepared input-port Close never accepts a foreign or missing graph after the click',async()=>{
+ for(const fault of ['document','workflow','node','body','locked','workflow_path']) {
+  const {page,native,crumbs}=await preparedInputCloseFixture(),snapshot=await page.observe();
+  const yes=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));assert.ok(yes,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+   if(fault==='body')native.tid='MF;TF-5;Graph;Foreign';
+   if(fault==='locked')native.locked=true;
+   if(fault==='workflow_path')crumbs[4].ownText='Другой сценарий';
+  };
+  const result=await page.act({verb:'confirm_wizard_close',ref:yes.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),false,fault);
+ }
+});
+
+
+test('prepared input-port Close is never issued from a Yes label without the complete native binding',async()=>{
+ for(const fault of ['unbound','document','workflow','node','root','direction','port','native_index','port_guid','opening_operation','workflow_path','question','mask']) {
+  const {page,native,prepared,question}=await preparedInputCloseFixture();
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='root')native.tid='MF;TF-5;ForeignWizard';
+  if(fault==='direction')native.input_port.direction='output';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=-1;
+  if(fault==='port_guid')delete native.input_port.port_guid;
+  if(fault==='opening_operation')delete native.input_port.opening_operation_id;
+  if(fault==='workflow_path')prepared.workflow_ref.navigation_path=[];
+  if(fault==='question')question.ownText='Удалить пакет?';
+  if(fault==='mask')page.add('div',null,'Загрузка',{x:20,y:100,width:100,height:30}).attrs.class='x-mask-msg';
+  const result=await page.execute({mode:'observe',...(fault==='unbound'?{prepared_node_context:null}:{})});
+  assert.equal(result.status,'SUCCEEDED',fault+JSON.stringify(result.error));
+  const yes=result.output.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.ok(yes.allowed_actions.includes('click'),fault);
+  assert.equal(yes.allowed_actions.includes('confirm_wizard_close'),false,fault);
+  assert.equal(yes.wizard_close_confirmation,undefined,fault);
+  assert.equal(page.events.length,0,fault);
  }
 });

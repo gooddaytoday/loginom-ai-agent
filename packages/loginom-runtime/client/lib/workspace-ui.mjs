@@ -105,7 +105,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedInputCloseNode}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -2700,7 +2700,19 @@ function readRenderedInputMapping(observation) {
         && wizard.output_columns.auto_sync?.status==='observed';
       const inputCloseOwner=preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
         &&wizard.stage==='input_mapping'&&wizard.input_port_context?.status==='observed'
-        ? wizard.input_port_context:null;
+        ? wizard.input_port_context
+        // A verified native opening receipt also owns cancellation when the
+        // input wizard does not render its node/port breadcrumbs.
+        : tid==='msgbox;tlb;yes'&&dialogs.length===1&&wizard.stage==='input_mapping'&&preparedInputCloseNode?.root_tid===wizard.root_tid
+          &&preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
+          &&Number.isInteger(preparedInputPort.native_index)&&preparedInputPort.native_index>=0
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
+          &&preparedWorkflowPath.every(c=>typeof c.tid==='string'&&typeof c.label==='string')
+          &&select('.bg-mask-message,.x-mask-msg').filter(visible).every(e=>refOf(e)===wizard.root_ref
+            &&!e.contains(dialogElements[0])&&!dialogElements[0].contains(e))
+          ? {status:'prepared_input_port',node:preparedInputCloseNode,input_port:preparedInputPort}:null;
       const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
         &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
         &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
@@ -3237,6 +3249,11 @@ function readRenderedInputMapping(observation) {
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
+    preparedInputCloseNode:nodeContext?.surface==='wizard'
+      &&typeof nodeContext.document_id==='string'&&nodeContext.document_id===task.prepared_node_context?.document_id
+      &&typeof nodeContext.workflow_id==='string'&&nodeContext.workflow_id===task.prepared_node_context?.workflow_ref.workflow_id
+      &&typeof nodeContext.node_id==='string'&&nodeContext.node_id===task.prepared_node_context?.node.node_id
+      ? {document_id:nodeContext.document_id,workflow_id:nodeContext.workflow_id,node_id:nodeContext.node_id,root_tid:nodeContext.tid}:null,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
@@ -3656,15 +3673,18 @@ function readRenderedInputMapping(observation) {
         }
         if(task.action.verb==='confirm_wizard_close') {
           const confirmation=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_close_confirmation;
-          const path=(confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
-          const key=confirmation.owner.node.label.replace(/\s/g,'_').replace(/,/g,'');
+          const preparedInput=confirmation.input_port&&confirmation.owner.status==='prepared_input_port';
+          const path=(preparedInput?task.prepared_node_context.workflow_ref.navigation_path
+            :confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
           const returnedNode=s=>{
             const before=current.prepared_node_context,after=s.prepared_node_context;
             if(task.prepared_node_context)return before?.verified===true&&after?.verified===true
               &&before.surface==='wizard'&&after.surface==='graph'
+              &&(!preparedInput||after.locked===false)
               &&after.node_id===task.prepared_node_context.node.node_id
               &&['document_id','workflow_id','node_id'].every(k=>typeof before[k]==='string'&&before[k]===after[k])
               &&s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.tid===after.tid).length===1;
+            const key=confirmation.owner.node.label.replace(/\s/g,'_').replace(/,/g,'');
             return s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.graph_node.node_label===key).length===1;
           };
           const ready=s=>lifecycleContextMatches(s)&&s.wizard.status==='absent'&&!s.ui.dialogs.length&&!s.ui.masks.length
