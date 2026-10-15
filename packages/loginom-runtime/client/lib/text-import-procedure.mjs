@@ -522,11 +522,15 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     // needs no five extra browser reads. Every edit still starts with fresh refs,
     // and the final complete sweep verifies all fields, including skipped ones.
     if(fieldsOnly&&['name','label','type','data_kind','used'].every(k=>parsedColumns[i][k]===parameters.columns[i][k]))continue;
+    // No-op property checks may share this field's last completed observation.
+    // Every mutation below is followed by a new read before retaining it here.
+    let columnState;
     for (const property of ['type', 'data_kind']) {
       const definitionReady=state=>fieldsOnly?state.wizard.import_columns?.page?.status==='complete_definition_page'
         :state.wizard.import_columns?.definition_coverage?.status==='complete_configured_columns'
           &&state.wizard.import_columns?.fields?.length===parameters.columns.length;
-      let s = await read('text_import_format', 'complete configured columns', definitionReady), c = columns(s).find(f=>f.index===i);
+      let s = columnState ?? await read('text_import_format', 'complete configured columns', definitionReady), c = columns(s).find(f=>f.index===i);
+      if(fieldsOnly)columnState=s;
       const desired=parameters.columns[i];
       const wanted=fieldsOnly?{...desired,name:desired.source_name??desired.name,label:c.label,used:c.used}:desired;
       requireValue(c.name === wanted.name && c.label === wanted.label && c.used === wanted.used,
@@ -577,13 +581,15 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
           && e.wizard_combo.field?.owner_ref === editor.owner_ref
           && e.wizard_combo.field?.name === property).length === 1);
       await selectImportColumnOption(channel,choosing,i,property,label);
-      requireValue(columns(await read('text_import_format', 'column value applied: ' + i + '/' + property, state =>
-        state.wizard.import_columns?.fields?.find(f=>f.index===i)?.[property] === wanted[property])).find(f=>f.index===i)[property] === wanted[property], 'Column readback differs');
+      s=await read('text_import_format', 'column value applied: ' + i + '/' + property, state =>
+        state.wizard.import_columns?.fields?.find(f=>f.index===i)?.[property] === wanted[property]);
+      requireValue(columns(s).find(f=>f.index===i)[property] === wanted[property], 'Column readback differs');
+      if(fieldsOnly)columnState=s;
     }
     if(fieldsOnly)for(const property of ['name','label','used']) {
       const wanted=parameters.columns[i];
       const ready=s=>s.wizard.import_columns?.page?.status==='complete_definition_page';
-      let s=await read('text_import_format','field metadata ready',ready),c=columns(s).find(f=>f.index===i);
+      let s=columnState??await read('text_import_format','field metadata ready',ready),c=columns(s).find(f=>f.index===i);
       if(c[property]===wanted[property])continue;
       const before={name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:c.used};
       const associated=c.label_associated===true;
@@ -629,6 +635,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
       }
       s=await read('text_import_format','metadata cell committed',state=>ready(state)
         && state.wizard.import_columns.fields.find(f=>f.index===i)?.[property]===wanted[property]);
+      columnState=s;
       c=columns(s).find(f=>f.index===i);
       requireValue(c.type===before.type && c.data_kind===before.data_kind
         && (property==='used'||c.used===before.used) && (property==='name'||c.name===before.name)

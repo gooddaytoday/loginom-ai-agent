@@ -87,6 +87,40 @@ for(const [name,editorChange] of Object.entries({
 test('the final full sweep rejects a change to a skipped offscreen field',async()=>{
  const f=fixture(400,{drift:true});await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner),/definitions differ/);
 });
+test('48 label edits in a 130-field source fit the configure budget without using a pre-mutation observation',async()=>{
+ const f=fixture(130,{editLabels:true});
+ f.parameters.columns.slice(48).forEach((c,i)=>{c.label='F'+(i+48);});
+ const observe=f.channel.observe,act=f.channel.act;
+ let elapsed=0,dirty=true,generation=0,refs;
+ const charge=()=>{elapsed+=1100;assert.ok(elapsed<=600000,'configure budget exhausted');};
+ f.channel.observe=async options=>{
+  charge();const s=await observe(options);dirty=false;generation++;
+  const remap=new Map();
+  for(const c of s.wizard.import_columns.fields)for(const key of Object.keys(c.cell_refs)){
+   const old=c.cell_refs[key],ref=old+':'+generation;remap.set(old,ref);c.cell_refs[key]=ref;
+  }
+  for(const e of s.ui.elements)if(remap.has(e.ref))e.ref=remap.get(e.ref);
+  refs=new Set(s.ui.elements.map(e=>e.ref));return s;
+ };
+ f.channel.act=async action=>{
+  charge();assert.equal(dirty,false,'a mutation requires a completed observation after the previous gesture');
+  if(action.verb==='click'&&action.ref.startsWith('label:'))assert.ok(refs.has(action.ref),'stale field reference');
+  await act(action);dirty=true;
+ };
+ const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
+ assert.deepEqual(result.columns.map(c=>c.label),f.parameters.columns.map(c=>c.label));
+ assert.equal(f.gestures,48*3+1);
+ assert.equal(f.reads.filter(r=>r.condition.startsWith('complete import definition page')).length,34);
+});
+test('a lost post-commit observation stops before another field edit',async()=>{
+ const f=fixture(9,{editLabels:true}),observe=f.channel.observe,error=new Error('post-commit read lost');
+ f.channel.observe=options=>{
+  if(options.condition==='text_import_format: metadata cell committed')throw error;
+  return observe(options);
+ };
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner),e=>e===error);
+ assert.equal(f.gestures,4,'only Next and the first label edit; no second field click');
+});
 test('an empty existing patch budgets its entire retained schema and mapping reorders stay bounded',()=>{
  const existing={target:{kind:'existing'},parameters:{settings:{}},mappings:[]};
  const full={target:{kind:'new'},parameters:{settings:{columns:Array(1000).fill({})}},mappings:[]};
