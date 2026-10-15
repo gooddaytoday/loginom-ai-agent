@@ -476,3 +476,48 @@ test('birth continuation real Task constructor stays linked through existing pac
  assert.equal(result.readonlyStorageVerified,true);assert.equal(result.componentReady,false);assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');
  assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);for(const key of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority','closureIdentityQualified'])assert.equal(result[key],false);
 },{originalSdk:true,invokeSdk:true,realCompletion:true}));
+
+// Forwarders execute the original pinned Task.js functions in the same VM as
+// mscorlib.js. Native/session/dispatch remain explicitly labelled doubles.
+test('derived forwarders retain original returned promises and same secondary reader/receiver',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower;let f=r.forwarders;
+ assert.equal(f.task,r.continuationBirth.task);assert.equal(f.lexicalCalleeIdentityQualified,false);
+ assert.equal(f.bases.length,4);assert.equal(f.outputs.length,4);assert.equal(f.reads.length,0);assert.equal(f.settlements.length,0);
+ for(let i=0;i<4;i++){const row=f.outputs[i];assert.equal(row.task,f.task);assert.equal(row.method,x.f.ss.Task.prototype[row.kind]);assert.equal(Object.getPrototypeOf(row.promise),runInContext('Promise.prototype',x.f.c));assert.equal(f.bases[i].task,f.task)}
+ assert.equal(f.outputs[0].promise,f.bases[0].promise);assert.notEqual(f.outputs[1].promise,f.bases[1].promise);
+ assert.notEqual(f.outputs[2].promise,f.bases[2].promise);assert.notEqual(f.outputs[3].promise,f.bases[3].promise);
+ await x.realm.native.drain();assert.equal(await work,x.realm.native.support);await Promise.all(f.outputs.map(row=>row.promise));await Promise.resolve();
+ f=b.inspect().lower.forwarders;assert.equal(f.reads.length,4);assert.equal(f.settlements.length,4);assert(Object.isFrozen(f.reads));assert(Object.isFrozen(f.settlements));
+ for(const row of f.reads){assert.equal(row.task,f.task);assert.equal(row.reader,f.reader);assert.equal(row.rejected,false);assert.equal(row.value,undefined)}
+ for(const row of f.settlements){assert.equal(row.rejected,false);assert.equal(row.value,undefined)}
+ for(const key of ['toPromise','then','getAwaitedResult'])assert.equal(Object.getOwnPropertyDescriptor(f.task,key),undefined);
+ assert.equal(b.query(),work);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},true,true));
+for(const key of ['toPromise','then','catch','finally','getAwaitedResult'])test('derived forwarders pending '+key+' accessor refuses getter0 before native resolver',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower;let gets=0;
+ Object.defineProperty(r.continuationBirth.task,key,{get(){gets++;throw Error('foreign forwarder')},configurable:true});
+ const failed=assert.rejects(work,/CHANGED|UNAVAILABLE/);await x.realm.native.drain();await failed;
+ assert.equal(gets,0);assert.equal(r.sourceTask.status,3);assert.equal(r.continuationBirth.task.status,3);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true,true));
+test('derived forwarders same packet/control route retains original task reads and qualification refusal',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const result=await x.host.witness.continueStorage(x.host.f.bridge);
+ const binding=x.provider.arm(x.f.c.__armInput);let f=binding.inspect().lower.forwarders;await Promise.all(f.outputs.map(row=>row.promise));await Promise.resolve();f=binding.inspect().lower.forwarders;
+ assert.equal(f.reads.length,4);assert.equal(f.settlements.length,4);assert.equal(f.lexicalCalleeIdentityQualified,false);
+ assert.equal(result.readonlyStorageVerified,true);assert.equal(result.componentReady,false);assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
+
+for(const target of ['Promise','task method','returned prototype'])test('derived forwarders '+target+' substitution cannot qualify or replay',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();let gets=0;
+ if(target==='Promise')Object.defineProperty(x.f.c,'Promise',{get(){gets++;throw Error('foreign Promise')},configurable:true});
+ if(target==='task method')Object.defineProperty(x.f.ss.Task.prototype,'toPromise',{get(){gets++;throw Error('late alias')},configurable:true});
+ if(target!=='returned prototype'){assert.throws(()=>b.query(),/CHANGED|UNAVAILABLE/);assert.equal(x.realm.native.calls.length,0)}
+ else{const work=b.query(),f=b.inspect().lower.forwarders;Object.setPrototypeOf(f.outputs[0].promise,{});const rejected=assert.rejects(work,/CHANGED|UNAVAILABLE/);await x.realm.native.drain();await rejected;assert.equal(f.task.status,3);assert.equal(b.query(),work)}
+ assert.equal(gets,0);assert.equal(x.realm.native.writes(),0);
+},true,true));
+for(const reason of [false,0,null,undefined,'',Error('forward first',{cause:0})])test('derived forwarders raw '+String(reason)+' reader failure wins forwarder drift',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower;let gets=0;
+ x.realm.native.fail(reason);Object.defineProperty(r.continuationBirth.task,'finally',{get(){gets++;throw Error('late finally')},configurable:true});
+ const rejected=assert.rejects(work,e=>Object.is(e,reason));await x.realm.native.drain();await rejected;
+ assert.equal(gets,0);assert.equal(r.sourceTask.status,3);assert.equal(r.forwarders.task.status,3);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true,true));
