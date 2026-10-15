@@ -22,9 +22,12 @@ test.skipIf(!available)("series pins reject environment, config, CLI, judge, cor
     await Bun.$`git add .`.cwd(checkout).quiet()
     await Bun.$`git -c user.name=Fixture -c user.email=fixture@example.invalid commit -m fixture`.cwd(checkout).quiet()
     const cli = path.join(root, "cli/bin/cli"), judge = path.join(root, "bin/codex")
-    const product = `#!/bin/sh\nif [ "$1" = models ]; then printf 'openai/gpt-6.1-sol\\n'; exit 0; fi\ntouch ${JSON.stringify(path.join(root, "PRODUCT_EXECUTED"))}\n`
+    const source = path.join(root, "fixture.ts")
+    await writeFile(source, `if(process.argv.includes('models'))console.log('openai/gpt-6.1-sol');else await Bun.write(${JSON.stringify(path.join(root, "PRODUCT_EXECUTED"))},'executed');`)
+    await Bun.$`${process.execPath} build ${source} --compile --outfile ${cli}`.quiet()
+    const product = await readFile(cli)
     const judgeSource = "#!/bin/sh\nprintf 'codex-cli 0.159.3\\n'\n"
-    await writeFile(cli, product, { mode: 0o755 }); await writeFile(judge, judgeSource, { mode: 0o755 })
+    await writeFile(judge, judgeSource, { mode: 0o755 })
     await cp("/usr/bin/true", path.join(root, "cli/resources/loginom/chrome"))
     await writeFile(path.join(root, "cli/resources/loginom/resource-manifest.json"), '{"browser":"chrome"}', { mode: 0o600 })
     await chmod(cli, 0o755); await chmod(judge, 0o755)
