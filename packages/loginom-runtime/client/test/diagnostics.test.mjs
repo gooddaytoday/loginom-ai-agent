@@ -33,6 +33,14 @@ test('diagnostics separate Dock authentication from Loginom reachability and nev
   assert.equal(noDisplay.ok, false);
   assert.equal(noDisplay.checks.server.ok, true);
   assert.equal(noDisplay.checks.browserEnvironment.ok, false);
+  const headless = await diagnoseConnection(config, { fetcher, manifest, platform: 'linux', environment: {}, headless: true });
+  assert.equal(headless.ok, true);
+  assert.equal(headless.checks.browserEnvironment.browserLaunch, 'not_checked');
+  assert.equal(headless.checks.loginom.browserLogin, 'not_checked');
+  for (const headless of [false, undefined, null, 'true']) {
+    const unknown = await diagnoseConnection(config, { fetcher, manifest, platform: 'linux', environment: {}, headless });
+    assert.equal(unknown.checks.browserEnvironment.ok, false);
+  }
   for (const environment of [{ DISPLAY: ':1' }, { WAYLAND_DISPLAY: 'wayland-0' }]) {
     const withDisplay = await diagnoseConnection(config, { fetcher, manifest, platform: 'linux', environment });
     assert.equal(withDisplay.ok, true);

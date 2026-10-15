@@ -48,10 +48,14 @@ test('the deactivation prompt is not a wizard cancellation even when native butt
 test('native input-port Close binds the port and rejects foreign confirmations',()=>{
  const {state}=fixture();state.wizard.stage='input_mapping';state.wizard.owner_context={status:'unobserved'};
  state.prepared_node_context.input_port={direction:'input',port:0,native_index:0,port_guid:'port0',opening_operation_id:'open0'};
+ state.wizard.input_port_context={status:'unobserved',direction:'input',opening_verified:false};
  const binding=wizardCloseBinding(state);assert.equal(boundWizardCloseConfirmation(state,binding),true);
  for(const change of [s=>delete s.prepared_node_context.input_port,s=>s.prepared_node_context.input_port.port=1,
   s=>s.prepared_node_context.input_port.port_guid='foreign',s=>s.prepared_node_context.input_port.opening_operation_id='foreign',
-  s=>s.prepared_node_context.node_id='foreign',s=>s.wizard.stage='done',s=>s.ui.dialogs[0].text='Удалить узел?']){
+  s=>s.prepared_node_context.node_id='foreign',s=>s.prepared_node_context.document_id='foreign',
+  s=>s.prepared_node_context.workflow_id='foreign',s=>s.prepared_node_context.input_port.native_index=1,
+  s=>s.prepared_node_context.input_port.direction='output',s=>s.wizard.root_ref='foreign',s=>s.wizard.root_tid='foreign',
+  s=>s.ui.elements[0].signature.dialog_ref='foreign',s=>s.wizard.stage='done',s=>s.ui.dialogs[0].text='Удалить узел?']){
   const altered=structuredClone(state);change(altered);assert.equal(boundWizardCloseConfirmation(altered,binding),false);
  }
  for(const port of [{direction:'output',port:0},{direction:'input',port:1}]){

@@ -65,6 +65,19 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     action_revision: '1', operation_id: task.operation_id ?? null, phase, effect_possible: effectPossible, output, error, trace });
   const fail = (code, message) => { const error = new Error(message); error.code = code; throw error; };
   const timeout = () => { const left = deadline - Date.now(); if (left <= 0) fail('UI_DEADLINE_EXCEEDED', 'Observed UI action deadline exceeded'); return left; };
+  // Time only existing pre-gesture reads. No values, identifiers or exception
+  // messages cross this boundary; diagnostics never reset/check the deadline.
+  let preconditionReads = 0, preconditionTiming = true;
+  const timedPreconditionRead = async (readPhase, read) => {
+    if (task.mode !== 'act' || !preconditionTiming || effectPossible || preconditionReads >= 64) return read();
+    const readStarted = Date.now(), index = ++preconditionReads;
+    const timing = () => ({read_phase:readPhase,index,elapsed_ms:Date.now()-readStarted,
+      limit_ms:deadline-started,remaining_ms:Math.max(0,deadline-Date.now())});
+    record('ui_precondition_read_started',timing());
+    let completed = false;
+    try { const value = await read(); completed = true; return value; }
+    finally { record('ui_precondition_read_finished',{...timing(),completed}); }
+  };
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
   const waitForMasks = async (observed, read, unchanged) => {
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
@@ -104,8 +117,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // Loginom. Re-rendering an identical-looking control invalidates its old ref.
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false) => {
-    const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
+    const nodeContext=await timedPreconditionRead('prepared_context_before',boundNode);
+    const observed = await timedPreconditionRead('dom_read',()=>page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedInputCloseNode}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -2691,6 +2704,21 @@ function readRenderedInputMapping(observation) {
         && wizard.input_mapping.source_rows?.length===wizard.input_mapping.rendered_coverage.source_count
         && wizard.input_mapping.target_rows?.length===wizard.input_mapping.rendered_coverage.target_count
         && wizard.input_mapping.links?.length===wizard.input_mapping.rendered_coverage.link_count);
+      // Some input wizards omit breadcrumbs. The verified native opening
+      // receipt and a complete addressed definition page bind this Done.
+      const preparedInputFinishOwner=wizard.status==='observed'&&wizard.stage==='input_mapping'
+        &&wizard.input_port_context?.status==='unobserved'&&preparedInputCloseNode?.root_tid===wizard.root_tid
+        &&preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
+        &&Number.isInteger(preparedInputPort.native_index)&&preparedInputPort.native_index>=0
+        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+        &&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
+        &&preparedWorkflowPath.every(c=>typeof c.tid==='string'&&typeof c.label==='string')
+        &&wizard.output_columns?.auto_sync?.status==='observed'&&wizard.output_columns.auto_sync.value===true
+        &&wizard.output_columns.page?.status==='complete_definition_page'
+        &&wizard.output_columns.page.returned===wizard.output_columns.fields?.length
+        &&!dialogs.length&&select('.bg-mask-message,.x-mask-msg').filter(visible).every(e=>refOf(e)===wizard.root_ref)
+        ? {node:preparedInputCloseNode,input_port:preparedInputPort,workflow_path:preparedWorkflowPath}:null;
       const outputPortFinishReady=wizard.stage==='output_mapping' && wizard.port_context?.status==='observed'
         && wizard.port_context.kind==='output_data' && wizard.output_columns?.status==='rendered_rows'
         && (wizard.output_columns.definition_coverage?.status==='complete_configured_rows'
@@ -2700,7 +2728,19 @@ function readRenderedInputMapping(observation) {
         && wizard.output_columns.auto_sync?.status==='observed';
       const inputCloseOwner=preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
         &&wizard.stage==='input_mapping'&&wizard.input_port_context?.status==='observed'
-        ? wizard.input_port_context:null;
+        ? wizard.input_port_context
+        // A verified native opening receipt also owns cancellation when the
+        // input wizard does not render its node/port breadcrumbs.
+        : tid==='msgbox;tlb;yes'&&dialogs.length===1&&wizard.stage==='input_mapping'&&preparedInputCloseNode?.root_tid===wizard.root_tid
+          &&preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
+          &&Number.isInteger(preparedInputPort.native_index)&&preparedInputPort.native_index>=0
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
+          &&preparedWorkflowPath.every(c=>typeof c.tid==='string'&&typeof c.label==='string')
+          &&select('.bg-mask-message,.x-mask-msg').filter(visible).every(e=>refOf(e)===wizard.root_ref
+            &&!e.contains(dialogElements[0])&&!dialogElements[0].contains(e))
+          ? {status:'prepared_input_port',node:preparedInputCloseNode,input_port:preparedInputPort}:null;
       const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
         &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
         &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
@@ -2718,6 +2758,8 @@ function readRenderedInputMapping(observation) {
         ? {...(tid.endsWith(';btnExecute')?{mode:'execute'}:{}),root_ref:wizard.root_ref,owner:wizard.owner_context,completion:wizard.completion}
         : tid===wizard.root_tid+';btnDone' && wizard.controls.btnDone?.status==='observed' && inputPortFinishReady
           ? {mode:'input_port',root_ref:wizard.root_ref,node_ref:wizard.input_port_context.node.ref,port_ref:wizard.input_port_context.port_ref}
+          : tid===wizard.root_tid+';btnDone' && wizard.controls.btnDone?.status==='observed' && preparedInputFinishOwner
+            ? {mode:'input_port',root_ref:wizard.root_ref,prepared_owner:preparedInputFinishOwner}
           : tid===wizard.root_tid+';btnDone' && wizard.controls.btnDone?.status==='observed' && outputPortFinishReady
             ? {mode:'output_port',root_ref:wizard.root_ref,node_ref:wizard.port_context.node.ref,port_ref:wizard.port_context.port.ref}:null;
       const reformColumn=wizard.stage==='field_parameters',column=reformColumn?wizard.reform_parameters:wizard.column_parameters;
@@ -3237,7 +3279,12 @@ function readRenderedInputMapping(observation) {
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
+    preparedInputCloseNode:nodeContext?.surface==='wizard'
+      &&typeof nodeContext.document_id==='string'&&nodeContext.document_id===task.prepared_node_context?.document_id
+      &&typeof nodeContext.workflow_id==='string'&&nodeContext.workflow_id===task.prepared_node_context?.workflow_ref.workflow_id
+      &&typeof nodeContext.node_id==='string'&&nodeContext.node_id===task.prepared_node_context?.node.node_id
+      ? {document_id:nodeContext.document_id,workflow_id:nodeContext.workflow_id,node_id:nodeContext.node_id,root_tid:nodeContext.tid}:null,
+    cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null}));
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
@@ -3247,11 +3294,11 @@ function readRenderedInputMapping(observation) {
       fail(Object.hasOwn(messages,code)?code:'UI_OBSERVATION_FAILED',messages[code]??messages.UI_OBSERVATION_FAILED);
     }
     if(nodeContext) {
-      const after=await boundNode();
+      const after=await timedPreconditionRead('prepared_context_after',boundNode);
       if(!same(nodeContext,after)) {
         // A read can straddle native unlock after Close or a completed wizard
         // gesture. Discard the mixed snapshot; pre-gesture guards stay strict.
-        if((task.mode==='observe'||effectPossible&&['finish_wizard','execute_wizard','begin_wizard','confirm_wizard_deactivation'].includes(task.action?.verb))
+        if((task.mode==='observe'||effectPossible&&['finish_wizard','execute_wizard','begin_wizard','confirm_wizard_deactivation','confirm_wizard_close'].includes(task.action?.verb))
           && nodeContext.surface==='graph' && after.surface==='graph'
           && typeof nodeContext.locked==='boolean' && typeof after.locked==='boolean'
           && nodeContext.locked!==after.locked && same({...nodeContext,locked:false},{...after,locked:false})
@@ -3323,8 +3370,9 @@ function readRenderedInputMapping(observation) {
       &&typeof observedGraph.native_prefix==='string'&&current.tid?.startsWith(observedGraph.native_prefix)
       &&current.identity.anchor_tid?.startsWith(observedGraph.native_prefix)?observedGraph:null;
     const locator = locatorFor(current.identity,scopedGraph);
-    if (await locator.count() !== 1) fail('UI_REFERENCE_STALE', 'Observed control is no longer unique');
-    const handle = await locator.elementHandle({ timeout: timeout() });
+    if (await timedPreconditionRead('locator_count',()=>locator.count()) !== 1) fail('UI_REFERENCE_STALE', 'Observed control is no longer unique');
+    const handleTimeout = timeout();
+    const handle = await timedPreconditionRead('element_handle',()=>locator.elementHandle({ timeout: handleTimeout }));
     if (!handle) fail('UI_REFERENCE_STALE', 'Observed control is detached');
     handles.push(handle);
     const graphPrefix = task.snapshot.graph_identity?.status==='observed'?task.snapshot.graph_identity.native_prefix:null;
@@ -3656,15 +3704,18 @@ function readRenderedInputMapping(observation) {
         }
         if(task.action.verb==='confirm_wizard_close') {
           const confirmation=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_close_confirmation;
-          const path=(confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
-          const key=confirmation.owner.node.label.replace(/\s/g,'_').replace(/,/g,'');
+          const preparedInput=confirmation.input_port&&confirmation.owner.status==='prepared_input_port';
+          const path=(preparedInput?task.prepared_node_context.workflow_ref.navigation_path
+            :confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
           const returnedNode=s=>{
             const before=current.prepared_node_context,after=s.prepared_node_context;
             if(task.prepared_node_context)return before?.verified===true&&after?.verified===true
               &&before.surface==='wizard'&&after.surface==='graph'
+              &&(!preparedInput||after.locked===false)
               &&after.node_id===task.prepared_node_context.node.node_id
               &&['document_id','workflow_id','node_id'].every(k=>typeof before[k]==='string'&&before[k]===after[k])
               &&s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.tid===after.tid).length===1;
+            const key=confirmation.owner.node.label.replace(/\s/g,'_').replace(/,/g,'');
             return s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.graph_node.node_label===key).length===1;
           };
           const ready=s=>lifecycleContextMatches(s)&&s.wizard.status==='absent'&&!s.ui.dialogs.length&&!s.ui.masks.length
@@ -3680,10 +3731,18 @@ function readRenderedInputMapping(observation) {
           const finish=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_finish;
           const contextMatches=lifecycleContextMatches;
           const inputPort=finish.mode==='input_port',outputPort=finish.mode==='output_port',port=inputPort||outputPort;
-          const finishOwner=inputPort?current.wizard.input_port_context:outputPort?current.wizard.port_context:finish.owner;
-          const expectedLabel=port?finishOwner.node.label:finish.completion.fields.label.value;
-          const workflowPath=(inputPort?finishOwner.node_path.slice(0,-1):outputPort?finishOwner.path.slice(0,-4):finishOwner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
+          const preparedInput=inputPort?finish.prepared_owner:null;
+          const finishOwner=preparedInput??(inputPort?current.wizard.input_port_context:outputPort?current.wizard.port_context:finish.owner);
+          const expectedLabel=preparedInput?null:port?finishOwner.node.label:finish.completion.fields.label.value;
+          const workflowPath=(preparedInput?preparedInput.workflow_path:inputPort?finishOwner.node_path.slice(0,-1):outputPort?finishOwner.path.slice(0,-4):finishOwner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
           const targetNode=fresh=>{
+            if(preparedInput){
+              const bound=fresh.prepared_node_context,owner=preparedInput.node;
+              if(!bound?.verified||bound.surface!=='graph'||bound.locked===true
+                ||!['document_id','workflow_id','node_id'].every(k=>bound[k]===owner[k]))return null;
+              const bodies=fresh.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.tid===bound.tid);
+              return bodies.length===1?bodies[0]:null;
+            }
             const expected=expectedLabel;
             // E2E Format maps whitespace to underscores and removes commas.
             // Wrapped SVG labels may lose whitespace at BR boundaries, so
@@ -3720,6 +3779,7 @@ function readRenderedInputMapping(observation) {
             timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await waitForMasks(await readOpeningUi(),readOpeningUi,contextMatches);
           }
           const sameDestination=fresh=>contextMatches(fresh) && fresh.wizard.status==='absent' && !!targetNode(fresh)
+            &&(!preparedInput||!fresh.ui.dialogs.length)
             && fresh.navigation_context?.status==='observed'
             && same(fresh.navigation_context.path,workflowPath);
           const ready=fresh=>sameDestination(fresh) && !fresh.ui.masks.length;
@@ -3748,7 +3808,7 @@ function readRenderedInputMapping(observation) {
           const node=targetNode(observed);
           record(port?(inputPort?'input_port_finish_settled':'output_port_finish_settled'):finish.mode==='execute'?'wizard_execute_settled':'wizard_finish_settled',{quiet_samples:quietSamples,interval_ms:200,dom_epoch:observed.dom_epoch,node_ref:node.ref});
           if(port)record(inputPort?'input_port_finish_verified':'output_port_finish_verified',{wizard_root_ref:finish.root_ref,control_ref:task.action.ref,
-            port_path:inputPort?finishOwner.port_path:finishOwner.path.slice(0,-1).map(({tid,label})=>({tid,label})),node:node.graph_node,node_ref:node.ref,workflow_path:workflowPath,
+            port_path:preparedInput?null:inputPort?finishOwner.port_path:finishOwner.path.slice(0,-1).map(({tid,label})=>({tid,label})),...(preparedInput?{input_port:preparedInput.input_port,previous_owner:preparedInput.node}:{}),node:node.graph_node,node_ref:node.ref,workflow_path:workflowPath,
             reopen_required:true,settings_readback_verified:false,settings_applied:false,source_identity_verified:false,package_saved:false});
           else record(finish.mode==='execute'?'wizard_execute_graph_verified':'wizard_finish_graph_verified',{...(finish.mode==='execute'?{launch_gesture_verified:true,execution_completed:false}:{}),previous_owner:finish.owner.node,node:node.graph_node,node_ref:node.ref,
             label:finish.completion.fields.label.value,reopen_required:true,settings_readback_verified:false,package_saved:false});
@@ -4018,6 +4078,7 @@ function readRenderedInputMapping(observation) {
         outcome = result('SUCCEEDED', { ...observed, gesture_applied: effectPossible, verification_required: true });
       }
     } catch (error) {
+      preconditionTiming = false;
       record('ui_action_failed', { code: error?.code ?? 'UI_BROWSER_CALL_FAILED' });
       let observed = {};
       if (error?.code === 'UI_SCAN_LIMIT') observed = { observation_required: true, scan: { complete: false, limit_exceeded: true } };

@@ -21,7 +21,8 @@ export function nodePlacementViewport(element,nodeId) {
   nodeBounds={x,y,width:Math.max(...boxes.map(r=>r.x+r.width))-x,height:Math.max(...boxes.map(r=>r.y+r.height))-y};
  }
  return {...(nodeBounds?{node_bounds:nodeBounds}:{}),x:b.x,y:b.y,width:b.width,height:b.height,viewportWidth:innerWidth,viewportHeight:innerHeight,
-  scale:g.view.scale,translate:{x:g.view.translate.x,y:g.view.translate.y},scroll:{x:element.scrollLeft,y:element.scrollTop}};
+  scale:g.view.scale,translate:{x:g.view.translate.x,y:g.view.translate.y},scroll:{x:element.scrollLeft,y:element.scrollTop},
+  scroll_extent:{x:Math.max(0,element.scrollWidth-element.clientWidth),y:Math.max(0,element.scrollHeight-element.clientHeight)}};
 }
 export function nodePlacementPoint(view,position) {
  if(![view.x,view.y,view.scale,view.translate?.x,view.translate?.y,view.scroll?.x,view.scroll?.y,position?.x,position?.y].every(Number.isFinite)||view.scale<=0)throw Error('Invalid native canvas transform');
@@ -62,12 +63,40 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  try {
   if(!within(view,point)) {
    await guard();remaining();
+   // Scroll only this verified native canvas. Never replace an offscreen target
+   // with a clamped click point, pan the model, or move unrelated nodes.
+   if(nodeId!==undefined&&view.scroll_extent&&Object.values(view.scroll_extent).every(Number.isFinite)){
+    const bounds=view.node_bounds;
+    const left=Math.max(view.x,0)+16,top=Math.max(view.y,0)+16;
+    const right=Math.min(view.x+view.width,view.viewportWidth)-16,bottom=Math.min(view.y+view.height,view.viewportHeight)-16;
+    if(bounds.width<right-left&&bounds.height<bottom-top){
+     const dx=bounds.x<left?bounds.x-left:Math.max(0,bounds.x+bounds.width-right);
+     const dy=bounds.y<top?bounds.y-top:Math.max(0,bounds.y+bounds.height-bottom);
+     const scroll={x:Math.max(0,Math.min(view.scroll_extent.x,view.scroll.x+dx)),y:Math.max(0,Math.min(view.scroll_extent.y,view.scroll.y+dy))};
+     if(scroll.x!==view.scroll.x||scroll.y!==view.scroll.y){
+      await root.evaluate((element,scroll)=>element.scrollTo({left:scroll.x,top:scroll.y,behavior:'instant'}),scroll);
+      remaining();await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+     }
+    }
+   }
+   if(within(view,point))return {view,point,zoom_steps:0,outline_closed:false,fully_visible:true};
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');
    if(await owner.count()!==1||!await owner.isVisible())throw Error('Owned canvas outline container unavailable');
    zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');
-   if(await zoom.count()>1)throw Error('Owned canvas zoom-out control is ambiguous');
-   if(await zoom.count()===0||!await zoom.isVisible()){
-    if(await toggle.count()!==1||!await toggle.isVisible())throw Error('Canvas outline control unavailable');
+   const zoomCount=await zoom.count(),zoomVisible=zoomCount===1?await zoom.isVisible():false;
+   if(zoomCount>1)throw Error('Owned canvas zoom-out control is ambiguous');
+   if(zoomCount===0||!zoomVisible){
+    const toggleCount=await toggle.count();
+    const controls={toggle:{count:toggleCount,visible:toggleCount===1?await toggle.isVisible():toggleCount===0?false:null},
+      zoom:{count:zoomCount,visible:zoomVisible}};
+    if(toggleCount!==1||!controls.toggle.visible){
+     if(nodeId===undefined)throw Error('Canvas outline control unavailable');
+     // An unavailable outline cannot prove the whole drawing visible. Only an
+     // existing input-add target may proceed to its unchanged center hit-test.
+     await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+     return {view,point,zoom_steps:steps,outline_closed:false,fully_visible:within(view,point),
+       outline_controls:controls,point_check_required:true};
+    }
     await toggle.click({timeout:remaining()});opened=true;
     await zoom.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    }

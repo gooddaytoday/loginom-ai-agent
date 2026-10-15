@@ -23,8 +23,8 @@ export function agentVersionGuidance(agent, result) {
 }
 
 export async function diagnoseConnection(config, { fetcher = fetch, manifest = () => skillTransport(config).manifest(),
-  platform = process.platform, environment = process.env } = {}) {
-  const displayAvailable = platform !== 'linux' || Boolean(environment.DISPLAY || environment.WAYLAND_DISPLAY);
+  platform = process.platform, environment = process.env, headless = false } = {}) {
+  const displayAvailable = headless === true || platform !== 'linux' || Boolean(environment.DISPLAY || environment.WAYLAND_DISPLAY);
   const checks = { browserEnvironment: displayAvailable
     ? { ok: true, browserLaunch: 'not_checked' }
     : { ok: false, message: 'Для видимого браузера Dock нужна графическая сессия Linux. Запустите агент в рабочем столе с DISPLAY или WAYLAND_DISPLAY.' } };

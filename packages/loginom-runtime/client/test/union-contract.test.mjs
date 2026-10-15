@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyInputSchema} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
@@ -7,3 +8,24 @@ const request=()=>({operation_id:'union-op',contract_revision:'1.0.0',document_i
 const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
 test('public Union contract admits three sources and the installed typed handler',()=>{const r=request();assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema,r));assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));assert.equal(typeof handlers.get('transform.union_data').configurationReadback,'function');});
 test('public Union contract refuses foreign, missing, unordered and unsupported inputs',()=>{for(const change of [r=>r.inputs[2].source.workflow_id='foreign',r=>r.inputs.pop(),r=>r.parameters.tables.reverse(),r=>r.mode='distinct',r=>r.mappings[0].port=3]){const r=request();change(r);assert.throws(()=>{validateActionParameters(nodeApplyInputSchema,r);validateNodeApplyRequest(r,handlers);});}});
+test('two-input Union declares only the joined table and explains accidental main-table entries',()=>{
+ const r=request();r.inputs.pop();r.parameters.tables.pop();r.mappings=[];
+ r.parameters.prefixes={enabled:false,name:'',label:''};
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));
+ r.parameters.tables.push({port:2,fields:[{source:'Extra',main:null}]});
+ assert.throws(()=>validateNodeApplyRequest(r,handlers),/requires 3 input sources at ports 0\.\.2.*never the main table at port 0/);
+});
+test('public and installed typed Union schemas admit preserve-native and reject mixed forms',()=>{
+ const schema=handlers.get('transform.union_data').parameter_schema;
+ const provider=new AjvJsonSchemaValidator(),publicCheck=provider.getValidator(nodeApplyInputSchema),typedCheck=provider.getValidator(schema);
+ const r=request();r.parameters.prefixes={enabled:false,preserve_native:true};
+ assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema,r));
+ assert.doesNotThrow(()=>validateActionParameters(schema,r.parameters));
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));
+ assert.equal(publicCheck(r).valid,true);assert.equal(typedCheck(r.parameters).valid,true);
+ for(const prefixes of [{enabled:true,preserve_native:true},{enabled:false,preserve_native:true,name:'Union'},{enabled:false,preserve_native:true,label:''}]){
+  r.parameters.prefixes=prefixes;
+  assert.equal(publicCheck(r).valid,false);assert.equal(typedCheck(r.parameters).valid,false);
+  assert.throws(()=>validateNodeApplyRequest(r,handlers));
+ }
+});

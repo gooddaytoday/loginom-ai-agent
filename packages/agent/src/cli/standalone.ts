@@ -28,7 +28,7 @@ export async function standalone(
   if (options.includes("--help") || options.includes("-h")) {
     process.stdout.write(
       `${Product.name} CLI\n\nUsage: ${Product.cliExecutable} [options] [command]\n\n` +
-        "Commands: run, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
+        "Commands: run, serve, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
         "Without a command: interactive TUI\n\n" +
         "Options: --headless, --no-headless, --help, --version, --capabilities\n" +
         "Management: --format json; setup --stdin-json; recover --acknowledge [id...]\n" +
@@ -41,7 +41,7 @@ export async function standalone(
     return
   }
   if (
-    ["run", "providers", "auth", "models"].includes(
+    ["run", "serve", "providers", "auth", "models"].includes(
       options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
     )
   )

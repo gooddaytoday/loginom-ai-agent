@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
 import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
+import { wizardCloseBinding, boundWizardCloseConfirmation } from '../lib/node-wizard-close.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
@@ -1977,7 +1978,7 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
   for(const mode of ['bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
-    const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+    const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
     for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
       path+=(path?'>':'')+label;
@@ -2036,7 +2037,8 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       }
       return output;
     };
-    page.waitForTimeout=async()=>{
+    page.waitForTimeout=async ms=>{
+      clock.advance(ms);
       waits++;
       if(detached){page.document.body.append(detached);detached=null;}
       if(mode==='stale_origin')page.location.origin='https://other.invalid';
@@ -2062,7 +2064,7 @@ test('typed wizard opening verifies node and workflow path after one settings cl
 });
 
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
- for(const mode of ['success','wrong_question','wrong_node','still_open']) {
+ for(const mode of ['success','wrong_question','wrong_node','still_open','bound_graph_unlock','bound_graph_lock_churn','bound_graph_foreign','bound_graph_tid','bound_graph_surface']) {
   const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
   let path='';const crumbs=[];
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
@@ -2071,6 +2073,7 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
    if(label==='Old')page.add('span',null,'',undefined,crumb).attrs.class='bg-vendor-icon-calcdata';
    if(label==='Настройка')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-wizard';
   }
+  page.waitForTimeout=async()=>{};
   const wizard=page.add('div',base+'WizrdMCF');
   page.add('input',base+'WizrdMCF;DoneWizard;edtDisplayName','',undefined,wizard).value='Draft rename';
   page.add('button',base+'WizrdMCF;btnDone','Done',undefined,wizard);
@@ -2079,6 +2082,16 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
   page.add('span',null,mode==='wrong_question'?'Удалить пакет?':'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
   page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  if(mode.startsWith('bound_graph_')) {
+   let postClickReads=0;
+   const readNode=async()=>{const graph=page.events.includes('click')&&++postClickReads>1;
+    return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:graph&&postClickReads>=4&&mode==='bound_graph_foreign'?'foreign':'node',
+     surface:graph?(postClickReads>=4&&mode==='bound_graph_surface'?'views':'graph'):'wizard',
+     tid:base+(graph?(postClickReads>=4&&mode==='bound_graph_tid'?'Graph;Other':'Graph;Old'):'WizrdMCF'),
+     ...(graph?{locked:mode==='bound_graph_lock_churn'?postClickReads%2===1:postClickReads<4}:{})};};
+   page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},readNode));
+  }
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));
   if(mode==='wrong_question'){assert.equal(button,undefined);continue;}
   assert.ok(button);
@@ -2089,9 +2102,15 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
    const node=page.add('g',base+'Graph;'+name,'',undefined,graph);page.add('span',base+'Graph;'+name+';Label;Label',name,undefined,node);
   };
   const result=await page.act({verb:'confirm_wizard_close',ref:button.ref},snapshot);
-  assert.equal(result.status,mode==='success'?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  const success=['success','bound_graph_unlock'].includes(mode);
+  assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
-  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),mode==='success');
+  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),success);
+  if(mode.startsWith('bound_graph_')) {
+   const reads=result.trace.filter(e=>e.event==='node_graph_lock_rediscovery');
+   assert.equal(reads.length,mode==='bound_graph_unlock'?1:mode==='bound_graph_lock_churn'?2:0,mode);
+   if(!success)assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+  }
  }
 });
 
@@ -4163,6 +4182,77 @@ test('action deadline expires before the gesture with a controlled clock', async
   assert.deepEqual(page.events, []);
 });
 
+test('precondition timings distinguish delayed existing reads without clicking after expiry',async()=>{
+ for(const delayed of ['prepared_context_before','dom_read','prepared_context_after','locator_count','element_handle']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  page.add('button','Safe;btnAction','private control contents');
+  const binding={verified:true,surface:'graph',document_id:'doc',workflow_id:'workflow',node_id:'node'};
+  const prepared={document_id:'doc',workflow_ref:{prefix:'MF;TF-1',navigation_path:[]},node:{node_id:'node'}};
+  let contextReads=0,domReads=0,countReads=0,handleReads=0,armed=false;
+  const pause=stage=>{if(armed&&stage===delayed)clock.advance(18991);};
+  const reader=async()=>{contextReads++;pause(contextReads===1?'prepared_context_before':'prepared_context_after');return {...binding};};
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:prepared,...options},reader);
+  const snapshot=(await execute({mode:'observe'})).output,target=snapshot.ui.elements.find(e=>e.tid==='Safe;btnAction');
+  contextReads=0;armed=true;
+  const evaluate=page.evaluate.bind(page),locator=page.locator.bind(page);
+  page.evaluate=async(...args)=>{domReads++;if(domReads===1)pause('dom_read');return evaluate(...args);};
+  page.locator=selector=>{
+   const found=locator(selector),count=found.count,handle=found.elementHandle;
+   found.count=async()=>{countReads++;pause('locator_count');return count();};
+   found.elementHandle=async options=>{handleReads++;assert.equal(options.timeout,15000);pause('element_handle');return handle(options);};
+   return found;
+  };
+  const outcome=await execute({mode:'act',action:{verb:'click',ref:target.ref},snapshot});
+  assert.equal(outcome.error.code,'UI_DEADLINE_EXCEEDED',delayed);
+  assert.deepEqual(page.clickedPoints,[],delayed);
+  assert.equal(countReads,1);assert.equal(handleReads,delayed==='element_handle'?1:0);
+  const finished=outcome.trace.filter(e=>e.event==='ui_precondition_read_finished');
+  const slow=finished.filter(e=>e.elapsed_ms===18991);
+  assert.equal(slow.length,1);assert.equal(slow[0].read_phase,delayed);assert.equal(slow[0].remaining_ms,0);
+  assert.equal(slow[0].limit_ms,15000);assert.equal(slow[0].completed,true);
+  for(const event of outcome.trace.filter(e=>e.event.startsWith('ui_precondition_read_'))) {
+   assert.deepEqual(Object.keys(event).sort(),(event.event.endsWith('finished')
+    ?['at_ms','event','read_phase','index','elapsed_ms','limit_ms','remaining_ms','completed']
+    :['at_ms','event','read_phase','index','elapsed_ms','limit_ms','remaining_ms']).sort());
+   assert.ok(event.index<=64);
+  }
+  assert.equal(JSON.stringify(finished).includes('private control contents'),false);
+  if(delayed!=='element_handle') {
+   assert.equal(outcome.status,'NOT_APPLIED');assert.equal(outcome.effect_possible,false);
+   // The unchanged failure path takes its own output snapshot after refusal.
+   assert.equal(contextReads,4);assert.equal(domReads,2);
+  } else {
+   // Preserve the existing conservative classification at gesture admission.
+   assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);
+  }
+ }
+});
+
+test('precondition diagnostics retain context and epoch refusals and record rejected reads without error text',async()=>{
+ for(const fault of ['context','epoch','rejected_read']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});page.add('button','Safe;btnAction','Action');
+  const prepared={workflow_ref:{prefix:'MF;TF-1',navigation_path:[]},node:{node_id:'node'}};
+  let reads=0,armed=false;
+  const reader=async()=>{
+   reads++;
+   if(armed&&reads===2&&fault==='rejected_read')throw Error('secret must not appear in timing');
+   return {verified:true,surface:'graph',node_id:armed&&reads===2&&fault==='context'?'foreign':'node'};
+  };
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:prepared,...options},reader);
+  const snapshot=(await execute({mode:'observe'})).output,target=snapshot.ui.elements.find(e=>e.tid==='Safe;btnAction');
+  if(fault==='epoch')snapshot.dom_epoch.revision++;
+  reads=0;armed=true;
+  const outcome=await execute({mode:'act',action:{verb:'click',ref:target.ref},snapshot});
+  assert.equal(outcome.status,'NOT_APPLIED');assert.equal(outcome.effect_possible,false);assert.deepEqual(page.clickedPoints,[]);
+  if(fault!=='rejected_read')assert.equal(outcome.error.code,fault==='context'?'PREPARED_NODE_CONTEXT_CHANGED':'UI_EPOCH_CHANGED');
+  const timings=outcome.trace.filter(e=>e.event.startsWith('ui_precondition_read_'));
+  assert.equal(JSON.stringify(timings).includes('secret'),false);
+  if(fault==='rejected_read')assert.equal(timings.at(-1).completed,false);
+ }
+});
+
 test('wide import definitions have addressed pages with one schema identity and explicit completeness',async()=>{
  const page=new Page(),c=importCoverageFixture(page,12);c.body.scrollWidth=c.header.scrollWidth=1620;
  const read=async offset=>(await page.execute({mode:'observe',import_column_page:{offset,limit:8}})).output.wizard.import_columns;
@@ -5142,5 +5232,197 @@ test('fractional Reform rows retain complete definitions and native record bindi
   const s=await page.observe();
   assert.equal(s.wizard.reform_columns.definition_coverage.status,'complete_configured_fields',String(scale));
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
+ }
+});
+
+
+async function preparedInputCloseFixture() {
+ const f=await inputPortContextFixture(),{page,wizard,crumbs}=f,base='MF;TF-5;';
+ for(const c of crumbs.slice(5))c.remove();
+ const workflowPath=crumbs.slice(0,5).map(c=>({tid:c.attrs['data-tid'],label:c.ownText.replace(/\s+/g,' ').trim()}));
+ const prepared={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-5',navigation_path:workflowPath},node:{node_id:'node'}};
+ const native={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'wizard',tid:base+'WizrdMCF',
+  input_port:{direction:'input',port:0,native_index:0,port_guid:'port0',opening_operation_id:'open0'}};
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ const title=page.add('h1',null,'Подтвердить',undefined,dialog);title.attrs.role='heading';
+ const question=page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:prepared,...options},async()=>structuredClone(native)));
+ page.waitForTimeout=async()=>{};
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{
+  await click(...args);dialog.remove();wizard.remove();
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),node=page.add('g',base+'Graph;Revenue','',undefined,graph);
+  page.add('span',base+'Graph;Revenue;Label;Label','Revenue',undefined,node);
+  Object.assign(native,{surface:'graph',tid:base+'Graph;Revenue',locked:false});delete native.input_port;
+ };
+ return {...f,prepared,native,dialog,title,question};
+}
+
+test('prepared input-port Close admits the Edit116 unrendered owner and verifies the same returned node',async()=>{
+ const {page}=await preparedInputCloseFixture(),snapshot=await page.observe();
+ assert.equal(snapshot.wizard.stage,'input_mapping');
+ assert.equal(snapshot.wizard.owner_context.status,'unobserved');
+ assert.equal(snapshot.wizard.input_port_context.status,'unobserved');
+ assert.equal(snapshot.wizard.input_port_context.node_path,undefined);
+ const binding=wizardCloseBinding(snapshot);assert.equal(boundWizardCloseConfirmation(snapshot,binding),true);
+ const yes=snapshot.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');assert.ok(yes.allowed_actions.includes('confirm_wizard_close'));
+ assert.deepEqual(yes.wizard_close_confirmation.input_port,binding.owner.input_port);
+ assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+ const result=await page.act({verb:'confirm_wizard_close',ref:yes.ref},snapshot);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),true);
+});
+
+test('prepared input-port Close rejects foreign bindings roots and dialogs before any click',async()=>{
+ for(const fault of ['document','workflow','node','direction','port','native_index','port_guid','opening_operation','root','dialog','question']) {
+  const {page,native,question,title}=await preparedInputCloseFixture(),snapshot=await page.observe();
+  const yes=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));assert.ok(yes,fault);
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='direction')native.input_port.direction='output';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=1;
+  if(fault==='port_guid')native.input_port.port_guid='foreign';
+  if(fault==='opening_operation')native.input_port.opening_operation_id='foreign';
+  if(fault==='root')native.tid='MF;TF-5;ForeignWizard';
+  if(fault==='dialog')title.ownText='Foreign';
+  if(fault==='question')question.ownText='Удалить узел?';
+  const result=await page.act({verb:'confirm_wizard_close',ref:yes.ref},snapshot);
+  assert.equal(result.status,'NOT_APPLIED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,0,fault);
+ }
+});
+
+test('prepared input-port Close never accepts a foreign or missing graph after the click',async()=>{
+ for(const fault of ['document','workflow','node','body','locked','workflow_path']) {
+  const {page,native,crumbs}=await preparedInputCloseFixture(),snapshot=await page.observe();
+  const yes=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));assert.ok(yes,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+   if(fault==='body')native.tid='MF;TF-5;Graph;Foreign';
+   if(fault==='locked')native.locked=true;
+   if(fault==='workflow_path')crumbs[4].ownText='Другой сценарий';
+  };
+  const result=await page.act({verb:'confirm_wizard_close',ref:yes.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),false,fault);
+ }
+});
+
+
+test('prepared input-port Close is never issued from a Yes label without the complete native binding',async()=>{
+ for(const fault of ['unbound','document','workflow','node','root','direction','port','native_index','port_guid','opening_operation','workflow_path','question','mask']) {
+  const {page,native,prepared,question}=await preparedInputCloseFixture();
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='root')native.tid='MF;TF-5;ForeignWizard';
+  if(fault==='direction')native.input_port.direction='output';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=-1;
+  if(fault==='port_guid')delete native.input_port.port_guid;
+  if(fault==='opening_operation')delete native.input_port.opening_operation_id;
+  if(fault==='workflow_path')prepared.workflow_ref.navigation_path=[];
+  if(fault==='question')question.ownText='Удалить пакет?';
+  if(fault==='mask')page.add('div',null,'Загрузка',{x:20,y:100,width:100,height:30}).attrs.class='x-mask-msg';
+  const result=await page.execute({mode:'observe',...(fault==='unbound'?{prepared_node_context:null}:{})});
+  assert.equal(result.status,'SUCCEEDED',fault+JSON.stringify(result.error));
+  const yes=result.output.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.ok(yes.allowed_actions.includes('click'),fault);
+  assert.equal(yes.allowed_actions.includes('confirm_wizard_close'),false,fault);
+  assert.equal(yes.wizard_close_confirmation,undefined,fault);
+  assert.equal(page.events.length,0,fault);
+ }
+});
+
+async function preparedInputFinishFixture() {
+ const f=await preparedInputCloseFixture(),{page,wizard,native,dialog,marker}=f;
+ dialog.remove();marker.remove();
+ native.input_port={direction:'input',port:2,native_index:2,port_guid:'48960769-8b6d-4eba-bba6-087918eb68c7',opening_operation_id:'union-edit118-config-exec-001:n44'};
+ const c=mappingCoverageFixture(page,4),old=c.base;page.context.innerWidth=1440;page.context.innerHeight=1000;
+ for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(old))e.attrs['data-tid']=e.attrs['data-tid'].replace(old,'MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;').replace('colDefaultUsageType_','colUsageType_');
+ for(const child of [...c.form.children]){child.remove();wizard.append(child);}c.form.remove();
+ c.body.clientHeight=50;c.body.scrollHeight=100;
+ const done=page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:800,y:700,width:100,height:25},wizard);
+ const execute=page.execute;page.execute=options=>execute({output_column_page:{offset:0,limit:8},...options});
+ return {...f,c,done};
+}
+
+test('prepared input-port Done admits Edit118 complete definition page with partial coverage',async()=>{
+ const {page}=await preparedInputFinishFixture(),s=await page.observe();
+ assert.equal(s.wizard.input_port_context.status,'unobserved');assert.equal(s.wizard.owner_context.status,'unobserved');
+ assert.equal(s.wizard.output_columns.definition_coverage.status,'partial');
+ assert.equal(s.wizard.output_columns.page.status,'complete_definition_page');
+ assert.equal(s.wizard.output_columns.page.returned,4);assert.equal(s.wizard.output_columns.fields.length,4);
+ const done=s.ui.elements.find(e=>e.tid===s.wizard.root_tid+';btnDone');
+ assert.ok(done.allowed_actions.includes('finish_wizard'));
+ assert.equal(done.wizard_finish.prepared_owner.input_port.port,2);
+ assert.doesNotThrow(()=>validateUiAction({verb:'finish_wizard',ref:done.ref},s));
+ const r=await page.act({verb:'finish_wizard',ref:done.ref},s);
+ assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.ok(r.trace.some(e=>e.event==='input_port_finish_verified'));
+});
+
+test('prepared input-port Done needs the complete binding and addressed page before issuing a verb',async()=>{
+ for(const fault of ['unbound','unverified','document','workflow','node','root','direction','port','native_index','port_guid','opening_operation','workflow_path','incomplete_page','autosync_off','autosync_missing','disabled','dialog','mask']){
+  const {page,native,prepared,c,done}=await preparedInputFinishFixture();
+  if(fault==='unverified')native.verified=false;
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='root')native.tid='MF;TF-5;OtherWizard';
+  if(fault==='direction')native.input_port.direction='output';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=-1;
+  if(fault==='port_guid')delete native.input_port.port_guid;
+  if(fault==='opening_operation')delete native.input_port.opening_operation_id;
+  if(fault==='workflow_path')prepared.workflow_ref.navigation_path=[];
+  if(fault==='incomplete_page')c.rows[3].children.at(-1).remove();
+  if(fault==='autosync_off')c.auto.attrs.class='';
+  if(fault==='autosync_missing')c.auto.remove();
+  if(fault==='disabled')done.disabled=true;
+  if(fault==='dialog')page.add('div',null,'Foreign').attrs.class='x-window';
+  if(fault==='mask')page.add('div',null,'Загрузка').attrs.class='x-mask-msg';
+  const r=await page.execute({mode:'observe',...(fault==='unbound'?{prepared_node_context:null}:{})});
+  assert.equal(page.events.length,0,fault);
+  if(r.status!=='SUCCEEDED'){assert.equal(fault,'unverified',fault+JSON.stringify(r.error));continue;}
+  const button=r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.ok(!button?.allowed_actions.includes('finish_wizard'),fault);
+ }
+});
+
+test('prepared input-port Done rechecks its full binding and page before one click',async()=>{
+ for(const fault of ['document','workflow','node','port','native_index','port_guid','opening_operation','root','incomplete_page','autosync_off']){
+  const {page,native,c}=await preparedInputFinishFixture(),s=await page.observe();
+  const done=s.ui.elements.find(e=>e.wizard_finish?.prepared_owner);assert.ok(done,fault);
+  if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+  if(fault==='port'||fault==='native_index')native.input_port[fault]=1;
+  if(fault==='port_guid')native.input_port.port_guid='foreign';
+  if(fault==='opening_operation')native.input_port.opening_operation_id='foreign';
+  if(fault==='root')native.tid='MF;TF-5;OtherWizard';
+  if(fault==='incomplete_page')c.rows[3].children.at(-1).remove();
+  if(fault==='autosync_off')c.auto.attrs.class='';
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},s);
+  assert.equal(r.status,'NOT_APPLIED',fault+JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='click').length,0,fault);
+ }
+});
+
+test('prepared input-port Done refuses foreign or incomplete destinations after exactly one click',async()=>{
+ for(const fault of ['document','workflow','node','body','duplicate_body','locked','workflow_path','wizard','dialog','mask']){
+  const {page,native,crumbs}=await preparedInputFinishFixture(),s=await page.observe();
+  const done=s.ui.elements.find(e=>e.wizard_finish?.prepared_owner);assert.ok(done,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);
+   if(['document','workflow','node'].includes(fault))native[fault+'_id']='foreign';
+   if(fault==='body')native.tid='MF;TF-5;Graph;Foreign';
+   if(fault==='duplicate_body')page.add('g','MF;TF-5;Graph;Revenue');
+   if(fault==='locked')native.locked=true;
+   if(fault==='workflow_path')crumbs[4].ownText='Другой сценарий';
+   if(fault==='wizard')page.add('div','MF;TF-5;WizrdMCF');
+   if(fault==='dialog')page.add('div',null,'Foreign').attrs.class='x-window';
+   if(fault==='mask')page.add('div',null,'Загрузка').attrs.class='x-mask-msg';
+  };
+  const clock=fixtureClock();page.context.Date=clock.Date;page.waitForTimeout=async ms=>clock.advance(ms);
+  const r=await page.act({verb:'finish_wizard',ref:done.ref},s);
+  assert.equal(r.status,'AMBIGUOUS',fault+JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.ok(!r.trace.some(e=>e.event==='input_port_finish_verified'),fault);
  }
 });

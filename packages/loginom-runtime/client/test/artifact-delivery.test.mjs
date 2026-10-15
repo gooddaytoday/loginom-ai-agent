@@ -37,7 +37,7 @@ test('cancellation after a no-effect stale refusal prevents the next navigation 
  const result=await f.service.deliver(request,{signal:controller.signal});
  assert.equal(attempts,1);assert.equal(result.outcome.status,'AMBIGUOUS');assert.ok(!f.calls.includes('upload'));
 });
-function fixture(fault,initialDirectory='/') {
+function fixture(fault,initialDirectory='/',now=Date.now) {
  const artifact={artifact_id:'artifact',name:'input.csv',bytes:3,sha256:'a'.repeat(64),upload:{grant_id:'grant',directory:'/user/dock-p3',destination:'/user/dock-p3/input.csv',overwrite:'replace'}};
  const calls=[],events=[];let directory=initialDirectory,verified=false;
  const prefix='MF;TF-2',nav=prefix+';NavigationBar;NavigationPanel';
@@ -47,7 +47,7 @@ function fixture(fault,initialDirectory='/') {
   uploadDeliveredArtifact:async()=>{calls.push('upload');if(fault==='upload')throw Error('Lost browser response');return {status:'AMBIGUOUS',cleanup_complete:true,output:{upload_submitted:true}};},
   inspect:async()=>{calls.push('inspect');return {output:{state:verified?'resolved':'pending',cleanup_confirmed:true,outcome:{status:verified?'SUCCEEDED':'AMBIGUOUS',output:{upload_submitted:true,server_copy_verification:{bytes_verified:true,upload_completion_verified:true,destination:artifact.upload.destination,bytes:3,sha256:fault==='digest'?'b'.repeat(64):artifact.sha256,verification_id:'delivery:verify'}}}}};},
   verifyDeliveredArtifact:async({onDispatched}={})=>{onDispatched?.();calls.push('verify');if(fault==='verify')throw Error('Lost download receipt');verified=true;return {status:'SUCCEEDED',cleanup_complete:true,output:{bytes_verified:true}};}};
- const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;}});
+ const service=createArtifactDelivery({runtime,now,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;}});
  return {service,artifact,calls,events,runtime};
 }
 test('delivery navigates exact authorized folders and reuses upload and byte verification once',async()=>{
@@ -348,4 +348,40 @@ test('resume never extends the original delivery deadline',async()=>{
  await new Promise(resolve=>setTimeout(resolve,1050));
  assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.ok(!f.calls.includes('verify'));
+});
+
+
+test('expired pre-upload navigation retains its checkpoint without offering impossible resume',async()=>{
+ let clock=0;
+ const f=fixture(undefined,'/',()=>clock),act=f.runtime.uiAct;
+ f.runtime.uiAct=async(a,o)=>{const result=await act(a,o);clock=1000;return result;};
+ const result=await f.service.deliver({...request,budget_ms:1000});
+ assert.equal(result.outcome.status,'AMBIGUOUS');
+ assert.equal(result.outcome.effect_possible,true);
+ assert.equal(result.outcome.upload_submitted_or_unknown,false);
+ assert.equal(result.outcome.cleanup_complete,true);
+ assert.equal(result.outcome.inspection_required,false);
+ assert.equal(result.outcome.deadline_elapsed,true);
+ assert.equal(result.outcome.next_step,undefined);
+ assert.equal(result.error.message,'Delivery readiness timeout: storage navigation loaded');
+ assert.equal(f.service.unsettled,false);
+ assert.equal(f.calls.includes('upload'),false);
+ assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
+ assert.deepEqual(f.service.status('delivery'),result);
+});
+
+test('expired lost upload retains uncertainty and first failure without suggesting resume or replay',async()=>{
+ let clock=0;
+ const f=fixture(undefined,'/',()=>clock);
+ f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');clock=1000;throw Error('Original upload reply lost');};
+ const result=await f.service.deliver({...request,budget_ms:1000});
+ assert.equal(result.error.message,'Original upload reply lost');
+ assert.equal(result.outcome.upload_submitted_or_unknown,true);
+ assert.equal(result.outcome.inspection_required,true);
+ assert.equal(result.outcome.deadline_elapsed,true);
+ assert.equal(result.outcome.next_step,undefined);
+ assert.equal(f.service.unsettled,true);
+ assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+ assert.equal(f.calls.includes('verify'),false);
 });

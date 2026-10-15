@@ -229,12 +229,16 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
     : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
+   const deadlineElapsed=now()>=job.deadline;
+   const resumableNow=!signal?.aborted&&!deadlineElapsed;
    job.outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
     ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
-    ...(submitted&&!job.verificationStarted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
+    ...(submitted&&!job.verificationStarted&&resumableNow?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
       instruction:'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
-    ...(navigationResumable?{cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
-     instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})};
+    ...(navigationResumable?{cleanup_complete:true,...(resumableNow?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
+     instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})}:{}),
+    ...(deadlineElapsed?{deadline_elapsed:true}:{}),
+   };
   } finally {job.state='settled';active=null;}
   return snapshot(job);
  }

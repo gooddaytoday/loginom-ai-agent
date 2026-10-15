@@ -1,0 +1,75 @@
+{
+  "package_path": "/lab-72-union/union-worker-01.lgp",
+  "nodes": [
+    {
+      "type": "transform.union_data"
+    }
+  ],
+  "output_node_type": "transform.union_data",
+  "columns": [
+    {
+      "name": "Code",
+      "label": "Code",
+      "type": "string"
+    },
+    {
+      "name": "Amount",
+      "label": "Amount",
+      "type": "integer"
+    },
+    {
+      "name": "Note",
+      "label": "Note",
+      "type": "string"
+    },
+    {
+      "name": "Extra",
+      "label": "Extra",
+      "type": "string"
+    }
+  ],
+  "rows": [
+    {
+      "Code": "A",
+      "Amount": 10,
+      "Note": "repeat",
+      "Extra": null
+    },
+    {
+      "Code": "A",
+      "Amount": 10,
+      "Note": "repeat",
+      "Extra": null
+    },
+    {
+      "Code": "B",
+      "Amount": 20,
+      "Note": null,
+      "Extra": null
+    },
+    {
+      "Code": "A",
+      "Amount": 10,
+      "Note": "repeat",
+      "Extra": null
+    },
+    {
+      "Code": "C",
+      "Amount": 30,
+      "Note": "",
+      "Extra": null
+    },
+    {
+      "Code": "D",
+      "Amount": 40,
+      "Note": "third",
+      "Extra": "solo"
+    },
+    {
+      "Code": "A",
+      "Amount": 10,
+      "Note": "repeat",
+      "Extra": null
+    }
+  ]
+}

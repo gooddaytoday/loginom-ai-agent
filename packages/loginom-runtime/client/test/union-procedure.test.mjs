@@ -44,3 +44,11 @@ test('Union does not click or scroll from a clipped quarter-point cell whose cen
  const channel={perform:async({resolve})=>{assert.deepEqual(resolve(s),{verb:'scroll_horizontal',ref:'middle',delta_x:-400});partial.interaction=hit.interaction;for(const e of s.ui.elements)e.horizontal_scroll.left=81;gestures++;},observe:async({ready})=>{assert.ok(ready(s));return structuredClone(s);}};
  await revealUnionField(channel,structuredClone(s),2,'A','field');assert.equal(gestures,1);
 });
+
+ test('Union refuses disabled prefix edits that cached readback cannot prove persisted',async()=>{
+ const f=fixture();f.c.mappings[0]={port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']};
+ const wanted={...p,prefixes:{enabled:false,name:'',label:''}};
+ await assert.rejects(configureUnion(f.channel,wanted,{request:{finish:'done'}}),/disabled prefix values differ/);
+ assert.equal(f.actions.length,0);
+ assert.deepEqual(f.c.prefixes,p.prefixes);
+});
