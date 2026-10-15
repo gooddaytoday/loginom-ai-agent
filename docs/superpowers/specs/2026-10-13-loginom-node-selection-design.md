@@ -1,11 +1,11 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты14 candidate,
-policy PASS во всех14. Один итоговый расчёт правильный,13 результатов не получены.
-Одна сессия завершена штатно,13 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты15 candidate,
+policy PASS во всех15. Один итоговый расчёт правильный,14 результатов не получены.
+Одна сессия завершена штатно,14 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось11 candidate, включая текущую first-last-touch/2. Sequential
-runner3679277/exec53273 продолжил серию2026-10-14T23:57:07.093361+00:00;
+Осталось10 candidate, включая текущую explicit-js/2. Sequential
+runner3724959/exec55216 продолжил серию2026-10-15T00:14:34.609924+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -17,6 +17,25 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+First-last-touch/2 closed2026-10-15T00:08:35.360Z: policy PASS `d86f4946…`,
+mandatory review `d53f02b0…`;45messages/166parts/46tools/138events/3525runtime,
+JS0/nochildren,7stdsuccess: Import→Calculator-last→Group-first/last→InnerJoin→
+Rename→Sort. Реальная IIF validationrefusal с restored unchanged draft/cleanuptrue
+(native635) исправлена If на SAMEGUID27df… и выполнена. Это natural recovery,
+исходный C9 functionalrecoveryFALSE не заменяет. ОбеGroup complete имеют одинаковые
+5каналов/noNone; InnerJoin5 обоснован actualinput. Export1/2 before_node:null/
+effectfalse/cleanuptrue/noexecution; Export3 inputmapping AMBIGUOUS с точной причиной
+OUTPUT_PORT_OPEN_UNCONFIRMED, noexecute. ПослеExport3 нетapply/JS, честный блокер.
+Две raw knowledge-search ошибки сохранены отдельно от JSON Dockreceipts.
+CSV/LGP/oracle не получены; originalCLI1/cleanupfalse/purehistory-provenancePASS/
+runtimefalse-unsettled сохранены. Own275closed00:11:55.205Z/admin276logout00:11:56.838Z/
+browserclosed00:11:58.042Z;9actualPIDgone/exactguardarchive00:13:10.451028Z,
+unknown271+274 видны вдвухreadbacks. Root независимо проверилscope доclose;
+17original bytes unchanged,18case/26recovery readonly; descriptor `3eaa2746…`.
+Independent firstlast2 finalrelease review `eca00804…`/readback `9433ca48…`
+approved; actualgate2026-10-15T00:14:29.017Z разрешил technical-failed.
+Originalattempt `757fa189…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Campaign-roi-by-channel/2 closed23:52:57.502Z: policy PASS `6f08793e…`, mandatory
 review `c516f040…`;30messages/118parts/32tools/95events/2316runtime, JS0/nochildren.
