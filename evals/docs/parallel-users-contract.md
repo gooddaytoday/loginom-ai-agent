@@ -2582,3 +2582,52 @@ SHA256 `5b8e2e688422b1af2bf653391f534cb55b0e50f9bb1012ad4855f047a82336bd`
 checks94 facts/50 sources,16 overlapping snapshots and12 source/binary pins.
 All own pair/network/root resources are absent. No production readiness or live
 model/judge qualification is claimed.
+
+
+### Agent archive-before-close — 2026-10-16
+
+`AdminConnection.closeAgentSession(lease, secretFile, id, archive)` closes a
+qualified agent browser session. `archive: {path, sha256}` points to the private
+`agent-archive-<physical CLI invocation UUID>.json` in controller state. The
+committed profile archive must belong to the leased profile/history directory
+and start after actual continuous CLI closure. Missing or earlier archives fail
+before dispatch. `readAgentArchive` replays the committed archive validation,
+including moved tree identities/content and a clean settled working profile;
+the parent repeats this check immediately before the native request.
+
+The driver adopts the immutable agent ledger and validates its normal lease,
+protected preparation/user/activation, selected process entry/proof, native
+before/during/after sources and archive hash/order. The fresh account and unique
+Name/CreateTime tuple must match; the session must be pending disconnect and
+retain the qualified post-CLI package count. CloseSession confirmation plus fresh
+absence permits a private terminal sidecar tied to the exact adopt/archive and
+confirmed command/reply hashes. Repeated close revalidates this terminal result;
+read-back after inventory sealing remains valid. Historical terminal validation
+reads the immutable archive source without requiring the reused profile to stay
+empty. No operation-stop, backup/storage deletion, reservation release or new
+admission authority follows from this close API.
+
+TDD: missing export RED, then native driver refusal SESSION_SOURCE_UNCONFIRMED
+(19 assertions154.46s), then native1/29 PASS134.46s. Missing/too-old archive
+controls dispatched no close RPC. One actual agent Count1 session closed; a
+nonempty setup-session baseline remained present. The archived database retains
+the original SDK session ID. Related48/233 PASS50.73s, typecheck/syntax/diff PASS.
+Private native-agent-replay-d75f5d7a-0a38-4fdb-887f-16b24f89a4b7/source-audit.json
+SHA256 `0c35e3dcdbb2531950fb5f9d8153efc94fd695eb1aeedbd14a1963716334280e`
+checks1648 facts/66 sources,15 causal snapshots/13 source+binary pins and all
+archived tree inode/content metadata. Own pair/network/controller root are gone;
+private historyDir from settlement.json remains outside that root, preserving the
+original rename-based archive on the same filesystem. Complete same-user
+accounting, active finalizer/recovery and production admission remain open.
+
+A/B management regression1/20 PASS164.60s: the shared causal adoption path still
+closes A Count0 sessions while B remains active; B subsequently completes a fresh
+LOGINOM_CONNECTION_VALID check. Both finalizers retain delete/admission=false.
+Native-agent verification.json SHA256
+`d0512a31055b7b291f2c3b982f4bd32b83bda07fc59c3022ef9f5782375f1991`
+rechecks79 evidence/source-pin hashes and exact own resource absence.
+
+Private native-two-users-79a7ca24-8890-473d-aedb-792c884b62bd/source-audit.json
+SHA256 `5d6da801c8ef9bd9da0fdac201118d59426a15a1c608aced638558f85780d1ab`
+checks634 facts/183 sources, continuous closures/archive order and exact own
+pair/network/root absence.
