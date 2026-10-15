@@ -462,6 +462,24 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 const info = await storage.GetFileInfo(target)
                 const copySize = await info.Size
                 await ReleaseObject(info, true)
+                const directory = peer ? "access-peer-positive" : "access-positive"
+                await storage.CreateDirectory(directory)
+                await storage.CreateDirectory(`${directory}/nested`)
+                const unusual = []
+                for (const name of ["space name.lgp", "tab\tname.lgp", "line\nname.lgp", "Юникод.lgp", "-leading.lgp", ".hidden.lgp", "nested/file.lgp"]) {
+                  const copied = await storage.CopyFile(source, `${directory}/${name}`, false, false)
+                  const stream = await storage.OpenFile(`${directory}/${name}`, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
+                  try {
+                    const size = await stream.Size
+                    const buffer = new Uint8Array(Math.min(size, 64))
+                    await stream.ReadBuffer(buffer)
+                    const writer = await storage.CreateFile(`${directory}/${name}.write`)
+                    try {
+                      await writer.WriteBuffer(new Uint8Array([65]))
+                      unusual.push({ name, copied, size, written: await writer.Size === 1, readConfirmed: size > 0 && buffer.some(value => value !== 0) })
+                    } finally { await ReleaseObject(writer, true) }
+                  } finally { await ReleaseObject(stream, true) }
+                }
                 const denials = []
                 if (peer) {
                   console.info("ADMIN_USER_STAGE_STORAGE_DENIALS")
@@ -493,7 +511,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 }
                 const continued = await storage.OpenFile(source, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
                 try { return { readConfirmed: size > 0 && buffer.some(value => value !== 0), size, copySize: copied ? copySize : null,
-                  continued: await continued.Size === size, denials } }
+                  continued: await continued.Size === size, unusual, denials } }
                 finally { await ReleaseObject(continued, true) }
               }, { item: handle, peer: payload.peer ?? null, shared: payload.expectedPolicy.map(directory => directory.name).sort() })) : null
               const backup = payload.phase === "session-backup-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
