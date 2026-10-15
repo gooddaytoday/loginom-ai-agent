@@ -63,14 +63,36 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("preparation recovery: native b
     expect(await Bun.file(path.join(cleanup.profileArchive.archive, "data/recovery-history")).text()).toBe("preserve-native-recovery")
     expect(cleanup.recoveryProcessInventories).toHaveLength(1)
     expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/recovery-control`.quiet()).text()).toBe("preserve")
+    const fromCLI = async (out: string) => {
+      const command = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "recover", "--config", slotsFile,
+        "--incident", journal, "--out", out], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
+        env: { PATH: process.env.PATH ?? "", HOME: root, EVAL_CLI_BIN: "/unreadable-runtime" } })
+      const [code, stdout, stderr] = await Promise.all([command.exited, new Response(command.stdout).text(), new Response(command.stderr).text()])
+      return { code, stdout, stderr }
+    }
     const beforeRepeat = await readdir(file.controller.stateDir)
-    const repeatedOut = path.join(root, "repeated-recovery")
-    const repeated = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "recover", "--config", slotsFile,
-      "--incident", journal, "--out", repeatedOut], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
-      env: { PATH: process.env.PATH ?? "", HOME: root, EVAL_CLI_BIN: "/unreadable-runtime" } })
-    const [repeatCode, repeatStdout, repeatStderr] = await Promise.all([repeated.exited, new Response(repeated.stdout).text(), new Response(repeated.stderr).text()])
-    expect({ code: repeatCode, stderr: repeatStderr, output: repeatCode ? repeatStdout : "" }).toEqual({ code: 0, stderr: "", output: "" })
-    expect(JSON.parse(repeatStdout)).toMatchObject({ status: "already_released", ready: false, journal: recovered.journal, finalization: result })
+    const terminalFiles = [recovered.receipt, `${journal}.completion.json`]
+    const terminalBytes = await Promise.all(terminalFiles.map(file => Bun.file(file).text()))
+    await Promise.all(terminalFiles.map(file => rm(file)))
+    try {
+      const bytes = await Bun.file(result.server.path).text()
+      await writeLeaseReceipt(result.server.path, { ...JSON.parse(bytes), status: "unknown" })
+      try {
+        const refused = await fromCLI(path.join(root, "refused-reconciliation"))
+        expect({ code: refused.code, stdout: refused.stdout, stderr: refused.stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "PREPARATION_COMPLETION_UNCONFIRMED" })
+        expect(await Promise.all(terminalFiles.map(file => Bun.file(file).exists()))).toEqual([false, false])
+      } finally { await writeLeaseReceipt(result.server.path, JSON.parse(bytes)) }
+      const reconciled = await fromCLI(path.join(root, "reconciled-recovery"))
+      expect({ code: reconciled.code, stderr: reconciled.stderr, output: reconciled.code ? reconciled.stdout : "" }).toEqual({ code: 0, stderr: "", output: "" })
+      expect(JSON.parse(reconciled.stdout)).toMatchObject({ status: "already_released", finalization: result })
+      expect(await Promise.all(terminalFiles.map(file => Bun.file(file).text()))).toEqual(terminalBytes)
+    } finally {
+      await Promise.all(terminalFiles.map((file, index) => writeLeaseReceipt(file, JSON.parse(terminalBytes[index]!))))
+    }
+    expect(await readdir(file.controller.stateDir)).toEqual(beforeRepeat)
+    const repeated = await fromCLI(path.join(root, "repeated-recovery"))
+    expect({ code: repeated.code, stderr: repeated.stderr, output: repeated.code ? repeated.stdout : "" }).toEqual({ code: 0, stderr: "", output: "" })
+    expect(JSON.parse(repeated.stdout)).toMatchObject({ status: "already_released", ready: false, journal: recovered.journal, finalization: result })
     expect(await readdir(file.controller.stateDir)).toEqual(beforeRepeat)
     const completion = await readLeaseReceipt(`${journal}.completion.json`) as { proofs: { path: string; sha256: string }[] }
     const retainedSources = await Promise.all(completion.proofs.map(async source => ({ ...source, value: await readLeaseReceipt(source.path) })))
@@ -95,7 +117,13 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("preparation recovery: native b
     } finally {
       try {
         const admin = await openLoginomAdmin(file, pair.identity, { serverLease: next.server, processInventory: nextInventory })
-        try { await finalizeUnactivatedEnvironment(file, next, admin) }
+        try {
+          const finalized = await finalizeUnactivatedEnvironment(file, next, admin)
+          expect(await recoverUnactivatedPreparation({ slotsFile, incident: nextJournal })).toMatchObject({ status: "already_released", finalization: finalized })
+          const names = await readdir(file.controller.stateDir)
+          expect(await recoverUnactivatedPreparation({ slotsFile, incident: nextJournal })).toMatchObject({ status: "already_released", finalization: finalized })
+          expect(await readdir(file.controller.stateDir)).toEqual(names)
+        }
         finally { await admin.dispose() }
       } catch (error) { completed.released = false; throw error }
       finally { await Promise.all([next.server.close(), ...next.slots.map(lease => lease.close())]) }
@@ -105,7 +133,8 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("preparation recovery: native b
     await writeLeaseReceipt(path.join(evidence, "recovery.json"), { version: 2, identity: pair.identity, result, cleanup,
       command: await readLeaseReceipt(recovered.journal), original: await readLeaseReceipt(journal), incident: await readLeaseReceipt(incident),
       recoverySlot: await readLeaseReceipt(recoverySlot), server: await readLeaseReceipt(result.server.path), completion, retainedSources,
-      repeated: JSON.parse(repeatStdout), historicalRepeatPreservedNextReservations: beforeNext.map(value => JSON.parse(value)), liveQualified: false })
+      recovered, terminalReceipts: terminalBytes.map(value => JSON.parse(value)), repeated: JSON.parse(repeated.stdout),
+      historicalRepeatPreservedNextReservations: beforeNext.map(value => JSON.parse(value)), liveQualified: false })
   } catch (error) {
     if (!completed.released) console.error(`recovery fixture retained: ${root}`)
     throw error

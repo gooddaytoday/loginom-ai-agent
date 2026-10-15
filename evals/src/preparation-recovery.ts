@@ -1,8 +1,8 @@
 import path from "node:path"
 import { readdir, readFile } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, writeLeaseReceipt } from "./lease"
-import { acquireEnvironmentLeases, loadSlots, parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, withResourceReservationGuards, writeLeaseReceipt } from "./lease"
+import { acquireEnvironmentLeases, finalizeReleasedSlot, loadSlots, parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
 import { openLoginomAdmin, readAdminProcessInventory } from "./loginom-admin"
 import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import type { finalizeUnactivatedEnvironment } from "./environment-finalization"
@@ -16,6 +16,8 @@ export async function recoverUnactivatedPreparation(input: { slotsFile: string; 
   await verifyParallelPair(file, identity)
   const completed = await readPreparationCompletion(file, identity, input.incident)
   if (completed) return completed
+  const reconciled = await reconcilePreparationCompletion(file, identity, input.incident, lockRoot)
+  if (reconciled) return reconciled
   const environment = await recoverPreparationLeases(file, identity, input.incident, lockRoot)
   const receipt = `${environment.journal}.result.json`
   try {
@@ -27,9 +29,7 @@ export async function recoverUnactivatedPreparation(input: { slotsFile: string; 
       const finalization = await finalizeUnactivatedEnvironment(file, environment, admin)
       const result: PreparationRecoveryResult = { version: 2, kind: "preparation-recovery", status: "released", ready: false, identity,
         incident: input.incident, journal: environment.journal, receipt, finalization }
-      await writeLeaseReceipt(receipt, result)
-      await writeLeaseReceipt(`${input.incident}.completion.json`, { version: 2, kind: "preparation-recovery-completion", identity,
-        incident: command.incident, result: { path: receipt, sha256: hash(result) }, proofs: await completionProofs(file, finalization) })
+      await writePreparationCompletion(file, result, command.incident)
       return result
     } finally { await admin.dispose() }
   } catch (error) {
@@ -39,6 +39,65 @@ export async function recoverUnactivatedPreparation(input: { slotsFile: string; 
       incident: input.incident, journal: environment.journal, receipt, reason, finalization: { status: "unconfirmed" } })
     throw new EnvironmentFailure(reason, receipt)
   } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
+}
+
+async function reconcilePreparationCompletion(file: SlotFile, identity: ServerIdentity, incident: string, lockRoot: string) {
+  const key = `server:${identity.containerId}`
+  return withResourceReservationGuards([key], lockRoot, async rows => {
+    const current = rows[0]!.reservation
+    if (!current || current.state !== "released") return
+    const original = await readLeaseReceipt(incident), command = await readLeaseReceipt(current.journal)
+    if (!object(original) || original.version !== 2 || original.kind !== "unactivated-preparation" || Object.keys(original).length !== 7 ||
+      !Array.isArray(original.slotIds) || !original.slotIds.length || JSON.stringify(original.identity) !== JSON.stringify(identity) ||
+      !["unactivated", "finalizing"].includes(String(original.phase)) ||
+      !object(command) || command.phase !== "finalizing" || command.commandId !== current.commandId ||
+      JSON.stringify(command.identity) !== JSON.stringify(identity) || JSON.stringify(current.identity) !== JSON.stringify(identity))
+      throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    const reference = { path: incident, sha256: hash(original) }, recovery = command.kind === "unactivated-recovery"
+    if (recovery ? JSON.stringify(command.incident) !== JSON.stringify(reference) : current.journal !== incident || command.kind !== "unactivated-preparation") return
+    if (Object.keys(command).length !== (recovery ? 9 : 7) || typeof command.processInventory !== "string" ||
+      recovery && (!Array.isArray(command.slotIncidents) || command.slotIncidents.length !== original.slotIds.length) ||
+      recovery && !current.lineage.some(entry => entry.journal === incident && entry.commandId === original.commandId && JSON.stringify(entry.identity) === JSON.stringify(identity)) ||
+      !current.releaseEvidence || current.releaseEvidence.path !== `${current.journal}.server-finalization.json`)
+      throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    const server = await readLeaseReceipt(current.releaseEvidence.path)
+    const selected = parseSlots(file, original.slotIds.length).slots.slice(0, original.slotIds.length)
+    if (!object(server) || hash(server) !== current.releaseEvidence.sha256 || server.kind !== "unactivated-server-finalization" || server.status !== "confirmed" ||
+      server.key !== key || server.token !== current.token || server.revision !== current.revision || server.serverEpoch !== identity.serverEpoch ||
+      JSON.stringify(original.slotIds) !== JSON.stringify(selected.map(slot => slot.id)) || !Array.isArray(server.slots) || server.slots.length !== selected.length)
+      throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    const processes = await readAdminProcessInventory(file, identity, { file: command.processInventory, journal: current.journal,
+      commandId: current.commandId, producerPid: current.owner.pid })
+    if (JSON.stringify(processes.source) !== JSON.stringify(server.processInventory)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    const slots = []
+    for (const [index, slot] of selected.entries()) {
+      const source = server.slots[index]
+      if (!object(source) || source.slotId !== slot.id || !object(source.cleanup) || typeof source.cleanup.path !== "string" ||
+        !source.cleanup.path.endsWith(".cleanup.json") || path.dirname(source.cleanup.path) !== file.controller.stateDir || typeof source.cleanup.sha256 !== "string")
+        throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      const slotIncident = recovery ? (command.slotIncidents as unknown[])[index] : source.cleanup.path.slice(0, -".cleanup.json".length)
+      if (typeof slotIncident !== "string") throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      const manifest = await readLeaseReceipt(slotIncident)
+      if (!object(manifest) || manifest.journal !== incident || manifest.commandId !== original.commandId)
+        throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      const finalized = await finalizeReleasedSlot(file, slot, identity, slotIncident, lockRoot)
+      if (finalized.cleanupReceipt !== source.cleanup.path || hash(await readLeaseReceipt(finalized.cleanupReceipt)) !== source.cleanup.sha256)
+        throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      slots.push({ slotId: slot.id, cleanup: { path: source.cleanup.path, sha256: source.cleanup.sha256 } })
+    }
+    const result: PreparationRecoveryResult = { version: 2, kind: "preparation-recovery", status: "released", ready: false, identity,
+      incident, journal: current.journal, receipt: `${current.journal}.result.json`,
+      finalization: { status: "released", slots, server: current.releaseEvidence } }
+    await writePreparationCompletion(file, result, reference)
+    return { ...result, status: "already_released" as const }
+  })
+}
+
+async function writePreparationCompletion(file: SlotFile, result: PreparationRecoveryResult, incident: unknown) {
+  const proofs = await completionProofs(file, result.finalization)
+  await writeLeaseReceipt(result.receipt, result)
+  await writeLeaseReceipt(`${result.incident}.completion.json`, { version: 2, kind: "preparation-recovery-completion", identity: result.identity,
+    incident, result: { path: result.receipt, sha256: hash(result) }, proofs })
 }
 
 async function readPreparationCompletion(file: SlotFile, identity: ServerIdentity, incident: string) {
@@ -87,14 +146,14 @@ async function completionProofs(file: SlotFile, finalization: unknown) {
     if (cleanup.kind !== "unactivated-environment-finalization" || cleanup.status !== "confirmed" || cleanup.slotId !== slot.slotId ||
       cleanup.processes !== "confirmed" || cleanup.serverSessions !== "confirmed" || cleanup.archive !== "committed" ||
       cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true || !object(cleanup.profileArchive) ||
-      !Array.isArray(cleanup.recoveryProcessInventories)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      cleanup.recoveryProcessInventories !== undefined && !Array.isArray(cleanup.recoveryProcessInventories)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
     await read(cleanup.command)
     await read({ path: cleanup.profileArchive.journal, sha256: cleanup.profileArchive.sha256 })
     const observation = await read(cleanup.observation)
     await read(observation.command)
     if (object(observation.ownership)) await read({ path: observation.ownership.path, sha256: observation.ownership.sha256 })
     const inventories = [cleanup.processInventory]
-    for (const prior of cleanup.recoveryProcessInventories) {
+    for (const prior of (cleanup.recoveryProcessInventories ?? []) as unknown[]) {
       if (!object(prior) || !Array.isArray(prior.connections)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
       await read(prior.command)
       for (const connection of prior.connections) await read(connection)
