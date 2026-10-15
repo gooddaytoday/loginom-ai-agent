@@ -67,6 +67,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   await mkdir(path.join(directory, "profile"), { mode: 0o700 })
   const driver = path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")
   const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "starting", initialization: "not_started", dispose: "not_started",
+    transportDisconnect: null as "confirmed" | "unknown" | null,
     initializationCode: null as string | null, initializationStage: null as string | null, passwordState: null as string | null, disposeCode: null as string | null,
     runtimeManifestHash: runtime.manifestHash, driverHash: new Bun.CryptoHasher("sha256").update(await Bun.file(driver).bytes()).digest("hex"),
     processes: null as ProcessCleanup | null }
@@ -291,7 +292,9 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         const ack = await request("dispose", {}).catch(() => undefined)
         receipt.dispose = ack?.outcome ?? "unknown"
         receipt.disposeCode = ack?.outcome === "confirmed" ? null : ack ? adminReplyCode(ack) : "ADMIN_OPERATION_UNKNOWN"
-        const disposed = ack?.outcome === "confirmed" && jsonObject(ack.data) && ack.data.disposed === true
+        receipt.transportDisconnect = ack?.outcome === "confirmed" && jsonObject(ack.data) && ack.data.transportDisconnect === "confirmed" ? "confirmed" : "unknown"
+        const disposed = ack?.outcome === "confirmed" && jsonObject(ack.data) && ack.data.disposed === true &&
+          (receipt.initialization !== "confirmed" || receipt.transportDisconnect === "confirmed")
         if (!disposed) stop()
         await channel.end().catch(stop)
         const result = await pending.catch(() => undefined)
