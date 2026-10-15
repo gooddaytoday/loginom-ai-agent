@@ -688,3 +688,20 @@ client FileDownloader.js и CopyPasteManager.js; native control подтверд
 `research/evidence/native-user-b4aaf4ce-b2a7-4972-b12f-bbfb1649a29f/storage-probe.json`.
 Это positive own-root capability, `liveQualified=false`; соседние/shared
 операции, imports/exports, concurrent B и production readiness ещё открыты.
+
+Research `session-storage-probe` допускает дополнительный `peer:{name,objectId}`
+только с canonical slot username. Native admin заново перечисляет users, требует
+одного exact Name/UserKind0/objectId, awaited cast IBGDeductorUser и Blocked=false
+до evaluated login. Caller paths/JS не принимаются. Peer probe использует другие
+фиксированные собственные имена, чтобы не сталкиваться с первым positive control.
+Под evaluated identity выполняются read/CreateFile+WriteBuffer/copy-out/copy-in
+к существующему peer `access-probe.lgp`: `/<peer>`,
+`/workdir/UserStorage/<peer>`, `../<peer>`. Rejection/CopyFile=false фиксируются
+пооперационно; последующий успешный OpenFile своего пакета исключает потерянное
+соединение как единственное объяснение. Это observation отказа, не точный
+диагноз серверной ACL-ошибки. Native A→B/B→A control также проверяет неизменность
+SHA обоих peer files и NUL-safe directory entries, отсутствие partial new files;
+foreign peer identity и traversal name отвергаются. Evidence private600:
+`research/evidence/native-user-dfb3a33f-9f9f-402b-9f18-7fbbbfdf9c15/storage-probe.json`.
+Shared directories, imports/exports и concurrent heartbeat ещё не проверены.
+В production parent эти research phases не подключены и не дают ready/release.
