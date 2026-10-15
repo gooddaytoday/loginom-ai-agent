@@ -72,7 +72,7 @@ liveIntegration("native targeted close preserves a different user's active brows
   const result = await nativeUserCapability("peer-close")
   expect(result).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: "eval-b" }, backup: { periodMs: 5000, modified: true } } })
 }, 180_000)
-liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
+liveIntegration("native backup research: observes real autosave and unqualified backup after daemon restart", () => nativeUserCapability("backup"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
@@ -111,6 +111,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       return channel.request({ v: 1, id: crypto.randomUUID(), op, expectedIdentity: pair.identity, deadline: Date.now() + 30_000, payload })
     }
     let complete = false
+    let disposedBeforeRestart: Awaited<ReturnType<typeof request>> | undefined
     try {
       expect((await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
         credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(profile, "loginom/runtime/admin/attempts/context/browser-profile") })).outcome).toBe("confirmed")
@@ -410,6 +411,10 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await writeLeaseReceipt(path.join(evidence, "autosave-evidence.json"), { identity: pair.identity, username: credentials.username,
           sessionGuid: backupData.ownSession.guid, periodMs: backupData.backup.periodMs, bytes: bytes.length,
           sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"), sessionBackupQualified: false })
+        disposedBeforeRestart = await request("dispose", {})
+        expect(disposedBeforeRestart).toMatchObject({ outcome: "confirmed", data: { disposed: true, transportDisconnect: "confirmed" } })
+        await channel.end()
+        expect((await pending).processCleanup.status).toBe("confirmed")
         const stop = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "stop", "--time", "10", pair.identity.containerId], { stdout: "pipe", stderr: "pipe" })
         expect(await stop.exited).toBe(0)
         const backupDir = path.join(evidence, "server-shutdown-backup")
@@ -418,9 +423,41 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         expect(await copy.exited).toBe(0)
         const backups = await readdir(backupDir)
         await writeLeaseReceipt(path.join(evidence, "server-shutdown-backup.json"), { identity: pair.identity, entries: backups })
+        const start = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "start", pair.identity.containerId], { stdout: "pipe", stderr: "pipe" })
+        expect(await start.exited).toBe(0)
+        const restarted = await readServerIdentity(file)
+        expect(restarted.containerId).toBe(pair.identity.containerId)
+        expect(restarted.studioContainerId).toBe(pair.identity.studioContainerId)
+        expect(restarted.startedAt).not.toBe(pair.identity.startedAt)
+        expect(restarted.serverEpoch).not.toBe(pair.identity.serverEpoch)
+        const reconnected = await nativeAdminPeer(runtime, file, restarted, root, evidence)
+        try {
+          expect(await reconnected.request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
+            credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(reconnected.profile, "loginom/runtime/admin/attempts/context/browser-profile") }))
+            .toMatchObject({ outcome: "confirmed" })
+          const inventory = await reconnected.request("inspect", {})
+          await writeLeaseReceipt(path.join(evidence, "server-restarted-inventory.json"), inventory)
+          expect(inventory).toMatchObject({ outcome: "confirmed", data: { identity: restarted } })
+        } finally {
+          expect(await reconnected.dispose()).toMatchObject({ outcome: "confirmed", data: { transportDisconnect: "confirmed" } })
+        }
+        const restartedDir = path.join(evidence, "server-restarted-backup")
+        await mkdir(restartedDir, { mode: 0o700 })
+        const copyRestarted = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "cp", `${restarted.containerId}:${file.server.backupRoot}/.`, restartedDir], { stdout: "pipe", stderr: "pipe" })
+        expect(await copyRestarted.exited).toBe(0)
+        const entries = await readdir(restartedDir)
+        const metadata = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", restarted.containerId,
+          "find", "/workdir", "-maxdepth", "1", "-name", "SessionBackup.cfg", "-printf", "%f\\0%y\\0%s\\0"], { stdout: "pipe", stderr: "pipe" })
+        const metadataOutput = await new Response(metadata.stdout).text()
+        expect(await metadata.exited).toBe(0)
+        await writeLeaseReceipt(path.join(evidence, "server-restarted-backup.json"), { version: 1, previousIdentity: pair.identity,
+          identity: restarted, entries, metadataOutput, oldAdminDisposed: disposedBeforeRestart, sessionBackupQualified: false,
+          pairNonce: pair.nonce, resources: pair.resources, root })
         // This controlled recipe produces autosave; empty SessionBackup is not a disabled-policy proof.
         expect(backupData.backup.after).toHaveLength(0)
         expect(backups).toHaveLength(0)
+        expect(entries).toHaveLength(0)
+        expect(metadataOutput).toBe("")
         complete = true
         return
       }
@@ -552,7 +589,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         location: error instanceof Error ? error.stack?.match(/loginom-admin-integration\.test\.ts:\d+:\d+/)?.[0] ?? null : null })
       throw error
     } finally {
-      const disposed = await request("dispose", {}).catch(() => undefined)
+      const disposed = disposedBeforeRestart ?? await request("dispose", {}).catch(() => undefined)
       if (disposed?.outcome !== "confirmed") abort.abort()
       await channel.end().catch(() => abort.abort())
       const run = await pending
