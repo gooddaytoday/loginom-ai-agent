@@ -728,3 +728,35 @@ test('format window refuses an unbound or foreign dialog before recording',async
   const f=fixture();await assert.rejects(f.channel.observe({condition:'format',ready:()=>true,timeoutMs:60000,...extra}),/bounded readiness/);assert.equal(f.records.length,0);assert.ok(!f.events.includes('mutated'));
  }
 });
+
+test('Table format Apply settlement retains the original deadline and exact owner without another gesture',async()=>{
+ for(const mode of ['slow','expired','foreign','no_apply','other_click','transport']) {
+  const table={view_guid:'11111111-1111-1111-1111-111111111111',port_guid:'22222222-2222-2222-2222-222222222222',table_tid:'MF;TF-1;ViewsForm;BrowseView'};
+  const dialog={table,kind:'format'},modal=table.table_tid+';ModalWindow_BrowseFormat';
+  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const node={...binding.node,verified:true,surface:'views',tid:'MF;TF-1;ViewsForm'};
+  let time=1,applied=false,mutations=0,reads=0;
+  const operation={id:'format-settle',deadline:mode==='expired'?12000:65000,action:{action_key:'node.apply',revision:'1'}};
+  const records=[];
+  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,
+   scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{ref:'ui-modal',tid:modal},{ref:'ui-apply',tid:modal+(mode==='other_click'?';btnCancel':';btnApply'),allowed_actions:['click']}],
+    masks:applied&&time<31000?[{kind:'busy',target_tid:modal}]:[],dialogs:!applied||time<31000?[{identity:{anchor_tid:modal}}]:[],truncated:{dialogs:false,masks:false}}});
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;},
+   targetOrigin:'http://example.test',targetBuild:'7.4.2',record:async r=>{records.push(r);return structuredClone(r);},wrapMutation:(code,receipt)=>({code,receipt}),
+   execute:async code=>{
+    if(typeof code!=='string') {mutations++;if(mode==='transport')throw Error('transport');applied=true;return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state()};}
+    time+=20;reads++;
+    if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:state()};
+    return {verified:true,node_context:node,tables:[{...table,active:true,...(mode==='foreign'&&applied&&time>20000?{port_guid:'foreign'}:{})}]};
+   }});
+  const settle=()=>channel.observe({condition:'Table format dialog closed',tableDialog:dialog,settleTableFormat:true,readOutputs:true,ready:s=>s.ui.dialogs.length===0});
+  if(mode==='no_apply') {await assert.rejects(settle(),/confirmed Apply/);assert.equal(records.length,0);continue;}
+  await channel.observe({condition:'bound format Apply',tableDialog:dialog,ready:()=>true});
+  if(mode==='transport') {await assert.rejects(channel.act({verb:'click',ref:'ui-apply'}),/transport/);await assert.rejects(settle(),/confirmed Apply/);continue;}
+  await channel.act({verb:'click',ref:'ui-apply'});
+  if(mode==='slow') {await settle();assert.ok(time>=31000);assert.ok(reads>160);}
+  else await assert.rejects(settle(),mode==='expired'?/readiness timeout|budget/:mode==='foreign'?/owner changed/:/confirmed Apply/);
+  if(mode!=='expired')await assert.rejects(settle(),/confirmed Apply/);
+  assert.equal(mutations,1);assert.equal(operation.deadline,mode==='expired'?12000:65000);
+ }
+});

@@ -62,6 +62,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let lastPreparedStep = null;
   let evidenceSnapshot = null;
   let snapshotTableDialog = null;
+  let tableFormatCompletion = null;
   let snapshotWizardConfirmation = null;
   if(preparedNodeContext)validatePreparedNodeContext(preparedNodeContext);
   const boundOptions=preparedNodeContext?{prepared_node_context:structuredClone(preparedNodeContext)}:{};
@@ -215,10 +216,18 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, settleTableFormat = false, wizardConfirmation } = {}) {
       checkBudget();
+      if(typeof settleTableFormat!=='boolean')throw Error('Table format settlement must be explicit');
+      if(settleTableFormat) {
+        // Only the fixed Table handler can consume this one confirmed Apply.
+        if(tableDialog?.kind!=='format'||!tableFormatCompletion
+          ||JSON.stringify(tableDialog)!==JSON.stringify(tableFormatCompletion))throw Error('Table format settlement requires its confirmed Apply receipt');
+        tableFormatCompletion=null;
+        timeoutMs=Math.max(1,operation.deadline-now());
+      }
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
-        || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > (readProcesses || tableFormatPage && tableDialog?.kind==='format' ? 60000 : 15000)) {
+        || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || !settleTableFormat && timeoutMs > (readProcesses || tableFormatPage && tableDialog?.kind==='format' ? 60000 : 15000)) {
         throw new Error('A named, bounded readiness condition is required');
       }
       readOutputs ||= !!tablePage || !!tableDialog;
@@ -240,7 +249,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
       let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
-      for (let sample = 0; sample < 80; sample++) {
+      for (let sample = 0; settleTableFormat || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
@@ -456,6 +465,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes'))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
+      const completingTableFormat=snapshotTableDialog?.kind==='format'&&action.verb==='click'
+        &&snapshot.ui.elements.filter(e=>e.ref===action.ref&&e.tid===snapshotTableDialog.table.table_tid+';ModalWindow_BrowseFormat;btnApply').length===1
+        ?structuredClone(snapshotTableDialog):null;
+      tableFormatCompletion=null;
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot]);
       // This write must be durable before the browser receives the mutation.
@@ -496,6 +509,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (result.status !== 'SUCCEEDED' || !operation.cleanupConfirmed) {
         throw new NodeProcedureStepError(result);
       }
+      tableFormatCompletion=completingTableFormat;
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);
     },

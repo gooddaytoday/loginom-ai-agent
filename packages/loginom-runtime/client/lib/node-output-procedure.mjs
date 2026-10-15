@@ -186,7 +186,7 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
   }
   if(!s)s=await read('Table format ready to apply');
   await action(s,'apply bound Table format',s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';ModalWindow_BrowseFormat;btnApply'),'Unique Table format Apply missing').ref}),()=>({fields:targets}));
-  await channel.observe({condition:'Table format dialog closed',tableDialog:dialog,readOutputs:true,ready:s=>s.ui.dialogs.length===0&&s.node_outputs?.tables?.some(t=>t.active&&t.view_guid===table.view_guid)});
+  await channel.observe({condition:'Table format dialog closed',tableDialog:dialog,settleTableFormat:true,readOutputs:true,ready:s=>s.ui.dialogs.length===0&&s.node_outputs?.tables?.some(t=>t.active&&t.view_guid===table.view_guid)});
   const default_datetime_restoration=deferred.length?await restoreEmptyDateTimeFormats(channel,table,deferred,restore):[];
   return {table,fields,numeric_formats:numeric,datetime_formats:datetime,original_formats:originals,restored:restore!==null,default_datetime_restoration,
     dialog_readback_verified:fields.length!==1||targets.length===0,format_application_pending:fields.length===1&&targets.length===1,values_verified:false};
