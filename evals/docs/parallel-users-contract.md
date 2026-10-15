@@ -705,3 +705,18 @@ foreign peer identity и traversal name отвергаются. Evidence private
 `research/evidence/native-user-dfb3a33f-9f9f-402b-9f18-7fbbbfdf9c15/storage-probe.json`.
 Shared directories, imports/exports и concurrent heartbeat ещё не проверены.
 В production parent эти research phases не подключены и не дают ready/release.
+
+Тот же native research probe проверяет shared directories из exact read-back
+policy: только canonical basename names, остальные topology требуют отдельной
+квалификации (ADMIN_CAPABILITY_UNSUPPORTED до probe). Для pinned image
+наблюдались common/temp, physical roots `/workdir/UserStorage/common` и `/workdir/UserStorage/temp`.
+Перед отрицательными операциями тест создаёт там копии настоящего собственного
+пакета и проверяет SHA; это data-only filesystem control, не native admin login.
+A и B после удаления Everyone grants отвергают все четыре операции по virtual,
+absolute и `../` paths; shared/peer file hashes и NUL-safe entries остаются
+неизменными. Всего72 отрицательные операции с native own-root positives до/после.
+Copy-out destinations остаются валидными собственными basenames. Конкретный
+код серверной ACL ошибки не утверждается; import/export, unusual names и
+одновременный heartbeat B всё ещё требуют отдельных positive/negative controls.
+
+Latest shared+neighbor control: private600 `research/evidence/native-user-d0a06c5b-7a61-4119-a120-5363660337a3/storage-probe.json`, SHA256 `10dc8b38624e6cdb53913d67076c6e000bf2ac36262b0390bc81d4a2d9e9f3c6`. Shared sentinels independently match the native positive package SHA. Unsupported traversal shared policy names refuse before probe. Native1 PASS/108 (40.91s);60 admin/user/slots PASS/260 and typecheck/diff PASS. Three superseded own artifacts removed only after process proofs and exact pair absence; audit retained beside this receipt.
