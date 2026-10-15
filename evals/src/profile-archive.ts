@@ -120,7 +120,9 @@ function requireManifest(value: unknown, profile: string, archive: string, bindi
 async function capture(file: string): Promise<Snapshot> {
   const info = await lstat(file, { bigint: true })
   const kind = info.isSymbolicLink() ? "link" : info.isDirectory() ? "directory" : info.isFile() ? "file" : undefined
-  if (!kind || info.uid !== BigInt(process.getuid!()) || kind === "file" && info.nlink !== 1n) throw new EvalFailure("ARCHIVE_TOPOLOGY", 2)
+  if (!kind || info.uid !== BigInt(process.getuid!()) || kind === "file" && info.nlink !== 1n)
+    throw Object.assign(new EvalFailure("ARCHIVE_TOPOLOGY", 2), { cause: { path: file, kind: kind ?? "other", type: Number(info.mode & 0o170000n),
+      device: String(info.dev), inode: String(info.ino), uid: Number(info.uid), gid: Number(info.gid), mode: Number(info.mode), nlink: String(info.nlink) } })
   const hash = new Bun.CryptoHasher("sha256")
   if (kind === "link") hash.update(await readlink(file))
   if (kind === "directory") hash.update(JSON.stringify(await Promise.all((await readdir(file)).sort().map(async name => ({ name, snapshot: await capture(path.join(file, name)) })))))
