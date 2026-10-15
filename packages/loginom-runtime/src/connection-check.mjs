@@ -82,7 +82,9 @@ export async function loginPage(page, candidate, owner) {
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
   let widgetFailed=false,widgetPrimary
   try {
-    const ready=avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+    // Filter each alternative before taking the first: a hidden earlier avatar
+    // must not hide a visible login field (or the reverse) from the wait.
+    const ready=page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]:visible, [data-tid="LoginForm;Login;edtUsername"]:visible').first().waitFor({ state: "visible", timeout: 60_000 })
     await (owner?.staticLoader?Promise.race([ready,owner.staticLoader.failure]):ready)
   }catch(error){widgetFailed=true;widgetPrimary=error}
   try {await owner?.staticLoader?.stop()}

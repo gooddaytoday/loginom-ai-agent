@@ -98,7 +98,7 @@ for (const [initial, password, expected] of [
 for(const scenario of ['ready-after-avatar','foreign-account','foreign-document','changed-page','expired'])test('managed login native initialization '+scenario,async()=>{
  const {default:vm}=await import('node:vm');let clicks=0,waits=0;
  const native=vm.createContext({document:{},location:{origin:'https://fixture.invalid'},bg:{app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'User',Connected:true}}}}}}}});
- const owner={id:'original',account:'User',origin:'https://fixture.invalid',deadline:Date.now()+(scenario==='expired'?-1:6000)};
+ const owner={evidence:{},id:'original',account:'User',origin:'https://fixture.invalid',deadline:Date.now()+(scenario==='expired'?-1:6000)};
  const locator={or(){return this},first(){return this},async waitFor(){},async isVisible(){return true},async click(){clicks++}};
  const page={async goto(){},locator(){return locator},async evaluate(fn,arg){return vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',native)},
   async waitForFunction(fn,arg,opts){waits++;assert.ok(opts.timeout>0&&opts.timeout<=6000);
@@ -117,7 +117,7 @@ for(const scenario of ['ready-after-avatar','foreign-account','foreign-document'
 for(const scenario of ['missing-map','missing-connection','missing-account','missing-connected','never-ready','late-foreign','disconnected'])test('readiness incomplete native initialization '+scenario,async()=>{
  const {default:vm}=await import('node:vm');let polls=0;
  const native=vm.createContext({document:{},location:{origin:'https://fixture.invalid'},bg:{app:{Application:{FInstance:{FMainForm:{}}}}}});
- const owner={id:'original',account:'User',origin:'https://fixture.invalid',deadline:Date.now()+6000};
+ const owner={evidence:{},id:'original',account:'User',origin:'https://fixture.invalid',deadline:Date.now()+6000};
  const locator={or(){return this},first(){return this},async waitFor(){},async isVisible(){return true}};
  const execute=(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',native);
  if(scenario!=='missing-map'&&scenario!=='never-ready')vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree={}',native);
