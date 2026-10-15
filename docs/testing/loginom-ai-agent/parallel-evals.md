@@ -1102,3 +1102,22 @@ Two duplicate unexecuted audit drafts were removed after copying verified recipe
 Whole-run sealing remains required by the current collector. Per-attempt producer
 boundaries, normal slot/attempt finalizer and recovery remain the next work;
 production admission, backup/licence/resources/OAuth/real judge/live gates are open.
+
+
+Paused-prefix qualification (2026-10-16): the native fixture uses a durable pause
+and immutable snapshot for combined accounting/targeted close, then performs
+final resource sealing. `pauseAgentProcessInventory` blocks another CLI, preserves
+its snapshot through sealing and retains the pause if publication fails; retry
+reconciles the same source. A corrupt source blocks read/seal. Full resource
+accounting still refuses an unsealed inventory.
+
+Native resource-only reader RED9 assertions98.59s → browser+text2/56
+PASS243.49s. Related50/263 PASS51.57s, typecheck/syntax/diff PASS; primitive5/52
+PASS7.81s. Private149f6bd8… audit3abbca9b…1650/108/16 causal frames andae3518db…
+audit9a8f9abb…91/62/6 preserve original paused sources after final sealing and
+both15 pins. Own pairs/networks/controller roots are gone, private histories remain.
+
+This does not resume a slot. The next implementation must compose normal
+slot/attempt finalization, backend/storage/backup proofs and a validated unpause;
+sessions_closed alone grants no next admission or release. Active recovery and
+production/live gates remain open.
