@@ -9,6 +9,8 @@ import { readAgentArchive, readAgentSession, recordAgentSessions } from "../src/
 import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { openLoginomAdmin } from "../src/loginom-admin"
+import { collectManagementSessions, collectSlotSessions } from "../src/management-sessions"
+import { sealManagementProcessInventory } from "../src/management-process-evidence"
 import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { archiveProfileEvidence } from "../src/profile-archive"
 import { ensureProfile, releaseStaleWriter } from "../src/profile"
@@ -38,7 +40,7 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
     await mkdir(evidence, { mode: 0o700 })
     console.error(`native agent replay evidence: ${evidence}`)
     const sources = await Promise.all(["native-agent-run-integration.test.ts", "helpers/loginom-replay-provider.ts", "../src/cli.ts",
-      "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
+      "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/management-sessions.ts", "../src/management-process-evidence.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
       "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", process.env.EVAL_CLI_BIN!].map(async file => {
       const source = path.resolve(import.meta.dir, file)
       return { path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }
@@ -65,16 +67,21 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
         await prepareUserStorage(file, lease, prepared.secretFile, environment.server)
         await admin.activateOwnedUser(lease, prepared.secretFile)
         await writeLeaseReceipt(journal, { ...await readLeaseReceipt(journal) as Record<string, unknown>, phase: "cli_admitted" })
+        const management = path.join(file.controller.stateDir, "management.json")
+        await writeLeaseReceipt(management, { version: 2, kind: "management-processes", commandId, journal, identity: pair.identity,
+          leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
         const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!,
           EVAL_PROFILE_DIR: lease.slot.profileDir, EVAL_WORKSPACE_ROOT: lease.slot.workspaceRoot, EVAL_AGENT_MODEL: "native-replay/replay",
           EVAL_AGENT_PROVIDER_ID: "native-replay", EVAL_AGENT_PROVIDER_MODEL_ID: "replay", EVAL_AGENT_PROVIDER_API_KEY: "native-fixture-only",
           EVAL_AGENT_PROVIDER_BASE_URL: provider.server.url.href, LOGINOM_URL: url, LOGINOM_USERNAME: credentials.username,
           LOGINOM_PASSWORD: credentials.password, LOGINOM_DOCK_API_KEY: process.env.LOGINOM_DOCK_API_KEY! })
         const command = { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, "management"),
-          cleanupSecrets: [credentials.password, config.dock.apiKey, config.agent.provider!.apiKey] }
+          cleanupSecrets: [credentials.password, config.dock.apiKey, config.agent.provider!.apiKey],
+          managementEvidence: { file: management, lease, admin } }
         settlement.cli = false
         await ensureProfile(config, command)
         settlement.cli = true
+        await sealManagementProcessInventory(file, environment.server, lease, management)
         const settings = path.join(lease.slot.profileDir, "config/loginom-ai-agent.json")
         await Bun.write(settings, JSON.stringify({ ...await Bun.file(settings).json(), permission: { "loginom_*": "allow", skill: "allow" }, model: config.agent.model,
           small_model: config.agent.model, enabled_providers: ["native-replay"] }))
@@ -82,6 +89,8 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
         await archiveProfileEvidence(lease.slot.profileDir, path.join(lease.slot.historyDir, "initial"), path.join(file.controller.stateDir, "initial.archive.json"))
         const agents = path.join(file.controller.stateDir, "agents.json")
         await writeLeaseReceipt(agents, { version: 2, kind: "eval-agent-processes", commandId, slotId: "a", producerPid: process.pid, state: "open", processes: [] })
+        await writeLeaseReceipt(journal, { ...await Bun.file(journal).json(), agentInventories: [
+          { file: agents, slotId: lease.slot.id, leaseToken: lease.token, profileDir: lease.slot.profileDir }] })
         const agentEvidence = { file: agents, commandId, slotId: "a", assertHeld: lease.assertHeld }
         const before = await admin.inspectSessionInventory()
         const during: Awaited<ReturnType<typeof admin.inspectSessionInventory>>[] = []
@@ -127,6 +136,15 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
         expect(sessions[0]).toMatchObject({ kind: "owned-agent-session", actor: { kind: "agent", runId: commandId, attemptId: entry.entrySource.id },
           binding: { username: credentials.username, serverEpoch: pair.identity.serverEpoch } })
         expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(sessions[0]!)
+        const inputs = { management, agents: { file: agents, observations: [references] } }
+        await expect(collectSlotSessions(file, lease, prepared.secretFile, inputs, after!.source)).rejects.toThrow("AGENT_PROCESS_INVENTORY_UNSEALED")
+        const sealed = await sealAgentProcessInventory(agentEvidence)
+        const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, after!.source)
+        expect(accounted.management).toHaveLength(1)
+        expect(accounted.agents).toEqual(sessions)
+        await expect(collectManagementSessions(file, lease, prepared.secretFile, management, after!.source)).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN")
+        await expect(collectSlotSessions(file, lease, prepared.secretFile, { ...inputs, agents: { file: agents, observations: [] } }, after!.source))
+          .rejects.toThrow("AGENT_SESSION_INVENTORY_INCOMPLETE")
         const archiveFile = path.join(file.controller.stateDir, `agent-archive-${entry.entrySource.id}.json`)
         await expect(admin.closeAgentSession(lease, prepared.secretFile, sessions[0]!.id, { path: archiveFile, sha256: "0".repeat(64) }))
           .rejects.toThrow("AGENT_ARCHIVE_UNCONFIRMED")
@@ -152,13 +170,16 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
           closedSnapshot.sessions.some(row => row.objectId === previous.objectId && row.name === previous.name && row.createdAt === previous.createdAt))).toBe(true)
         await admin.closeAgentSession(lease, prepared.secretFile, sessions[0]!.id, archive)
         expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(closed)
+        const completed = await collectSlotSessions(file, lease, prepared.secretFile, inputs, closedSnapshot.source)
+        expect(completed.agents).toEqual([closed])
+        expect(completed.management).toEqual(accounted.management)
+        await writeLeaseReceipt(path.join(evidence, "slot-sessions.json"), { inputs, before: accounted, after: completed })
         await writeLeaseReceipt(path.join(evidence, "agent-close.json"), { archived, archive, closed, after: closedSnapshot })
         await expect(recordAgentSessions(file, lease, prepared.secretFile, { ...references, process: { ...references.process, sha256: "0".repeat(64) } }))
           .rejects.toThrow("AGENT_SESSION_PROCESS_CHANGED")
         await expect(recordAgentSessions(file, lease, prepared.secretFile, { ...references, after: before.source }))
           .rejects.toThrow("AGENT_SESSION_WINDOW_INVALID")
         await writeLeaseReceipt(path.join(evidence, "agent-sessions.json"), { sessions, references })
-        const sealed = await sealAgentProcessInventory(agentEvidence)
         expect((await readAgentProcessInventory({ ...agentEvidence, producerPid: process.pid })).source).toEqual(sealed)
         expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(closed)
         expect(await readServerIdentity(file)).toEqual(pair.identity)

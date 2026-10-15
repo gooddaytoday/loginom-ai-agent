@@ -2,6 +2,7 @@ import path from "node:path"
 import { EvalFailure } from "./fail"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { readManagementProcess, readManagementProcessInventory } from "./management-process-evidence"
+import { readAgentSessionInventory, type AgentSessionSource } from "./agent-sessions"
 import { readUserActivation, readUserOwnership, readUserPreparation } from "./user-environment"
 import type { SlotFile, SlotLease } from "./slots"
 import type { AdminReply } from "./loginom-admin"
@@ -32,6 +33,14 @@ export async function recordManagementSession(file: SlotFile, lease: SlotLease, 
 
 /** Accounts for every same-user row without closing sessions or granting cleanup. */
 export async function collectManagementSessions(file: SlotFile, lease: SlotLease, secretFile: string, inventoryFile: string, observation: { path: string; sha256: string }) {
+  const collected = await collectSlotSessions(file, lease, secretFile, { management: inventoryFile }, observation)
+  return { sessions: collected.management, source: collected.sources.management, observation: collected.observation }
+}
+
+/** Accounts for all normal producers and same-user rows before any slot close. */
+export async function collectSlotSessions(file: SlotFile, lease: SlotLease, secretFile: string,
+  sources: { management: string; agents?: { file: string; observations: AgentSessionSource[] } }, observation: { path: string; sha256: string }) {
+  const inventoryFile = sources.management
   const input = await managementInput(file, lease, inventoryFile)
   const inventory = await readManagementProcessInventory(input)
   const command = object(await readLeaseReceipt(input.journal))
@@ -49,33 +58,44 @@ export async function collectManagementSessions(file: SlotFile, lease: SlotLease
     if (process.result.exitCode !== 0 || process.result.timedOut || process.result.interrupted)
       throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
   }
-  if (new Set(sessions.map(session => session.id)).size !== sessions.length ||
-    new Set(sessions.map(session => JSON.stringify([session.binding.name, session.binding.createdAt]))).size !== sessions.length)
+  if (sources.agents && (!Array.isArray(command.agentInventories) ||
+    command.agentInventories.filter(value => object(value).slotId === lease.slot.id).length !== 1 ||
+    !command.agentInventories.some(value => {
+      const binding = object(value)
+      return Object.keys(binding).length === 4 && binding.file === sources.agents!.file && binding.slotId === lease.slot.id &&
+        binding.leaseToken === lease.token && binding.profileDir === lease.slot.profileDir
+    }))) throw new EvalFailure("AGENT_SESSION_INVENTORY_UNCONFIRMED", 2)
+  const agents = sources.agents ? await readAgentSessionInventory(file, lease, secretFile, sources.agents.file, sources.agents.observations) : undefined
+  const known = [...sessions, ...agents?.sessions ?? []]
+  if (new Set(known.map(session => session.id)).size !== known.length ||
+    new Set(known.map(session => JSON.stringify([session.binding.name.toLowerCase(), session.binding.createdAt]))).size !== known.length)
     throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
   const { readAdminSessionInventory } = await import("./loginom-admin")
   const current = await readAdminSessionInventory(file, lease.identity, observation)
-  if (inventory.processes.some(process => Date.parse(process.finishedAt) > Date.parse(current.observation.startedAt)))
+  if ([...inventory.processes, ...agents?.processes ?? []].some(process => Date.parse(process.finishedAt) > Date.parse(current.observation.startedAt)))
     throw new EvalFailure("MANAGEMENT_SESSION_UNCONFIRMED", 2)
   const username = lease.slot.username.toLowerCase()
   const sameUser = (name: string) => name.toLowerCase() === username || name.toLowerCase().startsWith(username + ":")
   const rows = current.sessions.filter(row => sameUser(row.name))
-  const snapshots = inventory.processes.flatMap(process => process.sessions ? [process.sessions.before, ...process.sessions.during, process.sessions.after] : [])
-  if (new Set(rows.map(row => JSON.stringify([row.name, row.createdAt]))).size !== rows.length ||
+  const snapshots = [...inventory.processes.flatMap(process => process.sessions ? [process.sessions.before, ...process.sessions.during, process.sessions.after] : []),
+    ...agents?.snapshots ?? []]
+  if (new Set(rows.map(row => JSON.stringify([row.name.toLowerCase(), row.createdAt]))).size !== rows.length ||
     // Proxy IDs are local to each admin context, including historical observations after reconnect.
     snapshots.some(snapshot => {
       const observed = snapshot.sessions.filter(row => sameUser(row.name))
-      return new Set(observed.map(row => JSON.stringify([row.name, row.createdAt]))).size !== observed.length ||
-        observed.some(row => !sessions.some(session => session.binding.name === row.name &&
-          session.binding.createdAt === row.createdAt && row.packageCount === 0))
+      return new Set(observed.map(row => JSON.stringify([row.name.toLowerCase(), row.createdAt]))).size !== observed.length ||
+        observed.some(row => !known.some(session => session.binding.name === row.name &&
+          session.binding.createdAt === row.createdAt && (session.actor.kind === "agent" || row.packageCount === 0)))
     }) ||
-    rows.some(row => !sessions.some(session => session.state !== "closed" &&
-      session.binding.name === row.name && session.binding.createdAt === row.createdAt && row.packageCount === 0)))
-    throw new EvalFailure("MANAGEMENT_SESSION_UNKNOWN", 2)
+    rows.some(row => !known.some(session => session.state !== "closed" &&
+      session.binding.name === row.name && session.binding.createdAt === row.createdAt && (session.actor.kind === "agent" || row.packageCount === 0))))
+    throw new EvalFailure(sources.agents ? "SLOT_SESSION_UNKNOWN" : "MANAGEMENT_SESSION_UNKNOWN", 2)
   await lease.assertHeld()
   if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256 || hash(await readLeaseReceipt(input.journal)) !== hash(command) ||
-    inventory.seal && hash(await readLeaseReceipt(inventory.seal.path)) !== inventory.seal.sha256)
+    inventory.seal && hash(await readLeaseReceipt(inventory.seal.path)) !== inventory.seal.sha256 ||
+    agents && hash(await readLeaseReceipt(agents.source.path)) !== agents.source.sha256)
     throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
-  return { sessions, source: inventory.source, observation: current.source }
+  return { management: sessions, agents: agents?.sessions ?? [], sources: { management: inventory.source, agents: agents?.source ?? null }, observation: current.source }
 }
 
 export async function readManagementSession(file: SlotFile, lease: SlotLease, secretFile: string, id: string) {

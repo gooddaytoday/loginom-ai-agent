@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { acquireEnvironmentLeases } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { collectManagementSessions } from "../src/management-sessions"
+import { collectManagementSessions, collectSlotSessions } from "../src/management-sessions"
 import { sealManagementProcessInventory } from "../src/management-process-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
@@ -44,9 +44,21 @@ test.each([["finalizing", "EVAL-A:9"], ["finalizing", "eval-a"], ["finalizing", 
     await expect(collectManagementSessions(fixture.slots, lease, path.join(root, "unused-secret"), inventoryFile,
       { path: target, sha256: hash(snapshot) })).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN")
     const peer = { ...snapshot, sessions: [{ ...snapshot.sessions[0]!, name: "eval-b:9" }] }
+    const agents = path.join(fixture.slots.controller.stateDir, "agents.json")
+    await writeLeaseReceipt(agents, { version: 2, kind: "eval-agent-processes", commandId: command.commandId, slotId: lease.slot.id,
+      producerPid: process.pid, state: "sealed", processes: [] })
+    const inputs = { management: inventoryFile, agents: { file: agents, observations: [] } }
+    await expect(collectSlotSessions(fixture.slots, lease, path.join(root, "unused-secret"), inputs,
+      { path: target, sha256: hash(snapshot) })).rejects.toThrow("AGENT_SESSION_INVENTORY_UNCONFIRMED")
+    await writeLeaseReceipt(journal, { ...await Bun.file(journal).json(), agentInventories: [
+      { file: agents, slotId: lease.slot.id, leaseToken: lease.token, profileDir: lease.slot.profileDir }] })
+    await expect(collectSlotSessions(fixture.slots, lease, path.join(root, "unused-secret"), inputs,
+      { path: target, sha256: hash(snapshot) })).rejects.toThrow("SLOT_SESSION_UNKNOWN")
     await writeLeaseReceipt(target, peer)
     expect((await collectManagementSessions(fixture.slots, lease, path.join(root, "unused-secret"), inventoryFile,
       { path: target, sha256: hash(peer) })).sessions).toEqual([])
+    expect(await collectSlotSessions(fixture.slots, lease, path.join(root, "unused-secret"), inputs,
+      { path: target, sha256: hash(peer) })).toMatchObject({ management: [], agents: [] })
   } finally {
     await Promise.all([environment.server.close(), lease.close()])
     await rm(root, { recursive: true, force: true })

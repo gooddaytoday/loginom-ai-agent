@@ -1,6 +1,6 @@
 import path from "node:path"
 import { EvalFailure } from "./fail"
-import { readAgentProcess } from "./agent-process-evidence"
+import { readAgentProcess, readAgentProcessInventory } from "./agent-process-evidence"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { archiveProfileEvidence } from "./profile-archive"
 import { readUserActivation, readUserOwnership, readUserPreparation } from "./user-environment"
@@ -25,6 +25,25 @@ export async function recordAgentSessions(file: SlotFile, lease: SlotLease, secr
     if (existing === undefined) await writeLeaseReceipt(target, session)
   }
   return Promise.all(sessions.map(session => readAgentSession(file, lease, secretFile, session.id)))
+}
+
+/** Requires an observation window for every invocation in the sealed slot inventory. */
+export async function readAgentSessionInventory(file: SlotFile, lease: SlotLease, secretFile: string, inventoryFile: string, observations: AgentSessionSource[]) {
+  await lease.assertHeld()
+  if (lease.recoveryOnly || path.dirname(inventoryFile) !== file.controller.stateDir) throw new EvalFailure("AGENT_SESSION_INVENTORY_UNCONFIRMED", 2)
+  const origin = object(await readLeaseReceipt(lease.receipt))
+  if (typeof origin.commandId !== "string") throw new EvalFailure("AGENT_SESSION_INVENTORY_UNCONFIRMED", 2)
+  const inventory = await readAgentProcessInventory({ file: inventoryFile, commandId: origin.commandId, slotId: lease.slot.id, producerPid: process.pid })
+  if (!Array.isArray(observations) || observations.length !== inventory.processes.length ||
+    new Set(observations.map(source => source.process.id)).size !== observations.length ||
+    observations.some(source => source.process.path !== inventoryFile)) throw new EvalFailure("AGENT_SESSION_INVENTORY_INCOMPLETE", 2)
+  const sessions = (await Promise.all(observations.map(source => recordAgentSessions(file, lease, secretFile, source)))).flat()
+  const { readAdminSessionInventory } = await import("./loginom-admin")
+  const snapshots = await Promise.all(observations.flatMap(source => [source.before, ...source.during, source.after])
+    .map(source => readAdminSessionInventory(file, lease.identity, source)))
+  await lease.assertHeld()
+  if (hash(await readLeaseReceipt(inventoryFile)) !== inventory.source.sha256) throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+  return { sessions, snapshots, processes: inventory.processes, source: inventory.source }
 }
 
 export async function readAgentSession(file: SlotFile, lease: SlotLease, secretFile: string, id: string) {
