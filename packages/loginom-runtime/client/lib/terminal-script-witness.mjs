@@ -369,7 +369,14 @@ export function collectTerminalScriptWitness(expected){
    });
    r.dispatchPatch=patch(transport,'DispatchMessageAsync',original=>function(request){
     if(!invoking)return apply(original,this,arguments);
-    guard();if(this!==transport||r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_REPLAY');r.request=request;
+    guard();if(this!==transport||r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_REPLAY');if(readMethod){
+      const call=r.storageCall;
+      if(!call||call.receiver!==storage||call.receiver!==armed.initial.storage||call.method!==storageReaders[readMethod]
+        ||call.initial!==armed.initial||call.packet!==creationState.packet)throw Error('TERMINAL_PROVIDER_STORAGE_RECEIVER');
+      r.storageDispatch=Object.freeze({call,request,receiver:call.receiver,method:call.method,initial:call.initial,packet:call.packet,
+       scope:'FileStorage.'+readMethod+':dispatch',nativeReceiversQualified:true,closureIdentityQualified:false});
+     }
+     r.request=request;
     patch(request,'Release',release=>function(){guard();const value=apply(release,this,arguments);guard();return value});
     const task=apply(original,this,arguments);r.dispatchTask=task;
     const begin=providerChecks.length;r.originalReader=hold(task,'getAwaitedResult');const readerChecks=providerChecks.slice(begin);
@@ -406,7 +413,19 @@ export function collectTerminalScriptWitness(expected){
      }]);
     });return task;
    });
-   guard();invoking=true;try{r.task=readMethod?apply(storageReaders[readMethod],storage,[]):apply(originalQuery,proxy,[type])}finally{invoking=false}
+   guard();invoking=true;try{
+    if(readMethod){
+     // Capture the actual receiver of this fixed invocation boundary before
+     // entering the retained original method. No identity/DTO reconstruction.
+     const invoke=function(){
+      if(this!==storage||this!==armed.initial.storage||proxy!==this||armed.initial.storageReaders!==storageReaders)throw Error('TERMINAL_PROVIDER_STORAGE_RECEIVER');
+      r.storageCall=Object.freeze({receiver:this,method:storageReaders[readMethod],initial:armed.initial,packet:creationState.packet,
+       scope:'FileStorage.'+readMethod+':call',nativeReceiversQualified:false,closureIdentityQualified:false});
+      return apply(r.storageCall.method,this,arguments);
+     };
+     r.task=apply(invoke,proxy,[]);
+    }else r.task=apply(originalQuery,proxy,[type]);
+   }finally{invoking=false}
    if(!r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_DISPATCH_UNAVAILABLE');
    if(!r.completion||r.sourceTask!==r.task)throw Error('TERMINAL_PROVIDER_COMPLETION_TASK');
    return r;
@@ -423,6 +442,7 @@ export function collectTerminalScriptWitness(expected){
  provider=Object.freeze({
   inspect(){if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();return Object.freeze({preparation,receipts,document:doc,documentId:preparationId,
    currentUser:own(sample,'user'),acquisition,transport,connection,storage,query:originalQuery,streamType,armed:!!armed,
+   storageDispatches:Object.freeze(storageStates.map(state=>state.lower?.storageDispatch).filter(Boolean)),
    nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false})},
   continueCreation(mode){
    if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();
