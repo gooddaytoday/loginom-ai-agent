@@ -14,7 +14,7 @@ test.skipIf(!available)("series pins reject environment, config, CLI, judge, cor
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-pins-"))
   const container = (await Bun.$`docker run --rm -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()
   try {
-    for (const name of ["checkout/evals", "cli/bin", "bin", "profile", "workspace", "results", "judge"])
+    for (const name of ["checkout/evals", "cli/bin", "cli/resources/loginom", "bin", "profile", "workspace", "results", "judge"])
       await mkdir(path.join(root, name), { recursive: true, mode: 0o700 })
     const checkout = path.join(root, "checkout")
     await cp(path.join(evalsRoot, "tasks"), path.join(checkout, "evals/tasks"), { recursive: true })
@@ -22,12 +22,16 @@ test.skipIf(!available)("series pins reject environment, config, CLI, judge, cor
     await Bun.$`git add .`.cwd(checkout).quiet()
     await Bun.$`git -c user.name=Fixture -c user.email=fixture@example.invalid commit -m fixture`.cwd(checkout).quiet()
     const cli = path.join(root, "cli/bin/cli"), judge = path.join(root, "bin/codex")
-    const product = `#!/bin/sh\ntouch ${JSON.stringify(path.join(root, "PRODUCT_EXECUTED"))}\n`
+    const product = `#!/bin/sh\nif [ "$1" = models ]; then printf 'openai/gpt-6.1-sol\\n'; exit 0; fi\ntouch ${JSON.stringify(path.join(root, "PRODUCT_EXECUTED"))}\n`
     const judgeSource = "#!/bin/sh\nprintf 'codex-cli 0.159.3\\n'\n"
     await writeFile(cli, product, { mode: 0o755 }); await writeFile(judge, judgeSource, { mode: 0o755 })
+    await cp("/usr/bin/true", path.join(root, "cli/resources/loginom/chrome"))
+    await writeFile(path.join(root, "cli/resources/loginom/resource-manifest.json"), '{"browser":"chrome"}', { mode: 0o600 })
     await chmod(cli, 0o755); await chmod(judge, 0o755)
     const installed = { format: "loginom-cli-artifact-v1", metadata: { version: "0.2.0", sourceCommit: "a".repeat(40), sourceDirty: false },
-      files: [{ path: "bin/cli", sha256: evalrunnerHash(product), mode: 0o755 }] }
+      files: [{ path: "bin/cli", sha256: evalrunnerHash(product), mode: 0o755 },
+        { path: "resources/loginom/chrome", sha256: evalrunnerHash(await readFile("/usr/bin/true")), mode: 0o755 },
+        { path: "resources/loginom/resource-manifest.json", sha256: evalrunnerHash('{"browser":"chrome"}'), mode: 0o600 }] }
     const installedFile = path.join(root, "cli/cli-manifest.json")
     await writeFile(installedFile, JSON.stringify(installed), { mode: 0o600 })
     const config: EvalrunnerConfig = { kind: "evalrunner-runtime", version: 2, root, checkout,
@@ -38,13 +42,20 @@ test.skipIf(!available)("series pins reject environment, config, CLI, judge, cor
       judgeBin: judge, judgeVersion: "codex-cli 0.159.3", judgeSha256: evalrunnerHash(judgeSource), bunSha256: evalrunnerHash(await readFile(process.execPath)),
       qualificationFile: path.join(root, "qualification.json"), qualificationSha256: "0".repeat(64) }
     const env = { EVAL_CLI_BIN: cli, EVAL_PROFILE_DIR: config.profile, EVAL_WORKSPACE_ROOT: config.workspace, LOGINOM_URL: config.endpoint,
-      CODEX_HOME: config.judgeHome, EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "gpt-6-sol", JUDGE_REASONING: "xhigh", EVAL_JUDGE_COMMAND: judge }
+      CODEX_HOME: config.judgeHome, EVAL_CLI_MODE: "binary", LOGINOM_DOCK_API_KEY: "fixture", EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "gpt-6-sol", JUDGE_REASONING: "xhigh", EVAL_JUDGE_COMMAND: judge }
+    await writeFile(config.envFile, JSON.stringify(env), { mode: 0o600 })
+    const catalog = JSON.stringify({ openai: { models: { "gpt-6.1-sol": { id: "gpt-6.1-sol", reasoning_options: [{ type: "effort", values: ["medium"] }] } } } })
+    config.catalog = { path: path.join(root, "catalog.json"), sha256: evalrunnerHash(catalog) }
+    await writeFile(config.catalog.path, catalog, { mode: 0o600 })
+    await writeFile(path.join(config.profile, "cli-profile.json"), "{}", { mode: 0o600 })
+    Object.assign(env, { LOGINOM_AI_AGENT_MODELS_PATH: config.catalog.path, LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1" })
     await writeFile(config.envFile, JSON.stringify(env), { mode: 0o600 })
     const initial = await qualifyEvalrunner(config), corpus = await loadEvalrunnerCorpus(path.join(checkout, "evals"))
     const qualification = { kind: "evalrunner-nonmodel-qualification", status: "QUALIFIED", harnessSha: initial.harnessSha, binarySha256: initial.binarySha256,
       manifestSha256: initial.manifestSha256, envSha256: initial.envSha256, corpusSha256: corpus.sha256, containerId: container, imageDigest: config.imageDigest,
       judgeSha256: config.judgeSha256, bunSha256: config.bunSha256, tests: { exitCode: 0, fail: 0 }, typecheck: { exitCode: 0 },
-      native: { cleanup: "confirmed" }, sandbox: "confirmed", exportDownloadRegression: "confirmed", historicalRecovery: { status: "RECOVERED" } }
+      native: { cleanup: "confirmed" }, sandbox: "confirmed", exportDownloadRegression: "confirmed", historicalRecovery: { status: "RECOVERED" },
+      catalog: initial.catalog, catalogRecognition: { recognition: "confirmed", sha256: config.catalog.sha256, cleanup: "confirmed" } }
     await writeFile(config.qualificationFile!, JSON.stringify(qualification), { mode: 0o600 })
     config.qualificationSha256 = evalrunnerHash(await readFile(config.qualificationFile!))
     const proof = await qualifyEvalrunner(config)

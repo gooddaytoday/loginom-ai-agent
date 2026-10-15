@@ -11,6 +11,7 @@ export type EvalrunnerConfig = {
   cliVersion?: string; cliSourceSha?: string
   judgeBin?: string; judgeVersion?: string; judgeSha256?: string; bunSha256?: string
   qualificationFile?: string; qualificationSha256?: string
+  catalog?: { path: string; sha256: string }
 }
 
 export function checkEvalrunnerOutcome(summary: RunSummary, node = false) {
@@ -41,6 +42,13 @@ export async function qualifyEvalrunner(config: EvalrunnerConfig) {
   if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.mode & 0o077)
     throw new EvalFailure("Private environment required", 2)
   const env = await Bun.file(config.envFile).json() as Record<string, string>
+  const catalog = config.catalog ? await (async () => {
+    const { verifyEvalrunnerCatalog } = await import("./evalrunner-catalog")
+    if (!config.catalog!.path.startsWith(config.root + path.sep) || [config.checkout, config.profile, config.workspace, config.results, config.judgeHome]
+      .some(root => config.catalog!.path.startsWith(root + path.sep)) || env.LOGINOM_AI_AGENT_MODELS_PATH !== config.catalog!.path ||
+      env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH !== "1") throw new EvalFailure("Catalog environment/boundary pins changed", 2)
+    return verifyEvalrunnerCatalog(config.catalog!)
+  })() : undefined
   if (Object.entries(env).some(([name, value]) => typeof value !== "string" || /TOKEN|SSH|SUDO|MULTICA/.test(name)) ||
     env.EVAL_CLI_BIN !== config.cliBin || env.EVAL_PROFILE_DIR !== config.profile || env.EVAL_WORKSPACE_ROOT !== config.workspace ||
     env.LOGINOM_URL !== config.endpoint || env.CODEX_HOME !== config.judgeHome || env.EVAL_AGENT_MODEL !== "openai/gpt-6.1-sol" ||
@@ -60,7 +68,7 @@ export async function qualifyEvalrunner(config: EvalrunnerConfig) {
     throw new EvalFailure("Loginom container pins changed", 2)
   return { version: 1, cli: metadata, configSha256: hash(JSON.stringify(config)), envSha256: await fileHash(config.envFile),
     manifestSha256: config.cliManifestSha256, binarySha256: config.binarySha256, harnessSha: config.harnessSha,
-    containerId: config.containerId, imageDigest: config.imageDigest, judge, comparison: "INCOMPARABLE", env }
+    containerId: config.containerId, imageDigest: config.imageDigest, judge, ...(catalog ? { catalog } : {}), comparison: "INCOMPARABLE", env }
 }
 
 export type EvalrunnerInput = { series: string; case: string; issue: string; task: string; collection?: string }
@@ -83,9 +91,9 @@ export async function dispatchEvalrunner(config: EvalrunnerConfig, input: Evalru
       admission.kind !== "evalrunner-slot-admission" || admission.slot?.case !== input.case || admission.slot?.collection !== input.collection))
     throw new EvalFailure("Durable admission differs", 2)
   if (admission.kind === "evalrunner-slot-admission") {
-    const { readEvalrunnerSeries, readEvalrunnerDocument, loadEvalrunnerCorpus, evalrunnerHash } = await import("./evalrunner-series")
+    const { readEvalrunnerSeries, readEvalrunnerDocument, loadEvalrunnerCorpus, evalrunnerHash, evalrunnerSeriesKey } = await import("./evalrunner-series")
     const manifest = await readEvalrunnerSeries(config, admission.series)
-    const global = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`, `${admission.slot.id}.json`)
+    const global = path.join(config.root, "operations/series-admissions", evalrunnerSeriesKey(manifest), `${admission.slot.id}.json`)
     if (JSON.stringify(JSON.parse(await readEvalrunnerDocument(global))) !== JSON.stringify(admission) ||
       admission.manifestSha256 !== evalrunnerHash(JSON.stringify(manifest, null, 2)) ||
       input.series !== path.join(manifest.series, "slots", admission.slot.id) || manifest.pins.configSha256 !== proof.configSha256)

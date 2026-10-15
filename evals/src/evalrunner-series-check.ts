@@ -1,7 +1,7 @@
 import path from "node:path"
 import { readFile, realpath, lstat } from "node:fs/promises"
 import { checkEvalrunnerEvidence, checkEvalrunnerOutcome } from "./evalrunner"
-import { readEvalrunnerSeries, readEvalrunnerDocument, evalrunnerHash, type EvalrunnerSlot, type EvalrunnerSeriesManifest } from "./evalrunner-series"
+import { readEvalrunnerSeries, readEvalrunnerDocument, evalrunnerHash, evalrunnerSeriesKey, type EvalrunnerSlot, type EvalrunnerSeriesManifest } from "./evalrunner-series"
 import type { verifyEvalrunnerModel } from "./evalrunner-model"
 import type { RunSummary } from "./report"
 import { loadTasks } from "./task"
@@ -17,7 +17,7 @@ export async function inspectEvalrunnerSeries(config: Roots, series: string) {
   const measurements: EvalrunnerMeasurement[] = []
   let next: EvalrunnerSlot | null = null
   for (const slot of manifest.slots) {
-    const admission = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`, `${slot.id}.json`)
+    const admission = path.join(config.root, "operations/series-admissions", evalrunnerSeriesKey(manifest), `${slot.id}.json`)
     if (!await Bun.file(admission).exists()) {
       if (await Bun.file(path.join(series, "slots", slot.id, "release.json")).exists())
         return { status: "BLOCKED" as const, completed: measurements.length, expected: manifest.slots.length, next: null, blockedSlot: slot.id, reason: "Unadmitted evidence", measurements }

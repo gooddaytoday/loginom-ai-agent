@@ -2,7 +2,7 @@ import path from "node:path"
 import { lstat, mkdir, readFile, unlink, rmdir, writeFile } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { durableEvalrunnerJson, durableEvalrunnerBytes, evalrunnerHash, createEvalrunnerManifest, loadEvalrunnerCorpus, reserveEvalrunnerSeries,
-  readEvalrunnerSeries, admitEvalrunnerSlot, type EvalrunnerSeriesManifest, type EvalrunnerSeriesScope, type EvalrunnerSlot } from "./evalrunner-series"
+  readEvalrunnerSeries, admitEvalrunnerSlot, evalrunnerSeriesKey, type EvalrunnerSeriesManifest, type EvalrunnerSeriesScope, type EvalrunnerSlot } from "./evalrunner-series"
 import { qualifyEvalrunner, dispatchEvalrunner, sealEvalrunnerEvidence, checkEvalrunnerEvidence, type EvalrunnerConfig } from "./evalrunner"
 import { inspectEvalrunnerSeries, verifyEvalrunnerSlot } from "./evalrunner-series-check"
 import { verifyEvalrunnerModel } from "./evalrunner-model"
@@ -34,14 +34,15 @@ export async function runEvalrunnerSeries(config: EvalrunnerConfig, input: { ser
   if (await Bun.file(path.join(input.series, "finalizing.json")).exists()) throw new EvalFailure("Finalization admitted; preserve evidence for recovery", 2)
   await verifyEvalrunnerSeriesPins(config, manifest)
   for (const scope of manifest.scope === "full" ? ["readiness-calc", "readiness-node"] : manifest.scope === "readiness-node" ? ["readiness-calc"] : []) {
-    const ready = await checkEvalrunnerSeries(config, path.join(config.results, `v02-${scope}-${manifest.issue}`))
+    const { resolveEvalrunnerReadiness } = await import("./evalrunner-recovery")
+    const ready = await checkEvalrunnerSeries(config, await resolveEvalrunnerReadiness(config, manifest.issue, scope))
     if (ready.status !== "RELEASED" || ready.completed !== 1) throw new EvalFailure("Prior readiness not released", 2)
   }
   const executor = await acquireEvalrunnerExecutor(config, { issue: manifest.issue, series: manifest.series, task: input.task })
   try {
     const lease = await acquireEvalrunnerSeriesLease(config, manifest)
     for (const slot of manifest.slots) {
-      const admitted = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`, `${slot.id}.json`)
+      const admitted = path.join(config.root, "operations/series-admissions", evalrunnerSeriesKey(manifest), `${slot.id}.json`)
       if (!await Bun.file(admitted).exists()) break
       if (!input.resume) throw new EvalFailure("Series already started; use resume with original manifest", 2)
       await completeEvalrunnerSlot(config, manifest, slot)
@@ -111,10 +112,14 @@ export async function verifyEvalrunnerSeriesPins(config: EvalrunnerConfig, manif
     evalrunnerHash(await readFile(path.join(manifest.series, "cli-manifest.json"))) !== config.cliManifestSha256)
     throw new EvalFailure("Series pins, corpus, environment, CLI or container changed", 2)
   await requireQualification(config, proof, corpus.sha256)
+  if (config.catalog) {
+    const { qualifyEvalrunnerCatalog } = await import("./evalrunner-catalog")
+    await qualifyEvalrunnerCatalog(config, proof.env, config.catalog)
+  }
   return proof
 }
 
-async function requireQualification(config: EvalrunnerConfig, proof: Awaited<ReturnType<typeof qualifyEvalrunner>>, corpusSha256: string) {
+export async function requireEvalrunnerQualification(config: EvalrunnerConfig, proof: Awaited<ReturnType<typeof qualifyEvalrunner>>, corpusSha256: string) {
   if (!config.qualificationFile || !config.qualificationSha256 || !config.qualificationFile.startsWith(config.root + path.sep) ||
     await realpathQualification(config.qualificationFile) !== config.qualificationFile ||
     evalrunnerHash(await readFile(config.qualificationFile)) !== config.qualificationSha256) throw new EvalFailure("Nonmodel qualification receipt required", 2)
@@ -126,7 +131,12 @@ async function requireQualification(config: EvalrunnerConfig, proof: Awaited<Ret
     receipt.tests?.fail !== 0 || receipt.typecheck?.exitCode !== 0 || receipt.native?.cleanup !== "confirmed" ||
     receipt.sandbox !== "confirmed" || receipt.exportDownloadRegression !== "confirmed" || receipt.historicalRecovery?.status !== "RECOVERED")
     throw new EvalFailure("Nonmodel qualification incomplete or pins differ", 2)
+  if (!config.catalog || JSON.stringify(receipt.catalog) !== JSON.stringify(proof.catalog) || receipt.catalogRecognition?.recognition !== "confirmed" ||
+    receipt.catalogRecognition?.sha256 !== config.catalog.sha256 || receipt.catalogRecognition?.cleanup !== "confirmed")
+    throw new EvalFailure("Pinned catalog qualification required", 2)
 }
+
+const requireQualification = requireEvalrunnerQualification
 
 async function realpathQualification(file: string) {
   const { realpath } = await import("node:fs/promises")

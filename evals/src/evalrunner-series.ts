@@ -34,9 +34,12 @@ export function buildEvalrunnerSlots(corpus: EvalrunnerCorpus): EvalrunnerSlot[]
 }
 
 export function createEvalrunnerManifest(input: { issue: string; task: string; series: string; scope: EvalrunnerSeriesScope;
-  pins: Record<string, unknown>; corpus: EvalrunnerCorpus }) {
+  pins: Record<string, unknown>; corpus: EvalrunnerCorpus; generation?: 1; recovery?: { file: string; sha256: string } }) {
   if (![input.issue, input.task].every(value => /^[\w-]+$/.test(value)) || !["full", "readiness-calc", "readiness-node"].includes(input.scope))
     throw new EvalFailure("Invalid series identity", 2)
+  if (input.generation !== undefined && (input.generation !== 1 || input.scope !== "readiness-calc" ||
+    input.issue !== "01a13fd2-a6b1-7459-b641-fb41b04eb229" || !input.recovery) || input.recovery && input.generation !== 1)
+    throw new EvalFailure("Unauthorized readiness generation", 2)
   const slots = input.scope === "full" ? buildEvalrunnerSlots(input.corpus) : [{
     id: `${input.scope}-r1`, round: 1, collection: input.scope === "readiness-calc" ? "regular" as const : "node" as const,
     case: input.scope === "readiness-calc" ? "calc-data-double" : "crosstable-fixed-sum" }]
@@ -48,9 +51,10 @@ export function createEvalrunnerManifest(input: { issue: string; task: string; s
 
 /** Registry and admissions are global to issue/scope, independent of task or output directory. */
 export async function reserveEvalrunnerSeries(config: SeriesRoots, manifest: EvalrunnerSeriesManifest) {
-  const expected = path.join(config.results, manifest.scope === "full" ? `v02-full-${manifest.issue}` : `v02-${manifest.scope}-${manifest.issue}`)
+  const expected = evalrunnerSeriesPath(config, manifest)
   if (manifest.series !== expected || path.resolve(expected) !== expected || !expected.startsWith(config.root + path.sep))
     throw new EvalFailure("Noncanonical series directory", 2)
+  if (manifest.generation) await verifyEvalrunnerRecoveryLink(config, manifest)
   const raw = JSON.stringify(manifest, null, 2)
   await mkdir(path.dirname(registryPath(config, manifest)), { recursive: true, mode: 0o700 })
   await durableEvalrunnerJson(registryPath(config, manifest), { kind: "evalrunner-series-reservation", series: expected, sha256: evalrunnerHash(raw), manifest })
@@ -71,6 +75,8 @@ export async function readEvalrunnerSeries(config: SeriesRoots, series: string) 
   if (manifest.kind !== "evalrunner-full-series" || manifest.version !== 2 || manifest.series !== series ||
     !["full", "readiness-calc", "readiness-node"].includes(manifest.scope) || !/^[\w-]+$/.test(manifest.issue))
     throw new EvalFailure("Invalid series manifest", 2)
+  if (manifest.series !== evalrunnerSeriesPath(config, manifest)) throw new EvalFailure("Noncanonical series directory", 2)
+  if (manifest.generation) await verifyEvalrunnerRecoveryLink(config, manifest)
   const reservation = JSON.parse(await readEvalrunnerDocument(registryPath(config, manifest))) as { series: string; sha256: string }
   if (reservation.series !== series || reservation.sha256 !== evalrunnerHash(raw) || JSON.stringify(manifest.policy) !== JSON.stringify(policy))
     throw new EvalFailure("Manifest changed", 2)
@@ -83,7 +89,7 @@ export async function admitEvalrunnerSlot(config: SeriesRoots, manifest: Evalrun
   const saved = await readEvalrunnerSeries(config, manifest.series)
   if (saved.nonce !== manifest.nonce || !/^[\w-]+$/.test(task) || !saved.slots.some(item => JSON.stringify(item) === JSON.stringify(slot)))
     throw new EvalFailure("Slot identity differs", 2)
-  const directory = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`)
+  const directory = path.join(config.root, "operations/series-admissions", evalrunnerSeriesKey(manifest))
   await mkdir(directory, { recursive: true, mode: 0o700 })
   if (await Bun.file(path.join(directory, `${slot.id}.json`)).exists()) throw new EvalFailure("Slot already admitted; inspect original evidence", 2)
   const { inspectEvalrunnerSeries } = await import("./evalrunner-series-check")
@@ -142,8 +148,36 @@ export async function readEvalrunnerDocument(file: string) {
   } finally { await handle.close() }
 }
 
-function registryPath(config: SeriesRoots, manifest: Pick<EvalrunnerSeriesManifest, "issue" | "scope">) {
-  return path.join(config.root, "operations/series-registry", `${manifest.issue}-${manifest.scope}.json`)
+function registryPath(config: SeriesRoots, manifest: Pick<EvalrunnerSeriesManifest, "issue" | "scope" | "generation">) {
+  return path.join(config.root, "operations/series-registry", `${evalrunnerSeriesKey(manifest)}.json`)
+}
+
+export function evalrunnerSeriesKey(manifest: { issue: string; scope: string; generation?: 1 }) {
+  return `${manifest.issue}-${manifest.scope}${manifest.generation ? "-g1" : ""}`
+}
+
+export function evalrunnerSeriesPath(config: { results: string }, manifest: { issue: string; scope: string; generation?: 1 }) {
+  return path.join(config.results, `v02-${manifest.scope}-${manifest.issue}${manifest.generation ? "-g1" : ""}`)
+}
+
+export async function verifyEvalrunnerRecoveryLink(config: { root: string }, manifest: EvalrunnerSeriesManifest) {
+  if (manifest.generation !== 1 || manifest.scope !== "readiness-calc" || manifest.issue !== "01a13fd2-a6b1-7459-b641-fb41b04eb229")
+    throw new EvalFailure("Unauthorized readiness generation", 2)
+  const file = path.join(config.root, "operations/series-recovery", manifest.issue + "-readiness-calc/receipt.json")
+  const raw = await readEvalrunnerDocument(file)
+  const receipt = JSON.parse(raw)
+  if (manifest.recovery?.file !== file || manifest.recovery.sha256 !== evalrunnerHash(raw) ||
+    receipt.status !== "RECOVERED_PRE_INFERENCE" || receipt.newSeries !== manifest.series ||
+    receipt.newPinsSha256 !== evalrunnerHash(JSON.stringify(manifest.pins)) || receipt.productInferenceCalls !== 0 || receipt.judgeCalls !== 0 ||
+    receipt.issue !== manifest.issue || receipt.scope !== manifest.scope || receipt.generation !== 1 || receipt.originalReleased !== false ||
+    !Array.isArray(receipt.preserved) || receipt.preserved.length < 5)
+    throw new EvalFailure("Recovery link differs", 2)
+  const { requestedAt, ...audit } = JSON.parse(await readEvalrunnerDocument(path.join(path.dirname(file), "request.json")))
+  if (!requestedAt || JSON.stringify(audit) !== JSON.stringify(receipt.audit)) throw new EvalFailure("Recovery request differs", 2)
+  for (const item of receipt.preserved as { file: string; sha256: string }[]) {
+    if (!item.file.startsWith(config.root + path.sep) || await realpath(item.file) !== item.file ||
+      evalrunnerHash(await readFile(item.file)) !== item.sha256) throw new EvalFailure("Recovered original evidence changed", 2)
+  }
 }
 
 async function inventory(root: string, relative = ""): Promise<{ path: string; sha256: string }[]> {

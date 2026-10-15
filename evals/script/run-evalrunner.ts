@@ -8,6 +8,7 @@ const { values, positionals } = parseArgs({ args: Bun.argv.slice(2), allowPositi
   config: { type: "string" }, series: { type: "string" }, case: { type: "string" },
   issue: { type: "string" }, task: { type: "string" }, collection: { type: "string" },
   scope: { type: "string" }, baseline: { type: "string" }, help: { type: "boolean" },
+  "proof-sha256": { type: "string" },
 } })
 const command = positionals[0]
 try {
@@ -19,7 +20,11 @@ try {
   } else {
     if (!values.config) throw Error("--config required")
     const config = await readEvalrunnerConfig(values.config)
-    if (command === "prepare-series") {
+    if (command === "recover-readiness") {
+      if (!values.series || !values.task || !values["proof-sha256"]) throw Error("--series --task --proof-sha256 required")
+      const { recoverEvalrunnerReadiness } = await import("../src/evalrunner-recovery")
+      console.log(JSON.stringify(await recoverEvalrunnerReadiness(config, { series: values.series, task: values.task, proofSha256: values["proof-sha256"] })))
+    } else if (command === "prepare-series") {
       if (!values.issue || !values.task || !["full", "readiness-calc", "readiness-node"].includes(values.scope ?? "")) throw Error("--issue --task --scope required")
       console.log(JSON.stringify(await prepareEvalrunnerSeries(config, { issue: values.issue, task: values.task, scope: values.scope as EvalrunnerSeriesScope })))
     } else if (command === "start-series" || command === "resume-series") {
