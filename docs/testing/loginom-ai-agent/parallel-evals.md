@@ -968,3 +968,13 @@ related29/126 PASS37.89s, typecheck PASS. Private
 (pins a2a98eeb...), B survival/fresh check, global archive reuse и exact own
 pair/network/root absence. Receipt закрывает normal management Count0 sessions;
 полный attempt cleanup/recovery, backup/delete/release/readiness не заявлены.
+
+Summary теперь сохраняет per-attempt `limit_evidence` и отдельный
+`parallel_limits` gate, включая initial infra retry и interrupted runs. Visible
+HTTP429 не стирается successful retry/`--judge-only`; отсутствующая/неполная
+transport coverage даёт incomplete. Report показывает gate рядом с quality
+metrics, без смены исходных statuses/cost/exit code. TDD fake-child/report
+RED→GREEN; report/compare/policy108/436, run/rejudge43/334, current retry2/22 и
+extended rejudge1/16 PASS, typecheck PASS. Private limit-aggregate-198c93eb...
+verification SHAebcee9a1b425adc590b523fee6acaa4eda09e252df1286448c979aab70890e1f.
+Full hidden transport/Dock/judge coverage и v2 admission этим не подтверждены.

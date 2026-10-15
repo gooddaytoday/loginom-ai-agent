@@ -405,6 +405,18 @@ known event; assessParallelLimits возвращает failed. Headless JSON н�
 transport/retry visibility, coverage остаётся unavailable и без события даёт
 incomplete. Этот producer не доказывает отсутствие hidden limits.
 
+Measured AttemptResult теперь сохраняет optional `limit_evidence`, включая
+исходный infra retry и failure checkpoint. `summary.parallel_limits` оценивает
+все actual runs, включая interrupted; missing/partial coverage остаётся
+incomplete, известный visible429 остаётся failed после успешного retry. Report
+показывает эту проверку отдельно; quality/status/cost/exit code сохраняются,
+judge-only сохраняет original metadata. Legacy summaries не мигрируются.
+TDD actual fake-child retry и report warning RED→GREEN; final retry2/22 PASS,
+report/compare/policy108/436 и run/rejudge43/334 PASS, extended rejudge1/16 PASS,
+typecheck PASS. Private limit-aggregate-198c93eb... verification SHA
+ebcee9a1b425adc590b523fee6acaa4eda09e252df1286448c979aab70890e1f. Эти
+нормализованные наблюдения не доказывают full transport coverage/live admission.
+
 
 Native admin inspect сохраняет private session-observations.json при
 qualification=false: exact ServerIdentity, собственный Session GUID/proxy ID,

@@ -540,6 +540,32 @@ test("fixture main: a shared profile is rejected across all configured slots bef
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("fixture main: a successful retry preserves the initial provider limit and quality outcome", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-limit-retry-"))
+  let passed = false
+  try {
+    const input = await parallelFixture(root, ["parallel-infra-retry"])
+    const task = path.join(root, "tasks/parallel-infra-retry")
+    await Bun.write(path.join(task, "provider-limit.json"), "{}")
+    await Bun.write(path.join(task, "task.json"), JSON.stringify({ ...await Bun.file(path.join(task, "task.json")).json(), inputs: ["provider-limit.json"] }))
+    const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "1", "--skip-judge"],
+      input.env, { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    const result = summary.tasks[0]!.attempts[0]!
+    expect(result).toMatchObject({ status: "completed", exit_code: 0, infra_retry: { initial: { status: "infra_error", exit_code: 1 } } })
+    expect(result.infra_retry!.initial.limit_evidence?.events).toEqual([{ source: "provider", kind: "http", status: 429 }])
+    expect(result.limit_evidence?.events).toEqual([])
+    expect(summary.parallel_limits).toMatchObject({ status: "failed", codes: expect.arrayContaining(["PROVIDER_HTTP_429"]) })
+    expect(await Bun.file(path.join(run.runDir!, "report.md")).text()).toContain("Проверка лимитов: failed · PROVIDER_HTTP_429")
+    expect(summary.metrics).toMatchObject({ total: 1, completed: 1, completion_rate: 1, infra_error_count: 1 })
+    const initial = await Bun.file(path.join(run.runDir!, result.task_id, "1/infra-error/result.json")).json()
+    expect(initial.limit_evidence).toEqual(result.infra_retry!.initial.limit_evidence)
+    expect(JSON.stringify(initial.limit_evidence)).not.toContain("private-limit-diagnostic")
+    passed = true
+  } finally { if (passed) await rm(root, { recursive: true, force: true }) }
+}, 60_000)
+
 test("fixture main: one infra retry keeps the same slot and archives the initial attempt", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-retry-"))
   try {
