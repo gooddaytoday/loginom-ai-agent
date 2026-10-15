@@ -37,14 +37,28 @@ export function collectTerminalScriptWitness(expected){
  };
  script('initial',own(initializer,'initialScript'));script('modifier',own(initializer,'modifierScript'));
  const records=own(initializer,'records');requireFrozen(records);if(own(records,'length')!==3)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+ const initializerCalls=[],initializerCompletions=[];
  const names=['ObjectProxy','FileStorage','StreamPersist'],constructors=['ObjectProxy','FileStorage','StreamPersistProxy'];
  for(let i=0;i<3;i++){
   const r=requireFrozen(own(records,String(i))),kind=own(r,'kind'),ctor=own(r,'ctor'),ss=own(r,'ss'),members=own(r,'members'),methods=requireFrozen(own(r,'methods')),dependencies=requireFrozen(own(r,'dependencies'));
   if(kind!==names[i]||ctor!==own(bindings,constructors[i])||ss!==own(bindings,'ss')||own(r,'receiver')!==ss||own(ctor,'__assembly')!==own(r,'assembly'))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
   for(const key of Reflect.ownKeys(methods)){const method=own(methods,key);if(typeof method!=='function'||own(members,key)!==method||own(own(ctor,'prototype'),key)!==method)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE')}
   if(own(dependencies,'shallowCopy')!==own(ss,'shallowCopy')||own(dependencies,'prepareProperties')!==own(ss,'prepareProperties')||typeof own(dependencies,'initialBase')!=='function')throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  const call=requireFrozen(own(r,'call')),completion=requireFrozen(own(r,'completion')),args=own(call,'arguments'),values=requireFrozen(own(call,'values'));
+  const check=()=>{
+   if(own(r,'call')!==call||own(r,'completion')!==completion||own(completion,'call')!==call||own(completion,'originalReturned')!==true
+     ||own(call,'ordinal')!==i||own(call,'beforeOriginalCall')!==true||own(call,'initializer')!==own(r,'initializer')||own(call,'receiver')!==ss
+     ||own(call,'ctor')!==ctor||own(call,'assembly')!==own(r,'assembly')||own(call,'members')!==members
+     ||own(call,'baseType')!==own(r,'baseType')||own(call,'interfaces')!==own(r,'interfaces')
+     ||own(call,'arguments')!==args||own(call,'values')!==values||own(args,'length')!==own(values,'length')
+     ||own(call,'closureIdentityQualified')!==false||own(call,'nativeReceiversQualified')!==false
+     ||own(completion,'closureIdentityQualified')!==false||own(completion,'nativeReceiversQualified')!==false)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   for(let j=0;j<values.length;j++)if(own(args,String(j))!==own(values,String(j)))throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+   if(values[0]!==ctor||values[1]!==own(r,'assembly')||values[2]!==members)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
+  };check();integrityChecks.push(check);initializerCalls.push(call);initializerCompletions.push(completion);
   script(kind,own(r,'execution'));
  }
+ Object.freeze(initializerCalls);Object.freeze(initializerCompletions);
  if(nodes[3]!==nodes[4]||nodes[0]===nodes[1]||nodes[2]===nodes[3])throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
  // Re-run the original guard after projection. Never return a node/receiver/closure as DTO.
  if(own(requireFrozen(Reflect.apply(inspect,publisher,[])),'document')!==doc)throw Error('TERMINAL_SCRIPT_WITNESS_UNAVAILABLE');
@@ -541,7 +555,7 @@ export function collectTerminalScriptWitness(expected){
    const initial=Object.freeze({request,document:doc,documentId:preparationId,account,preparation,receipts,
     currentUser:own(sample,'user'),userTask:own(sample,'task'),acquisition,acquisitionTask:own(acquisition,'task'),
     acquisitionReceiver:own(acquisition,'receiver'),connection,applicationSession,storage,transport,
-    definitions:originalDefs,bindings,storageReaders,query:originalQuery,streamType,controlLocation:'host'});
+    definitions:originalDefs,bindings,initializerCalls,initializerCompletions,storageReaders,query:originalQuery,streamType,controlLocation:'host'});
    for(const key of Reflect.ownKeys(initial))hold(initial,key);
    armed={...entry,initial,check,binding};return binding;
   },
