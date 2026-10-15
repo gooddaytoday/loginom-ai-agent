@@ -525,9 +525,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { browser_transport_closed: browserTransportClosed,
           browser_process_terminated: browserProcessTerminated, clipboard_leases_retained: heldLeases.size };
       })().then(result => {
-        if (result?.browser_transport_closed !== true) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
+        if ((managedCleanup || config.acceptanceCleanupPackage) && result?.browser_transport_closed !== true) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
         return result;
-      }, error => { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; throw error; });
+      }, error => { if(managedCleanup)cleanupRefused=true; if (managedCleanup || config.acceptanceCleanupPackage) { closing = undefined; shutdownStarted = false; } throw error; });
       return closing;
     } };
   } catch (error) {
