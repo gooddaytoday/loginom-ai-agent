@@ -5,11 +5,17 @@ import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResou
 import { acquireEnvironmentLeases, loadSlots, parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
 import { openLoginomAdmin, readAdminProcessInventory } from "./loginom-admin"
 import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
+import type { finalizeUnactivatedEnvironment } from "./environment-finalization"
+
+type PreparationRecoveryResult = { version: 2; kind: "preparation-recovery"; status: "released" | "already_released"; ready: false;
+  identity: ServerIdentity; incident: string; journal: string; receipt: string; finalization: Awaited<ReturnType<typeof finalizeUnactivatedEnvironment>> }
 
 export async function recoverUnactivatedPreparation(input: { slotsFile: string; incident: string }, lockRoot = globalLockRoot) {
   const file = await loadSlots(input.slotsFile, 1)
   const identity = await readServerIdentity(file)
   await verifyParallelPair(file, identity)
+  const completed = await readPreparationCompletion(file, identity, input.incident)
+  if (completed) return completed
   const environment = await recoverPreparationLeases(file, identity, input.incident, lockRoot)
   const receipt = `${environment.journal}.result.json`
   try {
@@ -19,9 +25,11 @@ export async function recoverUnactivatedPreparation(input: { slotsFile: string; 
     try {
       const { finalizeUnactivatedEnvironment } = await import("./environment-finalization")
       const finalization = await finalizeUnactivatedEnvironment(file, environment, admin)
-      const result = { version: 2, kind: "preparation-recovery", status: "released", ready: false, identity,
+      const result: PreparationRecoveryResult = { version: 2, kind: "preparation-recovery", status: "released", ready: false, identity,
         incident: input.incident, journal: environment.journal, receipt, finalization }
       await writeLeaseReceipt(receipt, result)
+      await writeLeaseReceipt(`${input.incident}.completion.json`, { version: 2, kind: "preparation-recovery-completion", identity,
+        incident: command.incident, result: { path: receipt, sha256: hash(result) }, proofs: await completionProofs(file, finalization) })
       return result
     } finally { await admin.dispose() }
   } catch (error) {
@@ -31,6 +39,81 @@ export async function recoverUnactivatedPreparation(input: { slotsFile: string; 
       incident: input.incident, journal: environment.journal, receipt, reason, finalization: { status: "unconfirmed" } })
     throw new EnvironmentFailure(reason, receipt)
   } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
+}
+
+async function readPreparationCompletion(file: SlotFile, identity: ServerIdentity, incident: string) {
+  if (path.dirname(incident) !== file.controller.stateDir || path.resolve(incident) !== incident)
+    throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_INVALID", 2)
+  const marker = await readLeaseReceipt(`${incident}.completion.json`).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+  })
+  if (marker === undefined) return
+  if (!object(marker) || Object.keys(marker).length !== 6 || marker.version !== 2 || marker.kind !== "preparation-recovery-completion" ||
+    JSON.stringify(marker.identity) !== JSON.stringify(identity) || !object(marker.incident) || marker.incident.path !== incident ||
+    hash(await readLeaseReceipt(incident)) !== marker.incident.sha256 || !object(marker.result) || typeof marker.result.path !== "string" ||
+    path.dirname(marker.result.path) !== file.controller.stateDir || !Array.isArray(marker.proofs))
+    throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+  const result = await readLeaseReceipt(marker.result.path)
+  if (!object(result) || Object.keys(result).length !== 9 || result.version !== 2 || result.kind !== "preparation-recovery" || result.status !== "released" ||
+    result.ready !== false || result.incident !== incident || JSON.stringify(result.identity) !== JSON.stringify(identity) ||
+    result.receipt !== marker.result.path || typeof result.journal !== "string" || path.dirname(result.journal) !== file.controller.stateDir ||
+    result.receipt !== `${result.journal}.result.json` || hash(result) !== marker.result.sha256 ||
+    JSON.stringify(await completionProofs(file, result.finalization)) !== JSON.stringify(marker.proofs))
+    throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+  return { ...(result as PreparationRecoveryResult), status: "already_released" as const }
+}
+
+async function completionProofs(file: SlotFile, finalization: unknown) {
+  const proofs = new Map<string, string>()
+  const read = async (reference: unknown): Promise<Record<string, unknown>> => {
+    if (!object(reference) || Object.keys(reference).length !== 2 || typeof reference.path !== "string" ||
+      !reference.path.startsWith(file.controller.stateDir + path.sep) || path.resolve(reference.path) !== reference.path ||
+      typeof reference.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(reference.sha256)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    const value = await readLeaseReceipt(reference.path)
+    if (!object(value) || hash(value) !== reference.sha256 || proofs.has(reference.path) && proofs.get(reference.path) !== reference.sha256)
+      throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    proofs.set(reference.path, reference.sha256)
+    return value
+  }
+  if (!object(finalization) || finalization.status !== "released" || !Array.isArray(finalization.slots))
+    throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+  const server = await read(finalization.server)
+  if (server.kind !== "unactivated-server-finalization" || server.status !== "confirmed" ||
+    JSON.stringify(server.slots) !== JSON.stringify(finalization.slots)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+  for (const slot of finalization.slots) {
+    if (!object(slot) || !file.slots.some(configured => configured.id === slot.slotId)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    const cleanup = await read(slot.cleanup)
+    if (cleanup.kind !== "unactivated-environment-finalization" || cleanup.status !== "confirmed" || cleanup.slotId !== slot.slotId ||
+      cleanup.processes !== "confirmed" || cleanup.serverSessions !== "confirmed" || cleanup.archive !== "committed" ||
+      cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true || !object(cleanup.profileArchive) ||
+      !Array.isArray(cleanup.recoveryProcessInventories)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+    await read(cleanup.command)
+    await read({ path: cleanup.profileArchive.journal, sha256: cleanup.profileArchive.sha256 })
+    const observation = await read(cleanup.observation)
+    await read(observation.command)
+    if (object(observation.ownership)) await read({ path: observation.ownership.path, sha256: observation.ownership.sha256 })
+    const inventories = [cleanup.processInventory]
+    for (const prior of cleanup.recoveryProcessInventories) {
+      if (!object(prior) || !Array.isArray(prior.connections)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      await read(prior.command)
+      for (const connection of prior.connections) await read(connection)
+      inventories.push(prior.processInventory)
+    }
+    for (const reference of inventories) {
+      const inventory = await read(reference)
+      if (!Array.isArray(inventory.connections)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+      for (const entry of inventory.connections) {
+        if (!object(entry) || typeof entry.directory !== "string" || path.dirname(entry.directory) !== file.controller.stateDir ||
+          !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(entry.directory))) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+        const target = path.join(entry.directory, "connection.json"), value = await readLeaseReceipt(target)
+        const receipt = await read({ path: target, sha256: hash(value) })
+        if (!object(receipt.finalization)) throw new EvalFailure("PREPARATION_COMPLETION_UNCONFIRMED", 2)
+        await read(receipt.finalization.command)
+      }
+    }
+  }
+  return [...proofs].sort(([a], [b]) => a < b ? -1 : 1).map(([path, sha256]) => ({ path, sha256 }))
 }
 
 /** Adopts reservations only; native/process/archive proof is required before release. */

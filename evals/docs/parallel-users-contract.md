@@ -1221,3 +1221,29 @@ reconciliation ещё необходимы. Старые incidents не затр
 
 После recovery extension обычный native parent path также PASS:1/31 assertions
 (41.16s), log600 /tmp/evals-recovery-normal-regression-native.log.
+
+
+### Durable recovery completion and historical repeat
+
+После slot/server release и private result receipt recovery пишет отдельный
+`<original incident>.completion.json`. Он связывает original command/result
+source hashes, identity и полный immutable closure source set: server/slot
+cleanup, commands, observations/ownership creation command, archive manifests,
+все prior/current inventories, connection/dispose receipts. References private,
+canonical, внутри controller state; source drift даёт отказ.
+
+При наличии completion повтор возвращает historical already_released до CAS
+и admin runtime, сохраняя ready:false. Проверка completion не получает
+provisioning/delete/admission grant и не зависит от нового владельца тех же
+resources. Неверный completion не превращается в попытку takeover. Crash между
+releases и durable completion пока требует отдельной terminal reconciliation.
+
+Actual repeat PREPARATION_RECOVERY_SLOT_UNCONFIRMED RED→GREEN.100 unit PASS/433
+(7.15s), native1 PASS/14 (55.47s), typecheck/diff PASS. Repeat с unreadable
+CLI runtime не создаёт controller state files; изменённый server proof refused.
+Следующий owner держит server/user/profile reservations, historical repeat
+сохраняет все3 bytes, затем next normal finalization released. Private600
+`native-recovery-2a249859-79fc-4310-a7c6-492f75cd8163/recovery.json` SHA256
+`f8a75284863bf67c3d30bc2072bb99449628ca7d1ec4ef22dad68fad38b9b9f9`;14
+retained source hashes и exact pair absence PASS. Superseded own green log
+удалён после private audit/read-back; RED и current qualified logs сохранены.
