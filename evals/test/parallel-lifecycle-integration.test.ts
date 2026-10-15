@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { createPair, destroyPair, prepareUserStorage } from "../src/parallel-pair"
 import { loadConfig } from "../src/config"
@@ -10,8 +10,8 @@ import { afterAttempt, runAttempt } from "../src/run"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { storageCodecFixture } from "./helpers/storage-codec-fixture"
 import { parallelFixture } from "./helpers/parallel-fixture"
-import { loadSlots, parseSlots } from "../src/slots"
-import { recoverPreparationLeases } from "../src/preparation-recovery"
+import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
+import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
 import { openLoginomAdmin } from "../src/loginom-admin"
 
@@ -51,30 +51,67 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("preparation recovery: native b
   expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
   const incident = stdout.trim()
   await Bun.$`docker exec ${pair.identity.containerId} sh -c ${'mkdir /workdir/UserStorage/eval-b; printf preserve > /workdir/UserStorage/eval-b/recovery-control'}`.quiet()
-  const environment = await recoverPreparationLeases(file, pair.identity, journal)
+  const completed = { released: false }
   try {
-    const command = await readLeaseReceipt(environment.journal) as { processInventory: string }
-    const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: command.processInventory })
+    const recovered = await recoverUnactivatedPreparation({ slotsFile, incident: journal })
+    const result = recovered.finalization
+    completed.released = result.status === "released"
+    const recoverySlot = result.slots[0]!.cleanup.path.slice(0, -".cleanup.json".length)
+    expect(result.status).toBe("released")
+    expect(await readLeaseReceipt(incident)).toMatchObject({ state: "released", releaseReceipt: recoverySlot })
+    const cleanup = await readLeaseReceipt(result.slots[0]!.cleanup.path) as { profileArchive: { archive: string }; recoveryProcessInventories: unknown[] }
+    expect(await Bun.file(path.join(cleanup.profileArchive.archive, "data/recovery-history")).text()).toBe("preserve-native-recovery")
+    expect(cleanup.recoveryProcessInventories).toHaveLength(1)
+    expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/recovery-control`.quiet()).text()).toBe("preserve")
+    const beforeRepeat = await readdir(file.controller.stateDir)
+    const repeatedOut = path.join(root, "repeated-recovery")
+    const repeated = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "recover", "--config", slotsFile,
+      "--incident", journal, "--out", repeatedOut], { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
+      env: { PATH: process.env.PATH ?? "", HOME: root, EVAL_CLI_BIN: "/unreadable-runtime" } })
+    const [repeatCode, repeatStdout, repeatStderr] = await Promise.all([repeated.exited, new Response(repeated.stdout).text(), new Response(repeated.stderr).text()])
+    expect({ code: repeatCode, stderr: repeatStderr, output: repeatCode ? repeatStdout : "" }).toEqual({ code: 0, stderr: "", output: "" })
+    expect(JSON.parse(repeatStdout)).toMatchObject({ status: "already_released", ready: false, journal: recovered.journal, finalization: result })
+    expect(await readdir(file.controller.stateDir)).toEqual(beforeRepeat)
+    const completion = await readLeaseReceipt(`${journal}.completion.json`) as { proofs: { path: string; sha256: string }[] }
+    const retainedSources = await Promise.all(completion.proofs.map(async source => ({ ...source, value: await readLeaseReceipt(source.path) })))
+    const bytes = await Bun.file(result.server.path).text()
+    await writeLeaseReceipt(result.server.path, { ...JSON.parse(bytes), status: "unknown" })
+    try { await expect(recoverUnactivatedPreparation({ slotsFile, incident: journal })).rejects.toThrow("PREPARATION_COMPLETION_UNCONFIRMED") }
+    finally { await writeLeaseReceipt(result.server.path, JSON.parse(bytes)) }
+    expect(await readdir(file.controller.stateDir)).toEqual(beforeRepeat)
+    const nextJournal = path.join(file.controller.stateDir, "next-command.json"), nextInventory = path.join(file.controller.stateDir, "processes-next.json")
+    await writeLeaseReceipt(nextJournal, { version: 2, kind: "unactivated-preparation", commandId: "next-preparation", identity: pair.identity,
+      slotIds: ["a"], phase: "unactivated", processInventory: nextInventory })
+    await writeLeaseReceipt(nextInventory, { version: 2, kind: "admin-processes", commandId: "next-preparation", journal: nextJournal, identity: pair.identity, connections: [] })
+    const next = await acquireEnvironmentLeases(file, 1, pair.identity, nextJournal)
+    const nextManifest = await readLeaseReceipt(next.slots[0]!.receipt) as { resources: { receipt: string }[] }
+    const reserved = [next.server.receipt, ...nextManifest.resources.map(resource => resource.receipt)]
+    const beforeNext = await Promise.all(reserved.map(file => Bun.file(file).text()))
+    const nextNames = await readdir(file.controller.stateDir)
     try {
-      const result = await finalizeUnactivatedEnvironment(file, environment, admin)
-      expect(result.status).toBe("released")
-      expect(await readLeaseReceipt(incident)).toMatchObject({ state: "released", releaseReceipt: environment.slots[0]!.receipt })
-      const cleanup = await readLeaseReceipt(result.slots[0]!.cleanup.path) as { profileArchive: { archive: string }; recoveryProcessInventories: unknown[] }
-      expect(await Bun.file(path.join(cleanup.profileArchive.archive, "data/recovery-history")).text()).toBe("preserve-native-recovery")
-      expect(cleanup.recoveryProcessInventories).toHaveLength(1)
-      expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/recovery-control`.quiet()).text()).toBe("preserve")
-      const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-recovery-${crypto.randomUUID()}`)
-      await mkdir(evidence, { mode: 0o700 })
-      await writeLeaseReceipt(path.join(evidence, "recovery.json"), { version: 2, identity: pair.identity, result, cleanup,
-        command: await readLeaseReceipt(environment.journal), original: await readLeaseReceipt(journal), incident: await readLeaseReceipt(incident),
-        recoverySlot: await readLeaseReceipt(environment.slots[0]!.receipt), server: await readLeaseReceipt(result.server.path), liveQualified: false })
-    } finally { await admin.dispose() }
-    await destroyPair(file, options)
-    await rm(root, { recursive: true, force: true })
+      expect(await recoverUnactivatedPreparation({ slotsFile, incident: journal })).toMatchObject({ status: "already_released", finalization: result })
+      expect(await Promise.all(reserved.map(file => Bun.file(file).text()))).toEqual(beforeNext)
+      expect(await readdir(file.controller.stateDir)).toEqual(nextNames)
+    } finally {
+      try {
+        const admin = await openLoginomAdmin(file, pair.identity, { serverLease: next.server, processInventory: nextInventory })
+        try { await finalizeUnactivatedEnvironment(file, next, admin) }
+        finally { await admin.dispose() }
+      } catch (error) { completed.released = false; throw error }
+      finally { await Promise.all([next.server.close(), ...next.slots.map(lease => lease.close())]) }
+    }
+    const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-recovery-${crypto.randomUUID()}`)
+    await mkdir(evidence, { mode: 0o700 })
+    await writeLeaseReceipt(path.join(evidence, "recovery.json"), { version: 2, identity: pair.identity, result, cleanup,
+      command: await readLeaseReceipt(recovered.journal), original: await readLeaseReceipt(journal), incident: await readLeaseReceipt(incident),
+      recoverySlot: await readLeaseReceipt(recoverySlot), server: await readLeaseReceipt(result.server.path), completion, retainedSources,
+      repeated: JSON.parse(repeatStdout), historicalRepeatPreservedNextReservations: beforeNext.map(value => JSON.parse(value)), liveQualified: false })
   } catch (error) {
-    console.error(`recovery fixture retained: ${root}`)
+    if (!completed.released) console.error(`recovery fixture retained: ${root}`)
     throw error
-  } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
+  } finally {
+    if (completed.released) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+  }
 }, 120_000)
 
 integration("runAttempt: native slot leftovers forbid dispatch while B files remain intact", async () => {
