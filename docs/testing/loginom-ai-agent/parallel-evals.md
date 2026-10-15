@@ -989,3 +989,35 @@ native-user-831bf8d0... audit7678658c18976971879db5dc3c56d1f906a0b2dc1ed0f2b736a
 (24 checks/32 sources), verificationfa28c0dd...96 original source hashes/all3
 own pairs+networks+roots absent. Нужен supported create trigger либо доказанный
 enforced-disabled contract; этот отрицательный recipe gate не снимает.
+
+Native agent research выполняется отдельно от LLM acceptance:
+
+```bash
+# Из evals/. EVAL_CLI_BIN указывает на квалифицированный installed candidate;
+# EVAL_ADMIN_LIVE_CONFIG — на private research slots, Dock key загружен из env.
+TMPDIR=/home/kiselev/storage/tmp bun run test test/native-agent-run-integration.test.ts
+```
+
+Этот тест создаёт свою research-пару и реального пользователя. Actual runAgent
+использует bubblewrap, собственный профиль и local OpenAI-compatible SSE replay:
+skill(loginom-automation) → dock_prepare(new_draft) → final text. Model и small_model
+закреплены на local native-replay/replay, остальные providers выключены; в trace
+попадают только model/tool names и признаки этапов. Платные модельные запросы не
+выполняются. Fixture отвечает404 на debugger discovery GET /json/version.
+
+2026-10-15: native1 PASS/14 assertions105.74s, related provider/agent inventory
+5 PASS/46 assertions, typecheck PASS. Independent private audit
+native-agent-replay-6b26e673-ec6d-4200-ae43-5b9edea3eaee/source-audit.json
+SHA256 `665a2bea4d19f71f7dffe029ab766a0a4ca3e0a184d0fb2101f4ac2df3167176`
+подтвердил87 checks/45 sources и11 tested source/binary pins.15 snapshots
+пересекают actual closed CLI lifetime; наблюдена одна новая active Count1 row,
+после local closure она pending Count1. CLI/Chromium и admin завершены с
+continuous proofs, собственные pair/network/root отсутствуют. Browser profile и
+credentials в копию controller evidence не включаются.
+
+Активации skill недостаточно: отдельный skill-only control завершился exit0 с
+runtimeDirectories=[] и без новой сессии. Первый native fixture остановил Bun на
+необработанном GET; второй отказал до spawn из-за отсутствующего outDir. Их
+ресурсы/источники retained и перечислены в eval_parallel_blockers.md. Native PASS
+их не исправляет. Эта проверка ещё не выдаёт agent session ledger, targeted close,
+backup/storage cleanup, production admission либо N2/LLM acceptance.
