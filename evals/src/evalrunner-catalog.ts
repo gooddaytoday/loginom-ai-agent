@@ -1,5 +1,5 @@
 import path from "node:path"
-import { readFile, lstat, realpath, mkdtemp, cp, rm } from "node:fs/promises"
+import { readFile, lstat, realpath, mkdtemp, cp, rm, chmod } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { evalrunnerHash } from "./evalrunner-series"
 import { agentCommand } from "./cli"
@@ -22,13 +22,23 @@ export async function verifyEvalrunnerCatalog(catalog: EvalrunnerCatalog) {
   return { ...catalog, bytes: bytes.length, model: "openai/gpt-6.1-sol", variant: "medium", fetchDisabled: true }
 }
 
-/** Offline only; identical product flags and filesystem boundary, with a separate empty profile. */
+/** Offline only; identical product flags and auth, with a separate profile containing no history. */
 export async function qualifyEvalrunnerCatalog(config: { workspace: string; profile: string }, env: Record<string, string>, catalog: EvalrunnerCatalog) {
   const verified = await verifyEvalrunnerCatalog(catalog)
   const root = await mkdtemp(path.join(config.workspace, ".catalog-probe-"))
   const { mkdir } = await import("node:fs/promises")
   await mkdir(path.join(root, "profile"), { mode: 0o700 }); await mkdir(path.join(root, "workspace"), { mode: 0o700 })
   await cp(path.join(config.profile, "cli-profile.json"), path.join(root, "profile/cli-profile.json"))
+  for (const relative of ["data/auth.json", "config/loginom-ai-agent.json"]) {
+    const source = path.join(config.profile, relative)
+    const info = await lstat(source).catch(error => { if (error.code === "ENOENT" && relative.startsWith("config/")) return undefined; throw error })
+    if (!info) continue
+    if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.mode & (relative === "data/auth.json" ? 0o077 : 0o022))
+      throw new EvalFailure("Probe profile settings unsafe", 2)
+    await mkdir(path.dirname(path.join(root, "profile", relative)), { recursive: true, mode: 0o700 })
+    await cp(source, path.join(root, "profile", relative))
+    await chmod(path.join(root, "profile", relative), 0o600)
+  }
   const effective = { ...env, EVAL_PROFILE_DIR: path.join(root, "profile") }
   const command = agentCommand(loadConfig(["--skip-judge"], effective), effective)
   const cmd = [...command.cmd, "models", "openai"]

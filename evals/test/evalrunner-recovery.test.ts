@@ -51,12 +51,13 @@ test("only the authorized pre-inference calc refusal is eligible; source evidenc
   } finally { await rm(f.config.root, { recursive: true, force: true }) }
 })
 
-test.each(["session", "judge", "unknown", "cleanup", "events", "full", "owner"])("pre-inference recovery refuses %s evidence", async kind => {
+test.each(["session", "judge", "unknown", "cleanup", "events", "full", "owner", "empty-release"])("pre-inference recovery refuses %s evidence", async kind => {
   const f = await fixture()
   try {
     if (kind === "full") {
       const raw = JSON.parse(await Bun.file(f.proofFile).text()); raw.scope = "full"; await Bun.write(f.proofFile, JSON.stringify(raw))
-    } else if (kind === "owner") await Bun.write(f.owner, "foreign")
+    } else if (kind === "empty-release") await Bun.write(path.join(f.manifest.series, "release.json"), "")
+    else if (kind === "owner") await Bun.write(f.owner, "foreign")
     else if (kind === "events") await Bun.write(path.join(f.attempt, "events.jsonl"), '{"type":"step_finish","sessionID":"unexpected"}\n')
     else if (kind === "unknown" || kind === "cleanup") {
       const file = path.join(f.attempt, "cleanup.json"), value = await Bun.file(file).json()
@@ -70,7 +71,7 @@ test.each(["session", "judge", "unknown", "cleanup", "events", "full", "owner"])
     }
     await expect(auditEvalrunnerPreInference(f.config, { series: f.manifest.series, proofFile: f.proofFile })).rejects.toThrow()
     expect(await Bun.file(f.admission).exists()).toBe(true)
-    expect(await Bun.file(path.join(f.manifest.series, "release.json")).exists()).toBe(false)
+    expect(await Bun.file(path.join(f.manifest.series, "release.json")).exists()).toBe(kind === "empty-release")
   } finally { await rm(f.config.root, { recursive: true, force: true }) }
 })
 

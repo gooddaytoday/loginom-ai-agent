@@ -45,18 +45,21 @@ test("pinned public catalog survives both child boundaries with only one read-on
 test("catalog recognition initializes a private probe profile and verifies actual sandboxed output before admission", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-catalog-probe-"))
   try {
-    for (const name of ["installation/bin", "installation/resources/loginom", "profile", "workspace"])
+    for (const name of ["installation/bin", "installation/resources/loginom", "profile/data", "profile/config", "workspace"])
       await mkdir(path.join(root, name), { recursive: true, mode: 0o700 })
     const binary = path.join(root, "installation/bin/cli"), file = path.join(root, "models.json")
     await writeFile(binary + ".ts", "import {statSync,readFileSync} from 'node:fs';\n" +
       "const p=process.env.LOGINOM_AI_AGENT_CLI_PROFILE!;if((statSync(p).mode&0o777)!==0o700)throw Error('PROFILE_PERMISSIONS_INVALID');\n" +
       "if(JSON.parse(readFileSync(p+'/cli-profile.json','utf8')).channel!=='dev')throw Error('PROFILE_FORMAT_INVALID');\n" +
+      "if(!JSON.parse(readFileSync(p+'/data/auth.json','utf8')).openai)throw Error('PROVIDER_NOT_FOUND');\n" +
       "if(process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH!=='1')throw Error('FETCH_ENABLED');console.log('openai/gpt-6.1-sol');")
     await Bun.$`${process.execPath} build ${binary + ".ts"} --compile --outfile ${binary}`.quiet()
     await cp("/usr/bin/true", path.join(root, "installation/resources/loginom/chrome"))
     await Bun.write(path.join(root, "installation/resources/loginom/resource-manifest.json"), '{"browser":"chrome"}')
     await Bun.write(path.join(root, "installation/cli-manifest.json"), "{}")
     await Bun.write(path.join(root, "profile/cli-profile.json"), '{"format":"loginom-cli","version":1,"channel":"dev"}')
+    await writeFile(path.join(root, "profile/data/auth.json"), '{"openai":{"type":"fixture"}}', { mode: 0o600 })
+    await writeFile(path.join(root, "profile/config/loginom-ai-agent.json"), '{"permission":{"loginom_*":"allow"}}', { mode: 0o644 })
     await Bun.write(file, JSON.stringify({ openai: { models: { "gpt-6.1-sol": { id: "gpt-6.1-sol", reasoning_options: [{ type: "effort", values: ["medium"] }] } } } }))
     const env = { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: binary, LOGINOM_DOCK_API_KEY: "fixture",
       LOGINOM_AI_AGENT_MODELS_PATH: file, LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1" }

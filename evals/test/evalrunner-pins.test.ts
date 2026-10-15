@@ -14,7 +14,7 @@ test.skipIf(!available)("series pins reject environment, config, CLI, judge, cor
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-pins-"))
   const container = (await Bun.$`docker run --rm -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()
   try {
-    for (const name of ["checkout/evals", "cli/bin", "cli/resources/loginom", "bin", "profile", "workspace", "results", "judge"])
+    for (const name of ["checkout/evals", "cli/bin", "cli/resources/loginom", "bin", "profile/data", "workspace", "results", "judge"])
       await mkdir(path.join(root, name), { recursive: true, mode: 0o700 })
     const checkout = path.join(root, "checkout")
     await cp(path.join(evalsRoot, "tasks"), path.join(checkout, "evals/tasks"), { recursive: true })
@@ -51,6 +51,7 @@ test.skipIf(!available)("series pins reject environment, config, CLI, judge, cor
     config.catalog = { path: path.join(root, "catalog.json"), sha256: evalrunnerHash(catalog) }
     await writeFile(config.catalog.path, catalog, { mode: 0o600 })
     await writeFile(path.join(config.profile, "cli-profile.json"), "{}", { mode: 0o600 })
+    await writeFile(path.join(config.profile, "data/auth.json"), "{}", { mode: 0o600 })
     Object.assign(env, { LOGINOM_AI_AGENT_MODELS_PATH: config.catalog.path, LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1" })
     await writeFile(config.envFile, JSON.stringify(env), { mode: 0o600 })
     const initial = await qualifyEvalrunner(config), corpus = await loadEvalrunnerCorpus(path.join(checkout, "evals"))

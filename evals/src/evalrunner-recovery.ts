@@ -32,7 +32,7 @@ export async function auditEvalrunnerPreInference(config: Roots, input: { series
     throw new EvalFailure("Independent recovery proof/owner differs", 2)
   const slot = path.join(input.series, "slots/readiness-calc-r1")
   if (await readEvalrunnerDocument(path.join(slot, "manifest.json")) !== await readEvalrunnerDocument(admission)) throw new EvalFailure("Admission changed", 2)
-  if ([path.join(input.series, "release.json"), path.join(slot, "release.json")].some(file => Bun.file(file).size > 0) ||
+  if ((await Promise.all([path.join(input.series, "release.json"), path.join(slot, "release.json")].map(file => Bun.file(file).exists()))).some(Boolean) ||
     (await readdir(path.join(input.series, "completions"))).length) throw new EvalFailure("Measured/released readiness cannot recover", 2)
   const runs = await readdir(path.join(slot, "runs"))
   if (runs.length !== 1) throw new EvalFailure("Recovery run identity differs", 2)
