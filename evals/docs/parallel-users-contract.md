@@ -1839,3 +1839,23 @@ Final related regression:53 PASS/346 (104.22s) across management accounting,
 process evidence, admin, archive, preparation recovery and user ownership;
 typecheck/diff PASS. The normal-path finalizer is implemented; this does not
 qualify multi-slot native admission or backup/storage release.
+
+
+Controlled retained-package ownership and reconnect close (2026-10-15)
+
+The parent observation API accepts an optional fixed `retained-package` mode.
+Its native probe creates one empty package without execution, closes only its
+own writer context and records Count0→1→1 plus exact pending=true/Count1 after
+disconnect. The private parent ledger and reconnect driver both validate this
+trace. Only that phase grants Count1 close; normal management claims retain
+Count0. Fresh account/epoch/Name/CreateTime checks and bounded absence remain
+mandatory. This does not authorize arbitrary active operations or storage deletion.
+
+TDD producer ordinary-phase RED→native1/14 PASS70.65s; reconnect source rejection
+RED→native1/16 PASS97.50s, including repeat, fresh absence and both admin process
+closures. Private600 native-parent-activation-576bd87a-1f61-42d5-a3f4-3c09e0b822f1
+retained-close.json SHA256 c1ef86c7a8b08c6f5abb8fda097ae9a7a1f6e78259a794f4c7c1377287e0b20f.
+Independent audit34 checks/5 source artifacts PASS; exact own pair/root absent.
+Related37 tests/193 assertions PASS40.78s; unchanged native wire/Count0/reconnect
+matrix1/118 PASS72.21s; typecheck/diff PASS. SessionBackup,
+CLI SIGKILL, concurrent user B and arbitrary active operations remain open.

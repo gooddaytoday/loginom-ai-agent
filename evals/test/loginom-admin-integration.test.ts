@@ -884,7 +884,7 @@ liveIntegration("parent activation requires prepared storage and retains generat
   await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "parent-activate", journal, identity: pair.identity, connections: [] })
   const { acquireEnvironmentLeases } = await import("../src/slots")
   const { prepareUserStorage } = await import("../src/parallel-pair")
-  const { readUserActivation, readUserConfiguration, readUserOwnership } = await import("../src/user-environment")
+  const { readServerSession, readUserActivation, readUserConfiguration, readUserOwnership } = await import("../src/user-environment")
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-parent-activation-${crypto.randomUUID()}`)
   await mkdir(evidence, { mode: 0o700 })
@@ -922,12 +922,35 @@ liveIntegration("parent activation requires prepared storage and retains generat
         commands: await Promise.all([first, second].map(async result => ({ source: result.source, value: await readLeaseReceipt(result.source.path) }))),
         adminCommands: await Promise.all((await readdir(path.dirname(first.source.path))).map(async name => ({ name,
           value: await readLeaseReceipt(path.join(path.dirname(first.source.path), name)) }))) })
+      const retained = await admin.observeOwnedSession(lease, prepared.secretFile, (await admin.inspectPolicy()).sharedDirectories, "retained-package")
+      expect(retained.observation.payload.phase).toBe("session-package-crash-probe")
+      expect((retained.observation.reply.data as { afterDisconnect: { objectId: string; packageCount: number; pendingDisconnect: boolean }[] })
+        .afterDisconnect.find(row => row.objectId === retained.binding.remoteKey)).toMatchObject({ packageCount: 1, pendingDisconnect: true })
+      await writeLeaseReceipt(path.join(evidence, "retained-session.json"), retained)
+      await writeLeaseReceipt(path.join(evidence, "retained-source.json"), await readLeaseReceipt(retained.source.path) as object)
+      const reconnected = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: inventory })
+      try {
+        await reconnected.closeOwnedSession(lease, prepared.secretFile, retained.source.id)
+        const closed = await readServerSession(file, lease, prepared.secretFile, retained.source.id)
+        expect(closed.state).toBe("closed")
+        await reconnected.closeOwnedSession(lease, prepared.secretFile, retained.source.id)
+        const after = await reconnected.inspectSessionInventory()
+        expect(after.sessions.some(row => row.objectId === retained.binding.remoteKey ||
+          row.name === retained.binding.name && row.createdAt === retained.binding.createdAt)).toBe(false)
+        const terminal = await readLeaseReceipt(path.join(file.controller.stateDir, `session-${retained.source.id}.closed.json`)) as { source: { path: string } }
+        await writeLeaseReceipt(path.join(evidence, "retained-close.json"), { closed, terminal,
+          command: await readLeaseReceipt(terminal.source.path), after, observation: await readLeaseReceipt(after.source.path),
+          observationCommand: await readLeaseReceipt((await readLeaseReceipt(after.source.path) as { command: { path: string } }).command.path) })
+      } finally { await reconnected.dispose() }
     } finally {
       await admin.dispose()
       const entries = await readLeaseReceipt(inventory) as { connections: { directory: string }[] }
-      const finalization = await readAdminFinalization(file, pair.identity, entries.connections[0]!.directory, process.pid)
-      const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
-      await writeLeaseReceipt(path.join(evidence, "admin.json"), { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) })
+      const connections = await Promise.all(entries.connections.map(async entry => {
+        const finalization = await readAdminFinalization(file, pair.identity, entry.directory, process.pid)
+        const connection = await readLeaseReceipt(finalization.source.path) as { finalization: { command: { path: string } } }
+        return { finalization, connection, disposeCommand: await readLeaseReceipt(connection.finalization.command.path) }
+      }))
+      await writeLeaseReceipt(path.join(evidence, "admin.json"), { connections })
       settled.admin = true
     }
   } finally {

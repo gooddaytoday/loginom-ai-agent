@@ -53,7 +53,7 @@ export type AdminConnection = {
   configureOwnedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof recordUserConfiguration>>>
   reconcileOwnedAcl(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string; policy: SharedDirectoryPolicy;
     source: { path: string; id: string; sha256: string } }>
-  observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown): Promise<Awaited<ReturnType<typeof recordServerSession>>>
+  observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown, mode?: "retained-package"): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
   closeManagementSession(lease: SlotLease, secretFile: string, id: string): Promise<void>
   activateOwnedUser(lease: SlotLease, secretFile: string): Promise<{ activated: boolean; userKey: string; source: { path: string; id: string; sha256: string } }>
@@ -411,7 +411,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (JSON.stringify(await readLeaseReceipt(target)) !== JSON.stringify(receipt)) throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
       return { activated: data.activated, userKey: before.owned.userKey, source }
     },
-    async observeOwnedSession(lease, secretFile, policy) {
+    async observeOwnedSession(lease, secretFile, policy, mode) {
       await lease.assertHeld()
       if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
@@ -419,7 +419,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       const activation = await readUserActivation(file, lease, secretFile)
       if (!activation) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
       if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      const payload = { phase: "session-probe", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
+      const payload = { phase: mode === "retained-package" ? "session-package-crash-probe" : "session-probe", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
         desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: owned.objectId, name: owned.username,
           userKind: owned.userKind, preparationNonce: owned.preparationNonce, secretHash: prepared.secretHash }, expectedPolicy: structuredClone(policy) }
       const reply = await request("reconcile-user", payload, async () => {
