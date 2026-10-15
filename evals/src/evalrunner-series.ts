@@ -84,6 +84,10 @@ export async function admitEvalrunnerSlot(config: SeriesRoots, manifest: Evalrun
     throw new EvalFailure("Slot identity differs", 2)
   const directory = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`)
   await mkdir(directory, { recursive: true, mode: 0o700 })
+  if (await Bun.file(path.join(directory, `${slot.id}.json`)).exists()) throw new EvalFailure("Slot already admitted; inspect original evidence", 2)
+  const { inspectEvalrunnerSeries } = await import("./evalrunner-series-check")
+  const progress = await inspectEvalrunnerSeries(config, manifest.series)
+  if (progress.status !== "READY" || progress.next?.id !== slot.id) throw new EvalFailure("Earlier slot unresolved or slot order differs", 2)
   const admission = { kind: "evalrunner-slot-admission", version: 2, manifestSha256: evalrunnerHash(JSON.stringify(saved, null, 2)),
     issue: manifest.issue, scope: manifest.scope, slot, task, series: manifest.series, at: new Date().toISOString() }
   await durableEvalrunnerJson(path.join(directory, `${slot.id}.json`), admission)

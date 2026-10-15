@@ -39,6 +39,7 @@ test("versioned series reservation survives another directory and task, and a co
     const first = manifest.slots[0]!
     await admitEvalrunnerSlot(config, manifest, first, "task-1")
     expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "BLOCKED", completed: 0, expected: 144, blockedSlot: first.id })
+    await expect(admitEvalrunnerSlot(config, manifest, manifest.slots[1]!, "task-2")).rejects.toThrow("Earlier slot unresolved")
     await expect(admitEvalrunnerSlot(config, manifest, first, "task-2")).rejects.toThrow("already admitted")
     await Bun.write(path.join(manifest.series, "manifest.json"), JSON.stringify({ ...manifest, slots: manifest.slots.slice(1) }))
     await expect(readEvalrunnerSeries(config, manifest.series)).rejects.toThrow("Manifest changed")

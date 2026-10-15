@@ -33,6 +33,10 @@ export async function acquireEvalrunnerSeriesLease(config: { root: string }, man
   if (info.isSymbolicLink() || info.uid !== process.getuid?.() || info.mode & 0o077 ||
     await readFile(path.join(directory, "owner.json"), "utf8") !== raw) throw new EvalFailure("Stand BUSY/BLOCKED; foreign or historical lease retained", 2)
   return { nonce: manifest.nonce, release: async () => {
+    const { inspectEvalrunnerSeries } = await import("./evalrunner-series-check")
+    const progress = await inspectEvalrunnerSeries({ ...config, results: path.dirname(manifest.series) }, manifest.series)
+    if (progress.status !== "COMPLETE" || progress.completed !== (manifest.scope === "full" ? 144 : 1))
+      throw new EvalFailure("Series coverage unconfirmed; stand retained", 2)
     const current = await lstat(directory)
     if (current.isSymbolicLink() || current.dev !== info.dev || current.ino !== info.ino ||
       await readFile(path.join(directory, "owner.json"), "utf8") !== raw) throw new EvalFailure("Series stand owner changed", 2)

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { acquireEvalrunnerExecutor, acquireEvalrunnerSeriesLease } from "../src/evalrunner-controller"
-import { createEvalrunnerManifest, loadEvalrunnerCorpus } from "../src/evalrunner-series"
+import { createEvalrunnerManifest, loadEvalrunnerCorpus, reserveEvalrunnerSeries } from "../src/evalrunner-series"
 import { evalsRoot } from "../src/config"
 
 test("one durable executor excludes concurrent start and resume, and refuses altered owner on release", async () => {
@@ -24,11 +24,13 @@ test("logical series lease remains across controller handles and never adopts hi
     await mkdir(path.join(root, "operations"))
     const corpus = await loadEvalrunnerCorpus(evalsRoot)
     const manifest = createEvalrunnerManifest({ issue: "LAB-77", task: "task-1", series: path.join(root, "results/v02-full-LAB-77"), scope: "full", pins: {}, corpus })
+    await mkdir(path.join(root, "results"))
+    await reserveEvalrunnerSeries({ root, results: path.join(root, "results") }, manifest)
     const first = await acquireEvalrunnerSeriesLease({ root }, manifest)
     const resumed = await acquireEvalrunnerSeriesLease({ root }, manifest)
     expect(resumed.nonce).toBe(first.nonce)
-    await expect(acquireEvalrunnerSeriesLease({ root }, { ...manifest, nonce: "other" })).rejects.toThrow("Stand BUSY/BLOCKED")
-    await first.release()
-    expect(await Bun.file(path.join(root, "operations/stand.lease/owner.json")).exists()).toBe(false)
+    await expect(acquireEvalrunnerSeriesLease({ root }, { ...manifest, nonce: crypto.randomUUID() })).rejects.toThrow("Stand BUSY/BLOCKED")
+    await expect(first.release()).rejects.toThrow("Series coverage unconfirmed")
+    expect(await Bun.file(path.join(root, "operations/stand.lease/owner.json")).exists()).toBe(true)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
