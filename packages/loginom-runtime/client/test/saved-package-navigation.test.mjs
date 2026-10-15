@@ -13,8 +13,10 @@ test('saved package rekey preserves real prepared context, activation and graph 
  f.returnGraph();assert.equal((await activatePreparedWorkflow(f.page,task(f))).verified,true);
  const returned=await readGraph(f.page,task(f));assert.deepEqual(returned.workflow_ref,initial.workflow_ref);assert.deepEqual(returned.nodes,initial.nodes);assert.deepEqual(f.calls,[]);
 });
-test('rekey cannot establish a baseline retrospectively from an unconfirmed wizard',async()=>{
- const f=nativePage();f.enterWizard();assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);f.returnGraph();assert.equal((await activatePreparedWorkflow(f.page,task(f))).verified,false);await assert.rejects(readGraph(f.page,task(f)),/navigation/);assert.deepEqual(f.calls,[]);
+test('canonical wizard read cannot establish a graph baseline retrospectively',async()=>{
+ const f=nativePage();f.enterWizard();
+ const wizard=await readPreparedNodeContext(f.page,f.binding);assert.equal(wizard.verified,true);assert.equal(wizard.surface,'wizard');assert.ok(wizard.navigation_rebinding);assert.equal(f.record.nodeNavigationBinding,undefined);
+ f.returnGraph();assert.equal((await activatePreparedWorkflow(f.page,task(f))).verified,false);await assert.rejects(readGraph(f.page,task(f)),/navigation/);assert.deepEqual(f.calls,[]);
 });
 const changes={document:f=>{f.prep.document={}},document_id:f=>{f.prep.id='other'},package:f=>{f.record.packageNode={}},workflow:f=>{f.record.nodeTargetWorkflowNode={}},workflow_guid:f=>{f.flow.FGuid='foreign'},package_guid:f=>{f.pkg.FGuid='foreign'},tab:f=>{f.record.tab={}},inactive_tab:f=>f.setActive(false),node:f=>{f.node.FGuid='foreign'},wizard_model:f=>{f.controller.FController.FModelNode={}},account:f=>{f.main.FMapTree.FServerConnection.UserName='foreign'},package_path:f=>{f.pkg.PackageFileName='/other.lgp'},label:f=>{f.crumbs()[2].textContent='other'},package_name:f=>{f.pkg.PackageName='other'},module_parent:f=>{f.native[3].ParentNode={}},foreign_module:f=>{f.components.get(f.crumbs()[3].id)._node.data.node={ParentNode:f.pkg}},foreign_node_crumb:f=>{f.components.get(f.crumbs()[5].id)._node.data.node={ParentNode:f.flow,FGuid:'node'}},foreign_wizard_crumb:f=>{f.components.get(f.crumbs()[6].id)._node.data.node={ParentNode:f.node}},component_dom:f=>{f.components.get(f.crumbs()[2].id).el.dom={}},missing_native:f=>{f.components.delete(f.crumbs()[2].id)},duplicate_crumb:f=>f.duplicateCrumb(),incomplete_crumb:f=>f.removeCrumb(),empty_crumbs:f=>f.clearCrumbs(),arbitrary_tid:f=>{f.binding.workflow_ref.navigation_path[2].tid='made-up'},unconfirmed_binding:f=>{f.record.crumbs[2].label='other';delete f.record.nodeNavigationBinding},ambiguous_receipt:f=>{f.prep.receipts.set('foreign',{...f.record,packageNode:{}})}};
 for(const [name,change] of Object.entries(changes))test('saved package navigation refuses '+name,async()=>{
@@ -78,8 +80,9 @@ for(const mode of ['account','package_path','package','workflow','tab','ambiguou
 
 test('a refused original node observation cannot authorize a later rekey',async()=>{
  const f=nativePage();f.graph.FDiagram.FNodes.FCollection=[];
- assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ const graph=await readPreparedNodeContext(f.page,f.binding);assert.equal(graph.verified,false);assert.equal(graph.reason,'graph_node');
  assert.equal(f.record.nodeNavigationBinding,undefined);
- f.enterWizard();assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ f.enterWizard();const wizard=await readPreparedNodeContext(f.page,f.binding);assert.equal(wizard.verified,true);assert.equal(wizard.surface,'wizard');assert.ok(wizard.navigation_rebinding);assert.equal(f.record.nodeNavigationBinding,undefined);
+ f.returnGraph();assert.equal((await activatePreparedWorkflow(f.page,task(f))).verified,false);await assert.rejects(readGraph(f.page,task(f)),/navigation/);
  assert.deepEqual(f.calls,[]);
 });
