@@ -167,12 +167,13 @@ for(const mode of ['accessor','copy','wrong-intent','late'])test('capsule fixed 
  assert.throws(()=>runInContext(entry+'(__capsule,__request)',x.f.c),/REQUEST|UNAVAILABLE|LATE/);assert.equal(x.f.c.getterCalls,0);assert.equal(x.realm.native.calls.length,0);
 }));
 
-async function creationControl(fn,{pageFailure,phaseHook}={}){return control(async x=>{
+async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invokeSdk=false}={}){return control(async x=>{
  x.f.c.__capsule=x.capsule;
  if(pageFailure){x.realm.page.page.evaluate=async()=>{pageFailure(x);throw pageFailure.value}}
- const host=await joined({pageOverride:x.realm.page.page,account:'test-account',sessionId:'own-session',
+ const host=await joined({pageOverride:x.realm.page.page,account:'test-account',sessionId:'own-session',originalSdk,
   preparation(_f,input){x.f.c.__armInput=runInContext('('+JSON.stringify(input)+')',x.f.c);return runInContext('('+witness.retainTerminalPrepareOnCapsule.toString()+')(__capsule,__armInput)',x.f.c)},
-  continuation(fn,mode){if(phaseHook)phaseHook(x,fn,mode);x.f.c.__creationPhase=mode;return runInContext('('+fn.toString()+')(__capsule,__creationPhase)',x.f.c)}});
+  continuation(fn,mode){if(phaseHook){const intercepted=phaseHook(x,fn,mode);if(intercepted!==undefined)return intercepted}x.f.c.__creationPhase=mode;return runInContext('('+fn.toString()+')(__capsule,__creationPhase)',x.f.c)}});
+ if(invokeSdk)host.c.token.invoke({signal:host.c.token.inspect().signal});
  const request=Object.freeze({operationId:'original',sessionId:'own-session',intent:'new_draft'});
  await host.witness.retainPrepare(request,host.f.bridge);
  const options={loginomUrl:'http://loginom.example/app?testable=true',compatibility:{profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'},platform:'darwin',sessionId:'own-session',operationId:'original',timeoutMs:1};
@@ -224,3 +225,58 @@ test('creation continuation successful completion refuses later options drift wi
  assert.throws(()=>x.host.witness.createWorkspace(x.options,x.host.f.bridge));assert.deepEqual(x.realm.native.calls,[0]);
  assert.equal(x.realm.page.events.filter(e=>e==='create_draft').length,1);
 }));
+
+test('packet continuation retains initial realm custody before creation and queries same packet with original managed control',()=>creationControl(async x=>{
+ const initial=x.provider.arm(x.f.c.__armInput).inspect().initial;assert(Object.isFrozen(initial));assert.equal(initial.request,x.f.c.__armInput);assert.equal(initial.currentUser,x.f.user);
+ assert.equal(initial.preparation,x.realm.preparation);assert.equal(initial.transport,x.realm.native.session);assert.equal(x.realm.preparation.receipts.size,0);
+ assert.throws(()=>x.provider.packet(),/INCOMPLETE/);
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const packet=x.provider.packet();assert.equal(packet.initial,initial);assert.equal(packet.receipt,x.realm.preparation.receipts.get('original'));
+ const before=x.host.c.token.inspect(),work=x.host.witness.continueComponent(x.host.f.bridge);assert.equal(x.host.witness.continueComponent(x.host.f.bridge),work);
+ const result=await work;assert.equal(result.packetQueryContinuationVerified,true);assert.equal(result.componentReady,false);assert.equal(result.reason,'READONLY_STORAGE_COMPONENT_NOT_BOUND');assert.equal(result.originalManagedControlRetained,true);assert.equal(result.parentSignalSameReference,false);
+ const after=x.host.c.token.inspect();for(const key of ['signal','controller','handleTask','sdkTask'])assert.equal(after[key],before[key]);assert(before.sdkTask instanceof Promise);
+ for(const key of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'])assert.equal(result[key],false);
+ assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);assert.equal(x.host.witness.continueComponent(x.host.f.bridge),work);
+},{originalSdk:true,invokeSdk:true}));
+for(const mode of ['missing','late'])test('packet continuation '+mode+' SDK task cannot repair initial control',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+ if(mode==='late')x.host.c.token.invoke({signal:x.host.c.token.inspect().signal});
+ assert.throws(()=>x.host.witness.continueComponent(x.host.f.bridge),/SDK_TASK_UNAVAILABLE/);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true}));
+test('packet continuation copied packet cannot enter original provider or local packet registry',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const retained=x.provider.packet(),copy=Object.freeze({...retained});
+ assert.throws(()=>x.provider.checkPacket(copy),/PACKET_FOREIGN/);assert.throws(()=>packet.checkTerminalOriginalPacket(copy,{}),/PACKET/);
+ assert.throws(()=>x.provider.queryPacket(copy),/PACKET_FOREIGN/);await x.host.witness.continueComponent(x.host.f.bridge);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true,invokeSdk:true}));
+for(const reason of [false,0,null,undefined,'',Error('first component',{cause:0})])test('packet continuation raw '+String(reason)+' wins secondary controller drift',()=>{
+ let host;return creationControl(async x=>{host=x.host;await x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+  const work=x.host.witness.continueComponent(x.host.f.bridge);let caught=false;try{await work}catch(value){caught=true;assert.equal(value,reason)}assert(caught);assert.equal(x.host.witness.continueComponent(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0]);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn){if(fn.name==='continueTerminalRealmComponent'){host.f.state.controller={};throw reason}}});
+});
+test('packet continuation initial controller accessor refuses getter0 before realm/component read',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);let gets=0;Object.defineProperty(x.host.f.state,'controller',{get(){gets++;throw Error('foreign controller')}});
+ assert.throws(()=>x.host.witness.continueComponent(x.host.f.bridge),/CHANGED/);assert.equal(gets,0);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true,invokeSdk:true}));
+
+test('packet continuation before creation refuses exact missing completion without native call',()=>creationControl(async x=>{
+ assert.throws(()=>x.host.witness.continueComponent(x.host.f.bridge),/CREATION_UNAVAILABLE/);assert.deepEqual(x.realm.native.calls,[]);assert.equal(x.realm.preparation.receipts.size,0);
+},{originalSdk:true,invokeSdk:true}));
+test('packet continuation original abort false precedes foreign Page getter',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);let gets=0;x.host.f.state.controller.abort(false);
+ Object.defineProperty(x.host.f.owner,'page',{get(){gets++;throw Error('foreign Page')}});
+ let caught=false;try{x.host.witness.continueComponent(x.host.f.bridge)}catch(value){caught=true;assert.equal(value,false)}assert(caught);assert.equal(gets,0);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true,invokeSdk:true}));
+for(const mode of ['accessor','native-flag'])test('packet continuation '+mode+' projected component cannot mint qualification getter0',()=>{
+ let gets=0;return creationControl(async x=>{await x.host.witness.createWorkspace(x.options,x.host.f.bridge);await assert.rejects(x.host.witness.continueComponent(x.host.f.bridge));assert.equal(gets,0);assert.deepEqual(x.realm.native.calls,[0]);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn){if(fn.name!=='continueTerminalRealmComponent')return;
+  const result={packetQueryContinuationVerified:true,interface_reply:'original_proxy_observed',componentReady:false,reason:'READONLY_STORAGE_COMPONENT_NOT_BOUND',controlLocation:'host',sourceExecutionQualified:false,closureIdentityQualified:false,nativeReceiversQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false};
+  if(mode==='accessor')Object.defineProperty(result,'componentReady',{get(){gets++;throw Error('foreign metadata')}});else result.nativeReceiversQualified=true;
+  return Promise.resolve(result);
+ }});
+});
+
+test('packet continuation waits original pending creation while SDK task remains pending without remint',()=>creationControl(async x=>{
+ const original=x.host.c.token.inspect().sdkTask,creation=x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+ const work=x.host.witness.continueComponent(x.host.f.bridge);assert.equal(x.host.witness.continueComponent(x.host.f.bridge),work);
+ assert.equal((await work).packetQueryContinuationVerified,true);assert.equal((await creation).status,'READY');
+ assert.equal(x.host.c.token.inspect().sdkTask,original);assert.equal(x.realm.page.events.filter(e=>e==='create_draft').length,1);assert.deepEqual(x.realm.native.calls,[0]);
+},{originalSdk:true,invokeSdk:true}));

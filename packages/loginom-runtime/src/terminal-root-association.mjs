@@ -361,10 +361,10 @@ export async function bindTerminalScriptWitness(owner){
   }
   // One original JSHandle/evaluator; no proxy or function is reconstructed from
   // the returned evidence. Cache the exact pending/rejected prepare task.
-  let prepareTask,prepareInput,prepareCheck,prepareCall,prepareBridge;
+  let prepareTask,prepareInput,prepareCheck,prepareCall,prepareBridge,prepareControl;
   function retainPrepare(input,bridge){
    if(prepareTask){if(input!==prepareInput||bridge!==prepareBridge)fail();prepareCall.guard();prepareCheck();return prepareTask}
-   load.guard();check();prepareCall=terminalManagedCallForBridge(bridge);if(!prepareCall||terminalSourceForManagedCall(owner,prepareCall.facts.message)!==load)fail();prepareCall.guard();prepareBridge=bridge;prepareInput=input;prepareCheck=snapshot(input);prepareCheck();
+   load.guard();check();prepareCall=terminalManagedCallForBridge(bridge);if(!prepareCall||terminalSourceForManagedCall(owner,prepareCall.facts.message)!==load)fail();prepareCall.guard();prepareControl=prepareCall.inspect();prepareBridge=bridge;prepareInput=input;prepareCheck=snapshot(input);prepareCheck();
    prepareTask=(async()=>{try{
     load.guard();check();prepareCall.guard();prepareCheck();
     const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.retainTerminalPrepareOnCapsule,input]);
@@ -403,12 +403,41 @@ export async function bindTerminalScriptWitness(owner){
     return Object.freeze({...result,creationContinuationVerified:true,queryCompleted:true,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
    }catch(error){creationFailed=true;throw load.reject(error)}})();return creationWork;
   }
+  let componentWork,componentFailed=false;
+  function continueComponent(bridge){
+   const checkControl=()=>{
+    prepareCall?.guard();load.guard();check();
+    if(bridge!==prepareBridge||terminalManagedCallForBridge(bridge)!==prepareCall||!prepareControl)fail();
+    const now=prepareCall.inspect();
+    if(!prepareControl.sdkTask||prepareControl.phase!=='dispatched')throw Error('LOGINOM_ORIGINAL_COMPONENT_SDK_TASK_UNAVAILABLE');
+    if(['controller','signal','handleTask','sdkTask'].some(k=>now[k]!==prepareControl[k]))fail();
+    if(typeof creationCheck!=='function')throw Error('LOGINOM_ORIGINAL_COMPONENT_CREATION_UNAVAILABLE');creationCheck();
+   };
+   if(componentWork){if(!componentFailed)checkControl();return componentWork}
+   checkControl();if(!creationWork)fail();
+   componentWork=(async()=>{try{
+    await creationWork;checkControl();
+    const packetModule=await load.observed(import('../client/lib/terminal-original-packet.mjs'));checkControl();
+    const packetTask=Reflect.apply(originalHandleEvaluate,originalHandle,[packetModule.inspectTerminalRealmPacket]);
+    const packet=await load.observed(packetTask);checkControl();snapshot(packet)();
+    if(loadData(packet,'operationId')!==prepareInput.operationId||loadData(packet,'sessionId')!==prepareInput.sessionId
+      ||loadData(packet,'sameRealmInitialPacket')!==true||loadData(packet,'receiptVerified')!==true||loadData(packet,'controlLocation')!=='host'||['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'].some(k=>loadData(packet,k)!==false))fail();
+    const module=await load.observed(import('../client/lib/terminal-original-interfaces.mjs'));checkControl();
+    const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.continueTerminalRealmComponent]);
+    const result=await load.observed(task);checkControl();snapshot(result)();
+    if(loadData(result,'packetQueryContinuationVerified')!==true||loadData(result,'interface_reply')!=='original_proxy_observed'
+      ||loadData(result,'componentReady')!==false||loadData(result,'reason')!=='READONLY_STORAGE_COMPONENT_NOT_BOUND'
+      ||loadData(result,'controlLocation')!=='host'||['sourceExecutionQualified','closureIdentityQualified','nativeReceiversQualified','nativeAuthority','contentAuthority','saveAuthority','closeAuthority'].some(k=>loadData(result,k)!==false))fail();
+    return Object.freeze({...result,originalManagedControlRetained:true,parentSignalSameReference:false});
+   }catch(error){componentFailed=true;throw load.reject(error)}})();return componentWork;
+  }
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
    realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,supportedInitialLoadJoined,initialLoadReason:supportedInitialLoadJoined?undefined:(Object.hasOwn(summary,'initialLoadReason')?loadData(summary,'initialLoadReason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
    recheck:originalHandle?()=>recheck():undefined,
    createWorkspace:originalHandle?createWorkspace:undefined,
+   continueComponent:originalHandle?continueComponent:undefined,
    retainPrepare:originalHandle&&Object.hasOwn(summary,'privatePrepareAvailable')&&loadData(summary,'privatePrepareAvailable')===true?retainPrepare:undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}

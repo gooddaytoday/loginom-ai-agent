@@ -238,6 +238,9 @@ export function collectTerminalScriptWitness(expected){
        ||own(entry,'tab')!==own(completion,'tab')||own(entry,'packageNode')!==own(completion,'packageNode'))throw Error('TERMINAL_PROVIDER_FOREIGN_CREATION');
      for(const key of Reflect.ownKeys(completion))hold(completion,key);hold(entry,'terminalOriginalCreation');hold(entry,'tab');hold(entry,'packageNode');
      creationState.completion=completion;creationState.phase='verified';
+     creationState.packet=Object.freeze({initial:armed.initial,request,receipt:entry,completion,
+      preparation,receipts,document:doc,account,session:transport,packageNode:own(completion,'packageNode'),tab:own(completion,'tab'),proxy:own(completion,'packageProxy')});
+     for(const key of Reflect.ownKeys(creationState.packet))hold(creationState.packet,key);
     }else if(mode==='query'){
      if(creationState.phase!=='verified'||entry!==creationState.receipt||own(entry,'terminalOriginalCreation')!==creationState.completion)throw Error('TERMINAL_PROVIDER_CREATION_CHANGED');
      return armed.binding.query();
@@ -247,6 +250,15 @@ export function collectTerminalScriptWitness(expected){
     originalRequestRetained:true,receiptVerified:creationState.phase==='verified',nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
    }catch(value){providerFailure??={value};throw providerFailure.value}
   },
+  packet(){if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();
+   if(!creationState?.packet)throw Error('TERMINAL_PROVIDER_PACKET_INCOMPLETE');provider.checkPacket(creationState.packet);return creationState.packet},
+  checkPacket(packet){if(this!==provider||!creationState||packet!==creationState.packet)throw Error('TERMINAL_PROVIDER_PACKET_FOREIGN');
+   guard();armed.check();
+   if(packet.initial!==armed.initial||packet.request!==armed.request||packet.receipt!==readReceipt(armed.operationId)
+     ||own(packet.receipt,'phase')!=='verified'||own(packet.receipt,'terminalOriginalCreation')!==packet.completion
+     ||packet.completion!==creationState.completion||own(packet.completion,'packageProxy')!==packet.proxy)throw Error('TERMINAL_PROVIDER_CREATION_CHANGED');
+   return true},
+  queryPacket(packet){if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');provider.checkPacket(packet);return armed.binding.query()},
   arm(request){
    if(this!==provider)throw Error('TERMINAL_PROVIDER_RECEIVER');guard();
    if(armed){if(armed.request!==request)throw Error('TERMINAL_PROVIDER_REPLAY');armed.check();return armed.binding}
@@ -289,11 +301,18 @@ export function collectTerminalScriptWitness(expected){
       }]);
      }catch(error){rejectFirst(error)}return work;
     },
-    inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType,
+    inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,initial:armed?.initial,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType,
      lower:lower?Object.freeze({dispatchTask:lower.dispatchTask,request:lower.request,response:lower.response,continuation:lower.originalContinuation,reader:lower.originalReader,resolver:lower.resolverPatch.method,
       w:lower.w,o:lower.o,hresult:lower.hresult,returnedType:lower.returnedType,support:lower.support,observed:lower.observed,completed:lower.completed,restored:lower.restored}):undefined})},
    });
-   armed={...entry,check,binding};return binding;
+   // Same-realm initial custody is captured before begin/reserve/effect. The
+   // physical host control deliberately stays outside this packet.
+   const initial=Object.freeze({request,document:doc,documentId:preparationId,account,preparation,receipts,
+    currentUser:own(sample,'user'),userTask:own(sample,'task'),acquisition,acquisitionTask:own(acquisition,'task'),
+    acquisitionReceiver:own(acquisition,'receiver'),connection,applicationSession,storage,transport,
+    definitions:originalDefs,bindings,query:originalQuery,streamType,controlLocation:'host'});
+   for(const key of Reflect.ownKeys(initial))hold(initial,key);
+   armed={...entry,initial,check,binding};return binding;
   },
  });
  }catch(value){

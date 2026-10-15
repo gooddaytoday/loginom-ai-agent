@@ -6,7 +6,7 @@ const root=process.env.ROOT_RUNTIME_ROOT?new URL('file://'+process.env.ROOT_RUNT
 const roots=await import(new URL('src/terminal-root-association.mjs',root));
 const {beginTerminalManagedCall}=await import(new URL('src/terminal-managed-call.mjs',root));
 const {retainOriginalPrepareStartup,requireTerminalPrepareProvider}=await import(new URL('src/original-prepare-lender.mjs',root));
-function fixture({handleEvaluate,deadline=Date.now()+60000,pageOverride,account='account',sessionId='session'}={}){
+function fixture({handleEvaluate,deadline=Date.now()+60000,pageOverride,account='account',sessionId='session',originalSdk=false}={}){
  const controller=new AbortController();
  const capture={revision:1,harness:'sorting-before-close-v1',owner:'owner',run:'run',lease:'owner:run',generation:1,chat:'chat',account,packagePath:'/account/original.lgp',admission:'original',expires:deadline};
  const wire={originId:'root',deadline,parentPid:1,hostPid:2,childPid:3,generation:1,chat:'chat',loadPurpose:{...capture,purpose:'sorting-terminal-source-v1'}};
@@ -22,7 +22,7 @@ function fixture({handleEvaluate,deadline=Date.now()+60000,pageOverride,account=
  state.startupOwner=owner;load.bindOwner(owner,'/own/profile');load.admitBrowser(owner,connection,'/own/profile');owner.context=context;load.bindContext(context);owner.page=page;load.bindPage(page);
  const session={metadata:{sessionId},directory:'/own'},bridge={},startup=Object.freeze({...owner,owner});
  const lender=retainOriginalPrepareStartup(session,{startup,owner,readiness:{documentId:'document',account,loginomBuild:'7.4.2'},assertStartup(){}});lender.bind(bridge);
- state.bridge=bridge;state.session=session;state.client={callTool(){throw Error('NO_DISPATCH')}};
+ state.bridge=bridge;state.session=session;state.client={callTool(){if(!originalSdk)throw Error('NO_DISPATCH');return new Promise(()=>{})}};
  return{wire,state,start,load,owner,page,context,session,bridge,lender,controller,frame,get routeHandler(){return routeHandler}};
 }
 function call(f,{otherState,associated=true}={}){
@@ -80,7 +80,7 @@ test('root expiry is original absolute deadline and precedes foreign Page getter
 
 // The retained handle below deliberately returns a labelled summary double.
 // It tests the production consumer and original route receipts, not realm proof.
-async function joined({afterFirst,preparation,pageOverride,account='account',sessionId='session',continuation}={}){
+async function joined({afterFirst,preparation,pageOverride,account='account',sessionId='session',continuation,originalSdk=false}={}){
  const {terminalScriptWitnessArguments}=await import(new URL('client/lib/terminal-script-witness.mjs',root));
  const pins=terminalScriptWitnessArguments('original',account).initialLoadPins;
  const paths=['bg/js/mscorlib.js','bg/js/bg.mscorlib.js','bg/js/rpc.js','bg/js/bg.rtl.rpc.js','bg/js/bg.rtl.rpc.js'];
@@ -89,7 +89,7 @@ async function joined({afterFirst,preparation,pageOverride,account='account',ses
   initialLoad:{records:pins.map(([url,integrity])=>({url,integrity,loaded:true})),definingExportsRetained:true,applicationSourcesJoined:true},
   rows:paths.map((p,i)=>{const url='https://app.loginom.ai/app/'+p;return{kind:kinds[i],url,integrity:pins.find(([u])=>u===url)[1],armedBeforeSource:true,initialExecutionObserved:true}})};
  if(preparation)summary.privatePrepareAvailable=true;
- let calls=0;const f=fixture({pageOverride,account,sessionId,handleEvaluate(fn,input){calls++;if(['continueTerminalCreationOnCapsule','inspectWorkspaceRealm'].includes(fn.name)&&continuation)return continuation(fn,input);if(fn.name==='retainTerminalPrepareOnCapsule'&&preparation)return preparation(f,input);if(calls>1&&afterFirst)return afterFirst(f);return Promise.resolve(structuredClone(summary))}});
+ let calls=0;const f=fixture({pageOverride,account,sessionId,originalSdk,handleEvaluate(fn,input){calls++;if(['continueTerminalCreationOnCapsule','inspectWorkspaceRealm','inspectTerminalRealmPacket','continueTerminalRealmComponent'].includes(fn.name)&&continuation)return continuation(fn,input);if(fn.name==='retainTerminalPrepareOnCapsule'&&preparation)return preparation(f,input);if(calls>1&&afterFirst)return afterFirst(f);return Promise.resolve(structuredClone(summary))}});
  await roots.prepareTerminalSourceResponses(f.owner);
  const inputs=process.env.TERMINAL_SOURCE_INPUT_DIR?new URL('file://'+process.env.TERMINAL_SOURCE_INPUT_DIR+'/'):new URL('../../../../publisher-source/',import.meta.url);
  const docs=new URL('../../../docs/testing/loginom-ai-agent/',import.meta.url);

@@ -311,3 +311,20 @@ export function readTerminalOriginalPacket(packet,name) {
   const method=data(entry.start.load.definitions.FileStoragePrototype,name);
   return callOriginalTask(packet,entry,name,entry.original.fileStorage,method,[]);
 }
+
+// Fixed typed-capsule inspection. This opaque realm packet is NOT a token from
+// the local initials/packets registry above and does not bypass its guards.
+export function inspectTerminalRealmPacket(capsule){
+ const data=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('TERMINAL_PACKET_ACCESSOR');return d.value};
+ Reflect.apply(data(capsule,'checkOriginal'),capsule,[]);
+ const provider=data(capsule,'originalProvider'),packet=Reflect.apply(data(provider,'packet'),provider,[]);
+ Reflect.apply(data(provider,'checkPacket'),provider,[packet]);
+ const initial=data(packet,'initial'),request=data(initial,'request'),completion=data(packet,'completion');
+ if(!Object.isFrozen(packet)||!Object.isFrozen(initial)||!Object.isFrozen(completion)
+   ||data(packet,'request')!==request||data(packet,'preparation')!==data(initial,'preparation')
+   ||data(packet,'receipts')!==data(initial,'receipts')||data(packet,'document')!==data(initial,'document')
+   ||data(packet,'account')!==data(initial,'account')||data(packet,'session')!==data(initial,'transport')
+   ||data(completion,'connection')!==data(initial,'connection')||data(initial,'controlLocation')!=='host')throw Error('TERMINAL_PACKET_INITIAL_PROVENANCE');
+ return Object.freeze({operationId:data(request,'operationId'),sessionId:data(request,'sessionId'),sameRealmInitialPacket:true,
+  receiptVerified:true,controlLocation:'host',nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
+}

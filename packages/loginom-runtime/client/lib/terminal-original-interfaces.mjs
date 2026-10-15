@@ -132,3 +132,18 @@ export function retainTerminalOriginalInterfaces({original, current, definitions
   };
   return Object.freeze(api);
 }
+
+// Fixed query-custody consumer on the original capsule handle. Full local
+// retainTerminalOriginalInterfaces and its readonly/storage predicates remain
+// separate; a JSON projection cannot instantiate either original-ref scope.
+export async function continueTerminalRealmComponent(capsule){
+ const data=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('TERMINAL_INTERFACE_ACCESSOR');return d.value};
+ Reflect.apply(data(capsule,'checkOriginal'),capsule,[]);
+ const provider=data(capsule,'originalProvider'),packet=Reflect.apply(data(provider,'packet'),provider,[]);
+ const check=data(provider,'checkPacket');Reflect.apply(check,provider,[packet]);
+ const task=Reflect.apply(data(provider,'queryPacket'),provider,[packet]);await task;Reflect.apply(check,provider,[packet]);
+ return Object.freeze({packetQueryContinuationVerified:true,interface_reply:'original_proxy_observed',
+  componentReady:false,reason:'READONLY_STORAGE_COMPONENT_NOT_BOUND',controlLocation:'host',
+  sourceExecutionQualified:false,closureIdentityQualified:false,nativeReceiversQualified:false,
+  nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
+}
