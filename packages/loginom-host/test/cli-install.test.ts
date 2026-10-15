@@ -6,6 +6,37 @@ import { installCli, uninstallCli } from "../src/cli-install"
 import { writeCliManifest } from "../src/cli-manifest"
 import { copyProductSkillsFixture } from "./fixtures/product-skills"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
+import release from "../../product/loginom-release.json"
+
+test.skipIf(process.platform !== "linux")("user install validates the pinned Chromium sandbox before publishing a launcher", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cli-install-sandbox-"))
+  const artifact = join(root, "artifact")
+  const home = join(root, "home")
+  try {
+    for (const file of [
+      "bin/loginom-ai-agent-cli",
+      "resources/loginom/bin/node",
+      "resources/loginom/host/node-host.mjs",
+      `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
+    ]) {
+      await mkdir(dirname(join(artifact, file)), { recursive: true })
+      await writeFile(join(artifact, file), file, { mode: 0o755 })
+    }
+    await copyProductSkillsFixture(join(artifact, "resources/loginom"))
+    await writeFile(join(artifact, "resources/loginom/resource-manifest.json"), JSON.stringify({
+      protocol: 1, files: await resourceInventory(join(artifact, "resources/loginom")),
+    }))
+    await writeCliManifest(artifact, {
+      version: "test", channel: "dev", platform: process.platform, arch: process.arch,
+      sourceCommit: "a".repeat(40), sourceTreeSha256: "b".repeat(64), sourceDirty: true, dependencies: {},
+    })
+    await expect(installCli(artifact, home)).rejects.toThrow("CLI_SANDBOX_MODE_INVALID")
+    expect(await Bun.file(join(home, ".local/bin/loginom-ai-agent-cli")).exists()).toBe(false)
+    expect(await Bun.file(join(home, ".local/share/loginom-ai-agent-cli/current.json")).exists()).toBe(false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
   "user install preserves foreign launchers/profiles and refuses uninstall of a live payload",

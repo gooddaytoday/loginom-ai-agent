@@ -32,7 +32,8 @@ if(scenario!=='unprepared')state.bridge={async close(){
   if(scenario==='reject')throw Error('private injected failure');
   if(scenario==='missing')return undefined;
   return {browser_transport_closed:scenario!=='transport-false',browser_process_terminated:scenario!=='process-false',
-    clipboard_leases_retained:scenario==='retained'?1:0};
+    clipboard_leases_retained:scenario==='retained'?1:0,
+    ...(scenario==='package-blocked'?{package_cleanup:{policy:'last_confirmed_own_save',status:'BLOCKED'}}:{})};
 }};
 let closing;
 process.on('message',message=>{
@@ -53,7 +54,7 @@ process.on('message',message=>{
 process.send({kind:'ready',profile,diagnostic});
 `
 
-for (const scenario of ["success", "transport-false", "process-false", "retained", "missing", "reject", "client-reject", "server-reject", "unprepared", "diagnostic-unwritable"]) {
+for (const scenario of ["success", "package-blocked", "transport-false", "process-false", "retained", "missing", "reject", "client-reject", "server-reject", "unprepared", "diagnostic-unwritable"]) {
   test(`managed resource close drains admitted work and checks bridge ACK: ${scenario}`, async (t) => {
     const child = spawn(process.execPath, ["--input-type=module", "-e", CHILD,
       new URL("../src/managed-resources-close.mjs", import.meta.url).href, scenario],
@@ -85,7 +86,7 @@ for (const scenario of ["success", "transport-false", "process-false", "retained
       assert.equal(actual.error, "LOGINOM_RUNTIME_CLEANUP_FAILED")
       assert.equal(actual.closed, undefined)
       assert.equal(JSON.stringify(actual).includes("private injected failure"), false)
-      if (!["client-reject", "server-reject"].includes(scenario)) {
+      if (!["client-reject", "server-reject", "package-blocked"].includes(scenario)) {
         assert.equal(actual.server, true)
         assert.equal(actual.browser, true)
         assert.deepEqual(actual.calls, ["client", "bridge"])
@@ -93,6 +94,7 @@ for (const scenario of ["success", "transport-false", "process-false", "retained
       } else {
         assert.equal(actual.browser, false)
         assert.deepEqual(actual.calls, ["client", "bridge", "server", "browser"])
+        if (scenario === "package-blocked") assert.equal((await stat(ready.profile)).isDirectory(), true)
       }
     }
     if (scenario !== "diagnostic-unwritable") {

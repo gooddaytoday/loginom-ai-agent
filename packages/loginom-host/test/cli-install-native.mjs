@@ -45,7 +45,8 @@ async function run(label, command, args = []) {
 try {
   const manifestBytes = await readFile(join(artifact, "cli-manifest.json"))
   const manifest = JSON.parse(manifestBytes)
-  const sandboxRelative = "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox"
+  const resources = JSON.parse(await readFile(join(artifact, "resources/loginom/resource-manifest.json")))
+  const sandboxRelative = `resources/loginom/${resources.browser.slice(0, resources.browser.lastIndexOf('/') + 1)}chrome-sandbox`
   const originalSandbox = await lstat(join(artifact, sandboxRelative))
   assert.equal(originalSandbox.mode & 0o7777, 0o4755)
   assert.notEqual(originalSandbox.uid, 0, "archive extraction must reproduce user-owned sandbox")

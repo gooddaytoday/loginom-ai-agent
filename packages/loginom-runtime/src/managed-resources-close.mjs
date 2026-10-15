@@ -21,6 +21,7 @@ export async function closeManagedResources(state, requests) {
   await record("client", "started")
   const results = await Promise.allSettled([Promise.resolve().then(() => state.client?.close())])
   await record("client", results[0].status)
+  let packageCleanupFailed = false
   if (state.bridge) {
     await record("bridge", "started")
     const bridge = await Promise.allSettled([Promise.resolve().then(() => state.bridge.close())])
@@ -31,12 +32,21 @@ export async function closeManagedResources(state, requests) {
       throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     }
     await record("bridge_ack", "fulfilled")
+    const cleanup = bridge[0].value.package_cleanup
+    packageCleanupFailed = cleanup?.policy === "last_confirmed_own_save"
+      && !["SUCCEEDED", "SKIPPED_UNPREPARED"].includes(cleanup.status)
   }
   for (const [stage, handle] of [["browser_server", state.browserServer], ["browser", state.browser]]) {
     await record(stage, "started")
     const closed = await Promise.allSettled([Promise.resolve().then(() => handle?.close())])
     results.push(...closed)
     await record(stage, closed[0].status)
+  }
+  // Closing the browser releases resources; it cannot certify native package
+  // closure. Keep the profile and failed ACK available for ordinary recovery.
+  if (packageCleanupFailed) {
+    await record("complete", "rejected")
+    throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   }
   if (state.browserProfile) {
     await record("profile", "started")

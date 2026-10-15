@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink } from "node:fs/pr
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildNodeHost } from "../script/build-node-host"
+import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
@@ -29,6 +30,8 @@ async function configuredRuntime(directory: string, source: string) {
   await symlink(fixture.node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
   await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
+  await mkdir(root, { recursive: true, mode: 0o700 })
+  if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
   await store.stage({
     generation: 1,
@@ -144,6 +147,8 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     });
   `,
     )
+    await mkdir(root, { recursive: true, mode: 0o700 })
+    if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
     const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
     await store.stage({
       generation: 1,

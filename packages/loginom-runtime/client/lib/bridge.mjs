@@ -522,10 +522,10 @@ export async function createBridge(config, session, { browserTransport: managedB
             await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
             await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
           } catch (error) {
-            if (config.acceptanceCleanupPackage || normalCleanup) throw error;
+            if (config.acceptanceCleanupPackage) throw error;
             cleanup = {...cleanup, status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED'};
           }
-          if ((config.acceptanceCleanupPackage || normalCleanup) && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
+          if (config.acceptanceCleanupPackage && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
             package_cleanup:cleanup,
           };

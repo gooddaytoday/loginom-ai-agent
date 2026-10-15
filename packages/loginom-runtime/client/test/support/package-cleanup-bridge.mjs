@@ -122,7 +122,7 @@ const cases=['success','unprepared','no-save','native-blocked','busy','dirty-aft
 const productCases=['product-success','product-unsettled','product-gate-unsettled','product-native-blocked','product-evidence-directory','product-journal-directory','product-no-save','product-multiple-paths','product-busy','product-native-error','product-native-malformed'];
 for(const mode of ['isolated','product','normal'])for(const scenario of mode==='isolated'?cases:mode==='product'?productCases:[...cases,
   'latest-same-path','older-save-retry','inspected-older-save','failed-new-save','mutated-after-save',
-  'foreign-path','foreign-account','discard-receipt','changed-document'])test(mode+' shutdown lifecycle: '+scenario,async t=>{
+  'foreign-path','foreign-account','discard-receipt','changed-document','normal-evidence-directory','normal-journal-directory'])test(mode+' shutdown lifecycle: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-bridge-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog};
@@ -169,12 +169,12 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
       assert.notEqual(second.isError,true,JSON.stringify(second));
     }
     f.busy=scenario.endsWith('busy');f.unsettled=scenario==='product-unsettled';f.workChecks=0;
-    if(scenario==='product-evidence-directory')await mkdir(join(directory,'package-cleanup.json'));
-    if(scenario==='product-journal-directory'){
+    if(scenario.endsWith('evidence-directory'))await mkdir(join(directory,mode==='normal'?'saved-package-cleanup.json':'package-cleanup.json'));
+    if(scenario.endsWith('journal-directory')){
       await rm(join(directory,'execution-events.jsonl'));await mkdir(join(directory,'execution-events.jsonl'));
     }
     const first=bridge.close();assert.equal(bridge.close(),first);const result=await first;
-    if(['product-evidence-directory','product-journal-directory'].includes(scenario)){
+    if(scenario.endsWith('evidence-directory')||scenario.endsWith('journal-directory')){
       assert.equal(result.package_cleanup.status,'BLOCKED');assert.equal(result.package_cleanup.reason,'CLEANUP_EVIDENCE_UNCONFIRMED');
       assert.equal(result.browser_transport_closed,true);assert.equal(f.events.includes('browser-close'),true);return;
     }
@@ -208,8 +208,8 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
       else assert.equal(f.events.includes('package-cleanup'),false);
       assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
     }else{
-      assert.equal(result.browser_transport_closed,false);assert.equal(receipt.status,'BLOCKED');
-      assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
+      assert.equal(result.browser_transport_closed,mode==='normal');assert.equal(receipt.status,'BLOCKED');
+      assert.equal(f.events.includes('browser-close'),mode==='normal');assert.equal(f.events.includes('release-uploads'),mode==='normal');
       assert.equal(f.events.includes('package-cleanup'),!['no-save','busy','changed-document'].includes(scenario));
     }
     assert.equal(f.events.filter(e=>e==='package-cleanup').length,['unprepared','no-save','busy','changed-document'].includes(scenario)?0:1);
@@ -265,7 +265,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
    const closed=await bridge.close();
    const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
    const accepted=['generated-id','reconciled-own','reconciled-older','reconciled-not-admitted','noeffect-retry','validation-retry'].includes(scenario);
-   assert.equal(closed.browser_transport_closed,accepted);
+   assert.equal(closed.browser_transport_closed,true);
    assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED');
    assert.equal(cleanup.save_operation_id,accepted?(scenario==='reconciled-older'?'newer-save'
     :['reconciled-not-admitted','noeffect-retry','validation-retry'].includes(scenario)?'deferred-save':save.operation_id):null);
