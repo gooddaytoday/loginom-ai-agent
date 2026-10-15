@@ -79,6 +79,10 @@ test('capsule provider pending proxy identity replacement refuses support withou
  x.realm.native.packageProxy.$={...x.realm.native.packageProxy.$};await x.realm.native.drain();await assert.rejects(work,/CHANGED/);
  assert.equal(b.query(),work);assert.equal(x.realm.native.calls.length,1);
 }));
+test('capsule provider original QueryInterface function prototype drift refuses before dispatch',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();Object.setPrototypeOf(x.realm.native.definitions.ObjectProxyPrototype.QueryInterface,{});
+ assert.throws(()=>b.query(),/CHANGED/);assert.equal(x.realm.native.calls.length,0);
+}));
 for(const target of ['session','method'])test('capsule provider foreign returned support '+target+' refuses without replay getter0',()=>control(async x=>{
  const b=x.provider.arm(x.request);await x.prepare();let gets=0;
  x.realm.native.queryReply(original=>{const foreign=Object.create(Object.getPrototypeOf(original),Object.getOwnPropertyDescriptors(original));

@@ -91,6 +91,7 @@ export function collectTerminalScriptWitness(expected){
    if(d){if(!('value'in d))throw Error('TERMINAL_PROVIDER_ACCESSOR');value=d.value;break}
   }
   if(!chain.at(-1)?.d)throw Error('TERMINAL_PROVIDER_MISSING_'+key);
+  if(value&&['object','function'].includes(typeof value)){const prototype=parent(value);providerChecks.push(()=>{if(parent(value)!==prototype)throw Error('TERMINAL_PROVIDER_CHANGED')})}
   providerChecks.push(()=>{let p=object;for(const x of chain){const d=descriptor(p,key);
    if(p!==x.p||parent(p)!==x.prototype||(!x.d?d!==undefined:!d||Reflect.ownKeys(x.d).some(k=>!Object.is(d[k],x.d[k]))))throw Error('TERMINAL_PROVIDER_CHANGED');p=parent(p)}});
   return value;
