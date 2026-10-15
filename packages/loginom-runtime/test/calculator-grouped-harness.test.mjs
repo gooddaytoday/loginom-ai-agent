@@ -124,6 +124,15 @@ test('cached-window type telemetry whitelists seven inputs and never copies arra
 
 test('descriptor diagnostic strips values and bounds prototype depth',()=>{
  const r=captureWindowDiagnostic({predicates:{cached_windows:[{isBufferedStore_descriptor:{own:'absent',own_type:'object',inherited:'data',inherited_type:'boolean',depth:999,value:false,private:'secret'}}]}});
- assert.deepEqual(r.windows[0].isBufferedStore_descriptor,{own:'absent',own_type:null,inherited:'data',inherited_type:'boolean',depth:null});
+ assert.deepEqual(r.windows[0].isBufferedStore_descriptor,{own:'absent',own_type:null,own_value:null,inherited:'data',inherited_type:'boolean',inherited_value:null,depth:null});
  assert.ok(!JSON.stringify(r).includes('secret'));assert.ok(!JSON.stringify(r).includes('private'));
+});
+
+for(const location of ['own','inherited'])for(const [tag,type,value,expected] of [
+ ['data','boolean',false,false],['data','boolean',true,true],['data','boolean',0,null],
+ ['absent','boolean',false,null],['accessor','boolean',false,null],['data','object',false,null],['depth_bound','boolean',false,null]
+])test(`descriptor boolean whitelist ${location} ${tag} ${type} ${value}`,()=>{
+ const d={[location]:tag,[location+'_type']:type,[location+'_value']:value};
+ const r=captureWindowDiagnostic({predicates:{cached_windows:[{isBufferedStore_descriptor:d}]}});
+ assert.equal(r.windows[0].isBufferedStore_descriptor[location+'_value'],expected);
 });

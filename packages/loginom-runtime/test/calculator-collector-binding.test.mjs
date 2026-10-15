@@ -159,6 +159,7 @@ for(const kind of ['own-data','own-object','own-accessor','inherited-data','inhe
   const d=captureWindowDiagnostic(r);assert.equal(getterCalls,0);
   const expected={own:kind.startsWith('own-')?(kind==='own-accessor'?'accessor':'data'):'absent',own_type:kind==='own-data'?'boolean':kind==='own-object'?'object':null,
    inherited:kind.startsWith('own-')?'not_checked':kind==='inherited-data'?'data':kind==='inherited-accessor'?'accessor':kind==='depth-bound'?'depth_bound':'absent',
+   own_value:kind==='own-data'?false:null,inherited_value:kind==='inherited-data'?false:null,
    inherited_type:kind==='inherited-data'?'boolean':null,depth:kind.startsWith('inherited-')?1:null};
   for(const w of d.windows){assert.deepEqual(w.isBufferedStore_descriptor,expected);assert.equal(w.evaluated,kind==='own-data');}
   assert.ok(!JSON.stringify(d).includes('never copy'));assert.ok(!JSON.stringify(d).includes('private'));

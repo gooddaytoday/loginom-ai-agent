@@ -176,8 +176,10 @@ export function captureWindowDiagnostic(capture) {
   const type=t=>['undefined','boolean','number','string','object','function','symbol','bigint'].includes(t)?t:null;
   return {own:['absent','accessor','data','unavailable'].includes(d?.own)?d.own:null,
    own_type:d?.own==='data'?type(d.own_type):null,
+   own_value:d?.own==='data'&&d.own_type==='boolean'?flag(d.own_value):null,
    inherited:['not_checked','absent','accessor','data','depth_bound'].includes(d?.inherited)?d.inherited:null,
    inherited_type:d?.inherited==='data'?type(d.inherited_type):null,
+   inherited_value:d?.inherited==='data'&&d.inherited_type==='boolean'?flag(d.inherited_value):null,
    depth:['data','accessor'].includes(d?.inherited)&&Number.isInteger(d?.depth)&&d.depth>=1&&d.depth<=8?d.depth:null};
  };
  return {length:Array.isArray(windows)?windows.length:null,truncated:Array.isArray(windows)&&windows.length>2,

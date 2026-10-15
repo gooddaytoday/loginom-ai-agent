@@ -4102,18 +4102,20 @@ export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
   for(let i=e.children.length-1;i>=0;i--)stack.push(e.children[i]);
  }
  const bufferedDescriptor=store=>{
-  const result={own:'unavailable',own_type:null,inherited:'not_checked',inherited_type:null,depth:null};
+  const result={own:'unavailable',own_type:null,own_value:null,inherited:'not_checked',inherited_type:null,inherited_value:null,depth:null};
   try{
    const d=Object.getOwnPropertyDescriptor(store,'isBufferedStore');
    result.own=d?('value'in d?'data':'accessor'):'absent';
-   if(d){if('value'in d)result.own_type=typeof d.value;return result;}
+   if(d){if('value'in d){result.own_type=typeof d.value;if(typeof d.value==='boolean')result.own_value=d.value;}return result;}
    let p=store;
    for(let depth=1;depth<=8;depth++){
     p=Object.getPrototypeOf(p);
     if(p===null){result.inherited='absent';return result;}
     const inherited=Object.getOwnPropertyDescriptor(p,'isBufferedStore');
     if(inherited){result.inherited='value'in inherited?'data':'accessor';
-     result.inherited_type='value'in inherited?typeof inherited.value:null;result.depth=depth;return result;}
+     result.inherited_type='value'in inherited?typeof inherited.value:null;
+     if('value'in inherited&&typeof inherited.value==='boolean')result.inherited_value=inherited.value;
+     result.depth=depth;return result;}
    }
    result.inherited='depth_bound';return result;
   }catch{return result;}
