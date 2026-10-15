@@ -27,7 +27,7 @@ export async function qualifyEvalrunnerCatalog(config: { workspace: string; prof
   const verified = await verifyEvalrunnerCatalog(catalog)
   const root = await mkdtemp(path.join(config.workspace, ".catalog-probe-"))
   const { mkdir } = await import("node:fs/promises")
-  await mkdir(path.join(root, "profile")); await mkdir(path.join(root, "workspace"))
+  await mkdir(path.join(root, "profile"), { mode: 0o700 }); await mkdir(path.join(root, "workspace"), { mode: 0o700 })
   await cp(path.join(config.profile, "cli-profile.json"), path.join(root, "profile/cli-profile.json"))
   const effective = { ...env, EVAL_PROFILE_DIR: path.join(root, "profile") }
   const command = agentCommand(loadConfig(["--skip-judge"], effective), effective)
@@ -35,8 +35,10 @@ export async function qualifyEvalrunnerCatalog(config: { workspace: string; prof
   const boundary = await sandboxCommand({ cmd, profileDir: effective.EVAL_PROFILE_DIR, workdir: path.join(root, "workspace"), env: command.env })
   const result = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd,
     profileDir: effective.EVAL_PROFILE_DIR, timeoutMs: 600_000 })
+  const { writeFile } = await import("node:fs/promises")
+  await writeFile(path.join(root, "probe-result.private.json"), JSON.stringify(result, null, 2), { flag: "wx", mode: 0o600 })
   if (result.exitCode !== 0 || result.timedOut || result.sandboxError || result.interrupted || result.processCleanup.status !== "confirmed" ||
-    !result.stdout.split(/\r?\n/).includes("openai/gpt-6.1-sol")) throw new EvalFailure("Catalog sandbox recognition/cleanup unconfirmed; preserve probe", 2)
+    !result.stdout.split(/\r?\n/).includes("openai/gpt-6.1-sol")) throw new EvalFailure(`Catalog sandbox recognition/cleanup unconfirmed (exit ${result.exitCode}, cleanup ${result.processCleanup.status}, ${result.processCleanup.error ?? result.sandboxError ?? "output"}); preserve probe`, 2)
   await verifyEvalrunnerCatalog(catalog)
   await rm(root, { recursive: true })
   return { ...verified, recognition: "confirmed", sandbox: "confirmed", cleanup: "confirmed", productInferenceCalls: 0, judgeCalls: 0 }
