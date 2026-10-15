@@ -1171,3 +1171,28 @@ original→recovery→second recovery target1 PASS/8 (0.534s), typecheck/diff PA
 Revision3 связывает оба прежних server owners/journals; оба slots recovery-only,
 preparation refused, live retry не меняет reservations. Native cleanup/release
 и public recover ещё не квалифицированы.
+
+
+### Recovered pre-CLI finalization
+
+Existing unactivated finalizer принимает recovery-only server/slots только через
+exact9-key unactivated-recovery command, original7-key command/hash, explicit
+slot incidents/recovery receipts и actual server lineage. Все прежние controller
+admin inventories проверяются с original producer PID и continuous closure;
+при том же boot ID выполняется fresh PID/starttime scan. Неизвестный или живой
+process не разрешает archive/release. Sources перечитываются после current native
+admin dispose, перед releases. Recovery admin launch требует explicit inventory
+и unactivated phase; seal запрещает новые connections до runtime.
+
+Далее действует существующий native blocked/absent account, no sessions, archive,
+owned/absent root путь. Cleanup сохраняет recoveryProcessInventories. После
+release recovery slot receipt original incident дополняется через
+finalizeReleasedSlot; server release следует за всеми slots. Provisioning и CLI
+при recovery-only по-прежнему запрещены.
+
+TDD old normal finalizer refusal и missing recovery inventory before runtime
+RED→GREEN.91 unit PASS/388 (7.17s), native1 PASS/6 (42.50s), typecheck/diff PASS.
+Native exited controller/blocked account/history/B canary qualified; green pair
+removed. RED fixture /tmp/evals-recover-preparation-CrWNk2 остаётся для public
+recover/resumption. Полная source capture, CLI command, idempotency и partial
+terminal reconciliation ещё open.
