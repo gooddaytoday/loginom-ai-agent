@@ -230,6 +230,14 @@ no_artifact с confirmed cleanup и прежними quality scores=0. Подр�
   Report показывает оба исхода. `--judge-only` сохраняет
   `infra_retry.initial` и пересуживает только последний запуск. Старые результаты
   без `infra_retry` сохраняют прежний смысл; исторические файлы не мигрируются.
+- Необязательное `AttemptResult.limit_evidence` сохраняет нормализованные
+  наблюдения лимитов CLI (`coverage` и безопасные `events`) также в исходном
+  `infra_retry.initial`. `summary.parallel_limits` отдельно оценивает все
+  фактические запуски, включая исходные infra retries и interrupted: известный
+  лимит остаётся `failed` после успешного повтора. Неполная или отсутствующая
+  transport coverage даёт `incomplete`, не PASS. Эта проверка не переписывает
+  quality statuses, score/pass, counters, стоимость и действующий exit code
+  measured run; она сама по себе не подтверждает live parallelism admission.
 - `interrupted`, `harness_error`, `infra_error` не входят в знаменатель метрик
   качества и разброс баллов; их число выводится отдельно. Ошибка судьи с
   `pass = null` не входит в знаменатель `pass_rate`. Если oracle уже доказал

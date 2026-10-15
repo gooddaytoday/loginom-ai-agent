@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readdir } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
+import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
 import { comparisonSummary } from "./helpers/compare-summary"
 
 test("statusFor: ошибка изоляции останавливает запуск даже при exit 1 или timeout", () => {
@@ -315,4 +315,35 @@ test("writeSummary: пишет summary.json и report.md", async () => {
   expect(written.run_id).toBe("20260918-120000-abc1234")
   expect(await Bun.file(path.join(dir, "report.md")).exists()).toBe(true)
   expect((await readdir(dir)).filter((name) => name.endsWith(".tmp"))).toEqual([])
+})
+
+test("report: limit failure is visible beside successful quality metrics", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.parallel_limits = { status: "failed", codes: ["PROVIDER_HTTP_429"] }
+  const before = JSON.stringify(run)
+  const report = renderReport(run)
+  expect(report).toContain("Проверка лимитов: failed · PROVIDER_HTTP_429")
+  expect(report).toContain("completion_rate: 100.0%")
+  expect(JSON.stringify(run)).toBe(before)
+  expect(renderReport(comparisonSummary([{ successes: 1, attempts: 1 }], 1))).not.toContain("Проверка лимитов:")
+})
+
+test("aggregateLimits includes interrupted runs even when quality and spend exclude them", () => {
+  // Declared receipt coverage only; this is not a transport qualification.
+  const coverage = { provider: "complete", dock: "complete", judge: "complete" }
+  const attempts = [attempt({ status: "interrupted", pass: null, score: null, cost: 10,
+    limit_evidence: { coverage, events: [{ source: "provider", kind: "http", status: 429 }] } }),
+    attempt({ limit_evidence: { coverage, events: [] } })]
+  const before = JSON.stringify(attempts)
+  expect(aggregateLimits(attempts)).toEqual({ status: "failed", codes: ["PROVIDER_HTTP_429"] })
+  expect(aggregate(attempts, false)).toMatchObject({ total: 1, completed: 1, total_cost: 0.01 })
+  expect(JSON.stringify(attempts)).toBe(before)
+})
+
+test("aggregateLimits keeps empty, legacy and partially observed runs incomplete", () => {
+  const complete = attempt({ limit_evidence: { coverage: { provider: "complete", dock: "complete", judge: "complete" }, events: [] } })
+  expect(aggregateLimits([complete])).toEqual({ status: "passed", codes: [] })
+  for (const attempts of [[], [attempt({})], [complete, attempt({})], [complete, attempt({ limit_evidence: {
+    coverage: { provider: "complete", dock: "unavailable", judge: "complete" }, events: [] } })]])
+    expect(aggregateLimits(attempts).status).toBe("incomplete")
 })

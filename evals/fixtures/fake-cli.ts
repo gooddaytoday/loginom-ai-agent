@@ -200,6 +200,8 @@ const id = infraRetry ? launch === 1 ? "host-timeout" : retryOutcomes[process.en
   : process.env.EVAL_TASK_ID === "parallel-a-stop" ? "stop-case"
   : process.env.EVAL_TASK_ID?.match(/^a-exit[23]$/) ? "stop-case" : process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
+if (launch === 1 && Bun.argv.some((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "provider-limit.json"))
+  console.log(JSON.stringify({ type: "error", error: { name: "APIError", data: { statusCode: 429, message: "private-limit-diagnostic" } } }))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
 process.stdout.write(await chosen.text())
 if (command === "run" && process.env.EVAL_FAKE_STATE_FILE) {
