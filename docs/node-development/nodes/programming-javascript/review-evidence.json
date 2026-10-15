@@ -1,0 +1,424 @@
+{
+  "kind": "javascript_recommendations_verification",
+  "date": "2026-09-26",
+  "loginom_live_executed": false,
+  "editor_standin": {
+    "scope": "local_codemirror_standin_not_loginom",
+    "versions": {
+      "node": "v24.19.0",
+      "playwright": "1.63.0-alpha-2026-08-31",
+      "chromium": "153.0.8010.12",
+      "codeMirror": "5.65.18"
+    },
+    "paths": {
+      "node": "/home/george/git/loginom-ai-agent/packages/desktop/resources/loginom/bin/node",
+      "playwright": "/home/george/git/loginom-ai-agent/packages/loginom-runtime/client/node_modules/playwright-core/index.mjs",
+      "chromium": "/home/george/git/loginom-ai-agent/packages/desktop/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+      "codeMirror": "/home/george/git/loginom-ai-agent/packages/desktop/resources/loginom/runtime/client/node_modules/playwright-core/lib/vite/traceViewer/assets/codeMirrorModule-Clyh72-A.js"
+    },
+    "sha256": {
+      "node": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "playwright": "3d36e2132d3c8b62397d23f0bb4177336aaee503203ae2a2c90fbeb5bf3317dd",
+      "chromium": "8c599d43aec53f2460a31ae2f4af6bd863f8258b34ff519564bc5d4726bfaa1e",
+      "codeMirror": "03e8e7fd938b0b5193c88291e1a2ffa752b4c0fc58678223054924aa5bc4dcfa"
+    },
+    "settings": {
+      "mode": "javascript",
+      "inputStyle": "textarea",
+      "electricChars": true,
+      "autoCloseBrackets": [
+        false,
+        true
+      ]
+    },
+    "cases": [
+      {
+        "label": "lf",
+        "method": "type",
+        "autoCloseBrackets": false,
+        "equal": false,
+        "input": "if (true) {\n  const x = 1;\n}",
+        "result": "if (true) {\n    const x = 1;\n}",
+        "enterEvents": 2,
+        "tabEvents": 0
+      },
+      {
+        "label": "lf",
+        "method": "insertText",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "if (true) {\n  const x = 1;\n}",
+        "result": "if (true) {\n  const x = 1;\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "lf",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "if (true) {\n  const x = 1;\n}",
+        "result": "if (true) {\n  const x = 1;\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "electric",
+        "method": "type",
+        "autoCloseBrackets": false,
+        "equal": false,
+        "input": "if (true) {\n    const x = 1;\n    }",
+        "result": "if (true) {\n      const x = 1;\n}",
+        "enterEvents": 2,
+        "tabEvents": 0
+      },
+      {
+        "label": "electric",
+        "method": "insertText",
+        "autoCloseBrackets": false,
+        "equal": false,
+        "input": "if (true) {\n    const x = 1;\n    }",
+        "result": "if (true) {\n    const x = 1;\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "electric",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "if (true) {\n    const x = 1;\n    }",
+        "result": "if (true) {\n    const x = 1;\n    }",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "brackets",
+        "method": "type",
+        "autoCloseBrackets": false,
+        "equal": false,
+        "input": "function f() {\n  return \"ёж\";\n}",
+        "result": "function f() {\n    return \"ёж\";\n}",
+        "enterEvents": 2,
+        "tabEvents": 0
+      },
+      {
+        "label": "brackets",
+        "method": "insertText",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "function f() {\n  return \"ёж\";\n}",
+        "result": "function f() {\n  return \"ёж\";\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "brackets",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "function f() {\n  return \"ёж\";\n}",
+        "result": "function f() {\n  return \"ёж\";\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "spaces_tabs",
+        "method": "type",
+        "autoCloseBrackets": false,
+        "equal": false,
+        "input": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "result": "\tif (true) {  \n      \t\tconst label = \"Ёж\";   \n      \n    }\n",
+        "enterEvents": 4,
+        "tabEvents": 0
+      },
+      {
+        "label": "spaces_tabs",
+        "method": "insertText",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "result": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "spaces_tabs",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": false,
+        "equal": true,
+        "input": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "result": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "lf",
+        "method": "type",
+        "autoCloseBrackets": true,
+        "equal": false,
+        "input": "if (true) {\n  const x = 1;\n}",
+        "result": "if (true) {\n    const x = 1;\n}\n}",
+        "enterEvents": 2,
+        "tabEvents": 0
+      },
+      {
+        "label": "lf",
+        "method": "insertText",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "if (true) {\n  const x = 1;\n}",
+        "result": "if (true) {\n  const x = 1;\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "lf",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "if (true) {\n  const x = 1;\n}",
+        "result": "if (true) {\n  const x = 1;\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "electric",
+        "method": "type",
+        "autoCloseBrackets": true,
+        "equal": false,
+        "input": "if (true) {\n    const x = 1;\n    }",
+        "result": "if (true) {\n      const x = 1;\n}\n}",
+        "enterEvents": 2,
+        "tabEvents": 0
+      },
+      {
+        "label": "electric",
+        "method": "insertText",
+        "autoCloseBrackets": true,
+        "equal": false,
+        "input": "if (true) {\n    const x = 1;\n    }",
+        "result": "if (true) {\n    const x = 1;\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "electric",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "if (true) {\n    const x = 1;\n    }",
+        "result": "if (true) {\n    const x = 1;\n    }",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "brackets",
+        "method": "type",
+        "autoCloseBrackets": true,
+        "equal": false,
+        "input": "function f() {\n  return \"ёж\";\n}",
+        "result": "function f() {\n    return \"ёж\";\n}\n}",
+        "enterEvents": 2,
+        "tabEvents": 0
+      },
+      {
+        "label": "brackets",
+        "method": "insertText",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "function f() {\n  return \"ёж\";\n}",
+        "result": "function f() {\n  return \"ёж\";\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "brackets",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "function f() {\n  return \"ёж\";\n}",
+        "result": "function f() {\n  return \"ёж\";\n}",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "spaces_tabs",
+        "method": "type",
+        "autoCloseBrackets": true,
+        "equal": false,
+        "input": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "result": "\tif (true) {  \n    \t\tconst label = \"Ёж\";   \n    \n    \t}\n",
+        "enterEvents": 4,
+        "tabEvents": 0
+      },
+      {
+        "label": "spaces_tabs",
+        "method": "insertText",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "result": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "spaces_tabs",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "result": "\tif (true) {  \n\t\tconst label = \"Ёж\";   \n\n\t}\n",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "empty",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "",
+        "result": "",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "trailing_spaces",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "if (true) {\n    }   ",
+        "result": "if (true) {\n    }   ",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "only_lf",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "\n",
+        "result": "\n",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "astral",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": "// 👩🏽‍💻 Ёж\nconst x = `🦔`;\n",
+        "result": "// 👩🏽‍💻 Ёж\nconst x = `🦔`;\n",
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "max_bytes_ascii",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": {
+          "utf8_bytes": 32768,
+          "sha256": "67bf7724f570705103786fd6794926ee51d6241736b745665e3252cdda4cef0f"
+        },
+        "result": {
+          "utf8_bytes": 32768,
+          "sha256": "67bf7724f570705103786fd6794926ee51d6241736b745665e3252cdda4cef0f"
+        },
+        "enterEvents": 0,
+        "tabEvents": 0
+      },
+      {
+        "label": "max_lines",
+        "method": "insertTextTrailingLFBackspace",
+        "autoCloseBrackets": true,
+        "equal": true,
+        "input": {
+          "utf8_bytes": 1023,
+          "sha256": "cdfd2c0aee9ccfc4d52ed6a7e1f5d0090ca81985f3f73fcd11b0a5d7423fe6d3",
+          "lf_count": 1023
+        },
+        "result": {
+          "utf8_bytes": 1023,
+          "sha256": "cdfd2c0aee9ccfc4d52ed6a7e1f5d0090ca81985f3f73fcd11b0a5d7423fe6d3",
+          "lf_count": 1023
+        },
+        "enterEvents": 0,
+        "tabEvents": 0
+      }
+    ],
+    "counts": {
+      "insertText": {
+        "cases": 8,
+        "exact_matches": 6
+      },
+      "insertTextTrailingLFBackspace": {
+        "cases": 14,
+        "exact_matches": 14
+      },
+      "type": {
+        "cases": 8,
+        "exact_matches": 0
+      }
+    }
+  },
+  "historical_lgp": {
+    "scope": "historical_repository_lgp_serialization_not_current_loginom_save",
+    "root": "/home/george/git/testing/e2e-tests/testdata",
+    "archives_scanned": 496,
+    "source_counts": {
+      "LF": 133,
+      "single_line": 1
+    },
+    "examples": {
+      "LF": {
+        "path": "/home/george/git/testing/e2e-tests/testdata/helpers/WizardPreview.lgp",
+        "entry": "Unit_0/Unit.xml",
+        "archive_sha256": "4ce7d809e82edff078464ce44ec1cdfe36e563898b3707d86e96a4711f42fc52",
+        "source_sha256": "4b1822681d2fc3e59196aafe1226dab56adc3f8cfa7c5387ea598c1b97042ee7",
+        "decoded_prefix": "import { InputTable, InputTables, InputVariables, OutputTable, DataType, DataKind, UsageType } from \"builtIn/Data\";\n\nconst max = 6;\nconst jsDay = 86400000;\n\nAppend([1, true, 0, 3.1",
+        "raw_attribute_prefix": "import { InputTable, InputTables, InputVariables, OutputTable, DataType, DataKind, UsageType } from &quot;builtIn/Data&quot;;&#10;&#10;const max = 6;&#10;const jsDay = 86400000;&#10;&#10;Append([1, true, 0, 3.14, 7, &quo"
+      },
+      "single_line": {
+        "path": "/home/george/git/testing/e2e-tests/testdata/issues/10910/10910.lgp",
+        "entry": "Unit_0/Unit.xml",
+        "archive_sha256": "fb7c4363cd97d05cce51aa6af8265bff1f391ee67b406eae9f532a5461d5405c",
+        "source_sha256": "8f3bc09f61c1555212acd6a2ccf01ba37bd2765cc279563573c9ed4dd63e0046",
+        "decoded_prefix": "setTimeout(() => {throw new Error(\"error\")}, 15000);",
+        "raw_attribute_prefix": "setTimeout(() =&gt; {throw new Error(&quot;error&quot;)}, 15000);"
+      }
+    }
+  },
+  "response_budgets": {
+    "node": "v24.19.0",
+    "scope": "pure_actual_previewWireSize_not_loginom",
+    "envelope": "previewWireSize({source_text})",
+    "cases": [
+      {
+        "label": "ascii",
+        "source_utf8_bytes": 32768,
+        "wire_bytes": 32803
+      },
+      {
+        "label": "quotes_backslashes",
+        "source_utf8_bytes": 32768,
+        "wire_bytes": 131095
+      },
+      {
+        "label": "tabs",
+        "source_utf8_bytes": 32768,
+        "wire_bytes": 98331
+      },
+      {
+        "label": "quotes_backslashes",
+        "source_utf8_bytes": 16384,
+        "wire_bytes": 65559
+      },
+      {
+        "label": "tabs",
+        "source_utf8_bytes": 16384,
+        "wire_bytes": 49179
+      }
+    ]
+  }
+}

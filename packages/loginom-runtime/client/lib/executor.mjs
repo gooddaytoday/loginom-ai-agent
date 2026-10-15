@@ -20,6 +20,10 @@ import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
 import {nodeApiTools,deliveryApiTools} from './node-api.mjs';
+import {createJavascriptSourceReadRegistry} from './javascript-source-read-registry.mjs';
+import {createJavascriptSourceReadSession,validateJavascriptSourceReadRequest} from './javascript-source-read-session.mjs';
+import {createJavascriptContextReadSession,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
+import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
 
 const identifier = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$' };
@@ -184,6 +188,17 @@ async function browserArtifactReveal(page,task,snapshot) {
 }
 
 async function browserArtifactDownload(page,task,observe,act,reveal) {
+  let browserStep='preconditions';
+  const failureEvidence=error=>{
+    const causes=[];const seen=new Set();
+    for(let current=error;current&&causes.length<3&&!seen.has(current);current=current.cause){
+      seen.add(current);const message=String(current.message??'');
+      causes.push({kind:['Error','TimeoutError','TargetClosedError','AbortError'].includes(current.name)?current.name:'OtherError',
+        target_closed:/Target page, context or browser has been closed/i.test(message),
+        crashed:/crash/i.test(message),timeout:/timeout|timed out/i.test(message),cancelled:/cancel|abort/i.test(message)});
+    }
+    return {step:browserStep,causes,page_closed:typeof page.isClosed==='function'?page.isClosed():null};
+  };
   let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false;
   const trace=[],destination=task.output_binding??task.artifact.upload;
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
@@ -261,15 +276,28 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result(gesture?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_OUTPUT_SIZE_CHANGED');
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
-    event=page.waitForEvent('download',{timeout:15000}).then(value=>value,()=>null);
+    event=page.waitForEvent('download',{timeout:15000}).then(value=>value,error=>{
+      trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
+    });
     phase='requesting';gesture=true;
     completed=false;
+    browserStep='download.gesture';
     const action=await act(page,before.output);
     gesture=revealed || action.effect_possible===true;
+    const refusal=action.trace?.find(e=>e.event==='ui_reference_precondition_refused')?.checks;
+    const referenceChecks=refusal?Object.fromEntries(['present','identity_matches','signature_matches','action_allowed']
+      .filter(key=>typeof refusal[key]==='boolean').map(key=>[key,refusal[key]])):null;
+    const referenceReasons={
+      'The observed control changed; observe the workspace again':'control_changed_or_action_denied',
+      'Observed control is no longer unique':'not_unique','Observed control is detached':'detached',
+      'Observed control is detached, hidden, disabled, or replaced':'not_live_visible_enabled',
+      'Observed control geometry changed':'geometry_changed'};
     trace.push({event:'download_gesture_result',status:action.status,effect_possible:action.effect_possible===true,
       cleanup_complete:action.cleanup_complete===true,
-      error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null});
-    download=await event;
+      error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null,
+      ...(action.error?.code==='UI_REFERENCE_STALE'?{reference_reason:referenceReasons[action.error.message]??'unclassified',
+        ...(referenceChecks?{reference_checks:referenceChecks}:{})}:{})});
+    browserStep='download.event';download=await event;
     if(action.status!=='SUCCEEDED' || action.output?.gesture_applied!==true) {
       if(download) {gesture=true;await download.cancel();completed=true;}
       else if(action.effect_possible===false && action.cleanup_complete===true)completed=true;
@@ -278,6 +306,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     gesture=true;
     if(!download)return result('AMBIGUOUS','DOWNLOAD_EVENT_MISSING');
     // Do not persist the URL (it may carry credentials); compare only origin.
+    browserStep='download.metadata';
     const url=download.url(),originPrefix=task.expected_origin+'/';
     if(typeof url!=='string' || !(url.startsWith(originPrefix) || url.startsWith('blob:'+originPrefix))) {
       await download.cancel();completed=true;
@@ -289,9 +318,12 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result('AMBIGUOUS','DOWNLOAD_FILENAME_MISMATCH');
     }
     phase='downloading';
+    browserStep='download.saveAs';
     await download.saveAs(task.download_path);
+    browserStep='download.failure';
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
     completed=true;
+    browserStep='post_download_observation';
     const after=await observe(page);
     if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
       ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
@@ -299,11 +331,14 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     return result('SUCCEEDED',null,{artifact_id:task.artifact.artifact_id,...(task.output_binding?{output_binding:task.output_binding}:{upload_grant_id:task.artifact.upload.grant_id,upload_operation_id:task.upload_operation_id}),destination:destination.destination,
       suggested_name:name,download_completed:true,bytes_verification_required:true,
       file_ref:task.file_ref,observation_id:task.observation_id});
-  } catch {
+  } catch(error) {
+    trace.push({event:'download_browser_failure',...failureEvidence(error)});
     // An unexpected gesture exception may have emitted a download already.
     // Drain the bounded listener and cancel any captured transfer before exit.
     if(event && !download)try{download=await event;}catch{}
-    if(download && !completed)try{await download.cancel();completed=true;}catch{}
+    if(download && !completed)try{await download.cancel();completed=true;}catch(error){
+      browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
+    }
     return result(gesture || event?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_BROWSER_CALL_FAILED');
   }
 }
@@ -1327,7 +1362,8 @@ export function parseCapabilityResult(response) {
   throw new Error('Pinned browser capability returned no typed result');
 }
 
-export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
+export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
+  javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
@@ -1423,8 +1459,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
       ...(operation.action.effect?.destination_policy==='session_storage'?{storage_binding:getStorageBinding()}:{}),
-      ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms } : {}),
-    }), { timeout: operation.action.timeout_ms + 5000, ...options });
+      ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
+        : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
+    }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)
+      ? Math.max(1, Math.min(operation.action.timeout_ms, operation.deadline - now())) + 5000
+      : operation.action.timeout_ms + 5000, ...options });
     assertActionOutcome(outcome);
     if (outcome.action_key !== operation.action.action_key || outcome.action_revision !== operation.action.revision) {
       throw new Error('Dock capability outcome identity does not match the pinned action');
@@ -1768,17 +1807,81 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         accepted_phases:state.phases.map(p=>p.phase),pending_phase:state.pending?.phase??null,
         effect_possible:state.effect_possible,cleanup_complete:state.cleanup_complete}):null;
     }});
+  const sourceReads=createJavascriptSourceReadRegistry({
+    validateRequest:request=>request?.kind==='context'?validateJavascriptContextReadRequest(request):validateJavascriptSourceReadRequest(request),
+    openSession:async request=>{
+    if(!redactor || typeof redactor.text!=='function' || typeof redactor.redact!=='function'
+      || typeof targetOrigin!=='string' || typeof targetBuild!=='string')
+      throw Error('JavaScript source read host dependencies unavailable');
+    if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)||nodeJobs.has(request.operation_id))
+      throw Error('JavaScript source operation ID conflicts with another operation');
+    if(request.kind==='context'&&targetBuild!=='7.4.2')throw Error('JavaScript context is not validated for observed Loginom build');
+    const deadline=Date.now()+(request.budget_ms??(request.kind==='context'?600000:300000));
+    const uiEpoch=Date.now();
+    const operation={id:request.operation_id,action:{action_key:request.kind==='context'?'node.context':'node.source',revision:'1'},
+      checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline};
+    const prepared={document_id:request.document_id,workflow_ref:request.workflow_ref,node:request.node};
+    const executeSourceScript=async (code,options)=>{
+      const wrapped='async page => {const base={action_key:"node.source.transport",action_revision:"1",operation_id:'
+        +JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('
+        +code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_SOURCE_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
+      const response=await execute(wrapped,{timeout:Math.max(1,deadline-Date.now()),...options});
+      if(response.status!=='SUCCEEDED')throw Error(response.error?.message??'JavaScript source transport failed');
+      return response.output.value;
+    };
+    const adapter=javascriptSourceAdapterFactory({page:{},prepared,node:request.node,
+      uiEpoch,deadline,targetOrigin,execute:executeSourceScript,record:onRecord,
+      receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
+      channel:()=>createNodeProcedure({operation,execute:executeSourceScript,record:onRecord,
+        targetOrigin,targetBuild,preparedNodeContext:prepared,
+        wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
+          ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),
+          operation_id:reference.id})})});
+    const contextChannel=(until,{signal}={})=>{
+      if(until!==deadline)throw Error('JavaScript context original deadline changed');
+      return createNodeProcedure({operation,execute:executeSourceScript,record:onRecord,
+      targetOrigin,targetBuild,preparedNodeContext:prepared,maxSteps:4096,signal,
+      wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
+        ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),operation_id:reference.id})});
+    };
+    const graphRequest={document_id:request.document_id,workflow_ref:request.workflow_ref,
+      target:{kind:'existing',type:'programming.javascript',ref:request.node},inputs:[]};
+    const session=request.kind==='context'?createJavascriptContextReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord,
+      channel:contextChannel,observeGraph:()=>targetAdapter(operation).observe(graphRequest,deadline)}):
+      createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
+    auxiliary.set(request.operation_id,{signature:'node.'+request.kind+':'+fingerprint('node.'+request.kind,request)});
+    return session;
+  }});
   const runtime=Object.freeze({
-    startNodeApply:(request,options)=>nodeJobs.start(request,options),
-    startNodeRead:args=>nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id))),
-    nodeApplyStatus:id=>nodeJobs.status(id),
-    waitNodeApply:(id,options)=>nodeJobs.wait(id,options),
-    cancelNodeApply:id=>nodeJobs.cancel(id),
+    startNodeApply:(request,options)=>{
+      if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
+      if(sourceReads.has(request.operation_id))throw Error('Operation ID belongs to a JavaScript read');
+      return nodeJobs.start(request,options);
+    },
+    startNodeRead:async (args,options)=>{
+      if(!['source','context'].includes(args.kind)){
+        if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
+        if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
+        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)));
+      }
+      if(!sourceReads.has(args.operation_id)
+        &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))
+        throw Error('JavaScript source operation ID conflicts with another operation');
+      if(sourceReads.busy)return sourceReads.read(args,options);
+      if(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled)
+        throw Error('Resolve the pending Dock operation before JavaScript source reading');
+      running=true;
+      try{return await sourceReads.read(args,options);}
+      finally{running=false;}
+    },
+    nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
+    waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
+    cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
     tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
-      if (running || pending) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
+      if (running || pending || sourceReads.unsettled) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
     },
     describe(actionKey) {
       if (actionKey && typeof actionKey === 'object') {
@@ -1791,7 +1894,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           || query.action_keys.length > 16 || new Set(query.action_keys).size !== query.action_keys.length)) throw new Error('Select distinct action keys');
         return { actions: (query.action_keys ?? []).map(key => structuredClone(find(key))),
           node_types: query.node_types === undefined ? [] : describeNodeTypes(query.node_types, getNodeContractPins(), pinned.actions,
-            allowCandidate&&nodeApplyDriverFactory?nodeApplyHandlers:new Map()),
+            allowCandidate&&nodeApplyDriverFactory?nodeApplyHandlers:new Map(),targetBuild),
           session_manifest: structuredClone(pinned.pins) };
       }
       if (actionKey === undefined) return { available_actions: [...pinned.actions.keys()],
@@ -2320,7 +2423,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               throw error;
             }
             return {verified:true,cleanup_complete:!operation.targetPhase?.pending,
-              effect_possible:operation.targetPhase?.effect_possible===true,node:result.node.ref,target:result};
+              effect_possible:operation.targetPhase?.effect_possible===true||preflight?.effect_possible===true,
+              node:result.node.ref,target:result};
           }};
         }
         await remember(operation,resume?'node_apply_resume_prepared':'prepared');signal?.throwIfAborted();
@@ -2355,8 +2459,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(operation.outcome);
       }finally{running=false;}
     },
-    async run(actionKey, parameters, { signal, operationId } = {}) {
+    async run(actionKey, parameters, { signal, operationId, deadlineAt } = {}) {
       signal?.throwIfAborted();
+      // Host-only ceiling: preflight and evidence writes consume the caller's
+      // original budget. No new full action allowance at mutation admission.
+      if (deadlineAt !== undefined && (!Number.isSafeInteger(deadlineAt) || deadlineAt <= now()))
+        throw new Error('Action parent deadline must be a future safe integer');
       const action = find(actionKey);
       validateActionParameters(action.input_schema, parameters);
       if (operationId !== undefined && (typeof operationId !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(operationId))) {
@@ -2368,6 +2476,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (operationId && operations.has(operationId) && operations.get(operationId).signature !== signature) {
         throw new Error('operation_id was already used with different parameters');
       }
+      if (operationId && operations.has(operationId) && operations.get(operationId).parentDeadline !== deadlineAt)
+        throw new Error('operation_id was already used with a different parent deadline');
       // inspectApply сам захватывает шлюз только на время своих фазовых чтений;
       // под чужим захватом он принял бы этот вызов за активную операцию.
       if (pending?.action.capability === 'node.apply') {
@@ -2386,16 +2496,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           if (previous.signature !== signature) throw new Error('operation_id was already used with different parameters');
           return structuredClone(previous.outcome);
         }
-        const operation = { id: operationId ?? randomUUID(), action, signature, parameters: structuredClone(parameters) };
+        const operation = { id: operationId ?? randomUUID(), action, signature, parameters: structuredClone(parameters),
+          ...(deadlineAt !== undefined ? {parentDeadline: deadlineAt, deadline: Math.min(deadlineAt, now() + action.timeout_ms)} : {}) };
+        if (deadlineAt !== undefined && now() >= operation.deadline) throw new Error('Action parent deadline expired');
         let prepared;
         try { prepared = await invoke(operation, 'prepare', { signal }); }
         catch (error) { return failed(operation, 'PREFLIGHT_FAILED', String(error?.message ?? error).slice(0, 1000), 'FAILED'); }
         if (prepared.status !== 'NOT_APPLIED' || prepared.phase !== 'prepared' || !prepared.checkpoint?.workflow_ref) return prepared;
         operation.checkpoint = prepared.checkpoint;
         signal?.throwIfAborted();
-        operation.deadline = now() + action.timeout_ms;
+        operation.deadline ??= now() + action.timeout_ms;
         await remember(operation, 'prepared');
         signal?.throwIfAborted();
+        if (deadlineAt !== undefined && now() >= operation.deadline) throw new Error('Action parent deadline expired before mutation');
         operations.set(operation.id, operation);
         pending = operation;
         observations.clear();
@@ -2445,7 +2558,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     (...args)=>{
       if(delivery.busy){const error=Error('Artifact delivery is in progress');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
-      if(nodeJobs.busy&&!nodeControls.has(name)){const error=Error('A background node operation is running');
+      if((nodeJobs.busy||sourceReads.busy||sourceReads.unsettled)&&!nodeControls.has(name)){const error=Error('A background node operation is running');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       return value(...args);
     }]));
@@ -2454,8 +2567,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
-    hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
-    hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
+    hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});

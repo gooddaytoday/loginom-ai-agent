@@ -1,0 +1,21 @@
+{
+  "id": "recovery",
+  "title": "Ошибка Калькулятора: стандартное исправление без JavaScript",
+  "prompt": "Подготовь Калькулятор с полем Profit, первоначально равным Revenue, и выполни его. Затем один раз проверь в Loginom формулу `Revenue -`, изменяя существующее выражение Profit без изменения связей. Эту проверку синтаксиса не заменяй предварительным исправлением текста. Если Loginom отклонит формулу, заверши расчёт прибыли как Revenue минус Cost, посчитай сумму Profit по Category, отсортируй по суммарной прибыли по убыванию, сохрани пакет. Выгрузи CSV только с колонками Category,Profit",
+  "inputs": ["data/dataset.csv"],
+  "spec": "SPEC.md",
+  "expected_output": "Только колонки Category,Profit и ровно две строки по убыванию Profit: B,62; A,55. Значения сверяются с oracle.csv с допуском 0.01. Успешный CSV без наблюдённого отказа не подтверждает diagnostic coverage.",
+  "output_mode": "diagnostic",
+  "timeout_ms": 1800000,
+  "oracle_tolerance": 0.01,
+  "checker_files": ["oracle.py"],
+  "checklist": [
+    {"id": "initial-calculator", "required": true, "text": "Штатный импорт читает Category как строку, Revenue и Cost как числа. Калькулятор создаёт Profit=Revenue и действительно выполняется перед проверкой ошибочной формулы."},
+    {"id": "observed-validation-failure", "required": true, "requires_run": true, "text": "Для одной операции изменения Profit на Revenue - наблюдены NODE_APPLY_STOPPED с error.cause.code WIZARD_CALCULATOR_VALIDATION_FAILED и событие node_phase_refused с receipt.verification calculator_syntax_rejected_draft_restored. Оба доказательства относятся к одной operation_id и node identity; без отказа результат recovery_unobserved."},
+    {"id": "standard-recovery", "required": true, "requires_run": true, "text": "После отказа тот же GUID Калькулятора исправлен на Revenue минус Cost без изменения связей и успешно выполнен. Если исправление невозможно, сохранён конкретный blocker: это не успешный расчёт и не чистый проход первой волны."},
+    {"id": "no-javascript", "required": true, "requires_run": true, "text": "Нет ни одной JavaScript-попытки, включая неуспешные или незавершённые вызовы, и нет JS ни в одном workflow пакета. Ошибка стандартного узла не используется как основание fallback."},
+    {"id": "native-result-chain", "required": true, "text": "Штатная Группировка суммирует Profit по Category, штатная Сортировка упорядочивает сумму по убыванию, штатный экспорт сохраняет только Category,Profit. Граф связан от исходного импорта до экспорта."},
+    {"id": "result-rows", "required": true, "requires_result_file": true, "text": "CSV содержит ровно Category,Profit и две строки B,62 затем A,55. Без лишних колонок/строк; числовой допуск 0.01."},
+    {"id": "honest-report", "requires_run": true, "text": "Отчёт различает подтверждённую политику, успешный расчёт и recovery_unobserved/blocker; prompt подсказывает исправление, поэтому самостоятельная диагностика не заявляется."}
+  ]
+}

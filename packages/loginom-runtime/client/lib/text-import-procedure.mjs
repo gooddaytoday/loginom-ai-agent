@@ -286,6 +286,29 @@ export async function selectImportColumnOption(channel,initial,index,property,la
     resolve:state=>({verb:'select_wizard_option',ref:option(state).ref})});
 }
 
+// A delayed parse mask can invalidate a format snapshot before the gesture.
+// Only the existing proven no-effect refresh route may reacquire this field.
+export function setImportFormatField(channel,initial,name,text) {
+  requireValue(['delimiter','text_qualifier','null_marker','decimal_separator'].includes(name),'Unsupported import format field');
+  const describe=state=>{
+    const w=state.wizard,f=w?.settings?.fields?.[name];
+    requireValue(w?.status==='observed'&&w.stage==='text_import_format'&&w.owner_context?.status==='observed'
+      &&f?.status==='observed'&&f.truncated!==true&&typeof f.value==='string','Import format field is incomplete');
+    const input=one(state.ui.elements.filter(e=>e.ref===f.input_ref&&e.allowed_actions?.includes('set_wizard_field')
+      &&e.wizard_field?.scope==='import_format'&&e.wizard_field.name===name
+      &&e.wizard_field.owner_ref===f.owner_ref&&e.wizard_field.root_ref===w.root_ref),'Bound import format input unavailable');
+    requireValue(Object.values(w.settings.fields).every(field=>field.status==='observed'&&field.truncated!==true),'Import format settings are incomplete');
+    return {root:w.root_tid,root_ref:w.root_ref,owner:{node:w.owner_context.node.tid,path:w.owner_context.path.map(({tid,label})=>({tid,label}))},
+      native:state.prepared_node_context?Object.fromEntries(['document_id','workflow_id','node_id'].map(k=>[k,state.prepared_node_context[k]])):null,
+      field:{name,owner_ref:f.owner_ref,tid:input.tid,value:f.value},
+      settings:Object.fromEntries(Object.entries(w.settings.fields).map(([key,field])=>[key,field.value]))};
+  };
+  const expected=describe(initial);
+  return channel.perform({condition:'set bound import format '+name,initialObservation:initial,
+    ready:state=>same(describe(state),expected),identity:describe,
+    resolve:state=>({verb:'set_wizard_field',ref:state.wizard.settings.fields[name].input_ref,text})});
+}
+
 async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
   parameters=structuredClone(parameters);
@@ -401,25 +424,25 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     }
     // Native editable combo resolves typed NULL to the first case-insensitive
     // match (null) on blur. Select the exact observed built-in, never retype it.
-    if (name === 'date_separator' || name === 'null_marker' && ['null', 'NULL'].includes(text)) {
+    if (name === 'date_format' || name === 'date_separator' || name === 'null_marker' && ['null', 'NULL'].includes(text)) {
       const label=name==='date_separator'?{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[text]:text;
       const rootRef = s.wizard.root_ref;
       const owns = e => e.wizard_combo?.field && (e.wizard_combo.field.scope ?? 'import_format') === 'import_format'
         && e.wizard_combo.field.name === name && e.wizard_combo.field.owner_ref === f.owner_ref
         && e.wizard_combo.field.root_ref === rootRef;
-      const picker = name==='date_separator'?textImportFormatChoice(s,name,'picker'):
+      const picker = name!=='null_marker'?textImportFormatChoice(s,name,'picker'):
         one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='picker'),'Exact Null marker picker unavailable');
       await act(s, {verb:'click', ref:picker.ref});
       s = await read('text_import_format', 'exact Null marker option visible', state =>
         state.ui.elements.filter(e => owns(e) && e.wizard_combo.kind === 'option' && e.wizard_combo.label === label).length === 1);
-      const option = name==='date_separator'?textImportFormatChoice(s,name,'option',label):
+      const option = name!=='null_marker'?textImportFormatChoice(s,name,'option',label):
         one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===label),'Exact Null marker option unavailable');
       await act(s, {verb:'select_wizard_option', ref:option.ref});
       const after = field(await read('text_import_format', 'exact Null marker applied', state =>
         state.wizard.settings.fields[name]?.value === label), name);
       requireValue(after.value === label && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
         'Import format field or exact label changed after selection');
-    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
+    } else await setImportFormatField(channel,s,name,text);
   }
   let parsedColumns;
   if(patch) {

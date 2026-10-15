@@ -6,9 +6,11 @@ import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {createConnection} from '@playwright/mcp';
 import {createSession} from '../lib/session.mjs';
 import {loginBrowser} from '../../src/connection-check.mjs';
+import {browserProcessEnvironment} from '../lib/bridge.mjs';
 
 // No synthetic download event: the fixture uses a native Blob/anchor download
 // and real file inputs inside the same Page that MCP owns.
@@ -60,10 +62,21 @@ for (const owner of ['mcp', 'managed']) {
         // a capability decision already made by an authenticated application.
         assert.equal(await handles.context.pages()[0].evaluate(() => window.initialPicker), 'undefined');
       }
-      handles.server = await createConnection(config, owner === 'managed' ? async () => handles.context : undefined);
-      const [local, remote] = InMemoryTransport.createLinkedPair();
-      await handles.server.connect(remote);
-      await client.connect(local);
+      if (owner === 'managed') {
+        handles.server = await createConnection(config, async () => handles.context);
+        const [local, remote] = InMemoryTransport.createLinkedPair();
+        await handles.server.connect(remote);
+        await client.connect(local);
+      } else {
+        // Match the product's MCP-owned CLI path. The upstream in-process API
+        // does not own browser disposal; managed callers close their context.
+        handles.transport = new StdioClientTransport({command:process.execPath,
+          args:[session.browserCli, '--config', session.browserConfig],
+          env:browserProcessEnvironment(session.browserRoot), cwd:session.directory, stderr:'pipe'});
+        handles.transport.stderr?.on('data', () => {});
+        handles.transport.onclose = () => { handles.transportClosed = true; };
+        await client.connect(handles.transport);
+      }
       handles.connected = true;
       const code = async source => {
         const reply = await client.callTool({name:'browser_run_code_unsafe', arguments:{code:source}}, undefined, {timeout:30000});
@@ -115,12 +128,25 @@ for (const owner of ['mcp', 'managed']) {
       assert.equal(uploaded.isError ?? false, false, JSON.stringify(uploaded));
       assert.equal(await code('async page => await page.locator("#chooser").evaluate(async input => await input.files[0].text())'), 'group;qty\nA;1\n');
     } finally {
-      if (handles.connected) await client.callTool({name:'browser_close', arguments:{}});
-      await client.close();
-      await handles.server?.close();
-      await handles.context?.close();
-      await new Promise(resolve => http.close(resolve));
-      await rm(directory, {recursive:true, force:true, maxRetries:5});
+      try {
+        if (handles.connected) {
+          const closed = await client.callTool({name:'browser_close', arguments:{}}, undefined, {timeout:15000});
+          assert.equal(closed.isError ?? false, false, JSON.stringify(closed));
+        }
+      } finally {
+        try { await client.close(); }
+        finally {
+          try { await handles.server?.close(); }
+          finally {
+            try { await handles.context?.close(); }
+            finally {
+              await new Promise(resolve => http.close(resolve));
+              await rm(directory, {recursive:true, force:true, maxRetries:5});
+            }
+          }
+        }
+      }
+      if (handles.transport) assert.equal(handles.transportClosed, true, 'MCP child transport must close');
     }
   });
 }

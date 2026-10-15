@@ -173,3 +173,22 @@ Runtime dependency install, тесты Dock в новом layout, product identi
 Живая Loginom runtime-acceptance нового runtime и приёмка установленных
 артефактов остаются pending. Новый архивный снимок `83c52ebb` ещё не
 снят. Экологические падения Python-аудиторов на 3.10 не чинились.
+
+
+### JavaScript branch transformation refresh — 2026-10-01
+
+On node-javascript at `280a94c76fb210eb3af259d422db7dcbf9f7baf5`, the
+standard source verifier found 73 stale transformation hashes. Each previous
+recorded hash was located in the path's actual Git history; each current file
+matched the committed HEAD bytes. The updated transformation records retain the
+original upstream baseHash and previous rationale, and record all intervening
+commit IDs and subjects. No original identity/hash in source-map.json, notices,
+source files, archive entries or file modes were replaced by this refresh.
+
+This covers committed JavaScript source/context/diagnostics/execution changes,
+shared output/port/geometry/readiness changes, associated regressions and tool
+changes already present in this branch. It is source attribution/byte provenance,
+not a behavioral review, product registration, candidate or CLI acceptance. New
+local files absent from the original import map remain local code; they are not
+misrepresented as imported upstream files. Re-run the standard verifier after
+further changes to mapped files before candidate assembly.

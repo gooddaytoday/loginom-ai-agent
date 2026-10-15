@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readNodeProcesses} from '../lib/node-process-context.mjs';
 
-function fixture() {
-  const base='ConsoleForm;ProgressForm;',elements=new Map();
+function fixture(prefix='ConsoleForm') {
+  const base=prefix+';ProgressForm;',elements=new Map();
   const el=(tid,attrs={})=>{
     const e={attrs:{'data-tid':tid,...attrs},children:[],hidden:false,textContent:'',
       getAttribute(k){return this.attrs[k]??null},
@@ -14,6 +14,7 @@ function fixture() {
     e.classList={contains:c=>(e.attrs.class??'').split(' ').includes(c)};elements.set(tid,e);return e;
   };
   const left=el(base+'trpProgress;treepanel;tree'),right=el(base+'trpProgress;grd;tbl');left.id='left';right.id='right';
+  const panel=el(prefix);panel.contains=e=>e===left||e===right;
   const menu=el('mnContextMenu;mniShowCompletedProcesses',{class:'x-menu-item-checked'});
   const model=(id,record)=>({isModel:true,internalId:record,childNodes:[],data:{id,loaded:true,loading:false,expanded:true,Status:3,ErrorDetails:'',text:'Node'}});
   const root=model('root',100),group=model('1',101),child=model('1.1',102);root.childNodes=[group];group.childNodes=[child];
@@ -37,7 +38,7 @@ function fixture() {
   context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
   const page={evaluate:(fn,arg)=>{context.evaluateArg=arg;return structuredClone(vm.runInContext('('+fn.toString()+')(evaluateArg)',context));}};
   const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'graph'};
-  return {nodes,page,node,readNode:async()=>({...node}),left,right,menu,root,group,child,store,views,rows,masks,el};
+  return {nodes,page,node,readNode:async()=>({...node}),left,right,menu,root,group,child,store,views,rows,masks,el,panel,elements};
 }
 test('native process inventory binds both split grids and cached tree records',async()=>{
  const f=fixture(),r=await readNodeProcesses(f.page,{},f.readNode);
@@ -108,3 +109,10 @@ test('unrecognised, contradictory or incomplete process status never grants canc
  const r=await readNodeProcesses(f.page,{},f.readNode);assert.equal(r.verified,true);
  assert.equal(r.processes[1].owner,undefined);
  });
+
+for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('native inventory retains exact '+prefix+' owner and refuses another panel',async()=>{
+ const f=fixture(prefix);assert.equal((await readNodeProcesses(f.page,{},f.readNode)).verified,true);
+ assert.equal((await readNodeProcesses(f.page,{},f.readNode)).processes[1].process_tid,prefix+';ProgressForm;colProcess_1.1');
+ f.el(prefix==='ConsoleForm'?'MF;ConsoleForm':'ConsoleForm');
+ assert.equal((await readNodeProcesses(f.page,{},f.readNode)).reason,'console_panel');
+});

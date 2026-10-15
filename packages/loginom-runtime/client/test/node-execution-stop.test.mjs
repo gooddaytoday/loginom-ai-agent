@@ -4,11 +4,12 @@ import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs'
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl',cancel='mnContextMenu;mniCancel';
 const element=(tid,verbs=['click'])=>({tid,ref:'ui-'+tid,allowed_actions:verbs});
-async function fixture(fault, multiple=false) {
- let opened=true,menu=false,launched=false,terminal=false,cancelCalls=0;
- const actions=[];
+async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinned=false,retainReadWait=false}={}) {
+ let opened=true,pinned=initialPinned,menu=false,launched=false,terminal=false,cancelCalls=0;
+ const actions=[],reads=[];
  const proof={root_id:'root',record_id:'child',process_id:'1.1',node_id:'node',owner_verified:true,can_cancel:true,source:'native_process_model_identity'};
  const state=()=>{
+  const prefix=pinned?'MF;':'',consoleElement=(tid,verbs)=>element(prefix+tid,verbs);
   const progress_state={verified:true,state:terminal?'cancelled':'running',terminal,can_cancel:!terminal};
   const ps=launched?[{process_id:'1',record_id:'group',parent_id:null,rendered:true,expanded:true,children_loaded:true,progress_state},
    {process_id:'1.1',record_id:'child',parent_id:'1',rendered:true,process_tid:'child-row',progress_state}]:[];
@@ -23,21 +24,52 @@ async function fixture(fault, multiple=false) {
   if(terminal&&fault==='completed_race')ps[1].progress_state={verified:true,state:'completed',terminal:true,can_cancel:false};
   return {prepared_node_context:{...node,verified:true,surface:'graph'},node_processes:{verified:true,inventory_complete:true,
    root_id:'root',show_completed:true,node_context:{...node,verified:true},processes:ps},
-   ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[element(grid,['right_click']),element('ConsoleForm;btnClose'),element('child-row',['right_click'])]:[]),
+   ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[consoleElement(grid,['right_click']),consoleElement('ConsoleForm;btnClose'),
+     ...(fault==='missing_pin'?[]:[consoleElement(pinned?'ConsoleForm;btnPin':'ConsoleForm;btnUnpin')]),
+     {...element('child-row',['right_click']),process_row:{record_id:fault==='reused_row'?'foreign-record':'child'}}]:[]),
     ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press']),{...element(cancel,['cancel_process']),process_menu:{cancellation:actualProof}}]:[])]}};
  };
- const channel={observe:async o=>{const s=state();if(!o.ready(s))throw Error('Readiness refused: '+o.condition);return structuredClone(s);},
+ const channel={observe:async o=>{reads.push(o);const s=state();if(o.readProcesses===false)delete s.node_processes;if(!o.ready(s))throw Error('Readiness refused: '+o.condition);return structuredClone(s);},
   perform:async o=>{const s=state();assert.equal(o.ready(s),true);const identity=o.identity(s);assert.ok(identity);const a=o.resolve(s);actions.push(a);
    if(a.verb==='cancel_process') {cancelCalls++;if(fault==='unknown_receipt')throw Error('Unknown stop receipt');terminal=true;menu=false;}
    else if(a.verb==='right_click')menu=true;
    else if(a.verb==='press')menu=false;
-   else if(a.ref==='ui-ConsoleForm;btnClose')opened=false;
+   else if(a.ref==='ui-ConsoleForm;btnUnpin'){if(fault==='unknown_pin')throw Error('Unknown pin receipt');pinned=true;}
+   else if(a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose')opened=false;
    else if(a.ref==='ui-MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
    return {status:'SUCCEEDED'};
   }};
- const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;await driver.identify();actions.length=0;
- return {driver,channel,actions,get cancelCalls(){return cancelCalls;}};
+ const driver=createNodeExecutionProcedure(channel,node,{retainReadWait});await driver.prepare({keepConsoleOpen});
+ const preparationActions=structuredClone(actions);launched=true;await driver.identify();actions.length=0;
+ reads.length=0;
+ return {driver,channel,actions,reads,preparationActions,get cancelCalls(){return cancelCalls;}};
 }
+test('private prelaunch admission can retain the owned process console without a close gesture',async()=>{
+ const normal=await fixture(),held=await fixture(undefined,false,{keepConsoleOpen:true});
+ assert.equal(normal.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose').length,1);
+ assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose').length,0);
+ assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin').length,1);
+ const stopped=await held.driver.stop();assert.equal(stopped.stop_verified,true);assert.equal(held.cancelCalls,1);
+ assert.equal(held.preparationActions.some(a=>a.ref==='ui-MF;'+grid&&a.verb==='right_click'),true);
+ assert.equal(held.actions.at(-1).ref,'ui-MF;ConsoleForm;btnClose');
+});
+test('a retained console already pinned is not toggled again',async()=>{
+ const f=await fixture(undefined,false,{keepConsoleOpen:true,initialPinned:true});
+ assert.equal(f.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin'||a.ref==='ui-ConsoleForm;btnPin').length,0);
+});
+test('missing pin state or unknown pin receipt prevents execution preparation',async()=>{
+ await assert.rejects(fixture('missing_pin',false,{keepConsoleOpen:true}),/pin state unavailable/);
+ await assert.rejects(fixture('unknown_pin',false,{keepConsoleOpen:true}),/Unknown pin receipt/);
+});
+test('invalid retained console mode refuses before observations or gestures',async()=>{
+ const f=await fixture();await assert.rejects(f.driver.prepare({keepConsoleOpen:'yes'}),/must be boolean/);
+ assert.equal(f.reads.length,0);assert.deepEqual(f.actions,[]);
+});
+test('Stop refreshes native inventory when the process console was already visible',async()=>{
+ const f=await fixture();const stopped=await f.driver.stop();assert.equal(stopped.stop_verified,true);
+ assert.equal(f.reads[0].readProcesses,false);assert.equal(f.reads[1].readProcesses,true);
+ assert.equal(f.reads[1].condition,'process console visible');assert.equal(f.cancelCalls,1);
+});
 test('stop driver cancels only its identified native child and returns terminal evidence once',async()=>{
  const f=await fixture(),first=f.driver.stop(),second=f.driver.stop();assert.equal(first,second);
  const result=await first;assert.equal(result.status,'cancelled');assert.equal(result.stop_verified,true);
@@ -45,11 +77,11 @@ test('stop driver cancels only its identified native child and returns terminal 
  assert.equal(f.cancelCalls,1);assert.equal(await f.driver.stop(),result);
  assert.deepEqual(f.actions.map(a=>a.verb),['right_click','cancel_process','click']);
 });
-for(const fault of ['foreign_owner','unknown_receipt','replaced_terminal','completed_race'])
+for(const fault of ['foreign_owner','reused_row','unknown_receipt','replaced_terminal','completed_race'])
  test('stop driver preserves '+fault+' without a second gesture',async()=>{
   const f=await fixture(fault);const first=f.driver.stop();await assert.rejects(first);
   assert.equal(f.driver.stop(),first);await assert.rejects(f.driver.stop());
-  assert.equal(f.cancelCalls,fault==='foreign_owner'?0:1);
+  assert.equal(f.cancelCalls,['foreign_owner','reused_row'].includes(fault)?0:1);
  });
 
 test('long execution repeats only bounded observations, never launches or stops again',async()=>{
@@ -107,4 +139,52 @@ test('an abort after the read loop cannot authorize replaying ownership gestures
   controller.abort(Error('cancel after completion read'));throw controller.signal.reason;
  };
  await assert.rejects(f.driver.waitCompleted({signal:controller.signal}),e=>{assert.equal(e.nodeExecutionWaitPause,undefined);return e===controller.signal.reason;});
+});
+
+test('retained read wait pins native records before abort and inspects them without gestures',async()=>{
+ const f=await fixture(undefined,true,{keepConsoleOpen:true,retainReadWait:true}),controller=new AbortController();
+ const original=f.channel.observe;let pause;
+ f.channel.observe=async options=>{
+  if(options.condition!=='new node execution completed')return original(options);
+  const s=await original({...options,ready:()=>true});
+  s.node_processes.node_context.surface='graph';
+  s.node_processes.processes.forEach(p=>p.progress_state.source='native_progress_record');
+  assert.equal(options.ready(s),false);controller.abort(Error('local cancel'));throw controller.signal.reason;
+ };
+ await assert.rejects(f.driver.waitCompleted({signal:controller.signal}),error=>{pause=error.nodeExecutionWaitPause;return !!pause;});
+ assert.equal(pause.native_execution.process_record_id,'child');assert.equal(pause.native_execution.group_record_id,'group');
+ f.channel.observe=async options=>{
+  const s=await original({...options,ready:()=>true});s.node_processes.node_context.surface='graph';
+  s.node_processes.processes.forEach(p=>p.progress_state.source='native_progress_record');
+  assert.equal(options.ready(s),true);return s;
+ };
+ assert.deepEqual(await f.driver.verifyReadWaitContinuation(pause),pause.native_execution);
+ assert.deepEqual(f.actions,[]);assert.equal(f.cancelCalls,0);
+ const foreign=structuredClone(pause);foreign.native_execution.process_record_id='foreign';
+ await assert.rejects(f.driver.verifyReadWaitContinuation(foreign),/owned read wait/);
+ f.channel.observe=async options=>{
+  const s=await original({...options,ready:()=>true});s.node_processes.node_context.surface='graph';
+  s.node_processes.processes.forEach(p=>p.progress_state.source='native_progress_record');
+  s.node_processes.processes[1].record_id='replaced';options.ready(s);return s;
+ };
+ await assert.rejects(f.driver.verifyReadWaitContinuation(pause),/records changed/);assert.deepEqual(f.actions,[]);
+});
+
+test('retained mode cannot synthesize a pause when abort precedes its first native read',async()=>{
+ const f=await fixture(undefined,true,{retainReadWait:true}),controller=new AbortController();
+ controller.abort(Error('early local cancel'));f.channel.observe=async()=>{throw controller.signal.reason;};
+ await assert.rejects(f.driver.waitCompleted({signal:controller.signal}),e=>!e.nodeExecutionWaitPause);
+ await assert.rejects(f.driver.verifyReadWaitContinuation({execution_id:'doc:root:1',read_only:true,cleanup_complete:true}),/owned read wait/);
+ assert.deepEqual(f.actions,[]);
+});
+
+test('waiting for dependencies does not invent a requested-child pause or reject the ordinary wait',async()=>{
+ const f=await fixture('missing_native_owner',true,{retainReadWait:true}),controller=new AbortController(),original=f.channel.observe;
+ f.channel.observe=async options=>{
+  const s=await original({...options,ready:()=>true});s.node_processes.node_context.surface='graph';
+  s.node_processes.processes.forEach(p=>p.progress_state.source='native_progress_record');
+  assert.equal(options.ready(s),false);controller.abort(Error('cancel before native child exists'));throw controller.signal.reason;
+ };
+ await assert.rejects(f.driver.waitCompleted({signal:controller.signal}),e=>e===controller.signal.reason&&!e.nodeExecutionWaitPause);
+ assert.deepEqual(f.actions,[]);
 });

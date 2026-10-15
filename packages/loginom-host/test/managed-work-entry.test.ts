@@ -19,6 +19,14 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/src/start-input.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/managed-resources-close.mjs": await readFile(
+      new URL("../../loginom-runtime/src/managed-resources-close.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/src/call-timeout.mjs": await readFile(
+      new URL("../../loginom-runtime/src/call-timeout.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/resources.mjs": "export async function verifyResources() { return {} }",
     "runtime/src/connection-check.mjs": `
       export const loginomAddress = value => value;
@@ -38,7 +46,9 @@ test("actual managed entry reads live bridge work and dispatching over private I
       import { readFileSync } from 'node:fs';
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
       export async function createBridge() { return {
-        server: { connect: async () => {} }, close: async () => {},
+        server: { connect: async () => {} }, close: async () => ({
+          browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
+        }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
       } }`,
     "runtime/client/node_modules/@modelcontextprotocol/sdk/package.json": JSON.stringify({ type: "commonjs" }),
@@ -57,7 +67,8 @@ test("actual managed entry reads live bridge work and dispatching over private I
     "runtime/client/node_modules/@playwright/mcp/index.js":
       "exports.createConnection = async () => ({ connect: async () => {}, close: async () => {} })",
   }
-  // The entry and start validator are byte-identical copies. Only external browser/MCP/bridge boundaries are controlled.
+  // Entry, validator, timeout and resource cleanup are byte-identical copies.
+  // Only external browser/MCP/bridge boundaries are controlled.
   for (const [name, contents] of Object.entries(files)) {
     const target = join(directory, name)
     await mkdir(dirname(target), { recursive: true })

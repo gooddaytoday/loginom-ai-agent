@@ -31,6 +31,7 @@ function fixture(direction='output') {
   if(q==='[role="dialog"],.x-message-box')return dialog.visible?[dialog]:[];
   if(q==='.x-mask,.x-mask-msg,.bg-mask-message')return [];
   if(dialog.visible)return [dialog];
+  if(card.Controller.FController===wizard&&flags.finishMasks)return flags.finishMasks;
   if(flags.loading>0){flags.loading--;return [{checkVisibility:()=>true}];}return [];
  }};
  const prep={document,id:'doc',receipts:new Map([['prepare',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
@@ -42,7 +43,7 @@ function fixture(direction='output') {
   const tid=JSON.parse(selector.replace(/:visible$/, '').slice(10,-1));return {waitFor:async()=>{},click:async options=>{
    if(options?.trial){if(tid===confirmation.yes.tid)flags.beforeConfirm?.();return;}gestures.push(tid);
    if(tid===portDom.tid){menu.visible=true;graph.FCurrentPortMenu=flags.foreignMenu?{}:port;}
-   else if(tid===button.tid){if(flags.deactivation){menu.visible=false;dialog.visible=true;}else showWizard();}
+   else if(tid===button.tid){if(flags.holdOpen){menu.visible=false;}else if(flags.deactivation){menu.visible=false;dialog.visible=true;}else showWizard();}
    else if(tid===confirmation.yes.tid){showWizard();if(flags.lostConfirmation)throw Error('Confirmation reply lost');}
    else throw Error('Unexpected gesture');
   }};
@@ -101,7 +102,7 @@ test('active port opening confirms its bound question once and replay performs n
  const f=fixture();f.flags.deactivation=true;
  const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
  assert.deepEqual(f.gestures.slice(-1),['msgbox;tlb;yes']);assert.equal(f.gestures.length,3);
- assert.deepEqual(result.trace.map(t=>t.event),['output_port_reserved','output_port_menu_verified','output_port_deactivation_question_verified','output_port_deactivation_issued','output_port_wizard_verified']);
+ assert.deepEqual(result.trace.map(t=>t.event),['output_port_reserved','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_deactivation_question_verified','output_port_deactivation_issued','output_port_wizard_verified']);
  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,3);
 });
 
@@ -178,4 +179,42 @@ test('control input identity comes from the exact cached cell ordinal, never a S
 test('control input opening refuses a misleading native ordinal without a gesture',async()=>{
  const f=fixture('input');f.task.kind='control';f.portDom.tid='MF;TF;Graph;Node;Input_ControlVar';f.portDom.getAttribute=()=>f.portDom.tid;
  f.port.FPortIndex=7;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(f.gestures.length,0);
+});
+
+test('pending port opening reports bounded observed state without another gesture',async()=>{
+ const f=fixture();f.flags.holdOpen=true;f.page.waitForTimeout=async()=>{f.task.deadline=Date.now()-1;};
+ const r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(f.gestures.length,2);
+ assert.deepEqual(r.trace.map(x=>x.event),['output_port_reserved','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_open_pending']);
+ const pending=r.trace.at(-1);assert.equal(pending.samples,1);assert.equal(pending.last.wizard_count,1);
+ assert.deepEqual(Array.from(pending.last.wizard_visible),[false]);assert.equal(pending.last.controller_type,'ModelForm');
+ assert.equal(pending.last.port_menu_same,true);assert.equal(pending.last.node_locked,false);
+});
+
+
+test('output wizard permits only its native disabled delete-column mask',async()=>{
+ const variants=['valid','enabled','foreign-native','foreign-root','foreign-tid','duplicate-column','duplicate-mask','loading','message','dialog','text','input','foreign-port'];
+ for(const variant of variants){
+  const f=fixture(variant==='input'?'input':'output');
+  const column=f.el('MF;TF;WizrdMCF;DataSetOutputSocketWizard;colTargetDelete');column.parent=f.wizard.FView.el.dom;
+  f.nativeControls.set(column.id,{el:{dom:column},disabled:true});
+  const classes=new Set(['x-mask','x-border-box']);
+  const mask={parentElement:column,textContent:'',checkVisibility:()=>true,classList:{contains:name=>classes.has(name)},getAttribute:()=>null};
+  f.flags.finishMasks=[mask];
+  if(variant==='enabled')f.nativeControls.get(column.id).disabled=false;
+  if(variant==='foreign-native')f.nativeControls.get(column.id).el.dom={};
+  if(variant==='foreign-root')column.parent={};
+  if(variant==='foreign-tid')column.getAttribute=()=> 'other-column';
+  if(variant==='duplicate-column')f.el(column.tid);
+  if(variant==='duplicate-mask')f.flags.finishMasks.push({...mask});
+  if(variant==='loading')classes.add('x-mask-msg');
+  if(variant==='message')classes.add('bg-mask-message');
+  if(variant==='dialog')mask.getAttribute=()=> 'dialog';
+  if(variant==='text')mask.textContent='Loading';
+  if(variant==='foreign-port')f.flags.foreignWizard=true;
+  // A blocked settlement terminates deterministically without waiting in the test.
+  f.page.waitForTimeout=async()=>{throw Error('settlement still blocked');};
+  const result=await f.run();
+  assert.equal(result.status,variant==='valid'?'SUCCEEDED':'AMBIGUOUS',variant+': '+result.error);
+  assert.equal(f.gestures.length,2,variant);
+ }
 });

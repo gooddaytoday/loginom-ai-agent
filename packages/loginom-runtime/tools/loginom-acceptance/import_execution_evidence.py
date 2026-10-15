@@ -19,7 +19,8 @@ def verify_process_scroll_observations(observations, mutations):
         delta=action.get('delta_y');moves=[t for t in outcome.get('trace',[]) if t.get('event')=='ui_scroll_applied']
         target=min(scroll.get('max_top',0),max(0,scroll.get('top',0)+(delta if type(delta) is int else 0)))
         rows=[e for e in after.get('ui',{}).get('elements',[]) if e.get('process_grid',{}).get('grid_id')==grid.get('grid_id')]
-        if (control.get('tid')!='ConsoleForm;ProgressForm;trpProgress;treepanel;tree' or not grid.get('grid_id')
+        if (control.get('tid') not in ('ConsoleForm;ProgressForm;trpProgress;treepanel;tree',
+                'MF;ConsoleForm;ProgressForm;trpProgress;treepanel;tree') or not grid.get('grid_id')
                 or scroll.get('ref')!=action.get('ref') or 'scroll' not in control.get('allowed_actions',[])
                 or type(delta) is not int or not 0<abs(delta)<=1000 or target==scroll.get('top')
                 or len(moves)!=1 or moves[0].get('owner_ref')!=action.get('ref')
@@ -147,6 +148,16 @@ def verify_execution_observations(observations, mutations, node, *, launch_mode=
 
 
 def verify_text_import_execution(events, request, source_bytes):
+    result = verify_text_import_source_execution(events, request, source_bytes)
+    failures = list(result['failures'])
+    checkpoints = [e.get('result', {}) for e in events if e.get('operation_id') == request['operation_id'] and e.get('phase') == 'node_checkpoint']
+    if (len(checkpoints) != 1 or checkpoints[0].get('output', {}).get('ports') != [] or request.get('read', {}).get('ports') != []):
+        failures.append('execution_checkpoint_identity')
+    return dict(result,passed=not failures,failures=sorted(set(failures)),execution_verified=not failures)
+
+
+def verify_text_import_source_execution(events, request, source_bytes):
+    """Original file, configuration and fresh process only; preview is not data proof."""
     result = _verify_text_import(events, request, source_bytes, 'execute')
     seq = verify_internal_sequence(events, request['operation_id'], max_steps=import_operation_step_budget(events, request['operation_id']))
     bindings = [s.get('prepared_node_context', {}) for _, s in seq['observations']]
@@ -155,8 +166,7 @@ def verify_text_import_execution(events, request, source_bytes):
     proof = verify_execution_observations(seq['observations'], seq['mutations'], bindings[0])
     failures = result['failures'] + proof['failures']
     checkpoints = [e.get('result', {}) for e in events if e.get('operation_id') == request['operation_id'] and e.get('phase') == 'node_checkpoint']
-    if (len(checkpoints) != 1 or checkpoints[0].get('execution', {}).get('execution_id') != proof['execution_id']
-            or checkpoints[0].get('output', {}).get('ports') != [] or request.get('read', {}).get('ports') != []):
+    if (len(checkpoints) != 1 or checkpoints[0].get('execution', {}).get('execution_id') != proof['execution_id']):
         failures.append('execution_checkpoint_identity')
     return dict(result, passed=not failures, failures=sorted(set(failures)), execution_verified=not failures,
                 execution_id=proof['execution_id'], output_data_verified=False)

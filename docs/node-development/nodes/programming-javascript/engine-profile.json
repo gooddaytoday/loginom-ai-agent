@@ -1,0 +1,1277 @@
+{
+  "schema_version": 1,
+  "status": "partial_discovery_not_acceptance",
+  "target_url": "http://logi-test-plan.bg.local/app/",
+  "loginom_build": "7.4.2",
+  "edition": "Enterprise",
+  "operator_platform": "Ubuntu Linux x64",
+  "browser_mode": "headed",
+  "server_os": {
+    "status": "observed",
+    "value": "Linux",
+    "source": "owned Session.Version.IsWindows=false",
+    "source_commit": "ad48f23228a2ecb83722ae7538aacfa00a8f6bd2",
+    "report_sha256": "01753c77083437f86326809242122e7657b74c6003a78f013dd4f3b889286f5b"
+  },
+  "engine_version": {
+    "status": "not_observed"
+  },
+  "source_commit": "520ce1f78ce39859d3ce30a65db93e80c9081747",
+  "scope": "Operator-only discovery index. Not the runtime knowledge manifest; no G1-G7 closure or ECMAScript conformance claim.",
+  "cases": [
+    {
+      "id": "engine-data-smoke",
+      "scope": "v1",
+      "source_sha256": "fdf568072d6bf7924b9d8c901ee3be94e6a0c7278563637ee508325b8d9db3c7",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-01/report.json",
+        "report_sha256": "33fde39645f04cccdb8b720819f7bf1bc6f13e582d230c81eda2ac5eaa3e97b2",
+        "source_receipt": "engine-probe-01-source.json",
+        "journal_verifier": "engine-probe-01-verification.json",
+        "oracle_verifier": "engine-probe-01-oracle-verification.json"
+      }
+    },
+    {
+      "id": "engine-literal-trim",
+      "scope": "v1",
+      "source_sha256": "89354899d30075f74cff3cfde7e81db6986339d4c4677eb69adc4a22c1e59698",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-02/report.json",
+        "report_sha256": "c4ee8032c782be6620e3bf5ac952f7ce262c8a42b6f794fd42980b3c68f287f8",
+        "source_receipt": "engine-probe-02-source.json",
+        "journal_verifier": "engine-probe-02-verification.json",
+        "oracle_verifier": "engine-probe-02-oracle-verification.json"
+      }
+    },
+    {
+      "id": "engine-literal-lower",
+      "scope": "v1",
+      "source_sha256": "1512b3e1fb9afed66bd864435646ff9e2248bcc4fbdc323288e3ffc299349c91",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-03/report.json",
+        "report_sha256": "1e990ad99911d9aa3dc3afe1170bf2306c4fef03d81b28bf5677a3c947bbe65d",
+        "source_receipt": "engine-probe-03-source.json",
+        "journal_verifier": "engine-probe-03-verification.json",
+        "oracle_verifier": "engine-probe-03-oracle-verification.json"
+      }
+    },
+    {
+      "id": "engine-literal-upper",
+      "scope": "v1",
+      "source_sha256": "28f91bf1c82bf90c6b26090f73229b6c1449e0df55da6e3a3b768eb0f9cd0115",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-04/report.json",
+        "report_sha256": "3701ee69feea177e904482883f543e8340a56c75f71eee9c75142aed3d6d008d",
+        "source_receipt": "engine-probe-04-source.json",
+        "journal_verifier": "engine-probe-04-verification.json",
+        "oracle_verifier": "engine-probe-04-oracle-verification.json"
+      }
+    },
+    {
+      "id": "engine-nullish",
+      "scope": "characterization",
+      "source_sha256": "60cbbb1a9f2c7966cd889e7ac1bd3b5bbb3cf551cdc1b380bfb1e22477753207",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_native_refusal",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "manual_error_button_with_admin_recovery",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Syntax error at code (:4:33)",
+      "native_position": {
+        "line": 4,
+        "column": 33
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "operator_cleanup_complete": false,
+      "admin_recovery_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-error-button-07/report.json",
+        "report_sha256": "5c699efaa8444db8bc5a1d3205412e2d13d3b33a1a6b178098bc18e2dd379bd9",
+        "admin_recovery": "engine-error-button-admin-recovery-08.jsonl",
+        "admin_recovery_sha256": "3af60c29709e55fc381e68a2d1b440120875759a5d074bec75544f0290562569"
+      }
+    },
+    {
+      "id": "engine-optional-chain",
+      "scope": "characterization",
+      "source_sha256": "aaa5a1fe1e639a12fbd9d8c08932ec39ac1631654c693f187fa01a54664bee99",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_native_refusal",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Syntax error at code (:4:48)",
+      "native_position": {
+        "line": 4,
+        "column": 48
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-optional-chain-10/report.json",
+        "report_sha256": "392d590029baeef0932e840b7f0a1558023d86afa674989125eeb9a182c5250c",
+        "journal_sha256": "8cbdea4c2534b4d06a22a72c3082c8fdda79e1d94ef3a63a2b4343b565706c97",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-lookbehind",
+      "scope": "characterization",
+      "source_sha256": "f94303fb37eb25103ee236c9839ed8f536b5ac36d7162cff05502011e65f71e5",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_native_refusal",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Unexpected quantifier at code (:4:36)",
+      "native_position": {
+        "line": 4,
+        "column": 36
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-lookbehind-11/report.json",
+        "report_sha256": "c2afe20b746eaf342d6622e85c0821674379e9a011aff30e26d1268d85d5f395",
+        "journal_sha256": "fb3eeb405fb7abd0e0a676ee0d8025e80a102c36b4cb27a9157ff4ae36117ed5",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-bigint",
+      "scope": "characterization",
+      "source_sha256": "54c8ed2f7aad4079cd9c57dbfe679e245675a11b4629bf2ed9df024a25b398d6",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_native_refusal",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Unexpected identifier after numeric literal at code (:4:34)",
+      "native_position": {
+        "line": 4,
+        "column": 34
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-bigint-12/report.json",
+        "report_sha256": "bca74892ac2ec5c4350f20e5f4f6e329a1f26f7a383c322505c0afa241915908",
+        "journal_sha256": "5822d4e1cb04b378adc8a8aed02dfb7588b2477cbad7eccbb372aafdf3404be7",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-global-this",
+      "scope": "characterization",
+      "source_sha256": "865317e82f65e2480ab9f64290d3a1015bbb797be2a1af8f617a795d0c08640c",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          "object"
+        ]
+      ],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-global-this-13/report.json",
+        "report_sha256": "443cbc622754d42c2375ded6ff31b5256686516e2e6207fcf6b55042112a95b2",
+        "journal_sha256": "7a1393d71c8d02908b7efa218ede06c1a3d9e99188b58f3ea95bc001d4249d18",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-async-declaration",
+      "scope": "characterization",
+      "source_sha256": "9470d16e52d726b6232331641415d0bde8aeb1acfeb3e2bbea770b5490fabb2e",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          "function"
+        ]
+      ],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-async-declaration-14/report.json",
+        "report_sha256": "e6f042b06e75c9093792d1ca784bd69c46676a1b21326da849060f2b17993927",
+        "journal_sha256": "1ecd9c1f8fd1c5a28f23c92a973998bb90262d0d7a8ae80eab937965cb27ca95",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-top-level-await",
+      "scope": "characterization",
+      "source_sha256": "870883e4b8849c8b63b45da30be606f66fb5cacd1c8451502d04137a35cf9404",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_native_refusal",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: 'await' expression not allowed in this context at code (:4:27)",
+      "native_position": {
+        "line": 4,
+        "column": 27
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-top-level-await-15/report.json",
+        "report_sha256": "6366d7836b0af113d131ca2ceaf03edd00daa0479aa1d4f4e3bca867d1540798",
+        "journal_sha256": "454c7e1d57d669ff8443d0ae6b921929ffc3ae1ac6fd77eb81b522c979795226",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-strict-error",
+      "scope": "diagnostics",
+      "source_sha256": "7fed91e7806940c59098fc8e962513b1de6a5b913ba150778ffdfcf1b1e45f86",
+      "schema_mode": "code",
+      "expectation": "diagnostic",
+      "status": "observed_owned_native_failure",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_native_child_error",
+      "native_error_code": "NODE_EXECUTION_FAILED",
+      "native_error_message": "ReferenceError: Variable undefined in strict mode\n   at Anonymous function (<main>:5:56)\n   at Anonymous function (<main>:5:1)\n   at module (<main>:1:1)",
+      "class_observed": null,
+      "position_observed": null,
+      "output_refreshed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-strict-error-16/report.json",
+        "report_sha256": "fd022496f9f5d903500bd0dae12559536861279d9d5c76bcf7c7d69e1a446469",
+        "journal_sha256": "d4400a153779336cbd0d004e4ae165f9c72577d6c5c538763c1efb3e898c82e8",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-sync-throw",
+      "scope": "diagnostics",
+      "source_sha256": "4511b462cff1cad043d42e38d7ed6c4de31539f0528dfd96cc1db81d1f7502c7",
+      "schema_mode": "code",
+      "expectation": "diagnostic",
+      "status": "observed_owned_native_failure",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_native_child_error",
+      "native_error_code": "NODE_EXECUTION_FAILED",
+      "native_error_message": "Error: JS_DISCOVERY_SYNC_THROW\n   at Anonymous function (<main>:4:42)\n   at Anonymous function (<main>:4:1)\n   at module (<main>:1:1)",
+      "sync_marker_observed": true,
+      "class_observed": null,
+      "position_observed": null,
+      "output_refreshed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-sync-throw-17/report.json",
+        "report_sha256": "d2a9a8e1794d98e84fe2d875626a699a38486186a174bc1c5159ddba8cadf92f",
+        "journal_sha256": "4405869d01d0f68e2d4e11af253d04c5b6d447d1295a8f28514c139ca73a4d3e",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-native-parse-error",
+      "scope": "diagnostics",
+      "source_sha256": "bd308750f70dd6d0a1783613338360b556a0a13bcd41e0ab4e245b648a27f337",
+      "schema_mode": "code",
+      "expectation": "diagnostic",
+      "status": "observed_native_refusal",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Syntax error at code (:4:32)",
+      "native_position": {
+        "line": 4,
+        "column": 32
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-native-parse-error-18/report.json",
+        "report_sha256": "b9f065dd22a372940f9a7501e69725a3ea07d91ae4afd147a38c20a3ef242874",
+        "journal_sha256": "5694f011b2b4cfd94b83d8275b0100cbd03cb8b9c681f510365860f8d13426f5",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "engine-input-text",
+      "scope": "v1",
+      "source_sha256": "48095943949569f115b771a7346d8454203128fe442ac0f2f9f64a82fea9191e",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "output_rows": 6,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-05/report.json",
+        "report_sha256": "6d19df26fbd86e2801497685dd7d8300f824686ca9bcb0efd5570ecc6467800e",
+        "source_receipt": "engine-probe-05-source.json",
+        "journal_verifier": "engine-probe-05-verification.json",
+        "oracle_verifier": "engine-probe-05-oracle-verification.json"
+      }
+    },
+    {
+      "id": "g5-null-empty",
+      "scope": "G5",
+      "source_sha256": "5b312ad7ea5af26aa32759246e2162adff5d235579863fc0159c511f07c78c37",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 5,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          null
+        ],
+        [
+          ""
+        ],
+        [
+          "null"
+        ],
+        [
+          "0"
+        ],
+        [
+          "false"
+        ]
+      ],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-null-empty-19/report.json",
+        "report_sha256": "beb49d7d9fff27e85211cfb33cf3437e5f0033b0020a5aaa1be930876d9e043f",
+        "journal_sha256": "01eb830a93a3b6b45120785a3c06145e33e4e6cfe13586905f2bde804643ffeb",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-undefined",
+      "scope": "G5",
+      "source_sha256": "b91ad838ba2f6effa4d411e3a568411eeaf4465cb6caa098750ac0afcb0c45c9",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          null
+        ]
+      ],
+      "null_verified": true,
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-undefined-20/report.json",
+        "report_sha256": "412c6225afa15ae0ea1259297d0630db83bd01f33514cbdc062402b9e76071df",
+        "journal_sha256": "bf9c53e1e44f4fb71fb54afeb8a52aa7297c3cb9b9ff0af2d440c6f9b151014b",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-boolean",
+      "scope": "G5",
+      "source_sha256": "7bf18292a75218bc490b33937bfc974dd53bdbef3d45b9ac8ca14195e9aaef34",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "boolean"
+        }
+      ],
+      "output_rows": 3,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          null
+        ],
+        [
+          false
+        ],
+        [
+          true
+        ]
+      ],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-boolean-21/report.json",
+        "report_sha256": "8bcfed6c421e6d4fccf8b3537478ccbd98754a94c9e43fb1dc8e48024ad6e11b",
+        "journal_sha256": "59c4f9c03c003f9e6157c47b19165153f401468da42afc3bcc2cc33666d3c80f",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-real",
+      "scope": "G5",
+      "source_sha256": "86e2b53e66428553709ba3656c6b18a3ded9c366fbb69a69cc9911c2d80f9800",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "real"
+        }
+      ],
+      "output_rows": 4,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          null
+        ],
+        [
+          0
+        ],
+        [
+          -1.25
+        ],
+        [
+          10.125
+        ]
+      ],
+      "number_precision": "17_significant_digits",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-real-22/report.json",
+        "report_sha256": "e21652b38f9c6f0dc76ca95de4cfe8ff678c7ea52f8c26494527fe25a0379fff",
+        "journal_sha256": "c6717fb1af2e426d05c9f7effaacce583150b30e9cde8cd97bc778bb10346b9c",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-safe-integer",
+      "scope": "G5",
+      "source_sha256": "4191ec395e70045ec7f7e626123e849401e59eb83873be2d094560c7aa492283",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 3,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          "-9007199254740991"
+        ],
+        [
+          "0"
+        ],
+        [
+          "9007199254740991"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-safe-integer-23/report.json",
+        "report_sha256": "8deca09170bac452e5627c00a8b473f77112168522ecb924b187e854f4584b22",
+        "journal_sha256": "54bb4edf6753a552c27239d88f803e7f35d4c551d861af3cd8a19ba6e72f80ee",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-outside-safe",
+      "scope": "G5",
+      "source_sha256": "9de9debd30abdab9be899cc8cdfb4691ed58ac8892441a7a6813f6ce5b57dbf1",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "Number(\"9007199254740993\")",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          "9007199254740992"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-outside-safe-24/report.json",
+        "report_sha256": "817a251f198ad8b04fd4b081cefc42495638077e2e40816f1c40dc1044eaa2cc",
+        "journal_sha256": "fbb01478716148e2ea0873b530fa8f751f4d6c812c8dd84dc5bba458d21829b9",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-integer-fraction",
+      "scope": "G5",
+      "source_sha256": "8d3a0cf2afcbfc56deaa8eaa87255f5cc4344371d0f2938d16f92ada206d656c",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "1.75",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          "1"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-fraction-25/report.json",
+        "report_sha256": "384009cde105c15e87e2093f9827c047a753c289374cc344efe9e6ab21960b9c",
+        "journal_sha256": "e5737488151c2209b4c72ee63692fa0a93c487d6afc3a20b20b0cb242ec1e9dc",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-integer-string",
+      "scope": "G5",
+      "source_sha256": "f32ca0fa9bfc9cb336129aa15c99db8a0d0289a5cdc9ed79c48516c5a8b7403a",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "\"42\"",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          "42"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-string-26/report.json",
+        "report_sha256": "53feb81ece8ef215fe38971230d234df87244ea273cc36b13e62d3d874bb5b02",
+        "journal_sha256": "45fe1ee1e8798028307f7c261b9b8dbf0ee5b14712b72b473488898584810f72",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-integer-nan",
+      "scope": "G5",
+      "source_sha256": "9986aca88b5a2935b4229dbc896193892b68be7181a3abedf417b72c270e1478",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "NaN",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          null
+        ]
+      ],
+      "null_verified": true,
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-nan-27/report.json",
+        "report_sha256": "f93add41b4c35c36cbddc6219d216ab9c99cc60ada1d9b6a47b982072a1fca8f",
+        "journal_sha256": "2c855d8a6a7b39fc44f3692aab3bb2c266b7c0f95331285211711a3a5968516b",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-integer-positive-infinity",
+      "scope": "G5",
+      "source_sha256": "22d97b9959f45229b31af0f754f3cb45fab6a5c39c216fdcaf8ac5a679fee017",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "Infinity",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          "-9223372036854775808"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-positive-infinity-28/report.json",
+        "report_sha256": "0e5e55be45ccdb285bbed45c5b0bc83eca39ff1b3960fba6fe3c35baeb9cc3f1",
+        "journal_sha256": "257cc8415fc918d092b0e3dbbb5cf26883ac7ef8e0f7fcc88ae20279c1f7254d",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-integer-negative-infinity",
+      "scope": "G5",
+      "source_sha256": "61706bb2fd82a3a7f56934056bb00b1b538f21be9e39d5ba74853367517f4c66",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_characterization",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "-Infinity",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [
+          "-9223372036854775808"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-negative-infinity-29/report.json",
+        "report_sha256": "eeff0eb667ef89ddf76f2b5a665af0ba4c124bdc7d2bf62d1988f303db5c997c",
+        "journal_sha256": "9717ec3bf689dce636c7ae4dcc4d4deb0e6d4ce87e34e190d300664a73da1209",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-date-civil",
+      "scope": "G5",
+      "source_sha256": "dcc1d1da4d0349de981d1fd7549786cc02ced4aaea28279647a6d45d31670c46",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "datetime"
+        }
+      ],
+      "output_rows": 2,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          null
+        ],
+        [
+          "2024-02-29T23:59:59.123"
+        ]
+      ],
+      "datetime_precision": "millisecond_local_timezone_unspecified",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-date-civil-30/report.json",
+        "report_sha256": "7e7365c8fe4b3799d9faaacd4384521fe78e4f87f15bf871004dffb08b9de72f",
+        "journal_sha256": "df01ed63bbf517c4e8af57035368dcff91f8ae2a869dab7395b8b2889282a06f",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-named-access",
+      "scope": "G5",
+      "source_sha256": "f18c22929b8dfbd4587497a4ec66520314cb3607ad4bad88cdc43bfebbe42b41",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_name": "RowID",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 6,
+      "all_cells_verified": true,
+      "observed_values": [
+        [
+          "1"
+        ],
+        [
+          "2"
+        ],
+        [
+          "3"
+        ],
+        [
+          "4"
+        ],
+        [
+          "5"
+        ],
+        [
+          "6"
+        ]
+      ],
+      "number_precision": "exact_integer_decimal",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-named-access-31/report.json",
+        "report_sha256": "1c4442bc026ac924dfc0001e9f004f05366568a6b8f3ac6ba5f5fab640bb62b7",
+        "journal_sha256": "ad2a9ce78c846d14a457b533af6800ea3e513e6639fa898254b82c33b95e86a9",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-name-case",
+      "scope": "G5",
+      "source_sha256": "6ecde061ce177ae5c973d142249e1e1c22ddb12963e10ff74490cb7e8e53ac1d",
+      "schema_mode": "code",
+      "expectation": "characterization",
+      "status": "observed_owned_native_failure",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "owned_native_child_error",
+      "input_name": "rowid",
+      "native_error_code": "NODE_EXECUTION_FAILED",
+      "native_error_message": "Error: Столбец \"rowid\" отсутствует во входной таблице №0\n   at Anonymous function (<main>:3:22)\n   at module (<main>:1:1)",
+      "class_observed": null,
+      "position_observed": null,
+      "output_refreshed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-name-case-32/report.json",
+        "report_sha256": "5a93163d290104cdfdaab6e7e37717858eb07c57d5c264a4b90bea2b6e74708e",
+        "journal_sha256": "ee40a5ad8bff8a4f142f70d35e48105109bce59a01c879468267ffd16e97ac4e",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    },
+    {
+      "id": "g5-empty-output",
+      "scope": "G5",
+      "source_sha256": "435312fcd4d5c3cba1032cb684db6990ffb05da08f9890783d6d1d2088876562",
+      "schema_mode": "code",
+      "expectation": "fixed",
+      "status": "observed_pass",
+      "native_bytes_verified": false,
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 0,
+      "all_cells_verified": true,
+      "observed_values": [],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-empty-output-33/report.json",
+        "report_sha256": "a4248fbee8f314fb910c23b2d3545df6effddf47dd0d7be6861d928148149ea6",
+        "journal_sha256": "36166a3f13918638e4d5ff87fe0b0620e19672d494576ae95c2580718e3a42f6",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
+    }
+  ],
+  "limitations": [
+    "Next/Done execution effects remain unestablished; explicit Execute count does not prove exact body invocation count.",
+    "The indexed g5-* snippets remain not_checked. Separate source70-78 native probes provide scoped typed/cardinality evidence recorded in native-types-design.md and checkpoint.md; their different source hashes do not promote these indexed snippets or close G5.",
+    "Case source hashes identify probes, not support on another server or build.",
+    "All not_checked cases require individual evidence before promotion.",
+    "K1/K2/K3/K4 calibration observations use separately fixed sources. They do not promote engine-native-parse-error or engine-sync-throw legacy snippets, establish general source mapping, or close G6/J25.",
+    "The nullish refusal was read manually and required exact admin recovery; optional-chain was observed by the owned operator with complete cleanup. Neither is a successful JS Execute or closes J20."
+  ],
+  "calibration_observations": [
+    {
+      "id": "K1-parse-v1",
+      "source_commit": "ddc625cdd467da0b7665d72ffcf533c610987f4e",
+      "source_sha256": "721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "UNRESOLVED",
+      "result_status": "wizard_diagnostic_observed",
+      "report_sha256": "a18d78cdb4a21ecd0fade200882e72ab846a0beefeb18fd3fa19472ec95bba53",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k1-probe-01/report.json",
+        "independent_audit": "operator89-root-k1-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 4,
+      "journal_references_verified": 500,
+      "gates_closed": [],
+      "diagnostic_origin": "wizard_native_exception",
+      "native_class": "EBGException",
+      "raw_message": "SyntaxError: Syntax error at code (:4:19)",
+      "text_completeness_scope": "retained_wizard_exception_text_tree",
+      "explicit_execute_observed": false,
+      "prior_committed_source_restored": "not_established",
+      "source_span": null
+    },
+    {
+      "id": "K2-sync-v1",
+      "source_commit": "ddc625cdd467da0b7665d72ffcf533c610987f4e",
+      "source_sha256": "3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "DIAGNOSTIC_OBSERVED",
+      "result_status": "owned_failure_observed",
+      "report_sha256": "9f64074a37207a12e3b56e60e29c55c2e099d6f6cf4422ed10846e39bf0bdc7c",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k2-probe-02/report.json",
+        "independent_audit": "operator89-root-k2-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 8,
+      "journal_references_verified": 604,
+      "gates_closed": [],
+      "diagnostic_origin": "native_child",
+      "raw_error": "Error: JS_CAL_K2_SYNC_V1\n   at Anonymous function (<main>:4:1)\n   at module (<main>:1:1)",
+      "native_text_complete": true,
+      "explicit_execute_observed": true,
+      "mapping_status": "unverified",
+      "source_span": null
+    },
+    {
+      "id": "K3-shift-v1",
+      "source_commit": "990e6bf92462b5e1a3dce60a06ff1dbe22fccbbd",
+      "source_sha256": "02b7e36c08e2d1f18fe83e60ed145d00bef83746fbe14b1328b1b6ba91ab76b3",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "DIAGNOSTIC_OBSERVED",
+      "result_status": "owned_failure_observed",
+      "report_sha256": "2a1ae7bc73c3e7b8d58818d3e88dd20dc9144418e366a082b1dfbe303ad37b0e",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k3-probe-01/report.json",
+        "independent_audit": "operator90-root-k3-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 8,
+      "journal_references_verified": 598,
+      "gates_closed": [],
+      "diagnostic_origin": "native_child",
+      "raw_error": "Error: JS_CAL_K3_SYNC_SHIFT_V1\n   at Anonymous function (<main>:5:3)\n   at module (<main>:1:1)",
+      "native_text_complete": true,
+      "explicit_execute_observed": true,
+      "mapping_status": "unverified",
+      "source_span": null
+    },
+    {
+      "id": "K4-native-caller-v1",
+      "source_commit": "e5a80f5851d6ca249713e763c0f5dc493d56f2b3",
+      "source_sha256": "debb9802f3a381e3569b7a7c8857038a3a165fafacfbbcb7a5b18ed3dd17541f",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "DIAGNOSTIC_OBSERVED",
+      "result_status": "owned_failure_observed",
+      "report_sha256": "c239e6939bb53f3fca6dc7314c3da50dd0f3fce7223759f26dea4e91e03ef516",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k4-probe-01/report.json",
+        "independent_audit": "operator91-root-k4-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 8,
+      "journal_references_verified": 596,
+      "gates_closed": [],
+      "diagnostic_origin": "native_child",
+      "raw_error": "Error: Номер строки 4 вне диапазона [0, 3]\n   at Anonymous function (<main>:6:1)\n   at module (<main>:1:1)",
+      "native_text_complete": true,
+      "explicit_execute_observed": true,
+      "mapping_status": "unverified",
+      "source_span": null
+    }
+  ],
+  "required_runtime_subset": {
+    "status": "verified_at_isolated_public_runtime_level",
+    "validated_for": {
+      "loginom_build": "7.4.2",
+      "server_os": "Linux",
+      "operator_platform": "Ubuntu",
+      "browser_mode": "ordinary_headed"
+    },
+    "scope": "Required primitives of current knowledge 1.0.0 and the pinned sales business task. No full ECMAScript/Data API conformance or candidate/CLI acceptance. Existing extra cases retain their own observation statuses.",
+    "source_commit": "bc6494476a5f35379d3a70b3e510fb5c8d805ab5",
+    "knowledge_version": "1.0.0",
+    "knowledge_sha256": "4a8a2d6e712fc56d039d1e595361dde9afb7e16eb7f3b8fd1959d5f5908bc2ef",
+    "all_knowledge_examples": [
+      {
+        "example_id": "code-table-v1",
+        "schema_mode": "code",
+        "source_sha256": "d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2",
+        "report_sha256": "283c2e7741ad7f4fd805d26d725944d723086de505e40ac19c5db750672bb1fc",
+        "journal_sha256": "7167dab4fb1bd8a8aaea1ffcbe1504df62364e1b231500dfb3563ca0b24dc325",
+        "materialization_execution_id": "1790799555961-v0l9px6uxn:1265:3",
+        "final_execution_id": "1790799555961-v0l9px6uxn:1265:4",
+        "all_cells_retained_in_user_v1": true,
+        "cleanup_verified": [
+          "package",
+          "logout",
+          "browser",
+          "process_absence"
+        ],
+        "evidence": "e-public-knowledge-code-01",
+        "output_rows": 6,
+        "output_columns": 2,
+        "negative_mutations_refused": 32
+      },
+      {
+        "example_id": "declared-table-v1",
+        "schema_mode": "declared",
+        "source_sha256": "816b086fe447eb42afbf87ac46b18b01153f731f3baf0de2bcd280da1104957f",
+        "report_sha256": "41fc396ab1438132ec61e4963c5c37dd46ebef8238c5073a8e49582af7ab69d5",
+        "journal_sha256": "576f8ab83354a731e7b23f2b53f98f31c9f7f32834b5d3d45b1e7edfdb66115c",
+        "materialization_execution_id": "1790799988740-41ss54lbu8s:1269:3",
+        "final_execution_id": "1790799988740-41ss54lbu8s:1269:4",
+        "all_cells_retained_in_user_v1": true,
+        "cleanup_verified": [
+          "package",
+          "logout",
+          "browser",
+          "process_absence"
+        ],
+        "evidence": "e-public-knowledge-declared-01",
+        "output_rows": 6,
+        "output_columns": 2,
+        "negative_mutations_refused": 32
+      }
+    ],
+    "required_api": [
+      {
+        "primitive": "static named import from builtIn/Data",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "InputTable.RowCount and InputTable.Get(row, technicalName)",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "OutputTable.Append and OutputTable.Set(technicalName, value)",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "OutputTable.AssignColumns before Append; DataType.Integer",
+        "evidence": [
+          "code-table-v1"
+        ]
+      },
+      {
+        "primitive": "native declared schema; source without AssignColumns",
+        "evidence": [
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "DataType.String; String(value).trim().toLowerCase(); multiplication/division/subtraction, comparisons and conditional expressions",
+        "evidence": [
+          "e-public-required-code-01",
+          "e-public-required-declared-01"
+        ],
+        "scope": "Exact authored sales6x4/current Code and declared source; no arbitrary arithmetic/Unicode normalization claim."
+      },
+      {
+        "primitive": "synchronous for loops with var/let, assignments and scalar literals",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1",
+          "e-public-required-code-01",
+          "e-public-required-declared-01"
+        ]
+      }
+    ],
+    "boundaries": [
+      "Output named access is checked for the exact observed ASCII technical names; J24 other names remains separate.",
+      "No general outside-safe integer or epoch/timezone guarantee. Scalar/native precision evidence remains in J06-J08.",
+      "Additional syntax/API does not enter the required subset solely because a private engine snippet was observed.",
+      "Actual candidate knowledge delivery, current context J19/J21 and autonomous CLI acceptance remain required."
+    ],
+    "candidate_verified": false,
+    "cli_verified": false,
+    "gates_closed": []
+  }
+}

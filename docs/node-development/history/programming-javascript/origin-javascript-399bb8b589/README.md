@@ -1,0 +1,339 @@
+# JavaScript
+
+> Исторический материал: обучение JavaScript, `origin/javascript@399bb8b589` (26 сентября — 3 октября 2026).
+> Исходные SHA, статусы и ограничения сохранены; прежний PASS не подтверждает текущий runtime.
+
+**Обучение ядра v1 завершено; candidate15 принят.**
+Реализован JS handler code/declared/new/existing и штатное закрытие собственного
+пакета обычным CLI по подтверждённому Save. Две автономные Sol6.1/low попытки
+прошли полный oracle6×4, Save и независимый cold Execute/cleanup.
+
+[Итог](../../../nodes/programming-javascript/completion.md) · [матрица G/J и доказательства](../../../nodes/programming-javascript/completion-audit.md) ·
+[CLI-пара и pins](../../../nodes/programming-javascript/completion-phase6.md).
+
+Проверено на Loginom7.4.2/Linux, Ubuntu x64, обычный headed Chromium.
+Scope: synchronous builtIn/Data, один input/output0; Date без UTC/epoch и
+Integer без общей гарантии int64. Остальные ограничения — в итоговом аудите.
+
+**Не интегрировано и не выпущено:** код в `node-javascript`, source6f6a66eb62;
+canonical docs в `javascript`. Установленный клиент не заменялся. Все ресурсы
+приёмки освобождены. Дальнейшая интеграция требует отдельного назначения.
+
+Далее сохранены этапы реализации с их исходными границами проверки; для
+продолжения использовать только текущую сводку checkpoint.
+
+На child **7855b9bf11cb** реализованы независимые Python configuration/output
+аудиторы:40 адресных test methods,2 native captures и48 non-noop mutations PASS.
+[Границы и команды](checkpoint.md#фаза-4-configurationoutput-auditors--2026-10-02),
+[дизайн](../../../nodes/programming-javascript/cli-auditor-design.md). Итоговая standalone CLI-приёмка,
+same-task F review и candidate/CLI остаются открытыми; это не новый live run.
+Child **8d3eb30f1a4f** добавляет partial CLI evidence/bundle проверки:
+23 SQLite/filesystem tests PASS, actualexit0. [Границы и следующий шаг](checkpoint.md#фаза-4-standalone-cli-transportbundle--2026-10-02).
+Запуск compiled candidate и native Save/cold/cleanup они не подтверждают.
+На **1b3ed092e62b** добавлены standalone Host admission binding и product target
+pins:11/13/9 адресных tests PASS. [Подробности и границы](checkpoint.md#фаза-4-standalone-native-admission-и-production-target--2026-10-02).
+На **631bfbe75cd5** compact public-node/native binding прошёл17 tests с actual
+runtime-produced fixtures и SQLite. [Checkpoint](checkpoint.md#фаза-4-compact-public-node--native-binding--2026-10-02).
+На **fa631186fd75** добавлен partial last Save/dirty-state auditor:19PASS с actual
+runtime-produced receipts/advice и SQLite, плюс immutable headed Save trace.
+[Границы](checkpoint.md#фаза-4-последний-cli-save-и-dirty-state--2026-10-02).
+Fresh CLI Save/cold/cleanup и итоговая CLI-приёмка остаются открытыми.
+На **e7865eea0cc8** cold source/settings/mappings/GUID graph/fresh Execute/full6×4
+audit прошёл8 tests на закреплённых исторических captures; affected native9 и
+procedure21PASS. [Scope и оставшиеся связи](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
+Это проверка аудитора, fresh browser/CLI и process cleanup ещё впереди.
+На **3b02439bee96** late model `dock_node_read` public/native/source binding
+прошёл11 tests, node17 и Save19 regression PASS. На **5326767d6278** native
+late source/Execute/full6×4/restoration/workflow-return audit прошёл9 tests,
+affected configuration/output9 и public read11PASS. [Границы](checkpoint.md#фаза-4-native-late-read-sourceexecutefull-table--2026-10-02).
+Общий chunk audit на **1c846a7c2f21** проверен configuration9/cold9/read9 PASS;
+actual cold32KiB/1024LF содержит3×8 fragments и полный6×4.
+[Checkpoint](checkpoint.md#фаза-4-единый-closed-source-chunk-audit-и-native32kib-cold--2026-10-02).
+На **797927a5c709** устранён success resource ACK при unconfirmed bridge result:
+28 runtime/25 client/3 Host checks PASS. [Границы](checkpoint.md#фаза-4-managed-resource-close-ack--2026-10-02).
+Normal CLI package shutdown подключён на **49dcfa0d99b7**, source/private IPC
+checks и Host/Agent typecheck PASS; fresh native cleanup и независимый аудитор
+ещё открыты. Special supervised cleanup не подставляется вместо обычного CLI.
+[Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
+Retired failure сохранён наff8b2; normal receipt binding eb051/948bc (13PASS) и
+Linux Popen/session observer ec73da (9PASS) реализованы с явными scope limits.
+Whole CLI/controller/native fresh evidence пока не подтверждены.
+[Checkpoint](checkpoint.md#фаза-4-retained-shutdown-failure-normal-receipt-и-linux-observer--2026-10-02).
+CLI headed preflight наab721a703e и original CLI/cold launch controller на9b8e40b418
+проверены source/actual-process tests15+9+11/Host25+6, typechecks/provenance PASS.
+Actual candidate factory/live proof и whole auditor ещё не выполнены.
+[Текущий шаг и границы](checkpoint.md#фаза-4-original-clicold-controller-и-headed-preflight--2026-10-02).
+На **c664f40c61** source collector фильтрует/redact'ит CLI streams до записи,
+сохраняет original deadline/forced-exit failure и связывает secrets с own profile.
+Capture21/controller15/observer9 PASS, provenance5045; native journal/cold freeze/
+whole composition остаются открытыми. [Scope и следующий шаг](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
+На **17c994f042** whole committed QA freeze и candidate runtime overlay проверены
+10 filesystem/Git/actual Node loader fixtures; controller15/capture22 PASS.
+Native journal/lease/cold collection/whole auditor и actual candidate/live proof
+остаётся выполнить. [Точка продолжения](checkpoint.md#фаза-4-complete-qa-freeze-к-candidate-runtime--2026-10-02).
+
+На **15c0fb4f3c** native artifacts связываются с original observed CLI attempt,
+private metadata/source pins и неизменным append-only journal; cold gate повторяет
+сверку файлов. Production testable URL принят без изменения raw evidence.
+75 source/process tests и provenance5045 PASS; fresh native CLI не запускался.
+Следующий шаг — technical cold capture/campaign lease/whole composition.
+[Границы](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
+
+На **b3878d0bd1** technical cold collector разделяет summary/model events и
+сохраняет original10-minute ceiling; factory подготовка согласована с actual
+operator mkdir/assignment, freeze v2 включает committed release и candidate pins.
+75 source/process tests/provenance5045 PASS, actual factory/browser не запускались.
+[Следующий шаг](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02)
+— campaign lease и whole composition, затем F/fresh candidate/CLI.
+
+Актуальный source **e5e8c99286** реализует manual lease и общую original
+writer/trial/pair CLI-композицию; **1a8d236b76** добавляет повторную SQLite сверку
+в финальной pair. 93 адресных source/process/native regression tests и
+provenance5045 PASS; дополнительная SQLite regression23PASS пересекается с ними.
+Обязателен независимый разбор полного авторского кода перед cold, отдельно
+от authorship/hash. [Текущая точка продолжения](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
+Same-task F завершён на фактическом Astra/medium; найденное расхождение модели
+исправлено в **e02e8fd41f**: launcher и оба аудитора требуют gpt-6.1-sol/low.
+68 адресных tests/provenance5045 PASS. Candidate 0.0.0-dev-202610021209
+собран и полностью заморожен; начат OpenAI device-code OAuth в отдельном профиле.
+Fresh ordinary headed J01/J21/J27 и две Sol/low CLI попытки остаются открытыми;
+ready_for_acceptance не повышен. [Текущий вход](checkpoint.md#после-f-собранный-cli-и-подготовка-oauth--2026-10-02).
+
+OAuth подтверждён; после исправления cold import на **ee5184a606** собран
+candidate02 и проверен изолированный cold help. После восстановления связи
+headed setup/restart прошли: J27 PASS. Compiled Host prepare/describe/Save/own
+Close/logout проверены; backend model delivery J01/J21 и model trials открыты. [Точка продолжения](checkpoint.md#продолжение-oauth-подтверждён-cold-import-исправлен-setup-пока-не-завершён--2026-10-02).
+
+[Подплан](plan.md) · [исследование](../../../nodes/programming-javascript/research.md) · [данные и oracle](../../../nodes/programming-javascript/fixtures/README.md) ·
+[рекомендации ревью](../../../nodes/programming-javascript/review-recommendations.md) · перепроверка ускорения (`acceleration-review.md` — исторический документ недоступен) ·
+[реестр](../../../registry.json) ·
+[один узел](https://github.com/gooddaytoday/loginom-ai-agent/blob/399bb8b589818eab322088ec424d4110bb7990d0/docs/node-development/workflow/single-node.md).
+
+[Результаты перепроверки рекомендаций](../../../nodes/programming-javascript/review-verification.md) отделяют
+подтверждённые факты, новые проектные решения и ещё не выполненные live-пробы.
+Учтены бюджеты доставки, точность редактора, перенос docs в worktree,
+source-read без исполнения и отдельное declared-задание.
+
+Исходный пользовательский [справочник JavaScript/ChakraCore](../../../nodes/programming-javascript/references/js_node_loginom_system_prompt.md)
+для Loginom 7.4.2 сохранён в Git без изменения содержимого. Его аудит находится в
+[исследовании](../../../nodes/programming-javascript/research.md); подготовка проверенной runtime-редакции и её
+доставка модели предусмотрены фазой 1B подплана.
+
+Общий Done/Close lifecycle-v5 на **73a8e9df31** проверен fresh ordinary headed
+Code447/declared4482/2: public Done→Close→NEW preserve Execute, exact same-ID
+retry zero events, full source/settings/graph, full6×4/1950 и default materialized
+context. Independent v2 audit/36 non-noop negatives каждого и cleanup приняты.
+Done не обещает fresh output; explicit=false/internal=null. Эти trials используют
+existing saved nodes, новый generic Done покрыт source tests; product registration,
+review/candidate/CLI остаются открыты. [Границы и hashes](checkpoint.md#текущее-состояние),
+[design](../../../nodes/programming-javascript/configuration-lifecycle-design.md). Failed444 и verified recovery не
+превращены в PASS.
+
+## Состояние и границы
+
+**discovery_required**, 2026-09-29. Проведено исследование исходников,
+официальной справки, приложенного системного справочника и e2e-репозитория.
+Следующий текст — исторический срез до product registration; актуальная source
+граница указана выше и в checkpoint. Продуктового apply handler JavaScript
+на этом историческом срезе ещё нет. В child code
+`f8ceebcac9` реализован ограниченный injected existing-code handler:
+headed `public-node-apply-03` подтвердил публичный configure/Done,
+независимый source-read и cleanup 3/3. Output mapping остался
+`configured_only` (полная source identity не доказана); Execute, Save/cold и
+полный продуктовый handler этим не доказаны. Краткая актуальная
+сводка и SHA — в [checkpoint](checkpoint.md#текущее-состояние).
+Для C child `4d70ea22fb` составил новый Code lifecycle. Headed public run02
+подтвердил новый узел, source/Done, полные native mappings5/5 и4/4 и две разные
+owned completed execution identities; output read остановился до Table Add.
+Его пакет/сеанс закрыты отдельным recovery, original status сохранён. В отдельном run05 на `97098322a1` owned Views и полный typed UI 6×4,
+две owned Execute и независимый output-only oracle подтверждены. Исходный run
+не принят целиком: operator schema ошибочно требовала input `excluded`; пакет
+закрыт отдельным recovery. Контракт исправлен в `e615f4df7f`; `ed56268a6d`
+подключил owner-bound Save после полного public Code/source-read. Свежий headed
+Code → Save прошёл полный независимый audit и обычный cleanup3/3; отдельный
+cold reader без source/oracle подтвердил source/settings, fresh Execute и
+результат6×4; cleanup3/3 проверен. D05/source `418abc95c0` также прошёл полный
+public declared6×4/metadata/default usage/Save audit и cleanup3/3;
+отдельный cold reader без source/oracle подтвердил source/settings/new Execute/
+все6×4 cells и cleanup3/3. В первой части E/source `467da5ab9a` isolated public
+existing comment edit/Execute/read прошёл отдельно для code и declared:
+полные native settings/mappings/graph, fresh6×4 и independent public source
+проверены, cleanup3/3/process absence подтверждены. На `e1fd122320` отдельно
+приняты public existing changed/reordered input freshness для обоих modes:
+все input6×5/output6×4 cells, fresh executions и cleanup проверены.
+На `bccc8a0a08` fixed public Code scalar output5/5, named access и empty
+output также прошли independent typed audits и cleanup. На `2eef052e7a` и
+`64221b01c8` приняты one-row output и empty input с полной схемой/read.
+На `d4898cac03` все пять fixed public declared scalar outputs прошли отдельные
+independent audits и cleanup: String NULL/empty, Boolean, real, safe integer,
+civil Date. На том же SHA отдельно приняты named access, output0/1/N и
+empty input; все9 declared runs получили independent PASS и полную уборку.
+На `a679a63595` public native real identity-copy отдельно прошёл Code/declared:
+native input bytes до JS и полный typed output/cleanup подтверждены.
+На `14965ef148` тот же уровень отдельно подтверждён для native Boolean2/2,
+на `800381592a` — native String8×1 в обоих modes с NULL/empty/Unicode/LF.
+На `0be6a698c1` native safe-int644×1 подтверждён в обоих modes: input bytes
+и exact output decimal strings. Native civil Date3×1 также подтверждён Code/declared2/2 на `7d43cea036`: input
+bytes/owned civil attestation и полный millisecond output без UTC/epoch claims.
+Outside-safe2/2 characterized на `81b4bfef74`: native9007199254740993
+переходит в9007199254740992 в обоих modes, общей гарантии int64 нет.
+Native cardinality4/4 принят на `3bfbd9968b`: native input baseline,
+ordered keep2/odd/duplicate Code и canonical declared-empty/schema/cleanup.
+Fixed J23 public Code writer424/Save060a и independent path-only cold428/6531
+приняты: exact32768bytes/1024LF, source/settings и1fresh cold Execute/full6×4;
+v6/v7 independent audits/negative16 каждого и cleanup/process absence. Source
+revisions разделены, failed425 сохранён с exact recovery. Native LGP bytes и
+actual candidate/CLI/Gates этим не доказаны; дальше J25/J19 и F.
+J25 read-only native details inventory431/1a754aa192 принят: actual
+`DetailPanel;btnDetais` внутри owned error modal, retained source/NEW repair/
+2fresh Execute/full6×4 и cleanup/process absence; v4 audit/negative20/20.
+Owned details expansion432/22f2cffa89 также принят: один toggle,202UTF8bytes
+без truncation, public/user-v1 SyntaxError/(:17:26), retained source/NEW repair/
+2fresh Execute/full6×4; v2 audit/negative25/25/cleanup/process absence.
+Internal required-details proof не доказывает natural insufficient-primary
+или Done refusal; эти остатки и F открыты.
+Контракт — §12 [native error design](../../../nodes/programming-javascript/native-error-attribution-design.md).
+Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
+refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
+modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW
+same-node repair на `69c1f3d60c` также принят: native cancelled за12,173s,
+independent audit/negative62/62 и cleanup/process absence. Public local read
+cancel/SAME-ID continuation того же execution на `56f8df0250`
+также принят: один Raw Execute, audit/negative87/87, repair6×4/1950 и cleanup.
+Public lost-reply recovery (J13) принят на `90c3bdd7c6`, fresh398:
+status/Stop/settlement/inspect того же worker, один original Execute, native
+cancelled14,118s/NEW repair6×4, audit/negative88/88 и cleanup/process absence.
+Первоначальный failed395 сохранён. Для J09 child `0529096969` подготовил fixed
+Code/declared native source Required=true/target Required=false, сохранение
+manual label/autosync false после public source edit и mapping refusal before
+admission; адресные238/full18270 PASS. Code399/declared400 приняты2/2:
+independent audit v2, negative38/38 каждый, full6×4 и cleanup/process absence;
+исходный отказ auditor v1
+на неверных именах фаз сохранён, исправление сверено с runtime contract.
+Все два exact knowledge1.0 examples также приняты в Code401/declared402 на
+`bc6494476a`: independent audit/negative32/32 каждый, full6×2/user-v1/source и
+cleanup. Required primitives отделены в [engine profile](../../../nodes/programming-javascript/engine-profile.json),
+остальные engine observations не превращены в общую гарантию ES/Data API.
+Fixed current context Code403/declared404 наb0ecbeaadf также принят2/2:
+оба полных snapshots до/после source/comment/manual label, exact mappings/MCP,
+independent audit/negative64/64 каждый и cleanup. Compact bridge/guidance
+23e8488e29 проверен actual MCP и full client3179/10SKIP. Это не model resistance.
+Reordered current input/old source Code410/Declared411 принят2/2 на9c93,
+independent audit v3/negative80/80 каждый и cleanup; имена не переименовывались.
+Technical-name context Code441/declared442 на9bc52b9468 принят2/2:
+обычный context отказал после verified Close; NEW explicit allow_configured_output
+доставил old source/current CustomerNow и честный configured output source_pending.
+Correction из public Name, два corrected completed Execute/full6×4/1950 и final
+default materialized context подтверждены. Full client3419+10SKIP/operator18502PASS;
+independent v7 audit/119 negative copies каждого/cleanup/process absence. Code
+v7 — post-live strengthening после выявленного checker gap, declared — pre-pin.
+Actual model resistance/product registration/candidate/CLI этим не доказаны.
+Source/direct [J21 response budgets](../../../nodes/programming-javascript/response-budget-design.md) на8bca1b00aa
+проверены: addressed76/full client3188+10SKIP/operator45, actual MCP fixture и
+recorded live replies8/8; actual candidate/CLI limits и delivery остаются в F.
+[G1/J22 UI profiles](../../../nodes/programming-javascript/ui-profile-design.md) Code414/Declared415 на8acf420997
+приняты2/2: native source/settings/graph preservation, visible controls/cache,
+audit/negative57 каждого и cleanup. Для existing connected input0 на7.4.2/Linux
+выбран bounded identity contract; runtime FullType остаётся null/false, hidden
+menus и engine conformance не заявлены. Final addressed97/full18327 PASS.
+[J24 public column-name contract](../../../nodes/programming-javascript/public-column-names-design.md) наeed576 принят5/5:
+source→physical/API/full user-v1/source read, audit/negative50 каждого/cleanup.
+Knowledge1.1 на276c содержит scoped rule и пять observed пар; legacy1.0/exact
+examples сохранены. Client3189/10SKIP, operator126, addressed14/actual MCP
+prepare/describe/budgets проверены; actual candidate/CLI delivery остаётся F.
+[J26 source-bound output reread](../../../nodes/programming-javascript/module-policy-design.md) реализован на3b59423f1a:
+addressed415/full client3246+10SKIP/operator18411 PASS; beforeTarget/fresh Execute
+сверяют actual source/settings, verified closed refusals сохраняют owner/эффекты,
+user-v1 output не теряет строки при budget fence. Headed Code422/Declared423
+приняты2/2: public apply/8preflight refusals/source-bound reread/3distinct owned
+Execute/full6×4/user-v1/source read, v3 audit/negative14 каждый/cleanup. Saved
+unsupported source и drift проверены direct, без live injection/sandbox claim.
+Fixed long-source Save/cold принят выше; далее
+technical-details expansion/Done refusal/J19 model resistance и E/F/candidate/CLI.
+Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
+в продуктовом каталоге.
+
+Исследование мастера проводится в Ubuntu headed-браузере; private
+пробы подтвердили real/boolean/string/safe-int64 и Date civil/native identity,
+а также keep2/odd/duplicate cardinality с сохранением исходных данных и отдельно
+изменение точности outside-safe int64. Для двух фиксированных режимов сохранения
+частный writer/cold/package-byte цикл подтверждён вместе с чистым состоянием
+после Save; публичный G7-контракт этим не принят. UI declared-empty и ОС
+сервера Linux подтверждены отдельно. Доказательства и ограничения — в
+[checkpoint](checkpoint.md).
+Разработка публичного обработчика, сборка кандидата и автономная CLI-приёмка
+ещё не завершены.
+Состояния реализации, аналитической проверки, интеграции и выпуска в реестре
+остаются прежними. Планирование не запускает очередь.
+
+Внешние e2e/TestCafe используются как источник сценариев и примеров;
+их запуск не является условием разработки или приёмки. Обязательны адресные
+тесты обработчика, live-проверки и автономная CLI-приёмка по подплану.
+
+Предлагаемый первый этап — синхронное табличное ядро: один вход/выход,
+создание и редактирование кода, пять scalar-типов, заданная в мастере или коде
+схема, configure/execute/read/save/reopen, диагностические ошибки и восстановление.
+Выбор этого объёма — рекомендация плана, не объявление всего узла поддержанным.
+Несколько таблиц, переменные, `builtIn/Calc`, внешние модули, Fetch, FS и async
+учтены как отдельные расширения с собственными условиями приёмки.
+
+Исследованная продуктовая база: `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
+Этот SHA остаётся закреплённой продуктовой базой кампании. Ветка документации
+`javascript` уже перебазирована на `loginom` commit `3f35c5f232`, который добавил
+общее правило [чтения кнопки ошибки мастера](workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки).
+Перебазирование документации не меняет закреплённую продуктовую базу; её смена
+требует отдельной проверки и обновления назначения.
+
+Живой стенд назначен пользователем:
+[http://logi-test-plan.bg.local/app/](http://logi-test-plan.bg.local/app/).
+Целевой build обучения — Loginom 7.4.2: к нему относится справочник, и его же
+допускает текущий graph adapter. Доступность, build7.4.2 и вход выделенным
+пользователем `jsteach` подтверждены live-прогонами на Ubuntu. ОС сервера
+Linux установлена отдельным чтением `Session.Version.IsWindows=false`, а не
+по Ubuntu оператора; дистрибутив и версия ядра не установлены.
+
+## Главные условия продолжения
+
+- Сверить текущие docs/code и обработанные указания в каноническом checkpoint;
+  допуск Ubuntu/worktree/памяти повторять только при изменении предпосылок/сбое.
+- Результат **B — публичный configure existing code-table** подтверждён
+  только для fixed comment-only source в изолированном runtime; частичный
+  handler не включён в продуктовый registry. Повторять этот run без
+  затронувшего изменения не требуется.
+- Private G3 fixed code bridge GetColumn → native mapping → physical output0
+  подтверждён live01/source `1965b71edd`; остальные name/type/declared случаи
+  и public lifecycle открыты. Остаток 0B — G1 identity/assistant, G5 API/J24
+  и G6; точные границы — в [discovery](../../../nodes/programming-javascript/discovery.md).
+- Private P1 бизнес 6×4 проверен для code/base, declared/base и code
+  changed/reordered с неизменным oracle и cleanup 3/3; точные SHA и границы
+  в checkpoint. Private конечный native Stop, отдельный local read cancel и
+  short same-node rerun 6×4 подтверждены run08/source `0328cadfc9`, cleanup 3/3.
+  Fixed public C/D writer/Save и independent cold подтверждены; следующий
+  fixed E existing source edit/Execute/read для code/declared также принят;
+  public input freshness 4/4 также принят на `e1fd122320`; следующий
+  результат — one-row/empty input и точный остаток J06–J08 после
+  принятых fixed Code typed7/7, затем остаток J и F.
+  Полный G6 и product candidate/CLI
+  приёмка остаются открытыми.
+- После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
+  затем две автономные попытки GPT-6.1 Sol / low (`openai/gpt-6.1-sol`, variant `low`)
+  только на назначенном стенде — обновлённое назначение пользователя 2026-10-02.
+  Source fix explicit URL уже есть; альтернативный fix согласовать до сборки.
+
+Порядок A–F, уровни J01–J27 и правила итераций закреплены в [подплане](plan.md).
+Режим браузера — обычный headed по последнему указанию пользователя; правило
+остановки при недоступной памяти сохранено. Текущий документ не разрешает
+подменять пользовательский клиент, публиковать выпуск или сливать ветку.
+
+На `88ddfc958e` E public source fidelity/empty2/2 приняты: Code32KiB/1024lines/
+8chunks и прежний6×4, declared-empty0bytes и retained4-column schema/0rows.
+Независимые source/settings/mappings/graph/Views/2 fresh Execute/cleanup proofs
+проверены; candidate/CLI/full E остаются открыты. Следующий шаг — public owned
+refusal mode flip; подробности и ограничения в checkpoint.
+
+Свежий обязательный lifecycle срез 2026-10-01: existing Code447/declared448
+Done/Close/preserve Execute на73a8 и standalone new Done Code449/declared450
+наfecbc9f44d приняты2/2 каждый, ordinary headed/full source/settings/full6×4/1950/
+exact-ID zero events/independent audit+negative/cleanup. Это isolated API-path;
+product registration/review/immutable candidate/CLI остаются открыты.
+Подробности и ограничения аудита — [checkpoint](checkpoint.md).

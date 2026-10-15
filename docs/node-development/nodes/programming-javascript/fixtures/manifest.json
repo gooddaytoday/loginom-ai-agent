@@ -1,0 +1,103 @@
+{
+  "kind": "javascript_plan_fixtures",
+  "version": 4,
+  "status": "authored_not_live_validated",
+  "operator_only_must_not_be_delivered_to_model": true,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6722,
+      "sha256": "5ed0d24cd9db6130183ff2f3ee05f81e16c7aa7bf09e1a886372578a98d018ca"
+    },
+    {
+      "path": "model-input/sales.csv",
+      "bytes": 157,
+      "sha256": "4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e"
+    },
+    {
+      "path": "model-input/task.md",
+      "bytes": 1438,
+      "sha256": "f866e451a6594a4ea7b8cb15ac311be7a067b46e6cef393a8d6cc9321d4a9957"
+    },
+    {
+      "path": "model-input/task-declared.md",
+      "bytes": 1542,
+      "sha256": "455dd0b38fdd289e1e0319595a8750345b7445b47a1b46b31a5102ea06bcaa40"
+    },
+    {
+      "path": "operator-only/empty.csv",
+      "bytes": 46,
+      "sha256": "9f20a282b37003a861e94cf6ee7ec54cc91f33d32a8fadfa5fd2997d3b8f4b2d"
+    },
+    {
+      "path": "operator-only/expected.json",
+      "bytes": 788,
+      "sha256": "72934b72200e141f7b0c66717b6736fa2a153f5fb08df3cbdd92d35fa0dc65b9"
+    },
+    {
+      "path": "operator-only/sales-changed.csv",
+      "bytes": 157,
+      "sha256": "97b2be2549ab389a1b5e2fd1605125ab2b158cd788b1c6c43a24ed85d84e32d7"
+    },
+    {
+      "path": "operator-only/sales-reordered.csv",
+      "bytes": 157,
+      "sha256": "405a8f4515087df2ca0eecbc8169df235dc81f2eb6981d36baaabbbf96202c0b"
+    },
+    {
+      "path": "operator-only/typed-cases.json",
+      "bytes": 1706,
+      "sha256": "35dd2d1e145ff186b83582b8981af3e8510cfbc53cd078ae660d2bbfb4fd1046"
+    },
+    {
+      "path": "operator-only/typed-native-oracle.json",
+      "bytes": 2241,
+      "sha256": "382097f8c5491c1c30208c5c799d06c096a12496fb85298c43cc5b97b899e1ff"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-fraction-negative.csv",
+      "bytes": 12,
+      "sha256": "903706717263f47c0a16baf6780062e1334cd12b76e59c9a7b9ad8147ec4f66b"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-fraction-positive.csv",
+      "bytes": 11,
+      "sha256": "8bef552b1ef66cdeaf5e382ffc56658cb6c6117ff9e8ffd7bb2bf1a2f3bee765"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-nan.csv",
+      "bytes": 8,
+      "sha256": "cbae8bbee4380c47abea5ce84baeaf1391c345a8950e731fc77935afe4e4bad6"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-negative-infinity.csv",
+      "bytes": 9,
+      "sha256": "ca5f305ca67f9fc14d2b368007174be77607635eb3c5e5f6cbb9fcd779352a2c"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-positive-infinity.csv",
+      "bytes": 8,
+      "sha256": "c4b301392924e65794be7ce5ade35a17462cefb36ea095c95b91a36d03c1bcf6"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-string-invalid.csv",
+      "bytes": 23,
+      "sha256": "0b95bd2da8b44656df1d42d2734d0c7aa462a2802293e18b732e8db4515dfe89"
+    },
+    {
+      "path": "operator-only/javascript-native-input-integer-coercion-string-numeric.csv",
+      "bytes": 11,
+      "sha256": "97a11b225d4b86224e07f533e327c4e1d8d9da458818a2dca5b76d170504ca19"
+    }
+  ],
+  "model_workspace_files_by_mode": {
+    "code": [
+      "model-input/sales.csv",
+      "model-input/task.md"
+    ],
+    "declared": [
+      "model-input/sales.csv",
+      "model-input/task-declared.md"
+    ]
+  }
+}

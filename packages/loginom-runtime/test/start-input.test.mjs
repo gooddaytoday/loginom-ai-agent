@@ -5,14 +5,26 @@ import { validateStartInput } from "../src/start-input.mjs"
 const base = { protocol: 1, generation: 1, chat: "chat-1", stateDir: "/tmp/state" }
 
 test("managed start without cleanup input stays a product launch", () => {
-  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null })
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null })
+  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false })
 })
 
 test("managed start accepts an exact saved package path for acceptance cleanup", () => {
   const path = "/user/loginom-ai-agent-acceptance-run-A.lgp"
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false })
   assert.equal(validateStartInput({ ...base, acceptanceCleanupPackage: "/a b/пакет.lgp" }).acceptanceCleanupPackage, "/a b/пакет.lgp")
+})
+
+test("private normal shutdown policy accepts only an explicit boolean", () => {
+  for (const value of [undefined, false, true])
+    assert.equal(validateStartInput({ ...base, closeSavedPackageOnShutdown: value }).closeSavedPackageOnShutdown, value === true)
+  for (const value of [null, "true", 1, {}, []])
+    assert.throws(() => validateStartInput({ ...base, closeSavedPackageOnShutdown: value }), /^Error: LOGINOM_START_INVALID$/)
+})
+
+test("normal cleanup cannot borrow acceptance identity or run in validation/readiness", () => {
+  for (const patch of [{ acceptanceCleanupPackage: "/user/package.lgp" }, { validation: true }, { chat: "readiness" }])
+    assert.throws(() => validateStartInput({ ...base, ...patch, closeSavedPackageOnShutdown: true }), /^Error: LOGINOM_START_INVALID$/)
 })
 
 for (const [label, value] of [

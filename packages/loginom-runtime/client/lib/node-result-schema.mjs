@@ -7,8 +7,17 @@ const object=(properties,required=Object.keys(properties),additionalProperties=f
 const array=items=>({type:'array',items});
 const nullable=schema=>({anyOf:[schema,{type:'null'}]});
 const ref=object({document_id:str,workflow_id:str,node_id:str});
-const error=object({code:str,message:str,cause:object({code:str,message:str})},['code','message']);
-const phase=values('validate','source','workflow','target','input_mapping','open','configure','node_finish','output_mapping','finish','execute','read');
+const javascriptNativeError=object({kind:values('javascript_wizard'),stage:values('code_next','done'),node:ref,
+ source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},tooltip:{type:'string',maxLength:2048},tooltip_truncated:bool,
+ dialog_text:{type:'string',maxLength:2048},dialog_text_truncated:bool,dialog_closed:{type:'boolean',const:true},
+ error_class:{anyOf:[object({status:values('unrecognized')}),object({status:values('recognized'),
+  name:values('SyntaxError','TypeError','ReferenceError','RangeError','EvalError','URIError','Error')})]},
+ location:{anyOf:[object({status:values('unrecognized')}),object({status:values('recognized'),
+  line:{type:'integer',minimum:1},column:{type:'integer',minimum:1}})]},
+ technical_details:object({text:{type:'string',maxLength:2048},truncated:bool,expanded:{type:'boolean',const:true}})},
+ ['kind','stage','node','source_sha256','tooltip','tooltip_truncated','dialog_text','dialog_text_truncated','dialog_closed','error_class','location']);
+const error=object({code:str,message:str,cause:object({code:str,message:str}),native:javascriptNativeError},['code','message']);
+const phase=values('validate','source','workflow','target','input_mapping','open','configure','node_finish','materialization_start','materialization_execute','output_mapping','finish','execute','read');
 const execution={anyOf:[object({status:values('not_requested','pending','completed','cancelled'),execution_id:nullable(str),stop_verified:bool},['status','execution_id']),
  object({status:values('failed'),execution_id:str,failure_verified:{type:'boolean',const:true},root_id:str,group_id:str,group_record_id:str})]};
 const receipt=object({phase,receipt_id:str,status:values('pending','verified','not_requested'),effect_possible:bool});
@@ -25,7 +34,10 @@ export const nodeOutputPortSchema=port;
 const fileArtifact=object({artifact_id:str,destination:str,bytes:integer,sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},execution_id:str,verification_id:str,
  freshness_basis:values('explicit_replace_and_completed_native_execution','native_absence_check_and_completed_execution')});
 const output=object({status:values('not_refreshed','partial','complete'),evidence_ref:nullable(str),execution_id:str,ports:array(port),file_artifacts:{...array(fileArtifact),maxItems:1},
- verified:bool,cleanup_complete:bool,effect_possible:bool,no_output_requested:bool},['status','evidence_ref'],true);
+ verified:bool,cleanup_complete:bool,effect_possible:bool,no_output_requested:bool,
+ javascript_source:object({source_operation_id:str,source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},
+  source_utf8_bytes:{type:'integer',minimum:0,maximum:32768},source_lf_lines:{type:'integer',minimum:1,maximum:1024},
+  settings_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},policy:values('javascript-module-v1')})},['status','evidence_ref'],true);
 const readbackColumn=object({index:integer,name:str,label:str,type:str,data_kind:str,used:bool});
 const readbackMappingField=object({index:integer,name:str,label:str,type:str,data_kind:str,source_name:str});
 const boundedFields=items=>({...array(items),maxItems:1000});
@@ -145,7 +157,25 @@ const crossTableConfigurationReadback=object({kind:values('crosstable'),scope:va
   target_fields:array(object({index:integer,name:str,label:str,type:str,excluded:bool,source:object({record_id:str,name:str,label:str,type:str})}))}),
  output_scope:values('not_materialized','observed_after_verified_execution'),execution_id:nullable(str),category_fields:array(crossTableCategoryField),
  package_persistence_verified:{const:false}},['kind','scope','values_are','node','receipt_ids','mode','category_mode','row_keys','column','columns','facts','options','output_scope','execution_id','category_fields','package_persistence_verified']);
-const configurationReadback={anyOf:[crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
+const javascriptReadbackProperties={kind:values('javascript'),scope:values('observed_after_verified_finish'),node:ref,
+ values_are:values('independent_owned_source_readback'),schema_mode:values('code'),
+ source:object({sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},utf8_bytes:{type:'integer',minimum:0,maximum:32768},lf_lines:{type:'integer',minimum:1,maximum:1024}}),
+ settings_preserved:{type:'boolean',const:true},wizard_commit_verified:{type:'boolean',const:true},
+ package_persistence_verified:{type:'boolean',const:false}};
+const javascriptConfigurationReadback=object({...javascriptReadbackProperties,receipt_ids:{...array(str),minItems:6,maxItems:9},
+ execution_effects:object({explicit_execute_requested:{type:'boolean',const:false},internal_execution_started:{type:'null'}})});
+const javascriptExecutedConfigurationReadback=object({...javascriptReadbackProperties,receipt_ids:{...array(str),minItems:12,maxItems:13},
+ execution_effects:object({explicit_execute_requested:{type:'boolean',const:true},internal_execution_started:{type:'null'}}),
+ input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),
+ output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))})});
+const javascriptDeclaredConfigurationReadback=object({...javascriptExecutedConfigurationReadback.properties,
+ schema_mode:values('declared'),columns:{...array(object({index:integer,name:str,label:str,
+ type:values('integer','real','string','boolean','datetime'),data_kind:values('Неопределенное','Непрерывный','Дискретный'),
+ usage:values('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент'),
+ usage_type:integer,default_usage_type:integer,required:bool})),minItems:1,maxItems:64}});
+const javascriptDeclaredDoneReadback=object({...javascriptConfigurationReadback.properties,
+ schema_mode:values('declared'),columns:javascriptDeclaredConfigurationReadback.properties.columns});
+const configurationReadback={anyOf:[crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptDeclaredDoneReadback,javascriptExecutedConfigurationReadback,javascriptDeclaredConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),

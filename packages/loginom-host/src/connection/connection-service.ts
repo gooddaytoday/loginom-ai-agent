@@ -162,6 +162,7 @@ export async function connectionService(
           if (
             previous.revision !== candidate.revision ||
             previous.url !== candidate.url ||
+            previous.urlSource !== candidate.urlSource ||
             previous.username !== candidate.username ||
             previous.apiKey !== candidate.apiKey ||
             previous.password !== candidate.password
@@ -267,6 +268,9 @@ export async function connectionService(
         generation: state.generation + 1,
         revision: state.revision + 1,
         url: settingsAddress(candidate.url),
+        // Retain private provenance for the validated user choice. Startup
+        // preserves saved URLs independently of this marker.
+        urlSource: "explicit" as const,
         username: candidate.username,
         apiKey,
         password,

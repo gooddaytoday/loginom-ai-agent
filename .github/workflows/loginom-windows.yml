@@ -64,7 +64,8 @@ jobs:
         run: |
           npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
           & $env:LOGINOM_CI_NODE_SOURCE node_modules/playwright/cli.js install chromium
-          $browser = Join-Path $env:PLAYWRIGHT_BROWSERS_PATH "chromium-1243\chrome-win64\chrome.exe"
+          $release = Get-Content -LiteralPath ../../product/loginom-release.json -Raw | ConvertFrom-Json
+          $browser = Join-Path $env:PLAYWRIGHT_BROWSERS_PATH "chromium-$($release.chromiumRevision)\chrome-win64\chrome.exe"
           if (-not (Test-Path -LiteralPath $browser -PathType Leaf)) { throw "Pinned Chromium executable is missing: $browser" }
 
       - name: Build Desktop and CLI from a clean checkout
@@ -126,7 +127,7 @@ jobs:
             signed = $false
             node = (& $env:LOGINOM_CI_NODE_SOURCE --version)
             bun = (& $env:LOGINOM_CI_BUN_PATH --version)
-            chromium_revision = "1243"
+            chromium_revision = (Get-Content -LiteralPath packages/product/loginom-release.json -Raw | ConvertFrom-Json).chromiumRevision
             desktop = [ordered]@{ name = $installer[0].Name; bytes = $installer[0].Length; sha256 = (Get-FileHash -LiteralPath $installer[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
             cli = [ordered]@{ name = $archive[0].Name; bytes = $archive[0].Length; sha256 = $actual }
           }

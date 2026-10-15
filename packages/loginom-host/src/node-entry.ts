@@ -92,14 +92,17 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
-        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("closeSavedPackageOnShutdown" in input && typeof input.closeSavedPackageOnShutdown !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        preflightHeadless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        closeSavedPackageOnShutdown: "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }

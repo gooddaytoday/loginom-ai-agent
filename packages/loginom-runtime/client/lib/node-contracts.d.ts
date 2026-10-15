@@ -1,7 +1,7 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
 export type NodeType = 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
-  | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table';
+  | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
 export interface Position { x: number; y: number }
@@ -29,13 +29,15 @@ export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetReque
 export interface NodeHandler<T extends NodeType, P> {
   type?: T; revision: string; modes: readonly string[]; parameter_schema?: object;
   output_wizard?: 'embedded' | 'separate';
+  /** Host-only JavaScript lifecycle: await materialization before output mapping. */
+  materialize_output?: boolean;
   /** Must reject invalid/unsupported parameters before the graph phase. */
   validate(parameters: unknown, mode: string, request?: NodeApplyRequest<T, P>): P | void;
   /** Runs inside the caller's gate, journal, deadline and cancellation scope. */
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -44,7 +46,7 @@ export interface NodeProcedureContext {
   signal?: AbortSignal; stopSignal?: AbortSignal; receipt_id?: string;
 }
 export type PhaseName = 'validate' | 'source' | 'workflow' | 'target' | 'input_mapping' | 'open' | 'configure'
-  | 'node_finish' | 'output_mapping' | 'finish' | 'execute' | 'read';
+  | 'node_finish' | 'materialization_start' | 'materialization_execute' | 'output_mapping' | 'finish' | 'execute' | 'read';
 export interface PhaseReceipt { phase: PhaseName; receipt_id: string; status: 'pending' | 'verified' | 'not_requested'; effect_possible: boolean }
 export interface NodeApplyResult {
   operation_id: string; status: 'SUCCEEDED' | 'FAILED' | 'NOT_APPLIED' | 'AMBIGUOUS'; effect_possible: boolean;
@@ -52,7 +54,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -64,6 +66,21 @@ export interface TextImportConfigurationReadback {
   columns: Array<{index: number; name: string; label: string; type: string; data_kind: string; used: boolean}>;
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};
+}
+export interface JavascriptConfigurationReadback {
+  kind: 'javascript'; scope: 'observed_after_verified_finish'; node: NodeRef;
+  receipt_ids: string[]; values_are: 'independent_owned_source_readback'; schema_mode: 'code' | 'declared';
+  columns?: Array<{index: number; name: string; label: string; type: string; data_kind: string;
+    usage: string; usage_type: number; default_usage_type: number; required: boolean}>;
+  source: {sha256: string; utf8_bytes: number; lf_lines: number};
+  settings_preserved: true; wizard_commit_verified: true;
+  /** Explicit execution is separate from Loginom's unknown internal Done effects. */
+  execution_effects: {explicit_execute_requested: boolean; internal_execution_started: null};
+  input_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
+    type: string; data_kind: string; source_name: string}>};
+  output_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
+    type: string; data_kind: string; source_name: string; excluded: boolean}>};
+  package_persistence_verified: false;
 }
 export interface CalculatorParameters {
   expressions: Array<{target: {kind: 'new'} | {kind: 'existing'; name: string};
@@ -208,10 +225,10 @@ export interface NodeJobSnapshot {
   outcome: NodeApplyOutcome | null; error: NodeError | null;
 }
 export const NODE_CONTRACT_REVISION: string;
-export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
+export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт' | 'Программирование'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
 export function validateNodeReference(ref: unknown): void;
 export function validateNodeTargetRequest(request: unknown): NodeTargetRequest;
-export function describeNodeTypes(types: NodeType[], pins?: object, actions?: Map<string, object>, candidateHandlers?: Map<NodeType, {revision: string}>): object[];
+export function describeNodeTypes(types: NodeType[], pins?: object, actions?: Map<string, object>, candidateHandlers?: Map<NodeType, {revision: string}>, observedBuild?: string): object[];
 
 export type JoinParameters = {keys: Array<{left: string; right: string}>;
   case_sensitive: boolean; include_joined_keys: boolean} | Record<string, never>;

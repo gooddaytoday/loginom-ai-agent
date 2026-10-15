@@ -30,6 +30,7 @@ export async function launchNodeHost(
     headless: boolean
     environment?: NodeJS.ProcessEnv
     strictRecovery?: boolean
+    closeSavedPackageOnShutdown?: boolean
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -109,8 +110,14 @@ export async function launchNodeHost(
   function close() {
     if (state.closing) return state.closing
     state.closing = (async () => {
-      const deadline = Date.now() + (timing.teardown ?? 60_000)
-      const gracefulDeadline = Math.min(deadline, Date.now() + (timing.close ?? 30_000))
+      // Saved-package cleanup needs the longer graceful budget without consuming
+      // the TERM/KILL and actual-exit observation allowance.
+      const deadline =
+        Date.now() + (timing.teardown ?? (input.closeSavedPackageOnShutdown === true ? 90_000 : 60_000))
+      const gracefulDeadline = Math.min(
+        deadline,
+        Date.now() + (timing.close ?? (input.closeSavedPackageOnShutdown === true ? 60_000 : 30_000)),
+      )
       try {
         const result = await client
           .request("close", {}, Math.max(0, gracefulDeadline - Date.now()))
@@ -157,6 +164,9 @@ export async function launchNodeHost(
         resources: input.resources,
         headless: input.headless,
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
+        ...(input.closeSavedPackageOnShutdown !== undefined
+          ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
+          : {}),
       },
       // Restored startup acknowledges local activation independently of the Help catalog.
       // Preserve the bounded private-host budget; explicit Help preflight is a separate request.

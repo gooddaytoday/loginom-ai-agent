@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readMappingBrowser,readNodeMapping} from '../lib/node-mapping-context.mjs';
+import {readMappingBrowser,readNodeMapping,makeNodeMappingContextCode} from '../lib/node-mapping-context.mjs';
 function fixture({grouped=false,input=false,socket=false}={}) {
  grouped ||= socket;
  const base='MF;TF;WizrdMCF;'+(input?'TuneDataSourceMappingWizard':socket?'DataSetOutputSocketWizard':grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';',all=[],views={};
@@ -201,4 +201,218 @@ test('native mapping preserves meaningful leading/trailing label whitespace and 
  assert.equal(f.read().verified,true);assert.equal(f.read().target_fields[0].label,label);
  f.all.find(e=>e.tid===f.base+'colDisplayName_Out0').textContent=label.trim();
  assert.equal(f.read().verified,false);
+});
+
+for(const kind of ['value','missing','duplicate','long','disconnected'])test('render mismatch retains bounded evidence without admitting '+kind,()=>{
+ const f=fixture(),cell=f.all.find(e=>e.tid===f.base+'colSourceDisplayName_Out0');
+ if(kind==='value')cell.textContent='Different';
+ if(kind==='missing')f.all.splice(f.all.indexOf(cell),1);
+ if(kind==='duplicate')f.el(cell.tid,'Other',cell.parent);
+ if(kind==='long')cell.textContent='x'.repeat(10000);
+ if(kind==='disconnected'){
+  f.target[0].data.ConnectedRecord=null;f.source[0].data.ConnectedRecord=null;
+  f.target[0].data.SourceDisplayName=null;f.target[0].data.SourceDataType=null;
+ }
+ const result=f.read();assert.equal(result.verified,false);assert.equal(result.reason,'mapping_render_value');
+ assert.equal(result.source_identity_verified,false);
+ const d=result.render_mismatch;
+ assert.equal(d.column,'colSourceDisplayName_');assert.equal(d.field_name,'Out0');assert.equal(d.row_index,0);
+ assert.equal(d.expected,kind==='disconnected'?'':'Same');assert.equal(d.source_connected,kind!=='disconnected');
+ assert.equal(d.cell_count,kind==='missing'?0:kind==='duplicate'?2:1);
+ assert.ok(d.cells.length<=2);for(const entry of d.cells)assert.ok(entry.text.length<=240);
+ if(kind==='long'){assert.equal(d.cells[0].text.length,240);assert.equal(d.cells[0].truncated,true);}
+ assert.equal(d.source_count,2);assert.equal(d.target_count,2);
+});
+test('unverified render diagnostics cannot bypass the bracketing native owner check',async()=>{
+ const f=fixture();f.all.find(e=>e.tid===f.base+'colName_Out0').textContent='Wrong';
+ let reads=0;const result=await readNodeMapping({evaluate:async()=>f.read()},{workflow_ref:{prefix:'MF;TF'}},
+  async()=>({verified:true,surface:'wizard',node_id:String(++reads)}));
+ assert.deepEqual(result,{verified:false,reason:'mapping_node_changed'});
+});
+
+for(const mode of ['hidden','visible','unbound','throw','overflow'])test('failure-only header diagnostic '+mode,()=>{
+ const f=fixture(),cell=f.all.find(e=>e.tid===f.base+'colSourceDisplayName_Out0');
+ f.all.splice(f.all.indexOf(cell),1);
+ const header=f.el(f.base+'targetHeader','',mode==='unbound'?null:f.root);
+ const column=f.el(f.base+'sourceColumnHeader','',header);column.checkVisibility=()=>mode!=='hidden';
+ let calls=0;
+ f.views[f.grids[1].id].headerCt={el:{dom:header},getGridColumns:()=>{
+  calls++;if(mode==='throw')throw Error('UI unavailable');
+  return Array.from({length:mode==='overflow'?33:1},()=>({dataIndex:'SourceDisplayName',itemId:'source',hidden:mode==='hidden',el:{dom:column}}));
+ }};
+ const result=f.read();assert.equal(result.verified,false);assert.equal(result.reason,'mapping_render_value');
+ const d=result.render_mismatch;assert.equal(d.cell_count,0);assert.equal(d.cached_targets.length,2);
+ assert.equal(d.cached_targets_truncated,false);assert.equal(d.cached_targets[0].connected,true);
+ assert.equal(d.cached_targets[0].name,'Out0');assert.equal(d.cached_targets[0].type,'string');
+ assert.equal(d.headers.status,mode==='unbound'||mode==='overflow'?'unavailable':mode==='throw'?'diagnostic_failed':'observed');
+ assert.equal(calls,mode==='unbound'?0:1);
+ if(['hidden','visible'].includes(mode)){
+  assert.equal(d.headers.columns[0].data_index,'SourceDisplayName');assert.equal(d.headers.columns[0].dom_in_owner,true);
+  assert.equal(d.headers.columns[0].hidden,mode==='hidden');assert.equal(d.headers.columns[0].visible,mode!=='hidden');
+ }
+});
+test('successful mapping does not inspect optional diagnostic headers',()=>{
+ const f=fixture();Object.defineProperty(f.views[f.grids[1].id],'headerCt',{get(){throw Error('Diagnostic must not run');}});
+ assert.equal(f.read().verified,true);
+});
+
+function pendingFixture() {
+ const f=fixture({socket:true});f.source.splice(0);
+ for(const t of f.target)Object.assign(t.data,{ConnectedRecord:null,SourceDisplayName:null,SourceDataType:null});
+ for(const cell of [...f.all])if(cell.tid?.startsWith(f.base+'colSourceDisplayName_'))f.all.splice(f.all.indexOf(cell),1);
+ const header=f.el(f.base+'grdTargetColumns;headercontainer','',f.root);
+ const element=f.el(f.base+'colSourceDisplayName','',header);element.checkVisibility=()=>false;
+ const column={dataIndex:'SourceDisplayName',itemId:'colSourceDisplayName',hidden:true,el:{dom:element}};
+ const columns=[column];f.views[f.grids[1].id].headerCt={el:{dom:header},getGridColumns:()=>columns};
+ return {...f,header,element,column,columns};
+}
+test('owned hidden source column proves configured inventory without proving mapping',()=>{
+ const f=pendingFixture(),r=f.read();
+ assert.equal(r.verified,false);assert.equal(r.reason,'mapping_source_pending');assert.equal(r.source_identity_verified,false);
+ assert.equal(r.configured_inventory_verified,true);assert.equal(r.inventory_complete,true);
+ assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,2);
+ assert.equal(r.target_fields[0].name,'Out0');assert.equal(r.target_fields[0].source,null);
+ assert.equal(r.source_pending.native_header_verified,true);assert.equal(r.source_pending.target_count,2);
+ assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
+});
+for(const [name,change] of Object.entries({
+ visible:f=>{f.element.checkVisibility=()=>true;},not_hidden:f=>{f.column.hidden=false;},
+ foreign_header:f=>{f.header.parent=null;},missing_header:f=>{f.all.splice(f.all.indexOf(f.header),1);},
+ duplicate_header:f=>{f.el(f.header.tid,'',f.root);},foreign_column:f=>{f.column.el.dom=f.header;},
+ duplicate_column:f=>{f.columns.push({...f.column});},duplicate_dom:f=>{f.el(f.element.tid,'',f.header);},
+ wrong_data_index:f=>{f.column.dataIndex='Other';},wrong_item_id:f=>{f.column.itemId='Other';},
+ connected:f=>{f.target[0].data.ConnectedRecord={data:{}};},nonempty_source:f=>{f.source.push({});},
+ source_label:f=>{f.target[0].data.SourceDisplayName='Unknown';},source_type:f=>{f.target[0].data.SourceDataType=5;},
+ source_cell:f=>{f.el(f.base+'colSourceDisplayName_Out0','wrong',f.rows[0]);},
+ empty_source_cell:f=>{f.el(f.base+'colSourceDisplayName_Out0','',f.rows[0]);},
+ changed_name_cell:f=>{f.all.find(e=>e.tid===f.base+'colName_Out0').textContent='Other';},
+ incomplete_store:f=>{f.stores[1].getCount=()=>1;},autosync:f=>{f.views[f.button.id].pressed=true;},
+ wrong_form:f=>{for(const e of f.all)if(e.tid)e.tid=e.tid.replace('DataSetOutputSocketWizard','DerivedDataSourceOutputSocketWizard');}
+}))test('configured-only mapping rejects '+name,()=>{
+ const f=pendingFixture();change(f);const r=f.read();assert.equal(r.verified,false);assert.notEqual(r.configured_inventory_verified,true);
+});
+
+
+test('mapping read admits only its native disabled output delete-column mask',()=>{
+ const variants=['valid','enabled','foreign-native','foreign-root','foreign-view','foreign-tid','duplicate-column','duplicate-mask','loading','message','dialog','text','input'];
+ for(const variant of variants){
+  const f=fixture(variant==='input'?{input:true}:{socket:true});
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  const model={FView:{el:{dom:wizard}}};
+  const workspace={getActiveTab:()=>({Controller:{FController:model}})};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:true};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=name=>classes.has(name);
+  if(variant==='enabled')f.views[column.id].disabled=false;
+  if(variant==='foreign-native')f.views[column.id].el.dom={};
+  if(variant==='foreign-root')column.parent={};
+  if(variant==='foreign-view')model.FView.el.dom={};
+  if(variant==='foreign-tid')column.tid='other-column';
+  if(variant==='duplicate-column')f.el(column.tid);
+  if(variant==='duplicate-mask'){const second=f.el(null,'',column);second.mask=true;second.parentElement=column;}
+  if(variant==='loading')classes.add('x-mask-msg');
+  if(variant==='message')classes.add('bg-mask-message');
+  if(variant==='dialog')mask.attrs.role='dialog';
+  if(variant==='text')mask.textContent='Loading';
+  const result=f.read();
+  assert.equal(result.verified,variant==='valid',variant+': '+result.reason);
+  if(variant!=='valid')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});
+
+function inputEditorFixture() {
+ const f=fixture({input:true}),wizard=f.el('MF;TF;WizrdMCF'),body=f.el('MF');f.root.parent=wizard;
+ const form=f.el('EditTuneColumnDefForm'),mask=f.el(null,'',body);mask.mask=true;mask.parentElement=body;mask.attrs.role='presentation';
+ const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=key=>classes.has(key);form.matches=key=>key==='.x-window';
+ const native={constructor:{name:'EditTuneColumnDefForm'},FView:{el:{dom:form}},FAddMode:false,Records:[f.target[0]]};
+ const component={$className:'bg.wizards.columns.view.EditColumnDefForm',el:{dom:form},Controller:native,modal:true,hidden:false};
+ const manager={front:component,mask:{dom:mask}};component.zIndexManager=manager;f.context.Ext.WindowManager=manager;f.views[form.id]=component;
+ const model={FView:{el:{dom:wizard}}},workspace={getActiveTab:()=>({Controller:{FController:model}})};
+ f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
+ f.context.document.body=body;f.stores[1].getAt=i=>f.target[i];
+ const query=f.grids[1].querySelectorAll.bind(f.grids[1]);f.grids[1].querySelectorAll=q=>q==='table.x-grid-item-selected'?[f.rows[0]]:query(q);
+ const editor={opening_operation_id:'owned-input:n1',port_guid:'00000000-0000-4000-8000-000000000001',record_id:'t0'};
+ return {...f,wizard,body,form,mask,classes,native,component,manager,model,editor,
+  readOwned:()=>vm.runInNewContext('('+readMappingBrowser.toString()+')('+JSON.stringify({prefix:'MF;TF',editor})+')',f.context)};
+}
+
+test('an explicitly bound original input editor reads complete reciprocal caches; default masked read still refuses',()=>{
+ const f=inputEditorFixture();assert.equal(f.read().reason,'mapping_mask');
+ const result=f.readOwned();assert.equal(result.verified,true);assert.equal(result.inventory_complete,true);
+ assert.equal(result.source_identity_verified,true);assert.deepEqual(Array.from(result.target_fields,t=>t.source.name),['A','B']);
+ assert.equal(result.settings_applied,false);assert.equal(result.package_saved,false);
+});
+
+for(const [name,change] of [
+ ['unbound record',f=>f.editor.record_id=null],['foreign field',f=>f.editor.record_id='t1'],
+ ['foreign manager',f=>f.component.zIndexManager={...f.manager}],['foreign front',f=>f.manager.front={}],
+ ['foreign mask',f=>f.manager.mask.dom={}],['duplicate mask',f=>{const m=f.el(null);m.mask=true;m.parentElement=f.body;}],
+ ['foreign parent',f=>f.mask.parentElement={}],['wrong body',f=>f.body.tid='foreign'],
+ ['loading',f=>f.classes.add('x-mask-msg')],['message',f=>f.classes.add('bg-mask-message')],
+ ['wrong role',f=>f.mask.attrs.role='dialog'],['mask text',f=>f.mask.textContent='Loading'],
+ ['foreign wizard',f=>f.model.FView.el.dom={}],['foreign component',f=>f.component.el.dom={}],
+ ['foreign native view',f=>f.native.FView.el.dom={}],['wrong native class',f=>f.native.constructor.name='OtherForm'],
+ ['wrong component class',f=>f.component.$className='OtherForm'],['nonmodal',f=>f.component.modal=false],
+ ['hidden editor',f=>f.component.hidden=true],['add mode',f=>f.native.FAddMode=true],
+ ['foreign records',f=>f.native.Records=[{...f.target[0]}]],['two records',f=>f.native.Records.push(f.target[1])],
+ ['record accessor',f=>Object.defineProperty(f.native,'Records',{get(){throw Error('getter must not run');}})],
+ ['view accessor',f=>Object.defineProperty(f.native,'FView',{get(){throw Error('getter must not run');}})],
+ ['add mode accessor',f=>Object.defineProperty(f.native,'FAddMode',{get(){throw Error('getter must not run');}})],
+ ['wrong selected ID',f=>f.rows[0].attrs['data-recordid']='foreign'],['wrong selected index',f=>f.rows[0].attrs['data-recordindex']='1'],
+ ['missing selected index',f=>delete f.rows[0].attrs['data-recordindex']],
+ ['wrong selected view',f=>f.rows[0].attrs['data-boundview']='foreign'],['two selected rows',f=>f.grids[1].querySelectorAll=()=>f.rows],
+ ['loading store',f=>f.stores[1].isLoading=()=>true],['foreign grid view',f=>f.views[f.grids[1].id].el.dom={}],
+ ['two editors',f=>f.el('EditTuneColumnDefForm')],
+])test('owned input backdrop refuses '+name,()=>{
+ const f=inputEditorFixture();change(f);assert.equal(f.readOwned().reason,'mapping_mask');
+});
+
+for(const change of [f=>f.source[0].data.ConnectedRecord=f.target[1],f=>f.target[0].data.SourceDataType=4,
+ f=>f.stores[0].getTotalCount=()=>3,f=>f.target[1].data.Required='false'])
+test('owned editor backdrop retains full native inventory and reciprocal guards '+change.toString(),()=>{
+ const f=inputEditorFixture();change(f);assert.equal(f.readOwned().verified,false);
+});
+
+test('owned editor context requires its original input0 opening and brackets the cache read',async()=>{
+ const f=inputEditorFixture(),node={verified:true,surface:'wizard',input_port:{direction:'input',port:0,
+  port_guid:f.editor.port_guid,opening_operation_id:f.editor.opening_operation_id}},binding={workflow_ref:{prefix:'MF;TF'}};
+ let reads=0;const page={evaluate:async(fn,arg)=>{reads++;return vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context);}};
+ assert.equal((await readNodeMapping(page,binding,async()=>node,readMappingBrowser,f.editor)).verified,true);
+ for(const change of [p=>p.direction='output',p=>p.port=1,p=>p.port_guid='foreign',p=>p.opening_operation_id='foreign']){
+  const foreign=structuredClone(node);change(foreign.input_port);const before=reads;
+  assert.equal((await readNodeMapping(page,binding,async()=>foreign,readMappingBrowser,f.editor)).reason,'mapping_editor_owner');assert.equal(reads,before);
+ }
+ let n=0;assert.equal((await readNodeMapping(page,binding,async()=>({...node,node_id:String(++n)}),readMappingBrowser,f.editor)).reason,'mapping_node_changed');
+});
+
+test('owned mapping editor generator refuses changed binding shapes without reading getters',()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',
+  navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const editor=inputEditorFixture().editor;assert.doesNotThrow(()=>makeNodeMappingContextCode(binding,editor));
+ for(const change of [e=>delete e.record_id,e=>e.extra=true,e=>e.record_id='',e=>e.port_guid='foreign',
+  e=>Object.defineProperty(e,'record_id',{get(){throw Error('getter must not run');}}),e=>e[Symbol('foreign')]=true]){
+  const value={...editor};change(value);assert.throws(()=>makeNodeMappingContextCode(binding,value),/Exact owned input mapping editor/);
+ }
+});
+
+
+test('empty output socket mapping reports actual empty inventories without inventing rows',()=>{
+ const variants=['valid','loading','nonzero-total','filtered','nonempty-source','nonempty-target','input','other-form','stale-row'];
+ for(const variant of variants){
+  const f=fixture(variant==='input'?{input:true}:variant==='other-form'?{}:{socket:true});
+  const source=f.source[0],target=f.target[0];f.source.splice(0);f.target.splice(0);
+  if(variant!=='stale-row')for(let i=f.all.length-1;i>=0;i--)if(f.rows.some(row=>row.contains(f.all[i])))f.all.splice(i,1);
+  if(variant==='loading')f.stores[0].isLoading=()=>true;
+  if(variant==='nonzero-total')f.stores[0].getTotalCount=()=>1;
+  if(variant==='filtered')f.stores[0].getData=()=>({items:[],getSource:()=>({items:[source]})});
+  if(variant==='nonempty-source'){source.data.ConnectedRecord=null;f.source.push(source);}
+  if(variant==='nonempty-target'){Object.assign(target.data,{ConnectedRecord:null,SourceDisplayName:null,SourceDataType:null});f.target.push(target);}
+  const r=f.read();assert.equal(r.verified,variant==='valid',variant+': '+r.reason);
+  if(variant==='valid'){
+   assert.equal(r.inventory_complete,true);assert.equal(r.state_source,'cached_mapping_stores');
+   assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.rendered_indices.length,0);
+   assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
+  }
+ }
 });

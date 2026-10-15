@@ -74,6 +74,40 @@ export function verifyFailedExecution(execution,snapshot) {
     failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message:group.error_details.slice(0,1000)}};
 }
 
+// Stronger, opt-in evidence for callers that must attribute a failure to the
+// requested child. Never infer this from the group, caption or error text.
+export function selectFailedExecutionChild(execution,snapshot,expected) {
+  verifyFailedExecution(execution,snapshot);
+  const ps=inventory(snapshot,execution.node,execution.root_id);
+  requireValue(snapshot.node_context.surface==='graph','Failed child native owner must be observed on its graph');
+  const group=ps.find(p=>p.process_id===execution.group_id&&p.record_id===execution.group_record_id);
+  requireValue(group.children_loaded===true,'Failed execution children are not loaded');
+  const owned=ps.filter(p=>p.parent_id===execution.group_id&&p.owner?.verified===true
+    &&p.owner.node_id===execution.node.node_id&&p.owner.source==='native_process_model_identity');
+  requireValue(owned.length===1,'Exactly one native-owned failed child is required');
+  const child=owned[0],state=child.progress_state;
+  requireValue(child.state==='pending_or_failed'&&child.error===true&&nonempty(child.error_details?.trim())&&state?.verified===true
+    &&state.state==='failed'&&state.terminal===true&&state.can_cancel===false&&state.source==='native_progress_record',
+    'Requested child must have its own verified terminal failure');
+  if(expected)requireValue(child.process_id===expected.process_id&&child.record_id===expected.record_id
+    &&child.parent_id===expected.parent_id&&child.error_details===expected.error_details,
+    'Pinned failed child identity or error changed');
+  return structuredClone(child);
+}
+
+export function verifyFailedChildExecution(execution,snapshot,expected,owner) {
+  requireValue(expected,'Pinned failed child is required');
+  const child=selectFailedExecutionChild(execution,snapshot,expected);
+  requireValue(snapshot.processes.filter(p=>p.selected===true).length===1&&child.selected===true&&child.rendered===true,
+    'Failed child must remain the unique selected rendered process');
+  requireValue(owner?.verified===true&&owner.node_selected===true&&owner.process_id===child.process_id
+    &&owner.record_id===child.record_id&&sameNode(owner.node,execution.node)&&owner.node?.verified===true
+    &&owner.node.surface==='graph','Failed child Show Node proof differs');
+  return {...verifyFailedExecution(execution,snapshot),process_id:child.process_id,process_record_id:child.record_id,
+    owner_verified:true,ownership_source:'native_process_model_identity_and_show_node',error_source:'native_child_error_details',
+    error:{code:'NODE_EXECUTION_FAILED',message:child.error_details.slice(0,1000)}};
+}
+
 // Upstream dependencies can add sibling processes to this launch. Their captions
 // do not identify the requested child; use cached ModelNode object ownership.
 // Show Node remains an independent check before accepting completion.
@@ -87,6 +121,28 @@ export function selectExecutionChild(execution,snapshot) {
     &&p.owner.source==='native_process_model_identity');
   requireValue(owned.length===1,'Exactly one native-owned execution child is required');
   return structuredClone(owned[0]);
+}
+
+// A read-only pause may outlive a running child. Bind native records rather
+// than its progress state; completion still requires the usual Show Node proof.
+export function verifyExecutionReadWait(execution,snapshot,expected) {
+  const ps=inventory(snapshot,execution.node,execution.root_id);
+  requireValue(snapshot.node_context.surface==='graph'
+    &&execution.execution_id===execution.node.document_id+':'+execution.root_id+':'+execution.group_id,
+  'Read wait execution graph identity changed');
+  const group=ps.find(p=>p.parent_id===null&&p.process_id===execution.group_id&&p.record_id===execution.group_record_id);
+  const child=selectExecutionChild(execution,snapshot);
+  requireValue(child.owner?.verified===true&&child.owner.node_id===execution.node.node_id
+    &&child.owner.source==='native_process_model_identity','Read wait requires the native-owned child');
+  for(const item of [group,child])requireValue(item?.progress_state?.verified===true
+    &&item.progress_state.source==='native_progress_record'
+    &&['running','not_responding','completed','failed'].includes(item.progress_state.state),
+  'Read wait native progress state is unverified or cancelled');
+  const binding={execution_id:execution.execution_id,node:structuredClone(execution.node),root_id:execution.root_id,
+    group_id:group.process_id,group_record_id:group.record_id,process_id:child.process_id,process_record_id:child.record_id,
+    ownership_source:'native_process_model_identity'};
+  requireValue(!expected||JSON.stringify(binding)===JSON.stringify(expected),'Read wait native records changed');
+  return binding;
 }
 
 // Freeze the exact cancellable child before opening its menu. A matching

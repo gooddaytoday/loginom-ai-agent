@@ -80,7 +80,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const waitForMasks = async (observed, read, unchanged) => {
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
     const maskStarted=Date.now();
-    record('ui_mask_wait_started',{remaining_ms:timeout()});
+    record('ui_mask_wait_started',{remaining_ms:timeout(),masks:observed.ui.masks.map(mask=>({ref:mask.ref,kind:mask.kind,target_tid:mask.target_tid,
+      dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
       timeout();observed=await read();
@@ -96,7 +97,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // or GUID failures do not enter this wait.
     for(let sample=0;binding?.surface_pending===true && effectPossible
       && (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action?.verb)
-        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && sample<(task.opening_timeout_ms?900:200);sample++) {
+        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || sample<200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
       binding=await readNodeContext(page,task.prepared_node_context);
@@ -195,7 +196,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -278,6 +279,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // including buttons without their labels loses the observed directory.
     const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
+      // Its grid identifies the stage; this separate guard identifies the
+      // definition fields when the observed root is the native editor portal.
+      '[data-tid$=";WizrdMCF;DataSetOutputSocketWizard;btnAddMappingColumn"]',
       ...Object.entries({ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
@@ -340,7 +344,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if(requestedRoot?.getAttribute('data-tid')==='mnContextMenu'
       && requestedRoot.querySelectorAll('[data-tid="mnContextMenu;mniShowNodeToProcess"]').length===1
       && requestedRoot.querySelectorAll('[data-tid="mnContextMenu;mniShowCompletedProcesses"]').length===1) {
-      const panels=document.querySelectorAll('[data-tid="ConsoleForm"]');charge();
+      const panels=document.querySelectorAll('[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"]');charge();
       if(panels.length===1) {include(panels[0]);const descendants=panels[0].querySelectorAll('*');charge();
         for(const element of descendants)include(element);}
     }
@@ -451,12 +455,36 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return null;
     };
     const enabled = element => !element.matches(':disabled') && !element.closest('[aria-disabled="true"],.x-item-disabled,.x-btn-disabled,.x-menu-item-disabled');
+    const controlCodeIdentity = element => {
+      const tid=getTid(element),stem=workflow?.prefix+';FileStorageForm;colName_';
+      let controlTid=tid??'';
+      // colName_<filename> is data in a readonly storage cell, not an editor
+      // identity. Keep name/id and all other dangerous-control guards intact.
+      if(workflow&&element.tagName==='TD'&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')&&tid?.startsWith(stem)){
+        const gridTid=workflow.prefix+';FileStorageForm;pnlFileStorage;tbl';
+        const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']')];charge();
+        const row=element.closest('.x-grid-item'),label=element.textContent?.trim();
+        if(grids.length===1&&row&&grids[0].contains(row)&&row.contains(element)
+          &&typeof label==='string'&&label.length>0&&label.length<=240
+          &&tid===stem+label.replace(/\s/g,'_').replace(/,/g,''))controlTid=stem;
+      }
+      // A native-bound process caption may contain the node's name, including
+      // "JavaScript". Only its data suffix is exempt: editor/name/id/link and
+      // secret guards still apply, and the row only exposes process actions.
+      const process=processCells.get(state.ids.get(element))??processExpanders.get(state.ids.get(element));
+      const processStem=processBase+'colProcess_';
+      if(process&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')
+        &&(element.tagName==='TD'&&tid===processStem+process.path
+          ||processExpanders.has(state.ids.get(element))&&tid===processStem+process.path+';TreeExpander'))controlTid=processStem;
+      return [element.getAttribute('name')??'',element.getAttribute('id')??'',controlTid].join(' ');
+    };
     const dangerous = element => sensitive(element) || !!element.closest('a[href],iframe,object,embed')
       // The native chooser interrupts MCP's typed browser response. File
       // submission belongs to dock_artifact_upload and its pinned grant.
       || !!element.closest('[data-tid$=";FileStorageForm;btnUpload"]')
       || element.matches('input[type="url"],input[type="file"],input[type="hidden"]')
-      || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(['name', 'id', 'data-tid'].map(key => element.getAttribute(key) ?? '').join(' '))
+      || nativeGraphControl(element)?.status!=='non_script' && nativeGraphControl(element)!==null
+      || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(controlCodeIdentity(element))
       || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
@@ -491,6 +519,79 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const graphIdentity=graphPrefix?{status:'observed',container_ref:refOf(graphContainer),container_tid:getTid(graphContainer),native_prefix:graphPrefix}
       :{status:graphContainers.length>1 || namespaces.length>1?'ambiguous':'unobserved'};
     const ownedGraph=element=>!!graphPrefix && graphContainer.contains(element) && (getTid(element)??'').startsWith(graphPrefix);
+    // Native type, not an editable graph label, owns the extra script deny.
+    // Build once per observation; unconfirmed controls never inherit permission.
+    const nativeGraphControls=new Map(),nativeGraphLinks=new Set();
+    const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
+      ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
+    if(graphQueryable&&graphPrefix){
+      const value=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+      const method=(o,k)=>{for(let n=0;o&&n<8;n++,o=Object.getPrototypeOf(o)){charge();const d=Object.getOwnPropertyDescriptor(o,k);if(d)return Object.hasOwn(d,'value')&&typeof d.value==='function'?d.value:null;}return null;};
+      const dense=(a,limit)=>{if(!Array.isArray(a)||a.length>limit)return null;const result=[];for(let i=0;i<a.length;i++){charge();const d=Object.getOwnPropertyDescriptor(a,String(i));if(!d||!Object.hasOwn(d,'value')||!d.value||typeof d.value!=='object')return null;result.push(d.value);}return result;};
+      // Vendor ViewItemsController.Items is an inherited getter over own FItems.
+      const app=value(globalThis.bg,'app'),workspace=value(value(value(value(value(app,'Application'),'FInstance'),'FMainForm'),'FItems'),'Workspace');
+      const activeTab=method(workspace,'getActiveTab'),card=activeTab?.call(workspace),controller=value(card,'Controller'),model=value(controller,'FController');
+      const modelClass=value(app,'ModelForm'),diagram=value(model,'FDiagram'),graph=value(diagram,'FmxGraph'),view=value(graph,'view');
+      const nodes=dense(value(value(diagram,'FNodes'),'FCollection'),200),getState=method(view,'getState');
+      const scoped=new Map();
+      for(const e of nativeGraphElements){charge();const tid=getTid(e);if(!scoped.has(tid))scoped.set(tid,[]);scoped.get(tid).push(e);}
+      const unique=e=>e&&graphContainer.contains(e)&&scoped.get(getTid(e))?.length===1&&scoped.get(getTid(e))[0]===e;
+      const bindings=new Map();
+      const retain=(element,objects,icon)=>{
+        if(!unique(element))return;
+        const receipt={status:icon==='bg-vendor-icon-javascript'?'script':'non_script',identity:objects.map(o=>refOf(o,false)),icon};
+        if(bindings.has(element))nativeGraphControls.set(element,{status:'unconfirmed'});
+        else {bindings.set(element,true);nativeGraphControls.set(element,receipt);}
+      };
+      if(typeof modelClass==='function'&&model instanceof modelClass&&value(graph,'container')===graphContainer&&nodes&&getState){
+        const guids=new Map(),cells=new Map();
+        for(const n of nodes){charge();const guid=value(n,'FGuid'),cell=value(n,'FCell');guids.set(guid,(guids.get(guid)??0)+1);cells.set(cell,(cells.get(cell)??0)+1);}
+        for(const node of nodes){
+          charge();const guid=value(node,'FGuid'),cell=value(node,'FCell'),icon=value(node,'FIconCls');
+          if(typeof guid!=='string'||!guid||guid.length>128||guids.get(guid)!==1||!cell||typeof cell!=='object'||cells.get(cell)!==1
+            ||typeof icon!=='string'||!/^bg-vendor-icon-[a-z0-9_-]{1,128}$/.test(icon))continue;
+          const rendered=getState.call(view,cell),shape=value(value(rendered,'shape'),'node'),tid=getTid(shape);
+          if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
+          const identity=[model,diagram,graph,view,node,cell];
+          const data=value(node,'data');if(data&&typeof data==='object')identity.push(data);
+          retain(shape,identity,icon);
+          const label=value(node,'FLabel'),labelCell=value(label,'FCell');
+          if(value(label,'parent')===node&&labelCell&&value(labelCell,'parent')===cell){
+            const text=value(value(getState.call(view,labelCell),'text'),'node');
+            if(getTid(text)===tid+';Label;Label')retain(text,[...identity,label,labelCell],icon);
+          }
+          for(const suffix of [';Setting',';Visualizers']){
+            charge();const elements=scoped.get(tid+suffix);if(elements?.length===1)retain(elements[0],identity,icon);
+          }
+          const groups=dense(value(node,'FPorts'),16);if(!groups)continue;
+          const collections=groups.map(group=>dense(value(group,'FCollection'),100));if(collections.some(list=>!list))continue;
+          const ports=collections.flat();
+          const portCells=new Map(),portGuids=new Map();
+          for(const p of ports){charge();const c=value(p,'FCell'),g=value(p,'FGuid');portCells.set(c,(portCells.get(c)??0)+1);portGuids.set(g,(portGuids.get(g)??0)+1);}
+          for(const port of ports){
+            charge();const portCell=value(port,'FCell'),portGuid=value(port,'FGuid'),type=value(port,'FType'),subtype=value(port,'FSubType');
+            // Service AddPort (subtype10) has no ordinary GUID/index contract.
+            // Leave only that control denied; it cannot poison sibling data0.
+            if(subtype===10)continue;
+            if(value(port,'parent')!==node||!portCell||typeof portCell!=='object'||value(portCell,'parent')!==cell
+              ||portCells.get(portCell)!==1||typeof portGuid!=='string'||!portGuid||portGuid.length>128||portGuids.get(portGuid)!==1
+              ||![0,1].includes(type)||!Number.isInteger(subtype)||subtype<1||subtype>9)continue;
+            const element=value(value(getState.call(view,portCell),'shape'),'node'),portTid=getTid(element);
+            if(!portTid?.startsWith(tid+';'+(type===0?'Input_':'Output_')))continue;
+            const portData=value(port,'data');retain(element,[...identity,port,portCell,...(portData&&typeof portData==='object'?[portData]:[])],icon);
+          }
+        }
+        // Links are out of this node-control policy only when their native
+        // cell/renderer proves it. A '|' in a node label is ordinary data.
+        const links=dense(value(value(diagram,'FLinks'),'FCollection'),2000);
+        if(links)for(const link of links){
+          charge();const cell=value(link,'FCell'),source=value(link,'FSourcePort'),target=value(link,'FTargetPort');
+          if(!cell||typeof cell!=='object'||!nodes.includes(value(source,'parent'))||!nodes.includes(value(target,'parent')))continue;
+          const element=value(value(getState.call(view,cell),'shape'),'node');
+          if(unique(element)&&!nativeGraphControls.has(element))nativeGraphLinks.add(element);
+        }
+      }
+    }
     const scopeOf = element => {
       if (dialogRef(element)) return 'dialog';
       if(/^(MF;TF(?:-\d+)?;Graph;)/.test(getTid(element)??''))return ownedGraph(element)?'graph':'inactive_workflow';
@@ -555,7 +656,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           && typeof preparedOutputPort.opening_operation_id==='string'&&preparedOutputPort.opening_operation_id.length>0;
         const overflowSocket=e=>boundOutputOverflow&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
-          &&e.querySelectorAll('.bg-vendor-icon-deriveddatasourceoutputsocketdef,.bg-vendor-icon-outputdatasourcesocketdef').length===1
+          &&e.querySelectorAll('.bg-vendor-icon-deriveddatasourceoutputsocketdef,.bg-vendor-icon-outputdatasourcesocketdef,.bg-vendor-icon-datasetoutputsocketdef').length===1
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
@@ -662,10 +763,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)context.status='bounded';
         else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i>=7&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
-          // Ext may hide the final wizard breadcrumb in the overflow menu.
-          // Admit only its fixed caption with an independently bound native port.
+          // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
+          // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===8&&e.textContent.trim()==='Настройка'||i===7&&e.textContent.trim()==='Входной источник данных');
+            &&(i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
+              ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
+              ||(preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
+                ||preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица')
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1));
           const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
@@ -1861,9 +1966,10 @@ function readRenderedInputMapping(observation) {
     }
     const processConsole={status:'unobserved',top_groups:[],rows:[],top_level_complete:false,
       details_complete:false,execution_verified:false,owner_verified:false};
-    const consoles=tids.get('ConsoleForm')??[];
+    const consoles=[...document.querySelectorAll('[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"]')];charge();
+    const processBase=consoles.length===1?getTid(consoles[0])+';ProgressForm;':null;
     if(consoles.length===1 && (!requestedRoot || requestedRoot===consoles[0] || requestedRoot.contains(consoles[0]) || getTid(requestedRoot)==='mnContextMenu')) {
-      const panel=consoles[0],base='ConsoleForm;ProgressForm;';
+      const panel=consoles[0],base=processBase;
       const inside=(e,parent)=>{const b=boxOf(e),p=boxOf(parent);return visible(e) && !sensitive(e)
         && b.x>=0 && b.y>=0 && b.x+b.width<=globalThis.innerWidth && b.y+b.height<=globalThis.innerHeight
         && b.x>=p.x && b.y>=p.y && b.x+b.width<=p.x+p.width && b.y+b.height<=p.y+p.height;};
@@ -1897,7 +2003,7 @@ function readRenderedInputMapping(observation) {
           if(!record || seen.has(record) || pair[1].getAttribute('data-recordid')!==record || left.length!==2 || right.length!==8){valid=false;break;}
           const fields={},cells=[...left,...right];let path;
           for(const cell of cells) {
-            const match=/^ConsoleForm;ProgressForm;col(Id|Process|Percent|Progress|ActionStop|ActionDelete|ErrorDetails|ProgressStart|ProgressFinish|ProcessTime)_(Root>.+)$/.exec(getTid(cell)??'');
+            const match=/^col(Id|Process|Percent|Progress|ActionStop|ActionDelete|ErrorDetails|ProgressStart|ProgressFinish|ProcessTime)_(Root>.+)$/.exec((getTid(cell)??'').startsWith(base)?getTid(cell).slice(base.length):'');
             if(!match || fields[match[1]] || (tids.get(getTid(cell))??[]).length!==1 || !inside(cell,cell.closest('table'))
               || path && path!==match[2]){valid=false;break;}
             path=match[2];fields[match[1]]=cell;
@@ -1930,7 +2036,7 @@ function readRenderedInputMapping(observation) {
     // blank body authorizes only a context click, not an execution claim.
     const processGridControls=new Map();
     if(consoles.length===1 && visible(consoles[0])) {
-      const grids=['treepanel;tree','grd;tbl'].map(suffix=>(tids.get('ConsoleForm;ProgressForm;trpProgress;'+suffix)??[]));
+      const grids=['treepanel;tree','grd;tbl'].map(suffix=>(tids.get(processBase+'trpProgress;'+suffix)??[]));
       if(grids.every(xs=>xs.length===1&&consoles[0].contains(xs[0])&&visible(xs[0]))) {
         const views=grids.map(xs=>globalThis.Ext?.getCmp?.(xs[0].id));
         const store=views[0]?.getStore?.();
@@ -1942,7 +2048,7 @@ function readRenderedInputMapping(observation) {
     // A scrolled console is a visible window, never a complete DOM inventory.
     // Admit each row only through both native views and their shared cached model.
     if(processCells.size===0 && processGridControls.size===2) {
-      const grids=['treepanel;tree','grd;tbl'].map(suffix=>tids.get('ConsoleForm;ProgressForm;trpProgress;'+suffix)[0]);
+      const grids=['treepanel;tree','grd;tbl'].map(suffix=>tids.get(processBase+'trpProgress;'+suffix)[0]);
       const store=globalThis.Ext.getCmp(grids[0].id).getStore();
       const root=store.getRoot?.()??store.getRootNode?.(),records=new Map();let valid=true,visited=0;
       const walk=nodes=>{for(const model of nodes??[]){
@@ -1964,14 +2070,14 @@ function readRenderedInputMapping(observation) {
         const rightRow=rightRows[0];
         if(leftRow.getAttribute('data-boundview')!==grids[0].id||rightRow.getAttribute('data-boundview')!==grids[1].id
           ||rightRow.getAttribute('data-recordindex')!==String(index))continue;
-        const ids=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith('ConsoleForm;ProgressForm;colId_'));
-        const cells=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith('ConsoleForm;ProgressForm;colProcess_'));
-        const progress=[...rightRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith('ConsoleForm;ProgressForm;colProgress_'));
+        const ids=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith(processBase+'colId_'));
+        const cells=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith(processBase+'colProcess_'));
+        const progress=[...rightRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith(processBase+'colProgress_'));
         if(ids.length!==1||cells.length!==1||progress.length!==1||!visibleCell(cells[0],grids[0])
           ||textOf(ids[0],true)!==String(model.data.id))continue;
-        const cell=cells[0],path=getTid(cell).slice('ConsoleForm;ProgressForm;colProcess_'.length);
+        const cell=cells[0],path=getTid(cell).slice((processBase+'colProcess_').length);
         if(!path.startsWith('Root>')||(tids.get(getTid(cell))??[]).length!==1
-          ||getTid(progress[0])!=='ConsoleForm;ProgressForm;colProgress_'+path)continue;
+          ||getTid(progress[0])!==processBase+'colProgress_'+path)continue;
         const row={record_id:id,path,ordinal:String(model.data.id),process_cell_ref:refOf(cell),
           selected:leftRow.classList.contains('x-grid-item-selected'),record_index:index};
         rows.push(row);processCells.set(row.process_cell_ref,{record_id:id,path,record_index:index,
@@ -1997,7 +2103,7 @@ function readRenderedInputMapping(observation) {
       // prepared graph node. ModelNode is compared by identity, never dereferenced.
       let cancellation=null;
       if(preparedNodeId && processGridControls.size===2) {
-        const grid=tids.get('ConsoleForm;ProgressForm;trpProgress;treepanel;tree')[0];
+        const grid=tids.get(processBase+'trpProgress;treepanel;tree')[0];
         const store=globalThis.Ext.getCmp(grid.id).getStore(),root=store.getRoot?.()??store.getRootNode?.();
         const nodes=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()
           ?.Controller?.FController?.FDiagram?.FNodes?.FCollection;
@@ -2808,7 +2914,7 @@ function readRenderedInputMapping(observation) {
         ...(wizardFields.has(element) ? {wizard_field:wizardFields.get(element)} : {}),
         ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),
         ...(filterCell?{filter_cell:filterCell}:{}),
-        signature: { ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
+        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
@@ -2848,7 +2954,12 @@ function readRenderedInputMapping(observation) {
       // its controls must still pass exact painted hit ownership before acting.
       const owner = dialogRef(element), ownText = element.getAttribute('bg-mask-text');
       const kind = foregroundElement && !foregroundElement.contains(element) && !element.contains(foregroundElement) ? 'modal_background' : 'busy';
-      return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element) };
+      const importPreview=wizard.status==='observed'&&wizard.stage==='text_import_file'
+        &&getTid(element)===wizard.root_tid+';ImportTextFilePreviewWizard;pnlPreview'
+        &&wizardForms.length===1&&wizardForms[0].contains(element)
+        &&(tids.get(getTid(element))??[]).filter(visible).length===1;
+      return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
+        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}) };
     });
     const messages = readTexts('[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under');
     const definitionOnly=!!definitionPrefix && wizard.status==='observed';
@@ -3315,8 +3426,10 @@ function readRenderedInputMapping(observation) {
     return graph?page.locator('[data-tid='+JSON.stringify(graph.container_tid)+']').locator(selector):page.locator(selector);
   };
   const checkedHandle = async (before, current) => {
-    if (!current || !same(before.identity, current.identity) || !same(before.signature, current.signature)
-      || !current.allowed_actions.includes(task.action.verb)
+    const referenceChecks={present:!!current,identity_matches:!!current&&same(before.identity,current.identity),
+      signature_matches:!!current&&same(before.signature,current.signature),action_allowed:!!current&&current.allowed_actions.includes(task.action.verb)};
+    if(!Object.values(referenceChecks).every(Boolean))record('ui_reference_precondition_refused',{checks:referenceChecks});
+    if (!Object.values(referenceChecks).every(Boolean)
       || task.action.verb==='replace_expression' && !same(before.calculator_editor,current.calculator_editor)
       || task.action.verb==='set_wizard_field' && !same(before.wizard_field,current.wizard_field)
       || task.action.verb==='cancel_expression_parameters' && !same(before.expression_cancel,current.expression_cancel)
@@ -3768,32 +3881,50 @@ function readRenderedInputMapping(observation) {
           const opening=task.action.verb==='confirm_wizard_deactivation'?task.snapshot.node_wizard_confirmation.opening
             :current.ui.elements.find(e=>e.ref===task.action.ref).wizard_open;
           const contextMatches=lifecycleContextMatches;
+          const intendedWizard=fresh=>{
+            const owner=fresh.wizard?.owner_context;
+            if(fresh.wizard?.status!=='observed'||owner?.status!=='observed')return false;
+            // Duplicate labels use different graph and breadcrumb keys. Require
+            // the same native GUID and displayed label before accepting them.
+            const beforeNode=current.prepared_node_context,afterNode=fresh.prepared_node_context;
+            if(task.prepared_node_context&&(!afterNode?.verified
+              ||!['document_id','workflow_id','node_id'].every(k=>typeof beforeNode?.[k]==='string'&&beforeNode[k]===afterNode[k])))return false;
+            const labels=current.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.graph_node.node_label===opening.node.node_label);
+            const normalizeLabel=value=>typeof value==='string'?value.replace(/\s/g,''):'';
+            const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
+              &&beforeNode.surface==='graph'&&afterNode.surface==='wizard'
+              &&beforeNode.node_id===task.prepared_node_context.node.node_id
+              &&['document_id','workflow_id','node_id'].every(k=>typeof beforeNode[k]==='string'&&beforeNode[k]===afterNode[k])
+              &&beforeNode.tid===current.workflow_ref.prefix+';Graph;'+opening.node.node_label
+              &&(task.action.verb==='confirm_wizard_deactivation'
+                ?typeof beforeNode.pending_wizard_node?.tid==='string'&&beforeNode.pending_wizard_node.tid===owner.node.tid
+                  &&beforeNode.pending_wizard_node.label===owner.node.label
+                :labels.length===1&&normalizeLabel(labels[0].label)!==''
+                  &&normalizeLabel(labels[0].label)===normalizeLabel(owner.node.label));
+            return (guidOwnerMatches||owner.node.tid===opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label)
+              &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path);
+          };
+          const ownedLoading=fresh=>contextMatches(fresh)&&intendedWizard(fresh)
+            &&fresh.ui.masks.every(mask=>mask.kind==='busy'&&!mask.dialog_ref
+              &&(mask.ref===fresh.wizard.root_ref&&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF'
+                // Live text import has a second, independently settling preview
+                // mask. Admit only its exact contained DOM owner and native node.
+                ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
+                  &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='text_import_file'
+                  &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF;ImportTextFilePreviewWizard;pnlPreview'
+                  &&mask.import_preview_owner_ref===fresh.wizard.root_ref));
+          // The opening click is already sent. Observe its own loading mask
+          // within the original node deadline; never reissue the click.
+          observed=await waitForMasks(observed,readOpeningUi,ownedLoading);
           for(let attempt=0;attempt<24 && contextMatches(observed) && !(task.action.verb==='begin_wizard'&&exactDeactivation(observed))
-            && (observed.wizard?.owner_context?.status!=='observed' || observed.ui.masks.length);attempt++) {
-            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readOpeningUi();
+            && observed.wizard?.owner_context?.status!=='observed';attempt++) {
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));
+            observed=await waitForMasks(await readOpeningUi(),readOpeningUi,ownedLoading);
           }
           const deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
           if(deactivationPending)record('wizard_deactivation_question_observed',{node:opening.node,workflow_path:opening.workflow_path});
           const owner=observed.wizard?.owner_context;
-          // Duplicate labels use different native keys in graph (@1) and
-          // breadcrumb (-3). Accept that difference only with the original GUID
-          // independently bound to both surfaces and unchanged displayed label.
-          const beforeNode=current.prepared_node_context,afterNode=observed.prepared_node_context;
-          const labels=current.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.graph_node.node_label===opening.node.node_label);
-          const normalizeLabel=value=>typeof value==='string'?value.replace(/\s/g,''):'';
-          const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
-            &&beforeNode.surface==='graph'&&afterNode.surface==='wizard'
-            &&beforeNode.node_id===task.prepared_node_context.node.node_id
-            &&['document_id','workflow_id','node_id'].every(k=>typeof beforeNode[k]==='string'&&beforeNode[k]===afterNode[k])
-            &&beforeNode.tid===current.workflow_ref.prefix+';Graph;'+opening.node.node_label
-            &&(task.action.verb==='confirm_wizard_deactivation'
-              ?typeof beforeNode.pending_wizard_node?.tid==='string'&&beforeNode.pending_wizard_node.tid===owner?.node?.tid
-                &&beforeNode.pending_wizard_node.label===owner?.node?.label
-              :labels.length===1&&normalizeLabel(labels[0].label)!==''
-                &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
-          if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
-            || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+          if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || !intendedWizard(observed)))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
@@ -4059,8 +4190,8 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
-    ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
-    throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
+    ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>1800000))
+    throw Error('Extended opening wait requires a bound node wizard and the remaining node deadline');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);

@@ -5,155 +5,7 @@ import { createObservationPages } from '../lib/observation-pages.mjs';
 import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
-const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
-const clone = value => JSON.parse(JSON.stringify(value));
-
-// This small DOM is an external UI double, not a replacement of the production
-// observer/guards. Every test executes the full serialized browser capability.
-function matches(element, selector) {
-  if (selector.includes(',')) return selector.split(',').some(part => matches(element, part));
-  selector = selector.trim();
-  const breadcrumbLabel=/^(\[data-tid\*=";cnrNaviMode;b\.s"\]) (\.x-btn-inner-default-toolbar-small)$/.exec(selector);
-  if(breadcrumbLabel)return matches(element,breadcrumbLabel[2]) && !!element.parentElement?.closest(breadcrumbLabel[1]);
-  const ownedInput=/^((?:\[data-tid[$^*]?="[^"]+"\])+) (input|textarea|\.x-form-error-msg|img\.x-grid-checkcolumn)$/.exec(selector);
-  if(ownedInput)return matches(element,ownedInput[2]) && !!element.parentElement?.closest(ownedInput[1]);
-  const not = [...selector.matchAll(/:not\(([^)]+)\)/g)];
-  if (not.some(([, inner]) => matches(element, inner))) return false;
-  selector = selector.replace(/:not\([^)]+\)/g, '');
-  if (selector === ':disabled') return !!element.disabled;
-  const tag = selector.match(/^[a-z]+/i)?.[0];
-  if (tag && element.tagName !== tag.toUpperCase()) return false;
-  const attributes=/\[([^\s=\]$^*]+)(?:([$^*]?=)"([^"]*)")?\]/g;
-  for (const [,name,operator,value] of selector.matchAll(attributes)) {
-    const actual=element.getAttribute(name);
-    if (actual===null) return false;
-    if (operator==='=' && actual!==value || operator==='$=' && !actual.endsWith(value)
-      || operator==='^=' && !actual.startsWith(value) || operator==='*=' && !actual.includes(value)) return false;
-  }
-  selector=selector.replace(attributes,'');
-  for (const [, name] of selector.matchAll(/\.([\w-]+)/g)) if (!element.classList.contains(name)) return false;
-  return true;
-}
-class Element {
-  constructor(tag = 'div', attrs = {}, text = '', box = { x: 0, y: 0, width: 10, height: 10 }) {
-    this.tagName = tag.toUpperCase(); this.attrs = { ...attrs }; this.ownText = text;
-    this.children = []; this.parentElement = null; this.box = box; this.style = {};
-    this.value = ''; this.readOnly = false; this.disabled = false;
-    this.classList = { contains: name => (this.attrs.class ?? '').split(' ').includes(name) };
-  }
-  append(...elements) { for (const element of elements) { this.children.push(element); element.parentElement = this; } return elements.at(-1); }
-  remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(element => element !== this); this.parentElement = null; }
-  get isConnected() { return this.root || !!this.parentElement?.isConnected; }
-  get isContentEditable() { return this.attrs.contenteditable === 'true'; }
-  get textContent() { return this.ownText + this.children.map(child => child.textContent).join(' '); }
-  getAttribute(name) { return this.attrs[name] ?? null; }
-  hasAttribute(name) { return Object.hasOwn(this.attrs, name); }
-  getBoundingClientRect() { return { ...this.box }; }
-  matches(selector) { return matches(this, selector); }
-  closest(selector) { for (let element = this; element; element = element.parentElement) if (element.matches(selector)) return element; return null; }
-  contains(other) { for (let element = other; element; element = element.parentElement) if (element === this) return true; return false; }
-  descendants() { return this.children.flatMap(child => [child, ...child.descendants()]); }
-  querySelectorAll(selector) { return this.descendants().filter(element => element.matches(selector)); }
-  querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
-}
-class Document {
-  constructor() {
-    this.documentElement = new Element('html', {}, '', { x: 0, y: 0, width: 1000, height: 800 }); this.documentElement.root = true;
-    this.body = this.documentElement.append(new Element('body', {}, '', { x: 0, y: 0, width: 1000, height: 800 }));
-    this.activeElement = this.body;
-  }
-  all() { return [this.documentElement, ...this.documentElement.descendants()]; }
-  querySelectorAll(selector) { return this.all().filter(element => element.matches(selector)); }
-  createTreeWalker(element, kind, filter) {
-    if (kind === 1) {
-      const items=[];
-      const visit=parent=>{for(const child of parent.children){const accepted=filter?.acceptNode(child)??1;if(accepted===2)continue;if(accepted===1)items.push(child);visit(child);}};
-      visit(element);let index=0;return {nextNode:()=>items[index++]??null};
-    }
-    const text = [element, ...element.descendants()].filter(item => item.ownText).map(item => ({ parentElement: item, textContent: item.ownText }));
-    let index = 0; return { nextNode: () => text[index++] ?? null };
-  }
-  elementFromPoint(x, y) {
-    return this.all().filter(element => element.style.display !== 'none' && element.style.visibility !== 'hidden' && x >= element.box.x && y >= element.box.y
-      && x <= element.box.x + element.box.width && y <= element.box.y + element.box.height).at(-1) ?? null;
-  }
-}
-class Handle {
-  constructor(page, element) { this.page = page; this.element = element; }
-  async evaluate(fn, arg) {
-    if (fn.toString().includes('getBoundingClientRect')) this.page.beforeHandleGeometry?.(this.element);
-    return fn(this.element, arg);
-  }
-  async isVisible() { return this.element.isConnected && this.element.style.display !== 'none'; }
-  async isEnabled() { return !this.element.disabled; }
-  async boundingBox() { this.page.playwrightBoxReads++; return this.element.isConnected ? { ...this.element.box, ...this.page.playwrightBox } : null; }
-  async click() { this.page.events.push('click'); this.page.document.activeElement = this.element; }
-  async dblclick() { this.page.events.push('double_click'); this.page.document.activeElement = this.element; }
-  async press(key) {
-    this.page.events.push(key);
-    this.page.onPress?.(key,this.element);
-    if (key === 'ControlOrMeta+A') this.page.selectedAll = true;
-    if (key === 'Backspace' && this.page.selectedAll) this.element.value = '';
-    if (key === 'Enter') this.page.committed = this.element.value;
-  }
-  async dispose() { this.page.disposed++; }
-}
-class Page {
-  constructor({ clock = Date } = {}) {
-    this.document = new Document(); this.events = []; this.disposed = 0; this.location = { origin }; this.clickedPoints = []; this.playwrightBoxReads = 0;
-    this.app = { Version: build };
-    this.avatar = this.add('button', 'MF;cntMain;tlbMainToolbar;btnAvatar', '', { x: 950, y: 0, width: 30, height: 20 });
-    this.tab = this.add('div', 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', 'Сценарий', { x: 10, y: 5, width: 100, height: 20 });
-    this.tab.attrs.class = 'x-tab-active';
-    const page = this;
-    class MutationObserverFixture {
-      constructor(callback) { this.callback=callback; this.pending=[]; page.mutationObserver=this; }
-      observe(root, options) { this.root=root; this.options=options; }
-      takeRecords() { return this.pending.splice(0); }
-    }
-    this.context = vm.createContext({ document: this.document, location: this.location, bg: { app: this.app },
-      MutationObserver: MutationObserverFixture,
-      getComputedStyle: element => ({ display: 'block', visibility: 'visible', opacity: '1', transform:'none', zoom:'1', scale:'none', rotate:'none', borderLeftWidth:'0px', ...element.style }), Date: clock, Math });
-    this.keyboard = { type: async text => {
-      this.events.push('keyboard_type'); const element = this.document.activeElement;
-      element.value = this.selectedAll ? text : element.value + text; this.selectedAll = false;
-    } };
-    this.mouse = {
-      click: async (x, y, { clickCount, button }) => {
-        this.clickedButton = button;
-        this.events.push(clickCount === 2 ? 'double_click' : 'click'); this.clickedPoints.push({ x, y, clickCount });
-        this.document.activeElement = this.document.elementFromPoint(x, y);
-        if (this.failClick) { this.mouseHeld = true; throw new Error('Click response lost'); }
-      },
-      move: async (x, y) => { this.events.push('mouse_move'); if (this.mouseHeld && this.failDrag) throw new Error('lost browser response with secret=thismustnotleak'); this.point = { x, y }; },
-      down: async () => { this.events.push('mouse_down'); this.mouseHeld = true; },
-      up: async options => { this.releasedButton = options?.button; this.events.push('mouse_up'); if (this.failRelease) throw new Error('mouse release interrupted'); this.mouseHeld = false; },
-    };
-  }
-  add(tag, tid, text = '', box = { x: 30, y: 100, width: 100, height: 25 }, parent = this.document.body) {
-    // Graph fixture shorthand models Loginom's real cmpDiagram ownership.
-    // Tests for foreign elements pass an explicit parent to bypass this helper.
-    const prefix=/^(MF;TF(?:-\d+)?);Graph;/.exec(tid??'')?.[1];
-    if(prefix && arguments.length<5) {
-      const containerTid=prefix+';ModelForm;cmpDiagram';
-      parent=this.document.querySelectorAll('[data-tid="'+containerTid+'"]').find(e=>e.isConnected)
-        ?? this.document.body.append(new Element('div',{'data-tid':containerTid},'',{x:0,y:50,width:1000,height:700}));
-    }
-    return parent.append(new Element(tag, tid ? { 'data-tid': tid } : {}, text, box));
-  }
-  async evaluate(fn, arg) { return fn(arg); }
-  viewportSize() { return { width: 1000, height: 800 }; }
-  locator(selector, root = this.document) {
-    let [anchor, ...steps] = selector.split(' > ');
-    let elements = root.querySelectorAll(anchor);
-    for (const step of steps) { const index = Number(step.match(/nth-child\((\d+)\)/)[1]) - 1; elements = elements.map(element => element.children[index]).filter(Boolean); }
-    return { count: async () => elements.length, elementHandle: async () => new Handle(this, elements[0]),
-      locator: child=>this.locator(child,{querySelectorAll:query=>elements.flatMap(e=>e.querySelectorAll(query))}) };
-  }
-  async execute(options) { return clone(await vm.runInContext(`(${makeWorkspaceUiCode({ expected_build: build, expected_origin: origin, ...options })})`, this.context)(this)); }
-  async observe() { const outcome = await this.execute({ mode: 'observe' }); assertActionOutcome(outcome); assert.equal(outcome.status, 'SUCCEEDED'); return outcome.output; }
-  async act(action, snapshot) { return this.execute({ mode: 'act', operation_id: 'test-primitive', action, snapshot }); }
-}
+import {Page,Element,Document,build,origin,clone} from './support/workspace-ui-fixture.mjs';
 
 // Large fake-DOM tests measure traversal/ownership, not the JavaScript selector
 // double's speed under parallel test-runner load. Time guards have explicit tests.
@@ -1028,6 +880,68 @@ test('file storage name cells expose E2E targets without requiring a button role
   page.add('td','MF;TF-1;FileStorageForm;colName_user','user');
   const result=await page.execute({mode:'act',snapshot:observed,action:{verb:'double_click',ref:target.ref}});
   assert.notEqual(result.status,'SUCCEEDED');assert.deepEqual(page.events,[]);
+});
+
+function scriptNamedStorageFixture(name='javascript-native-input-real.csv') {
+  const page=new Page(),prefix='MF;TF-1;FileStorageForm;',table=page.add('div',prefix+'pnlFileStorage;tbl','',{x:0,y:80,width:900,height:400});
+  const row=page.add('table',null,'',{x:20,y:100,width:800,height:25},table);row.attrs.class='x-grid-item';
+  const cell=page.add('td',prefix+'colName_'+name.replace(/\s/g,'_').replace(/,/g,''),name,{x:30,y:100,width:500,height:25},row);
+  return {page,table,row,cell,prefix};
+}
+
+test('storage filename code tokens are data, not editor identity: native-input-probe-01 regression',async()=>{
+  for(const name of ['javascript-native-input-real.csv','javascript-x.csv','python-script.csv','codeeditor-source.tsv','a'.repeat(90)+'.csv','sales.csv']){
+    const {page,cell}=scriptNamedStorageFixture(name),snapshot=await page.observe();
+    const target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));
+    assert.equal(target.label,name);assert.ok(target.allowed_actions.includes('double_click'),name);
+    const result=await page.act({verb:'double_click',ref:target.ref},snapshot);
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(page.events.filter(e=>e==='double_click').length,1);
+  }
+});
+
+test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
+  for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
+    const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;
+    if(mode==='name')cell.attrs.name='javascript-editor';
+    if(mode==='id')cell.attrs.id='script-editor';
+    if(mode==='editor')row.attrs.class+=' CodeMirror';
+    if(mode==='href'){cell.tagName='A';cell.attrs.href='javascript:void(0)';}
+    if(mode==='secret')cell.attrs.name='private_key';
+    if(mode==='foreign'){page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';}
+    if(mode==='detached_row')row.attrs.class='other';
+    if(mode==='wrong_label')cell.ownText='sales.csv';
+    if(mode==='wrong_tag')cell.tagName='INPUT';
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='duplicate')page.add('div',table.getAttribute('data-tid'));
+    const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));
+    assert.ok(!target?.allowed_actions.includes('double_click'),mode);assert.equal(page.events.length,0);
+  }
+});
+
+test('denied script control exposes bounded reference checks and never a gesture',async()=>{
+  const {page,cell}=scriptNamedStorageFixture();cell.attrs.id='javascript-editor';
+  const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));
+  // The private discovery downloader calls the serialized capability directly,
+  // after its own exact-file admission, rather than validateUiAction's builder.
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {mode:'act',expected_build:build,expected_origin:origin,operation_id:'denied-download',snapshot,action:{verb:'double_click',ref:target.ref}}));
+  assert.equal(result.error.code,'UI_REFERENCE_STALE');assert.equal(result.effect_possible,false);
+  assert.deepEqual(result.trace.find(e=>e.event==='ui_reference_precondition_refused').checks,
+    {present:true,identity_matches:true,signature_matches:true,action_allowed:false});
+  assert.equal(page.events.filter(e=>e==='double_click').length,0);
+});
+
+test('storage filename download action retains fresh identity, DOM epoch and hit-test refusal',async()=>{
+  for(const mode of ['replacement','epoch','covered','geometry']){
+    const {page,cell,row}=scriptNamedStorageFixture(),snapshot=await page.observe();
+    const target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));assert.ok(target.allowed_actions.includes('double_click'));
+    if(mode==='replacement'){cell.remove();row.append(new Element('td',cell.attrs,cell.ownText,cell.box));}
+    if(mode==='epoch')page.mutationObserver.pending.push({type:'attributes',target:cell,attributeName:'class'});
+    if(mode==='covered')page.document.elementFromPoint=()=>page.document.body;
+    if(mode==='geometry')page.beforeHandleGeometry=element=>{if(element===cell)element.box={...element.box,width:element.box.width+10};};
+    const result=await page.act({verb:'double_click',ref:target.ref},snapshot);
+    assert.equal(result.status,'NOT_APPLIED',mode);assert.equal(result.effect_possible,false,mode);assert.equal(page.events.filter(e=>e==='double_click').length,0,mode);
+  }
 });
 
 test('observation error codes cross a serialized browser boundary without exception text', async () => {
@@ -1975,9 +1889,9 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 });
 
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
-  for(const mode of ['bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
+  for(const mode of ['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate','bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_expired','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage','bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
-    const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+    const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
     for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
       path+=(path?'>':'')+label;
@@ -1990,26 +1904,33 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     const body=page.add('g',base+'Graph;'+nodeKey,'',undefined,graph);
     page.add('span',base+'Graph;'+nodeKey+';Label;Label',nodeLabel,undefined,body);
     page.add('g',base+'Graph;'+nodeKey+';Setting','',mode.startsWith('clipped_settings')?{x:500,y:86,width:24,height:24}:{x:500,y:300,width:30,height:30},graph);
+    let pending=false,detached=null,waits=0,loading,preview;
     if(mode.startsWith('bound_begin_')) {
       let post=0;
       const reader=async()=>{const clicked=page.events.includes('click');if(clicked)post++;
-        if(mode==='bound_begin_pending'&&clicked&&post<=90)return {verified:false,surface_pending:true};
+        if(clicked&&(mode==='bound_begin_pending'&&post<=90||mode==='bound_begin_pending_long'&&post<=1300))return {verified:false,surface_pending:true};
         const graph=!clicked||mode==='bound_begin_churn'||post<=2;
-        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:mode==='bound_begin_foreign'&&post>=2?'foreign':'node',
+        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:mode==='bound_begin_foreign'&&post>=2||['bound_begin_busy_wrong_owner','bound_begin_busy_import_preview_wrong_owner'].includes(mode)&&waits>=2?'foreign':'node',
           surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+nodeKey:'WizrdMCF'),...(graph?{locked:clicked&&post%2===0}:{})};};
       page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-        {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},reader));
+        {expected_build:build,expected_origin:origin,kind:'workspace-ui',...(mode.startsWith('bound_begin_busy_')||mode==='bound_begin_pending_long'?{opening_timeout_ms:120000}:{}),...(mode.endsWith('_unbound')?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},reader));
     }
     if(mode.startsWith('clipped_settings')){page.context.innerWidth=1000;page.context.innerHeight=800;Object.assign(graph,{box:{x:0,y:103,width:1000,height:600},clientWidth:1000,clientHeight:600,scrollHeight:724,scrollTop:120,style:{overflowY:'auto'}});page.add('div','GraphTopToolbar','',{x:0,y:0,width:1000,height:103});}
     const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open);
     assert.ok(button);
-    let pending=false,detached=null,waits=0;
     const transition=()=>{graph.remove();
       const tab=page.document.querySelectorAll('.x-tab-active')[0];
       if(mode==='renamed_tab')tab.ownText='Настройка';
       if(mode==='replaced_tab'){const tid=tab.getAttribute('data-tid');tab.remove();page.add('div',tid,'Настройка').attrs.class='x-tab-active';}
-      const wizard=page.add('div',base+'WizrdMCF');
-      page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,wizard);
+      const wizard=mode.includes('import_preview')?importSourceFixture(page).form:page.add('div',base+'WizrdMCF');
+      if(mode.startsWith('bound_begin_busy_')){loading=wizard;wizard.attrs.class='bg-mask-message';}
+      if(mode.includes('import_preview')){
+        preview=page.add('div',base+'WizrdMCF;ImportTextFilePreviewWizard;pnlPreview','',undefined,mode.endsWith('_outside')?page.document.body:wizard);
+        preview.attrs.class='bg-mask-message';preview.attrs['bg-mask-text']='Подготовка предпросмотра';
+        if(mode.endsWith('_duplicate'))page.add('div',preview.attrs['data-tid'],'',undefined,wizard);
+        if(mode.endsWith('_only'))wizard.attrs.class='';
+      }
+      if(!mode.includes('import_preview'))page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,wizard);
       if(mode==='wrong_workflow')path=path.replace('Модуль1','Модуль2');
       const name=mode==='bound_begin_suffix'?'Сумма-3':['wrong_node','same_label_wrong_key','stale_wrong_owner'].includes(mode)?'Другой':nodeKey;
       const node=page.add('a',base+'cnrNaviMode;b.s_'+path+'>'+name,mode==='wrong_node'?'Другой':nodeLabel,undefined,panel);
@@ -2036,8 +1957,20 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       }
       return output;
     };
-    page.waitForTimeout=async()=>{
-      waits++;
+    page.waitForTimeout=async ms=>{
+      waits++;clock.advance(ms+(loading?2500:0));
+      if(mode==='bound_begin_busy_long'&&waits===30)loading.attrs.class='';
+      if(mode.includes('import_preview')&&!mode.endsWith('_expired')){
+        if(waits===1)loading.attrs.class='';
+        if(mode.endsWith('_foreign')&&waits===2)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+        if(mode.endsWith('_changed_stage')&&waits===2){
+          page.document.querySelectorAll('[data-tid="'+base+'WizrdMCF;ImportTextFilePreviewWizard;edtFileName"]')[0].remove();
+          page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,loading);
+        }
+        if(waits===3)preview.attrs.class='';
+      }
+      if(mode==='bound_begin_busy_foreign'&&waits===2){loading.attrs.class='';page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';}
+      if(mode==='bound_begin_busy_dialog'&&waits===2)page.add('div','foreign-dialog','Other').attrs.class='x-window';
       if(detached){page.document.body.append(detached);detached=null;}
       if(mode==='stale_origin')page.location.origin='https://other.invalid';
       if(mode==='stale_tab'){page.tab.remove();page.add('div','MF;cntMain;cntWorkspace;Workspace;t.br;tb-2','Настройка').attrs.class='x-tab-active';}
@@ -2045,10 +1978,24 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     };
     if(mode==='clipped_settings_covered')page.document.querySelectorAll('[data-tid="GraphTopToolbar"]')[0].box.height=115;
     const result=await page.act({verb:mode.startsWith('bound_begin_')?'begin_wizard':'open_wizard',ref:button.ref},snapshot);
-    const success=['bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
+    const success=['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':mode==='clipped_settings_covered'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,mode==='clipped_settings_covered'?0:1);
     assert.equal(result.trace.some(e=>e.event==='wizard_open_verified'),success);
+    if(mode==='bound_begin_busy_long')assert.ok(result.trace.find(e=>e.event==='ui_mask_wait_finished').elapsed_ms>60000);
+    if(mode==='bound_begin_busy_expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+    if(['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only'].includes(mode)){
+      assert.equal(waits,3,mode);assert.equal(result.trace.find(e=>e.event==='ui_mask_wait_finished').mask_present,false);
+      const masks=result.trace.find(e=>e.event==='ui_mask_wait_started').masks;
+      assert.equal(masks.length,mode.endsWith('_only')?1:2);
+      assert.equal(masks.at(-1).target_tid,base+'WizrdMCF;ImportTextFilePreviewWizard;pnlPreview');
+      assert.equal(masks.at(-1).import_preview_owner_ref,result.output.wizard.root_ref);
+    }
+    if(mode==='bound_begin_busy_import_preview_expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+    if(['bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate'].includes(mode))assert.equal(waits,0,mode);
+    if(['bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage'].includes(mode))assert.equal(waits,2,mode);
+    if(['bound_begin_busy_dialog','bound_begin_busy_wrong_owner'].includes(mode))assert.equal(waits,2,mode+JSON.stringify({error:result.error,trace:result.trace}));
+    if(mode==='bound_begin_pending_long')assert.equal(result.trace.filter(e=>e.event==='node_surface_wait').length,1300);
     if(mode==='bound_begin_pending')assert.equal(result.trace.filter(e=>e.event==='node_surface_wait').length,90);
     if(mode==='bound_begin_lock')assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,1);
     if(mode==='bound_begin_foreign')assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,0);
@@ -3634,6 +3581,159 @@ test('input port overflow caption requires native binding and the exact hidden c
  }
 });
 
+async function joinInputPortOverflowFixture(mode='valid',port=1) {
+  const caption=port===0?'Главная таблица':'Присоединяемая таблица';
+  const {page,panel,crumbs}=await inputPortContextFixture();
+  // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
+  // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
+  page.context.innerWidth=1280;page.context.innerHeight=800;
+  panel.box={x:182,y:35,width:1054,height:36};
+  const rects=[[182,47],[229,94.875],[324,118.859375],[443,101.984375],[545,110.03125],[656,251.734375],[908,142.53125]];
+  for(const [i,c] of crumbs.entries()) {
+    c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('Root_diagnostic_20260906_1753','JoinDiagnostic')
+      .replaceAll('Revenue','Общая_выручка_к_каждому_товару').replaceAll('Входной_источник_данных',caption.replaceAll(' ','_'));
+    c.ownText=i===2?'JoinDiagnostic':i===5?'Общая выручка к каждому товару':i===7?' '+caption:c.ownText;
+    c.box=i<7?{x:rects[i][0],y:41,width:rects[i][1],height:24}:{x:0,y:0,width:0,height:0};
+    if(i>=7)c.style.display='none';
+    for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
+  }
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-joindata';
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
+  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
+    c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),caption.replaceAll(' ','_')+'_2');
+    if(c===crumbs[7])c.ownText=caption+' 2';
+  }
+  if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+  if(mode==='hidden_ancestor')panel.style.display='none';
+  if(mode==='missing_wizard_icon')crumbs[8].children[0].remove();
+  const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
+    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
+  let reads=0;
+  if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
+      const next=structuredClone(binding);reads++;
+      if(mode==='unverified_owner')return {verified:false,reason:'node'};
+      if(mode==='missing_native_port')delete next.input_port;
+      if(reads>1&&mode.startsWith('changed_')) {
+        const key=mode.slice(8);
+        if(key in next.input_port)next.input_port[key]=key==='native_index'?1-port:'foreign';
+        else next[key]='foreign';
+      }
+      return next;
+    }));
+  return {page};
+}
+
+test('owned Join input observes its actual hidden joined-table breadcrumb',async()=>{
+  const {page}=await joinInputPortOverflowFixture();
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  assert.equal(full.wizard.input_port_context.opening_verified,false);
+  assert.deepEqual(page.events,[]);
+});
+
+test('owned Join input observes its known main-table caption when overflow hides it',async()=>{
+  // The same native Join exposed Главная таблица with verified input0/GUID/opening;
+  // hidden geometry comes from the captured input1 overflow, not a claimed input0 live failure.
+  const {page}=await joinInputPortOverflowFixture('valid',0);
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Главная таблица');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  assert.deepEqual(page.events,[]);
+});
+
+test('hidden Join caption cannot replace native identity, opening or visible ancestor evidence',async()=>{
+  for(const port of [0,1])for(const mode of ['unbound','unverified_owner','missing_native_port','wrong_port','unknown_port','wrong_icon','wrong_caption','foreign_path',
+    'hidden_ancestor','missing_wizard_icon','changed_document_id','changed_workflow_id','changed_node_id','changed_port_guid','changed_native_index','changed_opening_operation_id']) {
+    const {page}=await joinInputPortOverflowFixture(mode,port),result=await page.execute({mode:'observe'});
+    if(mode==='unverified_owner'||mode.startsWith('changed_'))assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+    else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
+async function exportInputPortOverflowFixture() {
+  const {exportInputPortOverflow}=await import('./export-input-port-overflow.fixture.mjs');
+  const {page,wizard,panel,crumbs}=await inputPortContextFixture();
+  page.context.innerWidth=exportInputPortOverflow.viewport.width;page.context.innerHeight=exportInputPortOverflow.viewport.height;
+  panel.box=exportInputPortOverflow.panel;
+  for(const [i,crumb] of crumbs.entries()) {
+    const captured=exportInputPortOverflow.crumbs[i];
+    crumb.attrs['data-tid']=captured.tid;crumb.ownText=captured.label;crumb.box=captured.rect;
+    if(!captured.visible)crumb.style.display='none';
+    for(const icon of crumb.children)icon.box={x:crumb.box.x+6,y:crumb.box.y+3,width:18,height:18};
+  }
+  // Model the external native cache; execute the real prepared-context reader.
+  class PackageTreeNode{};class WorkFlowTreeNode{};class ModelNodeTreeNode{};
+  class ModelInputPortsTreeNode{};class ModelPortTreeNode{};class WizardTreeNode{};class WizardModelComponentForm{};
+  const packageNode=new PackageTreeNode(),workflow=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
+  const nodeTree=Object.assign(new ModelNodeTreeNode(),{ParentNode:workflow,FGuid:'export-node',FModelNode:{}});
+  const group=Object.assign(new ModelInputPortsTreeNode(),{ParentNode:nodeTree});
+  const portTree=Object.assign(new ModelPortTreeNode(),{ParentNode:group,FIndex:1,FModelNodePort:{}});
+  const wizardTree=Object.assign(new WizardTreeNode(),{ParentNode:portTree});
+  const model=Object.assign(new WizardModelComponentForm(),{FModelSocket:{},FView:{el:{dom:wizard}}});
+  const node={FGuid:nodeTree.FGuid,data:nodeTree.FModelNode},port={FGuid:'export-input',parent:node,data:portTree.FModelNodePort,FPortIndex:1};
+  const opening={phase:'verified',direction:'input',document_id:'doc',workflow_id:'flow',node_id:node.FGuid,
+    wizard:model,nodeTree,portTree,workflow,packageNode,node,port,nodeData:node.data,portData:port.data,portGuid:port.FGuid,
+    nativeIndex:1,portIndex:0,enginePort:model.FModelSocket,operation_id:'export-open'};
+  const preparation={document:page.document,id:'doc',receipts:new Map([['prepare',{
+    phase:'verified',workflowId:'flow',tab:page.tab,packageNode,nodeTargetWorkflowNode:workflow}]]),
+    inputPortOpenReceipts:new Map([['export-open',opening]])};
+  page.context.__loginomDockPreparationV1=preparation;
+  Object.assign(page.app,{PackageTreeNode,WorkFlowTreeNode,ModelNodeTreeNode,ModelInputPortsTreeNode,ModelPortTreeNode,WizardTreeNode,
+    Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:wizardTree}},FController:model}})}}}}}});
+  const binding={document_id:'doc',node:{document_id:'doc',workflow_id:'flow',node_id:node.FGuid},
+    workflow_ref:{workflow_id:'flow',prefix:'MF;TF-5',tab_tid:page.tab.getAttribute('data-tid'),
+      navigation_path:crumbs.slice(0,5).map(c=>({tid:c.getAttribute('data-tid'),label:c.textContent.trim()}))}};
+  return {page,crumbs,panel,opening,preparation,binding,expectedPort:exportInputPortOverflow.inputPort};
+}
+
+test('owned text export input observes its actual hidden data-source caption',async()=>{
+  const {page,binding,expectedPort}=await exportInputPortOverflowFixture();
+  const full=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
+  assert.equal(full.output.wizard.input_port_context.status,'observed');
+  assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных');
+  assert.deepEqual(full.output.prepared_node_context.input_port,expectedPort);
+  const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
+  assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);
+  assert.deepEqual(page.events,[]);
+});
+
+test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
+  for(const mode of ['unbound','missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine',
+    'wrong_port','wrong_caption','foreign_path','duplicate_crumb','duplicate_panel','hidden_panel','missing_icon','sensitive']) {
+    const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
+    if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+    if(mode==='duplicate_opening')preparation.inputPortOpenReceipts.set('other',{...opening});
+    if(mode==='foreign_node')opening.node.FGuid='foreign';
+    if(mode==='foreign_port')opening.port.FGuid='foreign';
+    if(mode==='foreign_workflow')opening.workflow={};
+    if(mode==='foreign_engine')opening.enginePort={};
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='wrong_caption')for(const crumb of crumbs.slice(7)) {
+      crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Источник_данных','Источник_данных_2');
+      if(crumb===crumbs[7])crumb.ownText='Источник данных 2';
+    }
+    if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+    if(mode==='duplicate_crumb')page.add('a',crumbs[7].getAttribute('data-tid'),crumbs[7].ownText,crumbs[7].box,panel);
+    if(mode==='duplicate_panel')page.add('div',panel.getAttribute('data-tid'),'',panel.box);
+    if(mode==='hidden_panel')panel.style.display='none';
+    if(mode==='missing_icon')crumbs[8].children[0].remove();
+    if(mode==='sensitive')crumbs[7].attrs['aria-label']='password';
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    if(['missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine'].includes(mode))
+      assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+    else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('input port context rejects foreign duplicated hidden and incomplete breadcrumb evidence',async()=>{
   for(const mode of ['wrong_wizard','hidden','duplicate','duplicate_panel','foreign','wrong_folder','caption_number','broken_chain','clipped','missing_icon','hidden_icon','foreign_tab','bounded']){
     const {page}=await inputPortContextFixture(mode),r=await page.observe();assert.notEqual(r.wizard.input_port_context?.status,'observed',mode);
@@ -3899,8 +3999,22 @@ test('native Table coverage survives actual pager and independent journal compar
  assert.deepEqual(delivered.output.table_coverage,raw.output.table_coverage);
  assert.deepEqual(delivered.output.geometry,raw.output.geometry);
  const script="import sys,json,copy;from rename_effect import journal_equal;r,d=json.load(sys.stdin);d['output'].pop('operation',None);assert journal_equal(r,d);d['output']['table_coverage']['rendered_rows']['count']=7;assert not journal_equal(r,d)";
- const check=spawnSync('python3',['-B','-c',script],{cwd:new URL('../../tools/loginom-acceptance/',import.meta.url),input:JSON.stringify([raw,delivered]),encoding:'utf8'});
- assert.equal(check.status,0,check.stderr);
+ const {mkdtempSync,writeFileSync,openSync,closeSync,rmSync}=await import('node:fs');
+ const {tmpdir}=await import('node:os');
+ const {join}=await import('node:path');
+ const directory=mkdtempSync(join(tmpdir(),'loginom-journal-test-'));
+ try {
+  const path=join(directory,'input.json');
+  writeFileSync(path,JSON.stringify([raw,delivered]),{mode:0o600,flag:'wx'});
+  // A finite file supplies EOF independently of the parent/child pipe lifecycle.
+  const input=openSync(path,'r');
+  try {
+   const check=spawnSync('python3',['-B','-c',script],{cwd:new URL('../../tools/loginom-acceptance/',import.meta.url),
+    stdio:[input,'pipe','pipe'],encoding:'utf8',timeout:10000,killSignal:'SIGKILL'});
+   assert.equal(check.error,undefined,check.error?.message);
+   assert.equal(check.status,0,check.stderr);
+  } finally {closeSync(input);}
+ } finally {rmSync(directory,{recursive:true,force:true});}
 });
 
 
@@ -4015,11 +4129,12 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const mode of ['valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
     const socket=find('>Result'),settings=find('>Settings'),done=find(';btnDone');
+    socket.children[0].attrs.class='bg-vendor-icon-'+socketIcon;
     settings.attrs['data-tid']=settings.attrs['data-tid'].replace('>Settings','>Настройка');settings.ownText='Настройка';
     socket.style.display='none';settings.style.display='none';
     const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'};
@@ -4029,7 +4144,7 @@ test('overflow output socket requires a current native owner and visible actiona
     if(mode==='wrong_index')port.native_index=1;
     if(mode==='duplicate_socket'){
       const duplicate=page.add('a',socket.attrs['data-tid'],'Result',undefined,socket.parentElement);duplicate.style.display='none';
-      page.add('span',null,'',undefined,duplicate).attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+      page.add('span',null,'',undefined,duplicate).attrs.class='bg-vendor-icon-'+socketIcon;
     }
     if(mode==='wrong_socket_icon')socket.children[0].attrs.class='bg-vendor-icon-inputdatasourcesocketdef';
     if(mode==='missing_settings')settings.remove();
@@ -4044,7 +4159,7 @@ test('overflow output socket requires a current native owner and visible actiona
     if(mode==='stale_owner'){assert.notEqual(raw.status,'SUCCEEDED');assert.equal(raw.error.code,'PREPARED_NODE_CONTEXT_CHANGED');continue;}
     assert.equal(raw.status,'SUCCEEDED',mode);
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
-    assert.equal(controls.length,mode==='valid'?1:0,mode);
+    assert.equal(controls.length,mode==='valid'?1:0,socketIcon+': '+mode);
     if(mode==='valid'){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
     assert.equal(page.events.filter(e=>e==='click').length,0,mode);
   }
@@ -4144,6 +4259,15 @@ test('mask settlement cannot extend unbound or unrelated actions',()=>{
     ...[0,-1,1.5,1800001].map(settlement_timeout_ms=>({mode:'act',prepared_node_context:{},action:{verb:'finish_wizard',ref:'ui-done'},settlement_timeout_ms})),
     {mode:'act',prepared_node_context:{},action:{verb:'finish_wizard',ref:'ui-done'},opening_timeout_ms:1000},
   ])assert.throws(()=>makeWorkspaceUiCode({settlement_timeout_ms:60000,...options}),/Mask settlement requires/);
+});
+
+test('opening budget cannot extend unbound, unrelated or invalid actions',()=>{
+  for(const options of [
+    {mode:'observe'},
+    {mode:'act',action:{verb:'open_wizard',ref:'ui-open'}},
+    {mode:'act',prepared_node_context:{},action:{verb:'click',ref:'ui-open'}},
+    ...[0,-1,1.5,1800001].map(opening_timeout_ms=>({mode:'act',prepared_node_context:{},action:{verb:'open_wizard',ref:'ui-open'},opening_timeout_ms})),
+  ])assert.throws(()=>makeWorkspaceUiCode({opening_timeout_ms:60000,...options}),/Extended opening wait requires/);
 });
 
 test('action deadline expires before the gesture with a controlled clock', async () => {
@@ -4472,14 +4596,14 @@ test('native process scroll uses only the observed console grid owner',async()=>
  assert.notEqual(stale.status,'SUCCEEDED');assert.equal(grids[0].scrollTop,87);
 });
 
-function scrolledProcessWindowFixture() {
+function scrolledProcessWindowFixture(prefix='ConsoleForm') {
  const page=new Page();page.context.innerWidth=1000;page.context.innerHeight=800;
- const panel=page.add('div','ConsoleForm','',{x:0,y:400,width:900,height:300});
+ const panel=page.add('div',prefix,'',{x:0,y:400,width:900,height:300});
  const model={isModel:true,internalId:'record-5',data:{id:'5',loaded:true},childNodes:[]};
  const root={isModel:true,data:{loaded:true},childNodes:[model]};
  const store={$className:'Ext.data.TreeStore',isLoading:()=>false,getRoot:()=>root,getAt:i=>i===4?model:null},views={};
  const grids=['treepanel;tree','grd;tbl'].map((suffix,i)=>{
-  const e=page.add('div','ConsoleForm;ProgressForm;trpProgress;'+suffix,'',{x:i*400,y:420,width:400,height:154},panel);
+  const e=page.add('div',prefix+';ProgressForm;trpProgress;'+suffix,'',{x:i*400,y:420,width:400,height:154},panel);
   Object.assign(e,{scrollTop:87,scrollHeight:241,clientHeight:154});e.style.overflowY='auto';e.attrs.id='process-window'+i;e.id=e.attrs.id;
   views[e.id]={el:{dom:e},getStore:()=>store};return e;
  });
@@ -4487,9 +4611,9 @@ function scrolledProcessWindowFixture() {
   const row=page.add('table',null,'',{x:i*400,y:440,width:400,height:24},g);
   Object.assign(row.attrs,{class:'x-grid-item','data-recordid':'record-5','data-recordindex':'4','data-boundview':g.id});return row;
  });
- const id=page.add('td','ConsoleForm;ProgressForm;colId_Root>Task','5',{x:0,y:440,width:40,height:24},rows[0]);
- const cell=page.add('td','ConsoleForm;ProgressForm;colProcess_Root>Task','Task',{x:40,y:440,width:300,height:24},rows[0]);
- const progress=page.add('td','ConsoleForm;ProgressForm;colProgress_Root>Task','',{x:400,y:440,width:300,height:24},rows[1]);
+ const id=page.add('td',prefix+';ProgressForm;colId_Root>Task','5',{x:0,y:440,width:40,height:24},rows[0]);
+ const cell=page.add('td',prefix+';ProgressForm;colProcess_Root>Task','Task',{x:40,y:440,width:300,height:24},rows[0]);
+ const progress=page.add('td',prefix+';ProgressForm;colProgress_Root>Task','',{x:400,y:440,width:300,height:24},rows[1]);
  page.context.Ext={getCmp:id=>views[id]};return {page,store,root,model,grids,rows,id,cell,progress};
 }
 
@@ -4500,6 +4624,41 @@ test('scrolled process window offers native-bound rows without claiming complete
  assert.equal(s.process_console.top_level_rendered_coverage,false);
  const row=s.ui.elements.find(e=>e.process_row?.record_id==='record-5');
  assert.ok(row?.allowed_actions.includes('right_click'));assert.equal(row.process_row.record_index,4);
+});
+
+test('native process captions containing code tokens remain process controls, not editors',async()=>{
+ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor']){
+  const f=scrolledProcessWindowFixture(prefix),path='Root>'+name.replace(/\s/g,'_');
+  for(const [cell,column] of [[f.id,'colId_'],[f.cell,'colProcess_'],[f.progress,'colProgress_']])cell.attrs['data-tid']=prefix+';ProgressForm;'+column+path;
+  f.cell.ownText=name;
+  const expander=f.page.add('img',f.cell.attrs['data-tid']+';TreeExpander','',{x:44,y:442,width:12,height:18},f.cell);
+  expander.attrs.class='x-tree-expander';
+  const s=await f.page.observe(),row=s.ui.elements.find(e=>e.process_row),toggle=s.ui.elements.find(e=>e.process_expander);
+  assert.ok(row?.allowed_actions.includes('right_click'),name);assert.deepEqual(clone(toggle.allowed_actions),['click']);
+  assert.ok(!row.allowed_actions.includes('fill'));assert.ok(!row.allowed_actions.includes('double_click'));
+  const result=await f.page.act({verb:'right_click',ref:row.ref},s);
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ }
+});
+
+test('process caption exemption retains native binding, editor, name, link and secret guards',async()=>{
+ for(const mode of ['name','id','editor','href','secret','wrong_tag','editable','foreign_record','foreign_view','duplicate']){
+  const f=scrolledProcessWindowFixture(),stem='ConsoleForm;ProgressForm;';
+  f.cell.ownText='Расчёт продаж JavaScript';
+  f.cell.attrs['data-tid']=stem+'colProcess_Root>Расчёт_продаж_JavaScript';f.id.attrs['data-tid']=stem+'colId_Root>Расчёт_продаж_JavaScript';f.progress.attrs['data-tid']=stem+'colProgress_Root>Расчёт_продаж_JavaScript';
+  if(mode==='name')f.cell.attrs.name='javascript-editor';
+  if(mode==='id')f.cell.attrs.id='script-editor';
+  if(mode==='editor')f.rows[0].attrs.class+=' CodeMirror';
+  if(mode==='href'){f.cell.tagName='A';f.cell.attrs.href='javascript:void(0)';}
+  if(mode==='secret')f.cell.attrs.name='private_key';
+  if(mode==='wrong_tag')f.cell.tagName='INPUT';
+  if(mode==='editable')f.cell.attrs.contenteditable='true';
+  if(mode==='foreign_record')f.rows[1].attrs['data-recordid']='foreign';
+  if(mode==='foreign_view')f.rows[0].attrs['data-boundview']='foreign';
+  if(mode==='duplicate')f.page.add('td',f.cell.attrs['data-tid'],'JavaScript',undefined,f.rows[0]);
+  const s=await f.page.observe(),row=s.ui.elements.find(e=>e.tid===f.cell.attrs['data-tid']);
+  assert.ok(!row?.allowed_actions.includes('right_click'),mode);assert.equal(f.page.events.length,0);
+ }
 });
 
 test('scrolled process window refuses detached, foreign and clipped row bindings',async()=>{
@@ -4513,11 +4672,11 @@ test('scrolled process window refuses detached, foreign and clipped row bindings
 });
 
 test('global output editor is typed only when its native record belongs to the active mapping',async()=>{
- for(const mappingForm of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard']) for(const mode of ['bound','foreign_record','foreign_wizard','wrong_index']) {
+ for(const mappingForm of ['DataSetOutputSocketWizard','ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard']) for(const mode of ['bound','foreign_record','foreign_wizard','wrong_index','add_mode','multiple_records','wrong_view','unselected']) {
   const page=new Page(),base='MF;TF-1;WizrdMCF;',wizard=page.add('div',base.slice(0,-1));
   const stem=base+mappingForm+';';page.add('button',stem+'btnAddMappingColumn','',undefined,wizard);
   const grid=page.add('div',stem+'grdTargetColumns;tbl','',undefined,wizard);grid.id='mapping-view';grid.attrs.id=grid.id;
-  const row=page.add('table',null,'',undefined,grid);row.attrs={class:'x-grid-item-selected','data-recordindex':mode==='wrong_index'?'1':'0','data-recordid':'r1','data-boundview':grid.id};
+  const row=page.add('table',null,'',undefined,grid);row.attrs={class:mode==='unselected'?'x-grid-item':'x-grid-item-selected','data-recordindex':mode==='wrong_index'?'1':'0','data-recordid':'r1','data-boundview':mode==='wrong_view'?'foreign':grid.id};
   page.add('td',stem+'colName_A','A',undefined,row);
   const label=page.add('td',stem+'colDisplayName_A','A',undefined,row);page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
   page.add('td',stem+'colDataKind_A','Дискретный',undefined,row);page.add('td',stem+'colDefaultUsageType_A','Не задано',undefined,row);
@@ -4526,13 +4685,15 @@ test('global output editor is typed only when its native record belongs to the a
    const owner=page.add('div','EditColumnDefForm;'+key,'',undefined,form),input=page.add('input',null,'',undefined,owner);input.value=value;
   }
   const record={isModel:true,internalId:'r1'},store={$className:'Ext.data.Store',isLoading:()=>false,getAt:i=>i===0?record:null};
-  const native={FView:{el:{dom:form}},FAddMode:false,Records:[mode==='foreign_record'?{...record}:record]};
+  const native={FView:{el:{dom:form}},FAddMode:mode==='add_mode',Records:mode==='multiple_records'?[record,record]:[mode==='foreign_record'?{...record}:record]};
   page.context.Ext={getCmp:id=>id===form.id?{Controller:native}:id===grid.id?{el:{dom:grid},getStore:()=>store}:null};
   page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FView:{el:{dom:mode==='foreign_wizard'?form:wizard}}}}})}}}}};
-  for(const discover_roots of [false,true]) {
-   const reply=await page.execute({mode:'observe',discover_roots});assert.equal(reply.status,'SUCCEEDED');const s=reply.output;
+  const full=await page.observe(),formRef=full.ui.dialogs[0].ref;
+  for(const discover_roots of [false,true,'editor_root']) {
+   const reply=await page.execute({mode:'observe',...(discover_roots==='editor_root'?{root_ref:formRef}:{discover_roots})});assert.equal(reply.status,'SUCCEEDED');const s=reply.output;
    assert.equal(s.wizard.column_parameters.status,mode==='bound'?'observed':'ambiguous',mappingForm+':'+mode+':'+discover_roots);
-   if(!discover_roots)assert.equal(s.ui.elements.some(e=>e.wizard_field?.scope==='output_column'),mode==='bound',mode);
+   if(mode==='bound')assert.equal(s.wizard.column_parameters.selected_column?.name,'A',mappingForm+':'+discover_roots);
+   if(discover_roots!==true)assert.equal(s.ui.elements.some(e=>e.wizard_field?.scope==='output_column'),mode==='bound',mode);
   }
  }
 });
@@ -5203,4 +5364,28 @@ test('F3 refuses an output when the observed node body is ambiguous',async()=>{
  const port=page.add('g',base+';Output_Data-0','',{x:275,y:165,width:10,height:10});
  const s=await page.observe(),e=s.ui.elements.find(e=>e.tid===port.attrs['data-tid']);
  assert.ok(e);assert.throws(()=>validateUiAction({verb:'press',ref:e.ref,key:'F3'},s));
+});
+
+test('JavaScript output port remains publicly denied for click and F3',async()=>{
+  const page=new Page(),port=page.add('g','MF;TF-1;Graph;JavaScript;Output_Data-0');
+  const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===port.getAttribute('data-tid'));
+  assert.equal(target.visible,true);assert.equal(target.enabled,true);assert.deepEqual(target.allowed_actions,[]);
+  for(const action of [{verb:'click',ref:target.ref},{verb:'press',ref:target.ref,key:'F3'}]){
+    const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {mode:'act',expected_build:build,expected_origin:origin,operation_id:'denied-js-output-'+action.verb,snapshot,action}));
+    assert.equal(result.error.code,'UI_REFERENCE_STALE');assert.equal(result.effect_possible,false);
+  }
+  assert.equal(page.events.length,0);
+});
+
+for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('bounded '+prefix+' console exposes native rows through roots and refuses two panels',async()=>{
+ const f=scrolledProcessWindowFixture(prefix),roots=await f.page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===prefix);assert.ok(root);
+ const scoped=await f.page.execute({mode:'observe',root_ref:root.ref});
+ assert.equal(scoped.output.process_console.status,'rendered_process_window');
+ const row=scoped.output.ui.elements.find(e=>e.process_row?.record_id==='record-5');
+ assert.equal(row.tid,prefix+';ProgressForm;colProcess_Root>Task');assert.ok(row.allowed_actions.includes('right_click'));
+ f.page.add('div',prefix==='ConsoleForm'?'MF;ConsoleForm':'ConsoleForm','',{x:0,y:0,width:50,height:50});
+ const ambiguous=await f.page.execute({mode:'observe',root_ref:root.ref});
+ assert.equal(ambiguous.output.ui.elements.some(e=>e.process_row||e.process_grid),false);
 });

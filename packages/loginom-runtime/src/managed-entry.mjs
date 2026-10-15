@@ -2,9 +2,12 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile } from "node:fs/promises"
+import { appendFileSync } from "node:fs"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
+import { closeManagedResources } from "./managed-resources-close.mjs"
+import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -27,36 +30,44 @@ const state = {
   inputs: new Map(),
 }
 const requests = new Set()
+const terminalTrace = (stage) => {
+  if (!state.session?.directory) return
+  try {
+    appendFileSync(join(state.session.directory, "terminal-close.jsonl"),
+      JSON.stringify({ version: 1, stage, recorded_at: new Date().toISOString() }) + "\n", { mode: 0o600 })
+  } catch { /* Diagnostics cannot change the checked shutdown result. */ }
+}
 const send = (message, disconnect = false) => {
+  if (disconnect) terminalTrace("reply_sending")
   if (process.connected)
-    process.send(message, () => {
-      if (disconnect && process.connected) process.disconnect()
+    process.send(message, (error) => {
+      if (!disconnect) return
+      terminalTrace(error ? "reply_failed" : "reply_flushed")
+      if (!error && process.connected) process.disconnect()
+      terminalTrace("disconnect_returned")
+      // Node may postpone 'disconnect' while an incomplete later IPC frame is
+      // buffered. The reply is flushed and admitted work/resources are already
+      // drained; use the same checked stop path without waiting for that frame.
+      stop(error ? 1 : 0)
     })
 }
 function close() {
   if (state.closing) return state.closing
   state.controller?.abort()
   state.startupController.abort(Error("LOGINOM_HOST_CLOSED"))
-  state.closing = (async () => {
-    await Promise.allSettled([...requests])
-    const results = []
-    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
-    }
-    if (state.browserProfile)
-      results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (state.startupCleanupFailed || results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-  })()
+  state.closing = closeManagedResources(state, requests)
   return state.closing
 }
-const stop = () => {
+const stop = (exitCode = 0) => {
+  terminalTrace("stop_requested")
   void close().then(
-    () => process.exit(0),
-    () => process.exit(1),
+    () => { terminalTrace("exit_requested"); process.exit(exitCode) },
+    () => { terminalTrace("cleanup_rejected"); process.exit(1) },
   )
 }
-process.on("disconnect", stop)
-process.on("SIGTERM", stop)
+process.on("exit", () => terminalTrace("exit_event"))
+process.on("disconnect", () => stop())
+process.on("SIGTERM", () => stop())
 process.on("message", (message) => {
   const request = handle(message)
   requests.add(request)
@@ -74,7 +85,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -125,6 +136,7 @@ async function handle(message) {
         // Acceptance-only shutdown cleanup; the bridge binds it to the observed
         // prepared account, so no replay login account is needed here.
         acceptanceCleanupPackage,
+        closeSavedPackageOnShutdown,
         storageDirectories: {
           inputs: `/${input.connection.username}`,
           exports: `/${input.connection.username}`,
@@ -212,11 +224,11 @@ async function handle(message) {
     const controller = new AbortController()
     state.controller = controller
     try {
-      // dock_node_wait may legitimately wait 60 seconds. Leave room for its receipt
-      // before the supervisor's 120-second deadline, instead of the SDK's 60-second default.
+      // Allow the bounded owned read and cleanup to return before the outer IPC
+      // deadlines. Other tools retain room for a 60-second dock_node_wait.
       const result = await state.client.callTool(message.input, undefined, {
         signal: controller.signal,
-        timeout: 105_000,
+        timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       })
       send({
         id: message.id,

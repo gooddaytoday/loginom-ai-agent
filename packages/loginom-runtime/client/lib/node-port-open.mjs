@@ -46,7 +46,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    if(!dialogs.length) {
     if(mode==='deactivation_issued')fail('Port confirmation disappeared before gesture');
     const wizard=exact(b.workflow_ref.prefix+';WizrdMCF');
-    return wizard.length===1&&visible(wizard[0])?{wizard:true}:{pending:true};
+    return wizard.length===1&&visible(wizard[0])?{wizard:true}:{pending:true,wizard_count:wizard.length,wizard_visible:wizard.map(visible).slice(0,4),controller_type:typeof model?.constructor?.name==='string'?model.constructor.name.slice(0,120):null,node_locked:r.node.FLocked===true,port_menu_same:r.graph.FCurrentPortMenu===r.port};
    }
    const dialog=dialogs[0],native=globalThis.Ext?.getCmp?.(dialog.id);
    const normalize=s=>s.replace(/\s+/g,' ').trim();
@@ -72,14 +72,24 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id};
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
-  const blocked=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>{
-   if(!e.checkVisibility({checkVisibilityCSS:true}))return false;
-   const parent=e.parentElement,cmp=parent&&Ext.getCmp(parent.id),wiz=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
+  const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
+  const blocked=blockers.some(e=>{
+   const parent=e.parentElement,column=parent&&globalThis.Ext?.getCmp?.(parent.id),roots=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
    const ownDisabledHeader=control&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
-    &&cmp?.$className==='Ext.grid.column.Action'&&cmp.el.dom===parent&&cmp.disabled===true&&wiz.length===1&&wiz[0].contains(parent)
+    &&column?.$className==='Ext.grid.column.Action'&&column.el.dom===parent&&column.disabled===true&&roots.length===1&&roots[0].contains(parent)
     &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
-   return !ownDisabledHeader;
+   // Ext masks a disabled delete-all column even when the output wizard is ready.
+   // This one native control mask is not a wizard loading overlay.
+   const columnTid=b.workflow_ref.prefix+';WizrdMCF;DataSetOutputSocketWizard;colTargetDelete';
+   const ownDisabledOutputHeader=mode==='finish'&&!input&&e.classList?.contains('x-mask')
+    &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
+    &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
+    &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1
+    &&roots.length===1&&model?.FView?.el?.dom===roots[0]&&roots[0].contains(parent)
+    &&column?.el?.dom===parent&&column.disabled===true
+    &&blockers.filter(mask=>mask.parentElement===parent).length===1;
+   return !ownDisabledHeader&&!ownDisabledOutputHeader;
   });
   if(blocked){if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};fail('Port opening blocked');}
   if(mode==='begin') {
@@ -189,10 +199,17 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()});
   trace.push({event:direction+'_port_menu_verified',...await inspect('menu')});
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});await inspect('open_issued');
+  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});
+  trace.push({event:direction+'_port_open_issued',...await inspect('open_issued')});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
+  trace.push({event:direction+'_port_open_returned'});
+  let pendingObservation;
   while(remaining()>0) {
    const transition=await inspect('await_open');
+   if(transition.pending){
+    if(!pendingObservation){pendingObservation={event:direction+'_port_open_pending',samples:0,last:transition};trace.push(pendingObservation);}
+    pendingObservation.samples++;pendingObservation.last=transition;
+   }
    if(transition.wizard)break;
    if(transition.deactivation) {
     trace.push({event:direction+'_port_deactivation_question_verified',...transition});

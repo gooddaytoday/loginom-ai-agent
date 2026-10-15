@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
 import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
+import {javascriptSourceSettingsDigest} from '../lib/javascript-source-admission.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
@@ -39,6 +41,28 @@ test('Done never waits or reads stale output',async()=>{
  const f=fixture(),p=request();p.finish='done';p.read.ports=[];const r=await f.run(p);
  assert.equal(r.status,'SUCCEEDED');assert.deepEqual(r.execution,{status:'not_requested',execution_id:null});assert.equal(r.output.status,'not_refreshed');
  assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
+});
+test('JavaScript Done accepts a settled commit while retaining unknown internal execution',async()=>{
+ const f=fixture(),p=request();p.target={kind:'existing',type:'programming.javascript',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+ p.mode='script';p.parameters={source_text:'// unchanged schema\n',expected_source_sha256:'a'.repeat(64)};
+ p.finish='done';p.read.ports=[];
+ f.handlers.set('programming.javascript',{revision:'js-trial',modes:['script'],validate:()=>{},configure:async()=>({verified:true,cleanup_complete:true,effect_possible:true})});
+ f.drivers.finish=async mode=>({verified:true,cleanup_complete:true,effect_possible:true,mode,
+  execution_id:null,execution_started:null,explicit_execute_requested:false,settings_applied:true,
+  wizard_commit_verified:true,graph_owner_verified:true,source_readback_verified:true,owned_done_settled:true});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.configuration.status,'applied');
+ assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});
+ assert.equal(result.output.status,'not_refreshed');assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
+ for(const field of ['wizard_commit_verified','graph_owner_verified','source_readback_verified','owned_done_settled']){
+  const bad=fixture(),finish=f.drivers.finish;
+  bad.handlers.set('programming.javascript',f.handlers.get('programming.javascript'));
+  bad.drivers.finish=async mode=>({...await finish(mode),[field]:false});
+  const rejected=await bad.run(p);assert.equal(rejected.status,'AMBIGUOUS');assert.equal(rejected.pending_phase,'finish');
+ }
+ const other=fixture();other.drivers.finish=async mode=>({...await f.drivers.finish(mode)});
+ const standard=request();standard.finish='done';standard.read.ports=[];
+ assert.equal((await other.run(standard)).status,'AMBIGUOUS');
 });
 test('Close requires discarded settings and never executes or refreshes output',async()=>{
  for(const discarded of [true,false]) {
@@ -419,8 +443,39 @@ for(const finish of ['done','close'])test('incompatible '+finish+' read identifi
 });
 test('unsupported full coverage identifies its field before graph changes',()=>{
  const p=request();p.read.coverage='full';
- assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.coverage:.*other handlers support sample/);
+ assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.coverage:.*JavaScript UI full-read support/);
  p.read.coverage='sample';assert.doesNotThrow(()=>validateNodeApplyRequest(p,fixture().handlers));
+});
+
+test('JavaScript full UI read requires an installed capability and the complete bounded window before effects',()=>{
+ const f=fixture(),p=request();p.target.type='programming.javascript';p.mode='script';p.read={ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'};
+ f.handlers.set(p.target.type,{revision:'javascript-test',modes:['script'],validate(){},configure(){}});
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+ f.handlers.get(p.target.type).fullUiOutput=true;
+ assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));
+ p.read.sample_rows=10;
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+ p.read.sample_rows=100;p.read.require_exact_numbers=false;
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+ p.read.require_exact_numbers=true;p.read.ports=[];
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+});
+
+test('tabular handler publishes JavaScript full UI capability only when its implementation opts in',()=>{
+ const config={targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'};
+ const implementation={type:'programming.javascript',mode:'script',revision:'javascript-test',validate(){},configure(){}};
+ assert.equal(createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers.get(implementation.type).fullUiOutput,undefined);
+ assert.equal(createTabularTransformNodeSupport(config,{...implementation,fullUiOutput:true}).nodeApplyHandlers.get(implementation.type).fullUiOutput,true);
+});
+
+for(const complete of [true,false])test('JavaScript full UI read accepts only complete observed rows '+complete,async()=>{
+ const f=fixture(),p=request();p.target.type='programming.javascript';p.mode='script';p.read={ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'};
+ f.handlers.set(p.target.type,{revision:'javascript-test',modes:['script'],fullUiOutput:true,validate(){},configure:f.handlers.get('imports.text').configure});
+ f.drivers.readOutput=async()=>({verified:true,cleanup_complete:true,status:complete?'complete':'partial',
+  evidence_ref:'evidence1',execution_id:'execution1',ports:[{port:0,fresh:true,row_count:2,sample_rows:complete?2:1,sample_complete:complete}]});
+ const result=await f.run(p);
+ assert.equal(result.status,complete?'SUCCEEDED':'AMBIGUOUS');
+ if(!complete){assert.equal(result.pending_phase,'read');assert.match(result.error.message,/full JavaScript row coverage/);}
 });
 
 test('output sample accepts the expanded 100-row boundary',()=>{const f=fixture(),p=request();p.read.sample_rows=100;assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));});
@@ -433,4 +488,126 @@ for(const exceedsTotal of [false,true])test('read uses remaining total budget, p
  assert.equal(result.status,exceedsTotal?'AMBIGUOUS':'SUCCEEDED');
  assert.equal(f.calls.filter(c=>c==='execute').length,1);
  if(exceedsTotal)assert.match(result.error.message,/deadline elapsed/);
+});
+
+
+function javascriptMaterializationFixture() {
+ const f=separateFixture(),p=request();
+ p.target={kind:'existing',type:'programming.javascript',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+ p.mode='script';p.parameters={source_text:'// code',expected_source_sha256:'a'.repeat(64)};
+ f.handlers.set('programming.javascript',{revision:'js-materialization-test',modes:['script'],output_wizard:'separate',
+  materialize_output:true,validate:()=>{},configure:async()=>{f.calls.push('configure');return {verified:true,cleanup_complete:true};}});
+ f.drivers.finish=async mode=>{f.calls.push('node-'+mode);return {verified:true,cleanup_complete:true,effect_possible:true,mode,
+  execution_id:null,execution_started:null,explicit_execute_requested:false,settings_applied:true,
+  wizard_commit_verified:true,graph_owner_verified:true,source_readback_verified:true,owned_done_settled:true};};
+ f.drivers.materializeOutput=async()=>{f.calls.push('materialize');return {verified:true,cleanup_complete:true,
+  effect_possible:true,mode:'execute',execution_id:'materialization1'};};
+ f.drivers.waitExecution=async ctx=>{f.calls.push('await-'+ctx.execution.execution_id);return {verified:true,
+  cleanup_complete:true,status:'completed',owner_verified:true,execution_id:ctx.execution.execution_id};};
+ return {...f,p,run:extra=>f.run(p,extra)};
+}
+
+test('JavaScript materialization is an awaited public phase before mapping and a distinct final Execute',async()=>{
+ const f=javascriptMaterializationFixture(),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.execution.execution_id,'execution1');
+ assert.deepEqual(f.calls,['source','target','mapping','open','configure','node-done','materialize',
+  'await-materialization1','mapping','graph-execute','await-execution1','read']);
+ assert.equal(result.phases.find(p=>p.phase==='materialization_start').status,'verified');
+ assert.equal(result.phases.find(p=>p.phase==='materialization_execute').status,'verified');
+ assert.equal(f.operation.nodeApply.phases.find(p=>p.phase==='node_finish').value.execution_started,null);
+});
+
+for(const field of ['wizard_commit_verified','graph_owner_verified','source_readback_verified','owned_done_settled'])
+ test('JS intermediate Done rejects missing '+field+' before materialization',async()=>{
+ const f=javascriptMaterializationFixture(),finish=f.drivers.finish;
+ f.drivers.finish=async(...args)=>({...await finish(...args),[field]:false});
+ const result=await f.run();assert.equal(result.pending_phase,'node_finish');assert.ok(!f.calls.includes('materialize'));
+});
+
+for(const stage of ['start','wait','mapping'])test('lost '+stage+' reply cannot replay materialization or launch final Execute',async()=>{
+ const f=javascriptMaterializationFixture();
+ if(stage==='start')f.drivers.materializeOutput=async()=>{f.calls.push('materialize');throw Error('lost start reply');};
+ if(stage==='wait')f.drivers.waitExecution=async()=>{throw Error('lost wait reply');};
+ if(stage==='mapping'){let maps=0;f.drivers.mapPorts=async()=>{f.calls.push('mapping');if(++maps===2)throw Error('lost mapping reply');return {verified:true,cleanup_complete:true};};}
+ const result=await f.run();assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.pending_phase,stage==='start'?'materialization_start':stage==='wait'?'materialization_execute':'output_mapping');
+ await assert.rejects(()=>f.run({resume:true}),/unresolved original/);
+ assert.equal(f.calls.filter(x=>x==='materialize').length,1);assert.ok(!f.calls.includes('graph-execute'));assert.ok(!f.calls.includes('read'));
+});
+
+test('verified cancellation of materialization stops before mapping, final Execute and read',async()=>{
+ const f=javascriptMaterializationFixture(),stop=new AbortController();stop.abort(Error('stop requested'));
+ f.drivers.waitExecution=async ctx=>({verified:true,cleanup_complete:true,status:'cancelled',stop_verified:true,
+  owner_verified:true,execution_id:ctx.execution.execution_id});
+ const result=await f.run({stopSignal:stop.signal});assert.equal(result.status,'FAILED');
+ assert.equal(result.execution.execution_id,'materialization1');assert.equal(result.execution.status,'cancelled');
+ assert.equal(result.checkpoint_kind,'local_node_stopped');assert.equal(result.cleanup_complete,true);
+ assert.equal(f.calls.filter(x=>x==='mapping').length,1);assert.ok(!f.calls.includes('graph-execute'));
+});
+
+test('unowned materialization terminal and reused final identity cannot produce a fresh read',async()=>{
+ for(const changed of ['owner','identity']){
+  const f=javascriptMaterializationFixture();
+  if(changed==='owner')f.drivers.waitExecution=async ctx=>({verified:true,cleanup_complete:true,status:'completed',
+   owner_verified:false,execution_id:ctx.execution.execution_id});
+  if(changed==='identity')f.drivers.finishGraph=async()=>({verified:true,cleanup_complete:true,mode:'execute',execution_id:'materialization1'});
+  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.ok(!f.calls.includes('read'));
+ }
+});
+
+test('materialization requires explicit Execute and cannot be enabled for another node type',async()=>{
+ const f=javascriptMaterializationFixture();
+ const other=separateFixture();other.handlers.get('imports.text').materialize_output=true;
+ other.drivers.materializeOutput=f.drivers.materializeOutput;
+ await assert.rejects(()=>other.run(),/materialization requires/);assert.deepEqual(other.calls,[]);
+});
+
+for(const failure of [null,'owner','operation','mode','settings','digest','close','mutation','execute','verification','journal','foreign_type'])test('owned JavaScript mode mismatch refuses safely '+failure,async()=>{
+ const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();p.target={kind:'existing',type:'programming.javascript',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};p.mode='script';p.parameters={schema_mode:'declared'};
+ f.handlers.set('programming.javascript',{...f.handlers.get('imports.text'),modes:['script']});
+ f.drivers.prepareTarget=async()=>{
+  const e=Error('JavaScript existing lifecycle preserves observed schema');
+  e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'javascript_existing_schema_mode_refused',proof:{
+   node:p.target.ref,owner:{...p.target.ref,operation_id:p.operation_id,ui_epoch:1},admission_id:'00000000-0000-4000-8000-000000000000',observed_schema_mode:'code',requested_schema_mode:'declared',
+   source_identity:{source_sha256:'a'.repeat(64),source_utf8_bytes:0,source_lf_lines:1},settings:{generation:true,grids:[]},settings_sha256:javascriptSourceSettingsDigest({generation:true,grids:[]}),
+   source_read_discard_verified:true,settings_unchanged:true,editor_mutation_started:false,explicit_execute_requested:false}};
+  const proof=e.nodePhaseRefusal.proof;
+  if(failure==='owner')proof.owner.node_id='foreign';
+  if(failure==='operation')proof.owner.operation_id='foreign';
+  if(failure==='mode')proof.requested_schema_mode='code';
+  if(failure==='settings')proof.settings.generation=false;
+  if(failure==='digest')proof.source_identity.source_sha256='invalid';
+  if(failure==='close')proof.source_read_discard_verified=false;
+  if(failure==='mutation')proof.editor_mutation_started=true;
+  if(failure==='execute')proof.explicit_execute_requested=true;
+  if(failure==='verification')e.nodePhaseRefusal.verification='other';
+  throw e;
+ };
+ if(failure==='foreign_type'){p.target.type='imports.text';p.mode='delimited';}
+ const r=await f.run(p);
+ if(failure){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);assert.equal(r.pending_phase,'target');return;}
+ assert.equal(r.status,'FAILED');assert.equal(r.cleanup_complete,true);assert.equal(r.pending_phase,null);
+ assert.equal(r.effect_possible,true);assert.equal(r.execution.status,'not_requested');assert.deepEqual(f.calls,['source']);
+});
+
+
+for(const mode of ['done','close'])test('actual generic JS lifecycle '+mode+' omits materialization/output mapping and never calls Execute',async()=>{
+ const f=javascriptMaterializationFixture();f.p.finish=mode;f.p.read.ports=[];
+ if(mode==='done')f.drivers.finishGraph=async received=>{
+  assert.equal(received,'done');f.calls.push('graph-done');
+  return {verified:true,cleanup_complete:true,effect_possible:true,mode:received,execution_id:null,execution_started:null,
+   explicit_execute_requested:false,settings_applied:true,wizard_commit_verified:true,graph_owner_verified:true,
+   source_readback_verified:true,owned_done_settled:true};
+ };
+ if(mode==='close')f.drivers.finish=async received=>{
+  assert.equal(received,'close');f.calls.push('node-close');
+  return {verified:true,cleanup_complete:true,effect_possible:true,mode:received,execution_id:null,execution_started:false,
+   settings_applied:false,draft_discarded:true};
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED');
+ assert.deepEqual(f.calls,['source','target','mapping','open','configure',...(mode==='done'?['node-done','graph-done']:['node-close'])]);
+ assert.equal(result.configuration.status,mode==='done'?'applied':'discarded');
+ assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});assert.equal(result.output.status,'not_refreshed');
+ assert.deepEqual(result.output.ports,[]);
+ assert.ok(result.phases.every(p=>!['materialization_start','materialization_execute','output_mapping','execute','read'].includes(p.phase)));
 });

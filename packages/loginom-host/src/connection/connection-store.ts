@@ -9,6 +9,7 @@ const RecordSchema = Schema.Struct({
   generation: Schema.Number,
   revision: Schema.Number,
   url: Schema.String,
+  urlSource: Schema.optional(Schema.Literal("explicit")),
   username: Schema.String,
   secrets: Schema.Union([
     Schema.Struct({ apiKey: Schema.String, password: Schema.String }),
@@ -120,6 +121,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
       generation: record.generation,
       revision: record.revision,
       url: record.url,
+      ...(record.urlSource ? { urlSource: record.urlSource } : {}),
       username: record.username,
       ...(await codec.decode(record.secrets)),
     }
@@ -136,6 +138,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
           generation: value.generation,
           revision: value.revision,
           url: value.url,
+          ...(value.urlSource ? { urlSource: value.urlSource } : {}),
           username: value.username,
           secrets: await codec.encode(value),
         },
@@ -178,6 +181,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         generation: value.generation,
         revision: value.revision,
         url: value.url,
+        ...(value.urlSource ? { urlSource: value.urlSource } : {}),
         username: value.username,
         secrets: await codec.encode(value),
       }

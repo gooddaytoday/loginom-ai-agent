@@ -267,11 +267,15 @@ test('native process, port and mapping reads share the prepared node and durable
    execute:async code=>{
      calls.push(code);
      if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+     if(code.includes('async function readNodeProcesses'))state.dom_epoch.revision++;
      return {verified:true,node_context:{...node,node_id:changed?'foreign':'node'},processes:[],ports:[]};
    }});
  const s=await make().observe({condition:'native state',readProcesses:true,readOutputs:true,readMappings:true,ready:s=>s.node_processes?.verified&&s.node_outputs?.verified&&s.node_mapping?.verified});
  assert.equal(s.node_processes.verified,true);assert.equal(calls.length,5);
- assert.ok(calls[1].includes('"root_ref":"ui-console"'));
+ assert.equal(s.dom_epoch.revision,state.dom_epoch.revision,'issued UI epoch follows the native process transport');
+ assert.equal(records.at(-1).outcome.output.dom_epoch.revision,state.dom_epoch.revision);
+ assert.ok(calls[1].includes('async function readNodeProcesses'));
+ assert.ok(calls[2].includes('"root_ref":"ui-console"'));
  assert.equal(records.at(-1).outcome.output.node_outputs.node_context.node_id,'node');
  assert.equal(records.at(-1).outcome.output.node_mapping.node_context.node_id,'node');
  await assert.rejects(make(true).observe({condition:'native mapping',readMappings:true,ready:()=>true}),/context changed/);
@@ -279,7 +283,76 @@ test('native process, port and mapping reads share the prepared node and durable
  calls.length=0;
  state.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'ui-toolbar'}];
  await make().observe({condition:'closed console is opened from its toolbar',readProcesses:true,ready:()=>true});
+ assert.ok(calls[2].includes('"root_ref":"ui-toolbar"'));
+ calls.length=0;
+ const controls=await make().observe({condition:'console controls without history',readProcessControls:true,ready:()=>true});
+ assert.equal(calls.length,2,'only root and UI reads; no native process history');
  assert.ok(calls[1].includes('"root_ref":"ui-toolbar"'));
+ assert.equal(controls.node_process_controls_read,true);
+ assert.equal(controls.node_processes,undefined);
+ assert.equal(records.at(-1).outcome.output.node_process_controls_read,true);
+ await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
+});
+
+for(const fault of ['other field','source connection','port owner','incomplete mapping'])
+test('actual generated input mapping gate blocks post-ACK '+fault+' before UI dispatch',async()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const editor={opening_operation_id:'input:n1',port_guid:'00000000-0000-4000-8000-000000000001',record_id:'target-customer'};
+ const owner={verified:true,...binding.node,surface:'wizard',tid:'MF;TF-1;WizrdMCF',
+  input_port:{direction:'input',port:0,port_guid:editor.port_guid,opening_operation_id:editor.opening_operation_id}};
+ const mapping={verified:true,inventory_complete:true,source_identity_verified:true,node_context:owner,
+  target_fields:[{record_id:editor.record_id,name:'Customer',source:{record_id:'source-customer'}},{name:'Qty'}],rendered_indices:[0,1]};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,prepared_node_context:owner,
+  dom_epoch:{document:'doc',revision:1},scan:{complete:true},wizard:{status:'observed',stage:'input_mapping',root_tid:owner.tid,root_ref:'ui-root'},
+  ui:{elements:[{ref:'ui-button',allowed_actions:['click']}],masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false}}};
+ const receipts=[];let nativeReads=0;
+ const page={evaluate:async(fn)=>{nativeReads++;return structuredClone(fn.name==='readMappingBrowser'?mapping:owner);}};
+ const channel=createNodeProcedure({operation:{id:'owned-gate',deadline:10000,action:{action_key:'diagnostic.input',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1,
+  record:async event=>{receipts.push(structuredClone(event));
+   if(event.phase==='node_step_prepared'){
+    if(fault==='other field')mapping.target_fields[1].name='foreign';
+    if(fault==='source connection')mapping.target_fields[0].source.record_id='foreign';
+    if(fault==='port owner')owner.input_port.port_guid='foreign';
+    if(fault==='incomplete mapping')mapping.inventory_complete=false;
+   }return event;},wrapMutation:(code,options)=>({code,options}),
+  execute:async code=>{
+   if(typeof code==='string')return code.includes('function workspaceUiCapability')?{status:'SUCCEEDED',output:structuredClone(state)}:structuredClone(mapping);
+   return Function('return ('+code.code+')')()(page);
+  }});
+ const observed=await channel.observe({condition:'original complete mapping',readMappings:true,mappingEditor:editor,ready:()=>true});
+ editor.record_id='caller-mutated';assert.equal(observed.node_mapping_editor.record_id,'target-customer');
+ await assert.rejects(channel.perform({condition:'same owned field ready',initialObservation:observed,ready:()=>true,
+  identity:()=>({node:binding.node,field:'Customer'}),resolve:()=>({verb:'click',ref:'ui-button'})}),
+  error=>error.receipt?.status==='NOT_APPLIED'&&error.receipt.effect_possible===false
+   &&error.receipt.cleanup_complete===true&&error.receipt.error.code==='MAPPING_BINDING_CHANGED');
+ assert.equal(nativeReads,fault==='port owner'?1:3);
+ assert.equal(receipts.filter(e=>e.phase==='node_step_prepared').length,1);
+ assert.equal(receipts.filter(e=>e.phase==='node_step_completed').length,1);
+});
+
+test('JavaScript schema read uses the prepared node channel and journals its exact owner',async()=>{
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'js'}};
+ const context={verified:true,document_id:'doc',workflow_id:'flow',node_id:'js',surface:'wizard',tid:'MF;TF-1;WizrdMCF'};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:context,scan:{complete:true},wizard:{status:'observed',root_ref:'wizard',root_tid:context.tid},
+  ui:{elements:[],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const calls=[],records=[];
+ const channel=createNodeProcedure({operation:{id:'js-schema',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1,
+  record:async entry=>{records.push(entry);return structuredClone(entry)},execute:async code=>{
+   calls.push(code);
+   if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   assert.ok(code.includes('function readJavascriptSchemaContext'));
+   return {verified:true,node_context:context,form:'JavaScriptColumnsWizard',grids:[]};
+  }});
+ const observed=await channel.observe({condition:'owned JavaScript schema',readJavascript:true,
+  ready:value=>value.node_javascript_schema?.verified===true});
+ assert.equal(observed.node_javascript_schema.form,'JavaScriptColumnsWizard');
+ assert.equal(records.at(-1).outcome.output.node_javascript_schema.node_context.node_id,'js');
+ assert.equal(calls.length,3);
 });
 
 test('Table dialogs require an explicit active port binding and never waive unrelated dialogs',async()=>{
@@ -371,12 +444,13 @@ test('output port opening uses the parent journal and receipt wrapper before any
   const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
    prepared_node_context:{...binding.node,verified:true,surface:'graph',locked:false,tid:'MF;TF-1;Graph;Import'},scan:{complete:true},wizard:{status:'absent'},
    ui:{elements:[{tid:'MF;TF-1;ModelForm;cmpDiagram',ref:'graph'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
-  const entries=[],order=[],op={id:'parent',deadline:10000,action:{action_key:'node.apply',revision:'1'}};
+  const entries=[],order=[],op={id:'parent',deadline:100000,action:{action_key:'node.apply',revision:'1'}};
   const channel=createNodeProcedure({operation:op,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
    now:()=>1,wait:async()=>{},maxSteps:mode==='budget'?1:5,
    record:async e=>{order.push(e.phase);entries.push(e);if(mode==='journal'&&e.phase==='node_step_prepared')throw Error('disk');if(mode==='completion'&&e.phase==='node_step_completed')return {};return structuredClone(e);},
-   wrapMutation:(code,r)=>{order.push('wrapped');return {code,r};},execute:async code=>{
+   wrapMutation:(code,r)=>{order.push('wrapped');return {code,r};},execute:async(code,options)=>{
     if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+    assert.ok(code.code.includes('"deadline":100000'));assert.equal(options.timeout,99999);
     order.push('effect');if(mode==='transport')throw Error('transport');
     return {status:'SUCCEEDED',operation_id:mode==='foreign'?'other':code.r.id,action_key:code.r.action_key,effect_possible:true,cleanup_complete:true,
      output:{verified:true,direction:'output',port:0,opening_operation_id:code.r.id,...binding.node,node_id:mode==='owner'?'other':'node'}};
@@ -657,7 +731,7 @@ test('an incomplete observation preserves the original refusal in the journal',a
 });
 
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
-  for(const verb of ['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
+  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
     const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
     const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
@@ -670,11 +744,12 @@ test('bound completion gives mask settlement only the remaining parent deadline'
         if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
         assert.equal(options.timeout,verb==='click'?35000:69000);
         if(verb==='click')assert.doesNotMatch(code.code,/"settlement_timeout_ms":/);
-        else assert.match(code.code,/"settlement_timeout_ms":64000/);
+        else assert.match(code.code,['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(verb)?/"opening_timeout_ms":64000/:/"settlement_timeout_ms":64000/);
         return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};
       }});
+    if(verb==='wizard_step')state.wizard={status:'observed',stage:'text_import_file'};
     await channel.observe({condition:'bound completion',ready:()=>true});
-    await channel.act({verb,ref:'ui-button'});
+    await channel.act({verb,ref:'ui-button',...(verb==='wizard_step'?{expected_stage:'done'}:{})});
     assert.equal(operation.deadline,65000);
   }
 });
@@ -696,4 +771,19 @@ test('readiness expiry retains geometry across a final incomplete scan',async()=
   f.state.geometry={device_pixel_ratio:1.75,failure:{condition:'rows_end',actual:200.25,expected:200,delta:0.25,tolerance:1/64}};
   await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
   assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
+});
+
+
+test('root refusal retains bounded code and trace without payloads, retries or usable references',async()=>{
+ const refusal={status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',effect_possible:false,cleanup_complete:true,
+  error:{code:'PREPARED_NODE_CONTEXT_CHANGED',message:'secret payload'},output:{secret:'secret payload'},
+  trace:Array.from({length:20},()=>({event:'node_surface_wait',secret:'secret payload'}))};
+ let reads=0;const f=fixture({readRefusal:()=>{reads++;return refusal;}});
+ await assert.rejects(f.channel.observe({condition:'views ready',ready:()=>true}),e=>{
+   assert.match(e.message,/PREPARED_NODE_CONTEXT_CHANGED/);assert.equal(e.nodeObservationRefusal.trace.length,12);return true;
+ });
+ assert.equal(reads,1);const event=f.records.find(r=>r.phase==='node_observation_refused');
+ assert.equal(event.stage,'roots');assert.equal(JSON.stringify(event).includes('secret payload'),false);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+ assert.ok(!f.events.includes('mutated'));
 });

@@ -1,7 +1,7 @@
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { mkdir } from "node:fs/promises"
-import { isAbsolute } from "node:path"
+import { mkdir, writeFile } from "node:fs/promises"
+import { isAbsolute, join } from "node:path"
 
 export type Launch = {
   node: string
@@ -20,6 +20,8 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  // Private owner policy. The runtime derives the path from its confirmed Save.
+  closeSavedPackageOnShutdown?: boolean
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">
@@ -104,6 +106,7 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
     signal,
+    input.closeSavedPackageOnShutdown === true ? 45_000 : 5000,
   )
   const ready = runtime.ready
   if (
@@ -143,7 +146,13 @@ export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortS
   return { ...runtime, ready }
 }
 
-async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 120_000, signal?: AbortSignal) {
+async function superviseProcess(
+  input: ProcessLaunch,
+  start: unknown,
+  timeout = 120_000,
+  signal?: AbortSignal,
+  closeTimeout = 5000,
+) {
   signal?.throwIfAborted()
   if (![input.node, input.entry, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
@@ -209,10 +218,25 @@ async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      const started = new Date().toISOString()
+      // Native guarded package close/logout precedes resource close in this mode.
+      // This shutdown allowance does not extend an admitted operation deadline.
+      const response = await request("close", undefined, closeTimeout)
+        .then((result) => ({ result, error: null }), (error: unknown) => ({ result: undefined,
+          error: error instanceof Error && ["LOGINOM_RUNTIME_TIMEOUT", "LOGINOM_RUNTIME_DISCONNECTED",
+            "LOGINOM_RUNTIME_CLEANUP_FAILED"].includes(error.message) ? error.message : "LOGINOM_RUNTIME_FAILED" }))
+      const reply = response.result
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
+        // Private transport evidence, not a cleanup receipt. Never include the
+        // remote reply or exception text; they may contain sensitive values.
+        await writeFile(join(input.stateDir, `runtime-close-${child.pid}-${randomUUID()}.json`), JSON.stringify({
+          version: 1, pid: child.pid, started_at: started, completed_at: new Date().toISOString(),
+          request_error: response.error,
+          closed_ack: !!reply && typeof reply === "object" && "closed" in reply && reply.closed === true,
+          exit_code: outcome.code, exit_signal: outcome.signal,
+        }) + "\n", { mode: 0o600, flag: "wx" }).catch(() => undefined)
         if (
           !reply ||
           typeof reply !== "object" ||

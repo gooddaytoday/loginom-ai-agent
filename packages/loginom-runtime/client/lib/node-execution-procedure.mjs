@@ -1,5 +1,5 @@
 import {NodeReadinessTimeout} from './node-procedure.mjs';
-import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution} from './node-execution-evidence.mjs';
+import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution,verifyExecutionReadWait} from './node-execution-evidence.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,message)=>{requireValue(xs.length===1,message);return xs[0];};
@@ -7,8 +7,9 @@ const button='MF;cntMain;tlbMainToolbar;btnProgress';
 const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
 const filter='mnContextMenu;mniShowCompletedProcesses';
 const showNode='mnContextMenu;mniShowNodeToProcess';
+const consoleTid=(actual,canonical)=>actual===canonical||canonical.startsWith('ConsoleForm;')&&actual==='MF;'+canonical;
 const consoleMenuIdentity=s=>({epoch:s.dom_epoch,root:s.node_processes?.root_id,
-  grid:s.ui.elements.find(e=>e.tid===grid)?.signature});
+  grid:one(s.ui.elements.filter(e=>consoleTid(e.tid,grid)),'Unique console grid required').signature});
 const processControl=(process,part='process_tid')=>s=>s.node_processes?.processes.find(p=>
   p.process_id===process.process_id&&p.record_id===process.record_id)?.[part];
 
@@ -47,7 +48,7 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
     requireValue(valid(state),'Process identity changed while revealing its control');
     if(matches(state).length===1)return state;
     requireValue(matches(state).length===0,'Process control is ambiguous');
-    const owners=state.ui.elements.filter(e=>e.tid==='ConsoleForm;ProgressForm;trpProgress;treepanel;tree'
+    const owners=state.ui.elements.filter(e=>consoleTid(e.tid,'ConsoleForm;ProgressForm;trpProgress;treepanel;tree')
       &&e.process_grid&&e.scroll?.ref===e.ref&&e.allowed_actions.includes('scroll'));
     const owner=one(owners,'Bound process scroll owner unavailable');
     if(!reset&&owner.scroll.top===0)reset=true;
@@ -75,20 +76,22 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
   throw new Error('Process reveal exceeded bounded scroll steps');
 }
 
-export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false}={}) {
-  let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false;
+export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false}={}) {
+  let baseline,execution,stopPromise,readWaitBinding,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
-    return typeof current==='string'&&current.length?s.ui.elements.filter(e=>e.tid===current&&e.allowed_actions.includes(verb)):[];};
+    return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
     initialObservation:s,ready:s=>control(s,tid,verb).length===1,
     ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
-  const consoleVisible=s=>s.ui.elements.some(e=>e.tid===grid);
+  const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
   async function openConsole() {
-    let s=await observe('prepared node available for process console');
-    if(!consoleVisible(s)) {await act(s,button);s=await observe('process console visible',consoleVisible);}
-    return s;
+    let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true});
+    if(!consoleVisible(s))await act(s,button);
+    // The control-only read above has no native inventory, even when the
+    // console was already open. Stop must refresh its root/process proof.
+    return observe('process console visible',consoleVisible);
   }
   async function closeConsole(s) {
     if(consoleVisible(s))await act(s,'ConsoleForm;btnClose');
@@ -117,9 +120,20 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       p.process_id===group.process_id&&p.record_id===group.record_id&&p.children_loaded===true&&p.expanded===true));
   }
   return Object.freeze({
-    async prepare() {
+    async prepare({keepConsoleOpen=false}={}) {
+      requireValue(typeof keepConsoleOpen==='boolean','Owned process console mode must be boolean');
       requireValue(!baseline,'Execution baseline has already been captured');
       let s=await openConsole();
+      if(keepConsoleOpen) {
+        const pinned=s=>consoleVisible(s)&&control(s,'ConsoleForm;btnPin').length===1
+          &&control(s,'ConsoleForm;btnUnpin').length===0;
+        if(!pinned(s)) {
+          requireValue(control(s,'ConsoleForm;btnUnpin').length===1
+            &&control(s,'ConsoleForm;btnPin').length===0,'Owned process console pin state unavailable');
+          await act(s,'ConsoleForm;btnUnpin');
+          s=await observe('owned process console pinned before launch',pinned);
+        }
+      }
       // A long buffered process list can repaint after the panel becomes
       // visible. Require two matching epochs before its menu gesture, and
       // retain this readiness check on strictly pre-gesture recovery.
@@ -151,7 +165,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         }
       }
       baseline=captureExecutionBaseline(s.node_processes,node);
-      await closeConsole(s);
+      if(!keepConsoleOpen)await closeConsole(s);
       return structuredClone(baseline);
     },
     async launchGraph() {
@@ -216,15 +230,16 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         const childTid=processControl(child);
         s=await revealExecutionControl(channel,node,s,child,childTid,'right_click');
         const sameTarget=s=>JSON.stringify(expectedExecutionStopProof(execution,s.node_processes))===JSON.stringify(target);
-        await channel.perform({condition:'open exact cancellable process menu',initialObservation:s,
-          ready:s=>sameTarget(s)&&control(s,childTid,'right_click').length===1,
-          resolve:s=>({verb:'right_click',ref:one(control(s,childTid,'right_click'),'Stop process row unavailable').ref}),
+        const cancellableRow=s=>control(s,childTid,'right_click').filter(e=>e.process_row?.record_id===target.record_id);
+        await channel.perform({condition:'open exact cancellable process menu',initialObservation:s,processControl:execution,
+          ready:s=>sameTarget(s)&&cancellableRow(s).length===1,
+          resolve:s=>({verb:'right_click',ref:one(cancellableRow(s),'Stop process row unavailable').ref}),
           identity:()=>({node,...target})});
         const cancel=s=>control(s,'mnContextMenu;mniCancel','cancel_process').filter(e=>
           JSON.stringify(e.process_menu?.cancellation)===JSON.stringify(target));
         s=await observe('native owner-bound process cancel available',s=>sameTarget(s)&&cancel(s).length===1);
         const proof=structuredClone(one(cancel(s),'Native stop proof unavailable').process_menu.cancellation);
-        await channel.perform({condition:'cancel exact node execution',initialObservation:s,
+        await channel.perform({condition:'cancel exact node execution',initialObservation:s,processControl:execution,
           ready:s=>sameTarget(s)&&cancel(s).length===1,
           resolve:s=>({verb:'cancel_process',ref:one(cancel(s),'Native stop control changed').ref}),
           identity:()=>({node,...proof})});
@@ -241,6 +256,19 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       })();
       return stopPromise;
     },
+    async verifyReadWaitContinuation(proof) {
+      requireValue(retainReadWait&&execution&&readWaitBinding&&!stopPromise&&proof?.read_only===true
+        &&proof.cleanup_complete===true&&proof.execution_id===execution.execution_id
+        &&JSON.stringify(proof.native_execution)===JSON.stringify(readWaitBinding),
+      'An owned read wait pause is required for continuation');
+      const snapshot=await observe('same native execution before read wait continuation',s=>{
+        requireValue(s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
+          &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]),
+        'Read wait prepared node changed');
+        verifyExecutionReadWait(execution,s.node_processes,readWaitBinding);return true;
+      });
+      return verifyExecutionReadWait(execution,snapshot.node_processes,readWaitBinding);
+    },
     async waitCompleted({signal,stopSignal}={}) {
       requireValue(execution,'An identified execution is required');
       let s;
@@ -256,6 +284,11 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
               const group=s.node_processes.processes.find(p=>p.parent_id===null&&p.process_id===execution.group_id
                 &&p.record_id===execution.group_record_id);
               requireValue(group,'Execution group replaced while waiting');
+              // A dependency can still be running before our child exists.
+              // No resume proof exists until that child's native owner appears.
+              if(retainReadWait&&(readWaitBinding||s.node_processes.processes.some(p=>p.parent_id===execution.group_id
+                &&p.owner?.verified===true&&p.owner.node_id===node.node_id&&p.owner.source==='native_process_model_identity')))
+                readWaitBinding=verifyExecutionReadWait(execution,s.node_processes,readWaitBinding);
               if(group.state==='completed'&&group.error===false)return true;
               if(group.progress_state?.state==='failed') {verifyFailedExecution(execution,s.node_processes);return true;}
               if(group.progress_state?.verified===true&&group.progress_state.terminal===true)
@@ -268,45 +301,63 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         } catch(error) {
           // Only this loop is read-only. Once ownership/console gestures begin,
           // interruption must retain an unresolved phase until reconciled.
-          if(signal?.aborted&&error===signal.reason&&!stopSignal?.aborted) {
+          if(signal?.aborted&&error===signal.reason&&!stopSignal?.aborted&&(!retainReadWait||readWaitBinding)) {
             const interrupted=new Error(String(error.message??error));
             interrupted.nodeExecutionWaitPause={execution_id:execution.execution_id,
-              read_only:true,cleanup_complete:true};
+              read_only:true,cleanup_complete:true,...(retainReadWait?{native_execution:structuredClone(readWaitBinding)}:{})};
             throw interrupted;
           }
           if(!(error instanceof NodeReadinessTimeout)||error.condition!==condition)throw error;
         }
       }
       const group=one(s.node_processes.processes.filter(p=>p.process_id===execution.group_id&&p.record_id===execution.group_record_id),'Execution group replaced');
-      if(group.progress_state?.state==='failed') {
+      const failed=group.progress_state?.state==='failed';
+      if(failed&&!verifyFailedChild) {
         const receipt=verifyFailedExecution(execution,s.node_processes);
         await act(s,'ConsoleForm;btnClose','click',fresh=>verifyFailedExecution(execution,fresh.node_processes));
         await observe('failed execution console closed',s=>!consoleVisible(s));
         await returnToExecutedWorkflow(channel,node);
         return {...receipt,cleanup_complete:true,effect_possible:false};
       }
+      if(failed){
+        requireValue(!failedChildAttempted,'Failed child ownership already attempted; no gesture replay');
+        failedChildAttempted=true;
+      }
       s=await revealChildren(s,group);
-      const child=selectExecutionChild(execution,s.node_processes);
+      const child=failed?selectFailedExecutionChild(execution,s.node_processes):selectExecutionChild(execution,s.node_processes);
+      const checkChild=(state,selected=false)=>{
+        if(!failed)return;
+        const fresh=selectFailedExecutionChild(execution,state.node_processes,child);
+        if(selected)requireValue(fresh.selected===true&&fresh.rendered===true
+          &&state.node_processes.processes.filter(p=>p.selected).length===1,'Failed child selection changed');
+      };
       const childTid=processControl(child);
       s=await revealExecutionControl(channel,node,s,child,childTid,'right_click');
       await act(s,childTid,'right_click',s=>{
+        checkChild(s);
         requireValue(s.node_processes.processes.some(p=>p.process_id===child.process_id&&p.record_id===child.record_id&&p.rendered),'Process row changed');
         return {node,process_id:child.process_id,record_id:child.record_id};
       });
-      s=await observe('Show Node available for the new process',s=>processes(s)&&control(s,showNode,'show_process_node').length===1
-        &&s.node_processes.processes.filter(p=>p.selected).length===1&&s.node_processes.processes.some(p=>p.selected&&p.record_id===child.record_id));
-      await act(s,showNode,'show_process_node',s=>({node,process_id:child.process_id,record_id:child.record_id,
-        selected:s.node_processes.processes.filter(p=>p.selected).map(p=>p.record_id)}));
+      s=await observe('Show Node available for the new process',s=>{
+        checkChild(s,true);return processes(s)&&control(s,showNode,'show_process_node').length===1
+          &&s.node_processes.processes.filter(p=>p.selected).length===1&&s.node_processes.processes.some(p=>p.selected&&p.record_id===child.record_id);
+      });
+      await act(s,showNode,'show_process_node',s=>{
+        checkChild(s,true);return {node,process_id:child.process_id,record_id:child.record_id,
+          selected:s.node_processes.processes.filter(p=>p.selected).map(p=>p.record_id)};
+      });
       // Switching back from Files can hide the process panel. Reopen it for
       // a fresh check of the same execution; this never launches the node.
       await openConsole();
       s=await observe('new process selects the prepared graph node',s=>processes(s)&&s.node_outputs?.verified===true
         &&s.node_outputs.node_selected===true&&s.prepared_node_context.surface==='graph',{readOutputs:true});
-      const receipt=verifyCompletedExecution(execution,s.node_processes,{verified:true,process_id:child.process_id,record_id:child.record_id,
-        node_selected:s.node_outputs.node_selected,node:s.prepared_node_context});
+      const owner={verified:true,process_id:child.process_id,record_id:child.record_id,
+        node_selected:s.node_outputs.node_selected,node:s.prepared_node_context};
+      const receipt=failed?verifyFailedChildExecution(execution,s.node_processes,child,owner)
+        :verifyCompletedExecution(execution,s.node_processes,owner);
       await closeConsole(s);
       await returnToExecutedWorkflow(channel,node);
-      return receipt;
+      return failed?{...receipt,cleanup_complete:true,effect_possible:false}:receipt;
     },
   });
 }

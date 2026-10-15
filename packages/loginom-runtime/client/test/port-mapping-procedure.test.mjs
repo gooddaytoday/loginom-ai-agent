@@ -272,10 +272,10 @@ test('inline derived output preserves an existing exclusion without a separate-w
  assert.equal(f.count(),actions);assert.deepEqual(f.native,before);
 });
 
-test('inline derived reorder retains exclusion groups and native group indices',async()=>{
+for(const form of ['DerivedDataSourceMappingEngineOutputPortWizard','DataSetOutputSocketWizard'])test('grouped reorder retains native membership and indices: '+form,async()=>{
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs'),f=reorderFixture(true);
  const observe=f.channel.observe,perform=f.channel.perform;
- const adapt=s=>{s.node_mapping.mapping_wizard='DerivedDataSourceMappingEngineOutputPortWizard';for(const e of s.ui.elements)if(e.tid)e.tid=e.tid.replace('DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard');return s;};
+ const adapt=s=>{s.node_mapping.mapping_wizard=form;for(const e of s.ui.elements)if(e.tid)e.tid=e.tid.replace('DerivedDataSourceOutputSocketWizard',form);return s;};
  f.channel.observe=async o=>adapt(await observe({...o,ready:s=>o.ready(adapt(s))}));
  f.channel.perform=async o=>perform({...o,ready:s=>o.ready(adapt(s)),resolve:s=>o.resolve(adapt(s))});
  const result=await reorderOutputFields(f.channel,['t3','t1','t2','t0']);
@@ -304,4 +304,78 @@ test('exclusion of a renamed field restores source name and refuses explicit wro
  const bad=structuredClone(mapping);bad.fields[1].label='Исходная метка';await assert.rejects(configureOutputFields(f.channel,bad,configured),/source name as name and label/);assert.equal(f.count(),0);
  const r=await configureOutputFields(f.channel,mapping,configured);assert.equal(r.definition.target_fields.at(-1).name,'B');assert.equal(r.definition.target_fields.at(-1).label,'B');
  assert.equal(r.definition.target_fields.at(-1).exclusion_source.label,'Исходная метка');
+});
+
+// Minimal public projection of batch53 journal1709: the renamed target keeps
+// PhaseMarker as its source, with the DataSet autosync option still true.
+function dataSetOutputFixture(fault){
+ const source=['ObservedID','PhaseMarker'].map((name,i)=>({name,label:name,type:i?'string':'integer',record_id:'s'+i,field_id:String(i),index:i,required:true}));
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DataSetOutputSocketWizard',autosync:true,
+  source_fields:structuredClone(source),target_fields:source.map((f,i)=>({...f,name:i?'ManualMarker':f.name,label:i?'ManualMarker':f.label,
+   record_id:'t'+i,source:structuredClone(f),group_index:i,excluded:false,inherited:false,required:false,data_kind:i?'Дискретный':'Непрерывный'}))};
+ const configured=source.map(f=>({...f,used:true})),mapping={direction:'output',port:0,autosync:false,
+  fields:source.map((f,i)=>({source:{kind:'configured_field',name:f.name},name:i?'ManualMarker':f.name,label:i?'ManualMarker':f.label}))};
+ const owner={verified:true,document_id:'doc',workflow_id:'flow',node_id:'js'};
+ let finished=false,clicks=0,commits=0,opened=0;
+ const state=()=>{
+  const option={ref:'auto',tid:'W;DataSetOutputSocketWizard;btnAutoSyncThroughColumns',enabled:true,allowed_actions:['click']};
+  if(fault==='foreign_control')option.tid='Foreign;DataSetOutputSocketWizard;btnAutoSyncThroughColumns';
+  if(fault==='wrong_ref')option.ref='other';
+  if(fault==='disabled')option.allowed_actions=[];
+  const s={prepared_node_context:finished?{...owner,node_id:fault==='foreign_graph'?'other':'js',surface:'graph',locked:false}:
+   {...owner,surface:'wizard',output_port:{direction:'output',port:0,opening_operation_id:'open'}},node_mapping:structuredClone(native),
+   wizard:finished?{status:'absent'}:{status:'observed',stage:'output_mapping',root_ref:'root',root_tid:'W',
+    output_columns:{auto_sync:{status:'observed',value:native.autosync,ref:'auto'},
+     page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:2,returned:2,next_offset:null},
+     fields:native.target_fields.map(f=>({...f,status:'observed',usage:'Не задано',source:{...f.source,cell_ref:'source-cell-'+clicks}}))}},
+   ui:{elements:[option,{ref:'done',tid:'W;btnDone',wizard_finish:{mode:'output_port'},allowed_actions:['finish_wizard']}]}};
+  if(fault==='duplicate_control')s.ui.elements.push({...option,ref:'duplicate'});
+  if(fault==='competing_wizard')s.ui.elements.push({...option,ref:'duplicate',tid:'W;DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns'});
+  return s;
+ };
+ const channel={openOutputPort:async port=>{assert.equal(port,0);opened++;},observe:async o=>{
+  const s=state();if(!o.ready(s))throw Error('Owner not ready');return s;
+ },perform:async o=>{
+  const s=state();if(fault==='changed_root')s.wizard.root_ref='other';
+  if(fault==='changed_option_ref')s.wizard.output_columns.auto_sync.ref='other';
+  if(!o.ready(s))throw Error('Bound control changed');o.identity(s);const a=o.resolve(s);
+  if(a.verb==='click'){
+   assert.equal(a.ref,'auto');clicks++;native.autosync=!native.autosync;
+   if(fault==='changed_source')native.target_fields[1].source.label='foreign';
+   if(fault?.startsWith('changed_field_'))native.target_fields[1][fault.slice('changed_field_'.length)]='foreign';
+  }else if(a.verb==='finish_wizard'){assert.equal(a.ref,'done');commits++;finished=true;}
+  else throw Error('Unexpected action');
+ }};
+ return {channel,native,configured,mapping,get clicks(){return clicks;},get commits(){return commits;},get opened(){return opened;}};
+}
+
+test('DataSet standalone mapping preserves renamed source identity through autosync and owned Done',async()=>{
+ const {configureSeparateOutputPort}=await import('../lib/port-mapping-procedure.mjs');
+ const f=dataSetOutputFixture(),before=structuredClone(f.native),r=await configureSeparateOutputPort(f.channel,f.mapping,f.configured);
+ assert.equal(f.opened,1);assert.equal(f.clicks,1);assert.equal(f.commits,1);assert.equal(r.settings_applied,true);assert.equal(r.package_saved,false);
+ assert.deepEqual(r.definition,{...before,autosync:false});assert.equal(r.source_identity_verified,true);
+ assert.equal(r.definition.target_fields[1].name,'ManualMarker');assert.equal(r.definition.target_fields[1].source.name,'PhaseMarker');
+});
+
+test('DataSet autosync keeps its bound unique control and refuses foreign duplicate or replaced identities',async()=>{
+ for(const fault of ['foreign_control','wrong_ref','disabled','duplicate_control','competing_wizard','changed_root','changed_option_ref']){
+  const f=dataSetOutputFixture(fault);await assert.rejects(configureOutputAutosync(f.channel,false),/control|Bound/);
+  assert.equal(f.clicks,0,fault);assert.equal(f.commits,0,fault);
+ }
+});
+
+test('DataSet autosync refuses changes to source or configured schema after one click',async()=>{
+ for(const fault of ['changed_source',...['name','label','type','data_kind'].map(k=>'changed_field_'+k)]){
+  const f=dataSetOutputFixture(fault);await assert.rejects(configureOutputAutosync(f.channel,false),/Output definition changed/);
+  assert.equal(f.clicks,1,fault);assert.equal(f.commits,0,fault);
+ }
+});
+
+test('DataSet source mismatch prevents autosync and Done; foreign post-Done graph stays refused',async()=>{
+ const {configureSeparateOutputPort}=await import('../lib/port-mapping-procedure.mjs');
+ const bad=dataSetOutputFixture();bad.configured[1].type='integer';
+ await assert.rejects(configureSeparateOutputPort(bad.channel,bad.mapping,bad.configured),/Configured source/);
+ assert.equal(bad.clicks,0);assert.equal(bad.commits,0);
+ const foreign=dataSetOutputFixture('foreign_graph');await assert.rejects(configureSeparateOutputPort(foreign.channel,foreign.mapping,foreign.configured),/Owner not ready/);
+ assert.equal(foreign.clicks,1);assert.equal(foreign.commits,1);
 });

@@ -15,6 +15,7 @@ import {
 } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
 import { verifyCliManifest } from "./cli-manifest"
+import release from "../../product/loginom-release.json"
 
 // Unix user install. Profiles live elsewhere and are never inspected or removed.
 export async function installCli(artifact: string, home: string) {
@@ -118,7 +119,7 @@ export async function uninstallCli(home: string) {
 // Linux chown clears setuid, so restore the mode after changing ownership.
 async function ownLinuxSandbox(payload: string) {
   if (process.platform !== "linux") return
-  const path = join(payload, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox")
+  const path = join(payload, `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`)
   const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined
     throw error

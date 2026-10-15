@@ -13,7 +13,7 @@ import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
-test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnect", "other-chat", "direct"])(
+test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnect", "other-chat", "direct", "read-timeout"])(
   "parallel calls preserve ownership: %s",
   async (ending) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -40,7 +40,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
           started = m.id;
           return;
         }
-        if (m.operation === 'list') return reply(m.id, { prepared: true, tools: ['upload','describe','save-description','independent'].map(name => ({ name, inputSchema: { type: 'object' } })) });
+        if (m.operation === 'list') return reply(m.id, { prepared: true, tools: ['upload','describe','save-description','independent','dock_node_read'].map(name => ({ name, inputSchema: { type: 'object' } })) });
         if (m.operation === 'inspect') return reply(m.id, calls);
         if (m.operation === 'interrupts') return reply(m.id, interrupts);
         if (m.operation === 'interrupt' || m.operation === 'finish') {
@@ -104,6 +104,23 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
         profile: "loginom-automation",
       })
       await run.tools()
+      if (ending === "read-timeout") {
+        const timeouts: (number | undefined)[] = []
+        const request = runtime.request
+        runtime.request = (operation, input, timeout) => {
+          if (operation === "call") timeouts.push(timeout)
+          return request(operation, input, timeout)
+        }
+        for (const args of [{ kind: "source" }, { kind: "context" }, { kind: "source", budget_ms: 1_800_000 },
+          { kind: "context", cursor: "owned-cursor" }, { kind: "status" }]) {
+          expect(await run.call("dock_node_read", args, "original")).toEqual({ name: "dock_node_read" })
+        }
+        expect(timeouts).toEqual([330_000, 630_000, 1_830_000, 1_830_000, 120_000])
+        expect(host.journal.pending()).toEqual([])
+        expect(await readdir(join(root, "recovery"))).toEqual([])
+        await run.release()
+        return
+      }
       const controller = new AbortController()
       const first = run.call("upload", {}, "original", ending === "interrupt" ? controller.signal : undefined)
       await runtime.request("started")
@@ -172,6 +189,9 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
         )
         expect(await runtime.request("inspect")).toEqual(["upload"])
       }
+      // Disconnect rejects the caller locally before HostPort has drained the
+      // admitted reply and durable journal removal.
+      if (ending === "disconnect") await port.close()
       expect(host.journal.pending()).toHaveLength(ending === "uncertain" ? 1 : 0)
       expect(await readdir(join(root, "recovery"))).toHaveLength(ending === "uncertain" ? 1 : 0)
       await run.release()

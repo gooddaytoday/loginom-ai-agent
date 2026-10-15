@@ -3,7 +3,6 @@ import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fr
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { buildNodeHost } from "../script/build-node-host"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
@@ -14,7 +13,14 @@ const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_T
 beforeAll(async () => {
   if (!fixture.node) throw new Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-node-host-"))
-  fixture.entry = await buildNodeHost(fixture.directory)
+  // Match connection-validation: isolate Bun's build cache from this test runner.
+  const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory], {
+    stdout: "pipe", stderr: "pipe",
+  })
+  const [code, output, errors] = await Promise.all([builder.exited,
+    new Response(builder.stdout).text(), new Response(builder.stderr).text()])
+  expect({ code, output, errors }).toEqual({ code: 0, output: "", errors: "" })
+  fixture.entry = join(fixture.directory, "node-host.mjs")
 })
 afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })
@@ -386,6 +392,19 @@ test("an invalid handshake uses acknowledged cleanup before rejecting startup", 
   expect(failure).toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
 })
 
+test("a non-boolean saved-package cleanup policy is rejected before the host starts", async () => {
+  await expect(
+    launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root: join(fixture.directory, "bad-cleanup"),
+      resources: join(fixture.directory, "absent-runtime"),
+      headless: false,
+      closeSavedPackageOnShutdown: "true" as unknown as boolean,
+    }),
+  ).rejects.toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
+}, 15_000)
+
 test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack", "missing-ack", "exit-without-ack", "bad-exit"])(
   "host shutdown is bounded and never accepts incomplete cleanup: %s",
   async (mode) => {
@@ -429,4 +448,61 @@ test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack", "missing-ac
     await expect(host.request("connection.status", {})).rejects.toThrow("LOGINOM_HOST_CLOSED")
   },
   10000,
+)
+
+test.skipIf(process.platform === "win32")(
+  "saved-package Host teardown retains actual-exit margin after its full graceful window",
+  async () => {
+    const entry = join(fixture.directory, "saved-package-teardown.mjs")
+    const marker = join(fixture.directory, "saved-package-term-exited")
+    const pid = join(fixture.directory, "saved-package-teardown-pid")
+    await writeFile(
+      entry,
+      `
+      import { writeFileSync } from 'node:fs';
+      setInterval(() => {}, 1000);
+      process.on('message', m => {
+        if (m.method === 'start') {
+          writeFileSync(${JSON.stringify(pid)}, String(process.pid));
+          process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
+        }
+        // An acknowledgement alone cannot certify cleanup while the child stays alive.
+        if (m.method === 'close') process.send({id:m.id,result:{closed:true}});
+      });
+      process.on('SIGTERM', () => setTimeout(() => {
+        writeFileSync(${JSON.stringify(marker)}, 'exited');
+        process.exit(0);
+      }, 150));
+    `,
+    )
+    const host = await launchNodeHost({
+      node: fixture.node,
+      entry,
+      root: fixture.directory,
+      resources: fixture.directory,
+      headless: true,
+      closeSavedPackageOnShutdown: true,
+    })
+    try {
+      const started = Date.now()
+      const closing = host.close()
+      expect(host.close()).toBe(closing)
+      await expect(closing).rejects.toThrow("LOGINOM_HOST_CLEANUP_FAILED")
+      // The policy must reserve time after its 60s graceful window for TERM
+      // and observation. A 60s total deadline would kill before this marker.
+      expect(await Bun.file(marker).text()).toBe("exited")
+      expect(await host.exited).toEqual({ code: 0, signal: null })
+      expect(Date.now() - started).toBeGreaterThanOrEqual(60_000)
+      expect(Date.now() - started).toBeLessThan(75_000)
+      expect(host.alive).toBe(false)
+      await expect(host.close()).rejects.toThrow("LOGINOM_HOST_CLEANUP_FAILED")
+      const child = Number(await Bun.file(pid).text())
+      expect(() => process.kill(child, 0)).toThrow()
+    } finally {
+      try {
+        process.kill(Number(await Bun.file(pid).text()), "SIGKILL")
+      } catch {}
+    }
+  },
+  75_000,
 )

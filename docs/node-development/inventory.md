@@ -2,7 +2,7 @@
 
 Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.
 
-Исторический каталог: **78** компонентов. Обработчики: **15**; обычный остаток: **60**; условный резерв: **3**.
+Исторический каталог: **78** компонентов. Обработчики: **16**; обычный остаток: **59**; условный резерв: **3**.
 
 Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.
 
@@ -24,6 +24,7 @@
 | 14 | [Заполнение пропусков](nodes/missing-values/README.md) | [План](nodes/missing-values/plan.md) | `preprocessing.data_recovery` / impute | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 16 | [Свёртка столбцов](nodes/collapse-columns/README.md) | [План](nodes/collapse-columns/plan.md) | `transform.collapse_columns` / unpivot | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 17 | [Текстовый экспорт](nodes/text-export/README.md) | [План](nodes/text-export/plan.md) | `exports.text` / delimited | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
+| None | [JavaScript](nodes/programming-javascript/README.md) | [План](nodes/programming-javascript/plan.md) | `programming.javascript` / script | not_accepted | not_validated; аналитика: not_revalidated_standalone |
 | 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | [План](nodes/transform-crosstable/plan.md) | `transform.cross_table` / pivot | not_accepted | standalone_cli_accepted; аналитика: independent_oracle_pass |
 
 ## Компоненты без полного обработчика
@@ -73,7 +74,6 @@
 | `component.preprocessing.Elimoutlier` | [Редактирование выбросов](nodes/preprocessing-elimoutlier/README.md) | [План](nodes/preprocessing-elimoutlier/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |
 | `component.preprocessing.Sampling` | [Сэмплинг](nodes/preprocessing-sampling/README.md) | [План](nodes/preprocessing-sampling/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |
 | `component.preprocessing.Smoothing` | [Сглаживание](nodes/preprocessing-smoothing/README.md) | [План](nodes/preprocessing-smoothing/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |
-| `component.programming.JavaScript` | [JavaScript](nodes/programming-javascript/README.md) | [План](nodes/programming-javascript/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |
 | `component.programming.Python` | [Python](nodes/programming-python/README.md) | [План](nodes/programming-python/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |
 | `component.research.AutoCorrelation` | [Автокорреляция](nodes/research-autocorrelation/README.md) | [План](nodes/research-autocorrelation/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |
 | `component.research.CorrAnalysis` | [Корреляционный анализ](nodes/research-corranalysis/README.md) | [План](nodes/research-corranalysis/plan.md) | backlog | Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца. |

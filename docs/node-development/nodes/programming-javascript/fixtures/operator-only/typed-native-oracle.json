@@ -1,0 +1,71 @@
+{
+  "kind": "independent_native_scalar_oracle",
+  "version": 1,
+  "status": "mathematical_encodings_not_live_proof",
+  "operator_only_must_not_be_delivered_to_model": true,
+  "source_fixture_sha256": "35dd2d1e145ff186b83582b8981af3e8510cfbc53cd078ae660d2bbfb4fd1046",
+  "integer_encoding": "signed-int64-le",
+  "real_encoding": "ieee754-binary64-le",
+  "integers": [
+    {
+      "fixture": "integer-safe",
+      "decimal": "-9007199254740991",
+      "bytes_le": "010000000000e0ff",
+      "required_js_roundtrip": true
+    },
+    {
+      "fixture": "integer-safe",
+      "decimal": "0",
+      "bytes_le": "0000000000000000",
+      "required_js_roundtrip": true
+    },
+    {
+      "fixture": "integer-safe",
+      "decimal": "9007199254740991",
+      "bytes_le": "ffffffffffff1f00",
+      "required_js_roundtrip": true
+    },
+    {
+      "fixture": "integer-outside-safe",
+      "decimal": "-9007199254740992",
+      "bytes_le": "000000000000e0ff",
+      "required_js_roundtrip": false
+    },
+    {
+      "fixture": "integer-outside-safe",
+      "decimal": "9007199254740992",
+      "bytes_le": "0000000000002000",
+      "required_js_roundtrip": false
+    },
+    {
+      "fixture": "integer-outside-safe",
+      "decimal": "9007199254740993",
+      "bytes_le": "0100000000002000",
+      "required_js_roundtrip": false
+    }
+  ],
+  "reals": [
+    {
+      "value": 0,
+      "bytes_le": "0000000000000000",
+      "absolute_tolerance": 0
+    },
+    {
+      "value": -1.25,
+      "bytes_le": "000000000000f4bf",
+      "absolute_tolerance": 0
+    },
+    {
+      "value": 10.125,
+      "bytes_le": "0000000000402440",
+      "absolute_tolerance": 0
+    }
+  ],
+  "limitations": [
+    "Native fixture schema, bytes, full ownership and complete read must be verified before comparing JS output.",
+    "Outside-safe integer entries verify exact native INPUT preparation only. They do not require or promise exact JavaScript Number roundtrip.",
+    "Null is a separate native value, never encoded as numeric zero.",
+    "Civil datetime serial bytes must be captured from verified native inputs; this oracle assumes neither epoch nor timezone.",
+    "These bytes do not prove the current JS reader accepts or preserves the native transport encoding."
+  ]
+}

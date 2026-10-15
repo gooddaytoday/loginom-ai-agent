@@ -201,7 +201,7 @@ test('selection timeout after create and rename retains partial remove pending e
 
 test('all node connections wait through a transient graph mask and still reject graph drift before linking',async()=>{
  const {createNodeTargetBrowserAdapter}=await import('../lib/node-target-browser.mjs');let reads=0,waits=0;
- const before={complete:true,marker:'before'},after={complete:true,marker:'changed'};
+ const before={complete:true,dom_epoch:1,nodes:[],links:[]},after={complete:true,dom_epoch:2,nodes:[],links:[]};
  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',pinned:{},execute:async code=>{
   if(code.includes('waitForFunction')){waits++;return true;}
   assert.ok(code.includes('async function readGraph'));reads++;if(reads===2)throw Error('Graph is blocked');return reads===1?before:after;

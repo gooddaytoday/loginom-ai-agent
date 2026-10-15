@@ -59,6 +59,21 @@ test('complete import and existing patch pass the public schema and installed ha
  assert.equal(calls.length,5);
 });
 
+test('published JavaScript full UI request requires the bounded exact read window',async()=>{
+ const {runtime,calls}=fixture();
+ const request={operation_id:'js-full',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'prefix',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'programming.javascript',position:{x:128,y:128},label:'JavaScript'},
+  inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'input'},output:0,input:0}],
+  mode:'script',parameters:{source_text:'',schema_mode:'code'},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ for(const read of [{...request.read,sample_rows:10},{...request.read,require_exact_numbers:false}])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,read}));
+ assert.equal(calls.length,1);
+});
+
 test('Field Parameters dispatch uses the catalog scalar mode and rejects malformed changes',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
  const {runtime,calls}=fixture(),support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
@@ -105,4 +120,46 @@ test('published placement bounds and internal validation agree before mutations'
   if(valid){assert.doesNotThrow(published);assert.doesNotThrow(internal);}else{assert.throws(published);assert.throws(internal,new RegExp('target\\.position\\.'+axis));}
  }
  assert.doesNotThrow(()=>validateNodeTargetRequest(request));
+});
+
+test('CrossTable and JavaScript keep distinct columns in the published schema and actual dispatch',async()=>{
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const {validateCrossTableParameters}=await import('../lib/crosstable-parameters.mjs');
+ const schema=nodeApiTools.find(tool=>tool.name==='dock_node_apply').inputSchema;
+ const validate=new AjvJsonSchemaValidator().getValidator(schema);
+ const {runtime,calls}=fixture();
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ const cross={operation_id:'cross',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'MF;TF',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'transform.cross_table'},inputs:[{source,output:0,input:0}],mode:'pivot',
+  parameters:{row_keys:[],columns:[{kind:'input_field',name:'Category'}],
+   facts:[{field:{kind:'input_field',name:'Amount'},functions:['sum']}],category_mode:'sliding'},
+  mappings:[],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:false},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const javascript={...cross,operation_id:'javascript',target:{kind:'new',type:'programming.javascript'},mode:'script',
+  parameters:{source_text:'',schema_mode:'declared',columns:[{name:'Result',label:'Result',type:'integer',
+   data_kind:'Непрерывный',usage:'Активное'}]}};
+ runtime.startNodeApply=args=>{
+  if(args.target.type==='transform.cross_table')validateCrossTableParameters(args.parameters,args.mode,args);
+  calls.push(args);return {state:'running'};
+ };
+ for(const request of [cross,javascript,{...cross,parameters:{...cross.parameters,columns:[]}}]){
+  assert.equal(validate(request).valid,true);
+  await dispatchNodeApi(runtime,'dock_node_apply',request);
+ }
+ const invalid=[
+  {...cross,parameters:{...cross.parameters,columns:javascript.parameters.columns}},
+  {...javascript,parameters:{...javascript.parameters,columns:cross.parameters.columns}},
+  {...cross,parameters:{...cross.parameters,source_text:''}},
+  {...javascript,parameters:{...javascript.parameters,category_mode:'sliding'}},
+  {...cross,target:{kind:'new',type:'transform.group_data'},mode:'aggregate',parameters:{columns:cross.parameters.columns}},
+  {...javascript,parameters:{...javascript.parameters,columns:[]}},
+ ];
+ for(const request of invalid){
+  assert.equal(validate(request).valid,false);
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',request));
+ }
+ const incomplete=structuredClone(cross);delete incomplete.parameters.facts;
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',incomplete),/typed facts required/);
+ assert.equal(calls.length,3);
 });

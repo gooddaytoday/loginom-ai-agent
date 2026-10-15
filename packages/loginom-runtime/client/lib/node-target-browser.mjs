@@ -294,7 +294,25 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     }
   };
   const before=await observe();
-  if(JSON.stringify(before)!==JSON.stringify(task.effect.before))throw Error('Graph changed before link hover');
+  // The prior readBindings observation already permits node SVG replacement.
+  // Preserve the same complete graph contract here, then bind fresh hover epochs.
+  if(!sameGraph(task.effect.before,before)){
+    // Failure-only bounded evidence; structural admission and no-gesture exit remain.
+    const differences=[],pending=[{path:'$',expected:task.effect.before,observed:before}];
+    let inspected=0;
+    while(pending.length&&differences.length<32&&inspected++<512){
+      const item=pending.pop();
+      if(JSON.stringify(item.expected)===JSON.stringify(item.observed))continue;
+      if(item.expected&&item.observed&&typeof item.expected==='object'&&typeof item.observed==='object'){
+        const keys=[...new Set([...Object.keys(item.expected),...Object.keys(item.observed)])].slice(0,128);
+        for(const key of keys.reverse())pending.push({path:(item.path+'.'+key).slice(0,240),expected:item.expected[key],observed:item.observed[key]});
+      }else{
+        const bounded=value=>value===undefined?'[undefined]':typeof value==='string'?value.slice(0,128):value===null||typeof value==='boolean'||typeof value==='number'?value:'[object]';
+        differences.push({path:item.path,expected:bounded(item.expected),observed:bounded(item.observed)});
+      }
+    }
+    throw Error('Graph changed before link hover: '+JSON.stringify({differences,truncated:pending.length>0}));
+  }
   const root=page.locator('[data-tid='+JSON.stringify(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
   const source=root.locator('[data-tid='+JSON.stringify(task.source_tid)+']');
   if(await source.count()!==1)throw Error('Link hover source is not unique');
@@ -421,12 +439,12 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         // clears before dispatching the single admitted link gesture.
         let graph=await observeGraph(request,deadline);
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        if(JSON.stringify(graph)!==JSON.stringify(effect.before))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+        if(!samePlacementGraph(effect.before,graph))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_graph_changed'};
         // Reuse the complete native graph reader, including its strictly verified
         // rendered-port cache fallback; a second SVG-only resolver loses that identity.
         const bindingGraph=await observeGraph(request,deadline,{readBindings:true});
         const {native_bindings:bindings,...observed}=bindingGraph;
-        if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+        if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_binding_graph_changed'};
         const resolve=(id,direction,index)=>{
           const matches=bindings.filter(b=>b.node_id===id);
           if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact tabular port disappeared');
