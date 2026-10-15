@@ -2671,3 +2671,55 @@ checks1658 facts/113 sources,20 causal snapshots and15 source/binary pins. Own
 pair/network/controller root are absent; the private history archive remains.
 
 Related48 PASS/245 assertions55.60s, typecheck/diff PASS.
+
+
+### Empty/non-browser agent invocation — 2026-10-16
+
+A qualified closed CLI may have explicit empty `browserBindings` and
+`runtimeDirectories`. With a valid before/during/after native window and normal
+lease/preparation/user/activation sources, `recordAgentSessions` returns an empty
+list when no new same-user row exists. The physical invocation remains present
+in the sealed inventory; `collectSlotSessions` still requires its complete
+observation window. Baseline/unknown rows remain subject to combined accounting.
+Missing/incoherent browser metadata is refused, and any new causal row requires
+a qualified browser linkage before a session ledger may be published.
+
+TDD text provider1 FAIL→2/16 GREEN; actual no-browser run refused with
+AGENT_SESSION_BROWSER_UNCONFIRMED (8 assertions101.29s), then passed1/16 102.39s.
+A negative copy of a genuine browser proof, with only its browser metadata emptied,
+initially published a false claim (25 assertions137.36s RED). The new guard refuses
+this copy before ledger publication while preserving the original proof. Both
+native variants now pass2/55 assertions242.82s; related49/248 PASS58.87s and
+typecheck/diff PASS. Empty accounting issues no server close and creates no agent
+session ledger; the genuine browser path still closes its retained Count1 row.
+
+A short text run exposed a test-oracle assumption: its main SQLite file was4096
+bytes, while the SDK session was committed in an848752-byte WAL (SHM32768).
+An independent readonly query on a private copy of all three files found exactly
+one matching session with quick_check=ok, and original hashes remained unchanged.
+Bun SQLite1.3.14 independently read the same three-file WAL archive as well
+(private native-agent-replay-d0452642-edf5-4277-8ea3-9502aa8059fe/
+bun-sqlite-wal-audit.json SHAca9c44ae…); original hashes stayed
+unchanged. The archive implementation had preserved all files. The native oracle now reads
+a private DB/WAL/SHM copy, with temporary copies removed after the query; it never
+opens the immutable archive through SQLite. This covers a checkpointed database
+and retained WAL without treating absence from the main file as lost history.
+
+Private final browser native-agent-replay-d84be043-e4e6-4e25-a40b-23bd737e9ec0
+source-audit SHA256 `ca5c3ea576e414d67c3e31306e28c493704c5e91f1fa7ae5181979cf2585f53f`
+checks1648 facts/108 sources/16 causal frames, including omission refusal and
+archived tree identities. Final text native-agent-replay-71e4d75c-8149-417c-a7f1-d9901c4ed50b
+source-audit SHA256 `06a691321c1ee4cc2ed494e61a6828c9f9e4b07c42576793fc31fdba767f5488`
+checks80 facts/58 sources/6 causal frames and no fabricated ledger/close RPC.
+Both have15 source/binary pins, exact own pair/network/controller root absence
+and retained original histories. Two unused duplicate audit drafts were removed
+after verifying retained copies; original native proofs/archives remain intact.
+
+The combined collector currently requires a sealed whole-run agent inventory.
+Per-attempt accounting over a completed prefix, normal slot finalization/recovery,
+storage/backup release and production admission still require implementation and
+qualification. This change grants none of those later stages.
+
+Joint verification199 source/pin/WAL hashes and both exact resource-absence
+checks: d84be043…/verification.json SHA256
+`5916de3c12158ab05adb13e8743fcc254bd8ba5287c2cc8537b6b6a7cdcafd8a`.
