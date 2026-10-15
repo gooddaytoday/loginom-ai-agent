@@ -1,5 +1,48 @@
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
+import {verifyGroupingSourceFetch} from './grouping-output-sources.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// Fetching Join sources with native autosync can append previously implicit
+// through columns. Native record IDs are rebuilt; retained field IDs persist.
+// Only this measured transition is admitted, against the configured schema.
+export function verifyJoinSourceFetch(before,after,configured){
+ if(before?.target_fields?.length===after?.target_fields?.length)return verifyGroupingSourceFetch(before,after);
+ const owner=before?.node_context,port=owner?.output_port;
+ need(owner?.verified===true&&owner.surface==='wizard'
+  &&['document_id','workflow_id','node_id','tid'].every(k=>typeof owner[k]==='string'&&owner[k].length>0)
+  &&port?.direction==='output'&&port.port===0&&Number.isInteger(port.native_index)&&port.native_index>=0
+  &&typeof port.port_guid==='string'&&port.port_guid.length>0
+  &&typeof port.opening_operation_id==='string'&&port.opening_operation_id.length>0
+  &&same(owner,after?.node_context),'Join source fetch changed owner');
+ need(before.verified===true&&before.inventory_complete===true&&before.source_fields.length===0
+  &&before.mapping_wizard==='DerivedDataSourceOutputSocketWizard'&&after.mapping_wizard===before.mapping_wizard
+  &&before.autosync===true&&after.autosync===true&&after.verified===true
+  &&after.inventory_complete===true&&after.source_identity_verified===true,'Join source fetch requires complete autosync inventory');
+ const sources=after.source_fields,targets=after.target_fields,retained=before.target_fields;
+ need(Array.isArray(configured)&&configured.length>0&&new Set(configured.map(s=>s.name)).size===configured.length
+  &&sources.length===configured.length&&sources.every((s,i)=>s.index===i&&configured.some(c=>c.name===s.name&&c.label===s.label&&c.type===s.type))
+  &&['record_id','field_id','name'].every(k=>sources.every(s=>typeof s[k]==='string'&&s[k].length>0)&&new Set(sources.map(s=>s[k])).size===sources.length),
+  'Join fetched source schema differs');
+ need(targets.length===sources.length&&retained.length<=targets.length
+  &&['record_id','field_id','name'].every(k=>targets.every(t=>typeof t[k]==='string'&&t[k].length>0)&&new Set(targets.map(t=>t[k])).size===targets.length),
+  'Join fetched targets are incomplete or ambiguous');
+ const definition=f=>{const {record_id,source,exclusion_source,...rest}=f;return rest;};
+ need(retained.every((f,i)=>f.index===i&&f.excluded===false&&f.source===null&&f.exclusion_source===null
+  &&same(definition(f),definition(targets[i]))),'Join source fetch changed retained definition or order');
+ const linked=new Set();
+ for(const [i,t] of targets.entries()){
+  const matches=sources.filter(s=>same(s,t.source));
+  need(matches.length===1&&!linked.has(matches[0].record_id)&&t.index===i&&t.excluded===false&&t.exclusion_source===null
+   &&t.name===matches[0].name&&t.label===matches[0].label&&t.type===matches[0].type,
+   'Join fetched target source binding is incomplete or ambiguous');
+  linked.add(matches[0].record_id);
+ }
+ const missing=sources.filter(s=>!retained.some(t=>t.name===s.name));
+ need(targets.slice(retained.length).every((t,i)=>t.source.name===missing[i]?.name&&t.inherited===false
+  &&t.required===false&&t.group_index===retained.length+i&&typeof t.data_kind==='string'&&t.data_kind.length>0),
+  'Join source fetch changed appended through columns');
+ return true;
+}
 // Native Synchronize rebuilds its local records. Stable source field IDs plus
 // names/types identify the same complete inventory; active output IDs persist.
 export function verifyJoinOutputSync(before,after){

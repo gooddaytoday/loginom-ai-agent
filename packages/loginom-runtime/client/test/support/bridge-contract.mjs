@@ -17,7 +17,7 @@ import { actions, selectors, build, Page, nodeParameters } from './executor-fixt
 // no localhost listener, real browser, credentials or model is involved.
 test('MCP application refusals remain typed normal content and the same connection can create a node afterwards', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-bridge-contract-'));
-  const page = new Page(); let browserCalls = 0;
+  const page = new Page(); page.url = () => "about:blank"; let browserCalls = 0;
   const compatibility = { profile_id: 'unit-macos-chromium', loginom_build: build, platform: 'macos', browser: 'chromium' };
   const pinned = { actions, selectors, pins: {}, compatibility, manifest: { compatibility } };
   class ExternalClient {

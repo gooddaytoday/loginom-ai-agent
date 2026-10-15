@@ -1,0 +1,651 @@
+{
+  "initial": {
+    "wizard": {
+      "stage": "output_mapping",
+      "root_ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-157",
+      "root_tid": "MF;TF-3;WizrdMCF"
+    },
+    "prepared_node_context": {
+      "verified": true,
+      "document_id": "796e799f-60cb-400b-99eb-aa68db11c22d",
+      "workflow_id": "796e799f-60cb-400b-99eb-aa68db11c22d-2",
+      "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+      "surface": "wizard",
+      "tid": "MF;TF-3;WizrdMCF",
+      "output_port": {
+        "direction": "output",
+        "port": 0,
+        "native_index": 0,
+        "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+        "opening_operation_id": "explicit-order-output-0:n2"
+      }
+    },
+    "node_mapping": {
+      "verified": true,
+      "source_identity_verified": false,
+      "inventory_complete": true,
+      "mapping_wizard": "DerivedDataSourceOutputSocketWizard",
+      "state_source": "cached_mapping_stores",
+      "autosync": true,
+      "source_fields": [],
+      "target_fields": [
+        {
+          "record_id": "342",
+          "field_id": "0",
+          "index": 0,
+          "name": "LKey",
+          "label": "LKey",
+          "type": "string",
+          "required": false,
+          "group_index": 0,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": null
+        },
+        {
+          "record_id": "343",
+          "field_id": "1",
+          "index": 1,
+          "name": "Part",
+          "label": "Part",
+          "type": "integer",
+          "required": false,
+          "group_index": 1,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": null
+        },
+        {
+          "record_id": "344",
+          "field_id": "2",
+          "index": 2,
+          "name": "RKey",
+          "label": "RKey",
+          "type": "string",
+          "required": false,
+          "group_index": 2,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": null
+        },
+        {
+          "record_id": "345",
+          "field_id": "3",
+          "index": 3,
+          "name": "PartR",
+          "label": "PartR",
+          "type": "integer",
+          "required": false,
+          "group_index": 3,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": null
+        }
+      ],
+      "rendered_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "settings_applied": false,
+      "package_saved": false,
+      "node_context": {
+        "verified": true,
+        "document_id": "796e799f-60cb-400b-99eb-aa68db11c22d",
+        "workflow_id": "796e799f-60cb-400b-99eb-aa68db11c22d-2",
+        "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+        "surface": "wizard",
+        "tid": "MF;TF-3;WizrdMCF",
+        "output_port": {
+          "direction": "output",
+          "port": 0,
+          "native_index": 0,
+          "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+          "opening_operation_id": "explicit-order-output-0:n2"
+        }
+      }
+    },
+    "ui": {
+      "elements": [
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbTable;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-197",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        },
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbLinks;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-199",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        }
+      ]
+    }
+  },
+  "links": {
+    "wizard": {
+      "stage": "output_mapping",
+      "root_ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-157",
+      "root_tid": "MF;TF-3;WizrdMCF"
+    },
+    "prepared_node_context": {
+      "verified": true,
+      "document_id": "796e799f-60cb-400b-99eb-aa68db11c22d",
+      "workflow_id": "796e799f-60cb-400b-99eb-aa68db11c22d-2",
+      "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+      "surface": "wizard",
+      "tid": "MF;TF-3;WizrdMCF",
+      "output_port": {
+        "direction": "output",
+        "port": 0,
+        "native_index": 0,
+        "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+        "opening_operation_id": "explicit-order-output-0:n2"
+      }
+    },
+    "node_mapping": null,
+    "ui": {
+      "elements": [
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbTable;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-197",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        },
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbLinks;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-199",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        },
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;btnGetSourceColumns",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-270",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag"
+          ]
+        }
+      ]
+    }
+  },
+  "loaded": {
+    "wizard": {
+      "stage": "output_mapping",
+      "root_ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-157",
+      "root_tid": "MF;TF-3;WizrdMCF"
+    },
+    "prepared_node_context": {
+      "verified": true,
+      "document_id": "796e799f-60cb-400b-99eb-aa68db11c22d",
+      "workflow_id": "796e799f-60cb-400b-99eb-aa68db11c22d-2",
+      "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+      "surface": "wizard",
+      "tid": "MF;TF-3;WizrdMCF",
+      "output_port": {
+        "direction": "output",
+        "port": 0,
+        "native_index": 0,
+        "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+        "opening_operation_id": "explicit-order-output-0:n2"
+      }
+    },
+    "node_mapping": null,
+    "ui": {
+      "elements": [
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbTable;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-197",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        },
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbLinks;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-199",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        },
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;btnGetSourceColumns",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-270",
+          "allowed_actions": []
+        }
+      ]
+    }
+  },
+  "after": {
+    "wizard": {
+      "stage": "output_mapping",
+      "root_ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-157",
+      "root_tid": "MF;TF-3;WizrdMCF"
+    },
+    "prepared_node_context": {
+      "verified": true,
+      "document_id": "796e799f-60cb-400b-99eb-aa68db11c22d",
+      "workflow_id": "796e799f-60cb-400b-99eb-aa68db11c22d-2",
+      "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+      "surface": "wizard",
+      "tid": "MF;TF-3;WizrdMCF",
+      "output_port": {
+        "direction": "output",
+        "port": 0,
+        "native_index": 0,
+        "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+        "opening_operation_id": "explicit-order-output-0:n2"
+      }
+    },
+    "node_mapping": {
+      "verified": true,
+      "source_identity_verified": true,
+      "inventory_complete": true,
+      "mapping_wizard": "DerivedDataSourceOutputSocketWizard",
+      "state_source": "cached_mapping_stores",
+      "autosync": true,
+      "source_fields": [
+        {
+          "record_id": "346",
+          "field_id": "0",
+          "index": 0,
+          "name": "LKey",
+          "label": "LKey",
+          "type": "string",
+          "required": false
+        },
+        {
+          "record_id": "347",
+          "field_id": "1",
+          "index": 1,
+          "name": "Part",
+          "label": "Part",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "record_id": "348",
+          "field_id": "2",
+          "index": 2,
+          "name": "LValue",
+          "label": "LValue",
+          "type": "string",
+          "required": false
+        },
+        {
+          "record_id": "349",
+          "field_id": "3",
+          "index": 3,
+          "name": "RKey",
+          "label": "RKey",
+          "type": "string",
+          "required": false
+        },
+        {
+          "record_id": "350",
+          "field_id": "4",
+          "index": 4,
+          "name": "PartR",
+          "label": "PartR",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "record_id": "351",
+          "field_id": "5",
+          "index": 5,
+          "name": "RValue",
+          "label": "RValue",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "target_fields": [
+        {
+          "record_id": "352",
+          "field_id": "0",
+          "index": 0,
+          "name": "LKey",
+          "label": "LKey",
+          "type": "string",
+          "required": false,
+          "group_index": 0,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": {
+            "record_id": "346",
+            "field_id": "0",
+            "index": 0,
+            "name": "LKey",
+            "label": "LKey",
+            "type": "string",
+            "required": false
+          }
+        },
+        {
+          "record_id": "353",
+          "field_id": "1",
+          "index": 1,
+          "name": "Part",
+          "label": "Part",
+          "type": "integer",
+          "required": false,
+          "group_index": 1,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": {
+            "record_id": "347",
+            "field_id": "1",
+            "index": 1,
+            "name": "Part",
+            "label": "Part",
+            "type": "integer",
+            "required": false
+          }
+        },
+        {
+          "record_id": "354",
+          "field_id": "2",
+          "index": 2,
+          "name": "RKey",
+          "label": "RKey",
+          "type": "string",
+          "required": false,
+          "group_index": 2,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": {
+            "record_id": "349",
+            "field_id": "3",
+            "index": 3,
+            "name": "RKey",
+            "label": "RKey",
+            "type": "string",
+            "required": false
+          }
+        },
+        {
+          "record_id": "355",
+          "field_id": "3",
+          "index": 3,
+          "name": "PartR",
+          "label": "PartR",
+          "type": "integer",
+          "required": false,
+          "group_index": 3,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": {
+            "record_id": "350",
+            "field_id": "4",
+            "index": 4,
+            "name": "PartR",
+            "label": "PartR",
+            "type": "integer",
+            "required": false
+          }
+        },
+        {
+          "record_id": "356",
+          "field_id": "4",
+          "index": 4,
+          "name": "LValue",
+          "label": "LValue",
+          "type": "string",
+          "required": false,
+          "group_index": 4,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": {
+            "record_id": "348",
+            "field_id": "2",
+            "index": 2,
+            "name": "LValue",
+            "label": "LValue",
+            "type": "string",
+            "required": false
+          }
+        },
+        {
+          "record_id": "357",
+          "field_id": "5",
+          "index": 5,
+          "name": "RValue",
+          "label": "RValue",
+          "type": "string",
+          "required": false,
+          "group_index": 5,
+          "excluded": false,
+          "inherited": false,
+          "exclusion_source": null,
+          "data_kind": "Дискретный",
+          "source": {
+            "record_id": "351",
+            "field_id": "5",
+            "index": 5,
+            "name": "RValue",
+            "label": "RValue",
+            "type": "string",
+            "required": false
+          }
+        }
+      ],
+      "rendered_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "settings_applied": false,
+      "package_saved": false,
+      "node_context": {
+        "verified": true,
+        "document_id": "796e799f-60cb-400b-99eb-aa68db11c22d",
+        "workflow_id": "796e799f-60cb-400b-99eb-aa68db11c22d-2",
+        "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+        "surface": "wizard",
+        "tid": "MF;TF-3;WizrdMCF",
+        "output_port": {
+          "direction": "output",
+          "port": 0,
+          "native_index": 0,
+          "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+          "opening_operation_id": "explicit-order-output-0:n2"
+        }
+      }
+    },
+    "ui": {
+      "elements": [
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbTable;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-197",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        },
+        {
+          "tid": "MF;TF-3;WizrdMCF;DerivedDataSourceOutputSocketWizard;rbLinks;DisplayEl",
+          "ref": "ui-8494eef7-10f6-4367-912a-5e060be94b04-199",
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ]
+        }
+      ]
+    }
+  },
+  "configuration": {
+    "verified": true,
+    "inventory_complete": true,
+    "state_source": "cached_join_stores",
+    "selected_left": [
+      "Part"
+    ],
+    "input_fields": [
+      [
+        {
+          "record_id": "719",
+          "field_id": 0,
+          "name": "LKey",
+          "label": "LKey",
+          "type": "string"
+        },
+        {
+          "record_id": "720",
+          "field_id": 1,
+          "name": "Part",
+          "label": "Part",
+          "type": "integer"
+        },
+        {
+          "record_id": "721",
+          "field_id": 2,
+          "name": "LValue",
+          "label": "LValue",
+          "type": "string"
+        }
+      ],
+      [
+        {
+          "record_id": "722",
+          "field_id": 0,
+          "name": "RKey",
+          "label": "RKey",
+          "type": "string"
+        },
+        {
+          "record_id": "723",
+          "field_id": 1,
+          "name": "PartR",
+          "label": "PartR",
+          "type": "integer"
+        },
+        {
+          "record_id": "724",
+          "field_id": 2,
+          "name": "RValue",
+          "label": "RValue",
+          "type": "string"
+        }
+      ]
+    ],
+    "keys": [
+      {
+        "left": "LKey",
+        "right": "RKey",
+        "left_record_id": "719",
+        "right_record_id": "722",
+        "type": "string"
+      },
+      {
+        "left": "Part",
+        "right": "PartR",
+        "left_record_id": "720",
+        "right_record_id": "723",
+        "type": "integer"
+      }
+    ],
+    "mode": "inner",
+    "case_sensitive": true,
+    "include_joined_keys": true,
+    "settings_applied": false,
+    "node_context": {
+      "verified": true,
+      "document_id": "1635ce65-b274-4fd6-afc3-2897369ff243",
+      "workflow_id": "1635ce65-b274-4fd6-afc3-2897369ff243-1",
+      "node_id": "06654dc6-a228-4f00-be6b-a667a9e46748",
+      "surface": "wizard",
+      "tid": "MF;TF-1;WizrdMCF"
+    }
+  },
+  "parameters": {
+    "keys": [
+      {
+        "left": "LKey",
+        "right": "RKey"
+      },
+      {
+        "left": "Part",
+        "right": "PartR"
+      }
+    ],
+    "case_sensitive": true,
+    "include_joined_keys": true
+  },
+  "provenance": {
+    "sha": "792ede4435b6138fe6e6083086d078c79afb75da",
+    "lines": [
+      8,
+      12,
+      17,
+      21
+    ],
+    "journal_sha256": "d5f7adb726defc04ba9329462d63906250ec84aa7c0e8a97a6de495e1acde0e1"
+  }
+}

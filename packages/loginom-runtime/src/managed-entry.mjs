@@ -56,7 +56,7 @@ process.on("disconnect", stop)
 process.on("SIGTERM", stop)
 process.on("message", (message) => {
   const request = handle(message)
-  requests.add(request)
+  if (message?.operation !== "close") requests.add(request)
   void request
     .finally(() => requests.delete(request))
     .catch(() => {

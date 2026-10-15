@@ -453,7 +453,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!snapshot) throw new Error('A fresh internal observation is required');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
-      if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes'))throw Error('Only the bound wizard confirmation can answer this question');
+      if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || (snapshotWizardConfirmation.kind==='close'?(!boundWizardCloseConfirmation(snapshot,snapshotWizardConfirmation)||snapshot.ui.elements.find(e=>e.ref===action.ref)?.wizard_close_confirmation?.controls?.yes?.ref!==action.ref):snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;

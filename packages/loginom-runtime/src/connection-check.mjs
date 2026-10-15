@@ -29,7 +29,8 @@ export async function loginPage(page, candidate) {
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-  await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+  await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]:visible, [data-tid="LoginForm;Login;edtUsername"]:visible').first().waitFor({ state: "visible", timeout: 60_000 })
+  let loginReadyDeadline = Date.now() + 30_000
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
     const password = field("edtPassword").locator("input")
@@ -39,10 +40,20 @@ export async function loginPage(page, candidate) {
     // Passwordless accounts may make an already empty field readonly after username lookup.
     if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
     await field("btnLogin").click()
+    loginReadyDeadline = Date.now() + 30_000
     await avatar.waitFor({ state: "visible", timeout: 30_000 }).catch(() => {
       throw Error("LOGINOM_LOGIN_REJECTED")
     })
   }
+  const remaining = loginReadyDeadline - Date.now()
+  if (remaining <= 0) throw Error("LOGINOM_LOGIN_REJECTED")
+  await page.waitForFunction(account => {
+    const map = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+    const connection = map?.FServerConnection
+    if (connection?.UserName != null && connection.UserName !== account) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+    if (connection?.Connected !== undefined && connection.Connected !== true) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+    return connection?.UserName === account && connection?.Connected === true && !!map?.FPackagesParentNode
+  }, candidate.username, { timeout: remaining })
   const identity = await page.evaluate(
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
   )

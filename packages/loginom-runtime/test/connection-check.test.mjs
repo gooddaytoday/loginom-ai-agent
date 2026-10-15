@@ -69,6 +69,10 @@ for (const [initial, password, expected] of [
           assert.ok(selector.includes("LoginForm;Login;") || selector.includes("btnAvatar"))
           return locator(selector)
         },
+        async waitForFunction(fn, account, options) {
+          assert.ok(options.timeout > 0 && options.timeout <= 30_000)
+          if (account !== "User") throw Error("LOGINOM_ACCOUNT_MISMATCH")
+        },
         async evaluate() {
           return account
         },
@@ -92,4 +96,30 @@ for (const [initial, password, expected] of [
       )
     },
   )
+}
+
+// Real serialized readiness predicate; map and connection are native doubles.
+for (const mode of ['pending-map', 'pending-account', 'pending-connection', 'foreign', 'disconnected']) {
+  test('package tree readiness remains fail closed: ' + mode, async () => {
+    const vm = await import('node:vm')
+    const native = vm.createContext({bg:{app:{Application:{FInstance:{FMainForm:{}}}}}})
+    let calls = 0
+    const locator = {first(){return this},async waitFor(){},async isVisible(){return true}}
+    const page = {async goto(){},locator(){return locator},async evaluate(){return 'User'},
+      async waitForFunction(fn, account, options) {
+        calls++; assert.ok(options.timeout > 0 && options.timeout <= 30000)
+        const read = () => vm.runInContext('(' + fn.toString() + ')(' + JSON.stringify(account) + ')', native)
+        if (mode === 'pending-account') vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree={FServerConnection:{Connected:true}}', native)
+        if (mode === 'pending-connection') vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree={FServerConnection:{UserName:"User"}}', native)
+        assert.equal(read(), false)
+        vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree={FServerConnection:{UserName:"User",Connected:true},FPackagesParentNode:{}}', native)
+        if (mode === 'foreign') vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName="Other"', native)
+        if (mode === 'disconnected') vm.runInContext('bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Connected=false', native)
+        assert.equal(read(), true)
+      }}
+    const action = () => loginPage(page, {url:'https://fixture.invalid/app/', username:'User', password:''})
+    if (['foreign','disconnected'].includes(mode)) await assert.rejects(action(), /LOGINOM_ACCOUNT_MISMATCH/)
+    else assert.deepEqual(await action(), {authenticated:true})
+    assert.equal(calls, 1)
+  })
 }
