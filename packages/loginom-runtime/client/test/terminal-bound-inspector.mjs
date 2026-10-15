@@ -4,14 +4,14 @@ import {createHash,randomUUID} from 'node:crypto';
 import {parse} from '../../../loginom-host/node_modules/acorn/dist/acorn.mjs';
 const methods=['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'];
 const ids=[907,909,910,911];
-export function observeStorageBound({provider,context,guard,onPause,alterLocal,skipBreakpoint=false}){
+export function observeStorageBound({provider,context,guard,onPause,alterLocal,fullScriptSha256,skipBreakpoint=false}){
  if(typeof guard!=='function')throw Error('BOUND_INSPECTOR_CONTROL_UNAVAILABLE');guard();
  const session=new Session();session.connect();let first,closed=false,active;
- const records=[],breakpoints=new Map(),pending=new WeakMap(),ready=new WeakSet(),restorations=new Set(),locations=new Map();
+ const records=[],breakpoints=new Map(),pending=new WeakMap(),ready=new WeakSet(),restorations=new Set(),locations=new Map(),tracked=new Set(),observedRequests=new WeakSet(),scripts=new Map();
  const post=(method,params={})=>{let called=false,result,error;session.post(method,params,(e,r)=>{called=true;error=e;result=r});if(!called)throw Error('BOUND_INSPECTOR_ASYNC_POST');if(error)throw error;return result};
  const checkControl=()=>{try{return guard()}catch(value){first??={value};throw value}};
  const own=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('BOUND_INSPECTOR_ACCESSOR');return d.value};
- const before=provider.inspect(),storage=before.storage;
+ const before=provider.inspect(),storage=before.storage,witnessGate=typeof Object.getOwnPropertyDescriptor(provider,'retainBoundPause')?.value==='function';
  const root={methods:Object.fromEntries(methods.map(name=>[name,own(Object.getPrototypeOf(storage),name)])),
   pause(callee,receiver,lower,name){
    if(first)throw first.value;checkControl();
@@ -19,6 +19,10 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,s
    if(receiver!==storage||callee!==completion?.returned||call?.receiver!==storage||completion.call!==call
      ||call.storageCall!==lower.storageCall||call.storageCall.method!==root.methods[name]
      ||pending.has(lower)||active)throw Error('BOUND_INSPECTOR_CALL_CHANGED');
+   if(witnessGate){
+    const token=Reflect.apply(own(provider,'retainBoundPause'),provider,[lower,callee,receiver,name,locations.get(name)]);
+    pending.set(lower,token);tracked.add(lower);onPause?.({callee,receiver,lower,name,delegate:call.delegate,token});return true;
+   }
    const delegate=call.delegate,prototype=Object.getPrototypeOf(delegate),original=Object.getOwnPropertyDescriptor(delegate,'apply');
    if(original)throw Error('BOUND_INSPECTOR_APPLY_SHADOW');
    const base=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(delegate),'apply');
@@ -43,7 +47,9 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,s
    onPause?.({callee,receiver,lower,name,delegate,token});
    return true;
   },
-  arm(lower){checkControl();const token=pending.get(lower);if(!token||first||own(lower,'mkdelCompletion')!==token.completion||own(token.completion,'returned')!==token.callee)throw Error('BOUND_INSPECTOR_CALL_CHANGED');ready.add(token);return true}
+  arm(lower){const token=pending.get(lower);
+   if(witnessGate){try{checkControl();return Reflect.apply(own(provider,'armBoundPause'),provider,[token])}catch(value){if(token)Reflect.apply(own(provider,'refuseBoundPause'),provider,[token,value]);throw value}}
+   checkControl();if(!token||first||own(lower,'mkdelCompletion')!==token.completion||own(token.completion,'returned')!==token.callee)throw Error('BOUND_INSPECTOR_CALL_CHANGED');ready.add(token);return true}
  };
  const scriptContexts=new Map();session.on('Debugger.scriptParsed',({params})=>scriptContexts.set(params.scriptId,params.executionContextId));
  post('Runtime.enable');post('Debugger.enable');
@@ -72,16 +78,23 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,s
    const fn=post('Runtime.callFunctionOn',{objectId:remote,functionDeclaration:'function(name){return this.methods[name]}',arguments:[{value:name}]}).result;
    const props=post('Runtime.getProperties',{objectId:fn.objectId,ownProperties:true});
    const location=props.internalProperties?.find(p=>p.name==='[[FunctionLocation]]')?.value.value;if(!location)throw Error('BOUND_INSPECTOR_FUNCTION_LOCATION');
-   const script=post('Debugger.getScriptSource',{scriptId:location.scriptId}).scriptSource;
-   const ast=parse(script,{ecmaVersion:'latest',locations:true});
-   const expression=ast.body[0]?.expression;
-   if(expression?.type!=='FunctionExpression')throw Error('BOUND_INSPECTOR_FUNCTION_CHANGED');
-   const headerOffset=script.indexOf('(',expression.start),header=script.slice(0,headerOffset).split('\n');
-   if(headerOffset>=expression.body.start||header.length-1!==location.lineNumber||header.at(-1).length!==location.columnNumber)throw Error('BOUND_INSPECTOR_FUNCTION_CHANGED '+JSON.stringify({location,headerOffset,expectedLine:header.length-1,expectedColumn:header.at(-1).length}));
+   let compiled=scripts.get(location.scriptId);
+   if(!compiled){
+    const script=post('Debugger.getScriptSource',{scriptId:location.scriptId}).scriptSource,hash=createHash('sha256').update(script).digest('hex');
+    if(witnessGate&&(!fullScriptSha256||hash!==fullScriptSha256))throw Error('BOUND_INSPECTOR_FULL_SCRIPT_REQUIRED');
+    const ast=parse(script,{ecmaVersion:'latest',locations:true}),functions=new Map(),lines=[0];
+    for(let i=0;i<script.length;i++)if(script.charCodeAt(i)===10)lines.push(i+1);
+    function visit(node){if(!node||typeof node!=='object')return;
+     if(node.type==='FunctionExpression'){const offset=script.indexOf('(',node.start);if(offset<node.body.start)functions.set(offset,node)}
+     for(const [key,value]of Object.entries(node)){if(key==='loc')continue;if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value)}
+    }visit(ast);compiled={script,hash,lines,functions};scripts.set(location.scriptId,compiled);
+   }
+   const {hash,lines,functions}=compiled,expression=functions.get(lines[location.lineNumber]+location.columnNumber);
+   if(!expression)throw Error('BOUND_INSPECTOR_FUNCTION_CHANGED');
    const statements=expression.body.body.filter(n=>n.type==='ExpressionStatement'&&n.expression.type==='CallExpression'&&n.expression.callee.name==='$sm'&&n.expression.arguments.length===0);
    if(statements.length!==1)throw Error('BOUND_INSPECTOR_OPERATOR_UNAVAILABLE');
    const statement=statements[0],requested={scriptId:location.scriptId,lineNumber:statement.loc.start.line-1,columnNumber:statement.loc.start.column};
-   locations.set(name,Object.freeze({...requested,method:root.methods[name],scriptSha256:createHash('sha256').update(script).digest('hex')}));
+   locations.set(name,Object.freeze({...requested,method:root.methods[name],scriptSha256:hash,fullScript:!!fullScriptSha256&&hash===fullScriptSha256}));
    if(skipBreakpoint)continue;
    const result=post('Debugger.setBreakpoint',{location:requested});
    if(JSON.stringify(result.actualLocation)!==JSON.stringify(requested))throw Error('BOUND_INSPECTOR_BREAKPOINT_MOVED');
@@ -96,6 +109,7 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,s
   beforeDispatch(request){
    checkControl();const index=ids.indexOf(own(request,'method'));if(index<0)return;
    if(first)throw first.value;
+   if(witnessGate){const row=[...tracked].map(lower=>({lower,receipt:Object.getOwnPropertyDescriptor(lower,'boundReceipt')?.value})).find(x=>x.receipt?.request===request&&x.lower.boundActivation);if(!row||observedRequests.has(request))throw Error('BOUND_INSPECTOR_TOKEN_UNAVAILABLE');observedRequests.add(request);return}
    const state=active,token=state?.token;
    if(!token||token.name!==methods[index]||pending.get(token.lower)!==token||state.dispatches)throw Error('BOUND_INSPECTOR_TOKEN_UNAVAILABLE');
    if(token.callee!==token.completion.returned||token.delegate!==token.call.delegate||token.receiver!==storage)throw Error('BOUND_INSPECTOR_CALL_CHANGED');
@@ -104,7 +118,7 @@ export function observeStorageBound({provider,context,guard,onPause,alterLocal,s
     mkdelCall:token.call,mkdelCompletion:token.completion,initial:token.call.initial,packet:token.call.packet,request,
     activationToken:token,operator:token.operator,boundCallQualified:true,closureIdentityQualified:false,nativeReceiversQualified:false}));
   },
-  inspect(){if(first)throw first.value;return Object.freeze(records.slice())},
+  inspect(){if(first)throw first.value;return Object.freeze(witnessGate?[...tracked].map(lower=>Object.getOwnPropertyDescriptor(lower,'boundReceipt')?.value).filter(Boolean):records.slice())},
   close(){if(closed)return;closed=true;for(const cleanup of restorations)cleanup();for(const id of breakpoints.keys())post('Debugger.removeBreakpoint',{breakpointId:id});post('Runtime.releaseObjectGroup',{objectGroup:key});session.disconnect()}
  });
 }
