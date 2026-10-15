@@ -1,0 +1,1548 @@
+{
+  "main-inner-True-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "A",
+        2,
+        "part2right"
+      ]
+    ]
+  },
+  "main-inner-True-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right2"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "part2right"
+      ]
+    ]
+  },
+  "main-inner-False-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "A",
+        2,
+        "part2right"
+      ]
+    ]
+  },
+  "main-inner-False-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right2"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "part2right"
+      ]
+    ]
+  },
+  "main-left-True-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "A",
+        2,
+        "part2right"
+      ]
+    ]
+  },
+  "main-left-True-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right2"
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "part2right"
+      ]
+    ]
+  },
+  "main-left-False-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "A",
+        1,
+        "right2"
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "A",
+        2,
+        "part2right"
+      ]
+    ]
+  },
+  "main-left-False-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left1",
+        "right2"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right1"
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        "right2"
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        "part2right"
+      ]
+    ]
+  },
+  "case-inner-True-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        2,
+        "second",
+        "A",
+        2,
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ]
+    ]
+  },
+  "case-inner-True-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        2,
+        "second",
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ]
+    ]
+  },
+  "case-inner-False-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "upper",
+        "a",
+        1,
+        "lower"
+      ],
+      [
+        "A",
+        2,
+        "second",
+        "A",
+        2,
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ]
+    ]
+  },
+  "case-inner-False-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "upper",
+        "lower"
+      ],
+      [
+        "A",
+        2,
+        "second",
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ]
+    ]
+  },
+  "case-left-True-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "upper",
+        null,
+        null,
+        null
+      ],
+      [
+        " a",
+        1,
+        "space",
+        null,
+        null,
+        null
+      ],
+      [
+        "A",
+        2,
+        "second",
+        "A",
+        2,
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ]
+    ]
+  },
+  "case-left-True-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "upper",
+        null
+      ],
+      [
+        " a",
+        1,
+        "space",
+        null
+      ],
+      [
+        "A",
+        2,
+        "second",
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ]
+    ]
+  },
+  "case-left-False-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "upper",
+        "a",
+        1,
+        "lower"
+      ],
+      [
+        " a",
+        1,
+        "space",
+        null,
+        null,
+        null
+      ],
+      [
+        "A",
+        2,
+        "second",
+        "A",
+        2,
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        1,
+        "nullright"
+      ]
+    ]
+  },
+  "case-left-False-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "upper",
+        "lower"
+      ],
+      [
+        " a",
+        1,
+        "space",
+        null
+      ],
+      [
+        "A",
+        2,
+        "second",
+        "secondright"
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        "nullright"
+      ]
+    ]
+  },
+  "empty-inner-True-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": []
+  },
+  "empty-inner-True-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": []
+  },
+  "empty-inner-False-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": []
+  },
+  "empty-inner-False-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": []
+  },
+  "empty-left-True-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        null,
+        null,
+        null
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        null,
+        null,
+        null
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        null,
+        null
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        null,
+        null,
+        null
+      ]
+    ]
+  },
+  "empty-left-True-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        null
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        null
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        null
+      ]
+    ]
+  },
+  "empty-left-False-True": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RKey",
+        "label": "RKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "PartR",
+        "label": "PartR",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        null,
+        null,
+        null
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        null,
+        null,
+        null
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null,
+        null,
+        null
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        null,
+        null,
+        null
+      ]
+    ]
+  },
+  "empty-left-False-False": {
+    "columns": [
+      {
+        "name": "LKey",
+        "label": "LKey",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Part",
+        "label": "Part",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "LValue",
+        "label": "LValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "RValue",
+        "label": "RValue",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "rows": [
+      [
+        "A",
+        1,
+        "left1",
+        null
+      ],
+      [
+        "A",
+        1,
+        "left2",
+        null
+      ],
+      [
+        "B",
+        1,
+        "unmatched",
+        null
+      ],
+      [
+        null,
+        1,
+        "nullleft",
+        null
+      ],
+      [
+        "A",
+        2,
+        "part2",
+        null
+      ]
+    ]
+  }
+}

@@ -23,7 +23,7 @@ class ExternalClient {
   async callTool({arguments:{code}}){
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+      target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -33,8 +33,9 @@ class ExternalClient {
     }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
-      value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario==='native-blocked'?'BLOCKED':'SUCCEEDED',package_closed:this.f.scenario!=='native-blocked',
-        logged_out:this.f.scenario!=='native-blocked',account:'test-2',package_path:path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+      const blocked=['native-blocked','managed-unsaved'].includes(this.f.scenario);
+      value={version:1,session_id:'own-session',document_id:'own-doc',status:blocked?'BLOCKED':'SUCCEEDED',package_closed:!blocked,
+        logged_out:!blocked,account:this.f.scenario==='managed-identity'?'foreign':'test-2',package_path:path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:blocked?'UNSAVED_CHANGES':null};
     } else throw Error('Unexpected browser code');
     return {content:[{type:'text',text:JSON.stringify(value)}]};
   }
@@ -48,8 +49,9 @@ mock.module(new URL('../../lib/skill.mjs',import.meta.url).href,{namedExports:{.
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
-  const f=current;return {tools:[],describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
-    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
+  const f=current;return {tools:[],describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy||f.unknown)throw Error('busy');},
+    hasUnsettledWork:()=>!!f.unknown,hasActiveWork:()=>!!f.busy,
+    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',cleanup_complete:f.scenario!=='managed-unsettled-save',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
@@ -96,5 +98,57 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
       assert.equal(f.events.includes('package-cleanup'),scenario==='native-blocked');
     }
     assert.equal(f.events.filter(e=>e==='package-cleanup').length,['success','native-blocked','dirty-after-save','state-unavailable'].includes(scenario)?1:0);
+    if(['native-blocked','busy'].includes(scenario)) {
+      const retained=await client.callTool({name:'dock_diagnostics',arguments:{}});
+      assert.notEqual(retained.isError,true,JSON.stringify(retained));
+      f.busy=false;f.scenario='success';
+      const recovered=await bridge.close();assert.equal(recovered.browser_transport_closed,true);
+      assert.ok(f.events.includes('browser-close'));
+    }
+
   }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
+});
+
+for(const scenario of ['managed-success','managed-no-save','managed-unsettled-save','managed-unsaved','managed-identity','managed-pending','managed-unknown','managed-document','managed-account','managed-receipt-failure'])test('managed model shutdown lifecycle: '+scenario,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'managed-cleanup-bridge-'));
+ const f=current={scenario,events:[],busy:false,saves:0};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+  artifactStore:{list:()=>[],async releaseUploads(){
+   const receipt=JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8'));
+   assert.equal(receipt.status,'SUCCEEDED');f.events.push('release-uploads');
+  }}};
+ let bridge,client;
+ try{
+  bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null},session);
+  client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  const prepared=await client.callTool({name:'dock_prepare',arguments:{}});assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+  if(scenario!=='managed-no-save')await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
+  f.busy=scenario==='managed-pending';f.unknown=scenario==='managed-unknown';
+  if(scenario==='managed-document')session.metadata.workspacePreparation.state.document_id='foreign';
+  if(scenario==='managed-account')session.metadata.workspacePreparation.state.loginom_account='foreign';
+  if(scenario==='managed-receipt-failure')await (await import('node:fs/promises')).mkdir(join(directory,'package-cleanup.json'));
+  if(scenario==='managed-receipt-failure')await assert.rejects(bridge.close());
+  else{
+   const result=await bridge.close(),receipt=JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8'));
+   assert.equal(result.browser_transport_closed,scenario==='managed-success');
+   assert.equal(receipt.status,scenario==='managed-success'?'SUCCEEDED':'BLOCKED');
+  }
+  if(scenario==='managed-success'){
+   assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
+   assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
+  }else{
+   assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
+   assert.equal(bridge.hasUnsettledWork(),true);
+   const saves=f.saves;
+   await assert.rejects(client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'forbidden-replay'}}),/only read-only diagnosis/);
+   assert.equal(f.saves,saves);
+   assert.notEqual((await client.callTool({name:'dock_diagnostics',arguments:{checkConnections:false}})).isError,true);
+  }
+ }finally{
+  // Offline fixtures contain no native resources; do not manufacture cleanup
+  // authority or retry the refused mutation to silence teardown failures.
+  await client?.close();await rm(directory,{recursive:true,force:true});
+ }
 });

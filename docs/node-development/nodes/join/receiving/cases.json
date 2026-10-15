@@ -1,0 +1,944 @@
+{
+  "version": 1,
+  "status": "SOURCE_PENDING",
+  "baseline_product_sha": "0f85bff910d25d71eff716e17979bf3a2055ae8e",
+  "source_author": "LAB-68",
+  "receipt_authority": "same-bridge opaque object minted only by source-owned fixture adapter",
+  "base_fixture": "fresh settled exact native owner; complete import settings; no mutations; dirty=false; original upstream deadline",
+  "cases": [
+    {
+      "id": "clean-native-writable-task-readonly",
+      "fixture_changes": {
+        "native_dirty": false,
+        "native_readonly": false,
+        "task_readonly": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 1,
+        "native_logout": 1,
+        "ack": true,
+        "release": true,
+        "ordered_events": [
+          "identity_before",
+          "dirty_read_awaited",
+          "identity_after",
+          "running_after",
+          "native_close_confirmed",
+          "native_logout_confirmed",
+          "proof_synced",
+          "cleanup_synced",
+          "ack",
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "native-readonly-policy",
+      "fixture_changes": {
+        "native_dirty": false,
+        "native_readonly": true,
+        "task_readonly": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "dirty-true",
+      "fixture_changes": {
+        "native_dirty": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "dirty-null",
+      "fixture_changes": {
+        "native_dirty": null
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "dirty-zero",
+      "fixture_changes": {
+        "native_dirty": 0
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "dirty-empty",
+      "fixture_changes": {
+        "native_dirty": ""
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "dirty-string-false",
+      "fixture_changes": {
+        "native_dirty": "false"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "dirty-missing",
+      "fixture_changes": {
+        "omit_native_dirty": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-host",
+      "fixture_changes": {
+        "foreign_identity": "host"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-run",
+      "fixture_changes": {
+        "foreign_identity": "run"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-lease",
+      "fixture_changes": {
+        "foreign_identity": "lease"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-generation",
+      "fixture_changes": {
+        "foreign_identity": "generation"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-chat",
+      "fixture_changes": {
+        "foreign_identity": "chat"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-page",
+      "fixture_changes": {
+        "foreign_identity": "page"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-document",
+      "fixture_changes": {
+        "foreign_identity": "document"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-connection",
+      "fixture_changes": {
+        "foreign_identity": "connection"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-session",
+      "fixture_changes": {
+        "foreign_identity": "session"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-account",
+      "fixture_changes": {
+        "foreign_identity": "account"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-origin",
+      "fixture_changes": {
+        "foreign_identity": "origin"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-build",
+      "fixture_changes": {
+        "foreign_identity": "build"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-package",
+      "fixture_changes": {
+        "foreign_identity": "package"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-tab",
+      "fixture_changes": {
+        "foreign_identity": "tab"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-path",
+      "fixture_changes": {
+        "foreign_identity": "path"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-workflow",
+      "fixture_changes": {
+        "foreign_identity": "workflow"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-import_guid",
+      "fixture_changes": {
+        "foreign_identity": "import_guid"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "wrong-output0",
+      "fixture_changes": {
+        "foreign_identity": "output0"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "identity-race-package",
+      "fixture_changes": {
+        "change_after_awaited_dirty_read": "package"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "identity-race-tab",
+      "fixture_changes": {
+        "change_after_awaited_dirty_read": "tab"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "identity-race-connection",
+      "fixture_changes": {
+        "change_after_awaited_dirty_read": "connection"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "identity-race-document",
+      "fixture_changes": {
+        "change_after_awaited_dirty_read": "document"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "identity-race-path",
+      "fixture_changes": {
+        "change_after_awaited_dirty_read": "path"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "fresh-running-global",
+      "fixture_changes": {
+        "start_running_after_awaited_dirty_read": "global"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "fresh-running-package",
+      "fixture_changes": {
+        "start_running_after_awaited_dirty_read": "package"
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "upstream-deadline-before",
+      "fixture_changes": {
+        "deadline_expired_before": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "upstream-deadline-after-await",
+      "fixture_changes": {
+        "deadline_expires_during_dirty_read": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "unsettled",
+      "fixture_changes": {
+        "unsettled_operation": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "unknown",
+      "fixture_changes": {
+        "unknown_operation": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "mutation-seen",
+      "fixture_changes": {
+        "configuration_mutation_seen": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "partial-fields",
+      "fixture_changes": {
+        "truncate_ordered_columns": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "field-order",
+      "fixture_changes": {
+        "swap_field_indexes": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "field-type",
+      "fixture_changes": {
+        "replace_field_type": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "field-kind",
+      "fixture_changes": {
+        "replace_data_kind": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "foreign-retained-path",
+      "fixture_changes": {
+        "retained_path_differs_from_delivery": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "later-write",
+      "fixture_changes": {
+        "same_destination_later_upload": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "activity-unknown",
+      "fixture_changes": {
+        "activity_unknown": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "freshness-unknown",
+      "fixture_changes": {
+        "freshness_unknown": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "receipt-json-clone",
+      "fixture_changes": {
+        "clone_opaque_receipt": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "receipt-other-bridge",
+      "fixture_changes": {
+        "use_receipt_from_other_bridge": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "proof-persistence-refusal",
+      "fixture_changes": {
+        "proof_sync_refuses": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    },
+    {
+      "id": "cleanup-persistence-refusal",
+      "fixture_changes": {
+        "cleanup_sync_refuses": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 1,
+        "native_logout": 1,
+        "ack": false,
+        "release": false,
+        "ordered_events": [
+          "native_close_confirmed",
+          "native_logout_confirmed",
+          "cleanup_sync_refused"
+        ]
+      }
+    },
+    {
+      "id": "confirmed-evidence-retry-no-replay",
+      "fixture_changes": {
+        "cleanup_sync_refuses_once": true,
+        "retry_same_confirmed_receipt": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 1,
+        "native_logout": 1,
+        "ack": true,
+        "release": true,
+        "ordered_events": [
+          "native_close_confirmed",
+          "native_logout_confirmed",
+          "cleanup_sync_refused",
+          "evidence_retry",
+          "proof_synced",
+          "cleanup_synced",
+          "ack",
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "lost-native-reply",
+      "fixture_changes": {
+        "native_reply_lost": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 1,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": [
+          "native_close_dispatched",
+          "native_reply_unknown"
+        ]
+      }
+    },
+    {
+      "id": "ordinary-save-guard",
+      "fixture_changes": {
+        "ordinary_model_transaction": true,
+        "missing_save_receipt": true
+      },
+      "expected": {
+        "configure": 0,
+        "apply": 0,
+        "finish": 0,
+        "execute": 0,
+        "native_close": 0,
+        "native_logout": 0,
+        "ack": false,
+        "release": false,
+        "ordered_events": []
+      }
+    }
+  ]
+}

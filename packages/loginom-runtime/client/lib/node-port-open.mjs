@@ -12,16 +12,30 @@ function makePreparedPortOpenCode(binding,options,direction) {
    ||!Number.isInteger(options.port)||options.port<0||options.port>99
    ||typeof options.operation_id!=='string'||! /^[A-Za-z0-9_.:-]{1,160}$/.test(options.operation_id)
    ||!Number.isSafeInteger(options.deadline)||typeof options.origin!=='string'||typeof options.build!=='string')throw Error('Exact bounded output port opening required');
- return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction})},${readPreparedNodeContext.toString()})`;
+ return `async (page,progress)=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction})},${readPreparedNodeContext.toString()},progress)`;
 }
 
 // A local opening receipt retains UI object identity across graph -> port wizard.
 // Proxy objects are compared by reference only; no proxy property/method is used.
-export async function openPreparedOutputPort(page,task,readNode=readPreparedNodeContext) {
+export async function openPreparedOutputPort(page,task,readNode=readPreparedNodeContext,progress) {
  let effect=false;const trace=[],direction=task.direction??'output';
+ // Synchronous private publication on the original Page receipt, never an IO
+ // dispatcher. A missing hook is NOT_PERSISTED, never evidence of helper entry.
+ const identity={binding:task.binding,direction,port:task.port,operation_id:task.operation_id,deadline:task.deadline};
+ const mark=(phase,boundary)=>progress?.({identity,phase,boundary});
+ const provider=async(phase,call)=>{
+  mark(phase,'entry');
+  try{const value=await call();mark(phase,'returned');return value;}
+  catch(error){try{mark(phase,'refused');}catch{}throw error;}
+ };
+ const gesture=async(phase,call)=>{
+  mark(phase,'intent');
+  try{const value=await call();mark(phase,'returned');return value;}
+  catch(error){try{mark(phase,'refused');}catch{}throw error;}
+ };
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Output port opening deadline');return n;};
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
- const inspect=mode=>page.evaluate(({task,mode})=>{
+ const inspect=mode=>provider('inspect_'+mode,()=>page.evaluate(({task,mode})=>{
   const direction=task.direction??'output',input=direction==='input',control=task.kind==='control';
   if(control&&(!input||task.port!==0))throw Error('Control input only');
   if(!['input','output'].includes(direction))throw Error('Invalid port direction');
@@ -175,38 +189,38 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     direction,port:r.portIndex,native_index:r.nativeIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
   }
   fail('Unknown port opening phase');
- },{task,mode});
- const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
+ },{task,mode}));
+ const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await provider('poll_wait',()=>page.waitForTimeout(Math.min(100,remaining())));}};
  try {
-  remaining();let existing=await inspect('lookup');
+  mark('helper','entry');remaining();let existing=await inspect('lookup');
   if(existing?.phase==='reserved'){await inspect('release_reserved');existing=null;}
-  if(existing){effect=existing.phase!=='reserved';const result=await finish();return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,replayed:true,trace};}
-  const before=await readNode(page,task.binding);
+  if(existing){effect=existing.phase!=='reserved';const result=await finish();mark('helper_result','returned');return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,replayed:true,trace};}
+  const before=await provider('read_node',()=>readNode(page,task.binding));
   if(before?.verified!==true||before.surface!=='graph'||before.locked!==false)throw Error('Prepared unlocked graph required for port opening');
   const target=await inspect('begin');trace.push({event:direction+'_port_reserved',...target});
-  if(JSON.stringify(await readNode(page,task.binding))!==JSON.stringify(before))throw Error('Prepared node changed before port opening');
+  if(JSON.stringify(await provider('read_node',()=>readNode(page,task.binding)))!==JSON.stringify(before))throw Error('Prepared node changed before port opening');
   const issued=await inspect('menu_issued');effect=true;
-  await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()});
+  await gesture('menu_gesture',()=>page.mouse.click(issued.point.x,issued.point.y,{button:'right'}));
+  await provider('menu_wait',()=>page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()}));
   trace.push({event:direction+'_port_menu_verified',...await inspect('menu')});
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});await inspect('open_issued');
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
+  await provider('open_trial',()=>page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()}));await inspect('open_issued');
+  await gesture('open_gesture',()=>page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()}));
   while(remaining()>0) {
    const transition=await inspect('await_open');
    if(transition.wizard)break;
    if(transition.deactivation) {
     trace.push({event:direction+'_port_deactivation_question_verified',...transition});
-    await at('msgbox;tlb;yes').click({trial:true,timeout:remaining()});
+    await provider('confirm_trial',()=>at('msgbox;tlb;yes').click({trial:true,timeout:remaining()}));
     const issued=await inspect('deactivation_issued');
     trace.push({event:direction+'_port_deactivation_issued',...issued});
-    await at('msgbox;tlb;yes').click({timeout:remaining()});
+    await gesture('confirm_gesture',()=>at('msgbox;tlb;yes').click({timeout:remaining()}));
     break;
    }
-   await page.waitForTimeout(Math.min(100,remaining()));
+   await provider('poll_wait',()=>page.waitForTimeout(Math.min(100,remaining())));
   }
-  await at(task.binding.workflow_ref.prefix+';WizrdMCF').waitFor({state:'visible',timeout:remaining()});
+  await provider('wizard_wait',()=>at(task.binding.workflow_ref.prefix+';WizrdMCF').waitFor({state:'visible',timeout:remaining()}));
   const result=await finish();trace.push({event:direction+'_port_wizard_verified',...result});
-  return {status:'SUCCEEDED',...result,effect_possible:true,cleanup_complete:true,replayed:false,trace};
- }catch(error){if(!effect){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
-  error:String(error.message).slice(0,500),trace};}
+  mark('helper_result','returned');return {status:'SUCCEEDED',...result,effect_possible:true,cleanup_complete:true,replayed:false,trace};
+ }catch(error){try{mark('helper','refused');}catch{}if(!effect){try{await inspect('release_reserved');}catch{}}try{mark('helper_result','returned');}catch{}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
+  error:String(error?.message??error).slice(0,500),trace};}
 }

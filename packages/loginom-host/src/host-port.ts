@@ -20,6 +20,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       dispatching: boolean
       released: boolean
       active: Set<string>
+      captured: boolean
+      captureRefused: boolean
+      captureRuntime?: Awaited<ReturnType<typeof service.runtime>>
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
@@ -71,12 +74,93 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         await service.retireRuntime(chat)
         service.resetRestarts(chat)
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
+        try { service.bindCapture?.(owner, input.run, chat, lease) } catch (error) { lease.release(); throw error }
+        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), captured: false, captureRefused: false })
         reply({ id: data.id, result: { generation: lease.generation } })
         return
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
+      if (run.captureRefused) {
+        if (data.method !== "call" || !("name" in input) || typeof input.name !== "string"
+            || !["dock_diagnostics", "dock_workspace_observe", "dock_operation_inspect", "dock_node_status"].includes(input.name)
+            || run.calls || run.dispatching) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        // Same retained runtime, read-only diagnosis. Never reconcile the capture
+        // journal or mint another mutation admission from this observation.
+        run.calls++
+        try {
+          const runtime = run.captureRuntime
+          if(!runtime) throw Error("LOGINOM_RECOVERY_REQUIRED")
+          const observed = await runtime.request("call", {name:input.name,arguments:"args" in input ? input.args : undefined})
+          if (!observed || typeof observed !== "object" || !("result" in observed)) throw Error("LOGINOM_REPLY_INVALID")
+          reply({id:data.id,result:observed.result})
+        } finally { run.calls-- }
+        return
+      }
+      if (data.method === "acceptance.capture") {
+        const opening = "request" in input
+        const openingRequest = opening ? input.request : undefined
+        const openingRequestBytes = opening ? JSON.stringify(openingRequest) : undefined
+        if (Object.keys(input).sort().join(",") !== (opening ? "authorization,request,run" : "authorization,run")
+            || !("authorization" in input) || !service.authorizeCapture?.(input.authorization, owner, input.run, run.chat, run.lease, opening ? "import-before-configure-v1" : undefined) || run.captured)
+          throw Error("LOGINOM_METHOD_INVALID")
+        if (run.dispatching || run.calls || run.active.size || service.journal.pending().length)
+          throw Error("LOGINOM_CALL_BUSY")
+        run.captured = true
+        run.dispatching = true
+        run.calls++
+        let id: string | undefined
+        try {
+          const captureRun=input.run, authorization=input.authorization
+          const captureLease=run.lease, captureGeneration=captureLease.generation
+          const assertCaptureGeneration=()=>{
+            if(state.closed || run.released || runs.get(captureRun)!==run || run.lease!==captureLease
+                || !Number.isSafeInteger(captureGeneration) || captureGeneration<1
+                || captureLease.generation!==captureGeneration)
+              throw Error("LOGINOM_RECOVERY_REQUIRED")
+          }
+          const runtime = await service.runtime(captureGeneration, run.chat)
+          run.captureRuntime=runtime
+          const assertCapture=()=>{
+            assertCaptureGeneration()
+            if(state.closed || run.released || runs.get(captureRun)!==run
+                || opening && JSON.stringify(openingRequest)!==openingRequestBytes
+                || !service.authorizeCapture?.(authorization,owner,captureRun,run.chat,run.lease,opening ? "import-before-configure-v1" : undefined))
+              throw Error("LOGINOM_RECOVERY_REQUIRED")
+          }
+          assertCapture()
+          id = await service.journal.begin(run.chat, run.lease.generation)
+          run.active.add(id)
+          assertCapture()
+          const result = await runtime.request("acceptance.capture",opening ? {request:openingRequest} : undefined)
+          assertCapture()
+          if (!result || typeof result !== "object" || !("cleanupComplete" in result) || result.cleanupComplete !== true) {
+            run.captureRefused = true
+            run.lease.holdRecovery()
+            service.recoveries.set(run.chat, run.lease)
+            await service.journal.settle(id, false)
+            reply({id:data.id,result})
+            return
+          }
+          await runtime.close()
+          // Runtime exit legitimately updates lost/currentness; the original
+          // lease generation must still hold before settlement and reply.
+          assertCaptureGeneration()
+          await service.journal.settle(id, true)
+          assertCaptureGeneration()
+          run.active.delete(id)
+          reply({ id: data.id, result })
+        } catch (error) {
+          run.captureRefused = true
+          run.lease.holdRecovery()
+          service.recoveries.set(run.chat, run.lease)
+          if (id) await service.journal.settle(id, false)
+          throw error
+        } finally { run.calls--; run.dispatching = false }
+        return
+      }
+      if (run.captured && run.calls && data.method!=="interrupt") throw Error("LOGINOM_CALL_BUSY")
+      if (run.captured && ["call", "admit"].includes(data.method)) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (data.method === "release") {
         run.released = true
         if (!run.calls) {
@@ -207,13 +291,16 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   })
   function stop() {
     if (state.stopping) return state.stopping
-    state.closed = true
-    runs.forEach((run) => {
-      run.released = true
-    })
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
+      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused))
+        throw new Error("LOGINOM_RECOVERY_REQUIRED")
       for (const [id, run] of runs) await release(id, run)
+      state.closed = true
+    })
+    const attempt = state.stopping
+    void attempt.catch(() => {
+      if (state.stopping === attempt) state.stopping = undefined
     })
     return state.stopping
   }

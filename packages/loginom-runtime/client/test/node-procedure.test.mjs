@@ -697,3 +697,30 @@ test('readiness expiry retains geometry across a final incomplete scan',async()=
   await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
   assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
 });
+
+for(const stage of ['output_mapping','input_mapping','text_import_format'])test('timeout retains last public output definition without authority: '+stage,async()=>{
+ let time=1;const f=fixture({now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;}});
+ f.state.wizard={...f.state.wizard,stage,output_columns:{page:{status:'unverified_definition_page',offset:16,limit:8,
+  rendered_start:0,rendered_end:16,total_columns:40,schema_id:'mapping-current'},definition_scroll_ref:'private-ref',
+  fields:[{name:'DO_NOT_COPY',data:'DO_NOT_COPY'}]}};
+ await assert.rejects(f.channel.observe({condition:'complete output definition page at 16',outputColumnPage:{offset:16,limit:8},timeoutMs:30,ready:()=>false}),/readiness timeout/);
+ const entry=f.records.find(x=>x.phase==='node_observation_timeout');
+ assert.deepEqual(entry.last_output_definition,{stage,page:{status:'unverified_definition_page',offset:16,limit:8,
+  rendered_start:0,rendered_end:16,total_columns:40,schema_id:'mapping-current'},definition_scroll_ref_present:true});
+ assert.equal(entry.effect_possible,false);assert.ok(!JSON.stringify(entry).includes('DO_NOT_COPY'));assert.ok(!JSON.stringify(entry).includes('private-ref'));
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);assert.ok(!f.events.includes('mutated'));
+});
+test('timeout records last sample, preserves zero and missing facts as unknown',async()=>{
+ let time=1;const f=fixture({now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;f.state.wizard={status:'absent',stage:'input_mapping',output_columns:{page:{status:'rendered_definition_window',offset:0,limit:8,rendered_start:0,rendered_end:0,total_columns:0,schema_id:'latest'}}};}});
+ f.state.wizard={status:'absent',stage:'output_mapping',output_columns:{page:{status:'complete_definition_page',offset:16,limit:8,schema_id:'previous'},definition_scroll_ref:'previous-ref'}};
+ await assert.rejects(f.channel.observe({condition:'last sample',outputColumnPage:{offset:16,limit:8},timeoutMs:250,ready:()=>false}),/readiness timeout/);
+ const value=f.records.find(x=>x.phase==='node_observation_timeout').last_output_definition;assert.equal(value.stage,'input_mapping');assert.equal(value.page.schema_id,'latest');assert.equal(value.page.offset,0);assert.equal(value.page.total_columns,0);assert.equal(value.definition_scroll_ref_present,false);
+ const g=fixture();await assert.rejects(g.channel.observe({condition:'missing public facts',outputColumnPage:{offset:16,limit:8},ready:()=>false}),/readiness timeout/);
+ assert.deepEqual(g.records.find(x=>x.phase==='node_observation_timeout').last_output_definition,{stage:null,page:{status:null,offset:null,limit:null,rendered_start:null,rendered_end:null,total_columns:null,schema_id:null},definition_scroll_ref_present:false});
+});
+test('output diagnostic is absent without requested page and cannot replace durable timeout acknowledgement',async()=>{
+ const f=fixture();await assert.rejects(f.channel.observe({condition:'ordinary missing editor',ready:()=>false}),/readiness timeout/);
+ assert.equal(Object.hasOwn(f.records.find(x=>x.phase==='node_observation_timeout'),'last_output_definition'),false);
+ const g=fixture({recordFailure:'node_observation_timeout'});await assert.rejects(g.channel.observe({condition:'refused evidence',outputColumnPage:{offset:16,limit:8},ready:()=>false}),/disk failure/);
+ assert.ok(!g.events.includes('mutated'));
+});

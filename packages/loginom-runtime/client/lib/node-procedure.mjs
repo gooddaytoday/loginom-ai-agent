@@ -200,14 +200,24 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(now()>=operation.deadline)throw Error('Port opening deadline elapsed before mutation');
       const code=(direction==='input'?makePreparedInputPortOpenCode:makePreparedOutputPortOpenCode)(preparedNodeContext,{port,operation_id:id,origin:targetOrigin,build:targetBuild,
         deadline:Math.min(operation.deadline,now()+15000)});
-      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'port_open',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:r.error}:null,trace:r.trace}}`;
+      const envelope=`async page=>{const r=await (${code})(page,typeof portOpeningProgress==='function'?portOpeningProgress:undefined);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'port_open',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:r.error}:null,trace:r.trace}}`;
       let result;
       try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:20000});}
-      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;
+        try{await entry('node_port_open_publication',{step,internal_operation_id:id,signature,result_received:false,result_status:'UNKNOWN',authority:false});}catch{}
+        throw error;}
       if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Port opening receipt identity differs');}
-      operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
-      const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
-      if(completed?.outcome?.operation_id!==id||JSON.stringify(completed.outcome)!==JSON.stringify(result))throw Error('Port opening outcome was not durably preserved');
+      const helperCleanupConfirmed=result.cleanup_complete===true;
+      operation.cleanupConfirmed=false;operation.nodeEffectPossible ||= result.effect_possible===true;
+      // A result received from the helper is distinct from its durable outcome.
+      // Only node_step_completed's checked acknowledgement proves publication.
+      let completed;
+      try {
+        await entry('node_port_open_publication',{step,internal_operation_id:id,signature,result_received:true,result_status:result.status,authority:false});
+        completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+        if(completed?.outcome?.operation_id!==id||JSON.stringify(completed.outcome)!==JSON.stringify(result))throw Error('Port opening outcome was not durably preserved');
+      } catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      operation.cleanupConfirmed=helperCleanupConfirmed;
       const owner=result.output;
       if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||owner?.verified!==true||owner.direction!==direction||owner.port!==port
         ||owner.opening_operation_id!==id||owner.document_id!==preparedNodeContext.document_id
@@ -238,7 +248,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       const deadline = Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, lastOutputDefinition, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
       for (let sample = 0; sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -378,6 +388,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
+        if(outputColumnPage) {
+          // Only the already computed public sample, not a new native read or
+          // readiness proof. Missing facts remain unknown; do not copy UI text.
+          const wizard=result.output.wizard,page=wizard?.output_columns?.page;
+          const text=value=>typeof value==='string'&&value.length<=120?value:null;
+          const integer=value=>Number.isSafeInteger(value)?value:null;
+          lastOutputDefinition={stage:text(wizard?.stage),page:{status:text(page?.status),
+            offset:integer(page?.offset),limit:integer(page?.limit),
+            rendered_start:integer(page?.rendered_start),rendered_end:integer(page?.rendered_end),
+            total_columns:integer(page?.total_columns),schema_id:text(page?.schema_id)},
+            definition_scroll_ref_present:typeof wizard?.output_columns?.definition_scroll_ref==='string'
+              &&wizard.output_columns.definition_scroll_ref.length>0};
+        }
         if(readNavigation)result.output.node_navigation_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the
@@ -425,6 +448,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
+          ...(lastOutputDefinition?{last_output_definition:lastOutputDefinition}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);
@@ -453,7 +477,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!snapshot) throw new Error('A fresh internal observation is required');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
-      if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes'))throw Error('Only the bound wizard confirmation can answer this question');
+      if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || (snapshotWizardConfirmation.kind==='close'?(!boundWizardCloseConfirmation(snapshot,snapshotWizardConfirmation)||snapshot.ui.elements.find(e=>e.ref===action.ref)?.wizard_close_confirmation?.controls?.yes?.ref!==action.ref):snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;

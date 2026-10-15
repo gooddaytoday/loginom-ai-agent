@@ -1,0 +1,132 @@
+{
+  "classification": "MEASURED_HISTORICAL_PINS_ONLY",
+  "recorded_at": "2026-10-11T22:25:17.615Z",
+  "package": {
+    "name": "join-left-worker-20261011T093508Z.lgp",
+    "bytes": 9480,
+    "sha256": "b34c33d2144309a06655a78cb0f433560d6076cb60076de665e753d90811f9dd",
+    "unit_xml_sha256": "616b0a2912ea237590496b724cce11b9b68e8af3383fef4ed58600d8beeb2aa5",
+    "inner_guid": "1766bf56-0e45-4e0c-8c26-130117ab4602"
+  },
+  "imports": [
+    {
+      "role": "operations",
+      "node_guid": "e78dbebd-942a-4ef4-ac45-654eec157c31",
+      "retained_path": "/lab-71-monkey-6f251e8e-6b2a-4219-b4e9-8abe2643e62a/5cad3b63b9d297a96f17b02cbfce6e51b7f817dd600177b3baa26413849d1784-0-left.csv",
+      "csv": {
+        "artifact_id": "<fresh admitted artifact id>",
+        "upload_operation_id": "<fresh completed upload id>",
+        "bytes": 77,
+        "sha256": "93555e5639d5cc4c6fb1d96b710c3e1c13db23107911d52012e0e9af049db5fe"
+      },
+      "settings": {
+        "source": {
+          "source_path": "<fresh verified delivery.destination>",
+          "encoding": "UTF-8",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "decimal_separator": ".",
+          "null_marker": "NULL",
+          "text_qualifier": "\""
+        },
+        "columns": [
+          {
+            "source_name": "LKey",
+            "name": "LKey",
+            "label": "LKey",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "source_name": "Part",
+            "name": "Part",
+            "label": "Part",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "source_name": "LValue",
+            "name": "LValue",
+            "label": "LValue",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "details",
+      "node_guid": "6774e6c2-a207-4293-b7ea-8db76e168f98",
+      "retained_path": "/lab-71-monkey-6f251e8e-6b2a-4219-b4e9-8abe2643e62a/5cad3b63b9d297a96f17b02cbfce6e51b7f817dd600177b3baa26413849d1784-1-right.csv",
+      "csv": {
+        "artifact_id": "<fresh admitted artifact id>",
+        "upload_operation_id": "<fresh completed upload id>",
+        "bytes": 72,
+        "sha256": "2897691ec46dc8a9849ef43c3d07cc8276ac0b824936a84b2d85108042b06295"
+      },
+      "settings": {
+        "source": {
+          "source_path": "<fresh verified delivery.destination>",
+          "encoding": "UTF-8",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "decimal_separator": ".",
+          "null_marker": "NULL",
+          "text_qualifier": "\""
+        },
+        "columns": [
+          {
+            "source_name": "RKey",
+            "name": "RKey",
+            "label": "RKey",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "source_name": "PartR",
+            "name": "PartR",
+            "label": "PartR",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "source_name": "RValue",
+            "name": "RValue",
+            "label": "RValue",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ]
+      }
+    }
+  ],
+  "sources": [
+    {
+      "name": "provenance-explicit-plan.json",
+      "bytes": 5493,
+      "sha256": "5d114bc9773ce71a733d8bfb9dcf840206f4e71dd1f005012d96c3b670a6be92"
+    },
+    {
+      "name": "provenance-xml-comparison.json",
+      "bytes": 1133,
+      "sha256": "ba66cc82d84daf7f479d3d76ddc594d6ed5e6c42c4ae8fa5b1bcf561e8692453"
+    },
+    {
+      "name": "join-offline-proof/fixture.json",
+      "bytes": 217034,
+      "sha256": "75051122e075f7db0777192071a3ea3049cca626a77a2f044d37472c2bad0481"
+    }
+  ]
+}

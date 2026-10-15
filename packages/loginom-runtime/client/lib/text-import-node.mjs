@@ -15,6 +15,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
+import {makeImportOpeningCode} from './import-original-opening.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
@@ -104,8 +105,20 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,verifiedUploads,uploadHistory})=>{
+  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,verifiedUploads,uploadHistory,importPreconfig=false})=>{
     let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal;
+    let nativeOpeningTask;
+    const openingCall=async mode=>{
+      activeSignal?.throwIfAborted();
+      operation.importPreconfigAssert?.();
+      if(!nativeOpeningTask||operation.captureSignal!==activeSignal||now()>=nativeOpeningTask.deadline)
+        throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
+      const result=await execute(makeImportOpeningCode(nativeOpeningTask,mode),{timeout:nativeOpeningTask.deadline-now()});
+      activeSignal?.throwIfAborted();
+      operation.importPreconfigAssert?.();
+      if(now()>=nativeOpeningTask.deadline)throw Error('LOGINOM_IMPORT_OPENING_EXPIRED');
+      return result;
+    };
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
     const enter=ctx=>{
       activeSignal=ctx.signal;
@@ -131,6 +144,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       verifySource:async p=>(sourceReceipt=verifyTextImportSource(p,verifiedUploads(),uploadHistory?.())),
       async openWizard(ctx) {
         enter(ctx);
+        if(importPreconfig&&operation.nodeApply.request.target.kind!=='existing')throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
         if(operation.nodeApply.request.finish==='execute') {
           executionDriver=createNodeExecutionProcedure(channel,{document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id});
           await executionDriver.prepare();
@@ -140,7 +154,19 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           ready:s=>s.prepared_node_context?.surface==='graph' && s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid && e.graph_node?.part==='body' && e.allowed_actions.includes('click')),
           resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid && e.graph_node?.part==='body'),'Prepared graph body unavailable').ref}),
           identity:s=>s.prepared_node_context});
-        if(operation.nodeApply.request.target.kind==='existing')await openPreparedWizard(channel);
+        if(importPreconfig) {
+          requireValue(sourceReceipt?.verified===true&&sourceReceipt.source?.lineage,'Original verified source lineage required');
+          nativeOpeningTask=Object.freeze({origin:targetOrigin,build:targetBuild,receipt_id:ctx.receipt_id,
+            document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,tab_tid:ctx.workflow_ref.tab_tid,
+            prefix:ctx.workflow_ref.prefix,node_id:ctx.node.node_id,
+            session_id:operation.importPreconfigCapture.retained.binding.session,
+            account:operation.importPreconfigCapture.retained.binding.account,
+            deadline:Math.min(ctx.deadline,operation.importPreconfigCapture.retained.binding.expires),
+            source_path:sourceReceipt.source.destination});
+          await openingCall('reserve');
+        }
+        let originalOpening;
+        if(operation.nodeApply.request.target.kind==='existing')originalOpening=await openPreparedWizard(channel);
         else {
           s=await channel.observe({condition:'prepared import settings available',ready:s=>s.prepared_node_context?.surface==='graph'
             &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions.includes('open_wizard'))});
@@ -151,8 +177,17 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         }
         s=await read('text_import_file','prepared import source wizard initialized',isTextImportSourceReady);owner=s.wizard.owner_context;
         requireValue(owner?.status==='observed','Import owner unavailable');
+        if(importPreconfig) {
+          requireValue(originalOpening?.verified===true&&originalOpening.settings_applied===false
+            &&originalOpening.execution_started===false,'Original openWizard completion required');
+          const native_opening=await openingCall('complete');
+          return verified({effect_possible:true,node_context:s.prepared_node_context,
+            original_opening:originalOpening,native_opening});
+        }
         return verified({effect_possible:true,node_context:s.prepared_node_context});
       },
+      assertImportOpening:()=>openingCall('assert'),
+      readImportOpening:()=>openingCall('read'),
       async configureTextImport(ctx,p) {
         enter(ctx);requireValue(owner,'Import was not opened by this operation');
         try {

@@ -21,6 +21,9 @@ import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
 import {nodeApiTools,deliveryApiTools} from './node-api.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
+import {assertCaptureOwner,capturePublication} from '../../src/retained-capture.mjs';
+import {createImportOriginalPreconfigAdapter} from '../../src/acceptance/import-original-preconfig-v1.mjs';
+import {validateCaptureResult} from '../../src/acceptance/import-preconfig-adapter-v1.mjs';
 
 const identifier = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$' };
 const operationInspectTool = { name: 'dock_operation_inspect',
@@ -1286,8 +1289,12 @@ function browserReceipt(page, task, perform) {
     operation_id: task.operation_id, phase: 'observed', effect_possible: false, output: { state, ...output }, error: null, trace: [] });
   if (task.receipt_read) {
     if (!previous) return envelope('missing');
-    if (previous.signature !== task.receipt_signature) return envelope('identity_mismatch');
-    return envelope(previous.state, previous.outcome ? { receipt: previous.outcome } : {});
+    if (previous.signature !== task.receipt_signature || previous.portOpeningPage && previous.portOpeningPage!==page) return envelope('identity_mismatch');
+    const progress=previous.portOpeningProgress;
+    if(progress&&(progress.namespace!==task.receipt_namespace||progress.id!==(task.receipt_id??task.operation_id)
+      ||progress.signature!==task.receipt_signature||JSON.stringify(progress.identity)!==previous.portOpeningIdentity))return envelope('identity_mismatch');
+    return envelope(previous.state, { ...(previous.outcome ? { receipt: previous.outcome } : {}),
+      ...(previous.portOpeningProgress ? {port_open_progress:structuredClone(previous.portOpeningProgress)} : {}) });
   }
   if (previous) {
     if (previous.signature !== task.receipt_signature) throw new Error('Browser operation receipt identity mismatch');
@@ -1302,12 +1309,39 @@ function browserReceipt(page, task, perform) {
   const entry = { state: 'running', signature: task.receipt_signature };
   ledger.set(key, entry);
   return (async () => {
-    try { const outcome = await perform(); entry.outcome = outcome; entry.state = 'completed'; return outcome; }
-    catch (error) { entry.state = 'unknown'; throw error; }
+    try { const outcome = await perform(progress => {
+      // Only the fixed serialized port helper uses this private callback. It is
+      // bound to this exact namespace/id/signature and Page ledger entry.
+      if(ledger.get(key)!==entry||entry.state!=='running'||entry.signature!==task.receipt_signature)
+        throw Error('Port progress receipt custody changed');
+      if(!progress||progress.identity?.operation_id!==(task.receipt_id??task.operation_id)
+        ||!['entry','returned','refused','intent'].includes(progress.boundary)
+        ||!['helper','helper_result','read_node','poll_wait','menu_gesture','open_gesture','confirm_gesture','menu_wait','open_trial','confirm_trial','wizard_wait',
+          'inspect_lookup','inspect_release_reserved','inspect_begin','inspect_menu_issued','inspect_menu','inspect_open_issued','inspect_await_open','inspect_deactivation_issued','inspect_finish'].includes(progress.phase))
+        throw Error('Invalid fixed port progress');
+      const owner=progress.identity,b=owner.binding;
+      if(typeof task.receipt_namespace!=='string'||!task.receipt_namespace||typeof task.receipt_signature!=='string'||!task.receipt_signature
+        ||!b?.document_id||!b.workflow_ref?.workflow_id||!b.node?.node_id
+        ||b.node.document_id!==b.document_id||b.node.workflow_id!==b.workflow_ref.workflow_id
+        ||!['input','output'].includes(owner.direction)||!Number.isInteger(owner.port)||owner.port<0||owner.port>99||!Number.isSafeInteger(owner.deadline))
+        throw Error('Port progress binding incomplete');
+      const identity=JSON.stringify(owner),retained=entry.portOpeningProgress;
+      if(retained&&JSON.stringify(retained.identity)!==identity)throw Error('Port progress owner changed');
+      const value=retained??{identity:JSON.parse(identity),namespace:task.receipt_namespace,id:task.receipt_id??task.operation_id,
+        signature:task.receipt_signature,events:[],truncated:false,authority:false};
+      // Preserve the first and latest bounded phases; no object/DOM/error text.
+      if(value.events.length>=96){value.events.splice(1,1);value.truncated=true;}
+      value.events.push({sequence:(value.sequence??0)+1,phase:progress.phase,boundary:progress.boundary,at:Date.now()});
+      value.sequence=(value.sequence??0)+1;entry.portOpeningProgress=value;entry.portOpeningPage=page;entry.portOpeningIdentity=identity;
+    }); entry.outcome = outcome; entry.state = 'completed'; return outcome; }
+    catch (error) { try{entry.state = 'unknown';}catch{}throw error; }
   })();
 }
+export function makeBrowserReceiptReadCode(options) {
+  return `async page => (${browserReceipt.toString()})(page, ${JSON.stringify({...options,receipt_read:true})})`;
+}
 export function withBrowserReceipt(body, options) {
-  return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, () => ${body})`;
+  return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, portOpeningProgress => ${body})`;
 }
 
 export function parseCapabilityResult(response) {
@@ -1325,6 +1359,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
+  const importPreconfigKey=Object.freeze({kind:'existing-import-preconfig'});
   let running = false;
   const operations = new Map();
   const auxiliary = new Map();
@@ -1434,8 +1469,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const readReceipt = async (operation,reference=operation.lastReceipt) => {
     if (!reference) return { state: 'missing' };
-    const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
-      receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
+    const code = makeBrowserReceiptReadCode({receipt_namespace:receiptNamespace,receipt_id:reference.id,receipt_signature:reference.signature,operation_id:operation.id});
     const value = await execute(code, { timeout: 10000 });
     assertActionOutcome(value);
     const state = value.output;
@@ -1545,6 +1579,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       try{operation.inputMappingRecovery=await operation.nodeApplyDrivers.inspectInputMapping({readReceipt:ref=>readReceipt(operation,ref)});}
       catch(error){operation.inputMappingRecovery={available:false,phase:'input_mapping',reason:String(error.message).slice(0,1000)};}
       finally{running=false;}
+    }
+    if(operation.lastReceipt?.action_key==='node.output_port.open.internal') {
+      try {
+        const reference=structuredClone(operation.lastReceipt),state=await readReceipt(operation,reference);
+        if(JSON.stringify(reference)!==JSON.stringify(operation.lastReceipt))throw Error('Port progress reference changed');
+        await onRecord({operation_id:operation.id,action_key:operation.action.action_key,action_revision:operation.action.revision,
+          phase:'node_port_open_receipt_observed',reference,
+          receipt_state:state.state,progress:state.port_open_progress??null,
+          progress_status:state.port_open_progress?'RETAINED_HISTORICAL':'NOT_PERSISTED',authority:false});
+      } catch { /* Diagnostic read/write never replaces the original refusal or releases custody. */ }
     }
     if(operation.nodeApply?.pending?.phase==='output_mapping'&&operation.nodeApplyDrivers?.inspectOutputMapping){
       running=true;
@@ -2177,7 +2221,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     // Host-only until the complete real drivers pass admission. All child
     // phases own the same runtime gate; they cannot re-enter public run/act.
-    async runNodeApply(request,{signal,stopSignal,resume=false}={}) {
+    async runNodeApply(request,{signal,stopSignal,resume=false,preconfigKey,privateCapture}={}) {
+      const importPreconfig=preconfigKey===importPreconfigKey;
+      if(preconfigKey!==undefined&&!importPreconfig)throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
+      if(importPreconfig&&(!signal||resume||request.target?.kind!=='existing'||request.target.type!=='imports.text'
+        ||request.inputs?.length!==0||request.mappings?.length!==0||request.finish!=='close'||request.read?.ports?.length!==0))
+        throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
       request=structuredClone(request);
       signal?.throwIfAborted();checkId(request.operation_id);
       const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers);
@@ -2187,6 +2236,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const operationId=request.operation_id;
       if(auxiliary.has(operationId))throw new Error('Operation ID conflicts with a recovery or UI operation');
       let operation=operations.get(operationId);
+      if(operation?.importPreconfig===importPreconfigKey&&!importPreconfig)throw Error('LOGINOM_IMPORT_OPENING_RETAINED');
       if(operation&&operation.signature!==signature)throw new Error('operation_id was already used with different parameters or handler');
       if(pending&&pending!==operation)throw new Error('Another Dock operation remains pending');
       if(operation&&!resume)return inspectApply(operation);
@@ -2223,7 +2273,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(!operation){
           operation={id:operationId,signature,parameters:request,
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
-            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms,
+            captureSignal:signal,captureRequestBytes:JSON.stringify(request)};
+          if(importPreconfig)operation.importPreconfig=importPreconfigKey;
+          if(importPreconfig) {
+            operation.importPreconfigCapture=privateCapture;
+            operation.importPreconfigAssert=privateCapture.assertCurrent;
+          }
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -2231,11 +2287,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // unwrap their value locally, preserving the driver's original data.
           const executeNodeScript=async(code,options)=>{
             const wrapped='async page => {const base={action_key:"node.apply.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_APPLY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
-            const response=await execute(wrapped,options);
+            const deadline=importPreconfig?Math.min(operation.deadline,privateCapture.retained.binding.expires):undefined;
+            if(importPreconfig) {
+              privateCapture.assertCurrent();
+              if(now()>=deadline)throw Error('LOGINOM_IMPORT_OPENING_EXPIRED');
+            }
+            const response=await execute(wrapped,importPreconfig?{...options,timeout:Math.min(options?.timeout??Infinity,deadline-now())}:options);
+            if(importPreconfig) {
+              privateCapture.assertCurrent();
+              if(now()>=deadline)throw Error('LOGINOM_IMPORT_OPENING_EXPIRED');
+            }
             if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node driver transport failed');
             return response.output.value;
           };
-          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,
+          operation.nodeApplyDrivers=nodeApplyDriverFactory({operation,execute:executeNodeScript,onRecord,now,artifactStore,importPreconfig,
             receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
             readReceipt:reference=>readReceipt(operation,reference),
             nodeHistory:()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
@@ -2321,8 +2386,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume});}
+          record:onRecord,signal,stopSignal,now,resume,importPreconfig});}
         catch(error){
+          if(importPreconfig)operation.importPreconfigFailure??={value:error};
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.
           result={operation_id:operation.id,status:operation.nodeApply?'AMBIGUOUS':'NOT_APPLIED',
@@ -2343,6 +2409,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // node checkpoint; neither an empty output nor another run is needed.
           operation.outcome=nodeApplyOutcome(operation,{...result,status:result.effect_possible?'AMBIGUOUS':'NOT_APPLIED',
             error:{code:'EVIDENCE_WRITE_FAILED',message:String(error.message).slice(0,1000)}});
+          if(importPreconfig)operation.importPreconfigFailure??={value:error};
           return structuredClone(operation.outcome);
         }
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
@@ -2443,14 +2510,118 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       return value(...args);
     }]));
-  return Object.freeze({...exposed,
+  const captureFacade=Object.freeze({...exposed,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
+    retainCaptureNode(operationId) {
+      const operation=operations.get(operationId),state=operation?.nodeApply;
+      if(operation?.importPreconfig===importPreconfigKey) {
+        if(!operation.importPreconfigHandle)throw Error('LOGINOM_CAPTURE_NODE_REFUSED');
+        operation.importPreconfigHandle.assertCurrent();return operation.importPreconfigHandle;
+      }
+      const opening=state?.phases.find(p=>p.phase==='open');
+      const assert=()=>{
+        if (operations.get(operationId)!==operation || !state || operation.nodeApply!==state
+            || operation.captureNodeState!==state || operation.captureNode!==state.node
+            || operation.action.capability!=='node.apply' || !operation.captureSignal
+            || operation.captureSignal.aborted || running || pending || nodeJobs.unsettled || delivery.unsettled
+            || state.pending || operation.transportUncertain || operation.cleanupConfirmed!==true
+            || state.cleanup_complete!==true || !state.node || !opening || opening.status!=='verified'
+            || opening!==operation.captureOpening || JSON.stringify(opening)!==operation.captureOpeningBytes
+            || JSON.stringify(state.request)!==operation.captureRequestBytes || state.deadline!==operation.captureDeadline
+            || JSON.stringify(state.node)!==operation.captureTargetNodeBytes
+            || opening.value?.verified!==true || opening.value.cleanup_complete!==true
+            || state.phases.find(p=>p.phase==='open')!==opening || now()>=state.deadline)
+          throw Error('LOGINOM_CAPTURE_NODE_REFUSED');
+      };
+      assert();
+      const request=state.request,deadline=state.deadline;
+      const requestBytes=JSON.stringify(request),openingBytes=JSON.stringify(opening),nodeBytes=JSON.stringify(state.node);
+      return Object.freeze({request,state,opening,signal:operation.captureSignal,deadline,
+        requestSha256:createHash('sha256').update(requestBytes).digest('hex'),
+        openingSha256:createHash('sha256').update(openingBytes).digest('hex'),
+        assertCurrent() {
+          assert();
+          if(state.request!==request || state.deadline!==deadline || JSON.stringify(request)!==requestBytes
+              || JSON.stringify(opening)!==openingBytes || JSON.stringify(state.node)!==nodeBytes)throw Error('LOGINOM_CAPTURE_NODE_CHANGED');
+        }});
+    },
+    async openImportPreconfig(request,{signal,retained,identity}={}) {
+      const binding=retained?.binding,session=retained?.session,preparation=session?.metadata?.workspacePreparation;
+      const identityBytes=JSON.stringify(identity),preparationBytes=JSON.stringify(preparation);
+      const assertOwner=()=>{
+        signal?.throwIfAborted();assertCaptureOwner(retained);
+        if(binding?.harness!=='import-before-configure-v1'||!Object.isFrozen(identity)
+          ||signal!==retained.state.controller?.signal||identity?.session_id!==binding.session
+          ||identity.account!==binding.account||identity.package_path!==binding.packagePath
+          ||identity.document_id!==request.document_id||identity.tab_tid!==request.workflow_ref?.tab_tid
+          ||identity.loginom_build!=='7.4.2'||retained.binding!==binding||retained.session!==session
+          ||session.metadata.workspacePreparation!==preparation||JSON.stringify(preparation)!==preparationBytes
+          ||JSON.stringify(identity)!==identityBytes)throw Error('LOGINOM_IMPORT_OPENING_OWNER');
+      };
+      assertOwner();
+      const previous=operations.get(request.operation_id);
+      if(previous?.importPreconfig===importPreconfigKey) {
+        if(JSON.stringify(request)!==previous.captureRequestBytes||signal!==previous.captureSignal
+          ||previous.importPreconfigCapture?.retained!==retained||previous.importPreconfigCapture.identity!==identity)
+          throw Error('LOGINOM_IMPORT_OPENING_CHANGED');
+        if(previous.importPreconfigFailure)throw previous.importPreconfigFailure.value;
+        if(previous.importPreconfigHandle){previous.importPreconfigHandle.assertCurrent();return previous.importPreconfigHandle;}
+        throw Error('LOGINOM_IMPORT_OPENING_PENDING');
+      }
+      if(previous)throw Error('LOGINOM_IMPORT_OPENING_REUSED');
+      const privateCapture=Object.freeze({retained,identity,assertCurrent:assertOwner});
+      await runtime.runNodeApply(request,{signal,preconfigKey:importPreconfigKey,privateCapture});
+      const operation=operations.get(request.operation_id),state=operation?.nodeApply;
+      if(operation?.importPreconfigFailure)throw operation.importPreconfigFailure.value;
+      const opening=operation?.captureOpening,native=opening?.value?.native_opening;
+      const requestRef=state?.request,nodeRef=state?.node,phases=JSON.stringify(state?.phases);
+      const deadline=Math.min(state?.deadline,state?.configure_deadline,native?.deadline);
+      let handle,fixedAdapter;
+      const client=retained.runtime.client,clientCall=client.callTool;
+      const assert=()=>{
+        assertOwner();
+        if(retained.runtime.client!==client||client.callTool!==clientCall)throw Error('LOGINOM_IMPORT_OPENING_CLIENT');
+        if(!operation||operations.get(request.operation_id)!==operation||operation.importPreconfig!==importPreconfigKey
+          ||operation.captureSignal!==signal||running||pending!==operation||nodeJobs.unsettled||delivery.unsettled
+          ||operation.transportUncertain||operation.importPreconfigFailure||operation.nodeApply!==state
+          ||state.request!==requestRef||state.node!==nodeRef||operation.captureNode!==nodeRef
+          ||state.pending||state.cleanup_complete!==true||JSON.stringify(state.phases)!==phases
+          ||operation.captureOpening!==opening||JSON.stringify(opening)!==operation.captureOpeningBytes
+          ||JSON.stringify(requestRef)!==operation.captureRequestBytes||native?.status!=='completed'
+          ||opening.receipt_id!==native.receipt_id||native.node_id!==nodeRef?.node_id
+          ||native.workflow_id!==nodeRef?.workflow_id||native.document_id!==nodeRef?.document_id
+          ||!Number.isSafeInteger(deadline)||now()>=deadline||state.deadline!==operation.captureDeadline
+          ||operation.outcome?.output?.preconfig_opening!==true||operation.outcome?.error?.code!=='IMPORT_PRECONFIG_ONLY'
+          ||operation.importPreconfigHandle&&operation.importPreconfigHandle!==handle)
+          throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
+      };
+      assert();
+      handle=Object.freeze({preconfig:true,request:requestRef,state,opening,signal,deadline,
+        nativeOpening:native,owner:retained,identity,runtime:captureFacade,requestSha256:createHash('sha256').update(JSON.stringify(requestRef)).digest('hex'),
+        openingSha256:createHash('sha256').update(JSON.stringify(opening)).digest('hex'),assertCurrent:assert,
+        async assertOpeningCurrent(){assert();await operation.nodeApplyDrivers.assertImportOpening();assert();},
+        async readOriginalImport(){assert();const value=await operation.nodeApplyDrivers.readImportOpening();assert();return value;},
+        async readPreconfigSample(){
+          assert();
+          fixedAdapter??=createImportOriginalPreconfigAdapter({retained,node:handle,identity,
+            publication:capturePublication(retained,handle,identity),runtime:captureFacade,
+            browser:client,record:onRecord,signal},validateCaptureResult);
+          return fixedAdapter.readPreconfigSample();
+        }});
+      operation.importPreconfigHandle=handle;return handle;
+    },
+    assertImportPreconfigIdle(node) {
+      const operation=operations.get(node?.request?.operation_id);
+      if(operation?.importPreconfigHandle!==node)throw Error('LOGINOM_IMPORT_OPENING_REFUSED');
+      node.assertCurrent();return true;
+    },
     hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});
+  return captureFacade;
 }
