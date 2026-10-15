@@ -12,7 +12,7 @@ import { assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter } from "
 import type { ProcessCleanup } from "./process-supervisor"
 import type { AttemptResult } from "./report"
 import { acquireSlotLease, parseSlots, type SlotFile, type SlotLease } from "./slots"
-import { readJudgeProcessInventory } from "./judge-process-evidence"
+import { readJudgeProcessInventory, sealJudgeProcessInventory } from "./judge-process-evidence"
 
 export type ParallelFixture = { slots: SlotFile; lockRoot: string }
 
@@ -110,12 +110,14 @@ export async function finishFixtureJudge(context: Awaited<ReturnType<typeof prep
   if (!context.judgeLease) return
   try {
     await context.judgeLease.assertHeld()
-    const inventory = await readJudgeProcessInventory({ file: path.join(context.controllerDir, "judge-processes.json"),
-      commandId: path.basename(runDir), producerPid: process.pid })
+    const input = { file: path.join(context.controllerDir, "judge-processes.json"), commandId: path.basename(runDir) }
+    const source = await sealJudgeProcessInventory({ ...input, assertHeld: context.judgeLease.assertHeld })
+    const inventory = await readJudgeProcessInventory({ ...input, producerPid: process.pid })
+    if (!inventory.sealed || inventory.source.sha256 !== source.sha256) throw new EvalFailure("JUDGE_PROCESS_INVENTORY_CHANGED", 2)
     const proofs = inventory.processes.map(process => process.source)
     const receipt = path.join(context.controllerDir, "judge-release.json")
     await writeLeaseReceipt(receipt, { version: 2, status: "confirmed", liveQualified: false, key: context.judgeLease.reservation.key,
-      token: context.judgeLease.reservation.token, revision: context.judgeLease.reservation.revision, judgeProcesses: "confirmed", proofs })
+      token: context.judgeLease.reservation.token, revision: context.judgeLease.reservation.revision, judgeProcesses: "confirmed", proofs, inventory_source: source })
     await context.judgeLease.release(receipt)
   } finally { await context.judgeLease.close() }
 }
