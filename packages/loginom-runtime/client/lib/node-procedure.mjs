@@ -474,6 +474,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot]);
       // This write must be durable before the browser receives the mutation.
+      const preparedAt = monotonicNow();
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature });
       evidenceSnapshot = null;
@@ -492,11 +493,18 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ...boundOptions,
         snapshot: before, expected_origin: targetOrigin, expected_build: targetBuild });
       const wrapped = wrapMutation(code, { id, signature, action_key: 'ui.act' });
+      const timeout = settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000;
+      const executeStarted = monotonicNow();
       let result;
-      try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
+      try { result = await execute(wrapped, { timeout }); }
       catch (error) {
         operation.transportUncertain = true;
         operation.cleanupConfirmed = false;
+        // A missing RPC reply cannot establish whether the gesture happened.
+        // Keep the first rejection and uncertainty even if diagnostics fail.
+        try { await entry('node_step_execute_failed', { step, internal_operation_id: id,
+          verb: action.verb, timeout_ms: timeout, elapsed_ms: monotonicNow()-executeStarted,
+          prepared_to_execute_ms: executeStarted-preparedAt, parent_deadline: operation.deadline }); } catch {}
         throw error;
       }
       if (result.operation_id !== id || result.action_key !== 'ui.act') {
