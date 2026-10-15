@@ -780,3 +780,22 @@ SHA256 `ae86e6f17a70c3d9ee4759d98fbfc48d377825253f5d0a31e3ad9cf76665ca73`.
 Native process/dispose confirmed; exact pair independently absent.
 Это sequential isolation control, `liveQualified=false`. Unusual filenames,
 concurrent heartbeat, production lease/readiness/cleanup integration ещё открыты.
+
+### Native unusual filename positive controls
+
+Fixed FileStorage probe создаёт собственные access-positive/access-peer-positive
+directories и nested subdir; семь basenames покрывают space, tab, newline, Unicode,
+leading dash, dotfile и nested path. Native CopyFile/OpenFile/ReadBuffer проверяют
+пакетные копии, CreateFile/WriteBuffer записывают соседний `.write` canary с byte65,
+writer/reader proxies освобождаются синхронным ReleaseObject. Для обоих настоящих
+users independent Docker `sha256sum -z --` получает filenames отдельными argv:
+все14 package copies совпадают с собственным source SHA, все14 write canaries —
+с SHA байта A. Newline/tab не разбиваются по строкам.
+
+Private600 receipt с positive A и peerPositive B:
+`research/evidence/native-user-25ff20ac-bed1-4833-b7d4-5a6c22a7d6c0/storage-probe.json`,
+SHA256 `18b5183c728d3a906389c6550397217b9212af951a18b036bbbdf4590a2c4e41`.
+Native1 PASS/118 (38.29s), admin/user/slots60 PASS/260, typecheck/diff PASS;
+process/dispose confirmed и exact pair independently absent.
+Это positive filename capability; unusual neighbor/shared negatives и native
+component filename matrix ещё открыты, `liveQualified=false`.
