@@ -365,7 +365,7 @@ function startupOwner(owner, profile, candidate) {
     if(owner.closed) return owner.receipt
     if(owner.closing) return owner.closing
     owner.closing=(async()=>{
-      let nativeStage
+      let nativeStage,nativeLogoutObservation
       try {
         await owner.calculatorResourceReader?.dispose()
         if(owner.launchAttempted && !owner.context) throw Error('LOGINOM_STARTUP_LAUNCH_UNKNOWN')
@@ -396,12 +396,32 @@ function startupOwner(owner, profile, candidate) {
                 &&m.FServerConnection.UserName===o.account&&m.FServerConnection.Connected===true&&m.PackageNodes?.Count===0&&m.HasRunningNodes()===false
             },{id:owner.id,account:owner.account,origin:owner.origin})
             if(!same) throw Error('LOGINOM_STARTUP_IDENTITY_CHANGED')
-            if(!await at('MF;AppMenuForm;btnLogOut').isVisible()) {
+            const logoutGateVisible=await at('MF;AppMenuForm;btnLogOut').isVisible()
+            owner.evidence.logout_gate_visible=logoutGateVisible
+            if(!logoutGateVisible) {
               nativeStage='native_menu_reopen'
               await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:8000})
             }
             nativeStage='native_logout'
-            await at('MF;AppMenuForm;btnLogOut').click({timeout:8000})
+            try {await at('MF;AppMenuForm;btnLogOut').click({timeout:8000})}
+            catch(error) {
+              const message=typeof error?.message==='string'?error.message:''
+              const unstable=message.indexOf('not stable')
+              if(error?.name==='TimeoutError'&&unstable>=0&&message.indexOf('not visible',unstable)>unstable) {
+                nativeLogoutObservation={logout_visible:null,logout_bounding_box:null,menu_visible:null}
+                for(const [field,read] of [
+                  ['logout_visible',()=>at('MF;AppMenuForm;btnLogOut').isVisible()],
+                  ['logout_bounding_box',()=>at('MF;AppMenuForm;btnLogOut').boundingBox()],
+                  ['menu_visible',()=>at('MF;AppMenuForm').isVisible()],
+                ]) {
+                  try {nativeLogoutObservation[field]=await read()}
+                  catch(observationError) {
+                    (nativeLogoutObservation.observation_rejections??=[]).push({field,rejection:startupRejection(observationError)})
+                  }
+                }
+              }
+              throw error
+            }
             nativeStage='native_logout_confirmation'
             await at('LoginForm;Login;edtUsername').locator('input').waitFor({state:'visible',timeout:8000})
             if(await at('MF;cntMain;tlbMainToolbar;btnAvatar').isVisible()) throw Error('LOGINOM_STARTUP_LOGOUT_UNKNOWN')
@@ -434,7 +454,8 @@ function startupOwner(owner, profile, candidate) {
         if(nativeStage && !owner.nativeConfirmed && !owner.nativeFailure) {
           owner.nativeFailure={stage:nativeStage,value:error}
           owner.evidence.native_failure={stage:nativeStage,rejection:startupRejection(error)}
-          owner.evidence.stages.push({stage:nativeStage,status:'rejected',rejection:startupRejection(error)})
+          owner.evidence.stages.push({stage:nativeStage,status:'rejected',rejection:startupRejection(error),
+            ...(nativeLogoutObservation?{post_timeout_observation:nativeLogoutObservation}:{})})
         }
         owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:owner.guardFailure?owner.guardFailure.value:error
         owner.evidence.cleanup_complete=false

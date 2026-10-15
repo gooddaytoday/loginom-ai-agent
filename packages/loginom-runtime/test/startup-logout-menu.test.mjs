@@ -65,3 +65,29 @@ for(const mode of ['visible','closed-after-identity','still-hidden','avatar-erro
   else {await assert.rejects(f.functions.checkConnection(f.options));const before={avatars,logouts};await assert.rejects(f.owner.close());assert.deepEqual({avatars,logouts},before);if(mode==='page-changed'){assert.equal(avatars,0);assert.equal(logouts,0)}else {assert.equal(avatars,2);assert.equal(logouts,mode==='avatar-error'?0:1);assert.equal(f.owner.nativeFailure.value,original);}}
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+for(const observationFails of [false,true])test('logout visible gate then unstable/hidden timeout preserves original rejection; observation failure '+observationFails,async()=>{
+ const root=await mkdtemp(join(tmpdir(),'startup-menu-observe-')),f=fixture(root);
+ const locator=f.page.locator.bind(f.page);let avatars=0,logouts=0,visibleReads=0,boxReads=0,menuReads=0;
+ const original=Object.assign(Error('locator.click: Timeout 8000ms exceeded. element is not stable; element is not visible',{cause:0}),{name:'TimeoutError'});
+ const observationError=Error('box observation failed',{cause:0});
+ f.page.locator=selector=>{const h=locator(selector);
+  if(selector.includes('btnAvatar')){const click=h.click;h.click=async opts=>{avatars++;return click(opts)};}
+  if(selector.includes('btnLogOut')){
+   h.isVisible=async()=>{visibleReads++;return visibleReads===1};
+   h.boundingBox=async()=>{boxReads++;if(observationFails)throw observationError;return null};
+   h.click=async opts=>{assert.equal(opts.timeout,8000);logouts++;assert.equal(f.owner.evidence.logout_gate_visible,true);throw original};
+  }else if(selector==='[data-tid="MF;AppMenuForm"]')h.isVisible=async()=>{menuReads++;return false};
+  return h;
+ };
+ try{
+  await assert.rejects(f.functions.checkConnection(f.options));assert.equal(f.owner.nativeFailure.value,original);
+  const before={avatars,logouts,visibleReads,boxReads,menuReads};await assert.rejects(f.owner.close());assert.deepEqual({avatars,logouts,visibleReads,boxReads,menuReads},before);
+  assert.equal(avatars,1);assert.equal(logouts,1);assert.equal(visibleReads,2);assert.equal(boxReads,1);assert.equal(menuReads,1);
+  const evidence=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));
+  assert.equal(evidence.logout_gate_visible,true);assert.equal(evidence.cleanup_complete,false);assert.equal(evidence.native_failure.rejection.message,original.message);assert.equal(evidence.native_failure.rejection.cause.value,0);
+  const stages=evidence.stages.filter(x=>x.stage==='native_logout');assert.equal(stages.length,1);
+  const post=stages[0].post_timeout_observation;assert.equal(post.logout_visible,false);assert.equal(post.logout_bounding_box,null);assert.equal(post.menu_visible,false);
+  if(observationFails){assert.equal(post.observation_rejections.length,1);assert.equal(post.observation_rejections[0].field,'logout_bounding_box');assert.equal(post.observation_rejections[0].rejection.message,observationError.message);assert.equal(post.observation_rejections[0].rejection.cause.value,0)}else assert.equal(post.observation_rejections,undefined);
+ }finally{await rm(root,{recursive:true,force:true})}
+});
