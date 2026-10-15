@@ -107,6 +107,7 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
     modelProofSha256 = evalrunnerHash(await readFile(proofFile))
   }
   return { slot, verdict, status: attempt.status, score: node ? null : attempt.score, pass: verdict === "PASS", failures,
+    startedAt: summary.started_at, finishedAt: summary.finished_at,
     durationMs: attempt.duration_ms, tokens: attempt.tokens, sessionId: release.sessionId,
     releaseSha256: evalrunnerHash(await readFile(path.join(selected, "release.json"))), modelProofSha256, cleanupFile }
 }
