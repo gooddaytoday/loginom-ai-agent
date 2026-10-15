@@ -310,3 +310,17 @@ inventory. One-shot helper remains in
 `/home/kiselev/storage/tmp/evals-accounting-writer-cleanup.ts`; its nonce/source
 guards run before any archive or factory teardown. A separate cold accounting
 qualification does not resolve this observer/recovery gate.
+
+Следующий reconnect GREEN также остановился до collector: `setup` exit0,
+continuous proof failed `Writer owner unavailable`, unknown=[]/final00;
+`/home/kiselev/storage/tmp/evals-cli-sessions-LQKvkl` сохранён. Оба admin
+завершены подтверждённо; management inventory остаётся unconfirmed, after snapshot
+не опубликован. Private600
+`native-cli-sessions-b8a7aba3-a281-44e3-bac6-6172c0b19cee/setup-writer-sources.json`
+SHA256 `2aecee03849c6b14b7a516202856dd216a095997c6d073a7720bd53a7dc24638`
+сохраняет original sources, без дополнения отсутствующего after. Original proof
+SHA256 `29c9b80bf826634f0f08b5932a41b5e0c16782cb83e0c6620d2222fa9ec8aedb`.
+Nonce `eaf68d07-28ba-40e6-a226-f5c9eac601a2`, server
+`2a3fb5698f038f86478b3a5d5c9e406c597b38f78ce487d0de1e7e4238a1e612`, Studio
+`07169c9dd729f15a434fb296065cde626d6d58ac8952efaa0882d2d6c00b6bd1`.
+Normal proof не исправлен, closure/release/delete не квалифицированы.
