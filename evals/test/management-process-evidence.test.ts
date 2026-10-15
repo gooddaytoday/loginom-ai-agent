@@ -9,6 +9,7 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { agentCommand } from "../src/cli"
 import { loadConfig } from "../src/config"
 import { management } from "../src/profile"
+import { openLoginomAdmin, sealAdminProcessInventory } from "../src/loginom-admin"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
@@ -130,10 +131,14 @@ test("management process inventory precedes dispatch and binds actual continuous
 test("parallel management owners register both slot inventories before dispatch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-registry-")), fixture = await parallelFixture(root)
   const journal = path.join(fixture.slots.controller.stateDir, "command.json"), bundle = path.join(root, "bundle")
+  const adminInventory = path.join(fixture.slots.controller.stateDir, "admin-processes.json")
   await mkdir(bundle, { mode: 0o700 })
   await Bun.write(path.join(bundle, "browser"), Bun.file("/usr/bin/true"))
   await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "browser" }))
-  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "parallel-management", identity, phase: "cli_admitted" })
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "parallel-management", identity,
+    slotIds: ["a", "b"], phase: "cli_admitted", processInventory: adminInventory })
+  // Data-only empty admin inventory; this test launches no native Loginom process.
+  await writeLeaseReceipt(adminInventory, { version: 2, kind: "admin-processes", commandId: "parallel-management", journal, identity, connections: [] })
   const environment = await acquireEnvironmentLeases(fixture.slots, 2, identity, journal, fixture.lockRoot)
   try {
     const settled = await Promise.allSettled(environment.slots.map(async lease => {
@@ -156,6 +161,45 @@ test("parallel management owners register both slot inventories before dispatch"
     })
     const command = await readLeaseReceipt(journal) as { managementInventories: { slotId: string }[] }
     expect(command.managementInventories.sort((a, b) => a.slotId.localeCompare(b.slotId))).toEqual(results)
+    const admitted = await readLeaseReceipt(journal)
+    const original = await readLeaseReceipt(results[0]!.file) as { processes: unknown[] }
+    await writeLeaseReceipt(results[0]!.file, { ...original, processes: [...original.processes, ...original.processes] })
+    await expect(sealAdminProcessInventory(fixture.slots, environment.server, hash(admitted), environment.slots))
+      .rejects.toThrow("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED")
+    expect(await readLeaseReceipt(journal)).toEqual(admitted)
+    await writeLeaseReceipt(results[0]!.file, original)
+    await expect(sealAdminProcessInventory(fixture.slots, environment.server, hash(admitted), environment.slots.slice(0, 1)))
+      .rejects.toThrow("MANAGEMENT_ADMISSION_UNCONFIRMED")
+    await expect(sealAdminProcessInventory(fixture.slots, environment.server, "0".repeat(64), environment.slots))
+      .rejects.toThrow("MANAGEMENT_ADMISSION_UNCONFIRMED")
+    const marker = path.join(root, "live"), finish = path.join(root, "finish"), liveDirectory = path.join(fixture.slots.controller.stateDir, "live-a")
+    await mkdir(liveDirectory, { mode: 0o700 })
+    // Keep the OS probe alive while the subreaper publishes its durable CLI admission.
+    const live = superviseManagementProcess({ cmd: [process.execPath, "-e", `await Bun.write(${JSON.stringify(marker)},"ready");
+      await Bun.sleep(1000);
+      const until=Date.now()+2000;while(!await Bun.file(${JSON.stringify(finish)}).exists()&&Date.now()<until)await Bun.sleep(10)`],
+      cwd: root, env: { PATH: process.env.PATH ?? "", LOGINOM_AI_AGENT_CLI_BUNDLE: bundle }, profileDir: environment.slots[0]!.slot.profileDir, timeoutMs: 3000 },
+      { file: results[0]!.file, lease: environment.slots[0]!, directory: liveDirectory, operation: ["loginom", "status"] })
+    try {
+      const until = Date.now() + 2000
+      while (!await Bun.file(marker).exists() && Date.now() < until) await Bun.sleep(10)
+      expect(await Bun.file(marker).exists()).toBe(true)
+      await expect(sealAdminProcessInventory(fixture.slots, environment.server, hash(admitted), environment.slots))
+        .rejects.toThrow("MANAGEMENT_PROCESS_BUSY")
+      expect(await readLeaseReceipt(journal)).toEqual(admitted)
+    } finally { await Bun.write(finish, "done"); await live }
+    const sealed = await sealAdminProcessInventory(fixture.slots, environment.server, hash(admitted), environment.slots)
+    expect(sealed).toMatchObject({ phase: "finalizing", managementSources: await Promise.all(results.map(async result =>
+      ({ path: result.file, sha256: hash(await readLeaseReceipt(result.file)) }))) })
+    const lease = environment.slots[0]!, before = await Bun.file(results[0]!.file).text()
+    await expect(superviseManagementProcess({ cmd: [process.execPath, "-e", "throw Error('must not dispatch')"], cwd: root,
+      env: {}, profileDir: lease.slot.profileDir, timeoutMs: 3000 }, { file: results[0]!.file, lease,
+      directory: path.join(fixture.slots.controller.stateDir, "capture-a"), operation: ["loginom", "status"] }))
+      .rejects.toThrow("MANAGEMENT_ADMISSION_UNCONFIRMED")
+    await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: environment.server,
+      processInventory: adminInventory, binary: "/unreadable-runtime" })).rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
+    expect(await Bun.file(results[0]!.file).text()).toBe(before)
+    expect(await readLeaseReceipt(journal)).toEqual(sealed)
   } finally {
     await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())])
     await rm(root, { recursive: true, force: true })

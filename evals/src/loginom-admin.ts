@@ -521,7 +521,7 @@ function requireAdminReply(reply: AdminReply): unknown {
   throw new EvalFailure(adminReplyCode(reply), 2)
 }
 
-export async function sealAdminProcessInventory(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, expectedHash: string) {
+export async function sealAdminProcessInventory(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, expectedHash: string, slots?: SlotLease[]) {
   await server.assertHeld()
   const initial = await readLeaseReceipt(server.reservation.journal)
   const identity = server.reservation.identity
@@ -530,6 +530,10 @@ export async function sealAdminProcessInventory(file: SlotFile, server: Awaited<
   return withAdminInventoryWrite(initial.processInventory, async () => {
     await readAdminInventory(file, identity, { file: initial.processInventory as string, journal: server.reservation.journal, commandId: server.reservation.commandId })
     const command = await readLeaseReceipt(server.reservation.journal)
+    if (jsonObject(command) && command.phase === "cli_admitted" && slots) {
+      const { sealManagementProcessInventories } = await import("./management-process-evidence")
+      return sealManagementProcessInventories(file, server, slots, expectedHash)
+    }
     if (!jsonObject(command) || !["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) || command.phase !== "unactivated" ||
       new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") !== expectedHash)
       throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
