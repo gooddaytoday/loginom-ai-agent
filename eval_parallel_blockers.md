@@ -204,6 +204,28 @@ SHA6e1029b0f0d616178a5b3e0cec23047984b3e1fd2b26cd820bb3ec1aae63b655:
 17 independent checks,30 source hashes, both continuous closures and exact
 pair/network/root absence. Production grants неизменны; model/judge calls0.
 
+2026-10-15: отдельный hard-crash/startup control тоже не создал SessionBackup.
+Перед остановкой подтверждены pending Count1 backend row того же user/session,
+изменённый named package, native period5000/keepAlive1800000 и autosave5062 bytes
+SHA7fb44c3ed3a552016984fcbb9b54eec3d6a30f9467deeb1d5ca55a64c7132dd2.
+Старый admin подтвердил disconnect/continuous closure до `docker kill --signal
+KILL <exact own CID>`; actual state exit137/OOMKilled=false. После restart тех же
+CIDs новый admin init/inspect/dispose подтвердил новую StartedAt/epoch и closure.
+Manager list до crash пуст; physical copies после kill и после native-ready
+restart пусты, SessionBackup.cfg после restart absent. Это подтверждает лишь отрицательный исход данного recipe; create trigger
+и supported enforced-disabled policy по-прежнему не квалифицированы.
+
+TDD oracle RED на graceful0 вместо expected137 (1FAIL/68 assertions68.85s),
+после смены только termination command оба native controls GREEN2 PASS/146
+assertions147.83s; typecheck/diff PASS. Hard case
+`native-user-831bf8d0-e994-4722-8d64-0963f15ffd35/source-audit.json`
+SHA7678658c18976971879db5dc3c56d1f906a0b2dc1ed0f2b736a6985adcf03f4e:
+24 checks/32 sources. Graceful control62678829...22/30 и RED678fa71a...21/34
+сохранены; общий verification SHAfa28c0dd58ccb104a9271cfbfcdbaf29724d3d4d6aa081f284d28642e1160453
+перечитал96 source hashes и обе copied empty directories каждого case. Все3
+собственные пары/сети/temporary roots точно отсутствуют. Production grants не
+менялись; model/live judge calls0. Старые retained incidents не затрагивались.
+
 Дополнительный primary boundary2026-10-15: public pinned server image содержит
 `SessionBackup.cfg`/`SessionBackupConfiguration`, User/Name/Session map/list,
 backup status/finalize enums и package-autosave event flags. Binary SHA256

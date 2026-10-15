@@ -73,10 +73,11 @@ liveIntegration("native targeted close preserves a different user's active brows
   expect(result).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: "eval-b" }, backup: { periodMs: 5000, modified: true } } })
 }, 180_000)
 liveIntegration("native backup research: observes real autosave and unqualified backup after daemon restart", () => nativeUserCapability("backup"), 120_000)
+liveIntegration("native backup research: captures a hard daemon crash and restart", () => nativeUserCapability("backup", true), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close") {
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close", hardCrash = false) {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -93,6 +94,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     const profile = path.join(root, "admin-profile")
     const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-user-${crypto.randomUUID()}`)
     await mkdir(evidence, { mode: 0o700 })
+    console.error(`native user evidence: ${evidence}`)
     const journal = path.join(evidence, "commands")
     await mkdir(profile, { mode: 0o700 })
     await mkdir(journal, { mode: 0o700 })
@@ -411,18 +413,33 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await writeLeaseReceipt(path.join(evidence, "autosave-evidence.json"), { identity: pair.identity, username: credentials.username,
           sessionGuid: backupData.ownSession.guid, periodMs: backupData.backup.periodMs, bytes: bytes.length,
           sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"), sessionBackupQualified: false })
+        if (hardCrash) {
+          const beforeCrash = await request("inspect", {})
+          await writeLeaseReceipt(path.join(evidence, "server-before-crash.json"), beforeCrash)
+          const data = beforeCrash.data as { rawSessions: { name: string; createdAt: string; packageCount: number; pendingDisconnect: boolean }[] }
+          expect(data.rawSessions.find(row => row.name === backupData.binding.name && row.createdAt === backupData.binding.createdAt))
+            .toMatchObject({ packageCount: 1, pendingDisconnect: true })
+        }
         disposedBeforeRestart = await request("dispose", {})
         expect(disposedBeforeRestart).toMatchObject({ outcome: "confirmed", data: { disposed: true, transportDisconnect: "confirmed" } })
         await channel.end()
         expect((await pending).processCleanup.status).toBe("confirmed")
-        const stop = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "stop", "--time", "10", pair.identity.containerId], { stdout: "pipe", stderr: "pipe" })
+        expect(await readServerIdentity(file)).toEqual(pair.identity)
+        const termination = hardCrash ? ["kill", "--signal", "KILL", pair.identity.containerId] : ["stop", "--time", "10", pair.identity.containerId]
+        const stop = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", ...termination], { stdout: "pipe", stderr: "pipe" })
         expect(await stop.exited).toBe(0)
+        const inspected = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "inspect", "--format",
+          '{"running":{{json .State.Running}},"exitCode":{{json .State.ExitCode}},"oomKilled":{{json .State.OOMKilled}},"startedAt":{{json .State.StartedAt}},"finishedAt":{{json .State.FinishedAt}}}', pair.identity.containerId],
+          { stdout: "pipe", stderr: "pipe" })
+        expect(await inspected.exited).toBe(0)
+        const stopped = await new Response(inspected.stdout).json() as { running: boolean; exitCode: number; oomKilled: boolean; startedAt: string; finishedAt: string }
+        expect(stopped).toMatchObject({ running: false, oomKilled: false, startedAt: pair.identity.startedAt })
         const backupDir = path.join(evidence, "server-shutdown-backup")
         await mkdir(backupDir, { mode: 0o700 })
         const copy = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "cp", `${pair.identity.containerId}:${file.server.backupRoot}/.`, backupDir], { stdout: "pipe", stderr: "pipe" })
         expect(await copy.exited).toBe(0)
         const backups = await readdir(backupDir)
-        await writeLeaseReceipt(path.join(evidence, "server-shutdown-backup.json"), { identity: pair.identity, entries: backups })
+        await writeLeaseReceipt(path.join(evidence, "server-shutdown-backup.json"), { identity: pair.identity, entries: backups, termination, stopped })
         const start = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "start", pair.identity.containerId], { stdout: "pipe", stderr: "pipe" })
         expect(await start.exited).toBe(0)
         const restarted = await readServerIdentity(file)
@@ -452,12 +469,15 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         expect(await metadata.exited).toBe(0)
         await writeLeaseReceipt(path.join(evidence, "server-restarted-backup.json"), { version: 1, previousIdentity: pair.identity,
           identity: restarted, entries, metadataOutput, oldAdminDisposed: disposedBeforeRestart, sessionBackupQualified: false,
-          pairNonce: pair.nonce, resources: pair.resources, root })
+          pairNonce: pair.nonce, resources: pair.resources, root, termination, stopped })
         // This controlled recipe produces autosave; empty SessionBackup is not a disabled-policy proof.
-        expect(backupData.backup.after).toHaveLength(0)
-        expect(backups).toHaveLength(0)
-        expect(entries).toHaveLength(0)
-        expect(metadataOutput).toBe("")
+        if (!hardCrash) {
+          expect(backupData.backup.after).toHaveLength(0)
+          expect(backups).toHaveLength(0)
+          expect(entries).toHaveLength(0)
+          expect(metadataOutput).toBe("")
+        }
+        expect(stopped.exitCode).toBe(hardCrash ? 137 : 0)
         complete = true
         return
       }
