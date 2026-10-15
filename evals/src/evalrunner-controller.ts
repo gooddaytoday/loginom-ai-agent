@@ -32,7 +32,7 @@ export async function runEvalrunnerSeries(config: EvalrunnerConfig, input: { ser
   if (manifest.issue !== config.readinessIssue || !/^[\w-]+$/.test(input.task)) throw new EvalFailure("Assigned issue/task differs", 2)
   if (await Bun.file(path.join(input.series, "release.json")).exists()) return checkEvalrunnerSeries(config, input.series)
   if (await Bun.file(path.join(input.series, "finalizing.json")).exists()) throw new EvalFailure("Finalization admitted; preserve evidence for recovery", 2)
-  await pinnedSeriesProof(config, manifest)
+  await verifyEvalrunnerSeriesPins(config, manifest)
   for (const scope of manifest.scope === "full" ? ["readiness-calc", "readiness-node"] : manifest.scope === "readiness-node" ? ["readiness-calc"] : []) {
     const ready = await checkEvalrunnerSeries(config, path.join(config.results, `v02-${scope}-${manifest.issue}`))
     if (ready.status !== "RELEASED" || ready.completed !== 1) throw new EvalFailure("Prior readiness not released", 2)
@@ -48,7 +48,7 @@ export async function runEvalrunnerSeries(config: EvalrunnerConfig, input: { ser
     }
     let progress = await inspectEvalrunnerSeries(config, manifest.series)
     while (progress.status === "READY" && progress.next) {
-      const proof = await pinnedSeriesProof(config, manifest)
+      const proof = await verifyEvalrunnerSeriesPins(config, manifest)
       const slot = progress.next
       const series = await admitEvalrunnerSlot(config, manifest, slot, input.task)
       await dispatchEvalrunner(config, { series, case: slot.case, collection: slot.collection, issue: manifest.issue, task: input.task }, proof, async () => {})
@@ -58,7 +58,7 @@ export async function runEvalrunnerSeries(config: EvalrunnerConfig, input: { ser
     }
     if (progress.status !== "COMPLETE" || progress.completed !== manifest.slots.length)
       throw new EvalFailure(`Series BLOCKED: ${progress.reason ?? "coverage unconfirmed"}`, 2)
-    const proof = await pinnedSeriesProof(config, manifest)
+    const proof = await verifyEvalrunnerSeriesPins(config, manifest)
     await assertProfileClean(config.profile)
     await checkIsolatedLoginom(parseArtifactSource("docker", { container: proof.env.LOGINOM_CONTAINER!, storageDir: proof.env.LOGINOM_STORAGE_DIR! }))
     const summary = { kind: "evalrunner-series-summary", expected: progress.expected, completed: progress.completed,
@@ -104,7 +104,7 @@ export async function checkEvalrunnerSeries(config: { root: string; results: str
   return { ...progress, status: "RELEASED" as const, released: true }
 }
 
-async function pinnedSeriesProof(config: EvalrunnerConfig, manifest: EvalrunnerSeriesManifest) {
+export async function verifyEvalrunnerSeriesPins(config: EvalrunnerConfig, manifest: EvalrunnerSeriesManifest) {
   const proof = await qualifyEvalrunner(config)
   const corpus = await loadEvalrunnerCorpus(path.join(config.checkout, "evals"))
   if (JSON.stringify({ ...proof, env: undefined }) !== JSON.stringify(manifest.pins) || corpus.sha256 !== manifest.corpus.sha256 ||
