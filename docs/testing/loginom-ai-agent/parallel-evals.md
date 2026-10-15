@@ -946,3 +946,15 @@ reservation writes0. Credentials и OAuth bytes не читались/не ме�
 guard files сохранены. Private postcheck78d0039f... и config3310afcc... в
 native-two-users-6ebb9781. Acceptance pair journal ещё отсутствует, readiness=false;
 это разовая подготовка private paths, без нового CLI flag или live admission.
+
+Native normal management A/B qualification (32685e3e66):1 PASS/19 assertions
+168.88s без concurrent unit. A seals producers, commits archive, accounts for
+все свои sessions и closes while B continues; B сохраняет исходную session и
+проходит fresh check. Global finalizer переиспользует exact A archive manifest,
+четыре CLI и admin continuous closures qualified. Private
+`native-two-users-4a143678-dfcf-4a51-ae93-33db172b9b72/source-audit.json`
+SHAdd7acfd3197a7164153e1acdf2ff884ddc41726794123191d861c1e20fb7684a:
+649 checks/192 sources, exact disposable pair/network/root absent. Старый eR7Snq
+UID incident остаётся retained и не объяснён этим PASS. Count0 management gate
+не заменяет full attempt cleanup/recovery/SessionBackup/licence/resource/OAuth
+и LLM N2→N1/node приёмку; delete/release/admission остаются запрещены.
