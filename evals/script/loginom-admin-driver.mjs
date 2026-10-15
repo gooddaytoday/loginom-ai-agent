@@ -99,9 +99,10 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
     if (request.op === "close-session") {
       if (typeof request.payload?.proofId !== "string") throw Error("SESSION_IDENTITY_UNSUPPORTED")
-      const binding = sessionBindings.get(request.payload.proofId)
+      const binding = request.payload.adopt === undefined ? sessionBindings.get(request.payload.proofId)
+        : await readSessionBinding(request.payload, identity)
       if (!binding) { respond(id, "not_applied", { code: "SESSION_OWNERSHIP_UNCONFIRMED" }); continue }
-      if (Object.keys(request.payload).length !== 2 || !request.payload.session || Object.keys(request.payload.session).length !== 6 ||
+      if (Object.keys(request.payload).length !== (request.payload.adopt === undefined ? 2 : 3) || !request.payload.session || Object.keys(request.payload.session).length !== 6 ||
         Object.entries(binding.session).some(([key, value]) => request.payload.session[key] !== value)) {
         respond(id, "not_applied", { code: "SESSION_IDENTITY_CHANGED" }); continue
       }
@@ -496,7 +497,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
   } catch (error) {
     const codes = ["ADMIN_REQUEST_INVALID", "ADMIN_DEADLINE", "ADMIN_ALREADY_INITIALIZED", "ADMIN_NOT_INITIALIZED", "ADMIN_CREDENTIAL_PRIVATE",
       "ADMIN_CREDENTIAL_INVALID", "ADMIN_RUNTIME_PATH", "ADMIN_RUNTIME_HASH", "ADMIN_PROFILE_OWNERSHIP", "ADMIN_CAPABILITY_UNSUPPORTED",
-      "ADMIN_IDENTITY_CHANGED", "ADMIN_USER_IDENTITY_CHANGED", "SERVER_EPOCH_CHANGED", "SESSION_IDENTITY_UNSUPPORTED"]
+      "ADMIN_IDENTITY_CHANGED", "ADMIN_USER_IDENTITY_CHANGED", "SERVER_EPOCH_CHANGED", "SESSION_IDENTITY_UNSUPPORTED", "SESSION_SOURCE_UNCONFIRMED"]
     respond(id, dispatched ? "unknown" : "not_applied", { code: codes.includes(error?.message) ? error.message : "ADMIN_OUTCOME_UNKNOWN" })
   }
 }
@@ -523,6 +524,48 @@ async function bounded(request, promise) {
     timer = setTimeout(() => reject(Error("ADMIN_DEADLINE")), remaining(request))
   })]) }
   finally { clearTimeout(timer) }
+}
+
+async function readSessionBinding(payload, identity) {
+  const adopt = payload.adopt
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(payload.proofId) || !adopt || Object.keys(adopt).length !== 2 ||
+    typeof adopt.receipt !== "string" || path.basename(adopt.receipt) !== `session-${payload.proofId}.json` ||
+    typeof adopt.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(adopt.sha256)) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const claim = await readSessionReceipt(adopt.receipt)
+  if (!claim || claim.version !== 2 || claim.kind !== "owned-server-session" || claim.state !== "observed" ||
+    JSON.stringify(claim.identity) !== JSON.stringify(identity) || JSON.stringify(claim.binding) !== JSON.stringify(payload.session) ||
+    createHash("sha256").update(JSON.stringify(claim)).digest("hex") !== adopt.sha256 || claim.source?.id !== payload.proofId ||
+    typeof claim.source.path !== "string" || path.basename(claim.source.path) !== `${payload.proofId}.json`)
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const request = claim.observation?.payload, reply = claim.observation?.reply
+  const own = reply?.data?.ownSession
+  if (!request || !["session-probe", "session-crash-probe"].includes(request.phase) || !request.owned ||
+    typeof request.owned.objectId !== "string" || !request.owned.objectId || request.owned.userKind !== 0 ||
+    request.owned.name !== payload.session?.username || own?.userObjectId !== request.owned.objectId || own.username !== payload.session.username ||
+    own.isAdmin !== false || own.isDesigner !== true || reply?.v !== 1 || reply.id !== payload.proofId || reply.outcome !== "confirmed" ||
+    JSON.stringify(reply.data.binding) !== JSON.stringify(payload.session)) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const source = await readSessionReceipt(claim.source.path)
+  if (!source || source.version !== 1 || source.kind !== "loginom-admin-command" || source.state !== "confirmed" ||
+    source.id !== payload.proofId || source.op !== "reconcile-user" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(identity) ||
+    createHash("sha256").update(JSON.stringify(source)).digest("hex") !== claim.source.sha256 ||
+    source.desiredHash !== createHash("sha256").update(JSON.stringify(request)).digest("hex") ||
+    source.replyHash !== createHash("sha256").update(JSON.stringify(reply)).digest("hex")) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  return { session: payload.session, userObjectId: request.owned.objectId, retainedPackageCount: 0 }
+}
+
+async function readSessionReceipt(file) {
+  if (typeof file !== "string" || !path.isAbsolute(file) || path.resolve(file) !== file ||
+    await realpath(path.dirname(file)).catch(() => undefined) !== path.dirname(file)) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const directory = await lstat(path.dirname(file))
+  if (!directory.isDirectory() || directory.uid !== process.getuid() || (directory.mode & 0o777) !== 0o700) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => { throw Error("SESSION_SOURCE_UNCONFIRMED") })
+  try {
+    const info = await handle.stat()
+    if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid() || (info.mode & 0o777) !== 0o600 || info.size > 1024 * 1024)
+      throw Error("SESSION_SOURCE_UNCONFIRMED")
+    return JSON.parse(await handle.readFile("utf8"))
+  } catch { throw Error("SESSION_SOURCE_UNCONFIRMED") }
+  finally { await handle.close() }
 }
 
 async function readCredentials(file) {

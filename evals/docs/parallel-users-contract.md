@@ -630,3 +630,14 @@ Legacy afterAttempt отказывает SLOT_CLEANUP_REQUIRED до management c
 outcome не переписывается из-за незавершённого cleanup. Следующий attempt
 отвергает оставшиеся файлы. Положительный session-close/scoped-delete executor
 ещё необходим; эти negative gates не дают release authority.
+
+closeOwnedSession после смены admin context передаёт adopt только после полного
+readServerSession под held lease. Adopt связывает private canonical session receipt
+и semantic SHA; driver повторно проверяет UID0600/single-link/parent0700, identity,
+binding и исходный confirmed command с desired/reply/source hashes. Новый context
+получает свежие native account/manager proxies и применяет прежние exact tuple,
+Count0/pending и bounded absence checks. Username не заменяет proof. Допускаются
+только обычные session-probe/session-crash-probe; package/backup и произвольные
+active-session claims не получают adoption authority. Closure journal нового
+context связывает adopt receipt/SHA; старый same-context payload сохраняется.
+Full parent provisioning/admission и Session CAS recovery ещё требуют интеграции.
