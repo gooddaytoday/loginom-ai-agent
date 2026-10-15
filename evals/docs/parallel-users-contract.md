@@ -1795,3 +1795,47 @@ archive-before-close and exact own pair/root absence. The fixture still calls
 targeted close primitives explicitly; an all-slot finalizer must consume this
 accounting for every slot before any close. Actual unknown external-session
 acceptance, backup/storage and recovery gates remain open.
+
+### Normal management environment finalizer
+
+finalizeManagementEnvironment seals cli_admitted when needed, archives every
+profile, collects every selected normal slot against one fresh immutable native
+observation, and only then closes each exact ownership ledger. It requires a
+registered inventory for each selected slot. A fresh post-close observation is
+reconciled with all closed ledgers; unknown rows refuse confirmation. Admin
+disposal and every registered admin continuous process proof precede receipt
+publication. Pair identity and the entire archive are revalidated after closure.
+
+The private finalization receipt binds command, archive, before/after snapshots,
+admin inventory and observed/closed session hashes. Status sessions_closed grants
+no storage deletion or next admission; both fields remain false and all leases
+remain held. This is the normal management phase; recovery-only/mixed failures,
+backup/storage release and active attempts keep their separate gates.
+
+Native missing API RED50 (184.91s)→GREEN1/53 (291.45s). All three previously open
+sessions close through this API; held server/slot guards remain valid.
+Private600 native-cli-sessions-fa2f4727-507c-48b1-8e6a-f92d099ac8bb/finalizer.json
+SHA256 9b4f5f11e7199caddd884dca7a57fa1126560689eec29201dfde98b0bfa2b60a.
+The independent audit passed251 checks across eleven artifacts, including exact
+archive/ledger bindings, all3 rows before the API, close→absence→dispose ordering
+and own pair/root absence. Typecheck/diff PASS.
+
+A separate real unregistered client negative passed1/56 (211.19s). A genuine
+sixth check used the legacy client path outside the frozen producer inventory
+before archive; the fresh server list contains four same-user rows. Finalization
+refuses MANAGEMENT_SESSION_UNKNOWN before any close. Three known and one unknown
+rows retain exact identity/count; no close-session command, closed terminal or
+successful finalization receipt is created. Held leases remain valid.
+
+Private600 native-cli-sessions-9a6be541-6bcc-4712-813e-6737fc90062b/unknown-finalizer.json
+SHA256 513d1323ebd50f31d587b1c6ff2caa9f649ad4b196bbf544d1d50d2498325e36.
+The negative audit passed155 checks across nine linked artifacts, including all
+six local continuous process proofs, actual new-row baseline difference, archive
+and observation chains, zero close commands and own pair/root absence. These
+are genuine native rows; earlier data-only snapshot controls remain separate.
+Multi-slot native acceptance and backup/storage release remain open.
+
+Final related regression:53 PASS/346 (104.22s) across management accounting,
+process evidence, admin, archive, preparation recovery and user ownership;
+typecheck/diff PASS. The normal-path finalizer is implemented; this does not
+qualify multi-slot native admission or backup/storage release.

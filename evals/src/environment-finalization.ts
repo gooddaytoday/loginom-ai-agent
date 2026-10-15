@@ -10,6 +10,60 @@ import { readUnactivatedUserObservation, readUserOwnership, readUserPreparation 
 import { readPreparationRecoverySources } from "./preparation-recovery"
 import { readManagementProcessInventory } from "./management-process-evidence"
 import { assertProfileSettled } from "./profile"
+import { collectManagementSessions } from "./management-sessions"
+
+/** Quiesces normal management sessions; backup/storage qualification still owns release. */
+export async function finalizeManagementEnvironment(file: SlotFile, environment: Awaited<ReturnType<typeof acquireEnvironmentLeases>>, admin: AdminConnection) {
+  const server = environment.server, identity = server.reservation.identity, journal = server.reservation.journal
+  await server.assertHeld()
+  const admitted = await readLeaseReceipt(journal)
+  if (!identity || JSON.stringify(admin.identity) !== JSON.stringify(identity) || !object(admitted) ||
+    !["cli_admitted", "finalizing"].includes(String(admitted.phase)) || typeof admitted.processInventory !== "string" ||
+    path.dirname(admitted.processInventory) !== file.controller.stateDir) throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  if (admitted.phase === "cli_admitted") await sealAdminProcessInventory(file, server, hash(admitted), environment.slots)
+  const archived = await archiveManagementEnvironment(file, environment)
+  const command = await readLeaseReceipt(journal)
+  if (!object(command) || !Array.isArray(command.managementInventories)) throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  const before = await admin.inspectSessionInventory()
+  const prepared: { lease: SlotLease; secretFile: string; inventoryFile: string; accounted: Awaited<ReturnType<typeof collectManagementSessions>> }[] = []
+  for (const lease of environment.slots) {
+    const binding = command.managementInventories.find(entry => object(entry) && entry.slotId === lease.slot.id)
+    if (!object(binding) || typeof binding.file !== "string") throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+    const secretFile = path.join(file.controller.stateDir, `prepare-${lease.slot.id}.secret.json`)
+    prepared.push({ lease, secretFile, inventoryFile: binding.file,
+      accounted: await collectManagementSessions(file, lease, secretFile, binding.file, before.source) })
+  }
+  await server.assertHeld()
+  if (hash(await readLeaseReceipt(journal)) !== hash(command) || hash(await readLeaseReceipt(archived.source.path)) !== archived.source.sha256)
+    throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  // Every slot is accounted before the first destructive server operation.
+  for (const entry of prepared) for (const session of entry.accounted.sessions) await admin.closeManagementSession(entry.lease, entry.secretFile, session.id)
+  const after = await admin.inspectSessionInventory()
+  const slots = await Promise.all(prepared.map(async entry => {
+    const accounted = await collectManagementSessions(file, entry.lease, entry.secretFile, entry.inventoryFile, after.source)
+    return { slotId: entry.lease.slot.id, leaseToken: entry.lease.token, sessions: await Promise.all(accounted.sessions.map(async session => {
+      if (session.state !== "closed") throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+      const observed = path.join(file.controller.stateDir, `management-session-${session.id}.json`)
+      const closed = path.join(file.controller.stateDir, `management-session-${session.id}.closed.json`)
+      return { id: session.id, state: session.state, observed: { path: observed, sha256: hash(await readLeaseReceipt(observed)) },
+        closed: { path: closed, sha256: hash(await readLeaseReceipt(closed)) } }
+    })) }
+  }))
+  await admin.dispose()
+  const processes = await readAdminProcessInventory(file, identity, { file: admitted.processInventory, journal,
+    commandId: server.reservation.commandId, producerPid: process.pid })
+  if ([before, after].some(snapshot => !processes.connections.some(connection => path.dirname(connection.source.path) === path.dirname(snapshot.source.path))))
+    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+  await verifyParallelPair(file, identity)
+  if (hash(await archiveManagementEnvironment(file, environment)) !== hash(archived) || hash(await readLeaseReceipt(journal)) !== hash(command))
+    throw new EvalFailure("MANAGEMENT_FINALIZATION_UNCONFIRMED", 2)
+  const receipt = { version: 2, kind: "management-environment-finalization", status: "sessions_closed" as const, identity,
+    command: { path: journal, sha256: hash(command) }, archive: archived.source, processInventory: processes.source,
+    before: before.source, after: after.source, slots, storageDeletionAllowed: false, nextAdmissionAllowed: false }
+  const target = `${journal}.management-finalization.json`
+  await writeLeaseReceipt(target, receipt)
+  return { status: receipt.status, slots, after: after.source, source: { path: target, sha256: hash(receipt) } }
+}
 
 /** Archives every sealed normal management profile; server sessions and reservations remain held. */
 export async function archiveManagementEnvironment(file: SlotFile, environment: Awaited<ReturnType<typeof acquireEnvironmentLeases>>) {
