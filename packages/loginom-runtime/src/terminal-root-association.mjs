@@ -26,7 +26,7 @@ export function managedRootStartup(message,state){
 }
 
 // Fixed load-purpose custody only. No source bytes/native/Save/Close permission.
-const startups=new WeakMap(),owners=new WeakMap();
+const startups=new WeakMap(),owners=new WeakMap(),ownerPeers=new WeakMap();
 const fail=()=>{throw Error('LOGINOM_ORIGINAL_LOAD_CHANGED')};
 const loadData=(o,k)=>{const d=Object.getOwnPropertyDescriptor(o,k);if(!d||!('value'in d))fail();return d.value};
 function slot(object,key,checks){
@@ -59,7 +59,7 @@ export function retainTerminalSourceStartup(message,state){
   async observed(work){let value;try{value=await work}catch(error){throw remember(error)}if(work===initTask)initSettled=true;token.guard();return value},
   bindOwner(value,originalProfile){token.guard();if(typeof originalProfile!=='string'||owner||loadData(state,'startupOwner')!==value||owners.has(value))fail();profile=originalProfile;owner=value;
    slot(state,'startupOwner',checks);for(const key of ['directory','generation','chat'])slot(owner,key,checks);
-   if(loadData(owner,'generation')!==loadData(input,'generation')||loadData(owner,'chat')!==loadData(input,'chat'))fail();owners.set(owner,token);token.guard()},
+   if(loadData(owner,'generation')!==loadData(input,'generation')||loadData(owner,'chat')!==loadData(input,'chat'))fail();owners.set(owner,token);ownerPeers.set(owner,original.peer);token.guard()},
   admitBrowser(value,candidate,actualProfile){token.guard();if(browserAdmitted||value!==owner||actualProfile!==profile||candidate!==loadData(input,'connection')
     ||loadData(owner,'account')!==loadData(capture,'account'))fail();for(const key of ['id','account','origin'])slot(owner,key,checks);token.guard();browserAdmitted=true},
   bindContext(value){token.guard();if(context||loadData(owner,'context')!==value)fail();context=value;slot(owner,'context',checks);
@@ -82,6 +82,13 @@ export function retainTerminalSourceStartup(message,state){
  startups.set(state,token);token.guard();return token;
 }
 export function terminalSourceForOwner(owner){return owners.get(owner)}
+// Only the original received call from this owner's startup peer can consume
+// its load. Equal wire IDs, copies and another startup's Page do not bind it.
+export function terminalSourceForManagedCall(owner,message){
+ const call=calls.get(message),load=owners.get(owner);
+ if(!call||!load||ownerPeers.get(owner)!==call.peer)throw Error('LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE');
+ call.guard();load.guard();return load;
+}
 
 // Fixed accepted static inputs; hashes never claim actual execution or closures.
 const sourceResponsePins=Object.freeze([

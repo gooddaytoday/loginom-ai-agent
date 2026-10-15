@@ -1,5 +1,5 @@
 import {terminalManagedCallForBridge} from '../../src/terminal-managed-call.mjs';
-import {originalPrepareLenderForSession} from '../../src/original-prepare-lender.mjs';
+import {originalPrepareLenderForSession,requireTerminalPrepareProvider} from '../../src/original-prepare-lender.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -272,9 +272,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       // raw first rejection outside the public error-formatting catch.
       if (request.params.name === 'dock_prepare') {
         const managedCall=terminalManagedCallForBridge(bridge);
-        // Physical parent origin/control has not crossed the private IPC boundary.
-        // Retained child message/task/controller is evidence, never native permission.
-        if(managedCall)throw Error('LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE');
+        // Consume only the branded per-call/startup/load association. Parsed
+        // request and SDK extra remain evidence, never provider registration.
+        if(managedCall)await requireTerminalPrepareProvider(bridge);
         if(prepareLender)prepareLender.requireInvocation();
       }
       if (request.params.name === 'dock_diagnostics') {

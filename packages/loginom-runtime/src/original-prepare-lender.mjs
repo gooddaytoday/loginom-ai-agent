@@ -1,3 +1,5 @@
+import {terminalManagedCallForBridge} from './terminal-managed-call.mjs';
+import {terminalSourceForManagedCall} from './terminal-root-association.mjs';
 // Private fixed managed→bridge channel. No configuration, IPC or tool field can
 // register a Page here. Request/deadline admission belongs to the later H0 cut.
 const sessions=new WeakMap(),bridges=new WeakMap();
@@ -47,3 +49,35 @@ export function retainOriginalPrepareStartup(session,{startup,owner,readiness,as
 }
 export function originalPrepareLenderForSession(session){const lender=sessions.get(session);lender?.guard();return lender}
 export function originalPrepareLenderForBridge(bridge){const lender=bridges.get(bridge);lender?.guard();return lender}
+
+const invocations=new WeakMap();
+// Fixed H0 consumer. It can recheck an existing original realm binding, but
+// never turn its projection/false qualification into a creation provider.
+export function requireTerminalPrepareProvider(bridge){
+ const call=terminalManagedCallForBridge(bridge),lender=bridges.get(bridge);
+ const unavailable=reason=>{throw Object.assign(Error('LOGINOM_ORIGINAL_PREPARE_INVOCATION_UNAVAILABLE'),{cause:reason})};
+ if(!call||!lender)unavailable('ORIGINAL_CALL_OR_STARTUP_NOT_BOUND');
+ call.guard();lender.guard();
+ const previous=invocations.get(call);if(previous)return previous;
+ const original=lender.original(),load=terminalSourceForManagedCall(original.owner,call.facts.message);
+ const initial=load.inspect(),witness=initial.scriptWitness;
+ const check=()=>{call.guard();lender.guard();load.guard();
+  if(lender.original()!==original||load.inspect().page!==original.page||load.inspect().context!==original.context
+    ||call.facts.session!==original.session||load.facts.deadline!==call.facts.rootAssociation.wire.deadline)
+   unavailable('ORIGINAL_PROVIDER_IDENTITY_CHANGED');
+ };
+ check();
+ const work=Promise.resolve().then(async()=>{
+  check();
+  if(!witness?.complete||!witness.realmOriginalAssociation||!witness.supportedInitialLoadJoined
+    ||typeof witness.recheck!=='function')unavailable('ORIGINAL_INITIAL_LOAD_NOT_BOUND');
+  // Keep the exact recheck Promise and result. No new Page/JSHandle/evaluator,
+  // acquisition, reader, packet, task settlement or creation is introduced.
+  const task=witness.recheck();const result=await task;check();
+  if(result!==witness)unavailable('ORIGINAL_WITNESS_CHANGED');
+  // This accepted producer still promises literal false. No success branch is
+  // inferred from a future flag or caller-provided function/DTO.
+  unavailable('LOADED_NATIVE_PROVIDER_NOT_BOUND');
+ });
+ invocations.set(call,work);return work;
+}
