@@ -14,6 +14,42 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('published Calculator and common node schemas require root finish and explain a usable repair',async()=>{
+ const {calculatorParametersSchema}=await import('../lib/node-api.mjs');
+ const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
+ assert.ok(tool.inputSchema.required.includes('finish'));
+ assert.deepEqual(tool.inputSchema.properties.finish.enum,['done','execute','close']);
+ for(const description of [tool.description,tool.inputSchema.properties.finish.description,calculatorParametersSchema.description]){
+  assert.match(description,/top-level finish|top-level field/);
+  assert.match(description,/"finish":"execute"/);
+  assert.match(description,/beside parameters/);
+ }
+ for(const type of ['transform.calculator','transform.sorting']){
+  const args={...request(),target:{kind:'new',type},mode:type==='transform.calculator'?'expression':'keys'};
+  delete args.finish;
+  const before=structuredClone(args);let rejection;
+  try{validateActionParameters(tool.inputSchema,args);}catch(error){rejection=error;}
+  assert.equal(rejection?.message,'Invalid parameters: missing finish');
+  const failure={action_key:'request.validate',effect_possible:false,error:{code:'REQUEST_REJECTED',message:rejection.message}};
+  const reply=compactNodeRequestFailure(failure,args);
+  assert.equal(reply.error.parameter_path,'finish');
+  assert.match(reply.error.message,/"finish":"execute"/);
+  assert.match(reply.next_step.instruction,/not inside it/);
+  assert.match(reply.next_step.instruction,/NEW operation_id/);
+  assert.equal(reply.status,'NOT_APPLIED');assert.equal(reply.effect_possible,false);assert.equal(reply.cleanup_complete,true);
+  assert.equal(new AjvJsonSchemaValidator().getValidator(userResultSchema)(reply).valid,true);
+  assert.deepEqual(args,before);assert.equal(args.finish,undefined);
+  const nested=structuredClone(args);nested.parameters.finish='execute';
+  assert.throws(()=>validateActionParameters(tool.inputSchema,nested),/missing finish/);
+  const repaired={...args,operation_id:'repaired',finish:'execute'};
+  assert.doesNotThrow(()=>validateActionParameters(tool.inputSchema,repaired));
+  assert.throws(()=>validateActionParameters(tool.inputSchema,{...repaired,finish:'auto'}));
+  const unknown=compactNodeRequestFailure({...failure,effect_possible:true,operation_id:'pending'},args);
+  assert.equal(unknown.next_step.tool,'dock_operation_inspect');assert.equal(unknown.status,'AMBIGUOUS');
+  assert.equal(unknown.error.message,rejection.message);
+ }
+});
+
 test('new export technical defaults preserve explicit format and never authorize overwrite or patch existing nodes',()=>{
  const b=createUserWorkflowBindings();b.remember(workspace());
  const r={...request(),target:{kind:'new',type:'exports.text'},mode:'delimited',inputs:[{}],parameters:{destination:'/test-2/a.csv'}};delete r.read;

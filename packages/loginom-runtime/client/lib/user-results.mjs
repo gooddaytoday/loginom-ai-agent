@@ -37,17 +37,20 @@ export function compactNodeRequestFailure(outcome,request={}) {
     next_step:{tool:'dock_node_wait',arguments:{operation_id:active.operation_id,timeout_ms:10000},
       rejected_operation_id:requestedId,
       instruction:'The original node operation is still running. Wait for this operation ID; the competing request did not start. Do not inspect or repeat browser mutations while it runs.'}};
+  const missingFinish=!pending&&message==='Invalid parameters: missing finish';
+  const finishHint='Add the REQUIRED top-level field finish beside parameters, not inside it. Use "execute" to commit, execute and read output; "done" commits only; "close" discards the wizard draft. Example patch to merge into your original request: {"finish":"execute"}. Keep the other required fields and submit with a NEW operation_id.';
+  if(missingFinish)path='finish';
   return {result_version:'user-v1',operation_id:operationId,state:'settled',
     status:pending?'AMBIGUOUS':'NOT_APPLIED',action_key:outcome.action_key,phase:'request_rejected',
     request_rejected:true,effect_possible:pending,cleanup_complete:!pending,
-    error:{...outcome.error,parameter_path:path},output:{},limitations:[],
+    error:{...outcome.error,...(missingFinish?{message:message+'. '+finishHint}:{}),parameter_path:path},output:{},limitations:[],
     next_step:pending?{tool:'dock_operation_inspect',arguments:{operation_id:outcome.operation_id},
       instruction:'Inspect the original operation before continuing; do not repeat a possible effect.'}:
       path?.startsWith('parameters.')&&typeof request.target?.type==='string'
         ?{tool:'dock_action_describe',arguments:{node_types:[request.target.type]},original_operation_id:requestedId,
           instruction:'Read the parameter_schema for this exact node type. Then correct the rejected parameters and submit dock_node_apply with a NEW operation_id. No browser recovery is required.'}
         :{tool:'dock_node_apply',original_operation_id:requestedId,
-          instruction:'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
+          instruction:missingFinish?finishHint+' No browser recovery is required.':'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
 }
 
 export function compactNodeResult(result) {

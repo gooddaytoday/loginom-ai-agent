@@ -48,7 +48,7 @@ export function userNodeTool(tool) {
     description:'Type-specific settings. First call dock_action_describe with node_types:[target.type] and follow its parameter_schema.'};
   copy.description = tool.name==='dock_node_resume'
     ? 'Continue the original node operation with identical original parameters after inspecting it. Never repeat an unresolved effect with a new ID.'
-    : 'Create or update ONE supported node: connect, configure, finish, execute and read its output. First get the selected type parameters with dock_action_describe({node_types:[type]}). Use the issued document_id and workflow_ref:{workflow_id}. Position, mappings and read are optional technical defaults. The application manages bounded execution deadlines; do not supply budgets. Model chooses formulas, keys and analytical parameters. Wait on the same operation_id; save the package at the end.';
+    : 'Create or update ONE supported node. Every request MUST include top-level finish, beside parameters: "finish":"execute" commits, executes and reads output; "done" commits only; "close" discards the draft. No default is supplied. Example request fragment: {"parameters":{},"finish":"execute"}. First get the selected type parameters with dock_action_describe({node_types:[type]}). Use the issued document_id and workflow_ref:{workflow_id}. Position, mappings and read are optional technical defaults. The application manages bounded execution deadlines; do not supply budgets. Model chooses formulas, keys and analytical parameters. Wait on the same operation_id; save the package at the end.';
   return copy;
 }
 
