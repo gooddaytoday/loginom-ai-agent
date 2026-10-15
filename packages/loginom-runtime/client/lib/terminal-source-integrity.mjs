@@ -84,6 +84,7 @@ const pins=Object.freeze([
 ].map(row=>Object.freeze(row)));
 const propertyPins=Object.freeze([["https://app.loginom.ai/app/bg/js/BitConverter.js", "sha256-A/BRKGwnZgjacCPtkcye9cPWH8ymn3XeOQ1LcgBfgQA="], ["https://app.loginom.ai/app/bg/ts/Int64.js", "sha256-1H32matGbAynfDVdtvNwj/yE/BWryDmiLyK1qq7MvIk="], ["https://app.loginom.ai/app/bg/ts/SysUtils.js", "sha256-2cnhPsadRnbUGmYYVcGOGb+wySijnYxVBDXxhjE2K9Q="]].map(row=>Object.freeze(row)));
 export function terminalSourceIntegrityPins(){return pins}
+export function terminalPropertyIntegrityPins(){return propertyPins}
 export function terminalSourceIntegrityScript(){return `(${installTerminalSourceIntegrity.toString()})(${JSON.stringify(pins)},${JSON.stringify(propertyPins)});`}
 function installTerminalSourceIntegrity(pins,propertyPins){
  if(location.origin!=='https://app.loginom.ai'||globalThis.top!==globalThis)return;
