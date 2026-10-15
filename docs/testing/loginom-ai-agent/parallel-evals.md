@@ -1,6 +1,13 @@
 # Runbook параллельных evals по пользователям
 
 2026-10-13: контракт принят, реализация начата; live v2 ещё не квалифицирован.
+
+2026-10-15: physical user-root inspection/publication реализованы как внутренние
+API под slot/server guards и protected account source; private journal + exact
+inode/epoch/marker SHA, crash reconciliation и foreign/symlink refusal проверены.
+75 unit/native tests PASS/359, typecheck/diff PASS. Native Docker filesystem controls
+используют data-only account authority; public prepare/verify и live readiness
+по-прежнему не квалифицированы. SessionBackup/native cleanup/effective ACL остаются gates.
 Нормативный источник — [контракт](../../../evals/docs/parallel-users-contract.md),
 интерфейсы/команды/gates — [план](../../superpowers/plans/2026-10-13-evals-parallel-users.md).
 Команды из плана становятся применимы только после реализации соответствующих
