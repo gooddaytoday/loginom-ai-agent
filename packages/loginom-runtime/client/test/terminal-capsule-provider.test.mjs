@@ -552,10 +552,10 @@ for(const reason of [false,0,null,undefined,'',Error('callee first',{cause:0})])
  },true,{beforeCapture(f){tcCtor=f.ss.TaskCompletionSource;taskCtor=f.ss.Task;tcDescriptor=Object.getOwnPropertyDescriptor(tcCtor,'prototype');taskDescriptor=Object.getOwnPropertyDescriptor(taskCtor,'prototype')},continuation({primary,callback,original}){born=Reflect.apply(original,primary,[callback]);throw reason}});
 });
 
-for(const which of ['Task','TaskCompletionSource'])for(const samePrototype of [true,false])test('callee pair dynamic '+which+' alias '+(samePrototype?'same':'different')+' prototype cannot replace lexical callee',async()=>{
+for(const which of ['Task','TaskCompletionSource'])for(const alias of ['same prototype','different prototype','proxy'])test('callee pair dynamic '+which+' '+alias+' alias cannot replace lexical callee',async()=>{
  let entered=false;await control(async x=>{
-  entered=true;const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,/CALLEE|BIRTH|DEFINITION|CHANGED|UNAVAILABLE/);await x.realm.native.drain();assert.equal(x.probe.resolvers,0);assert.equal(x.realm.native.writes(),0);assert.equal(b.query(),work);
- },true,{beforeCapture(f){const original=f.ss[which];function foreign(...args){return Reflect.construct(original,args,original)}foreign.prototype=samePrototype?original.prototype:Object.create(original.prototype);f.ss[which]=foreign}}).catch(error=>{if(entered)throw error;assert.match(String(error),/CALLEE|BIRTH|DEFINITION|CHANGED|UNAVAILABLE/)})
+  entered=true;let b,work;await assert.rejects(async()=>{b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();work=b.query();await work},/CALLEE|BIRTH|DEFINITION|CHANGED|UNAVAILABLE/);await x.realm.native.drain();assert.equal(x.probe.resolvers,0);assert.equal(x.realm.native.writes(),0);if(work)assert.equal(b.query(),work);
+ },true,{beforeCapture(f){const original=f.ss[which];function foreign(...args){return Reflect.construct(original,args,original)}foreign.prototype=alias==='same prototype'?original.prototype:Object.create(original.prototype);f.ss[which]=alias==='proxy'?new Proxy(original,{}):foreign}}).catch(error=>{if(entered)throw error;assert.match(String(error),/CALLEE|BIRTH|DEFINITION|CHANGED|UNAVAILABLE/)})
 });
 for(const which of ['Task','TaskCompletionSource'])test('callee pair pending '+which+' prototype descriptor drift refuses before resolver',()=>control(async x=>{
  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower;const ctor=x.f.ss[which],foreign={foreign:true};ctor.prototype=foreign;
