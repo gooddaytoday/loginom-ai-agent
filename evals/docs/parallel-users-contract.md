@@ -1093,3 +1093,31 @@ byte-SHA; native verify operations только init/inspect/dispose, changed us
 SHA256 `112b6df4398d2232e5c48b5b9c62f286f757d6166c257b92708be6d789011307`
 содержит4 source sets;34 independent hash/status checks и exact pair absence
 PASS. Ready:false/code2 с фактическим SESSION_IDENTITY_UNSUPPORTED.
+
+
+### Never-created account finalization
+
+Normal `finalizeUnactivatedEnvironment` также завершает staged preparation, если
+свежий native inspect подтверждает account:null и отсутствие sessions. Protected
+preparation/secret сохраняются; profile archive commits предшествуют admin dispose.
+После подтверждённого disconnect/process inventory повторно проверяются sources,
+отсутствие activation/ownership, storage publication/reservation и физического root.
+`inspectAbsentUserStorage` читает exact configured slot/current verified pair,
+canonical ancestors и marker без claim этого username; существующий path, включая
+dangling symlink, даёт отказ. Marker и ServerIdentity повторно проверяются.
+
+После подтверждённого отсутствия root выпускаются normal slot/server reservations.
+Ничего на сервере не удаляется, credentials и соседний root сохраняются. Это
+только never-created normal ownership: private reserved/created root, unknown
+provisioning, recovery-only leases и partial terminal reconciliation остаются
+отдельными задачами. Readiness не появляется.
+
+Absent storage inspector TDD missing API RED→GREEN: native pair1 PASS/46
+(34.37s). Native unused+owned finalization2 PASS/39 (59.74s), source-complete
+unused rerun1 PASS/8 (22.20s),98 unit PASS/418 (6.90s), typecheck/diff PASS.
+Private600 `native-unused-ae4d5c22-e15e-4e38-bc94-d849a3d348bb/finalization.json`
+SHA256 `0294cfa0166a29769c01388f5da8b3f438222d1013a5886ac212488e4bb6548d`
+сохраняет original observation/command, inventory/admin receipt/dispose command,
+continuous process proof, archive и slot/server terminal receipts.16 independent
+checks подтвердили source hashes, process qualification, archive-before-dispose
+и отсутствие exact own pair. Старые recovery-only incidents не изменены.

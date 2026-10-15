@@ -39,6 +39,12 @@ integration("research pair: real create qualifies private route and epoch withou
     expect(await Bun.file(`${root}/controller/pair.json`).text()).toBe(journalBytes)
     await expect(verifyParallelPair(file, { ...created.identity, serverEpoch: "f".repeat(64) })).rejects.toThrow("SERVER_EPOCH_CHANGED")
     const marker = (await Bun.$`docker exec ${created.identity.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet()).text()
+    const { inspectAbsentUserStorage } = await import("../src/parallel-pair")
+    expect(await inspectAbsentUserStorage(file, created.identity, file.slots[0]!)).toMatchObject({
+      kind: "absent-user-storage", username: "eval-a", root: "/workdir/UserStorage/eval-a", identity: created.identity })
+    await Bun.$`docker exec ${created.identity.containerId} ln -s /missing-eval-storage /workdir/UserStorage/eval-a`.quiet()
+    try { await expect(inspectAbsentUserStorage(file, created.identity, file.slots[0]!)).rejects.toThrow("USER_STORAGE_NOT_ABSENT") }
+    finally { await Bun.$`docker exec ${created.identity.containerId} rm -- /workdir/UserStorage/eval-a`.quiet() }
     try {
       await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/.loginom-evals-isolated.json'} sh ${JSON.stringify({ ...JSON.parse(marker), inventory: [{ username: "eval-a", storage_dir: "/workdir/UserStorage/../SessionBackup", owner_nonce: created.nonce }] })}`.quiet()
       await expect(verifyParallelPair(file, created.identity)).rejects.toThrow("PAIR_MARKER")
