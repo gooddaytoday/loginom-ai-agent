@@ -27,18 +27,25 @@ export async function superviseAgentProcess(input: Parameters<typeof supervisePr
     const entry = { id: crypto.randomUUID(), directory, captureDirectory, owner: { kind: "slot" as const, id: evidence.slotId }, state: "planned" as const }
     await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, entry] })
     const run = await superviseProcess({ ...input, outDir: captureDirectory, owner: entry.owner })
-    const file = path.join(captureDirectory, "process-cleanup.json"), proof = path.join(directory, "process-cleanup.json")
-    const saved = await readLeaseReceipt(file).catch(() => null)
-    const matched = saved !== null && JSON.stringify(saved) === JSON.stringify(run.processCleanup)
-    if (matched && file !== proof) await writeLeaseReceipt(proof, run.processCleanup)
-    const qualified = matched && qualifyClosedProcessEvidence(saved, { owner: entry.owner, producerPid: process.pid })
-    if (!qualified) {
+    // Proof publication cannot discard the result of a CLI that already ran.
+    try {
+      await evidence.assertHeld()
+      const file = path.join(captureDirectory, "process-cleanup.json"), proof = path.join(directory, "process-cleanup.json")
+      const saved = await readLeaseReceipt(file).catch(() => null)
+      const matched = saved !== null && JSON.stringify(saved) === JSON.stringify(run.processCleanup)
+      if (matched && file !== proof) await writeLeaseReceipt(proof, run.processCleanup)
+      const qualified = matched && qualifyClosedProcessEvidence(saved, { owner: entry.owner, producerPid: process.pid })
+      if (!qualified) {
+        run.processCleanup.status = "failed"
+        run.processCleanup.error ??= "Agent process evidence unconfirmed"
+      }
+      await evidence.assertHeld()
+      await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, { ...entry, state: qualified ? "confirmed" : "unconfirmed",
+        proof: matched ? { path: proof, sha256: hash(saved) } : null }] })
+    } catch {
       run.processCleanup.status = "failed"
       run.processCleanup.error ??= "Agent process evidence unconfirmed"
     }
-    await evidence.assertHeld()
-    await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, { ...entry, state: qualified ? "confirmed" : "unconfirmed",
-      proof: matched ? { path: proof, sha256: hash(saved) } : null }] })
     return run
   } finally { activeInventories.delete(evidence.file) }
 }
