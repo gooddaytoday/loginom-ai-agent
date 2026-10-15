@@ -140,6 +140,26 @@ confirmed/capture-complete proof без unknown; writer-settlement exception т�
 
 ## Положительная SessionBackup policy остаётся неквалифицированной
 
+Дополнительный primary boundary2026-10-15: public pinned server image содержит
+`SessionBackup.cfg`/`SessionBackupConfiguration`, User/Name/Session map/list,
+backup status/finalize enums и package-autosave event flags. Binary SHA256
+`1fea749d88b89cdf810e7c23496e5ad146728a032abfcd235367c5f1969cdd0a`
+совпал в трёх независимых чтениях никогда не запускавшихся inspection containers.
+Эти имена не задают документированный create/enable/disable API или schema
+файла; наличие metadata map не доказывает сам trigger. Полный JS RPC formal
+`SavePackageAs(APackage,AFileName)` не содержит дополнительного backup-флага.
+На собственной permanent research pair fresh no-follow check подтвердил
+отсутствие `/workdir/SessionBackup.cfg` при неизменном StartedAt; это не disabled
+policy. Symbol-name/UTF16 lookup не нашёл дополнительного метода или debug section.
+Неподтверждённый config файл не создавался, старые crash recipes не повторялись.
+Private `management-registry-20261015/backup-binary-primary-audit.json`
+SHA7219026dd85f79d4aebf24816ffb6fa5465c83d86c0c489849bd5aae268cdc4c
+связывает5 primary sources/metadata receipts, свежую absence трёх собственных
+inspection CID и неизменный image/daemon. Raw binary copies/tmp roots удалены;
+permanent pair только читалась, новых browser/model/judge calls0. По-прежнему
+нужен подтверждённый server-side trigger/контракт от платформы либо supported
+enforced-disabled policy с положительным control. Gate не снимается.
+
 2026-10-15 research: native PackageAutoSavePeriod=5000 read-back + named package
 с реальным изменением создали ненулевой `UserStorage/eval-a/backup-probe.lgp.autosave`.
 SessionBackupManager.GetSessionsList остался пуст, физический SessionBackup пуст
