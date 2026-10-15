@@ -54,6 +54,31 @@ process.on('message', message => {
   }
 })
 
+test("runtime close awaits slow cleanup within the outer host deadline", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-slow-close-"))
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw new Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+  const entry = join(directory, "slow-close.mjs")
+  let child: Awaited<ReturnType<typeof supervise>> | undefined
+  try {
+    // Real IPC and process exit; cleanup itself is a delayed test double.
+    await writeFile(entry, `process.on('message', m => {
+      if(m.operation==='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+      if(m.operation==='close') setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),6500);
+    });`)
+    child = await supervise({
+      node, entry, resources: directory, stateDir: directory,
+      generation: 1, chat: "slow-close", endpoint: "https://example.test",
+      connection: { apiKey: "fixture", password: "", url: "https://example.test", username: "test" },
+    })
+    await child.close()
+    expect(await child.exited).toEqual({ code: 0, signal: null })
+  } finally {
+    await child?.exited
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 20000)
+
 test("runtime cleanup requires both a close acknowledgement and a clean exit", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-cleanup-"))
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE

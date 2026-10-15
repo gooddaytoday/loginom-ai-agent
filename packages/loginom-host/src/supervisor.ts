@@ -147,7 +147,9 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000)
+      // Native/transport cleanup can exceed five seconds. Leave the existing
+      // exit allowance inside the caller's unchanged 30-second close budget.
+      const reply = await request("close", undefined, 20_000)
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
