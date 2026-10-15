@@ -75,7 +75,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (options.processInventory !== command.processInventory || typeof options.processInventory !== "string" ||
         command.commandId !== options.serverLease.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
         throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
-      if (command.phase !== "unactivated") throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
+      if (command.phase !== "unactivated" && (command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted"))
+        throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
     }
   }
   const binary = options.binary ?? process.env.EVAL_CLI_BIN ?? Bun.which("loginom-ai-agent-cli")
@@ -106,7 +107,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       await lease.assertHeld()
       const current = await readAdminInventory(file, identity, { file: inventory, journal: lease.reservation.journal, commandId: lease.reservation.commandId })
       const command = await readLeaseReceipt(lease.reservation.journal)
-      if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) && command.phase !== "unactivated")
+      if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) &&
+        command.phase !== "unactivated" && (command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted"))
         throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
       await writeLeaseReceipt(inventory, { ...current, connections: [...current.connections, { directory, producerPid: process.pid }] })
       await lease.assertHeld()
