@@ -1,7 +1,7 @@
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {GROUPING_FUNCTIONS} from './grouping-parameters.mjs';
-import {configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
+import {configureOutputFields,reorderOutputFields,configureOutputAutosync,excludeOutputField} from './port-mapping-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function groupingOutputDefinitions(configuration){
@@ -65,14 +65,18 @@ export async function configureGroupingOutput(channel,configuration,parameters,m
  let initial=await channel.observe({condition:'grouping output inventory',readMappings:true,ready});
  initial=await ensureGroupingOutputSources(channel,initial);
  const planned=resolveGroupingOutput(configuration,parameters,initial.node_mapping,mapping),changes=[];
+ if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
  if(planned.fields){
-  const requested={direction:'output',port:0,fields:planned.fields.map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.label,excluded:f.excluded}))};
+  // Finish table edits before exclusion introduces a separate native group.
+  // Existing exclusions stay excluded; new exclusions use the same guarded
+  // native gesture only after names, labels and relative order are settled.
+  const requested={direction:'output',port:0,fields:planned.fields.map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.label,excluded:f.current.excluded}))};
   changes.push(await configureOutputFields(channel,requested,resolveGeneratedGroupingSources(configuration,initial.node_mapping).map(f=>({...f,name:f.source.name,used:true}))));
   const edited=(await channel.observe({condition:'grouping mapped fields before reorder',readMappings:true,ready})).node_mapping;
   const ids=planned.fields.map(f=>{const matches=edited.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'Grouping mapped source changed');return matches[0].record_id;});
   changes.push(await reorderOutputFields(channel,ids));
+  for(const field of planned.fields.filter(f=>f.excluded&&!f.current.excluded))changes.push(await excludeOutputField(channel,field.source.record_id));
  }
- if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
  const final=await channel.observe({condition:'grouping output names and order applied',readMappings:true,ready});
  if(planned.fields){const order=[...planned.fields.filter(f=>!f.excluded),...planned.fields.filter(f=>f.excluded)];
   need(same(final.node_mapping.target_fields.map(f=>({source:(f.source??f.exclusion_source)?.name,name:f.name,label:f.label,type:f.type,excluded:f.excluded})),
