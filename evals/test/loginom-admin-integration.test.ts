@@ -204,11 +204,22 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await writeLeaseReceipt(path.join(evidence, "storage-probe-reply.json"), probe)
         expect(probe.outcome).toBe("confirmed")
         const data = probe.data as { ownSession: { username: string }; binding: unknown;
-          storage: { readConfirmed: boolean; size: number; copySize: number } }
+          storage: { readConfirmed: boolean; size: number; copySize: number; unusual: { name: string; copied: boolean; written: boolean; readConfirmed: boolean; size: number }[] } }
         expect(data.ownSession.username).toBe(credentials.username)
         expect(data.storage.readConfirmed).toBe(true)
         expect(data.storage.size).toBeGreaterThan(0)
         expect(data.storage.copySize).toBe(data.storage.size)
+        const names = ["space name.lgp", "tab\tname.lgp", "line\nname.lgp", "Юникод.lgp", "-leading.lgp", ".hidden.lgp", "nested/file.lgp"]
+        expect(data.storage.unusual.map(row => row.name)).toEqual(names)
+        expect(data.storage.unusual.map(row => [row.copied, row.written, row.readConfirmed, row.size]))
+          .toEqual(names.map(() => [true, true, true, data.storage.size]))
+        const unusualHashes = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum -z -- ${`${file.server.storageRoot}/${credentials.username}/access-probe.lgp`} ${names.map(name => `${file.server.storageRoot}/${credentials.username}/access-positive/${name}`)}`.quiet()).text()
+          .split("\0").filter(Boolean).map(row => row.split(" ")[0])
+        expect(unusualHashes).toHaveLength(names.length + 1)
+        expect(unusualHashes.every(hash => hash === unusualHashes[0] && /^[0-9a-f]{64}$/.test(hash!))).toBe(true)
+        const writtenHashes = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum -z -- ${names.map(name => `${file.server.storageRoot}/${credentials.username}/access-positive/${name}.write`)}`.quiet()).text()
+          .split("\0").filter(Boolean).map(row => row.slice(0, 64))
+        expect(writtenHashes).toEqual(names.map(() => new Bun.CryptoHasher("sha256").update("A").digest("hex")))
         const hashes = await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${credentials.username}/access-probe.lgp`} ${`${file.server.storageRoot}/${credentials.username}/access-copy.lgp`}`.quiet()
         const digests = hashes.text().trim().split("\n").map(line => line.split(" ")[0])
         expect(digests).toHaveLength(2)
@@ -221,6 +232,17 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         const peerActivation = neighbor.activation
         const peerProbe = await request("reconcile-user", { ...peerActivation, phase: "session-storage-probe" })
         expect(peerProbe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: peer.name }, storage: { readConfirmed: true } } })
+        const peerData = peerProbe.data as typeof data
+        expect(peerData.storage.unusual.map(row => row.name)).toEqual(names)
+        expect(peerData.storage.unusual.map(row => [row.copied, row.written, row.readConfirmed, row.size]))
+          .toEqual(names.map(() => [true, true, true, peerData.storage.size]))
+        const peerHashes = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum -z -- ${`${file.server.storageRoot}/${peer.name}/access-probe.lgp`} ${names.map(name => `${file.server.storageRoot}/${peer.name}/access-positive/${name}`)}`.quiet()).text()
+          .split("\0").filter(Boolean).map(row => row.split(" ")[0])
+        expect(peerHashes).toHaveLength(names.length + 1)
+        expect(peerHashes.every(hash => hash === peerHashes[0] && /^[0-9a-f]{64}$/.test(hash!))).toBe(true)
+        const peerWritten = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum -z -- ${names.map(name => `${file.server.storageRoot}/${peer.name}/access-positive/${name}.write`)}`.quiet()).text()
+          .split("\0").filter(Boolean).map(row => row.slice(0, 64))
+        expect(peerWritten).toEqual(writtenHashes)
         expect(await request("close-session", { proofId: peerProbe.id, session: (peerProbe.data as { binding: unknown }).binding }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true } })
         const shared = after.map(directory => directory.name).sort()
@@ -265,7 +287,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
           denials.push({ username: owner.name, peer: target.name, ...data.storage })
         }
         await writeLeaseReceipt(path.join(evidence, "storage-probe.json"), { version: 1, identity: pair.identity,
-          username: credentials.username, positive: { ...data.storage, sha256: digests[0] }, sharedControls: shared.map(name => ({ name, sha256: digests[0] })), denials, liveQualified: false })
+          username: credentials.username, positive: { ...data.storage, sha256: digests[0] }, peerPositive: { username: peer.name, ...peerData.storage, sha256: peerHashes[0] },
+          sharedControls: shared.map(name => ({ name, sha256: digests[0] })), denials, liveQualified: false })
         complete = true
         return
       }
