@@ -863,5 +863,7 @@ cleanup, ready:false. Неопределённый исход — retained/uncon
 Повтор с durable completion возвращает historical already_released без CAS/admin
 и сохраняет reservations следующего владельца. Если completion/result ещё отсутствуют, но current server row уже released
 для этого cohort, metadata восстанавливается под guard по terminal proofs без
-CAS/admin runtime. Active CLI incidents, server-retained/partial terminal
-reconciliation и реальные SIGKILL окна ещё не покрываются этим путём. Offline judge recover сохранён.
+CAS/admin runtime. После release всех slots оставшийся server fence завершается отдельным
+recovery-only CAS с проверкой всех prior process proofs; user/profile rows
+сохраняются. Этот путь проверен late write fault и реальным SIGKILL controller.
+Active CLI incidents, mixed partial A/B и остальные crash windows ещё open. Offline judge recover сохранён.

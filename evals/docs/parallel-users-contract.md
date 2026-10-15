@@ -1273,3 +1273,30 @@ corrupt released-server proof не восстановил ни один. Normal 
 `d14762e0820b27b24b617e5488eb53fcd110be2a2692fb96e87c39e8c997e0fd`:14
 closure source hashes + original/result hashes совпали; exact own pair absent.
 Это не реальный SIGKILL в данном окне; такой crash case остаётся открытым.
+
+
+### Retained common fence after every slot has released
+
+Если все original slot manifests released, а server reservation ещё retained
+либо recovery-only, recovery не принимает user/profile ownership заново.
+Он проверяет original prefix/identity/lineage, сохраняет новый common recovery
+intent/empty inventory и выполняет только server CAS. Inventory seal запрещает
+новые admin admissions. Все prior controller inventories/continuous proofs и
+fresh PID/starttime absence проверяются до и после проверки slot terminal
+proofs. Pair/command reread предшествует server release. Old history archive
+и slot cleanup повторно не создаются; confirmed source refs входят в новый
+global proof/completion. Неполные process proofs оставляют server recovery-only.
+
+Реальный native late write fault (directory вместо server receipt, EISDIR),
+затем controller SIGKILL137 после slot releases: RED old recovery refusal→GREEN.
+100 unit PASS/433 (8.42s), native tail+base2 PASS/33 (117.16s), typecheck/diff
+PASS. Capture canary false отказывает; восстановление exact known receipt и
+retry выпускает только server. User/profile bytes и revisions1 сохранены,
+archived canary читается, new admin directory не создаётся при unreadable
+CLI runtime. Private600 `native-tail-2fb30702-17ea-46fa-b9b2-5b4deae2f28b/tail.json`
+SHA256 `243a1648ebb63ff3caa08c36dac2d0117802ed22f9814fa5730da128df1de2ff`:
+14 source hashes/result verified, exact pair absent. RED fixture n4IMAF также
+выпущена публичным API;12 sources/24 audit checks, qualified-tail SHA256
+`528096e030f8ce44ccb1db849d006c4241af50499162a64a1598325c7ed9d0d5`,
+штатный destroy/root cleanup с private audit. Other incidents preserved.
+Mixed partial A/B и другие crash windows пока open.
