@@ -66,7 +66,14 @@ export function retainTerminalSourceStartup(message,state){
    methods=Object.fromEntries(['pages','newPage','addInitScript'].map(key=>{const value=slot(context,key,checks);if(typeof value!=='function')fail();return[key,value]}));token.guard()},
   contextCall(key,args=[]){token.guard();if(!Object.hasOwn(methods,key)||key==='addInitScript')fail();return Reflect.apply(methods[key],context,args)},
   bindPage(value){token.guard();if(page||loadData(owner,'page')!==value)fail();page=value;slot(owner,'page',checks);
-   for(const key of ['goto','evaluate','locator'])if(typeof slot(page,key,checks)!=='function')fail();token.guard()},
+   for(const key of ['goto','evaluate','locator'])if(typeof slot(page,key,checks)!=='function')fail();
+   // The selected SDK evaluator (or absence) belongs to the original Page birth,
+   // before addInitScript/goto. A later method cannot become the initial reader.
+   let d;for(let p=page;p;p=Object.getPrototypeOf(p)){d=Object.getOwnPropertyDescriptor(p,'evaluateHandle');if(d)break}
+   if(d){if(typeof slot(page,'evaluateHandle',checks)!=='function')fail()}
+   else{const chain=[];for(let p=page;p;p=Object.getPrototypeOf(p))chain.push([p,Object.getPrototypeOf(p)]);
+    checks.push(()=>{let p=page;for(const[value,parent]of chain){if(p!==value||Object.getPrototypeOf(p)!==parent||Object.hasOwn(p,'evaluateHandle'))fail();p=Object.getPrototypeOf(p)}})}
+   token.guard()},
   init(content){token.guard();if(initStarted||!page||typeof content!=='string'||(sourceRoutes.has(owner)&&!sourceRoutes.get(owner).ready()))fail();initStarted=true;
    try{initTask=Reflect.apply(methods.addInitScript,context,[{content}]);return initTask}catch(error){throw remember(error)}},
   admitPage(value,candidate){token.guard();if(value!==page||candidate!==loadData(input,'connection')||!initStarted||!initTask||!initSettled||navigationStarted)fail();navigationStarted=true},
@@ -249,7 +256,7 @@ export async function prepareTerminalSourceResponses(owner){
 
 const sourceWitnesses=new WeakMap();
 export async function bindTerminalScriptWitness(owner){
- const load=terminalSourceForOwner(owner);if(!load)throw Error('LOGINOM_ORIGINAL_LOAD_UNAVAILABLE');load.guard();
+ const load=terminalSourceForOwner(owner);if(!load)throw Error('LOGINOM_ORIGINAL_LOAD_UNAVAILABLE');try{load.guard()}catch(error){throw load.reject(error)}
  if(sourceWitnesses.has(owner))fail();
  const original=load.inspect(),responses=original.sourceResponses;
  if(!responses?.responseBytesComplete){

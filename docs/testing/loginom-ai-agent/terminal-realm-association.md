@@ -17,7 +17,10 @@ constructor/member/dependency/node graph. It invokes the original publisher
 guard and compares the same refs on each use. A copied receiver fails even when
 it carries the same method. JSON contains only the old evidence rows.
 
-On a Page with an effective data evaluateHandle method, bindTerminalScriptWitness
+The Page birth guard now retains the effective data evaluateHandle descriptor
+or its absence during bindPage, before init/goto and every relevant load await.
+Late replacement/publication cannot supply the original evaluator. On that Page,
+bindTerminalScriptWitness
 retains that original method and its exact task before await, then the returned
 original JSHandle and its effective data evaluate method. A fixed projector
 invokes the retained capsule method through that handle. The existing exact
@@ -69,3 +72,12 @@ qualification and the fixed original provider/stock H0 on this association;
 full native receiver/typed input, semantic/physical/Sorting/model/cold predicates
 remain separate. No native Loginom/login/model/acquire/Prepare/Save/Close/replay
 is performed. UNKNOWN/pending/.writer/profiles/journals/originals are preserved.
+
+Self-review corrective before handoff: first runtime f636ddc1 captured the new
+evaluator only after navigation. Two new pre-load counterexamples on its exact
+installed product failed: a replaced present evaluator was accepted; a missing
+one dispatched a newly published method once. The final correcting cut holds
+presence/absence at Page birth and refuses both before that dispatch. Original
+FAIL logs/product metadata are preserved separately. The Node fixture now births
+its fixed SDK reader before load; it varies only the labelled SDK outcome behind
+that fixed method. No production late callback/registration input was added.
