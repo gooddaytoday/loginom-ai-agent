@@ -164,7 +164,7 @@ export function collectTerminalScriptWitness(expected){
  const storageReaders=Object.freeze(Object.fromEntries([['get_Connected','connected'],['get_CurrentDirectory','currentDirectory'],['get_IsOwnCurrentDirectory','ownDirectory'],['get_RootPath','rootPath']].map(([key,binding])=>{const method=hold(storage,key);if(typeof method!=='function'||method!==own(bindings,binding))throw Error('TERMINAL_PROVIDER_STORAGE_METHOD');return [key,method]})));
  const storageIdentity=hold(storage,'$');for(const key of ['$OW','$O']){const value=hold(storageIdentity,key);if(!Number.isInteger(value)||value<0)throw Error('TERMINAL_PROVIDER_STORAGE_IDENTITY')}
  const messages=hold(transport,'$M');hold(messages,'GetDynamicData');hold(transport,'$R');hold(transport,'DispatchMessageAsync');
- const nativeSS=own(bindings,'ss');const originalCompletionConstructor=hold(nativeSS,'TaskCompletionSource');hold(originalCompletionConstructor,'prototype');hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
+ const nativeSS=own(bindings,'ss');const originalCompletionConstructor=hold(nativeSS,'TaskCompletionSource');hold(originalCompletionConstructor,'prototype');const originalMkdel=hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
  const completionPrototype=hold(originalCompletionConstructor,'prototype');
  // Freeze the optional Task definition now. A double/missing definition cannot
  // be repaired by publishing a class after collection or by a returned DTO.
@@ -360,6 +360,23 @@ export function collectTerminalScriptWitness(expected){
      return source;
     }
    }));
+   if(readMethod)r.mkdelPatch=patch(nativeSS,'mkdel',original=>function(receiver,delegate){
+    if(!invoking)return apply(original,this,arguments);
+    guard();
+    if(original!==originalMkdel||this!==nativeSS||receiver!==storage||receiver!==armed.initial.storage
+      ||!r.storageCall||r.storageCall.receiver!==receiver||r.mkdelCall||typeof delegate!=='function')throw Error('TERMINAL_PROVIDER_STORAGE_MKDEL');
+    const delegatePrototype=parent(delegate);
+    providerChecks.push(()=>{if(parent(delegate)!==delegatePrototype)throw Error('TERMINAL_PROVIDER_STORAGE_DELEGATE_CHANGED')});
+    const call=r.mkdelCall=Object.freeze({mkdel:original,namespace:this,receiver,delegate,initial:armed.initial,packet:creationState.packet,
+     storageCall:r.storageCall,scope:'FileStorage.'+readMethod+':mkdel',mkdelIdentityQualified:true,closureIdentityQualified:false,nativeReceiversQualified:false});
+    let returned;
+    try{returned=apply(original,this,arguments)}catch(value){throw first(value)}
+    guard();if(typeof returned!=='function')throw Error('TERMINAL_PROVIDER_STORAGE_MKDEL_RESULT');
+    const returnedPrototype=parent(returned);
+    providerChecks.push(()=>{if(parent(returned)!==returnedPrototype)throw Error('TERMINAL_PROVIDER_STORAGE_DELEGATE_CHANGED')});
+    r.mkdelCompletion=Object.freeze({call,returned,closureIdentityQualified:false,nativeReceiversQualified:false});
+    return returned;
+   });
    if(!readMethod)r.resolverPatch=patch(transport,'$R',original=>function(w,o,type){
     if(!r.completing)return apply(original,this,arguments);
     guard();if(this!==transport||w!==r.w||o!==r.o||!Number.isInteger(type)||type<0)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
@@ -373,8 +390,10 @@ export function collectTerminalScriptWitness(expected){
       const call=r.storageCall;
       if(!call||call.receiver!==storage||call.receiver!==armed.initial.storage||call.method!==storageReaders[readMethod]
         ||call.initial!==armed.initial||call.packet!==creationState.packet)throw Error('TERMINAL_PROVIDER_STORAGE_RECEIVER');
+      if(!r.mkdelCall||r.mkdelCompletion?.call!==r.mkdelCall||r.mkdelCall.storageCall!==call
+        ||r.mkdelCall.receiver!==call.receiver||r.mkdelCall.mkdel!==originalMkdel)throw Error('TERMINAL_PROVIDER_STORAGE_MKDEL_UNAVAILABLE');
       r.storageDispatch=Object.freeze({call,request,receiver:call.receiver,method:call.method,initial:call.initial,packet:call.packet,
-       scope:'FileStorage.'+readMethod+':dispatch',nativeReceiversQualified:true,closureIdentityQualified:false});
+       mkdelCall:r.mkdelCall,mkdelCompletion:r.mkdelCompletion,scope:'FileStorage.'+readMethod+':dispatch',nativeReceiversQualified:true,closureIdentityQualified:false});
      }
      r.request=request;
     patch(request,'Release',release=>function(){guard();const value=apply(release,this,arguments);guard();return value});
