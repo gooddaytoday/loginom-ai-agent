@@ -148,8 +148,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           if (retained.some(row => row.name !== binding.session.name || row.createdAt !== binding.session.createdAt))
             return { outcome: "not_applied", data: { code: "SESSION_IDENTITY_CHANGED" } }
           if (retained.length) {
-            // Only fixed probes attest one package created without execution after closing the writer context.
-            if (retained[0].packageCount !== 0 && (binding.retainedPackageCount !== 1 || retained[0].packageCount !== 1) || retained[0].pendingDisconnect !== true)
+            // Agent closure requires its archived history and the frozen post-CLI package count.
+            if (retained[0].packageCount !== binding.retainedPackageCount || retained[0].pendingDisconnect !== true)
               return { outcome: "not_applied", data: { code: "SESSION_NOT_IDLE" } }
             applied = true
             if (!await manager.CloseSession(retained[0].proxy, 5000)) throw Error("close")
@@ -167,7 +167,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             }
             throw Error("deadline")
           }
-          // The fixed probe closed its only writer context; fresh server absence completes this bound observation.
+          // The qualified writer is closed; fresh server absence completes this bound observation.
           return { outcome: "confirmed", data: { closed: true, disposition: "observed_absent" } }
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "SESSION_CLOSE_UNKNOWN" } } }
       }, { ...binding, deadline: request.deadline }))
@@ -689,12 +689,12 @@ async function bounded(request, promise) {
 
 async function readSessionBinding(payload, identity) {
   const adopt = payload.adopt
-  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(payload.proofId) || !adopt || Object.keys(adopt).length !== 2 ||
-    typeof adopt.receipt !== "string" || ![`session-${payload.proofId}.json`, `management-session-${payload.proofId}.json`].includes(path.basename(adopt.receipt)) ||
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(payload.proofId) || !adopt ||
+    typeof adopt.receipt !== "string" || ![`session-${payload.proofId}.json`, `management-session-${payload.proofId}.json`, `agent-session-${payload.proofId}.json`].includes(path.basename(adopt.receipt)) ||
     typeof adopt.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(adopt.sha256)) throw Error("SESSION_SOURCE_UNCONFIRMED")
   const claim = await readSessionReceipt(adopt.receipt)
-  if (claim?.kind === "owned-management-session") return readManagementBinding(payload, identity, claim)
-  if (path.basename(adopt.receipt) !== `session-${payload.proofId}.json` || !claim || claim.version !== 2 || claim.kind !== "owned-server-session" || claim.state !== "observed" ||
+  if (["owned-management-session", "owned-agent-session"].includes(claim?.kind)) return readCausalBinding(payload, identity, claim)
+  if (Object.keys(adopt).length !== 2 || path.basename(adopt.receipt) !== `session-${payload.proofId}.json` || !claim || claim.version !== 2 || claim.kind !== "owned-server-session" || claim.state !== "observed" ||
     JSON.stringify(claim.identity) !== JSON.stringify(identity) || JSON.stringify(claim.binding) !== JSON.stringify(payload.session) ||
     createHash("sha256").update(JSON.stringify(claim)).digest("hex") !== adopt.sha256 || claim.source?.id !== payload.proofId ||
     typeof claim.source.path !== "string" || path.basename(claim.source.path) !== `${payload.proofId}.json`)
@@ -730,17 +730,20 @@ async function readSessionBinding(payload, identity) {
 }
 
 // Parent qualifies the frozen process/native sources under held slot and server fences immediately before dispatch.
-async function readManagementBinding(payload, identity, claim) {
+async function readCausalBinding(payload, identity, claim) {
   const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex")
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
   const root = path.dirname(payload.adopt.receipt)
-  if (!/^[a-f0-9]{64}$/.test(payload.proofId) || path.basename(payload.adopt.receipt) !== `management-session-${payload.proofId}.json` ||
+  const agent = claim.kind === "owned-agent-session"
+  if (!/^[a-f0-9]{64}$/.test(payload.proofId) || Object.keys(payload.adopt).length !== (agent ? 3 : 2) ||
+    path.basename(payload.adopt.receipt) !== `${agent ? "agent" : "management"}-session-${payload.proofId}.json` ||
     Object.keys(claim).length !== 13 || claim.version !== 2 || claim.state !== "observed" || claim.id !== payload.proofId ||
     hash(claim) !== payload.adopt.sha256 || !same(claim.identity, identity) || !same(claim.binding, payload.session) ||
-    Object.keys(claim.actor ?? {}).length !== 5 || claim.actor.kind !== "management" || claim.actor.attemptId !== null ||
+    Object.keys(claim.actor ?? {}).length !== (agent ? 4 : 5) || claim.actor.kind !== (agent ? "agent" : "management") ||
+    (agent ? claim.actor.attemptId !== claim.source?.process?.id : claim.actor.attemptId !== null) ||
     Object.keys(claim.binding ?? {}).length !== 6 || claim.binding.serverEpoch !== identity.serverEpoch ||
     !claim.binding.name?.startsWith(claim.binding.username + ":") || !/^[1-9]\d*$/.test(claim.binding.name.slice(claim.binding.username.length + 1)) ||
-    Object.keys(claim.source ?? {}).length !== 3 || path.dirname(claim.source.inventoryFile ?? "") !== root)
+    Object.keys(claim.source ?? {}).length !== (agent ? 4 : 3) || path.dirname((agent ? claim.source.process?.path : claim.source.inventoryFile) ?? "") !== root)
     throw Error("SESSION_SOURCE_UNCONFIRMED")
   const lease = await readSessionReceipt(path.join(root, `slot-${claim.slotId}-${claim.leaseToken}.lease.json`))
   const prepared = await readSessionReceipt(path.join(root, `prepare-${claim.slotId}.json`))
@@ -755,6 +758,7 @@ async function readManagementBinding(payload, identity, claim) {
     activation.kind !== "user-activation-intent" || activation.nonce !== claim.activationNonce || activation.preparationNonce !== claim.preparationNonce ||
     activation.objectId !== claim.userObjectId || activation.userKey !== claim.binding.userKey || !same(activation.identity, identity))
     throw Error("SESSION_SOURCE_UNCONFIRMED")
+  if (agent) return readAgentBinding(payload, identity, claim, lease)
   const results = []
   for (const entry of [claim.source.connection, claim.source.command]) {
     if (entry?.state !== "confirmed" || entry.proof?.path !== path.join(entry.directory ?? "", "process-cleanup.json") ||
@@ -795,6 +799,58 @@ async function readManagementBinding(payload, identity, claim) {
     snapshots.at(-1).sessions.some(row => row.objectId === claim.binding.remoteKey && (row.name !== claim.binding.name || row.createdAt !== claim.binding.createdAt)))
     throw Error("SESSION_SOURCE_UNCONFIRMED")
   return { session: payload.session, userObjectId: claim.userObjectId, retainedPackageCount: 0 }
+}
+
+async function readAgentBinding(payload, identity, claim, lease) {
+  const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex")
+  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+  const root = path.dirname(payload.adopt.receipt), source = claim.source
+  const inventory = await readSessionReceipt(source.process.path)
+  const entry = inventory.processes?.find(entry => entry.id === source.process.id)
+  if (inventory.version !== 2 || inventory.kind !== "eval-agent-processes" || inventory.commandId !== claim.actor.runId ||
+    inventory.slotId !== claim.slotId || !["open", "sealed"].includes(inventory.state) || !entry || entry.state !== "confirmed" ||
+    hash(entry) !== source.process.sha256 || !same(entry.owner, claim.actor.owner) || entry.owner.kind !== "slot" || entry.owner.id !== claim.slotId ||
+    path.dirname(entry.directory ?? "") !== root || !path.basename(entry.directory).startsWith("agent-process-") ||
+    entry.proof?.path !== path.join(entry.directory, "process-cleanup.json")) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const proof = await readSessionReceipt(entry.proof.path), lifetime = proof.lifetime
+  if (hash(proof) !== entry.proof.sha256 || proof.status !== "confirmed" || proof.error !== null || proof.capture_complete !== true ||
+    proof.observation_mode !== "continuous" || !same(proof.unknownProcesses, []) || proof.verification?.length !== 2 ||
+    proof.verification.some(pass => pass.owned_remaining !== 0) || !same(lifetime?.owner, entry.owner) || lifetime.producer_pid !== inventory.producerPid ||
+    !proof.browserBindings?.length || !proof.runtimeDirectories?.length || proof.runtimeDirectories.some(dir => !dir.startsWith(lease.slot.profileDir + path.sep)) ||
+    proof.browserBindings.some(binding => !proof.processes?.some(process => same(process, binding.process)) ||
+      !proof.runtimeDirectories.includes(binding.runtimeDirectory) || !Number.isFinite(Date.parse(binding.observed_at)) ||
+      Date.parse(binding.observed_at) < Date.parse(lifetime.started_at) || Date.parse(binding.observed_at) > Date.parse(lifetime.finished_at)))
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const snapshots = []
+  if (!Array.isArray(source.during) || !source.during.length) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  for (const ref of [source.before, ...source.during, source.after]) {
+    if (path.dirname(ref.path ?? "") !== path.dirname(source.before.path) || path.dirname(path.dirname(ref.path)) !== root)
+      throw Error("SESSION_SOURCE_UNCONFIRMED")
+    const snapshot = await readSessionReceipt(ref.path), command = await readSessionReceipt(snapshot.command?.path)
+    if (hash(snapshot) !== ref.sha256 || snapshot.kind !== "admin-session-inventory" || !same(snapshot.identity, identity) ||
+      !Array.isArray(snapshot.sessions) || hash(command) !== snapshot.command.sha256 || command.kind !== "loginom-admin-command" ||
+      command.state !== "confirmed" || command.op !== "inspect" || !same(command.expectedIdentity, identity) ||
+      command.id !== snapshot.reply?.id || command.replyHash !== snapshot.reply.sha256 || command.desiredHash !== hash({}) ||
+      !Number.isFinite(Date.parse(command.at)) || !Number.isFinite(Date.parse(command.settledAt)) || Date.parse(command.at) > Date.parse(command.settledAt))
+      throw Error("SESSION_SOURCE_UNCONFIRMED")
+    snapshots.push({ ...snapshot, startedAt: command.at, finishedAt: command.settledAt })
+  }
+  if (Date.parse(snapshots[0].finishedAt) > Date.parse(lifetime.started_at) || Date.parse(snapshots.at(-1).startedAt) < Date.parse(lifetime.finished_at) ||
+    snapshots.slice(1, -1).some(snapshot => Date.parse(snapshot.startedAt) > Date.parse(lifetime.finished_at) || Date.parse(snapshot.finishedAt) < Date.parse(lifetime.started_at)))
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const rows = snapshots.slice(1, -1).flatMap(snapshot => snapshot.sessions.filter(row => row.objectId === claim.binding.remoteKey))
+  const retained = snapshots.at(-1).sessions.filter(row => row.objectId === claim.binding.remoteKey)
+  if (!rows.length || snapshots[0].sessions.some(row => row.objectId === claim.binding.remoteKey || row.name.toLowerCase() === claim.binding.name.toLowerCase()) ||
+    [...rows, ...retained].some(row => row.name !== claim.binding.name || row.createdAt !== claim.binding.createdAt) || retained.length > 1 ||
+    retained.some(row => !Number.isSafeInteger(row.packageCount) || row.packageCount < 0)) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const ref = payload.adopt.archive
+  if (ref?.path !== path.join(root, `agent-archive-${entry.id}.json`) || Object.keys(ref).length !== 2) throw Error("SESSION_SOURCE_UNCONFIRMED")
+  const archive = await readSessionReceipt(ref.path)
+  if (hash(archive) !== ref.sha256 || archive.kind !== "profile-archive" || archive.status !== "committed" || archive.profile !== lease.slot.profileDir ||
+    path.dirname(archive.archive ?? "") !== lease.slot.historyDir || !Number.isFinite(Date.parse(archive.at)) || !Number.isFinite(Date.parse(archive.committedAt)) ||
+    Date.parse(archive.at) < Date.parse(lifetime.finished_at) || Date.parse(archive.committedAt) < Date.parse(archive.at))
+    throw Error("SESSION_SOURCE_UNCONFIRMED")
+  return { session: payload.session, userObjectId: claim.userObjectId, retainedPackageCount: retained[0]?.packageCount ?? 0 }
 }
 
 async function readSessionReceipt(file) {

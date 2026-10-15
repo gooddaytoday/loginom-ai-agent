@@ -2,13 +2,16 @@ import path from "node:path"
 import { EvalFailure } from "./fail"
 import { readAgentProcess } from "./agent-process-evidence"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
+import { archiveProfileEvidence } from "./profile-archive"
 import { readUserActivation, readUserOwnership, readUserPreparation } from "./user-environment"
+import type { AdminReply } from "./loginom-admin"
 import type { SlotFile, SlotLease } from "./slots"
 
 type Reference = { path: string; sha256: string }
+type Session = Pick<Awaited<ReturnType<typeof agentSessions>>[number], "id" | "actor" | "source" | "binding">
 export type AgentSessionSource = { process: Reference & { id: string }; before: Reference; during: Reference[]; after: Reference }
 
-/** Records causal agent sessions; closing and filesystem cleanup require separate fences. */
+/** Records causal agent sessions; filesystem cleanup requires separate fences. */
 export async function recordAgentSessions(file: SlotFile, lease: SlotLease, secretFile: string, source: AgentSessionSource) {
   const sessions = await agentSessions(file, lease, secretFile, source)
   for (const session of sessions) {
@@ -21,7 +24,7 @@ export async function recordAgentSessions(file: SlotFile, lease: SlotLease, secr
     await lease.assertHeld()
     if (existing === undefined) await writeLeaseReceipt(target, session)
   }
-  return sessions
+  return Promise.all(sessions.map(session => readAgentSession(file, lease, secretFile, session.id)))
 }
 
 export async function readAgentSession(file: SlotFile, lease: SlotLease, secretFile: string, id: string) {
@@ -30,7 +33,77 @@ export async function readAgentSession(file: SlotFile, lease: SlotLease, secretF
   const saved = object(await readLeaseReceipt(path.join(file.controller.stateDir, `agent-session-${id}.json`)))
   const expected = (await agentSessions(file, lease, secretFile, saved.source)).find(session => session.id === id)
   if (!expected || JSON.stringify(saved) !== JSON.stringify(expected)) throw new EvalFailure("AGENT_SESSION_SOURCE_CHANGED", 2)
-  return expected
+  const terminal = await readLeaseReceipt(path.join(file.controller.stateDir, `agent-session-${id}.closed.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (terminal === undefined) return expected
+  const closed = object(terminal), source = object(closed.source)
+  if (typeof source.path !== "string") throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const closure = await agentClosure(file, lease, expected, closed.archive as Reference, source.path, closed.reply as AdminReply)
+  if (JSON.stringify(closed) !== JSON.stringify(closure)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  return { ...expected, state: "closed" as const, close: closure.source, archive: closure.authority.archive }
+}
+
+export async function readAgentArchive(file: SlotFile, lease: SlotLease, secretFile: string, id: string, source: Reference) {
+  const entry = await readAgentSession(file, lease, secretFile, id)
+  const archive = await readArchiveSource(file, lease, entry, source)
+  await archiveProfileEvidence(lease.slot.profileDir, archive.archive, source.path)
+  await lease.assertHeld()
+  if (hash(await readLeaseReceipt(source.path)) !== source.sha256) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+  return { path: source.path, sha256: source.sha256 }
+}
+
+export async function recordAgentSessionClosed(file: SlotFile, lease: SlotLease, secretFile: string, id: string, archive: Reference, commandFile: string, reply: AdminReply) {
+  const entry = await readAgentSession(file, lease, secretFile, id)
+  const closure = await agentClosure(file, lease, entry, archive, commandFile, reply)
+  const target = path.join(file.controller.stateDir, `agent-session-${id}.closed.json`)
+  const existing = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(closure)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  if (existing === undefined) await writeLeaseReceipt(target, closure)
+  return readAgentSession(file, lease, secretFile, id)
+}
+
+async function readArchiveSource(file: SlotFile, lease: SlotLease, entry: Session, source: Reference) {
+  if (!source || source.path !== path.join(file.controller.stateDir, `agent-archive-${entry.actor.attemptId}.json`) ||
+    !/^[a-f0-9]{64}$/.test(source.sha256)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+  const saved = await readLeaseReceipt(source.path).catch(() => null)
+  if (!saved || hash(saved) !== source.sha256) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+  const archive = object(saved)
+  const processEntry = await readAgentProcess({ file: entry.source.process.path, commandId: entry.actor.runId,
+    slotId: lease.slot.id, producerPid: process.pid }, entry.actor.attemptId)
+  if (archive.version !== 1 || archive.kind !== "profile-archive" || archive.status !== "committed" || archive.profile !== lease.slot.profileDir ||
+    typeof archive.archive !== "string" || path.dirname(archive.archive) !== lease.slot.historyDir ||
+    typeof archive.at !== "string" || typeof archive.committedAt !== "string" ||
+    ![archive.at, archive.committedAt].every(value => Number.isFinite(Date.parse(value))) ||
+    Date.parse(archive.at) < Date.parse(processEntry.finishedAt) || Date.parse(archive.committedAt) < Date.parse(archive.at))
+    throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+  return { archive: archive.archive, at: archive.at, committedAt: archive.committedAt }
+}
+
+async function agentClosure(file: SlotFile, lease: SlotLease, entry: Session, archive: Reference, commandFile: string, reply: AdminReply) {
+  const savedArchive = await readArchiveSource(file, lease, entry, archive)
+  const data = object(reply.data), directory = path.dirname(path.dirname(commandFile))
+  if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
+    commandFile !== path.join(directory, "commands", `${reply.id}.json`) || Object.keys(data).length !== 2 || data.closed !== true ||
+    !["rpc_closed", "observed_absent"].includes(String(data.disposition))) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const authority = { receipt: path.join(file.controller.stateDir, `agent-session-${entry.id}.json`),
+    sha256: hash(await readLeaseReceipt(path.join(file.controller.stateDir, `agent-session-${entry.id}.json`))), archive }
+  const source = object(await readLeaseReceipt(commandFile))
+  if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
+    source.op !== "close-session" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    source.desiredHash !== hash({ proofId: entry.id, session: entry.binding, adopt: authority }) || source.replyHash !== hash(reply) ||
+    typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
+    !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.at) < Date.parse(savedArchive.committedAt) ||
+    Date.parse(source.at) > Date.parse(source.settledAt)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  return { version: 2, kind: "agent-session-close", id: entry.id, slotId: lease.slot.id, identity: lease.identity,
+    binding: entry.binding, authority, archive, source: { path: commandFile, id: reply.id, sha256: hash(source) }, reply }
 }
 
 async function agentSessions(file: SlotFile, lease: SlotLease, secretFile: string, source: unknown) {
@@ -70,7 +143,7 @@ async function agentSessions(file: SlotFile, lease: SlotLease, secretFile: strin
   return rows.map(row => ({ version: 2, kind: "owned-agent-session", id: hash({ process: processEntry.entrySource, remoteKey: row.objectId }),
     state: "observed" as const, slotId: lease.slot.id, identity: lease.identity, leaseToken: lease.token, preparationNonce: prepared.nonce,
     userObjectId: owned.objectId, activationNonce: activation.nonce,
-    actor: { kind: "agent", runId: origin.commandId, attemptId: processEntry.entrySource.id, owner: processEntry.owner },
+    actor: { kind: "agent", runId: input.commandId, attemptId: processEntry.entrySource.id, owner: processEntry.owner },
     binding: { remoteKey: row.objectId, userKey: owned.userKey, username: owned.username, serverEpoch: lease.identity.serverEpoch, name: row.name, createdAt: row.createdAt },
     source: { process: processEntry.entrySource, before: snapshots.before.source, during: snapshots.during.map(snapshot => snapshot.source), after: snapshots.after.source } }))
 }

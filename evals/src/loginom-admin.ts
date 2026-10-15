@@ -20,6 +20,7 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
 }
 import { EvalFailure } from "./fail"
 import { readManagementSession, recordManagementSessionClosed } from "./management-sessions"
+import { readAgentArchive, readAgentSession, recordAgentSessionClosed } from "./agent-sessions"
 import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
@@ -56,6 +57,7 @@ export type AdminConnection = {
   observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown, mode?: "retained-package"): Promise<Awaited<ReturnType<typeof recordServerSession>>>
   closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
   closeManagementSession(lease: SlotLease, secretFile: string, id: string): Promise<void>
+  closeAgentSession(lease: SlotLease, secretFile: string, id: string, archive: { path: string; sha256: string }): Promise<void>
   activateOwnedUser(lease: SlotLease, secretFile: string): Promise<{ activated: boolean; userKey: string; source: { path: string; id: string; sha256: string } }>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeSession(session: ServerSession): Promise<void>
@@ -464,6 +466,26 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       })
       requireAdminReply(reply)
       await recordManagementSessionClosed(file, lease, secretFile, id, path.join(directory, "commands", `${reply.id}.json`), reply)
+    },
+    async closeAgentSession(lease, secretFile, id, archive) {
+      const entry = await readAgentSession(file, lease, secretFile, id)
+      if (entry.state === "closed") {
+        if (JSON.stringify(entry.archive) !== JSON.stringify(archive)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+        return
+      }
+      if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
+        throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+      const adopt = { receipt: path.join(file.controller.stateDir, `agent-session-${id}.json`),
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex"),
+        archive: await readAgentArchive(file, lease, secretFile, id, archive) }
+      const reply = await request("close-session", { proofId: id, session: entry.binding, adopt }, async () => {
+        if (JSON.stringify(await readAgentSession(file, lease, secretFile, id)) !== JSON.stringify(entry))
+          throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
+        await readAgentArchive(file, lease, secretFile, id, archive)
+        await verifyParallelPair(file, identity)
+      })
+      requireAdminReply(reply)
+      await recordAgentSessionClosed(file, lease, secretFile, id, archive, path.join(directory, "commands", `${reply.id}.json`), reply)
     },
     async closeSession(session) {
       const data = requireAdminReply(await request("close-session", { session }))

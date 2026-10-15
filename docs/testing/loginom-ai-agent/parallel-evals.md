@@ -1035,3 +1035,28 @@ native-agent-replay-cbed6057… audit5b8e2e68… подтверждает94 chec
 16 overlapping snapshots/12 code+binary pins и exact own pair/network/root absence.
 Полное same-user accounting, archive-before-close, native adoption/targeted close
 agent ledger и recovery ещё требуют реализации; production admission закрыт.
+
+
+Native agent close now follows durable profile archival (2026-10-16).
+The same local-replay test refuses missing and pre-CLI committed archive sources,
+then archives the completed invocation, closes only its retained Count1 row,
+checks setup-session survival and idempotent terminal read-back after sealing.
+Archive trees retain their original inodes/content; the SQLite bytes still contain
+the SDK session ID. History now has its own private same-filesystem directory
+outside the temporary controller root and remains after successful teardown.
+Do not remove this history when cleaning temporary fixture roots.
+
+TDD driver RED19 assertions154.46s → GREEN1/29 PASS134.46s; related48/233
+PASS50.73s, typecheck/syntax/diff PASS. Private native-agent-replay-d75f5d7a…
+audit0c35e3dc…1648 checks/66 sources,15 causal snapshots/13 source+binary pins.
+Exact own pair/network/controller root absence verified; history retained.
+This qualifies archive/targeted session close only. Complete same-user accounting,
+operations/backup/storage cleanup, release/recovery and live admission remain open.
+
+The existing native two-user management regression also passes1/20 assertions
+164.60s: A closes under its slot finalizer while B remains active and then passes
+a fresh check; both finalizers retain delete/admission=false. Agent source
+verificationd0512a31… rechecks79 source/pin hashes and exact own resource absence.
+
+A/B private native-two-users-79a7ca24… audit5d6da801… verifies634 checks/183
+sources, continuous closures/archive order and exact own resource absence.
