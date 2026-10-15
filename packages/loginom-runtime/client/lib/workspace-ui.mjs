@@ -65,6 +65,19 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     action_revision: '1', operation_id: task.operation_id ?? null, phase, effect_possible: effectPossible, output, error, trace });
   const fail = (code, message) => { const error = new Error(message); error.code = code; throw error; };
   const timeout = () => { const left = deadline - Date.now(); if (left <= 0) fail('UI_DEADLINE_EXCEEDED', 'Observed UI action deadline exceeded'); return left; };
+  // Time only existing pre-gesture reads. No values, identifiers or exception
+  // messages cross this boundary; diagnostics never reset/check the deadline.
+  let preconditionReads = 0, preconditionTiming = true;
+  const timedPreconditionRead = async (readPhase, read) => {
+    if (task.mode !== 'act' || !preconditionTiming || effectPossible || preconditionReads >= 64) return read();
+    const readStarted = Date.now(), index = ++preconditionReads;
+    const timing = () => ({read_phase:readPhase,index,elapsed_ms:Date.now()-readStarted,
+      limit_ms:deadline-started,remaining_ms:Math.max(0,deadline-Date.now())});
+    record('ui_precondition_read_started',timing());
+    let completed = false;
+    try { const value = await read(); completed = true; return value; }
+    finally { record('ui_precondition_read_finished',{...timing(),completed}); }
+  };
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
   const waitForMasks = async (observed, read, unchanged) => {
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
@@ -104,8 +117,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // Loginom. Re-rendering an identical-looking control invalidates its old ref.
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false) => {
-    const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedInputCloseNode}) => {
+    const nodeContext=await timedPreconditionRead('prepared_context_before',boundNode);
+    const observed = await timedPreconditionRead('dom_read',()=>page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedInputCloseNode}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -3271,7 +3284,7 @@ function readRenderedInputMapping(observation) {
       &&typeof nodeContext.workflow_id==='string'&&nodeContext.workflow_id===task.prepared_node_context?.workflow_ref.workflow_id
       &&typeof nodeContext.node_id==='string'&&nodeContext.node_id===task.prepared_node_context?.node.node_id
       ? {document_id:nodeContext.document_id,workflow_id:nodeContext.workflow_id,node_id:nodeContext.node_id,root_tid:nodeContext.tid}:null,
-    cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
+    cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null}));
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
@@ -3281,7 +3294,7 @@ function readRenderedInputMapping(observation) {
       fail(Object.hasOwn(messages,code)?code:'UI_OBSERVATION_FAILED',messages[code]??messages.UI_OBSERVATION_FAILED);
     }
     if(nodeContext) {
-      const after=await boundNode();
+      const after=await timedPreconditionRead('prepared_context_after',boundNode);
       if(!same(nodeContext,after)) {
         // A read can straddle native unlock after Close or a completed wizard
         // gesture. Discard the mixed snapshot; pre-gesture guards stay strict.
@@ -3357,8 +3370,9 @@ function readRenderedInputMapping(observation) {
       &&typeof observedGraph.native_prefix==='string'&&current.tid?.startsWith(observedGraph.native_prefix)
       &&current.identity.anchor_tid?.startsWith(observedGraph.native_prefix)?observedGraph:null;
     const locator = locatorFor(current.identity,scopedGraph);
-    if (await locator.count() !== 1) fail('UI_REFERENCE_STALE', 'Observed control is no longer unique');
-    const handle = await locator.elementHandle({ timeout: timeout() });
+    if (await timedPreconditionRead('locator_count',()=>locator.count()) !== 1) fail('UI_REFERENCE_STALE', 'Observed control is no longer unique');
+    const handleTimeout = timeout();
+    const handle = await timedPreconditionRead('element_handle',()=>locator.elementHandle({ timeout: handleTimeout }));
     if (!handle) fail('UI_REFERENCE_STALE', 'Observed control is detached');
     handles.push(handle);
     const graphPrefix = task.snapshot.graph_identity?.status==='observed'?task.snapshot.graph_identity.native_prefix:null;
@@ -4064,6 +4078,7 @@ function readRenderedInputMapping(observation) {
         outcome = result('SUCCEEDED', { ...observed, gesture_applied: effectPossible, verification_required: true });
       }
     } catch (error) {
+      preconditionTiming = false;
       record('ui_action_failed', { code: error?.code ?? 'UI_BROWSER_CALL_FAILED' });
       let observed = {};
       if (error?.code === 'UI_SCAN_LIMIT') observed = { observation_required: true, scan: { complete: false, limit_exceeded: true } };
