@@ -4,7 +4,8 @@ import { tmpdir } from "node:os"
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { agentCommand, runAgent } from "../src/cli"
 import { loadConfig } from "../src/config"
-import { readAgentProcessInventory, sealAgentProcessInventory } from "../src/agent-process-evidence"
+import { readAgentProcess, readAgentProcessInventory, sealAgentProcessInventory } from "../src/agent-process-evidence"
+import { readAgentSession, recordAgentSessions } from "../src/agent-sessions"
 import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { openLoginomAdmin } from "../src/loginom-admin"
@@ -36,7 +37,7 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
     await mkdir(evidence, { mode: 0o700 })
     console.error(`native agent replay evidence: ${evidence}`)
     const sources = await Promise.all(["native-agent-run-integration.test.ts", "helpers/loginom-replay-provider.ts", "../src/cli.ts",
-      "../src/agent-process-evidence.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
+      "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
       "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", process.env.EVAL_CLI_BIN!].map(async file => {
       const source = path.resolve(import.meta.dir, file)
       return { path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }
@@ -116,8 +117,23 @@ test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || 
         expect(run.processCleanup.browserBindings?.length ?? 0).toBeGreaterThan(0)
         expect(during.some(snapshot => snapshot.sessions.some(row => row.name.startsWith(credentials.username + ":") &&
           !before.sessions.some(previous => previous.objectId === row.objectId)))).toBe(true)
+        const entry = await readAgentProcess({ ...agentEvidence, producerPid: process.pid }, (await Bun.file(agents).json()).processes[0].id)
+        const references = { process: entry.entrySource, before: before.source, after: after!.source,
+          during: during.filter(snapshot => Date.parse(snapshot.observation.startedAt) <= Date.parse(qualified!.finishedAt) &&
+            Date.parse(snapshot.observation.finishedAt) >= Date.parse(qualified!.startedAt)).map(snapshot => snapshot.source) }
+        const sessions = await recordAgentSessions(file, lease, prepared.secretFile, references)
+        expect(sessions).toHaveLength(1)
+        expect(sessions[0]).toMatchObject({ kind: "owned-agent-session", actor: { kind: "agent", runId: commandId, attemptId: entry.entrySource.id },
+          binding: { username: credentials.username, serverEpoch: pair.identity.serverEpoch } })
+        expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(sessions[0]!)
+        await expect(recordAgentSessions(file, lease, prepared.secretFile, { ...references, process: { ...references.process, sha256: "0".repeat(64) } }))
+          .rejects.toThrow("AGENT_SESSION_PROCESS_CHANGED")
+        await expect(recordAgentSessions(file, lease, prepared.secretFile, { ...references, after: before.source }))
+          .rejects.toThrow("AGENT_SESSION_WINDOW_INVALID")
+        await writeLeaseReceipt(path.join(evidence, "agent-sessions.json"), { sessions, references })
         const sealed = await sealAgentProcessInventory(agentEvidence)
         expect((await readAgentProcessInventory({ ...agentEvidence, producerPid: process.pid })).source).toEqual(sealed)
+        expect(await readAgentSession(file, lease, prepared.secretFile, sessions[0]!.id)).toEqual(sessions[0]!)
         expect(await readServerIdentity(file)).toEqual(pair.identity)
         expect(await Promise.all(sources.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
           .toEqual(sources.map(source => source.sha256))
