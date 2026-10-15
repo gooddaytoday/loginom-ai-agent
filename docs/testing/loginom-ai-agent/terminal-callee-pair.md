@@ -8,8 +8,10 @@ marker objects inheriting the original prototypes. It calls the retained
 continueWith once. The existing task-assignment setter observes the actual
 secondary source and born task: their immediate prototypes must be exactly the
 two markers. The returned object must be that born task, with status 3.
-Changing namespace slots to different function objects, even sharing the old
-prototype, cannot produce this observation from the lexical callee.
+The retained Task must also equal its original prototype data constructor;
+this rejects a transparent Proxy alias whose prototype writes would otherwise
+forward to its target. Changing namespace slots to different function objects,
+even sharing the old prototype, cannot qualify the lexical callee.
 
 The original function descriptors and both observed instance prototypes are
 restored before returning or throwing. Only exact owned descriptors and marker
