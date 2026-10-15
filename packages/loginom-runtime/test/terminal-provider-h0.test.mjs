@@ -6,8 +6,8 @@ const root=process.env.ROOT_RUNTIME_ROOT?new URL('file://'+process.env.ROOT_RUNT
 const roots=await import(new URL('src/terminal-root-association.mjs',root));
 const {beginTerminalManagedCall}=await import(new URL('src/terminal-managed-call.mjs',root));
 const {retainOriginalPrepareStartup,requireTerminalPrepareProvider}=await import(new URL('src/original-prepare-lender.mjs',root));
-function fixture({handleEvaluate}={}){
- const deadline=Date.now()+60000,controller=new AbortController();
+function fixture({handleEvaluate,deadline=Date.now()+60000}={}){
+ const controller=new AbortController();
  const capture={revision:1,harness:'sorting-before-close-v1',owner:'owner',run:'run',lease:'owner:run',generation:1,chat:'chat',account:'account',packagePath:'/account/original.lgp',admission:'original',expires:deadline};
  const wire={originId:'root',deadline,parentPid:1,hostPid:2,childPid:3,generation:1,chat:'chat',loadPurpose:{...capture,purpose:'sorting-terminal-source-v1'}};
  const connection={username:'account',url:'https://app.loginom.ai/app'},state={controller:undefined};
@@ -39,7 +39,7 @@ test('H0 original call/startup/root/Page association reaches explicit missing in
  for(const key of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'])assert.equal(f.load.facts[key],false);
 });
 test('same wire values from a different startup peer cannot bind owner to call',async()=>{
- const f=fixture(),other=fixture(),c=call(f,{otherState:other.state});await c.ready();
+ const f=fixture(),other=fixture({deadline:f.wire.deadline}),c=call(f,{otherState:other.state});await c.ready();
  assert.throws(()=>requireTerminalPrepareProvider(f.bridge),/INVOCATION_UNAVAILABLE/);
  assert.throws(()=>roots.terminalSourceForManagedCall({...f.owner},c.message),/INVOCATION_UNAVAILABLE/);
  assert.throws(()=>roots.terminalSourceForManagedCall(f.owner,{...c.message}),/INVOCATION_UNAVAILABLE/);
