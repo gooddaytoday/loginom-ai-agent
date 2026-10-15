@@ -133,7 +133,10 @@ export function collectTerminalScriptWitness(expected){
   const ctor=hold(nativeSS,'Task'),prototype=hold(ctor,'prototype'),continuation=hold(prototype,'continueWith');
   if(typeof ctor!=='function'||typeof continuation!=='function')throw Error('TERMINAL_PROVIDER_TASK_DEFINITION');
   for(const key of ['getAwaitedResult','isCompleted','_complete','_fail','_runCallbacks'])if(typeof hold(prototype,key)!=='function')throw Error('TERMINAL_PROVIDER_TASK_DEFINITION');
-  taskDefinition=Object.freeze({ctor,prototype,continuation});
+  const forwarders={};for(const key of ['toPromise','then','catch','finally']){const value=hold(prototype,key);if(typeof value!=='function')throw Error('TERMINAL_PROVIDER_TASK_FORWARDER');forwarders[key]=value}
+  const promise=hold(globalThis,'Promise'),promisePrototype=hold(promise,'prototype'),promiseThen=hold(promisePrototype,'then');
+  hold(promisePrototype,'catch');hold(promise,'resolve');
+  taskDefinition=Object.freeze({ctor,prototype,continuation,forwarders:Object.freeze(forwarders),promise,promisePrototype,promiseThen});
  }else providerChecks.push(()=>{if(descriptor(nativeSS,'Task')||parent(nativeSS)!==taskNamespacePrototype)throw Error('TERMINAL_PROVIDER_TASK_DEFINITION_CHANGED')});
  let birthWindow;const birthChain=[];
  if(taskDefinition){
@@ -181,8 +184,60 @@ export function collectTerminalScriptWitness(expected){
    returnedTask:returned,continuation,sourcePrototype:completionPrototype,taskPrototype:taskDefinition.prototype,
    statusAtReturn:3,assignmentObserved:true,prototypeRestored:true,lexicalCalleeIdentityQualified:false});
   for(const key of Reflect.ownKeys(lower.continuationBirth))hold(lower.continuationBirth,key);
-  guard();return returned;
+  retainForwarders(lower,born);guard();return returned;
   }catch(value){providerFailure??={value};throw providerFailure.value}
+ }
+
+
+ // Original Task.js forwarders on the observed secondary task. These are
+ // observations of returned promises and original reads, not lexical callee
+ // qualification. No promise/task is substituted or synthetically settled.
+ function retainForwarders(lower,task){
+  const methods=taskDefinition.forwarders,reader=hold(task,'getAwaitedResult');
+  for(const key of Reflect.ownKeys(methods))if(hold(task,key)!==methods[key])throw Error('TERMINAL_PROVIDER_FORWARDER_CHANGED');
+  const bases=[],outputs=[],reads=[],settlements=[],patches=[];let entry,readIndex=0,registered=false,thenCalls=0;
+  const keep=p=>{p.forwardPending=true;patches.push(p);return p};
+  function returnedPromise(value){
+   if(!value||parent(value)!==taskDefinition.promisePrototype)throw Error('TERMINAL_PROVIDER_FORWARD_PROMISE');
+   hold(value,'then');hold(value,'catch');return value;
+  }
+  keep(patch(task,'getAwaitedResult',original=>function(){
+   try{guard();if(this!==task||arguments.length||readIndex>=bases.length)throw Error('TERMINAL_PROVIDER_FORWARD_READER');
+    const index=readIndex++;let value,first;
+    try{value=apply(original,task,[])}catch(error){first={value:error}}
+    reads.push(Object.freeze({task,reader,index,...(first?{rejected:true,reason:first.value}:{rejected:false,value})}));
+    if(first)throw first.value;guard();return value;
+   }catch(value){providerFailure??={value};throw providerFailure.value}
+  }));
+  keep(patch(task,'toPromise',original=>function(){
+   guard();if(this!==task||arguments.length||!entry||bases.length!==outputs.length)throw Error('TERMINAL_PROVIDER_FORWARD_REENTRY');
+   const value=returnedPromise(apply(original,task,[]));bases.push(Object.freeze({kind:entry,task,method:original,promise:value}));return value;
+  }));
+  keep(patch(task,'then',original=>function(){
+   guard();if(this!==task||entry!=='finally'||++thenCalls!==1)throw Error('TERMINAL_PROVIDER_FORWARD_THEN');
+   const value=returnedPromise(apply(original,task,arguments));guard();return value;
+  }));
+  const fulfilled=value=>value,rejected=value=>{throw value},finished=()=>undefined;
+  for(const kind of ['toPromise','then','catch','finally']){
+   guard();entry=kind;
+   // Invoke only the retained fixed originals, with this exact secondary task.
+   const value=returnedPromise(kind==='toPromise'?apply(task.toPromise,task,[]):apply(methods[kind],task,
+    kind==='then'?[fulfilled,rejected]:kind==='catch'?[rejected]:[finished]));
+   if(bases.length!==outputs.length+1)throw Error('TERMINAL_PROVIDER_FORWARD_PROMISE');
+   outputs.push(Object.freeze({kind,task,method:methods[kind],promise:value}));entry=undefined;
+   // Observe settlement without replacing the original returned Promise. Both
+   // branches consume the observer result, including raw falsy rejection.
+   apply(taskDefinition.promiseThen,value,[outcome=>settled(kind,false,outcome),reason=>settled(kind,true,reason)]);
+  }
+  registered=true;
+  function settled(kind,rejected,value){
+   try{guard();if(!registered||readIndex!==4)throw Error('TERMINAL_PROVIDER_FORWARD_SETTLEMENT');
+    settlements.push(Object.freeze({kind,rejected,...(rejected?{reason:value}:{value})}));
+    if(settlements.length===4){for(const p of patches)p.forwardPending=false;restore(patches);}
+   }catch(error){providerFailure??={value:error}}
+  }
+  lower.forwardState={reads,settlements};
+  lower.forwarders=Object.freeze({task,reader,methods,bases:Object.freeze(bases),outputs:Object.freeze(outputs),lexicalCalleeIdentityQualified:false});
  }
 
  function patchCheck(p){if(parent(p.object)!==p.prototype||!descriptorEqual(descriptor(p.object,p.key),p.active?p.temporary:p.original))throw Error('TERMINAL_PROVIDER_PATCH_CHANGED')}
@@ -205,9 +260,9 @@ export function collectTerminalScriptWitness(expected){
   const temporary={value:make(method),writable:true,enumerable:original?.enumerable??false,configurable:original?.configurable??true};
   const p={object,key,prototype:parent(object),original,method,temporary,active:true};Object.defineProperty(object,key,temporary);providerPatches.push(p);return p;
  }
- function restore(){providerPatches.forEach(patchCheck);for(const p of providerPatches.slice().reverse())if(p.active){
+ function restore(selected=providerPatches){selected.forEach(patchCheck);for(const p of selected.slice().reverse())if(p.active&&!p.forwardPending){
   if(p.original)Object.defineProperty(p.object,p.key,p.original);else delete p.object[p.key];p.active=false;
- }providerPatches.forEach(patchCheck);providerPatches.length=0}
+ }providerPatches.forEach(patchCheck);for(let i=providerPatches.length-1;i>=0;i--)if(!providerPatches[i].active)providerPatches.splice(i,1)}
  function startLower(proxy,type,rejectWork,readMethod){
   const r={proxy,type,transport,observed:false,completed:false,restored:false};let invoking=false;
   const first=value=>{r.primary??={value};return r.primary.value};
@@ -421,7 +476,7 @@ export function collectTerminalScriptWitness(expected){
     },
     inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,initial:armed?.initial,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType,
      lower:lower?Object.freeze({dispatchTask:lower.dispatchTask,request:lower.request,response:lower.response,continuation:lower.originalContinuation,reader:lower.originalReader,resolver:lower.resolverPatch.method,
-      continuationBirth:lower.continuationBirth,completionSource:lower.completion,sourceTask:lower.sourceTask,sourceSettled:lower.sourceSettled,sourceMethod:lower.sourceMethod,sourceValue:lower.sourceValue,completionSourceCustodyVerified:lower.sourceTask===lower.task&&lower.sourceSettled===true,
+      continuationBirth:lower.continuationBirth,forwarders:lower.forwarders?Object.freeze({...lower.forwarders,reads:Object.freeze(lower.forwardState.reads.slice()),settlements:Object.freeze(lower.forwardState.settlements.slice())}):undefined,completionSource:lower.completion,sourceTask:lower.sourceTask,sourceSettled:lower.sourceSettled,sourceMethod:lower.sourceMethod,sourceValue:lower.sourceValue,completionSourceCustodyVerified:lower.sourceTask===lower.task&&lower.sourceSettled===true,
       w:lower.w,o:lower.o,hresult:lower.hresult,returnedType:lower.returnedType,support:lower.support,observed:lower.observed,completed:lower.completed,restored:lower.restored}):undefined})},
    });
    // Same-realm initial custody is captured before begin/reserve/effect. The
