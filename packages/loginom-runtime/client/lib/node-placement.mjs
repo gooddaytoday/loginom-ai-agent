@@ -65,9 +65,20 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');
    if(await owner.count()!==1||!await owner.isVisible())throw Error('Owned canvas outline container unavailable');
    zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');
-   if(await zoom.count()>1)throw Error('Owned canvas zoom-out control is ambiguous');
-   if(await zoom.count()===0||!await zoom.isVisible()){
-    if(await toggle.count()!==1||!await toggle.isVisible())throw Error('Canvas outline control unavailable');
+   const zoomCount=await zoom.count(),zoomVisible=zoomCount===1?await zoom.isVisible():false;
+   if(zoomCount>1)throw Error('Owned canvas zoom-out control is ambiguous');
+   if(zoomCount===0||!zoomVisible){
+    const toggleCount=await toggle.count();
+    const controls={toggle:{count:toggleCount,visible:toggleCount===1?await toggle.isVisible():toggleCount===0?false:null},
+      zoom:{count:zoomCount,visible:zoomVisible}};
+    if(toggleCount!==1||!controls.toggle.visible){
+     if(nodeId===undefined)throw Error('Canvas outline control unavailable');
+     // An unavailable outline cannot prove the whole drawing visible. Only an
+     // existing input-add target may proceed to its unchanged center hit-test.
+     await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+     return {view,point,zoom_steps:steps,outline_closed:false,fully_visible:within(view,point),
+       outline_controls:controls,point_check_required:true};
+    }
     await toggle.click({timeout:remaining()});opened=true;
     await zoom.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    }

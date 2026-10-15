@@ -229,7 +229,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed while revealing input-add port');}});
       gestureBefore=await read(page,task);
       if(!sameGraph(before,gestureBefore))throw Error('Input-add graph changed after viewport navigation');
-      if(!placementNavigation.fully_visible)throw Error('Input-add node and ports are not fully visible');
+      if(!placementNavigation.fully_visible&&!(placementNavigation.point_check_required===true&&placementNavigation.zoom_steps===0))throw Error('Input-add node and ports are not fully visible');
       const tid=await targetTid(p.ref);const add=find(tid+';Input_Add');await point(add,true);effectPossible=true;await add.click({timeout:remaining()});
       const choice=await wait('additional_table_input_or_type_menu',async()=>{
         if(await page.locator('[data-tid^='+JSON.stringify(tid+';Input_Data-')+']').count()>p.input)return 'created';
