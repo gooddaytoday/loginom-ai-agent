@@ -2365,3 +2365,19 @@ terminal SHA086d5028ffd8472adf6bdcde5474fee2a476f58170372dc63632d4e850ac24fb.
 SLOTS_ADMISSION_UNAVAILABLE/live model+judge calls0 remain. Full controller
 binding/before-during-after measurements/all runtime actors and actual budgets
 still precede live parallelism acceptance.
+
+Further SessionBackup primary inspection (2026-10-15) pins server binary
+SHA1fea749d88b89cdf810e7c23496e5ad146728a032abfcd235367c5f1969cdd0a
+from the existing image: SessionBackup.cfg/SessionBackupConfiguration and
+User/Session map/status/finalization names exist, with autosave event flags.
+These names do not establish a file schema or supported creation/disable API.
+The JS SavePackageAs formal parameters remain APackage/AFileName only; no
+invented backup option is sent. An exact no-follow file check on the unchanged
+own permanent research pair observes no /workdir/SessionBackup.cfg, which grants
+no disabled-policy credit. Method-symbol/UTF16 lookup supplies no new trigger.
+Private backup-binary-primary-audit.json5 source refs/read-back
+SHA7219026dd85f79d4aebf24816ffb6fa5465c83d86c0c489849bd5aae268cdc4c
+confirms all3 never-started inspection containers absent on the same daemon and
+image unchanged; temporary binary copies are removed. No new browser/model/judge
+work or permanent-pair mutation. SESSION_BACKUP_POLICY_UNPROVEN remains; the
+unsupported configuration is not manufactured from these symbol strings.
