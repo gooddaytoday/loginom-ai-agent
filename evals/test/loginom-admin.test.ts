@@ -2,14 +2,39 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { createAdminChannel, createJournaledAdminChannel, readAdminFinalization, readAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
-import { writeLeaseReceipt } from "../src/lease"
+import { createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
+import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const owned = { remoteKey: "session-41", userKey: "user-a", username: "eval-a", serverEpoch: "epoch-1", pendingDisconnect: true, activeOperations: 0 }
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("admin inventory sealing admits one transition under its held server fence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-seal-")), fixture = await parallelFixture(root)
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json"), inventory = path.join(fixture.slots.controller.stateDir, "processes-admin.json")
+  const command = { version: 2, kind: "unactivated-preparation", commandId: "prepare", identity, slotIds: ["a"], phase: "unactivated", processInventory: inventory }
+  await writeLeaseReceipt(journal, command)
+  await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "prepare", journal, identity, connections: [] })
+  const server = await acquireResourceLease({ key: `server:${identity.containerId}`, identity, journal, commandId: "prepare", lockRoot: fixture.lockRoot })
+  try {
+    const hash = new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex")
+    await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: server, binary: "/unreadable-runtime" })).rejects.toThrow("ADMIN_PROCESS_INVENTORY_UNCONFIRMED")
+    await expect(sealAdminProcessInventory(fixture.slots, server, "0".repeat(64))).rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
+    expect(await readLeaseReceipt(journal)).toEqual(command)
+    const attempts = await Promise.allSettled([sealAdminProcessInventory(fixture.slots, server, hash), sealAdminProcessInventory(fixture.slots, server, hash)])
+    expect(attempts.filter(attempt => attempt.status === "fulfilled")).toHaveLength(1)
+    expect(attempts.filter(attempt => attempt.status === "rejected")).toHaveLength(1)
+    expect(await readLeaseReceipt(journal)).toEqual({ ...command, phase: "finalizing" })
+    await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: server, processInventory: inventory, binary: "/unreadable-runtime" }))
+      .rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
+    await server.assertHeld()
+    await server.close()
+    await expect(sealAdminProcessInventory(fixture.slots, server, hash)).rejects.toThrow("LEASE_NOT_HELD")
+    expect(await readLeaseReceipt(journal)).toEqual({ ...command, phase: "finalizing" })
+  } finally { await server.close(); await rm(root, { recursive: true, force: true }) }
+})
 
 test("admin finalization reader requires the persisted disconnect command and continuous process closure", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-finalization-")), fixture = await parallelFixture(root)
