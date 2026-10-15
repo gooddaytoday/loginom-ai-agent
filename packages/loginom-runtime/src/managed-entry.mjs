@@ -38,7 +38,12 @@ function close() {
     await Promise.allSettled([...requests])
     const results = []
     for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
+      const [result] = await Promise.allSettled([Promise.resolve().then(() => handle?.close())])
+      results.push(result)
+      // A fulfilled bridge refusal must preserve the browser and cannot acknowledge cleanup.
+      if (handle && handle === state.bridge && result.status === "fulfilled"
+          && (result.value?.browser_transport_closed !== true || result.value?.browser_process_terminated !== true
+            || result.value?.clipboard_leases_retained !== 0)) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
