@@ -11,6 +11,7 @@ export type ManagementProcessEvidence = { file: string; lease: SlotLease; admin?
 type InventoryInput = { file: string; journal: string; commandId: string; identity: ServerIdentity; leaseToken: string;
   slotId: string; profileDir: string; producerPid: number }
 const active = new Set<string>()
+const registrations = new Map<string, Promise<void>>()
 const operations = new Set(["loginom setup", "loginom status", "loginom check", "loginom recover", "providers status"])
 
 export async function superviseManagementProcess(input: Parameters<typeof superviseProcess>[0], evidence: ManagementProcessEvidence & { directory: string; operation: string[] }) {
@@ -33,6 +34,7 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
     const inventory = await readInventory(expected)
     if (hash(inventory) !== previous.source.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
     await privateDirectory(evidence.directory)
+    await registerManagementInventory(expected, evidence.lease)
     const owner = { kind: "slot" as const, id: `${expected.commandId}:${expected.slotId}:${crypto.randomUUID()}` }
     if (evidence.admin && JSON.stringify(evidence.admin.identity) !== JSON.stringify(expected.identity)) throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
     const before = await evidence.admin?.inspectSessionInventory()
@@ -82,6 +84,34 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
     if (settled[1].status === "rejected") throw new EvalFailure("MANAGEMENT_SESSION_OBSERVATION_UNCONFIRMED", 2)
     return result
   } finally { active.delete(evidence.file) }
+}
+
+async function registerManagementInventory(input: InventoryInput, lease: SlotLease) {
+  const pending = (registrations.get(input.journal) ?? Promise.resolve()).then(async () => {
+    const command = await readLeaseReceipt(input.journal)
+    if (!object(command) || command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted" || command.commandId !== input.commandId ||
+      JSON.stringify(command.identity) !== JSON.stringify(input.identity)) throw new EvalFailure("MANAGEMENT_ADMISSION_UNCONFIRMED", 2)
+    const saved = command.managementInventories === undefined ? [] : command.managementInventories
+    if (!Array.isArray(saved)) throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    const registered = saved.filter(object)
+    if (registered.length !== saved.length || registered.some(entry => Object.keys(entry).length !== 4 ||
+      typeof entry.file !== "string" || path.resolve(entry.file) !== entry.file || path.dirname(entry.file) !== path.dirname(input.file) ||
+      typeof entry.slotId !== "string" || !entry.slotId || typeof entry.leaseToken !== "string" || !entry.leaseToken ||
+      typeof entry.profileDir !== "string" || !path.isAbsolute(entry.profileDir) || path.resolve(entry.profileDir) !== entry.profileDir) ||
+      ["file", "slotId", "leaseToken", "profileDir"].some(key => new Set(registered.map(entry => entry[key])).size !== registered.length))
+      throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    const entry = { file: input.file, leaseToken: input.leaseToken, slotId: input.slotId, profileDir: input.profileDir }
+    const existing = registered.find(candidate => candidate.slotId === input.slotId)
+    if (existing && JSON.stringify(existing) !== JSON.stringify(entry) || registered.some(candidate => candidate.slotId !== input.slotId &&
+      (candidate.file === input.file || candidate.profileDir === input.profileDir || candidate.leaseToken === input.leaseToken)))
+      throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    await lease.assertHeld()
+    if (JSON.stringify(await readLeaseReceipt(input.journal)) !== JSON.stringify(command)) throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    if (!existing) await writeLeaseReceipt(input.journal, { ...command, managementInventories: [...registered, entry] })
+  })
+  const settled = pending.then(() => {}, () => {})
+  registrations.set(input.journal, settled)
+  try { await pending } finally { if (registrations.get(input.journal) === settled) registrations.delete(input.journal) }
 }
 
 export async function readManagementProcessInventory(input: InventoryInput) {
