@@ -427,6 +427,10 @@ export function collectTerminalScriptWitness(expected){
       try{patchCheck(r.readerPatch);for(const check of readerChecks)check()}catch(value){stop(value);return}
       r.observed=true;
       try{r.outcome=apply(r.originalReader,task,[])}catch(value){first(value)}
+      // A failed original reader has no response for the original callback.
+      // Reject only the private work with that raw first reason; keep the
+      // native task pending and never enter its Exception.wrap continuation.
+      if(r.primary){stop(r.primary.value);return}
       try{guard()}catch(value){stop(value);return}
       return apply(callback,this,arguments);
      }]);
