@@ -12,7 +12,8 @@ mock.module(lib('node-context.mjs'),{namedExports:{...originals['node-context.mj
 mock.module(lib('node-target-browser.mjs'),{namedExports:{...originals['node-target-browser.mjs'],readGraph:async page=>page.graph}});
 mock.module(lib('node-graph-selection.mjs'),{namedExports:{...originals['node-graph-selection.mjs'],selectPreparedGraphNode:async()=>{state.events.push('select');}}});
 mock.module(lib('node-procedure.mjs'),{namedExports:{...originals['node-procedure.mjs'],createNodeProcedure:()=>({
- observe:async()=>state.snapshot(),openOutputPort:async()=>{state.events.push('open-output');state.open=true;}
+ observe:async()=>state.snapshot(),openOutputPort:async()=>{state.events.push('open-output');state.open=true;},
+ perform:async spec=>{const s=state.snapshot();assert.ok(spec.ready(s));const action=spec.resolve(s);assert.equal(action.verb,'click');state.events.push(action.ref);if(action.ref==='links')state.links=true;else {assert.equal(action.ref,'fetch');if(state.scenario==='fetch-unknown')throw Error('unknown fetch');state.fetched=true;}}
 })}});
 mock.module(lib('port-mapping-procedure.mjs'),{namedExports:{...originals['port-mapping-procedure.mjs'],excludeOutputField:async()=>{
  state.events.push('exclude');state.edited=true;return {verified:true,cleanup_complete:true,settings_applied:false};
@@ -38,11 +39,12 @@ function pageDouble(scenario){
  const view=e=>({el:{dom:e},getStore:()=>{
   const items=records();return {$className:'Ext.data.Store',isBufferedStore:false,currentPage:1,loading:false,getCount:()=>items.length,getTotalCount:()=>items.length,isLoading:()=>false,getRemoteFilter:()=>scenario==='filter',getRemoteSort:()=>false,getData:()=>({items,getSource:()=>({items})}),getProxy:()=>({$className:'bg.ext.CollectionProxy',pendingOperations:{}})};
  }});
- state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:scenario==='node'?'foreign':'node',tid:scenario==='node-root'?'foreign':'root'},
+ state={events,scenario,links:false,fetched:false,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:scenario==='node'?'foreign':'node',tid:scenario==='node-root'?'foreign':'root'},
   wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref',owner_context:{status:'observed',node_id:'node'}}:{status:'absent'},
-  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
-   target_fields:[{name:'Region',record_id:state.edited?'after':'before',excluded:state.edited,
-    ...(state.edited?{exclusion_source:{record_id:'source',field_id:'20'}}:{source:{record_id:'source',field_id:'20'}})}]}})};
+  ui:{elements:[{tid:'root;DerivedDataSourceOutputSocketWizard;rbLinks;DisplayEl',ref:'links',check_state:{checked:state.links},allowed_actions:['click']},{tid:'root;DerivedDataSourceOutputSocketWizard;btnGetSourceColumns',ref:'fetch',visible:state.links,enabled:true,allowed_actions:['click']}]},
+  node_mapping:{node_context:{output_port:{port_guid:scenario==='port'?'foreign':'4ba0e2c2-69ad-3a32-bbdc-75714efe7a51'}},verified:true,inventory_complete:true,source_identity_verified:state.fetched,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
+   target_fields:[{name:'Region',label:scenario==='label'?'wrong':'Region display',record_id:state.edited?'after':'before',excluded:state.edited,
+    ...(state.edited?{exclusion_source:{record_id:'source',field_id:'20',name:scenario==='source-name'?'wrong':'Region'}}:{source:{record_id:'source',field_id:'20',name:scenario==='source-name'?'wrong':'Region'}})}]}})};
  globalThis.document=document;globalThis.location={origin:'https://loginom.invalid'};
  globalThis.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'account'}}}}}}};
  globalThis.Ext={getCmp:id=>view(grids.find(e=>e.id===id))};
@@ -68,7 +70,7 @@ for(const scenario of ['success','document','node','node-root','root-ref','parti
    assert.equal(result.cancel_verified,true);assert.equal(result.capture_complete,false);assert.equal(result.native_verified,false);assert.equal(result.before.collector_revision,1);assert.ok(result.before.predicates.cached_windows.every(p=>p.value===true));
    assert.equal(result.before.dom.length,5);assert.equal(result.before.stores[1].records[0].internalId,'before');
    assert.equal(result.after.stores[1].records[0].data.GroupField,'Исключенные');
-   assert.deepEqual(events.filter(e=>e!=='browser'),['select','open-output','exclude','cancel']);
+   assert.deepEqual(events.filter(e=>e!=='browser'),['select','open-output','links','fetch','exclude','cancel']);
   }else {await assert.rejects(captureCalculator({binding,identity,browser,record:async()=>{}}));assert.equal(events.includes('exclude'),false);}
  }finally{for(const k of ['document','location','bg','Ext','__loginomDockPreparationV1'])delete globalThis[k];delete globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];}
 });

@@ -8,6 +8,7 @@ import {selectPreparedGraphNode} from '../../client/lib/node-graph-selection.mjs
 import {excludeOutputField} from '../../client/lib/port-mapping-procedure.mjs';
 import {closePreparedWizard,wizardCloseBinding} from '../../client/lib/node-wizard-close.mjs';
 import {readPreparedNodeContext} from '../../client/lib/node-context.mjs';
+import {readCalculatorOutputMapping} from '../../client/lib/calculator-output-source.mjs';
 
 const need=(ok,message)=>{if(!ok)throw Error('LOGINOM_CAPTURE_'+message);};
 export const CAPTURE_LIMITS=Object.freeze({bytes:524288,dom:4096,records:1000,string:512});
@@ -51,8 +52,15 @@ export async function captureCalculator({binding,identity,browser,record}) {
   &&identity.document_id===owner.document_id&&identity.account===owner.account&&identity.package_path===owner.package_path
   &&binding.owner===owner.owner&&binding.lease===owner.lease&&binding.run===owner.run
   &&binding.generation===owner.generation&&binding.chat===owner.chat,'OWNER_CHANGED');
+ let sourceFetchStarted=false;
  const observe=async()=>{
   current();
+  if(!sourceFetchStarted) {
+   // This flag is consumed before the gesture. An uncertain fetch must never
+   // be repeated by a later observation of this capture.
+   sourceFetchStarted=true;
+   return readCalculatorOutputMapping(channel);
+  }
   const s=await channel.observe({condition:'fixed Calculator output mapping capture',readMappings:true,
    ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});
   return s;
@@ -74,6 +82,12 @@ export async function captureCalculator({binding,identity,browser,record}) {
  current();await selectPreparedGraphNode(channel,selected,'fixed diagnostic Calculator selection');
  current();await channel.openOutputPort(0);
  const receipt=await captureDraft({owner,current,observe,snapshot,
+  checkBaseline:state=>{
+   const mapping=state.node_mapping,region=mapping.target_fields.filter(f=>f.name==='Region');
+   need(mapping.node_context?.output_port?.port_guid==='4ba0e2c2-69ad-3a32-bbdc-75714efe7a51','PORT');
+   need(region.length===1&&region[0].label==='Region display'&&region[0].excluded===false
+    &&region[0].source?.name==='Region','REGION');
+  },
   observeCancellation:()=>channel.observe({condition:'same owned Calculator draft before cancellation',
    ready:s=>s.prepared_node_context?.verified===true&&s.wizard?.status==='observed'}),
   exclude:source=>excludeOutputField(channel,source),cancel:state=>closePreparedWizard(channel,wizardCloseBinding(state)),record});
@@ -82,7 +96,7 @@ export async function captureCalculator({binding,identity,browser,record}) {
 
 // Small orchestration unit tested with labelled drivers; captureCalculator above
 // always supplies the real guarded channel. These doubles are not native PASS.
-export async function captureDraft({owner,current,observe,observeCancellation=observe,snapshot,exclude,cancel,record}) {
+export async function captureDraft({owner,current,observe,observeCancellation=observe,snapshot,exclude,cancel,record,checkBaseline=()=>{}}) {
  const owned=state=>{
   current();const n=state.prepared_node_context,w=state.wizard;
   need(n?.verified===true&&n.surface==='wizard'&&n.document_id===owner.document_id&&n.node_id===owner.node_id
@@ -101,7 +115,7 @@ export async function captureDraft({owner,current,observe,observeCancellation=ob
  };
  let before,after,baseline,changed,originalDraft,failure,failed=false,mutationUnconfirmed=false;
  try {
-  const initial=await observe();originalDraft=owned(initial);baseline=checked(initial);
+  const initial=await observe();originalDraft=owned(initial);baseline=checked(initial);checkBaseline(initial);
   need(baseline.region.excluded===false&&baseline.region.source?.record_id,'REGION_ALREADY_EXCLUDED');
   before=await snapshot(baseline.state);validateCapture(before,owner,baseline);
   await record({event:'calculator_capture_before',owner,capture:before});
