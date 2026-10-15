@@ -1643,3 +1643,56 @@ The audit retains semantic hash links to authority/readonly/cancelled/terminal
 artifacts and performs346 source/process/close/peer/cleanup checks; own pair and
 root are absent. Recovery-only lineage, failed setup, timeout, pending recovery,
 active attempts and SessionBackup remain separate gates. Model/judge calls0.
+
+### Durable registration of management inventories
+
+Before dispatch, the producer persists one command-level managementInventories
+entry binding the exact inventory file, slot, lease token and profile. Journal
+updates are serialized across parallel slots. Reuse preserves command bytes;
+an alternate file for the same slot or overlapping inventory/profile/token
+binding refuses admission. Files and schema remain private and canonical.
+The registry makes producer evidence discoverable; it does not qualify process
+closure, session identity, archive, deletion or release by itself. Legacy
+source readers remain compatible; future finalization must independently
+validate every registered source and refuse unknown sessions.
+
+The actual OS child independently reads its registration before executing.
+Missing registration RED→GREEN1 PASS/27 (3.54s); parallel owners2 PASS/30
+(5.10s), related69 PASS/358 (16.61s), typecheck/diff PASS. Cold native1 PASS/56 (193.44s),181 source/closure/cleanup audit checks;
+exact own pair/root absent. Three isolated new-scratch repetitions reproduced the
+10s runner timeout twice; the passing repetition took9.21s for that test.
+Only the two module-level test guards became30s. The final targeted module
+passed2/30 (16.19s; first test10.45s); typecheck PASS. All newly created temporary data uses
+TMPDIR=/home/kiselev/storage/tmp per the current workspace instruction;
+verification logs and audit artifacts are retained in private research evidence.
+
+The native cancellation fixture retains producer evidence before assertions.
+A cooperative SIGINT may settle with exit0 while interruption remains recorded;
+exit130 is not a required cancellation contract. A completed check may also win the abort race; that outcome must retain exact
+verified success/exit0, not a failed or uncertain response. Interruption grants
+no readiness.
+Data-only non-interrupted failure/timeout controls explicitly use failed
+exit130/reply:null, then restore the actual producer receipts before real close.
+An initial native case exceeded its old aggregate200s limit during pair-factory
+teardown after all56 assertions and confirmed admin closure. Public destroyPair
+resumed the recorded destroying phase, confirmed destroyed and removed only its
+own root; the recovered sources passed162 audit checks. That timed-out test is
+not a PASS. The fixture now budgets360s for five individually bounded CLI calls
+plus native lifecycle; CLI60s, RPC30s and supervisor grace/identity guards remain
+unchanged. A separate cold run is required for a passing fixture result.
+
+Cold registry source: private600 native-cli-sessions-1d3cde44-d95a-4a2c-b866-1ae1ac9ad481/registry.json
+SHA256 989e512f8f29ce9a90c9e1e991c99cfc87d9ae1fbcf5be74d8fe365935de2e37.
+The audit links seven artifacts including actual final inventory, native
+observations and terminal commands. New scratch related tests exceeded default
+5s and explicit10s guards in6 cases. The related rerun with30s runner guards passed69/358 (94.19s);
+functional checks,3s process deadlines,2s cancellation marker deadline and all
+production deadlines remain unchanged. The underlying slowdown is not attributed. Previous old-scratch69/358 PASS
+is retained as historical evidence, not a claim about the new scratch run.
+
+Final exact-source cold verification:1 PASS/57 (183.05s), private600
+native-cli-sessions-08dac3a1-1747-4965-b0d9-df324cb53563/registry.json
+SHA256 f266cea3f13072a740b8ae6132ce149d9d9560ea03bc1bb9fa326e82e260d4d6.
+The independent audit passed177 checks across seven linked artifacts; exact own
+pair/root are absent. The completed-success cancellation race occurred in this
+run; the earlier1d3cde44 source retains the actual interrupted outcome.

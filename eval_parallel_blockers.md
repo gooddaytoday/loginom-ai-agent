@@ -14,6 +14,18 @@ profile unit negative с prctl(PR_SET_DUMPABLE,0); точная атрибуци
 не позволяет текущему API завершить incident. Native browser проверки впредь
 не совмещаются также с unit suite, содержащей nondumpable/proc-denial controls.
 
+2026-10-15 08:11 UTC read-back: temporary incident root
+`/tmp/evals-cli-sessions-00q2hZ` теперь отсутствует, как и прежние `/tmp` logs
+и audit helper. Причина удаления не установлена. Сохранённый private source
+`native-cli-sessions-e585d09b-db03-49bf-a80d-a574adc9183e/cli.json` связывает
+исходную identity; exact Docker read-back всё ещё видит running
+`3ecb5dd074e5ae6aed47d0b53cab27720ca89dd33f7e0172a88e5b86acc4d4c5`
+(`/evals-cli-a9502f4d-server`) и
+`19f5810b91735893c1d3952277da90078e5e5a7598fd8f759ac259b15385f69a`
+(`/evals-cli-a9502f4d-studio`). Incident не считается завершённым; отсутствующие
+canonical journals/proofs не синтезировать, контейнеры вручную не удалять.
+Новые проверочные логи сохраняются в private research evidence вне `/tmp`.
+
 ## Mixed recovery: quarantine после пересечения собственных browser-проверок
 
 2026-10-15: `/tmp/evals-recover-mixed-dyI2ST`, собственная disposable pair

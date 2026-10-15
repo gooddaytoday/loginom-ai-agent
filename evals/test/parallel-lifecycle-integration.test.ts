@@ -148,25 +148,25 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
       if (cancelled[0].status === "rejected") throw cancelled[0].reason
       settlement.cli = cancelled[0].value.processCleanup.status === "confirmed" && cancelled[0].value.processCleanup.capture_complete
       if (cancelled[1].status === "rejected") throw cancelled[1].reason
-      expect({ interrupted: cancelled[0].value.interrupted, timedOut: cancelled[0].value.timedOut, settled: settlement.cli })
-        .toEqual({ interrupted: true, timedOut: false, settled: true })
-      expect([cancelled[0].value.stdout, cancelled[0].value.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
       const inventory = await readManagementProcessInventory({ file: inventoryFile, journal, commandId: "native-cli-sessions", identity: pair.identity,
         leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
       const current = inventory.processes.at(-1)!, snapshots = current.sessions!
-      expect(current.result).toMatchObject({ interrupted: true, timedOut: false })
-      expect(current.result?.exitCode).not.toBe(0)
-      expect(current.result?.reply?.browser).not.toBe("verified")
-      const cancelledEvidence = { observed: cancelled[1].value, inventory, manifest: await readLeaseReceipt(inventoryFile), processes: cancelled[0].value.processCleanup,
+      const cancelledEvidence = { cancelRequested: true, observed: cancelled[1].value, inventory, manifest: await readLeaseReceipt(inventoryFile), processes: cancelled[0].value.processCleanup,
         resultReceipt: await readLeaseReceipt(current.result!.source.path), sources: await Promise.all([snapshots.before, ...snapshots.during, snapshots.after].map(async snapshot => {
           const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
           return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
         })) }
       await writeLeaseReceipt(path.join(evidence, "cancelled-check.json"), cancelledEvidence)
-      // Data-only result controls around actual native sources; restore the original producer receipts.
+      expect({ timedOut: cancelled[0].value.timedOut, settled: settlement.cli }).toEqual({ timedOut: false, settled: true })
+      expect([cancelled[0].value.stdout, cancelled[0].value.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
+      expect(current.result).toMatchObject({ interrupted: cancelled[0].value.interrupted, timedOut: false })
+      if (!current.result?.interrupted) expect(current.result).toMatchObject({ exitCode: 0,
+        reply: { browser: "verified", ok: true, code: "LOGINOM_CONNECTION_VALID" } })
+      // A completed check may win the abort race; an observed interruption grants no readiness.
+      // Data-only failed-result controls restore the original producer receipts before actual close.
       const manifest = cancelledEvidence.manifest as { processes: Record<string, unknown>[] }
       for (const flags of [{ interrupted: false }, { timedOut: true }]) {
-        const changed = { ...cancelledEvidence.resultReceipt as Record<string, unknown>, ...flags }
+        const changed = { ...cancelledEvidence.resultReceipt as Record<string, unknown>, exitCode: 130, reply: null, interrupted: true, ...flags }
         await writeLeaseReceipt(current.result!.source.path, changed)
         await writeLeaseReceipt(inventoryFile, { ...manifest, processes: [...manifest.processes.slice(0, -1), { ...manifest.processes.at(-1),
           result: { path: current.result!.source.path, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changed)).digest("hex") } }] })
@@ -189,6 +189,14 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         survivors: { value: survivors, receipt: survivorSource, command: await readLeaseReceipt(survivorSource.command.path) },
         terminal: await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${cancelledSession.id}.closed.json`)),
         command: await readLeaseReceipt(cancelledClosed.close.path) })
+      const registeredCommand = await readLeaseReceipt(journal)
+      expect(registeredCommand).toMatchObject({ managementInventories: [{ file: inventoryFile, leaseToken: lease.token,
+        slotId: lease.slot.id, profileDir: lease.slot.profileDir }] })
+      const registeredInventory = await readLeaseReceipt(inventoryFile)
+      await writeLeaseReceipt(path.join(evidence, "registry.json"), { command: registeredCommand,
+        source: { path: journal, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex") },
+        inventories: [{ value: registeredInventory, source: { path: inventoryFile,
+          sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") } }] })
       for (const capture of captures) {
         expect(await readManagementSession(file, lease, secretFile, capture.session.id)).toEqual(capture.session)
         expect(await recordManagementSession(file, lease, secretFile, inventoryFile, capture.session.actor.owner.id)).toEqual(capture.session)
@@ -249,7 +257,8 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
       await rm(root, { recursive: true, force: true })
     } else console.error(`native CLI session fixture retained: ${root}`)
   }
-}, 200_000)
+  // Five bounded CLI calls plus native provisioning/teardown and durable evidence writes.
+}, 360_000)
 
 for (const partialRelease of [false, true]) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)(`mixed native recovery: released A survives B ${partialRelease ? "partial release and recovery SIGKILL" : "dirty root"} and B reuses its committed history`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
