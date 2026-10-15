@@ -842,5 +842,13 @@ Status не захватывает ownership, не входит в Loginom и н
 Это текущая стадия blocked-user preparation: actual session capability пока даёт
 `SESSION_IDENTITY_UNSUPPORTED`, receipt содержит ready:false, exit2. Native global
 fences, повторное использование users/passwords, архив и normal slot/server release
-квалифицированы отдельно; CLI setup/check/active cleanup, verify и full readiness
+квалифицированы отдельно; CLI setup/check/active cleanup и full readiness
 ещё не готовы. Подготовка не является model N2→N1 acceptance.
+
+`bun script/parallel-env.ts verify --config <private-slots.json> --out
+<new-private-directory> [--parallel N]` проверяет уже подготовленное
+never-activated окружение без reconcile/password/root publication. Native
+prepare2→1→public prepare1→verify1:21 assertions PASS, protected markers
+неизменны, normal reservations released. Verify пока также возвращает
+ready:false/code2 SESSION_IDENTITY_UNSUPPORTED; неполные preparations и active
+accounts требуют дальнейшей finalization/recovery, автоматического исправления нет.
