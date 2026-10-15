@@ -6,7 +6,7 @@ import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
-import { checkIsolatedLoginom, gitInfo, preflight } from "./preflight"
+import { checkIsolatedLoginom, gitInfo, preflight, type SlotStorageContext } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { createJudgeGate, judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
@@ -291,6 +291,7 @@ export async function runAttempt(input: {
   signal: AbortSignal
   profileRecovered: boolean
   slotId?: string
+  slot?: SlotStorageContext
   initialInfraAttempt?: AttemptResult
   skipJudge: boolean
   judge?: JudgeSettings
@@ -299,7 +300,7 @@ export async function runAttempt(input: {
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base: AttemptResult = {
     ...emptyResult(input.task.id, input.attempt, input.profileRecovered),
-    slot_id: input.slotId ?? "default",
+    slot_id: input.slot?.lease.slot.id ?? input.slotId ?? "default",
     ...(input.initialInfraAttempt ? { infra_retry: { initial: input.initialInfraAttempt } } : {}),
   }
   return attemptBody(input, base).catch(async (error: unknown) => {
@@ -318,8 +319,16 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const outDir = path.join(input.runDir, task.id, String(attempt))
   const workdir = path.join(config.agent.workspaceRoot, input.runId, task.id, String(attempt))
   await mkdir(outDir, { recursive: true })
-  if (!config.dryRun && config.agent.cliMode === "binary")
-    await checkIsolatedLoginom(input.source).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
+  if (!config.dryRun && (config.agent.cliMode === "binary" || input.slot)) {
+    if (config.agent.cliMode === "binary" && config.slotsFile && !input.slot) throw new SandboxFailure("SLOT_CONTEXT_REQUIRED")
+    if (input.slot && (config.profileDir !== input.slot.lease.slot.profileDir || path.resolve(config.agent.workspaceRoot) !== input.slot.lease.slot.workspaceRoot ||
+      config.loginom.url !== input.slot.file.server.url || config.loginom.username !== input.slot.lease.slot.username ||
+      config.loginom.container !== input.slot.lease.identity.containerId || config.loginom.storageDir !== `${input.slot.file.server.storageRoot}/${input.slot.lease.slot.username}` ||
+      input.command.mode !== config.agent.cliMode ||
+      input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE !== input.slot.lease.slot.profileDir || input.slotId && input.slotId !== input.slot.lease.slot.id))
+      throw new SandboxFailure("SLOT_CONTEXT_MISMATCH")
+    await checkIsolatedLoginom(input.source, input.slot).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
+  }
   await mkdir(workdir, { recursive: true })
   const files = await Promise.all(
     task.inputs.map(async (rel) => {
@@ -341,7 +350,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     model: config.agent.model,
     variant: config.agent.variant,
     profileDir: config.dryRun ? undefined : config.profileDir,
-    slotId: input.slotId ?? "default",
+    slotId: input.slot?.lease.slot.id ?? input.slotId ?? "default",
     prompt,
     files,
     workdir,
