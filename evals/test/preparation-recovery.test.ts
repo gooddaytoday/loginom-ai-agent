@@ -6,6 +6,7 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { recoverPreparationLeases } from "../src/preparation-recovery"
 import { stageUserPreparation } from "../src/user-environment"
+import { openLoginomAdmin, sealAdminProcessInventory } from "../src/loginom-admin"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
@@ -42,6 +43,13 @@ test("preparation recovery adopts the exited controller server and both slots wi
       const before = await Bun.file(recovered.server.receipt).text()
       await expect(recoverPreparationLeases(fixture.slots, identity, journal, fixture.lockRoot)).rejects.toThrow("BUSY")
       expect(await Bun.file(recovered.server.receipt).text()).toBe(before)
+      await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: recovered.server, binary: "/unreadable-runtime" }))
+        .rejects.toThrow("ADMIN_PROCESS_INVENTORY_UNCONFIRMED")
+      const command = await readLeaseReceipt(recovered.journal) as { processInventory: string }
+      expect(await sealAdminProcessInventory(fixture.slots, recovered.server,
+        new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex"))).toMatchObject({ phase: "finalizing" })
+      await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: recovered.server,
+        processInventory: command.processInventory, binary: "/unreadable-runtime" })).rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
     } finally { await Promise.all([recovered.server.close(), ...recovered.slots.map(lease => lease.close())]) }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
