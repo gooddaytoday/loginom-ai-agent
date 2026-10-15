@@ -269,8 +269,11 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
         throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       if (entry.state === "closed") return
-      if (path.dirname(entry.source.path) !== path.join(directory, "commands")) throw new EvalFailure("SESSION_OWNERSHIP_UNCONFIRMED", 2)
-      const reply = await request("close-session", { proofId: entry.source.id, session: entry.binding }, async () => {
+      const adopt = path.dirname(entry.source.path) === path.join(directory, "commands") ? undefined : {
+        receipt: path.join(file.controller.stateDir, `session-${proofId}.json`),
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex"),
+      }
+      const reply = await request("close-session", { proofId: entry.source.id, session: entry.binding, ...(adopt ? { adopt } : {}) }, async () => {
         if (JSON.stringify(await readServerSession(file, lease, secretFile, proofId)) !== JSON.stringify(entry))
           throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
         await verifyParallelPair(file, identity)

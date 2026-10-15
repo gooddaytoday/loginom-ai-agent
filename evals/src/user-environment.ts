@@ -272,13 +272,17 @@ export async function recordServerSessionClosed(file: SlotFile, lease: SlotLease
 async function sessionClosure(lease: SlotLease, entry: Awaited<ReturnType<typeof sessionFromProbe>>, commandFile: string, reply: AdminReply) {
   const data = record(reply.data)
   if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
-    !path.isAbsolute(commandFile) || path.resolve(commandFile) !== commandFile || path.dirname(commandFile) !== path.dirname(entry.source.path) ||
+    !path.isAbsolute(commandFile) || path.resolve(commandFile) !== commandFile || !commandFile.startsWith(path.dirname(lease.receipt) + path.sep) ||
     path.basename(commandFile) !== `${reply.id}.json` || Object.keys(data).length !== 2 || data.closed !== true ||
     !["observed_absent", "rpc_closed"].includes(String(data.disposition))) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
+  const adopt = path.dirname(commandFile) === path.dirname(entry.source.path) ? undefined : {
+    receipt: path.join(path.dirname(lease.receipt), `session-${entry.source.id}.json`),
+    sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(path.join(path.dirname(lease.receipt), `session-${entry.source.id}.json`)))).digest("hex"),
+  }
   const source = record(await readLeaseReceipt(commandFile))
   if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
     source.op !== "close-session" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
-    source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify({ proofId: entry.source.id, session: entry.binding })).digest("hex") ||
+    source.desiredHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify({ proofId: entry.source.id, session: entry.binding, ...(adopt ? { adopt } : {}) })).digest("hex") ||
     source.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
     typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
     !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.settledAt) < Date.parse(source.at)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)
