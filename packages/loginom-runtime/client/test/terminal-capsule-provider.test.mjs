@@ -687,3 +687,63 @@ for(const reason of [false,0,null,undefined,'',Error('receiver first',{cause:0})
   assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0,907,909]);assert.equal(x.realm.native.writes(),0);
  },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_CurrentDirectory'){x.realm.native.hold();queueMicrotask(held)}}});
 });
+
+test('storage mkdel exact retained function and FileStorage delegate link through all four dispatches',()=>creationControl(async x=>{
+ const mkdel=x.f.ss.mkdel,descriptor=Object.getOwnPropertyDescriptor(x.f.ss,'mkdel');
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const packet=x.provider.packet();
+ const result=await x.host.witness.continueStorage(x.host.f.bridge),receipts=x.provider.inspect().storageDispatches;
+ assert.equal(receipts.length,4);
+ for(const [i,method] of ['get_Connected','get_CurrentDirectory','get_IsOwnCurrentDirectory','get_RootPath'].entries()){
+  const dispatch=receipts[i],call=dispatch.mkdelCall,completion=dispatch.mkdelCompletion;
+  assert(Object.isFrozen(call));assert(Object.isFrozen(completion));assert.equal(call.mkdel,mkdel);
+  assert.equal(call.namespace,x.f.ss);assert.equal(call.receiver,packet.initial.storage);
+  assert.equal(call.initial,packet.initial);assert.equal(call.packet,packet);assert.equal(call.storageCall,dispatch.call);
+  assert.equal(call.scope,'FileStorage.'+method+':mkdel');assert.equal(call.mkdelIdentityQualified,true);assert.equal(typeof call.delegate,'function');
+  assert.equal(completion.call,call);assert.equal(typeof completion.returned,'function');
+  assert.equal(call.closureIdentityQualified,false);assert.equal(completion.closureIdentityQualified,false);
+  assert.equal(call.nativeReceiversQualified,false);assert.equal(result.nativeReceiversQualified,false);
+ }
+ assert.equal(new Set(receipts.map(r=>r.mkdelCall.delegate)).size,4);
+ assert.deepEqual(Object.getOwnPropertyDescriptor(x.f.ss,'mkdel'),descriptor);
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);
+ assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');assert.equal(result.componentReady,false);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
+for(const mode of ['method','accessor','prototype'])test('storage mkdel pre-call '+mode+' refuses getter0 before storage dispatch',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);let gets=0;
+ if(mode==='method')x.f.ss.mkdel=function(){gets++;throw Error('foreign')};
+ if(mode==='accessor')Object.defineProperty(x.f.ss,'mkdel',{configurable:true,get(){gets++;throw Error('foreign')}});
+ if(mode==='prototype')Object.setPrototypeOf(x.f.ss.mkdel,{});
+ await assert.rejects(x.host.witness.continueStorage(x.host.f.bridge));assert.equal(gets,0);
+ assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true}));
+for(const mode of ['foreign receiver','foreign namespace','repeated call'])test('storage mkdel injected '+mode+' refuses without another qualified dispatch',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);
+ x.probe.onDispatch=()=>{if(x.realm.native.calls.at(-1)!==907)return;
+  // Negative reentrant call while the original method is on the stack.
+  const ss=x.f.ss,storage=x.realm.native.storage;
+  if(mode==='foreign receiver')ss.mkdel({...storage},function(){});
+  if(mode==='foreign namespace')Reflect.apply(ss.mkdel,{...ss},[storage,function(){}]);
+  if(mode==='repeated call')ss.mkdel(storage,function(){});
+ };
+ await assert.rejects(x.host.witness.continueStorage(x.host.f.bridge));
+ assert.deepEqual(x.realm.native.calls,[0,907]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true,instrument:true}));
+for(const target of ['delegate','bound delegate','mkdel accessor'])test('storage mkdel pending '+target+' refuses getter0 before continuation/next dispatch',()=>{
+ let held;const ready=new Promise(resolve=>held=resolve);return creationControl(async x=>{
+  await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const work=x.host.witness.continueStorage(x.host.f.bridge);work.catch(()=>{});await ready;
+  let gets=0;
+  if(target==='delegate'||target==='bound delegate'){
+   const receipt=x.provider.inspect().storageDispatches[0];assert.equal(receipt.mkdelCall.scope,'FileStorage.get_Connected:mkdel');Object.setPrototypeOf(target==='delegate'?receipt.mkdelCall.delegate:receipt.mkdelCompletion.returned,{});
+  }else Object.defineProperty(x.f.ss,'mkdel',{configurable:true,get(){gets++;throw Error('foreign')}});
+  await x.realm.native.drain();await assert.rejects(work);assert.equal(gets,0);
+  assert.deepEqual(x.realm.native.calls,[0,907]);assert.equal(x.realm.native.writes(),0);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_Connected'){x.realm.native.hold();queueMicrotask(held)}}});
+});
+for(const reason of [false,0,null,undefined,'',Error('mkdel first',{cause:0})])test('storage mkdel raw '+String(reason)+' remains first over pending mkdel drift',()=>{
+ let held;const ready=new Promise(resolve=>held=resolve);return creationControl(async x=>{
+  await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const work=x.host.witness.continueStorage(x.host.f.bridge);work.catch(()=>{});await ready;
+  let gets=0;x.realm.native.fail(reason);Object.defineProperty(x.f.ss,'mkdel',{configurable:true,get(){gets++;throw Error('foreign')}});
+  await x.realm.native.drain();let caught=false;try{await work}catch(value){caught=true;assert.equal(value,reason)}assert(caught);assert.equal(gets,0);
+  assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0,907]);assert.equal(x.realm.native.writes(),0);
+ },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_Connected'){x.realm.native.hold();queueMicrotask(held)}}});
+});
