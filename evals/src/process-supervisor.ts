@@ -132,7 +132,12 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     const directory = `/proc/${pid}`
     const owner = await stat(directory)
     if (owner.uid !== process.getuid?.()) {
-      if (required || owners.some((entry) => entry.pid === pid)) throw Error("Process UID changed")
+      if (required || owners.some((entry) => entry.pid === pid)) {
+        // Diagnostic samples do not relax the UID refusal or establish a stable identity.
+        const raw = await readFile(path.join(directory, "stat"), "utf8").catch(() => null)
+        const fields = raw?.slice(raw.lastIndexOf(")") + 2).split(" ")
+        throw Error(`Process UID changed (proc_uid=${owner.uid}, starttime=${fields?.[19] ?? "unknown"}, state=${fields?.[0] ?? "unknown"})`)
+      }
       return undefined
     }
     const raw = await readFile(path.join(directory, "stat"), "utf8")

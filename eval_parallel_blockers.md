@@ -88,6 +88,13 @@ helper удалён с hash, положительного source-audit.json не
 UID-change frame либо квалифицированный recovery producer; retained reservations
 и данные не удаляются по гипотезе. Delete/admission=false, model/judge calls0.
 
+Следующий UID refusal теперь сохраняет sampled proc-directory UID, starttime и
+state; failed stat-read даёт unknown, исходный отказ не снимается. TDD actual
+read-only PID1 negative с ложной historical claim: RED старое сообщение без
+полей → GREEN1/5 (0.779s). Supervisor/writer suites34 PASS/2 nativeBusy SKIP/
+182 assertions148.47s, typecheck PASS. Это диагностические bookends, не атомарная
+identity и не объяснение старого frame; прежний failed source не изменён.
+
 ## Архив после фактически прерванного check: текущий native gate закрыт, старые источники сохранены
 
 2026-10-15: retained47d... fixture jothVh убран после qualified original setup/
