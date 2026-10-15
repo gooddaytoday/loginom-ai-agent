@@ -55,7 +55,17 @@ Read-only signal audit: PID4086419 отсутствует в own/peer/unknown/ad
 origin/browser-binding всех двух admin и четырёх CLI proofs; UID/starttime не
 сохранены, сейчас PID отсутствует. Exec/exit/zombie/владелец не атрибутированы.
 
-## Архив после фактически прерванного check: topology source не сохранён
+## Архив после фактически прерванного check: новый socket source установлен, native finalizer открыт
+
+2026-10-15 strict control `native-cli-sessions-47d5228b-5be6-4590-95ec-5804d054ca9f`
+подтвердил exit130/interrupted=true/timedOut=false и continuous cleanup confirmed.
+Same-lstat cause: `/home/kiselev/storage/tmp/evals-cli-sessions-jothVh/profile-a/cache/tmp/org.chromium.Chromium.55uJMQ/SingletonSocket`,
+AF_UNIX socket type0140000, UID/GID1001, nlink1, dev2050/inode209997114.
+Root jothVh и exact pair сохранены; normal release не выдан. Минимальный
+archive fix поддерживает rename socket object с сохранением identity и fsync
+каталога; real stopped-child socket RED→GREEN, archive12/78 PASS17.29s и
+typecheck/diff PASS. Свежий native archive/finalizer и полный source audit
+ещё требуются. Это не устанавливает причину старого f5bf... инцидента.
 
 Диагностика дополнена: ARCHIVE_TOPOLOGY теперь сохраняет path/kind/POSIX type,
 mode/nlink/UID/GID/device/inode из того же lstat в Error.cause; native fixture

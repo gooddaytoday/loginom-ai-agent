@@ -123,6 +123,31 @@ test("durable archive: a hardlink refuses before any move and preserves its othe
   } finally { await context.close() }
 })
 
+test("durable archive: a stopped browser's Unix socket moves as the same object and permits committed replay", async () => {
+  const context = await fixture()
+  try {
+    await mkdir(path.join(context.profile, "cache/tmp/browser"), { recursive: true, mode: 0o700 })
+    const socket = path.join(context.profile, "cache/tmp/browser/SingletonSocket")
+    const child = Bun.spawn([process.execPath, "-e", 'Bun.listen({unix:process.env.ARCHIVE_SOCKET,socket:{data(){}}});process.kill(process.pid,"SIGKILL")'],
+      { env: { PATH: process.env.PATH, ARCHIVE_SOCKET: socket }, stdout: "pipe", stderr: "pipe" })
+    await child.exited
+    const before = await lstat(socket, { bigint: true })
+    expect(before.isSocket()).toBe(true)
+    await symlink(socket, path.join(context.profile, "cache/tmp/socket-link"))
+    expect(await archiveProfileEvidence(context.profile, context.archive, context.journal)).toMatchObject({ status: "committed" })
+    const moved = await lstat(path.join(context.archive, "cache/tmp/browser/SingletonSocket"), { bigint: true })
+    expect({ socket: moved.isSocket(), device: moved.dev, inode: moved.ino, mode: moved.mode, size: moved.size })
+      .toEqual({ socket: true, device: before.dev, inode: before.ino, mode: before.mode, size: before.size })
+    expect(await lstat(socket).then(() => true, () => false)).toBe(false)
+    expect((await lstat(path.join(context.archive, "cache/tmp/socket-link"))).isSymbolicLink()).toBe(true)
+    const journal = await Bun.file(context.journal).text()
+    expect(await archiveProfileEvidence(context.profile, context.archive, context.journal)).toMatchObject({ status: "committed" })
+    expect(await Bun.file(context.journal).text()).toBe(journal)
+    expect(await Bun.file(path.join(context.archive, "data/loginom-ai-agent.db")).text()).toBe("database")
+    expect(await Bun.file(path.join(context.profile, "data/auth.json")).text()).toBe("retained-auth-fixture")
+  } finally { await context.close() }
+})
+
 test("durable archive: changed archived data cannot reuse a committed receipt", async () => {
   const context = await fixture()
   try {
