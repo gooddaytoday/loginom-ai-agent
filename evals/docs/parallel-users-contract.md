@@ -1859,3 +1859,31 @@ Independent audit34 checks/5 source artifacts PASS; exact own pair/root absent.
 Related37 tests/193 assertions PASS40.78s; unchanged native wire/Count0/reconnect
 matrix1/118 PASS72.21s; typecheck/diff PASS. SessionBackup,
 CLI SIGKILL, concurrent user B and arbitrary active operations remain open.
+
+
+Native targeted close with an active peer (2026-10-15)
+
+A dedicated two-user fixture closes only A's retained empty-package session while
+B's independently supervised design browser owns a changed named package.
+B remains Count1/pending=false in fresh manager observations before and after
+A CloseSession; B then completes its native probe, preserves a canary SHA and
+produces a nonzero autosave. This qualifies session-close noninterference only.
+Storage deletion/regrowth, positive SessionBackup and full live admission remain open.
+
+Managed-row proxy IDs differ across admin contexts for the same exact Name and
+CreateTime. The native account and epoch remain bound. Use the qualified full
+identity tuple across contexts; require stable proxy IDs within one observation
+context. Historical causal/source guards must remain intact. Fresh accounting
+currently still requires the historical remoteKey and needs a separate native
+reconnect/finalizer test and fix; proxy IDs are not an immutable Session identity.
+
+Native1/78 PASS82.84s; typecheck/diff PASS. Private600
+native-user-06b1d620-2a59-40c4-a818-78ba0fe81140/peer-survival.json
+SHA256 d96f30d2bebfd6ec770c814ca281945df419d6ce7d1567ed00591fd8941933af.
+Audit31 checks/3 sources confirms ordering, native account, both continuous admin
+closures and exact own pair/root absence. Fixture-only active-user budgets cover
+two logins and2 actual autosave periods; existing normal reconnect and production
+deadlines are unchanged. Earlier failures exposed observation after B had ended,
+insufficient fixture lifetime, an invalid cross-context ID assertion and teardown
+masking. Safe primary diagnostics now persist before teardown; both retained
+failed fixtures were removed via public destroyPair after qualified local closure.
