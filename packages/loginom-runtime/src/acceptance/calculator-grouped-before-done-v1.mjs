@@ -117,7 +117,9 @@ export async function captureDraft({owner,current,observe,observeCancellation=ob
  try {
   const initial=await observe();originalDraft=owned(initial);baseline=checked(initial);checkBaseline(initial);
   need(baseline.region.excluded===false&&baseline.region.source?.record_id,'REGION_ALREADY_EXCLUDED');
-  before=await snapshot(baseline.state);validateCapture(before,owner,baseline);
+  before=await snapshot(baseline.state);
+  await record({event:'calculator_capture_cached_windows',owner,stage:'before',diagnostic:captureWindowDiagnostic(before)});
+  validateCapture(before,owner,baseline);
   await record({event:'calculator_capture_before',owner,capture:before});
   current();
   mutationUnconfirmed=true;const edit=await exclude(baseline.region.source.record_id);
@@ -128,7 +130,9 @@ export async function captureDraft({owner,current,observe,observeCancellation=ob
    &&changed.region.exclusion_source?.field_id===baseline.region.source.field_id,'REGION_CHANGED');
   // Exclusion legitimately replaces the target record. Preserve both IDs and
   // require the original source record/field identity via normal native proof.
-  after=await snapshot(changed.state);validateCapture(after,owner,changed);
+  after=await snapshot(changed.state);
+  await record({event:'calculator_capture_cached_windows',owner,stage:'after',diagnostic:captureWindowDiagnostic(after)});
+  validateCapture(after,owner,changed);
   await record({event:'calculator_capture_after',owner,capture:after});
  }catch(error){failure=error;failed=true;}
  // Refuse cancellation after an uncertain mutation or identity loss. For a
@@ -155,6 +159,17 @@ export async function captureDraft({owner,current,observe,observeCancellation=ob
   capture_complete:false,missing:['ordinary_coverage','addressed_complete','native_window','full_geometry_trace'],
   before,after,region_transition:{source:baseline.region.source,before:baseline.region,after:changed.region},cancellation,
   native_verified:false};
+}
+
+// Only bounded predicate scalars, never DOM or store records. Missing or
+// malformed flags remain unknown; the strict capture predicate is unchanged.
+export function captureWindowDiagnostic(capture) {
+ const windows=capture?.predicates?.cached_windows;
+ const flag=value=>typeof value==='boolean'?value:null;
+ return {length:Array.isArray(windows)?windows.length:null,truncated:Array.isArray(windows)&&windows.length>2,
+  windows:Array.isArray(windows)?windows.slice(0,2).map(p=>({evaluated:flag(p?.evaluated),value:flag(p?.value),
+   reason:typeof p?.reason==='string'?p.reason.slice(0,256):null,
+   cache_complete:flag(p?.cache_complete),rows_complete:flag(p?.rows_complete)})):[]};
 }
 
 export function validateCapture(capture,owner,state) {

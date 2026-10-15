@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
+
 const path=process.env.CALCULATOR_HARNESS??new URL('../src/acceptance/calculator-grouped-before-done-v1.mjs',import.meta.url).pathname;
-const {captureCalculator,captureDraft,validateCapture,CAPTURE_LIMITS}=await import(pathToFileURL(path));
+const {captureCalculator,captureDraft,validateCapture,captureWindowDiagnostic,CAPTURE_LIMITS}=await import(pathToFileURL(path));
 const owner={document_id:'doc',node_id:'node',workflow_id:'flow',owner:'owner',run:'run',lease:'owner:run'};
 function fixture(scenario){
  let edited=false;const events=[];
@@ -31,7 +32,7 @@ test('real orchestration pauses before Done and preserves legitimate Region repl
  assert.equal(result.cancel_verified,true);assert.equal(result.settings_applied,false);assert.equal(result.paused_before_done,true);
  assert.equal(result.capture_complete,false);assert.equal(result.native_verified,false);
  assert.equal(result.region_transition.before.record_id,'original');assert.equal(result.region_transition.after.record_id,'replaced');
- assert.deepEqual(events,['capture','calculator_capture_before','exclude','capture','calculator_capture_after','cancel','calculator_capture_cancel']);
+ assert.deepEqual(events,['capture','calculator_capture_cached_windows','calculator_capture_before','exclude','capture','calculator_capture_cached_windows','calculator_capture_after','cancel','calculator_capture_cancel']);
 });
 for(const scenario of ['node','owner','pending','running','unknown','record','root','bytes','capture-error','uncertain','applied','error'])
  test('labelled channel/Ext doubles refuse '+scenario,async()=>{
@@ -86,4 +87,27 @@ for(const primary of [undefined,null,false,0,'',Error('original',{cause:0})])tes
   assert.equal(caught,true);assert.equal(events.includes('cancel'),true);
   assert.equal(events.includes('calculator_capture_cancel'),!secondary);
  }
+});
+
+test('cached-window refusal retains bounded diagnostics before Cancel without weakening the gate',async()=>{
+ const {drivers,events}=fixture(),snapshot=drivers.snapshot,records=[];
+ drivers.snapshot=async()=>{const c=await snapshot();c.predicates.cached_windows=[
+  {evaluated:true,value:false,reason:'rows_incomplete',cache_complete:true,rows_complete:false},
+  {evaluated:false,reason:'cache_flags_unavailable'}];return c;};
+ drivers.record=async e=>{records.push(e);events.push(e.event);return e;};
+ await assert.rejects(captureDraft(drivers),{message:'LOGINOM_CAPTURE_CACHED_WINDOW'});
+ assert.equal(records[0].event,'calculator_capture_cached_windows');assert.equal(records[0].stage,'before');
+ assert.deepEqual(records[0].diagnostic,{length:2,truncated:false,windows:[
+  {evaluated:true,value:false,reason:'rows_incomplete',cache_complete:true,rows_complete:false},
+  {evaluated:false,value:null,reason:'cache_flags_unavailable',cache_complete:null,rows_complete:null}]});
+ assert.ok(!events.includes('exclude'));assert.ok(!records.some(e=>e.event==='calculator_capture_before'));
+ assert.equal(records.at(-1).event,'calculator_capture_cancel');
+ assert.ok(!JSON.stringify(records[0]).includes('stores'));assert.ok(!JSON.stringify(records[0]).includes('dom'));
+});
+test('cached-window diagnostic bounds list and reason, retaining actual length and unknown flags',()=>{
+ const r=captureWindowDiagnostic({dom:'private',stores:['private'],predicates:{cached_windows:[
+  {evaluated:1,value:'true',reason:'r'.repeat(1000),cache_complete:undefined,rows_complete:null}, {}, {}, {}]}});
+ assert.equal(r.length,4);assert.equal(r.truncated,true);assert.equal(r.windows.length,2);
+ assert.equal(r.windows[0].reason.length,256);assert.equal(r.windows[0].evaluated,null);assert.equal(r.windows[0].value,null);
+ assert.deepEqual(captureWindowDiagnostic({}),{length:null,truncated:false,windows:[]});
 });
