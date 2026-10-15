@@ -55,7 +55,7 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
 
 liveIntegration("native user capability: creates one blocked account and refuses an unowned name on a disposable research pair", () => nativeUserCapability("sessions"), 120_000)
 liveIntegration("native backup research: observes real autosave and preserves unqualified session-backup evidence", () => nativeUserCapability("backup"), 120_000)
-liveIntegration("native effective storage: evaluated user saves, reads and copies its own package", () => nativeUserCapability("storage"), 120_000)
+liveIntegration("native effective storage: own operations succeed and both users refuse neighbor read, write and copy", () => nativeUserCapability("storage"), 120_000)
 
 async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
@@ -152,8 +152,49 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
         expect(digests[1]).toBe(digests[0])
         expect(await request("close-session", { proofId: probe.id, session: data.binding }))
           .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+        const neighbor = { username: file.slots[1]!.username, password: "E-" + crypto.randomUUID() + "!" }
+        const neighborSecret = path.join(root, "neighbor-secret.json")
+        await writeLeaseReceipt(neighborSecret, neighbor)
+        const neighborPayload = { ...payload, slot: file.slots[1]!, secretFile: neighborSecret, preparationNonce: crypto.randomUUID(),
+          secretHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(neighbor)).digest("hex") }
+        const created = await request("reconcile-user", neighborPayload)
+        expect(created.outcome).toBe("confirmed")
+        const peer = (created.data as { user: typeof user }).user
+        const peerOwned = { objectId: peer.objectId, name: peer.name, userKind: 0, preparationNonce: neighborPayload.preparationNonce, secretHash: null }
+        expect(await request("reconcile-user", { ...neighborPayload, phase: "configure", owned: peerOwned }))
+          .toMatchObject({ outcome: "confirmed", data: { user: { name: neighbor.username, blocked: true, isAdmin: false, isDesigner: true } } })
+        const peerActivation = { ...neighborPayload, owned: { ...peerOwned, secretHash: neighborPayload.secretHash }, expectedPolicy: after }
+        expect(await request("reconcile-user", { ...peerActivation, phase: "activate" })).toMatchObject({ outcome: "confirmed" })
+        const peerProbe = await request("reconcile-user", { ...peerActivation, phase: "session-storage-probe" })
+        expect(peerProbe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: neighbor.username }, storage: { readConfirmed: true } } })
+        expect(await request("close-session", { proofId: peerProbe.id, session: (peerProbe.data as { binding: unknown }).binding }))
+          .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+        const denials = []
+        for (const [owner, target, payload] of [[user, peer, activation], [peer, user, peerActivation]] as const) {
+          const before = await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${target.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()
+          const hash = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${target.name}/access-probe.lgp`} ${`${file.server.storageRoot}/${target.name}/access-copy.lgp`}`.quiet()).text()
+          expect(await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: target.name, objectId: "foreign" } }))
+            .toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_PEER_IDENTITY_CHANGED" } })
+          expect(await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: "../neighbor", objectId: target.objectId } }))
+            .toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_REQUEST_INVALID" } })
+          const denied = await request("reconcile-user", { ...payload, phase: "session-storage-probe", peer: { name: target.name, objectId: target.objectId } })
+          await writeLeaseReceipt(path.join(evidence, `storage-denials-${owner.name}.json`), denied)
+          expect(denied.outcome).toBe("confirmed")
+          const data = denied.data as { binding: unknown; storage: { readConfirmed: boolean; continued: boolean;
+            denials: { pathKind: string; operation: string; denied: boolean }[] } }
+          expect(data.storage.readConfirmed).toBe(true)
+          expect(data.storage.continued).toBe(true)
+          expect(data.storage.denials.map(row => [row.pathKind, row.operation])).toEqual(
+            ["virtual", "absolute", "traversal"].flatMap(pathKind => ["read", "write", "copy-out", "copy-in"].map(operation => [pathKind, operation])))
+          expect(data.storage.denials.every(row => row.denied)).toBe(true)
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${`${file.server.storageRoot}/${target.name}/access-probe.lgp`} ${`${file.server.storageRoot}/${target.name}/access-copy.lgp`}`.quiet()).text()).toBe(hash)
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${target.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(before.text())
+          expect(await request("close-session", { proofId: denied.id, session: data.binding }))
+            .toMatchObject({ outcome: "confirmed", data: { closed: true } })
+          denials.push({ username: owner.name, peer: target.name, ...data.storage })
+        }
         await writeLeaseReceipt(path.join(evidence, "storage-probe.json"), { version: 1, identity: pair.identity,
-          username: credentials.username, ...data.storage, sha256: digests[0], liveQualified: false })
+          username: credentials.username, positive: { ...data.storage, sha256: digests[0] }, denials, liveQualified: false })
         complete = true
         return
       }
@@ -328,8 +369,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage") {
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(1)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(mode === "storage" ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(mode === "storage" ? 2 : 1)
       }
     }
   } finally { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
