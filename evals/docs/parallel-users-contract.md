@@ -1887,3 +1887,10 @@ deadlines are unchanged. Earlier failures exposed observation after B had ended,
 insufficient fixture lifetime, an invalid cross-context ID assertion and teardown
 masking. Safe primary diagnostics now persist before teardown; both retained
 failed fixtures were removed via public destroyPair after qualified local closure.
+
+Docker read failure diagnostics (2026-10-15): PAIR_DOCKER_READ keeps exit2 and
+adds only a safe docker object with operation, numeric exitCode and timedOut.
+No argv, stdout or stderr are attached. The existing20s command deadline and
+mutation/read-back policy remain unchanged. A real missing-container inspect
+reproduced missing metadata (RED) then passed1 test/3 assertions (1.60s); pair
+unit11/45, typecheck/diff PASS. No container was created or removed by this test.
