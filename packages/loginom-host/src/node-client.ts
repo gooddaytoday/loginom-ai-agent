@@ -144,7 +144,7 @@ export async function launchSortingDiagnostic(input: NodeHostInput & { packagePa
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   for (const [path, actual] of [["bin/node", input.node],
     ["runtime/src/acceptance/sorting-before-close-v1.mjs", join(input.resources, "runtime/src/acceptance/sorting-before-close-v1.mjs")],
-    ...(root?["runtime/client/lib/terminal-script-witness.mjs","runtime/src/terminal-source-startup.mjs","runtime/src/terminal-root-association.mjs","runtime/src/connection-check.mjs","runtime/src/managed-entry.cjs","runtime/src/managed-entry.mjs","runtime/src/managed-session.mjs"].map(path=>[path,join(input.resources,path)]):[])]) {
+    ...(root?["runtime/client/lib/terminal-source-integrity.mjs","runtime/client/lib/terminal-script-witness.mjs","runtime/src/terminal-source-startup.mjs","runtime/src/terminal-root-association.mjs","runtime/src/connection-check.mjs","runtime/src/managed-entry.cjs","runtime/src/managed-entry.mjs","runtime/src/managed-session.mjs"].map(path=>[path,join(input.resources,path)]):[])]) {
     const items = manifest.files?.filter((file: { path: string }) => file.path === path)
     const item = items?.[0]
     if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await observed(realpath(actual!)) !== resolve(input.resources, path!)

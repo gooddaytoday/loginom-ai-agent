@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { mkdir, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
+import { terminalSourceIntegrityScript } from "../client/lib/terminal-source-integrity.mjs"
 import { terminalUserPublisherScript } from "../client/lib/terminal-user-publisher.mjs"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
@@ -228,7 +229,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     owner.page=(sourceLoad?sourceLoad.contextCall('pages'):owner.context.pages())[0]??await observed(sourceLoad?sourceLoad.contextCall('newPage'):owner.context.newPage())
     sourceLoad?.bindPage(owner.page)
     if(sourceLoad) await observed(prepareTerminalSourceResponses(owner))
-    const content=browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)
+    const content=(sourceLoad?terminalSourceIntegrityScript()+"\n":"")+browserDownloadScript(candidate.url)+"\n"+terminalUserPublisherScript(candidate.url)
     await observed(sourceLoad?sourceLoad.init(content):owner.context.addInitScript({content}))
     const result=await observed(loginPage(owner.page,candidate,owner))
     if(sourceLoad) await observed(bindTerminalScriptWitness(owner))

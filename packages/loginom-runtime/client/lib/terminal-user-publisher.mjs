@@ -57,6 +57,15 @@ function installOriginalUserPublisher(origin) {
       const d=descriptor(p,reader.key);if(d){if(p!==reader.owner||d.get!==reader.get||'value'in d)unavailable();return apply(reader.get,object,[])}
     }unavailable();
   };
+  // Only the original private init script can supply this before publication.
+  // Missing at birth remains missing; a late API is never adopted.
+  let originalIntegrity,inspectIntegrity;
+  const integrityDescriptor=descriptor(root,'__loginomOriginalScriptIntegrityV1');
+  if(integrityDescriptor){
+    if(!('value'in integrityDescriptor)||!Object.isFrozen(integrityDescriptor.value))unavailable();
+    originalIntegrity=hold(root,'__loginomOriginalScriptIntegrityV1');
+    inspectIntegrity=hold(originalIntegrity,'inspect');if(typeof inspectIntegrity!=='function')unavailable();
+  }
   const captureScript=path=>{
     if(!scriptReaders)return Object.freeze({complete:false,reason:'ORIGINAL_SCRIPT_READERS_UNAVAILABLE'});
     guard();const r=scriptReaders,script=readScriptSlot(r.current,originalDocument);
@@ -68,13 +77,17 @@ function installOriginalUserPublisher(origin) {
     const parsed=new r.URL(url),expected=origin+'/app/'+path;
     if(parsed.origin+parsed.pathname!==expected||parsed.hash||owner!==originalDocument||connected!==true
       ||(parsed.search&&!/^\?_dc=\d+$/.test(parsed.search)))unavailable();
+    const integrityReceipt=originalIntegrity?apply(inspectIntegrity,originalIntegrity,[script]):undefined;
+    if(integrityReceipt&&(data(integrityReceipt,'node')!==script||data(integrityReceipt,'document')!==originalDocument
+      ||data(integrityReceipt,'url')!==url||data(integrityReceipt,'integrity')!==integrity||data(integrityReceipt,'armedBeforeSource')!==true))unavailable();
     const chain=[];for(let p=script;p;p=prototype(p))chain.push(p);
     checks.push(()=>{
       let p=script;for(const expected of chain){if(p!==expected)unavailable();p=prototype(p)}if(p!==null)unavailable();
+      if(originalIntegrity&&apply(inspectIntegrity,originalIntegrity,[script])!==integrityReceipt)unavailable();
       if(readScriptSlot(r.src,script)!==url||readScriptSlot(r.integrity,script)!==integrity
         ||readScriptSlot(r.owner,script)!==owner||readScriptSlot(r.connected,script)!==true)unavailable();
     });guard();
-    return Object.freeze({complete:true,script,document:originalDocument,url,integrity,
+    return Object.freeze({complete:true,script,document:originalDocument,url,integrity,integrityReceipt,
       sourceExecutionQualified:false,closureIdentityQualified:false});
   };
   // Snapshot fixed defining exports before the original application acquisition.
