@@ -1,0 +1,164 @@
+diff --git a/evals/docs/evalrunner/runbook.md b/evals/docs/evalrunner/runbook.md
+index de5d17ddb4..fb905d62d0 100644
+--- a/evals/docs/evalrunner/runbook.md
++++ b/evals/docs/evalrunner/runbook.md
+@@ -137,11 +137,23 @@ Operational equivalence — private JSON version=1: baselineId, previous/current
+ previous/currentOpsConfigSha256, previous/currentHarnessSha, evaluatorSha256, decision,
+ changes из role/paths/operational-harness. Decision ссылается на проверенный операторский
+ аудит до/после: существенные условия стенда сохранены, различия config/AppArmor/путей
+-объяснены. Proof не заменяет проверки фиксированных endpoint/container/image/Dock/judge/
++объяснены. Proof не заменяет проверки фиксированных endpoint/image/Dock/judge/
+ corpus/rubric/oracle/лимитов; scoring files читаются на exact Git SHA и обязаны совпасть.
+ Agent не синтезирует такое решение. Без подходящего proof разница изоляции/config/harness
+ даёт INCOMPARABLE. Файл встраивается в immutable manifest, дальнейшее редактирование не влияет.
+
++Разные container ID допустимы только при точном совпадении фактического
++`target.loginom_build` из зарегистрированных SHA-проверенных архивных diagnostics
++продуктовых executions. На каждую серию требуется хотя бы одна известная версия;
++все наблюдения, включая infra retries/recoveries, должны согласоваться. Ожидаемый
++compatibility profile, Docker tag и текущий стенд не заменяют архивное доказательство.
++Неизвестные, повреждённые или конфликтующие версии сохраняют INCOMPARABLE.
++`comparison.json.containerIdentity` содержит основание, оба ID, версии и source path/SHA.
++Общий image digest и proof для изменённых isolation/config/harness остаются обязательными.
++Одинаковые ID сохраняют прежний путь без нового требования к историческим журналам.
++Admission/cleanup/recovery по-прежнему требуют точную принадлежность контейнеру.
++Публичный delivery archive содержит comparison metadata, но сами diagnostics не включает.
++
+ После изменения только operational harness уже измеренные smoke не повторяются.
+ Оператор может добавить в proof readiness: {issue, previousHarnessSha, manifestSha256},
+ закрепив ровно два исходных manifest SHA256. Executor принимает этот cohort только при
+diff --git a/evals/src/baseline-comparison.ts b/evals/src/baseline-comparison.ts
+index ee2a6b8550..9e146ada9f 100644
+--- a/evals/src/baseline-comparison.ts
++++ b/evals/src/baseline-comparison.ts
+@@ -2,6 +2,7 @@ import type { BaselinePins, checkBaseline } from "./baseline"
+ import { baselineCaseSummary, baselineRole } from "./baseline"
+ import { evaluatorFingerprint } from "./evaluator-replay"
+ import { analyzeComparison } from "./compare-analysis"
++import { compareContainerIdentity } from "./container-comparison"
+
+ export type OperationalEquivalence = {
+   version: 1; baselineId: string; previousIsolationSha256: string; currentIsolationSha256: string
+@@ -21,8 +22,11 @@ export async function compareBaselineConditions(before: Report, after: Report) {
+   if (JSON.stringify(before.manifest.cases) !== JSON.stringify(after.manifest.cases) || JSON.stringify(before.manifest.jobs) !== JSON.stringify(after.manifest.jobs)) reasons.push("corpus")
+   const a = before.manifest.pins
+   const b = after.manifest.pins
+-  const fixed: (keyof BaselinePins)[] = ["mode", "corpusSha", "judgeModel", "judgeReasoning", "threshold", "timeoutMs", "judgeTimeoutMs", "promptSha256", "schemaSha256", "endpoint", "containerId", "imageDigest", "dockRevision"]
++  const fixed: (keyof BaselinePins)[] = ["mode", "corpusSha", "judgeModel", "judgeReasoning", "threshold", "timeoutMs", "judgeTimeoutMs", "promptSha256", "schemaSha256", "endpoint", "imageDigest", "dockRevision"]
+   reasons.push(...fixed.filter(key => a[key] !== b[key]).map(key => key))
++  const containerIdentity = await compareContainerIdentity({ containerId: a.containerId, executions: before.executions },
++    { containerId: b.containerId, executions: after.executions })
++  if (!containerIdentity.compatible) reasons.push("containerId")
+   if (["cliVersion", "cliSource", "cliManifestSha256", "binarySha256"].some(key => a[key as keyof BaselinePins] !== b[key as keyof BaselinePins]) && !declared.includes("cli")) reasons.push("undeclared:cli")
+   if (a.model !== b.model && !declared.includes("model")) reasons.push("undeclared:model")
+   if (a.variant !== b.variant && !declared.includes("reasoning")) reasons.push("undeclared:reasoning")
+@@ -57,7 +61,7 @@ export async function compareBaselineConditions(before: Report, after: Report) {
+     if (JSON.stringify(a.dock) !== JSON.stringify(b.dock) || a.loginom.image_digest !== b.loginom.image_digest) reasons.push(`${item.key}:environment`)
+   }
+   return { status: reasons.length ? "INCOMPARABLE" as const : "COMPARABLE" as const, before: before.id, after: after.id, reasons,
+-    declaredChanges: declared, experiment,
++    declaredChanges: declared, experiment, containerIdentity,
+     operational: { previousRole: baselineRole(before.manifest), currentRole: baselineRole(after.manifest), explained: Boolean(explained), proof: proof ?? null },
+     retryPolicy: { previous: before.manifest.infraRetries, current: after.manifest.infraRetries, explained: retryExplained, consumed: retryConsumed },
+     evaluator: { previous: first ?? null, current: second ?? null },
+diff --git a/evals/test/baseline-comparison.test.ts b/evals/test/baseline-comparison.test.ts
+index 5341bae98f..f475d92e9a 100644
+--- a/evals/test/baseline-comparison.test.ts
++++ b/evals/test/baseline-comparison.test.ts
+@@ -1,5 +1,5 @@
+ import { expect, test } from "bun:test"
+-import { mkdtemp, rm } from "node:fs/promises"
++import { chmod, mkdtemp, rm } from "node:fs/promises"
+ import os from "node:os"
+ import path from "node:path"
+ import { completedBaselineFixture } from "./helpers/baseline-series"
+@@ -13,25 +13,35 @@ test("full model experiment compares fixed conditions and rejects unexplained en
+   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-compare-"))
+   try {
+     const pins = { ...baselineFixturePins, harnessSha: (await Bun.$`git -C ${repoRoot} rev-parse HEAD`.quiet()).text().trim() }
+-    const before = await completedBaselineFixture(path.join(directory, "before"), { pins })
++    const journalRecords = [{ target: { loginom_build: "7.4.2" } }]
++    const before = await completedBaselineFixture(path.join(directory, "before"), { pins, journalRecords })
+     const reference = await acceptBaseline(path.join(directory, "registry.json"), before.series, { issue: "LAB-55", decision: "owner fixture acceptance", expectedCurrent: null, archive: before.archive, archiveSha256: before.archiveSha256 })
+-    const candidate = { ...pins, model: "openai/other", variant: "high" }
++    const candidate = { ...pins, model: "openai/other", variant: "high", containerId: "6".repeat(64), isolationSha256: "7".repeat(64), opsConfigSha256: "8".repeat(64) }
+     const operationalEquivalence = { version: 1 as const, baselineId: reference.id, previousIsolationSha256: pins.isolationSha256,
+       currentIsolationSha256: candidate.isolationSha256, previousOpsConfigSha256: pins.opsConfigSha256, currentOpsConfigSha256: candidate.opsConfigSha256,
+       previousHarnessSha: pins.harnessSha, currentHarnessSha: candidate.harnessSha,
+       evaluatorSha256: await (await import("../src/evaluator-replay")).evaluatorFingerprint(repoRoot, pins.harnessSha),
+       decision: "Operator audited EvalRunner stop-on-infra policy; previous retry budget was never consumed", changes: ["role", "operational-harness"] as ("role" | "operational-harness")[] }
+     const after = await completedBaselineFixture(path.join(directory, "after"), { pins: candidate, executorRole: "evalrunner", baseline: reference,
+-      product: { version: candidate.cliVersion, source: candidate.cliSource, manifestSha256: candidate.cliManifestSha256, binarySha256: candidate.binarySha256, model: candidate.model, variant: candidate.variant }, declaredChanges: ["model", "reasoning"], operationalEquivalence })
++      product: { version: candidate.cliVersion, source: candidate.cliSource, manifestSha256: candidate.cliManifestSha256, binarySha256: candidate.binarySha256, model: candidate.model, variant: candidate.variant }, declaredChanges: ["model", "reasoning"], operationalEquivalence, journalRecords })
+     const a = await checkBaseline(before.series)
+     const b = await checkBaseline(after.series)
++    const originals = await Promise.all([
++      ...[before, after].flatMap(fixture => ["manifest.json", "journal.json"].map(file => path.join(fixture.series, file))),
++      ...[a, b].flatMap(report => report.executions.flatMap(execution => execution.record.files.map(file => path.join(execution.record.runDir, file.path)))),
++    ].map(async file => ({ file, bytes: await Bun.file(file).bytes() })))
+     expect(b.manifest.infraRetries).toBe(0)
+     expect((await compareBaselineConditions(a, { ...b, manifest: { ...b.manifest, operationalEquivalence: undefined } })).reasons).toContain("infra_retry_policy")
+     expect(await compareBaselineConditions(a, b)).toMatchObject({ status: "COMPARABLE", experiment: ["model", "reasoning"] })
++    const image = { ...b, manifest: { ...b.manifest, pins: { ...b.manifest.pins, imageDigest: "sha256:" + "9".repeat(64) } } }
++    expect((await compareBaselineConditions(a, image)).reasons).toContain("imageDigest")
++    const noVersion = { ...b, executions: b.executions.map(execution => ({ ...execution, record: { ...execution.record,
++      files: execution.record.files.filter(file => !file.path.endsWith("-execution-events.jsonl")) } })) }
++    expect(await compareBaselineConditions(a, noVersion)).toMatchObject({ status: "INCOMPARABLE", reasons: ["containerId"] })
+     const retried = { ...a, executions: [{ ...a.executions[0]!, result: { ...a.executions[0]!.result, infra_retry: { initial: a.executions[0]!.result } } }, ...a.executions.slice(1)] }
+     expect((await compareBaselineConditions(retried, b)).reasons).toContain("infra_retry_policy")
+     const changed = { ...b, manifest: { ...b.manifest, pins: { ...b.manifest.pins, isolationSha256: "0".repeat(64) } } }
+-    expect(await compareBaselineConditions(a, changed)).toMatchObject({ status: "INCOMPARABLE", reasons: ["isolationSha256", "infra_retry_policy"] })
++    expect(await compareBaselineConditions(a, changed)).toMatchObject({ status: "INCOMPARABLE", reasons: ["isolationSha256", "opsConfigSha256", "infra_retry_policy"] })
+     changed.manifest.operationalEquivalence = { version: 1, baselineId: a.id, previousIsolationSha256: a.manifest.pins.isolationSha256,
+       currentIsolationSha256: changed.manifest.pins.isolationSha256, previousOpsConfigSha256: a.manifest.pins.opsConfigSha256,
+       currentOpsConfigSha256: changed.manifest.pins.opsConfigSha256, previousHarnessSha: a.manifest.pins.harnessSha,
+@@ -46,7 +56,27 @@ test("full model experiment compares fixed conditions and rejects unexplained en
+     expect(output.code).toBe(0)
+     const report = await Bun.file(path.join(String(output.reportDir), "comparison.json")).json()
+     expect(report).toMatchObject({ status: "COMPARABLE", before: a.id, after: b.id })
++    expect(report.containerIdentity).toMatchObject({ compatible: true, basis: "loginom-version",
++      before: { containerId: pins.containerId, version: "7.4.2", error: null }, after: { containerId: candidate.containerId, version: "7.4.2", error: null } })
++    for (const [side, source] of [["before", a], ["after", b]] as const) {
++      expect(report.containerIdentity[side].evidence).toHaveLength(144)
++      const execution = source.executions[0]!
++      const evidence = execution.record.files.find(file => file.path.endsWith("-execution-events.jsonl"))!
++      expect(report.containerIdentity[side].evidence).toContainEqual(expect.objectContaining({ runDir: execution.record.runDir, path: evidence.path, sha256: evidence.sha256 }))
++    }
++    const exported = JSON.parse((await Bun.$`tar -xOzf ${String(output.archive)} comparison.json`.quiet()).text())
++    expect(exported.containerIdentity).toEqual(report.containerIdentity)
+     expect(report.cases).toHaveLength(48)
+     expect(report.cases.find((item: { collection: string }) => item.collection === "node")).toMatchObject({ before: { passed: 0, measured: 3 }, after: { passed: 0, measured: 3 } })
++    for (const original of originals) expect(await Bun.file(original.file).bytes()).toEqual(original.bytes)
++    const journal = originals.find(file => file.file === path.join(b.executions[0]!.record.runDir,
++      b.executions[0]!.record.files.find(file => file.path.endsWith("-execution-events.jsonl"))!.path))!
++    await chmod(journal.file, 0o600)
++    try {
++      await Bun.write(journal.file, new TextDecoder().decode(journal.bytes) + "\n")
++      expect(await compareBaselineConditions(a, b)).toMatchObject({ status: "INCOMPARABLE", reasons: ["containerId"] })
++      await expect(checkBaseline(after.series)).rejects.toThrow("EVIDENCE_CHANGED")
++    } finally { await Bun.write(journal.file, journal.bytes); await chmod(journal.file, 0o444) }
++    expect(await Bun.file(journal.file).bytes()).toEqual(journal.bytes)
+   } finally { await rm(directory, { recursive: true, force: true }) }
+-}, 90_000)
++}, 300_000)
+diff --git a/evals/test/helpers/baseline-series.ts b/evals/test/helpers/baseline-series.ts
+index f3eaf1e815..158e13672a 100644
+--- a/evals/test/helpers/baseline-series.ts
++++ b/evals/test/helpers/baseline-series.ts
+@@ -7,7 +7,7 @@ import { repoRoot } from "../../src/config"
+ import { comparisonSummary } from "./compare-summary"
+ import type { OperationalEquivalence } from "../../src/baseline-comparison"
+
+-export async function completedBaselineFixture(directory: string, options: { checkout?: string; pins?: BaselinePins; executorRole?: "evalrunner"; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: ("cli" | "model" | "reasoning")[]; operationalEquivalence?: OperationalEquivalence } = {}) {
++export async function completedBaselineFixture(directory: string, options: { checkout?: string; pins?: BaselinePins; executorRole?: "evalrunner"; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: ("cli" | "model" | "reasoning")[]; operationalEquivalence?: OperationalEquivalence; journalRecords?: unknown[] } = {}) {
+   await mkdir(directory, { recursive: true, mode: 0o700 })
+   const pins = options.pins ?? baselineFixturePins
+   const series = path.join(directory, "series")
+@@ -28,6 +28,7 @@ export async function completedBaselineFixture(directory: string, options: { che
+     await Bun.write(path.join(run, "summary.json"), JSON.stringify(summary))
+     await Bun.write(path.join(run, id, "1/cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: { status: "confirmed" },
+       stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
++    if (options.journalRecords) await Bun.write(path.join(run, id, "1/diagnostics/1-execution-events.jsonl"), options.journalRecords.map(record => JSON.stringify(record)).join("\n") + "\n")
+     await recordBaselineMeasurement(series, job.key, run)
+   }
+   await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
