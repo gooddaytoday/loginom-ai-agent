@@ -2097,3 +2097,51 @@ A diagnostic baseline regression returned RESOURCE_TIMELINE_UNBRACKETED before
 the original baseline wait was restored. Final target1/14 PASS5.05s, then the
 related run included all additional refusal controls. Failed roots retain their
 sources until a separate exact-own synthetic-fixture cleanup audit.
+
+Synthetic-only cleanup completed for Gj27dk, lpnecH and old retry StJZ4H.
+The shared qualifier accepted all9 original/canonical continuous proof files;
+fresh PID:birth checks found no matching live identities. All141 source files,
+including raw samples and the interrupted reservation temporary, were copied
+and read back in private600 closed-synthetic-units-full.json (SHA256
+03e7111569c35b5a9f9788486f2394d758090d01204869a570432aa3358e4d07).
+Free custom test OS guards were held while exact-root ownership and every
+source byte hash were rechecked and the three temporary roots removed. Private
+closed-synthetic-units-removal.json readback confirms3 roots/signals0 and no
+native authority. The superseded subset audit was removed only after checking
+that the full copy contains all its exact documents/proofs. EACCES aeGGa8 and
+every retained native incident/permanent pair remain untouched.
+
+Readonly licence source boundary: installed public bg/about/About.js selects
+Session.Version.SerialNumber and PlatformEdition; its expiration display is
+explicitly null. The exact IBGDeductorServerVersion exposes only ExpirationDate
+1930, IsWindows1931, PlatformEdition1928 and SerialNumber1929. This identifies an
+edition readback candidate, without a capacity getter in that interface. It
+does not prove absence of another licensing API or an actual concurrent-user
+limit. No runtime serial/key was read. Private licence-primary-boundary.json600
+contains6 source hashes/descriptors, readback and file SHA256
+55591cdf9b45a76e967f11caff23e1be1a8674315aab814ef9a32b7b895b826f.
+Live edition/assignment/capacity and simultaneous-user qualification remain open.
+
+Current affected-file regression at68d92ab783:67 PASS/0 FAIL/406 assertions
+402.32s across CLI, main fixture, process resources and agent inventory, with
+--isolate. This supersedes neither historical failed logs nor the remaining
+native/full-package qualification. Log agent-inventory-current-regression.log.
+
+Post-dispatch inventory IO and held-lease failures now preserve the measured
+CLI exit/stdout. A narrow publication exception boundary marks returned cleanup
+failed, keeps the source native proof unchanged and retains the planned/open
+inventory when publication cannot finish. Held authority is rechecked before
+canonical copy and final publication. Pre-dispatch refusal still throws before
+any measured CLI result exists. Fixture cleanup receives failed status and
+retains its fence; this creates no storage/release grant.
+
+Three actual child controls independently replaced the canonical proof with a
+directory, replaced inventory with a directory, or replaced its custom test
+guard inode. RED3 FAIL exposed post-dispatch EISDIR/EISDIR/LEASE_GUARD_CHANGED;
+GREEN preserved exit0/stdout with failed cleanup, qualified the unchanged native
+capture and refused seal in every case. Primitive4/33 PASS5.98s; after the final
+unknown-safe assertion adjustment, current agent/resource/main-retry targets
+6/69 PASS36.14s, typecheck/diff PASS. Earlier67-test regression is the preceding
+version, without this last delta. Logs agent-inventory-result-retention-{red,green}
+and agent-inventory-final-targets retain evidence; own fault roots were removed
+only after the original continuous capture qualified and custom guard closed.
