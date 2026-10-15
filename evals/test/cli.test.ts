@@ -10,6 +10,113 @@ import { evalsRoot, loadConfig } from "../src/config"
 const fixture = (name: string) => Bun.file(path.join(evalsRoot, "fixtures", name)).text()
 const fakeCommand = () => agentCommand(loadConfig(["--dry-run"], {}))
 
+test("runAgent masks configured credentials before live output persistence and preserves measured counters", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-secrets-"))
+  const secrets = ["slot-a-private-canary", "slot-b-private-canary", "admin-private-canary", "dock-private-canary"]
+  const release = path.join(root, "release")
+  const pending = runAgent({ command: { ...fakeCommand(), cleanupSecrets: secrets, cmd: [process.execPath, "-e", `
+    const secrets=${JSON.stringify(secrets)};
+    const event=JSON.stringify({type:"error",error:{name:"APIError",data:{statusCode:429,message:secrets.join("|")+"capture-ready"+"x".repeat(500)}}})+"\\n";
+    const cut=event.indexOf(secrets[0])+5;
+    process.stdout.write(event.slice(0,cut));process.stderr.write(secrets[0].slice(0,5));await Bun.sleep(30);
+    process.stdout.write(event.slice(cut));process.stderr.write(secrets[0].slice(5)+secrets.slice(1).join("|")+"capture-ready"+"x".repeat(500)+"\\n");
+    while(!await Bun.file(${JSON.stringify(release)}).exists())await Bun.sleep(10);
+    console.log(JSON.stringify({type:"step_finish",part:{cost:0.5,tokens:{input:11,output:7,reasoning:3}}}));
+    console.log(JSON.stringify({type:"text",part:{text:secrets.join("|")}}));
+  `] }, taskId: "output-secrets", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+  void pending.catch(() => {})
+  try {
+    const deadline = Date.now() + 3000
+    while (!await Bun.file(path.join(root, "events.jsonl")).exists() || !await Bun.file(path.join(root, "stderr.txt")).exists() ||
+      !(await Bun.file(path.join(root, "events.jsonl")).text()).includes("capture-ready") || !(await Bun.file(path.join(root, "stderr.txt")).text()).includes("capture-ready")) {
+      if (Date.now() > deadline) throw Error("Live output did not arrive")
+      await Bun.sleep(10)
+    }
+    const live = await Promise.all(["events.jsonl", "stderr.txt"].map(name => Bun.file(path.join(root, name)).text()))
+    for (const secret of secrets) expect(live.join("\n")).not.toContain(secret)
+    await Bun.write(release, "done")
+    const run = await pending
+    expect(run).toMatchObject({ exitCode: 0, cost: 0.5, tokens: { input: 11, output: 7, reasoning: 3 }, failureKind: "provider",
+      limitEvidence: { events: [{ source: "provider", kind: "http", status: 429 }] }, processCleanup: { status: "confirmed", capture_complete: true } })
+    const saved = await Promise.all(["events.jsonl", "stderr.txt", "run.json"].map(name => Bun.file(path.join(root, name)).text()))
+    for (const secret of secrets) expect(JSON.stringify(run) + saved.join("\n")).not.toContain(secret)
+    expect(parseEvents(saved[0]!).tokens).toEqual(run.tokens)
+  } finally { await Bun.write(release, "done"); await pending; await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
+test("runAgent redacts encoded credential values without corrupting JSON metadata or split UTF-8", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-encoded-"))
+  const secrets = ['"quoted-canary"', "пароль-Ω/ключ"]
+  try {
+    const run = await runAgent({ command: { ...fakeCommand(), cleanupSecrets: secrets, cmd: [process.execPath, "-e", `
+      const secrets=${JSON.stringify(secrets)};
+      const line=Buffer.from(JSON.stringify({type:"text",sessionID:"quoted-canary",part:{text:secrets.join("|")+"|"+secrets.map(encodeURIComponent).join("|")}})+"\\n");
+      const cut=line.indexOf(Buffer.from(secrets[1]))+1;
+      process.stdout.write(line.subarray(0,cut));await Bun.sleep(30);process.stdout.write(line.subarray(cut));
+      process.stderr.write(secrets.join("|"));
+      console.log(JSON.stringify({type:"step_finish",part:{cost:0.25,tokens:{input:5,output:2,reasoning:1}}}));
+    `] }, taskId: "encoded-output", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    const events = (await Bun.file(path.join(root, "events.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(events[0].sessionID).toBe("quoted-canary")
+    expect(run.sessionId).toBe("quoted-canary")
+    expect(parseEvents(events.map(event => JSON.stringify(event)).join("\n")).tokens).toEqual(run.tokens)
+    for (const secret of secrets) {
+      expect(events[0].part.text).not.toContain(secret)
+      expect(events[0].part.text).not.toContain(encodeURIComponent(secret))
+      expect(await Bun.file(path.join(root, "stderr.txt")).text()).not.toContain(secret)
+      expect(run.finalText).not.toContain(secret)
+    }
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", capture_complete: true })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("runAgent flushes redacted incomplete output on cancellation and retains the measured prefix", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-cancel-"))
+  const secret = "credential-first-line\ncredential-second-line", marker = path.join(root, "ready"), abort = new AbortController()
+  const pending = runAgent({ command: { ...fakeCommand(), cleanupSecrets: [secret], cmd: [process.execPath, "-e", `
+    process.on("SIGINT",()=>process.exit(130));
+    console.log(JSON.stringify({type:"step_finish",part:{cost:0.5,tokens:{input:9,output:4,reasoning:2}}}));
+    process.stdout.write('{"type":"text","part":{"text":'+JSON.stringify(${JSON.stringify(secret)}).slice(0,-1));
+    process.stderr.write(${JSON.stringify(secret)});
+    await Bun.write(${JSON.stringify(marker)},"ready");await Bun.sleep(10000);
+  `] }, taskId: "cancel-output", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root, signal: abort.signal })
+  void pending.catch(() => {})
+  try {
+    const deadline = Date.now() + 3000
+    while (!await Bun.file(marker).exists()) {
+      if (Date.now() > deadline) throw Error("Cancellation output did not arrive")
+      await Bun.sleep(10)
+    }
+    abort.abort()
+    const run = await pending
+    expect(run).toMatchObject({ exitCode: 130, interrupted: true, timedOut: false, cost: 0.5, tokens: { input: 9, output: 4, reasoning: 2 },
+      processCleanup: { status: "confirmed", capture_complete: true } })
+    const outputs = await Promise.all(["events.jsonl", "stderr.txt", "run.json"].map(name => Bun.file(path.join(root, name)).text()))
+    expect(parseEvents(outputs[0]!).tokens).toEqual(run.tokens)
+    for (const value of [secret, JSON.stringify(secret).slice(1, -1)]) expect(outputs.join("\n")).not.toContain(value)
+    expect(outputs[0]).toContain("[redacted]")
+    expect(outputs[1]).toBe("[redacted]")
+  } finally { abort.abort(); await pending; await rm(root, { recursive: true, force: true }) }
+})
+
+test("runAgent masks complete credentials before truncating diagnostics and node receipts", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-truncated-"))
+  const secrets = ["stderr-private-prefix\nstderr-private-tail", "node-secret-prefix-private-credential-value"]
+  try {
+    const run = await runAgent({ command: { ...fakeCommand(), cleanupSecrets: secrets, cmd: [process.execPath, "-e", `
+      process.stderr.write("safe\\n".repeat(19)+${JSON.stringify(secrets[0])});
+      console.log(JSON.stringify({type:"tool_use",part:{type:"tool",tool:"loginom_dock_node_apply",state:{status:"completed",output:"x".repeat(8192-19)+${JSON.stringify(secrets[1])}+"y".repeat(100)}}}));
+      console.log(JSON.stringify({type:"step_finish",part:{cost:0.5,tokens:{input:9,output:4,reasoning:2}}}));
+    `] }, taskId: "truncated-output", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    expect(run.stderrHead).not.toContain("stderr-private-prefix")
+    expect(run.stderrHead).toContain("[redacted]")
+    expect(run.nodeReceipts[0]).not.toContain("node-secret-prefix-")
+    expect(run.nodeReceipts[0]).toEndWith("…[truncated]")
+    expect(run).toMatchObject({ exitCode: 0, cost: 0.5, tokens: { input: 9, output: 4, reasoning: 2 }, nodeReceiptsDropped: 0,
+      processCleanup: { status: "confirmed", capture_complete: true } })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("parseEvents retains an explicit provider HTTP 429 without claiming complete transport coverage", () => {
   const parsed = parseEvents([
     { type: "error", error: { name: "APIError", data: { statusCode: 429, message: "provider-private-canary", responseBody: "private-response-canary" } } },
