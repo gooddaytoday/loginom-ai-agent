@@ -3,7 +3,6 @@ import { evalsRoot } from "../src/config"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { watch, readFileSync } from "node:fs"
 import { loadEvalrunnerCorpus, buildEvalrunnerSlots, createEvalrunnerManifest, reserveEvalrunnerSeries, readEvalrunnerSeries, admitEvalrunnerSlot, durableEvalrunnerJson } from "../src/evalrunner-series"
 import { inspectEvalrunnerSeries } from "../src/evalrunner-series-check"
 
@@ -28,21 +27,25 @@ test("full series freezes only 48 accepted cases and orders three rounds regular
 test("durable JSON becomes visible atomically as a complete document", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-atomic-"))
   const file = path.join(root, "admission.json"), payload = { value: "x".repeat(16 * 1024 * 1024) }
-  let observed = false, complete = false
-  const watcher = watch(root, (event, name) => {
-    if (name !== "admission.json" || observed) return
-    observed = true
-    try { complete = JSON.parse(readFileSync(file, "utf8")).value.length === payload.value.length } catch { complete = false }
-  })
+  const ready = path.join(root, "ready"), stop = path.join(root, "stop")
+  const reader = Bun.spawn([process.execPath, "-e", `
+    await Bun.write(${JSON.stringify(ready)},'ready');const deadline=Date.now()+15000;
+    while(!await Bun.file(${JSON.stringify(file)}).exists()){
+      if(Date.now()>deadline||await Bun.file(${JSON.stringify(stop)}).exists())process.exit(3);
+      await Bun.sleep(0);
+    }
+    try{const data=await Bun.file(${JSON.stringify(file)}).json();process.exit(data.value.length===${payload.value.length}?0:2)}catch{process.exit(2)}
+  `], { stdout: "pipe", stderr: "pipe" })
   try {
+    const deadline = Date.now() + 5000
+    while (!await Bun.file(ready).exists() && Date.now() < deadline) await Bun.sleep(5)
+    expect(await Bun.file(ready).exists()).toBe(true)
     await durableEvalrunnerJson(file, payload)
-    await Bun.sleep(20)
-    expect(observed).toBe(true)
-    expect(complete).toBe(true)
+    expect(await reader.exited).toBe(0)
     await expect(durableEvalrunnerJson(file, { value: "replacement" })).rejects.toThrow()
     expect((await Bun.file(file).json()).value.length).toBe(payload.value.length)
-  } finally { watcher.close(); await rm(root, { recursive: true, force: true }) }
-})
+  } finally { await Bun.write(stop, "stop"); await reader.exited; await rm(root, { recursive: true, force: true }) }
+}, 20_000)
 
 test("versioned series reservation survives another directory and task, and a consumed slot cannot dispatch again", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-series-"))
