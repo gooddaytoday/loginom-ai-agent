@@ -1,32 +1,15 @@
+import {checkTerminalWorkspaceCreation,evaluateTerminalWorkspaceCreation,terminalWorkspaceCreationAccount} from '../../src/terminal-root-association.mjs';
 import {terminalUserPublisherInspectorSource} from './terminal-user-publisher.mjs';
 import {checkTerminalInitialCustody,terminalInitialDeadline,terminalInitialAccount} from './terminal-original-packet.mjs';
-// Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
-export async function prepareWorkspace(page, options, terminal) {
-  const assertOriginal=()=>{if(terminal!==undefined)checkTerminalInitialCustody(terminal,page)};
-  assertOriginal();
-  const checked=async action=>{assertOriginal();const value=await action();assertOriginal();return value};
-  const deadline = terminal===undefined?Date.now()+options.timeoutMs:terminalInitialDeadline(terminal,page);
-  let phase = 'page', createdDraft = false, effectPossible = options.recoverOnly === true, target = null;
-  const trace = [];
-  let authenticated = false;
-  const remaining = () => {
-    if (Date.now() >= deadline) throw new Error('DEADLINE');
-    return deadline - Date.now();
-  };
-  const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
-  const wait = async (name, probe) => {
-    phase = name;
-    while (remaining()) {
-      const value = await checked(()=>(probe()));
-      if (value) { trace.push({ condition: name, satisfied: true }); return value; }
-      await checked(()=>(page.waitForTimeout(Math.min(100, remaining()))));
-    }
-  };
-  const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
-    authenticated, created_draft: createdDraft, effect_possible: effectPossible,
-    operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
-  // Only cached, read-only Loginom getters; never execute package or server methods.
-  const inspect = async mode => page.evaluate(({ mode, options, retainOriginalRealm, expectedAccount, expectedUserPublisherInspectorSource }) => {
+export function inspectWorkspaceRealm(capsuleOrInput,originalInput){
+  const {mode,options,retainOriginalRealm,expectedAccount,expectedUserPublisherInspectorSource}=originalInput===undefined?capsuleOrInput:originalInput;
+  let originalProvider;
+  if(originalInput!==undefined){
+    const read=(object,key)=>{const d=Object.getOwnPropertyDescriptor(object,key);if(!d||!('value'in d))throw Error('TERMINAL_PROVIDER_RECEIVER');return d.value};
+    const capsule=capsuleOrInput;Reflect.apply(read(capsule,'checkOriginal'),capsule,[]);originalProvider=read(capsule,'originalProvider');
+    const proof=Reflect.apply(read(originalProvider,'continueCreation'),originalProvider,['check']);
+    if(options.operationId!==proof.operationId||options.sessionId!==proof.sessionId||options.intent!=='new_draft')throw Error('TERMINAL_PROVIDER_REQUEST');
+  }
     const key = '__loginomDockPreparationV1';
     let state = globalThis[key];
     if (!state || state.document !== document) state = globalThis[key] = {
@@ -181,9 +164,10 @@ export async function prepareWorkspace(page, options, terminal) {
         return diagrams.length===1 ? {tab:t,graph:diagrams[0],html:diagrams[0].innerHTML} : null;
       }).filter(Boolean);
       state.receipts.set(options.operationId,{request,before:tabs,preserved,phase:'reserved'});
+      if(originalProvider)originalProvider.continueCreation('reserve');
     }
     const current = state.receipts.get(options.operationId);
-    if (mode==='effect') current.phase='effect_possible';
+    if (mode==='effect') {current.phase='effect_possible';if(originalProvider)originalProvider.continueCreation('effect')}
     if (mode==='lookup') {
       if (!receipt) return {exists:false,document_id:state.id};
       if (receipt.tab) {
@@ -231,6 +215,7 @@ export async function prepareWorkspace(page, options, terminal) {
       } else current.terminalOriginalCreation=Object.freeze(creation);
       current.tab=tab;current.packageNode=packageNode;current.crumbs=crumbs;current.phase='verified';
       current.workflowId ??= knownWorkflow?.workflowId ?? state.id+'-'+(state.sequence=(state.sequence??0)+1);
+      if(originalProvider)originalProvider.continueCreation('verify');
       return {document_id:state.id,loginom_account:retainOriginalRealm?state.terminalOriginalRealm.account:
         app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
         workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:current.workflowId},
@@ -241,8 +226,39 @@ export async function prepareWorkspace(page, options, terminal) {
           available_width:screen.availWidth,available_height:screen.availHeight}};
     }
     return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid};
-  }, {mode, options, retainOriginalRealm:terminal!==undefined,expectedAccount:terminal===undefined?undefined:terminalInitialAccount(terminal,page),
-    expectedUserPublisherInspectorSource:terminal===undefined?undefined:terminalUserPublisherInspectorSource});
+}
+// Fixed local lifecycle code. Catalogs never supply executable bootstrap code.
+export async function prepareWorkspace(page, options, terminal, creationToken) {
+  const assertOriginal=()=>{if(terminal!==undefined)checkTerminalInitialCustody(terminal,page);if(creationToken!==undefined)checkTerminalWorkspaceCreation(creationToken,page)};
+  assertOriginal();
+  const checked=async action=>{assertOriginal();const value=await action();assertOriginal();return value};
+  const deadline = creationToken!==undefined?checkTerminalWorkspaceCreation(creationToken,page):terminal===undefined?Date.now()+options.timeoutMs:terminalInitialDeadline(terminal,page);
+  let phase = 'page', createdDraft = false, effectPossible = options.recoverOnly === true, target = null;
+  const trace = [];
+  let authenticated = false;
+  const remaining = () => {
+    if (Date.now() >= deadline) throw new Error('DEADLINE');
+    return deadline - Date.now();
+  };
+  const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
+  const wait = async (name, probe) => {
+    phase = name;
+    while (remaining()) {
+      const value = await checked(()=>(probe()));
+      if (value) { trace.push({ condition: name, satisfied: true }); return value; }
+      await checked(()=>(page.waitForTimeout(Math.min(100, remaining()))));
+    }
+  };
+  const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
+    authenticated, created_draft: createdDraft, effect_possible: effectPossible,
+    operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
+  // Only cached, read-only Loginom getters; never execute package or server methods.
+  const inspect = mode => {
+    const input={mode,options,retainOriginalRealm:terminal!==undefined||creationToken!==undefined,
+      expectedAccount:creationToken!==undefined?terminalWorkspaceCreationAccount(creationToken,page):terminal===undefined?undefined:terminalInitialAccount(terminal,page),
+      expectedUserPublisherInspectorSource:terminal===undefined&&creationToken===undefined?undefined:terminalUserPublisherInspectorSource};
+    return creationToken===undefined?page.evaluate(inspectWorkspaceRealm,input):evaluateTerminalWorkspaceCreation(creationToken,page,input);
+  };
   try {
     const current = page.url() === 'about:blank' ? null : await checked(()=>(page.evaluate(() => ({origin:location.origin,pathname:location.pathname}))));
     if (page.url() !== 'about:blank' && (current.origin !== options.origin || current.pathname !== options.pathname)) {
@@ -305,7 +321,7 @@ export async function prepareWorkspace(page, options, terminal) {
     createdDraft=options.intent==='new_draft';
     return result('READY',null,{authenticated:true,...verified,replayed:old.exists===true});
   } catch (error) {
-    if(terminal!==undefined)throw error;
+    if(terminal!==undefined||creationToken!==undefined)throw error;
     return result('NOT_READY',error.message==='DEADLINE'?'DEADLINE':'PREPARATION_INTERRUPTED',
       {created_draft:createdDraft,verification_required:effectPossible});
   }
@@ -347,7 +363,7 @@ export function workspacePreparationOptions({ loginomUrl, compatibility, allowTe
 
 export function makeWorkspacePrepareCode(input) {
   const options=workspacePreparationOptions(input);
-  return `async (page) => (${prepareWorkspace.toString()})(page, ${JSON.stringify(options)})`;
+  return `async (page) => {const inspectWorkspaceRealm=${inspectWorkspaceRealm.toString()};return (${prepareWorkspace.toString()})(page, ${JSON.stringify(options)})}`;
 }
 
 export function parseWorkspacePreparation(response) {

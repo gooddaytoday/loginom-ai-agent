@@ -94,7 +94,7 @@ export function requireTerminalPrepareProvider(bridge){
    if(typeof value('operation_id')!=='string'||!value('operation_id')||value('intent')!=='new_draft'
      ||value('package_path')!=null||value('workflow_ref')!=null)unavailable('ORIGINAL_TYPED_CREATION_UNAVAILABLE');
    const request=Object.freeze({operationId:value('operation_id'),sessionId:original.sessionId,intent:'new_draft'});
-   const task=witness.retainPrepare(request);await task;check();argumentCheck();
+   const task=witness.retainPrepare(request,bridge);await task;check();argumentCheck();
    unavailable('ORIGINAL_CREATION_BOUND_NATIVE_QUALIFICATION_MISSING');
   }
   unavailable('LOADED_NATIVE_PROVIDER_NOT_BOUND');

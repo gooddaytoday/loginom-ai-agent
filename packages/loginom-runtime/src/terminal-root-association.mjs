@@ -1,3 +1,4 @@
+import {terminalManagedCallForBridge} from './terminal-managed-call.mjs';
 // Original private IPC births only. Wire evidence is never the physical parent signal.
 const roots=new WeakMap(),calls=new WeakMap(),replays=new WeakMap(),cancelled=new WeakMap();
 const data=(o,k)=>{const d=Object.getOwnPropertyDescriptor(o,k);if(!d||!('value'in d))throw Error('LOGINOM_ORIGINAL_ASSOCIATION_CHANGED');return d.value};
@@ -360,14 +361,14 @@ export async function bindTerminalScriptWitness(owner){
   }
   // One original JSHandle/evaluator; no proxy or function is reconstructed from
   // the returned evidence. Cache the exact pending/rejected prepare task.
-  let prepareTask,prepareInput,prepareCheck;
-  function retainPrepare(input){
-   if(prepareTask){if(input!==prepareInput)fail();prepareCheck();return prepareTask}
-   load.guard();check();prepareInput=input;prepareCheck=snapshot(input);prepareCheck();
+  let prepareTask,prepareInput,prepareCheck,prepareCall,prepareBridge;
+  function retainPrepare(input,bridge){
+   if(prepareTask){if(input!==prepareInput||bridge!==prepareBridge)fail();prepareCall.guard();prepareCheck();return prepareTask}
+   load.guard();check();prepareCall=terminalManagedCallForBridge(bridge);if(!prepareCall||terminalSourceForManagedCall(owner,prepareCall.facts.message)!==load)fail();prepareCall.guard();prepareBridge=bridge;prepareInput=input;prepareCheck=snapshot(input);prepareCheck();
    prepareTask=(async()=>{try{
-    load.guard();check();prepareCheck();
+    load.guard();check();prepareCall.guard();prepareCheck();
     const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.retainTerminalPrepareOnCapsule,input]);
-    const result=await load.observed(task);load.guard();check();prepareCheck();
+    const result=await load.observed(task);load.guard();check();prepareCall.guard();prepareCheck();
     const retained=snapshot(result);
     if(loadData(result,'operationId')!==loadData(input,'operationId')||loadData(result,'sessionId')!==loadData(input,'sessionId')
       ||loadData(result,'intent')!=='new_draft'||loadData(result,'creationArmed')!==true||loadData(result,'originalRequestRetained')!==true
@@ -375,12 +376,49 @@ export async function bindTerminalScriptWitness(owner){
     retained();return result;
    }catch(error){throw load.reject(error)}})();return prepareTask;
   }
+  let creationWork,creationOptions,creationBridge,creationCheck,creationFailed=false;
+  function createWorkspace(options,bridge){
+   if(creationWork){if(options!==creationOptions||bridge!==creationBridge)fail();if(!creationFailed)creationCheck();return creationWork}
+   load.guard();check();if(!prepareTask||!prepareInput)fail();
+   const call=terminalManagedCallForBridge(bridge);if(!call||call!==prepareCall||bridge!==prepareBridge||terminalSourceForManagedCall(owner,call.facts.message)!==load)fail();
+   const checkOptions=snapshot(options),guards=[];
+   for(const name of ['url','evaluate','locator','goto','waitForTimeout'])if(typeof slot(page,name,guards)!=='function')fail();
+   const verify=()=>{call.guard();load.guard();check();prepareCall.guard();prepareCheck();checkOptions();for(const guard of guards)guard();
+    if(terminalManagedCallForBridge(bridge)!==call||terminalSourceForManagedCall(owner,call.facts.message)!==load)fail()};
+   verify();creationOptions=options;creationBridge=bridge;creationCheck=verify;
+   const token=Object.freeze({});
+   const phase=async mode=>{verify();const task=Reflect.apply(originalHandleEvaluate,originalHandle,[module.continueTerminalCreationOnCapsule,mode]);const result=await load.observed(task);verify();return result};
+   workspaceCreations.set(token,{page,check:verify,deadline:load.facts.deadline,account,phase,async evaluate(input){verify();const task=Reflect.apply(originalHandleEvaluate,originalHandle,[workspaceCreations.get(token).evaluator,input]);const value=await load.observed(task);verify();return value}});
+   creationWork=(async()=>{try{
+    await prepareTask;verify();
+    const imported=await load.observed(import('../client/lib/workspace.mjs'));verify();workspaceCreations.get(token).evaluator=imported.inspectWorkspaceRealm;
+    const normalized=imported.workspacePreparationOptions(options);
+    if(normalized.operationId!==prepareInput.operationId||normalized.sessionId!==prepareInput.sessionId||normalized.intent!=='new_draft'
+      ||normalized.allowTestLogin||normalized.recoverOnly||normalized.packagePath!==null||normalized.workflowRef!==null)fail();
+    await phase('begin');verify();
+    const result=await imported.prepareWorkspace(page,normalized,undefined,token);verify();
+    if(result.status!=='READY')fail();
+    const query=await phase('query');verify();
+    if(loadData(query,'queryCompleted')!==true||['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'].some(k=>loadData(query,k)!==false))fail();
+    return Object.freeze({...result,creationContinuationVerified:true,queryCompleted:true,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});
+   }catch(error){creationFailed=true;throw load.reject(error)}})();return creationWork;
+  }
   load.guard();phases.phase='compared';
   bound=Object.freeze({complete:true,projectionOnly:true,witnessSummaryCompared:true,matches:Object.freeze(matches),page,
    originalInitTask:original.initTask,importTask:phases.importTask,evaluateTask:phases.evaluateTask,
    realmOriginalAssociation:!!originalHandle,selectedInitialExecutionJoined,supportedInitialLoadJoined,initialLoadReason:supportedInitialLoadJoined?undefined:(Object.hasOwn(summary,'initialLoadReason')?loadData(summary,'initialLoadReason'):'ORIGINAL_INITIAL_LOAD_UNAVAILABLE'),initialExecutionReason:selectedInitialExecutionJoined?undefined:'ORIGINAL_SRI_RECEIPTS_UNAVAILABLE',realmHandleTask:phases.realmHandleTask,realmHandle:originalHandle,
    recheck:originalHandle?()=>recheck():undefined,
+   createWorkspace:originalHandle?createWorkspace:undefined,
    retainPrepare:originalHandle&&Object.hasOwn(summary,'privatePrepareAvailable')&&loadData(summary,'privatePrepareAvailable')===true?retainPrepare:undefined,
    sourceExecutionQualified:false,closureIdentityQualified:false,nativeAuthority:false,contentAuthority:false,saveAuthority:false,closeAuthority:false});return bound;
  }catch(error){throw load.reject(error)}
 }
+
+// Opaque tokens are minted only by the retained witness closure below. Public
+// workspace options/JSON cannot install callbacks or original custody.
+const workspaceCreations=new WeakMap();
+export function checkTerminalWorkspaceCreation(token,page){const entry=workspaceCreations.get(token);if(!entry||entry.page!==page)fail();entry.check();return entry.deadline}
+export async function evaluateTerminalWorkspaceCreation(token,page,input){
+ const entry=workspaceCreations.get(token);if(!entry||entry.page!==page||!['lookup','observe','reserve','effect','verify'].includes(loadData(input,'mode')))fail();entry.check();return entry.evaluate(input);
+}
+export function terminalWorkspaceCreationAccount(token,page){checkTerminalWorkspaceCreation(token,page);return workspaceCreations.get(token).account}

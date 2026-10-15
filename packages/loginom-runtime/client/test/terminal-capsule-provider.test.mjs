@@ -1,3 +1,4 @@
+import {joined} from '../../test/terminal-provider-h0.test.mjs';
 // CODE/OFFLINE: real Node/VM/Promise/MessageChannel; DOM/Page/SDK/native/session/task doubles.
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';import {runInContext,runInThisContext} from 'node:vm';
@@ -164,4 +165,62 @@ for(const mode of ['accessor','copy','wrong-intent','late'])test('capsule fixed 
  if(mode==='copy')runInContext('globalThis.__capsule=Object.freeze(Object.create(Object.getPrototypeOf(__capsule),Object.getOwnPropertyDescriptors(__capsule)))',x.f.c);
  if(mode==='late')await x.prepare();
  assert.throws(()=>runInContext(entry+'(__capsule,__request)',x.f.c),/REQUEST|UNAVAILABLE|LATE/);assert.equal(x.f.c.getterCalls,0);assert.equal(x.realm.native.calls.length,0);
+}));
+
+async function creationControl(fn,{pageFailure,phaseHook}={}){return control(async x=>{
+ x.f.c.__capsule=x.capsule;
+ if(pageFailure){x.realm.page.page.evaluate=async()=>{pageFailure(x);throw pageFailure.value}}
+ const host=await joined({pageOverride:x.realm.page.page,account:'test-account',sessionId:'own-session',
+  preparation(_f,input){x.f.c.__armInput=runInContext('('+JSON.stringify(input)+')',x.f.c);return runInContext('('+witness.retainTerminalPrepareOnCapsule.toString()+')(__capsule,__armInput)',x.f.c)},
+  continuation(fn,mode){if(phaseHook)phaseHook(x,fn,mode);x.f.c.__creationPhase=mode;return runInContext('('+fn.toString()+')(__capsule,__creationPhase)',x.f.c)}});
+ const request=Object.freeze({operationId:'original',sessionId:'own-session',intent:'new_draft'});
+ await host.witness.retainPrepare(request,host.f.bridge);
+ const options={loginomUrl:'http://loginom.example/app?testable=true',compatibility:{profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'},platform:'darwin',sessionId:'own-session',operationId:'original',timeoutMs:1};
+ await fn({...x,host,options});
+})}
+test('creation continuation original armed request drives fixed workspace reserve/effect/verify and same query once',()=>creationControl(async x=>{
+ assert.equal(x.realm.preparation.receipts.size,0);assert.equal(x.realm.native.calls.length,0);
+ const work=x.host.witness.createWorkspace(x.options,x.host.f.bridge);assert.equal(x.host.witness.createWorkspace(x.options,x.host.f.bridge),work);
+ const result=await work;assert.equal(result.status,'READY');assert.equal(result.creationContinuationVerified,true);assert.equal(result.queryCompleted,true);
+ const b=x.provider.arm(x.f.c.__armInput),r=b.inspect();assert.equal(r.request,x.f.c.__armInput);assert.equal(r.receipt,x.realm.preparation.receipts.get('original'));
+ assert.equal(r.creation.packageProxy,x.realm.native.packageProxy);assert.equal(r.receipt.phase,'verified');assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+ for(const key of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority'])assert.equal(result[key],false);
+ assert.equal(x.host.witness.createWorkspace(x.options,x.host.f.bridge),work);
+}));
+test('creation continuation copied bridge refuses before workspace/dispatch',()=>creationControl(async x=>{
+ assert.throws(()=>x.host.witness.createWorkspace(x.options,{...x.host.f.bridge}));assert.equal(x.realm.preparation.receipts.size,0);assert.equal(x.realm.native.calls.length,0);
+}));
+test('creation continuation options accessor refuses getter0 before workspace',()=>creationControl(async x=>{
+ let gets=0;Object.defineProperty(x.options,'timeoutMs',{get(){gets++;throw Error('foreign getter')}});
+ assert.throws(()=>x.host.witness.createWorkspace(x.options,x.host.f.bridge));assert.equal(gets,0);assert.equal(x.realm.preparation.receipts.size,0);
+}));
+for(const reason of [false,0,null,undefined,'',Error('first creation',{cause:0})])test('creation continuation raw '+String(reason)+' before UI wins secondary options drift without replay',()=>{
+ const failure={value:reason};
+ return creationControl(async x=>{
+  // The hook receives the underlying control object. Share only this test value.
+  failure.options=x.options;
+  const work=x.host.witness.createWorkspace(x.options,x.host.f.bridge);let caught=false;
+  try{await work}catch(value){caught=true;assert.equal(value,reason)}assert(caught);
+  assert.equal(x.host.witness.createWorkspace(x.options,x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[]);assert.equal(x.realm.preparation.receipts.size,0);
+ },{pageFailure:Object.assign(()=>{failure.options.timeoutMs++},{value:reason})});
+});
+
+for(const drift of ['reader','receipt','before'])test('creation continuation pending '+drift+' refuses in same evaluator getter0 before create/query',()=>{
+ let gets=0;return creationControl(async x=>{
+  await assert.rejects(x.host.witness.createWorkspace(x.options,x.host.f.bridge),/CHANGED|UNAVAILABLE/);assert.equal(gets,0);assert.deepEqual(x.realm.native.calls,[]);assert.equal(x.realm.page.events.includes('create_draft'),false);
+ },{phaseHook(x,fn,input){if(fn.name!=='inspectWorkspaceRealm'||input.mode!=='effect')return;
+  const map=x.realm.preparation.receipts;
+  if(drift==='reader')Object.defineProperty(map,'get',{get(){gets++;throw Error('foreign getter')},configurable:true});
+  if(drift==='receipt')Map.prototype.set.call(map,'original',{phase:'reserved'});
+  if(drift==='before')Map.prototype.get.call(map,'original').before.push({});
+ }});
+});
+test('creation continuation completed managed call cannot be reacquired for creation',()=>creationControl(async x=>{
+ assert.equal(x.host.c.token.finish(),true);assert.throws(()=>x.host.witness.createWorkspace(x.options,x.host.f.bridge));assert.equal(x.realm.preparation.receipts.size,0);assert.equal(x.realm.native.calls.length,0);
+}));
+
+test('creation continuation successful completion refuses later options drift without create/query replay',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);x.options.timeoutMs++;
+ assert.throws(()=>x.host.witness.createWorkspace(x.options,x.host.f.bridge));assert.deepEqual(x.realm.native.calls,[0]);
+ assert.equal(x.realm.page.events.filter(e=>e==='create_draft').length,1);
 }));
