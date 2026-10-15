@@ -31,6 +31,8 @@ export function loginomAddress(value) {
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, owner) {
+  const originalContext = owner?.context
+  const originalBinding = { ownerId: owner?.id, account: owner?.account, origin: owner?.origin }
   if(owner) owner.navigationStarted=true
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   if(owner) {
@@ -48,7 +50,25 @@ export async function loginPage(page, candidate, owner) {
     const password = field("edtPassword").locator("input")
     // Loginom resolves password availability when username loses focus.
     // fill() waits for editability before focusing, so focus explicitly first.
-    await password.click()
+    try { await password.click() }
+    catch (error) {
+      // Opt-in private diagnostics run before startup cleanup. Their failure,
+      // including a late result, cannot replace the original click rejection.
+      try {
+        const diagnostic = owner?.passwordClickDiagnostic
+        const original = () => owner?.page === page && owner.context === originalContext
+          && originalContext?.pages().length === 1 && originalContext.pages()[0] === page
+          && owner.id === originalBinding.ownerId && owner.account === originalBinding.account
+          && owner.origin === originalBinding.origin
+        if (typeof diagnostic?.read === 'function' && typeof diagnostic.record === 'function'
+            && Object.values(originalBinding).every(value => typeof value === 'string' && value.trim() !== '')
+            && original()) {
+          const receipt = await page.evaluate(diagnostic.read, originalBinding)
+          if (original()) await diagnostic.record(receipt)
+        }
+      } catch {}
+      throw error
+    }
     // Passwordless accounts may make an already empty field readonly after username lookup.
     if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
     if(owner) owner.loginSubmitted=true
