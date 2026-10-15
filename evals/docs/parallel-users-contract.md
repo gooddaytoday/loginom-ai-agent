@@ -2312,3 +2312,26 @@ postcheck SHAe9b5d7493107d467476ab5788d15bf06e9f17c3eb5e27af9078c3f905cf689e7.
 Signals0, fixed global lock unlinks0; old EACCES/writer incidents/permanent pair
 remain untouched. One-shot audit/disposal helpers are retained privately with
 source receipts; their redundant temporary copies were removed after byte checks.
+
+readResourceNativeCensus reads the existing management finalization receipt
+rather than publishing another inventory. Its context binds command journal,
+run ID, selected slot/profile/lease tokens and both frozen container generations.
+It requires finalizing sealed command sources, every management inventory and
+every confirmed admin connection from the receipt's captured admin inventory SHA.
+Existing management/admin readers and shared continuous qualifier produce all
+canonical management proof refs plus complete admin dispatch-to-exit windows
+and connection-source refs. Terminal/command/admin index hashes are rechecked
+before return. The readonly admin reader signatures now request only the
+controller.stateDir actually consumed; no credentials capability is required.
+
+Native reconnect RED96f60785...undefined API133.44s→GREEN3abc0393-57f1-4a60-849a-305c59ef238a
+1/43 PASS127.39s. The audit verifies both CLI origins and both sequential admin
+windows/sources against original qualified native proofs,135 conditions/15
+source hashes/read-back, SHA291ab59098daf7939a5000591b6fb1f425073a243d926029fd553c1b247cf393,
+terminal SHAe837d1e6d90afca85557e5d5eb802225e008acacaa48a51a5b172c7186ab616d;
+base archive/targeted closure/fresh absence/exact pair-root disposal also pass.
+Related loginom-admin + management-process-evidence + management-sessions29/160
+PASS35.79s, typecheck/diff PASS. Logs native-resource-census-{red,green}.log and
+native-census-reader-regression.log remain private. Frozen journal binding and
+mandatory coordinator consumption are the next step; this reader alone grants
+no complete resource, storage deletion, slot release or production readiness.

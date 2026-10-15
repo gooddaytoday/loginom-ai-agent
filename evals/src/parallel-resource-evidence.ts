@@ -6,7 +6,7 @@ import { globalLockRoot } from "./lease"
 import { loadResourceSlots } from "./slots"
 import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 import type { ProcessOwner } from "./process-supervisor"
-import type { SlotDefinition } from "./slots"
+import type { ServerIdentity, SlotDefinition } from "./slots"
 import type { checkResourceEvidence } from "./parallel-acceptance"
 import { summarizeResourceSamples } from "./parallel-resource-summary"
 import { requireResourceBudgetScopes, validResourceBound } from "./parallel-resource-budget"
@@ -78,6 +78,74 @@ export async function readResourceJudgeInventory(input: {
   return { source: { file: inventory.source.path, sha256: inventory.source.sha256, producerPid: input.source.producerPid },
     proofs: inventory.processes.map(process => ({ file: process.source.path, sha256: process.source.sha256,
       owner: process.owner, producerPid: input.source!.producerPid })) }
+}
+
+export async function readResourceNativeCensus(input: {
+  manifest: Pick<ResourceManifest, "state_dir" | "run_id" | "slots"> & { command_journal: string
+    coverage: { containers: { role: string; id: string; startedAt: string }[] } }
+  source: { file: string; sha256: string; producerPid: number }
+}) {
+  const { readLeaseReceipt } = await import("./lease")
+  const manifest = input.manifest
+  if (path.resolve(manifest.command_journal) !== manifest.command_journal || !manifest.command_journal.startsWith(manifest.state_dir + path.sep) ||
+    input.source.file !== `${manifest.command_journal}.management-finalization.json`)
+    throw new EvalFailure("RESOURCE_NATIVE_CENSUS_PATH_MISMATCH", 2)
+  const terminal = resourceObject(await readLeaseReceipt(input.source.file)), commandSource = resourceObject(terminal.command)
+  if (resourceHash(terminal) !== input.source.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+  const command = resourceObject(await readLeaseReceipt(manifest.command_journal))
+  const identity = resourceObject(command.identity) as Partial<ServerIdentity>
+  const server = manifest.coverage.containers.find(container => container.role === "server")
+  const studio = manifest.coverage.containers.find(container => container.role === "studio")
+  const bindings = Array.isArray(command.managementInventories) ? command.managementInventories.map(resourceObject) : []
+  const sources = Array.isArray(command.managementSources) ? command.managementSources.map(resourceObject) : []
+  const slots = Array.isArray(terminal.slots) ? terminal.slots.map(resourceObject) : []
+  if (terminal.version !== 2 || terminal.kind !== "management-environment-finalization" || terminal.status !== "sessions_closed" ||
+    terminal.storageDeletionAllowed !== false || terminal.nextAdmissionAllowed !== false || commandSource.path !== manifest.command_journal ||
+    commandSource.sha256 !== resourceHash(command) || command.version !== 2 || command.kind !== "unactivated-preparation" ||
+    command.phase !== "finalizing" || command.commandId !== manifest.run_id || JSON.stringify(command.slotIds) !== JSON.stringify(manifest.slots.map(slot => slot.id)) ||
+    !server || !studio || manifest.coverage.containers.length !== 2 || server.id === studio.id || Object.keys(identity).length !== 6 ||
+    identity.containerId !== server.id || identity.startedAt !== server.startedAt || identity.studioContainerId !== studio.id || identity.studioStartedAt !== studio.startedAt ||
+    ![identity.serverEpoch, identity.configurationHash].every(value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value)) ||
+    JSON.stringify(terminal.identity) !== JSON.stringify(command.identity) || bindings.length !== manifest.slots.length || slots.length !== bindings.length ||
+    sources.length !== bindings.length || new Set(sources.map(source => source.path)).size !== sources.length ||
+    ["slotId", "file", "leaseToken", "profileDir"].some(key => new Set(bindings.map(binding => binding[key])).size !== bindings.length) ||
+    bindings.some(binding => typeof binding.file !== "string" || path.resolve(binding.file) !== binding.file || path.dirname(binding.file) !== manifest.state_dir ||
+      typeof binding.leaseToken !== "string" || !binding.leaseToken || !manifest.slots.some(slot => slot.id === binding.slotId && slot.profileDir === binding.profileDir) ||
+      !slots.some(slot => slot.slotId === binding.slotId && slot.leaseToken === binding.leaseToken) || !sources.some(source => source.path === binding.file)))
+    throw new EvalFailure("RESOURCE_NATIVE_CENSUS_UNCONFIRMED", 2)
+  const { readManagementProcessInventory } = await import("./management-process-evidence")
+  const proofs = []
+  for (const binding of bindings) {
+    const inventory = await readManagementProcessInventory({ file: String(binding.file), journal: manifest.command_journal, commandId: manifest.run_id,
+      identity: identity as ServerIdentity, leaseToken: String(binding.leaseToken), slotId: String(binding.slotId), profileDir: String(binding.profileDir), producerPid: input.source.producerPid })
+    if (!inventory.processes.length || !sources.some(source => source.path === inventory.source.path && source.sha256 === inventory.source.sha256))
+      throw new EvalFailure("RESOURCE_NATIVE_CENSUS_UNCONFIRMED", 2)
+    proofs.push(...inventory.processes.map(process => ({ file: process.source.path, sha256: process.source.sha256, owner: process.owner, producerPid: input.source.producerPid })))
+  }
+  const { readAdminProcessInventory } = await import("./loginom-admin")
+  const adminSource = resourceObject(terminal.processInventory)
+  if (typeof command.processInventory !== "string" || adminSource.path !== command.processInventory)
+    throw new EvalFailure("RESOURCE_NATIVE_CENSUS_UNCONFIRMED", 2)
+  const admins = await readAdminProcessInventory({ controller: { stateDir: manifest.state_dir } }, identity as ServerIdentity,
+    { file: command.processInventory, journal: manifest.command_journal, commandId: manifest.run_id, producerPid: input.source.producerPid })
+  if (!admins.connections.length || admins.source.sha256 !== adminSource.sha256) throw new EvalFailure("RESOURCE_NATIVE_CENSUS_UNCONFIRMED", 2)
+  const adminWindows = await Promise.all(admins.connections.map(async connection => {
+    const receipt = resourceObject(await readLeaseReceipt(connection.source.path))
+    if (resourceHash(receipt) !== connection.source.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+    const qualified = qualifyClosedProcessEvidence(receipt.processes, { owner: { kind: "admin", id: path.dirname(connection.source.path) }, producerPid: input.source.producerPid })
+    if (!qualified) throw new EvalFailure("RESOURCE_PROCESS_PROOF_UNCONFIRMED", 2)
+    return { kind: qualified.owner.kind, id: qualified.owner.id, producerPid: input.source.producerPid, launcher: qualified.launcher,
+      startedAt: qualified.startedAt, finishedAt: qualified.finishedAt }
+  }))
+  if (resourceHash(await readLeaseReceipt(manifest.command_journal)) !== commandSource.sha256 ||
+    resourceHash(await readLeaseReceipt(admins.source.path)) !== adminSource.sha256 || resourceHash(await readLeaseReceipt(input.source.file)) !== input.source.sha256)
+    throw new EvalFailure("RESOURCE_NATIVE_CENSUS_CHANGED", 2)
+  return { source: { file: input.source.file, sha256: input.source.sha256, producerPid: input.source.producerPid }, proofs, adminWindows,
+    adminSources: admins.connections.map(connection => ({ file: connection.source.path, sha256: connection.source.sha256, producerPid: input.source.producerPid })) }
+}
+
+function resourceHash(value: unknown) {
+  return new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
 type ResourceManifest = {
