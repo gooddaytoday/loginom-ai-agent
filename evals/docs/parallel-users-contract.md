@@ -2145,3 +2145,15 @@ unknown-safe assertion adjustment, current agent/resource/main-retry targets
 version, without this last delta. Logs agent-inventory-result-retention-{red,green}
 and agent-inventory-final-targets retain evidence; own fault roots were removed
 only after the original continuous capture qualified and custom guard closed.
+
+Fixture main now acquires its judge-home lease before judgeInfo/--version, as
+well as before the first agent. Inputs/rubric hashing happens before acquiring
+contexts; a judge admission rejection closes acquired slot/judge OS guards and
+retains their durable reservations. Successful fixture draining and legacy
+execution keep their existing cleanup paths. Production main is still gated.
+Actual held-home RED observed fake --version write before BUSY; GREEN refuses
+before that write, keeps holder reservation unchanged and dispatches no agent.
+Occupied-home/skip-judge/unused-model-admission controls3/9 PASS15.20s,
+typecheck/diff PASS. Logs judge-version-lease-{red,green}. Version/exec process
+inventory binding is the next step; lease ordering alone does not qualify the
+complete judge runtime census.
