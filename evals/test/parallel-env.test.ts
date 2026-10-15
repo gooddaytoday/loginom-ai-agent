@@ -128,7 +128,7 @@ test("verify CLI records an admission failure without preparing or modifying use
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "SLOT_PATH_PRIVATE" })
     expect(await Bun.file(path.join(out, "receipt.json")).json()).toMatchObject({ version: 2, kind: "environment-verification", ready: false,
-      status: "failed", reason: "SLOT_PATH_PRIVATE" })
+      status: "failed", reason: "SLOT_PATH_PRIVATE", finalization: { status: "unconfirmed" } })
     expect(await readdir(out)).toEqual(["receipt.json"])
     expect(await readdir(fixture.slots.controller.stateDir)).toEqual([])
     expect(await readdir(fixture.lockRoot)).toEqual([])

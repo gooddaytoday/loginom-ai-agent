@@ -2,7 +2,7 @@ import { parseArgs } from "node:util"
 import path from "node:path"
 import { lstat, mkdir, realpath } from "node:fs/promises"
 import { EvalFailure } from "../src/fail"
-import { globalLockRoot, writeLeaseReceipt } from "../src/lease"
+import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { loadResourceSlots } from "../src/slots"
 import { recoverOfflineJudgeIncident } from "../src/judge-recovery"
 import { readEnvironmentStatus } from "../src/parallel-status"
@@ -37,12 +37,14 @@ try {
       console.log(JSON.stringify(receipt))
     }
     if (command === "prepare" || command === "verify") {
-      const { prepareEnvironment, verifyEnvironment } = await import("../src/environment-preparation")
+      const { prepareEnvironment, verifyEnvironment, EnvironmentFailure } = await import("../src/environment-preparation")
       const check = command === "prepare" ? prepareEnvironment : verifyEnvironment
       const receipt = await check({ slotsFile, parallel: Number(args.values.parallel ?? "1") }).catch(async error => {
-        await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2,
+        const failure = error instanceof EnvironmentFailure ? await readLeaseReceipt(error.receipt) : { version: 2,
           kind: command === "prepare" ? "environment-preparation" : "environment-verification", status: "failed", ready: false,
-          reason: error instanceof EvalFailure ? error.message : "PREPARATION_FAILED" })
+          reason: error instanceof EvalFailure ? error.message : "PREPARATION_FAILED", finalization: { status: "unconfirmed" } }
+        if (!failure || typeof failure !== "object" || Array.isArray(failure)) throw new EvalFailure("PREPARATION_RECEIPT_UNCONFIRMED", 2)
+        await writeLeaseReceipt(path.join(out, "receipt.json"), failure)
         throw error
       })
       await writeLeaseReceipt(path.join(out, "receipt.json"), receipt)
