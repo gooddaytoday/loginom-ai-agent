@@ -508,3 +508,70 @@ async function nativeAdminPeer(runtime: Awaited<ReturnType<typeof verifyAdminRun
     return disposed
   } }
 }
+
+liveIntegration("parent preparation: blocked account, configuration, ACL and physical root compose without password rotation", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-parent-prepare-"))
+  const fixture = await parallelFixture(root)
+  const name = `evals-parent-${crypto.randomUUID().slice(0, 8)}`
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${listener.port}/app/`
+  listener.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 1)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
+  const pair = await createPair(file, options)
+  const journal = path.join(file.controller.stateDir, "prepare-command.json")
+  await writeLeaseReceipt(journal, { version: 2, commandId: "parent-prepare" })
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot)
+  const lease = environment.slots[0]!
+  let verified = false
+  try {
+    const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
+    const connection = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server })
+    try {
+      const first = await connection.reconcileUser(lease, prepared.secretFile)
+      const { readUserOwnership, readUserConfiguration } = await import("../src/user-environment")
+      const firstConfiguration = await readUserConfiguration(file, lease, prepared.secretFile)
+      expect(firstConfiguration?.observation.reply.data).toMatchObject({ passwordChanged: true })
+      const reserved = await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.reserve.json")) as { inode: number; device: string }
+      const { prepareUserStorage } = await import("../src/parallel-pair")
+      const storage = await prepareUserStorage(file, lease, prepared.secretFile, environment.server)
+      expect(storage).toMatchObject({ inode: reserved.inode, device: reserved.device })
+      const second = await connection.reconcileUser(lease, prepared.secretFile)
+      expect(second).toEqual(first)
+      expect(await prepareUserStorage(file, lease, prepared.secretFile, environment.server)).toEqual(storage)
+      expect(await readUserOwnership(file, lease, prepared.secretFile)).toMatchObject({ everActivated: false, username: lease.slot.username })
+      const configured = await readUserConfiguration(file, lease, prepared.secretFile)
+      expect(configured?.observation.reply.data).toMatchObject({ passwordChanged: false, authModeChanged: false })
+      const credential = await stageUserPreparation(file, lease, "e".repeat(64))
+      expect(credential).toEqual(prepared)
+      expect(await readdir(lease.slot.profileDir)).toEqual(["data"])
+      expect(await Bun.file(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)).exists()).toBe(false)
+      verified = true
+    } finally { await connection.dispose() }
+    // No evaluated-user login is admitted: native read-back requires Blocked=true throughout.
+    // The sole real admin transport and process have completed before this test-only release.
+    expect(verified).toBe(true)
+    const adminDirectory = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
+    const disposal = await readLeaseReceipt(path.join(file.controller.stateDir, adminDirectory, "connection.json")) as { status: string; transportDisconnect: string; processes: { status: string; capture_complete: boolean } }
+    expect(disposal).toMatchObject({ status: "disposed", transportDisconnect: "confirmed", processes: { status: "confirmed", capture_complete: true } })
+    const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-parent-${crypto.randomUUID()}`)
+    await mkdir(evidence, { mode: 0o700 })
+    await writeLeaseReceipt(path.join(evidence, "blocked-preparation.json"), { version: 2, kind: "native-parent-blocked-preparation", identity: pair.identity,
+      slotId: lease.slot.id, accountBlockedThroughout: true, repeatedWithoutPasswordRotation: true, physicalRoot: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
+      admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes }, liveQualified: false })
+    const cleanup = path.join(file.controller.stateDir, "unactivated-test-cleanup.json")
+    await writeLeaseReceipt(cleanup, { version: 2, kind: "native-unactivated-test-finalization", status: "confirmed", slotId: lease.slot.id,
+      leaseToken: lease.token, serverEpoch: pair.identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed", archive: "committed",
+      storageDeletionAllowed: true, nextAdmissionAllowed: true })
+    await lease.release(cleanup)
+    const release = path.join(file.controller.stateDir, "test-server-release.json")
+    await writeLeaseReceipt(release, { version: 2, status: "confirmed", key: environment.server.reservation.key,
+      token: environment.server.reservation.token, revision: environment.server.reservation.revision, serverEpoch: pair.identity.serverEpoch })
+    await environment.server.release(release)
+    await destroyPair(file, options)
+    await rm(root, { recursive: true, force: true })
+  } finally { await Promise.all([environment.server.close(), lease.close()]) }
+}, 120_000)
