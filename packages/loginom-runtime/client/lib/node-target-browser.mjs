@@ -126,7 +126,7 @@ export async function readGraph(page, task) {
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect snapshot must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph) {
-  let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
+  let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,inputAddPointRefusal;
   let gestureBefore=task.effect.before;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
@@ -143,11 +143,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const matches=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(matches.length!==1)throw new Error('Node disappeared');
     return d.FmxGraph.view.getState(matches[0].FCell)?.shape?.node?.getAttribute('data-tid');
   },ref.node_id);
-  const point=async locator=>{
+  const point=async(locator,captureCovering=false)=>{
     remaining();await ensureContext();
     if(await locator.count()!==1 || !await locator.isVisible() || !await locator.isEnabled())throw new Error('Exact interactive target unavailable');
-    const p=await locator.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
-      const hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw new Error('Target is covered');return{x,y};});return p;
+    const p=await locator.evaluate((e,capture)=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
+      const hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit))){
+        if(capture)return {covered:true,target_data_tid:e.getAttribute('data-tid'),covering_data_tid:hit?.getAttribute('data-tid')??null,point:{x,y}};
+        throw new Error('Target is covered');
+      }return{x,y};},captureCovering);
+    if(p.covered===true){inputAddPointRefusal=p;throw new Error('Target is covered');}
+    return p;
   };
   const drag=async(source,to)=>{const from=await point(source);remaining();if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
     try{remaining();await page.mouse.down();for(let step=1;step<=24;step++){remaining();await ensureContext();await page.mouse.move(from.x+(to.x-from.x)*step/24,from.y+(to.y-from.y)*step/24);}}finally{await page.mouse.up();held=false;}};
@@ -217,7 +222,15 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
     }else if(kind==='add_input'){
-      const tid=await targetTid(p.ref);const add=find(tid+';Input_Add');await point(add);effectPossible=true;await add.click({timeout:remaining()});
+      const node=before.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+      if(!node)throw Error('Input-add node identity unavailable');
+      const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+      placementNavigation=await revealPosition({page,root:canvas,nodeId:p.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed while revealing input-add port');}});
+      gestureBefore=await read(page,task);
+      if(!sameGraph(before,gestureBefore))throw Error('Input-add graph changed after viewport navigation');
+      if(!placementNavigation.fully_visible)throw Error('Input-add node and ports are not fully visible');
+      const tid=await targetTid(p.ref);const add=find(tid+';Input_Add');await point(add,true);effectPossible=true;await add.click({timeout:remaining()});
       const choice=await wait('additional_table_input_or_type_menu',async()=>{
         if(await page.locator('[data-tid^='+JSON.stringify(tid+';Input_Data-')+']').count()>p.input)return 'created';
         if(await find(tid+';Input_Add;Data').count()===1)return 'choose';
@@ -277,6 +290,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
+  if(inputAddPointRefusal)outcome.input_add_point_refusal=inputAddPointRefusal;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
   return outcome;
 }
