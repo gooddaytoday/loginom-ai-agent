@@ -63,20 +63,6 @@ test-only hint исправлен после real-fs rename/nlink0 control, froz
 ослаблены. До сохранения failing metadata причина ARCHIVE_TOPOLOGY остаётся
 неразрешённой; admission/release из этих результатов не следуют.
 
-## Current related unit regression: queue timing control и listing timeout
-
-2026-10-15 private `management-registry-20261015/resource-retry-private-proof-related.log`:
-55 PASS/2 FAIL/459 assertions341.77s after new attempt/infra-error0700 qualification.
-Target initial/retry proofs pass both isolated1/11 and related15.70s.
-Round-crossing test fast#2 started1133ms after slow#1 finished, contrary to its
-assertion. Source/history: fake sleeps20/3000ms introduced0ac8699dbd; independent
-queue2fd606f894 execute includes full recovery/archive/fsynced cleanup. The3s
-whole-pipeline assumption is extra to the queue contract. Next: input-only
-bounded peer-trace gate, preserving original order/PID/archive assertions.
-Separate existing slot-listing failure test exceeded its explicit30s budget;
-exact stall stage and recurrence not established. Next isolated unchanged rerun,
-without overlapping native/unit checks. Full current regression remains failed.
-
 ## Mixed recovery: quarantine после пересечения собственных browser-проверок
 
 2026-10-15: `/tmp/evals-recover-mixed-dyI2ST`, собственная disposable pair

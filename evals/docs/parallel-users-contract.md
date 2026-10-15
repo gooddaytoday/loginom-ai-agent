@@ -1999,3 +1999,24 @@ round-crossing assertion and an explicit30s slot-listing test timeout. The
 former assumes complete fast recovery/archive/receipts within the slow CLI's3s
 sleep; queue execute includes that durable cleanup and promises no such3s bound.
 No production queue/deadline change or successful full regression is claimed.
+
+
+The independent-queue fixture now supplies parallel-round-crossing.json only to
+the slow task. Slow#1 waits at most10s for the actual fast#2 trace in either
+owned workspace root of the same run, then records that process PID. Missing or
+ambiguous peer traces fail; there is no sleep/success fallback. The original
+start-before-finish, four unique PIDs and archive/auth/DB assertions remain.
+This removes the unsupported assumption that the whole fast recovery/archive
+pipeline finishes within the slow fixture's fixed3s delay. RED missing peer PID
+→GREEN1/16 in23.35s; typecheck/diff PASS. Production queue and other scenarios'
+deadlines/delays are unchanged. The separate listing case passed an unchanged
+isolated rerun1/6 in11.48s; its earlier30s timeout cause remains unattributed.
+
+The full parallel-run module then passed25 tests/164 assertions in260.21s,
+including both former failures with unchanged explicit30s case limits. Trace
+publication now writes a temporary file then atomically renames it, so the live
+peer never reads partially published JSON. After that refinement the crossing,
+listing and retry targets passed3/33 in51.92s; typecheck/diff PASS. Historical
+55/2 logs remain unchanged. The single listing timeout did not recur across
+isolated, complete-module and final target reruns; its exact cause is not
+attributed. A new full repository/package regression has not been claimed.
