@@ -72,15 +72,14 @@ export async function createLoginomHost(options: {
     {
       async check(connection) {
         const chat = randomUUID()
-        try {
-          const child = await launch(connection, chat, true)
-          await child.close()
-        } finally {
-          await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
-            recursive: true,
-            force: true,
-          })
-        }
+        const child = await launch(connection, chat, true)
+        await child.close()
+        // Failed validation/cleanup retains its original diagnostics and browser
+        // state. Only a confirmed successful check owns this temporary removal.
+        await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
+          recursive: true,
+          force: true,
+        })
       },
       async prepare(connection) {
         const child = await launch(connection, "readiness")

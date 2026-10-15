@@ -5,6 +5,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
+import { executionJournalAcknowledgement } from './execution-journal.mjs';
 import { makeWorkspaceUiCode, validateUiAction } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
@@ -215,13 +216,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
+    async observe(options = {}) {
+      const { condition, ready, confirmIdentity, timeoutMs = 15000, refreshAfterLateAcknowledgement = false, importColumnPage, outputColumnPage, readProcesses = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = options;
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
         throw new Error('A named, bounded readiness condition is required');
       }
-      readOutputs ||= !!tablePage || !!tableDialog;
+      const readOutputs = options.readOutputs || !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
@@ -236,9 +238,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      const deadline = Math.min(operation.deadline, started + timeoutMs);
+      const parentDeadline = operation.deadline;
+      const deadline = Math.min(parentDeadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      const read = async (stage,code) => {
+        const timeout=readTimeout(),readStarted=observationNow();
+        try { return await execute(code,{timeout}); }
+        catch(error) {
+          // Diagnostic only: a failed read never becomes an action snapshot or
+          // changes the original transport error, even if recording also fails.
+          try { await entry('node_observation_read_failed',{step,internal_operation_id:id,
+            condition,stage,timeout_ms:timeout,elapsed_ms:observationNow()-readStarted,
+            observation_elapsed_ms:observationNow()-started,observation_deadline:deadline,
+            parent_deadline:operation.deadline}); } catch {}
+          throw error;
+        }
+      };
+      let result, lastGeometry, lastSampleAcknowledgement, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
       for (let sample = 0; sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -247,10 +263,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         // Rediscover the root: wizard transitions and combo portals can replace it.
-        const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        const roots = await read('roots',makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
-          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
-        { timeout: readTimeout() });
+          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }));
         if (roots.status !== 'SUCCEEDED') {
           if (timeScanRefusal(roots,'workspace.observe')) {
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
@@ -298,26 +313,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
         const root = crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
-        result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        result = await read('detail',makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
           root_ref: root, expected_origin: targetOrigin, expected_build: targetBuild,
           ...(importColumnPage===undefined?{}:{import_column_page:importColumnPage}),
           ...(outputColumnPage===undefined?{}:{output_column_page:outputColumnPage}),
-          ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) }),
-        { timeout: readTimeout() });
+          ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) }));
         if(result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
           // Ext's message box has no root data-tid. Re-read its observed portal;
           // native field ownership and exact prompt controls are checked below.
-          result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
-            root_ref:result.output.ui.dialogs[0].ref,expected_origin:targetOrigin,expected_build:targetBuild}),
-          {timeout:readTimeout()});
+          result=await read('detail',makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+            root_ref:result.output.ui.dialogs[0].ref,expected_origin:targetOrigin,expected_build:targetBuild}));
         }
         if(result.status==='SUCCEEDED' && wizardConfirmationOwner(result.output,wizardConfirmation)) {
           // The native message box is a portal outside the wizard subtree.
           const dialog=result.output.ui.dialogs[0];
-          result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
-            root_ref:dialog.ref,expected_origin:targetOrigin,expected_build:targetBuild}),
-          {timeout:readTimeout()});
+          result=await read('detail',makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+            root_ref:dialog.ref,expected_origin:targetOrigin,expected_build:targetBuild}));
         }
         if (result.status !== 'SUCCEEDED') {
           // A wall-clock scan can expire under contention without producing
@@ -350,20 +362,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
         if(readPreview){
-          result.output.node_preview_schema=await execute(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_preview_schema=await read('node_preview_schema',makeNodePreviewSchemaCode(preparedNodeContext));
         }
         if(readFilter){
-          result.output.node_filter=await execute(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_filter=await read('node_filter',makeFilterContextCode(preparedNodeContext));
           if(result.output.node_filter.node_context&&JSON.stringify(canonical(result.output.node_filter.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native filter context changed during observation');
         }
         if(readMissingValues){
-          result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_missing_values=await read('node_missing_values',makeMissingValuesContextCode(preparedNodeContext));
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
         }
         // CrossTable modal ownership is attested by its native cached record,
         // before a modal can pass the context gate or authorize any action.
         if(readCrossTable&&result.output.wizard?.stage==='crosstable'){
-          result.output.node_crosstable=await execute(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_crosstable=await read('node_crosstable',makeCrossTableContextCode(preparedNodeContext));
           const native=result.output.node_crosstable;
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
@@ -388,7 +400,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readUnion,'node_union',makeUnionContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
-          const native=await execute(makeCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=await read(key,makeCode(preparedNodeContext));
           result.output[key]=native;
           if(native.node_context && JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw new Error('Native process/output context changed during observation');
@@ -396,8 +408,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(tablePage) {
           if(observationNow()>=deadline)break;
           result.output.node_table_request=structuredClone(tablePage);
-          result.output.node_table=await execute(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
-            {timeout:readTimeout()});
+          result.output.node_table=await read('node_table',makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page));
         }
         if(observationNow()>=deadline)break;
         if(tableDialog) {
@@ -414,9 +425,17 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const identity = satisfied && confirmIdentity ? digest(confirmIdentity(result.output)) : null;
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
-        await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: observationNow() - started },
+        const sampledAt=observationNow();
+        const sampleAcknowledgement = await entry('node_observation_sample', { step, sample, internal_operation_id: id,
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: sampledAt - started },
           outcome: structuredClone(result) });
+        const acknowledgedAt=observationNow();
+        lastSampleAcknowledgement={sample,satisfied,required_samples:confirmIdentity?2:1,
+          confirmations,sampled_elapsed_ms:sampledAt-started,
+          acknowledgement_elapsed_ms:acknowledgedAt-sampledAt,
+          acknowledged_elapsed_ms:acknowledgedAt-started,
+          ...(executionJournalAcknowledgement(sampleAcknowledgement)
+            ? { journal: executionJournalAcknowledgement(sampleAcknowledgement) } : {})};
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
@@ -424,10 +443,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
+          timeout_ms:timeoutMs,parent_deadline:parentDeadline,
           ...(lastGeometry?{geometry:lastGeometry}:{}),
+          ...(lastSampleAcknowledgement?{last_sample_acknowledgement:lastSampleAcknowledgement}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
-        throw new NodeReadinessTimeout(condition);
+        const failure=new NodeReadinessTimeout(condition);
+        failure.observationTimeout=structuredClone(timedOut);
+        throw failure;
       }
       const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
         readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: timeoutMs, elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
@@ -438,6 +461,28 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshotWizardConfirmation=snapshot.node_wizard_confirmation??null;
       return structuredClone(snapshot);
       } catch(error) {
+        // A slow durable acknowledgement cannot authorize from the old sample.
+        // Table reads may discard that sample and rediscover once, under the
+        // unchanged parent deadline. No action or pending operation is replayed.
+        const timeout=error?.observationTimeout,ack=timeout?.last_sample_acknowledgement;
+        if(refreshAfterLateAcknowledgement===true && error instanceof NodeReadinessTimeout
+          && timeout?.phase==='node_observation_timeout' && timeout.step===step
+          && timeout.internal_operation_id===id && timeout.condition===condition && timeout.effect_possible===false
+          && timeout.timeout_ms===timeoutMs && timeout.parent_deadline===parentDeadline
+          && ack?.satisfied===true && ack.confirmations>=ack.required_samples
+          && ack.sampled_elapsed_ms<timeoutMs && ack.acknowledged_elapsed_ms>=timeoutMs
+          && ack.acknowledgement_elapsed_ms>=timeoutMs-ack.sampled_elapsed_ms
+          && operation.deadline===parentDeadline && observationNow()<parentDeadline && !signal?.aborted) {
+          let refreshed;
+          try { refreshed=await entry('node_observation_refresh_prepared',{step,internal_operation_id:id,condition,
+            reason:'late_sample_acknowledgement',parent_deadline:parentDeadline,effect_possible:false}); }
+          catch { throw error; }
+          if(refreshed?.internal_operation_id!==id || refreshed.condition!==condition
+            || refreshed.parent_deadline!==parentDeadline || refreshed.effect_possible!==false
+            || refreshed.reason!=='late_sample_acknowledgement' || operation.deadline!==parentDeadline
+            || observationNow()>=parentDeadline || signal?.aborted)throw error;
+          return channel.observe({...options,refreshAfterLateAcknowledgement:false});
+        }
         if(signal?.aborted&&error===signal.reason) {
           const interrupted=await entry('node_observation_interrupted',{step,internal_operation_id:id,
             condition,reason:'local_cancel',effect_possible:false,cleanup_complete:true});
@@ -459,6 +504,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot]);
       // This write must be durable before the browser receives the mutation.
+      const preparedAt = monotonicNow();
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature });
       evidenceSnapshot = null;
@@ -477,11 +523,18 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ...boundOptions,
         snapshot: before, expected_origin: targetOrigin, expected_build: targetBuild });
       const wrapped = wrapMutation(code, { id, signature, action_key: 'ui.act' });
+      const timeout = settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000;
+      const executeStarted = monotonicNow();
       let result;
-      try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
+      try { result = await execute(wrapped, { timeout }); }
       catch (error) {
         operation.transportUncertain = true;
         operation.cleanupConfirmed = false;
+        // A missing RPC reply cannot establish whether the gesture happened.
+        // Keep the first rejection and uncertainty even if diagnostics fail.
+        try { await entry('node_step_execute_failed', { step, internal_operation_id: id,
+          verb: action.verb, timeout_ms: timeout, elapsed_ms: monotonicNow()-executeStarted,
+          prepared_to_execute_ms: executeStarted-preparedAt, parent_deadline: operation.deadline }); } catch {}
         throw error;
       }
       if (result.operation_id !== id || result.action_key !== 'ui.act') {

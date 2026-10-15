@@ -147,7 +147,10 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      // Durable progress writes and the original context close share this bound.
+      // Real fsync + persistent-context teardown can exceed twenty seconds.
+      // Leave five seconds for exit inside the outer host's 75-second close.
+      const reply = await request("close", undefined, 60_000).catch(() => undefined)
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
@@ -166,6 +169,17 @@ export async function supervise(input: Launch) {
     })()
     return closing.promise
   }
+  async function rejectAfterClose(error: Error): Promise<never> {
+    try {
+      await close()
+    } catch (cleanupError) {
+      // Start/handshake refusal stays primary. Retain the separate teardown
+      // failure privately; it must neither replace that refusal nor imply a
+      // successful close. Both errors here are owned by this supervisor.
+      Object.defineProperty(error, "cleanupError", { value: cleanupError })
+    }
+    throw error
+  }
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
   // documented budget with the ordinary 120-second runtime handshake.
@@ -173,12 +187,7 @@ export async function supervise(input: Launch) {
     "start",
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
+  ).catch(rejectAfterClose)
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -190,8 +199,7 @@ export async function supervise(input: Launch) {
       ? !("checked" in ready) || ready.checked !== true
       : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
   ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    return rejectAfterClose(new Error("LOGINOM_HANDSHAKE_INVALID"))
   }
   return { ready, request, close, exited }
 }

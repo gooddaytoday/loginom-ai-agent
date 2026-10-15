@@ -47,6 +47,13 @@ export async function loginPage(page, candidate) {
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
   )
   if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+  // The avatar is rendered before MainForm.Init prepares the package tree.
+  // Wait for the real SDK read to become available; unknown is never idle.
+  await page.waitForFunction(account => {
+    const m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+    return m?.FServerConnection?.UserName===account && m.FServerConnection.Connected===true
+      && typeof m.HasRunningNodes?.()==="boolean"
+  }, candidate.username, { timeout: 30_000 })
   return { authenticated: true }
 }
 

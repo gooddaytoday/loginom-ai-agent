@@ -24,7 +24,11 @@ export async function observeReplacementOutputPolicy(channel){
  const view=await channel.observe({condition:'replacement output view',ready:s=>s.wizard?.stage==='output_mapping'});
  const tables=view.ui.elements.filter(e=>[view.wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;rbTable;DisplayEl',view.wizard.root_tid+';DerivedDataSourceOutputSocketWizard;rbTable;DisplayEl'].includes(e.tid)&&e.allowed_actions.includes('click'));
  need(tables.length===1,'Replacement output table view unavailable');
- await channel.perform({condition:'show replacement output definitions',initialObservation:view,ready:s=>s.wizard?.stage==='output_mapping',identity:()=>view.prepared_node_context,resolve:()=>({verb:'click',ref:tables[0].ref})});
+ const checked=tables[0].check_state,context=view.prepared_node_context;
+ const tableSelected=context?.verified===true&&context.surface==='wizard'&&context.tid===view.wizard.root_tid
+  &&checked?.kind==='radio'&&checked.checked===true&&checked.indeterminate===false
+  &&checked.source==='loginom_ext'&&typeof checked.owner_ref==='string'&&checked.owner_ref.trim().length>0;
+ if(!tableSelected)await channel.perform({condition:'show replacement output definitions',initialObservation:view,ready:s=>s.wizard?.stage==='output_mapping',identity:()=>view.prepared_node_context,resolve:()=>({verb:'click',ref:tables[0].ref})});
  return channel.observe({condition:'replacement output policy',readMappings:true,ready});
 }
 async function setMode(channel,configuration){

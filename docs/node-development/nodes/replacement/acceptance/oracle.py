@@ -30,14 +30,13 @@ def expected():
         converted.append(result)
     names = ["Id", "Category", "Category_Replace", "Category_Replaced", "Code", "Code_Replace", "Code_Replaced", "Amount", "Amount_Replace", "Amount_Replaced", "Keep"]
     typed = output("Typed", names, ["integer", "string", "string", "boolean", "integer", "integer", "boolean", "real", "real", "boolean", "string"], converted)
-    partial = rows("partial-input.csv", {n: "string" for n in ["A", "A_Replace", "B", "C"]})
-    for row in partial:
-        row.update(B_Replace="New" if row["B"] == "old" else row["B"], B_Replaced=row["B"] == "old", C_Replace="Stayed" if row["C"] == "stay" else row["C"], C_Replaced=row["C"] == "stay")
-    names = ["A", "A_Replace", "B", "B_Replace", "B_Replaced", "C", "C_Replace", "C_Replaced"]
-    preserved = output("Preserved", names, ["string", "string", "string", "string", "boolean", "string", "string", "boolean"], partial)
-    # A_Replace is an original column and retains its original label.
-    preserved["columns"][1]["label"] = "A_Replace"
-    return {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.text", "label": "Main"}, {"type": "imports.text", "label": "Partial"}, {"type": "transform.replace_columns", "label": "Typed"}, {"type": "transform.replace_columns", "label": "Preserved"}], "outputs": [typed, preserved], "static_sources": [{"name": n, "bytes": (ROOT / "data" / n).stat().st_size, "sha256": hashlib.sha256((ROOT / "data" / n).read_bytes()).hexdigest()} for n in ["input.csv", "partial-input.csv"]]}
+    for row in converted:
+        row.update(Keep_Replace="AA" if row["Keep"] == "A" else row["Keep"], Keep_Replaced=row["Keep"] == "A")
+    typed["columns"].extend([
+        {"name": "Keep_Replace", "label": "Keep Замена", "type": "string"},
+        {"name": "Keep_Replaced", "label": "Keep Заменен", "type": "boolean"},
+    ])
+    return {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "transform.replace_columns", "label": "Typed"}], "outputs": [typed]}
 
 if __name__ == "__main__":
     print(json.dumps(expected(), ensure_ascii=False, indent=2))

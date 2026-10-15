@@ -72,6 +72,10 @@ for (const [initial, password, expected] of [
         async evaluate() {
           return account
         },
+        async waitForFunction(fn, expected, options) {
+          assert.equal(expected, account)
+          assert.equal(options.timeout, 30_000)
+        },
       }
       assert.deepEqual(await loginPage(page, { url: "http://example.test/app/", username: account, password }), {
         authenticated: true,
@@ -93,3 +97,22 @@ for (const [initial, password, expected] of [
     },
   )
 }
+
+test('native readiness never accepts unknown running or a foreign connection', async () => {
+  let captured
+  const page = {
+    goto: async () => {},
+    locator: () => ({ or(){return this}, first(){return this}, isVisible: async () => true, waitFor: async () => {} }),
+    evaluate: async () => 'User',
+    waitForFunction: async fn => { captured=fn },
+  }
+  await loginPage(page,{url:'http://example.test/app/',username:'User',password:''})
+  const {runInNewContext}=await import('node:vm')
+  for(const [user,connected,running,expected] of [
+    ['User',true,undefined,false],['User',true,null,false],['User',true,'false',false],
+    ['User',true,false,true],['User',true,true,true],['Other',true,false,false],['User',undefined,false,false],
+  ]) {
+    const context={bg:{app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:user,Connected:connected},HasRunningNodes:()=>running}}}}}}}
+    assert.equal(Boolean(runInNewContext('('+captured.toString()+')("User")',context)),expected)
+  }
+})
