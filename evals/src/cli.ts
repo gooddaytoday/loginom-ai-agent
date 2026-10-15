@@ -1,7 +1,8 @@
 import path from "node:path"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
-import { superviseProcess } from "./process-supervisor"
+import { superviseAgentProcess } from "./agent-process-evidence"
+import type { AgentProcessEvidence } from "./agent-process-evidence"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { assertProfileClean } from "./profile"
 import type { ManagementProcessEvidence } from "./management-process-evidence"
@@ -131,7 +132,7 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
   if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
   return { mode: "fake" as const, cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
 }
-export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[]; managementEvidence?: ManagementProcessEvidence }
+export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[]; managementEvidence?: ManagementProcessEvidence; agentEvidence?: AgentProcessEvidence }
 
 export async function runAgent(input: {
   command: AgentCommand
@@ -172,13 +173,13 @@ export async function runAgent(input: {
   const boundary = input.command.mode === "binary" ? await sandboxCommand({ cmd,
     profileDir: input.profileDir ?? input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir: input.workdir, env: input.command.env })
     .catch(() => { throw new SandboxFailure("не удалось подготовить binary CLI, профиль или mounts") }) : undefined
-  const processRun = await superviseProcess({
+  const processRun = await superviseAgentProcess({
     cmd, cwd: boundary?.cwd ?? input.command.cwd,
     env: boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }, sandbox: boundary?.cmd,
     profileDir: input.profileDir, outDir: input.outDir,
     timeoutMs: input.timeoutMs, signal: input.signal,
     owner: { kind: "slot", id: input.slotId ?? input.profileDir ?? input.workdir },
-  }).catch((error: unknown) => {
+  }, input.command.agentEvidence).catch((error: unknown) => {
     if (boundary) throw new SandboxFailure("не удалось запустить или проверить процессы границы")
     throw error
   })

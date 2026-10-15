@@ -70,7 +70,11 @@ export async function prepareFixture(config: EvalConfig, input: Awaited<ReturnTy
       if (!await Bun.file(stateFile).exists()) await writeLeaseReceipt(stateFile,
         { state: "ready", hasApiKey: true, url: own.loginom.url, username: slot.username })
       const base = agentCommand(own)
+      const agentInventory = path.join(file.controller.stateDir, `agent-processes-${slot.id}.json`)
+      await writeLeaseReceipt(agentInventory, { version: 2, kind: "eval-agent-processes", commandId: runId, slotId: slot.id,
+        producerPid: process.pid, state: "open", processes: [] })
       const command = { ...base, cleanupDir: path.join(runDir, "preparation", slot.id),
+        agentEvidence: { file: agentInventory, commandId: runId, slotId: slot.id, assertHeld: lease.assertHeld },
         env: { ...base.env, EVAL_FAKE_STATE_FILE: stateFile, EVAL_FAKE_SLOT_STORAGE: path.join(input.storage, slot.id) } }
       await ensureProfile(own, command)
       await assertAuth(own, command)
