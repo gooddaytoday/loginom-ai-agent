@@ -2536,3 +2536,49 @@ PASS. Hard native-user-831bf8d0... audit SHA
 проверяет24 checks/32 sources; verificationfa28c0dd... перечитала96 sources
 трёх controls и exact own pair/network/root absence. Recipe не доказывает
 positive/disabled backup policy; production admission/grants не изменены.
+
+### Read-only agent session ledger — 2026-10-15
+
+`readAgentProcess(input, id)` validates one confirmed entry in an open or sealed
+agent inventory. Its `entrySource: {path, id, sha256}` hashes the selected entry,
+not the whole file. Appending another invocation or sealing the inventory does
+not invalidate this reference. A planned/unconfirmed selected entry still fails;
+the full resource inventory reader still requires sealing and all process proofs.
+
+`recordAgentSessions(file, lease, secretFile, source)` and `readAgentSession(...)`
+produce/revalidate private `owned-agent-session` records. The source contains an
+immutable process entry reference plus native before/during/after snapshot refs.
+Normal lease, admission command/generation, protected preparation/user/activation
+and a browser runtime under the leased profile are required. Browser bindings
+identify a process in that same closed proof,
+a declared runtime directory and an observation inside the process lifetime.
+The negative codec tests use a real closed Bun process without any Loginom user
+or session; incoherent process/directory/time metadata is refused before reading
+user sources. Initial RED reached USER_PREPARATION_CONFLICT; GREEN refuses it as
+AGENT_SESSION_BROWSER_UNCONFIRMED and publishes no session ledger.
+
+Snapshots share one admin context; before precedes the process lifetime, during overlaps it and after
+follows it. Every new same-user row is derived from these frames; a new after-row
+missing from during is refused. Stable exact Name/CreateTime remain identity
+values, independent of the controller clock. Reused names or changed identities
+are ambiguous. Source drift and recovery-only leases fail closed.
+
+Actor runId is the admission command ID; attemptId is the durable physical CLI
+invocation UUID from the process entry. Logical task/repeat/retry mapping belongs
+to the controller and does not change quality denominators. The ledger records
+observations of browser actors; non-browser/empty accounting and complete baseline
+same-user accounting remain separate work. Driver adoption, archived-history
+fence, targeted close, recovery and filesystem release have not been added by
+this API. The native driver does not accept these records as close authority yet.
+
+TDD missing API RED → selected-entry reader GREEN, including an actual second Bun
+child which refuses its own planned entry and reads the completed predecessor.
+Native runAgent/bubblewrap/local replay produced one active Count1 session and a
+ledger that revalidated before and after inventory sealing. Wrong entry SHA and
+invalid snapshot window were refused. Native1 PASS/20 assertions107.77s;
+related8 PASS/59 assertions16.07s, typecheck/diff PASS. Private
+native-agent-replay-cbed6057-7ae0-4630-ad6c-c715ad896f79/source-audit.json
+SHA256 `5b8e2e688422b1af2bf653391f534cb55b0e50f9bb1012ad4855f047a82336bd`
+checks94 facts/50 sources,16 overlapping snapshots and12 source/binary pins.
+All own pair/network/root resources are absent. No production readiness or live
+model/judge qualification is claimed.

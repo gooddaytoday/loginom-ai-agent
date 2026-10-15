@@ -1019,5 +1019,19 @@ credentials в копию controller evidence не включаются.
 runtimeDirectories=[] и без новой сессии. Первый native fixture остановил Bun на
 необработанном GET; второй отказал до spawn из-за отсутствующего outDir. Их
 ресурсы/источники retained и перечислены в eval_parallel_blockers.md. Native PASS
-их не исправляет. Эта проверка ещё не выдаёт agent session ledger, targeted close,
-backup/storage cleanup, production admission либо N2/LLM acceptance.
+их не исправляет. Первый этап сохранил native observations; readonly ledger
+добавлен следующим этапом ниже. Targeted close, backup/storage cleanup,
+production admission и N2/LLM acceptance остаются открытыми.
+
+Следующий этап того же native-теста проверяет readonly agent ledger:
+`readAgentProcess` выдаёт стабильную ссылку на отдельный завершённый CLI entry,
+даже когда inventory ещё открыт. `recordAgentSessions` выводит новые own rows из
+квалифицированных native snapshots и записывает actor=agent с admission command ID
+и физическим CLI invocation UUID. Read-back повторяет проверку источников до и
+после общего sealing. Bad entry SHA и invalid window отклоняются.
+
+Native1/20 PASS107.77s; related8/59 PASS16.07s, typecheck PASS. Private
+native-agent-replay-cbed6057… audit5b8e2e68… подтверждает94 checks/50 sources,
+16 overlapping snapshots/12 code+binary pins и exact own pair/network/root absence.
+Полное same-user accounting, archive-before-close, native adoption/targeted close
+agent ledger и recovery ещё требуют реализации; production admission закрыт.

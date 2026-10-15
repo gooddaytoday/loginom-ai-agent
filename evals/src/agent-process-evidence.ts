@@ -70,6 +70,16 @@ export async function readAgentProcessInventory(input: InventoryInput) {
   return { commandId: inventory.commandId, slotId: inventory.slotId, processes, source: { path: input.file, sha256: hash(inventory) } }
 }
 
+export async function readAgentProcess(input: InventoryInput, id: string) {
+  const inventory = await readInventory(input)
+  const entry = inventory.processes.find(entry => entry.id === id)
+  if (!entry) throw new EvalFailure("AGENT_PROCESS_PROOF_UNCONFIRMED", 2)
+  const [process] = await readProcesses(input, { ...inventory, processes: [entry] })
+  const current = (await readInventory(input)).processes.find(entry => entry.id === id)
+  if (!current || hash(current) !== hash(entry)) throw new EvalFailure("AGENT_PROCESS_INVENTORY_CHANGED", 2)
+  return { ...process!, entrySource: { path: input.file, id, sha256: hash(entry) } }
+}
+
 async function readInventory(input: InventoryInput) {
   const root = path.dirname(input.file), info = await lstat(root)
   if (!path.isAbsolute(input.file) || path.resolve(input.file) !== input.file || await realpath(root) !== root ||
