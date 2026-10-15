@@ -3,7 +3,7 @@ import path from "node:path"
 import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
-import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, type AdminOperation } from "../src/loginom-admin"
+import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease, type SlotFile, type ServerIdentity } from "../src/slots"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
@@ -706,12 +706,17 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
   const { acquireEnvironmentLeases } = await import("../src/slots")
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot)
   const lease = environment.slots[0]!
+  const inventory = path.join(file.controller.stateDir, "processes-admin.json")
+  await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "parent-prepare", journal, identity: pair.identity, connections: [] })
   let verified = false
   const observations: unknown[] = []
   try {
     const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
-    const connection = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server })
+    const connection = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: inventory })
     try {
+      expect(await readLeaseReceipt(inventory)).toMatchObject({ commandId: "parent-prepare", connections: [{ producerPid: process.pid }] })
+      await expect(readAdminProcessInventory(file, pair.identity, { file: inventory, journal, commandId: "parent-prepare", producerPid: process.pid }))
+        .rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
       const inspect = () => (async () => {
         const value = await connection.inspectUnactivatedUser(lease, prepared.secretFile)
         const receipt = await readLeaseReceipt(value.source.path) as { command: { path: string; sha256: string }; observation: unknown }
@@ -762,6 +767,9 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
     const finalization = await readAdminFinalization(file, pair.identity, path.join(file.controller.stateDir, adminDirectory), process.pid)
       .then(value => ({ value }), error => ({ error: error instanceof Error ? error.message : String(error) }))
     observations.push(finalization)
+    const adminProcesses = await readAdminProcessInventory(file, pair.identity, { file: inventory, journal, commandId: "parent-prepare", producerPid: process.pid })
+      .then(value => ({ value }), error => ({ error: error instanceof Error ? error.message : String(error) }))
+    observations.push(adminProcesses)
     const finalizationReceipt = await readLeaseReceipt(path.join(file.controller.stateDir, adminDirectory, "connection.json")) as {
       finalization: { command: { path: string; sha256: string } }
     }
@@ -771,7 +779,7 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
     await writeLeaseReceipt(path.join(evidence, "blocked-preparation.json"), { version: 2, kind: "native-parent-blocked-preparation", identity: pair.identity,
       slotId: lease.slot.id, accountBlockedThroughout: true, repeatedWithoutPasswordRotation: true, physicalRoot: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
       admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes, finalization,
-        sources: { receipt: finalizationReceipt, command: finalizationCommand } }, observations, liveQualified: false })
+        sources: { receipt: finalizationReceipt, command: finalizationCommand, inventory: await readLeaseReceipt(inventory) } }, observations, liveQualified: false })
     const cleanup = path.join(file.controller.stateDir, "unactivated-test-cleanup.json")
     await writeLeaseReceipt(cleanup, { version: 2, kind: "native-unactivated-test-finalization", status: "confirmed", slotId: lease.slot.id,
       leaseToken: lease.token, serverEpoch: pair.identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed", archive: "committed",
@@ -791,6 +799,7 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
         receipt: { kind: "unactivated-user-observation", slotId: lease.slot.id, leaseToken: lease.token } } },
       { value: { status: "confirmed", transportDisconnect: "confirmed", processes: "confirmed",
         source: { path: path.join(file.controller.stateDir, adminDirectory, "connection.json") } } },
+      { value: { commandId: "parent-prepare", connections: [{ status: "confirmed", processes: "confirmed" }] } },
     ])
   } finally { await Promise.all([environment.server.close(), lease.close()]) }
 }, 120_000)
