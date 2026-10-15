@@ -747,3 +747,5 @@ for(const reason of [false,0,null,undefined,'',Error('mkdel first',{cause:0})])t
   assert.equal(x.host.witness.continueStorage(x.host.f.bridge),work);assert.deepEqual(x.realm.native.calls,[0,907]);assert.equal(x.realm.native.writes(),0);
  },{originalSdk:true,invokeSdk:true,phaseHook(x,fn,method){if(fn.name==='readTerminalRealmStorage'&&method==='get_Connected'){x.realm.native.hold();queueMicrotask(held)}}});
 });
+
+export {creationControl};
