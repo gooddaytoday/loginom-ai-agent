@@ -32,6 +32,7 @@ export async function loginPage(page, candidate) {
   await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
+    await field("edtUsername").locator("input").press("Tab")
     const password = field("edtPassword").locator("input")
     // Passwordless accounts may make an already empty field readonly after username lookup.
     if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
