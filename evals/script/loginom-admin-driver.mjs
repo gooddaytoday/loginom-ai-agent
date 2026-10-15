@@ -177,7 +177,11 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     if (request.op === "reconcile-user") {
       const payload = request.payload
       if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
-      if (!payload || Object.keys(payload).length !== (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+      if (payload.peer !== undefined && (payload.phase !== "session-storage-probe" || !payload.peer || Object.keys(payload.peer).length !== 2 ||
+        typeof payload.peer.name !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(payload.peer.name) || payload.peer.name === payload.slot?.username ||
+        typeof payload.peer.objectId !== "string" || !payload.peer.objectId)) throw Error("ADMIN_REQUEST_INVALID")
+      if (!payload || Object.keys(payload).length !== (payload.peer !== undefined ? 9 :
+        ["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -195,7 +199,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
       if (credentials.username !== payload.slot.username || createHash("sha256").update(JSON.stringify(credentials)).digest("hex") !== payload.secretHash)
         throw Error("ADMIN_CREDENTIAL_INVALID")
       dispatched = true
-      const result = await bounded(request, page.evaluate(async ({ username, owned, phase, password, secretHash, expectedPolicy }) => {
+      const result = await bounded(request, page.evaluate(async ({ username, owned, phase, password, secretHash, expectedPolicy, peer }) => {
         let applied = false
         let stage = "ENUMERATE"
         try {
@@ -204,15 +208,21 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           const users = await session.GetUsers()
           const enumerator = await users.GetEnumerator(bg.TBGDeductorUserKinds.dukAll)
           const matches = []
+          const peers = []
           try {
             while (await enumerator.MoveNext()) {
               const user = await enumerator.Current
               if ((await user.Name).toLowerCase() === username.toLowerCase()) matches.push(user)
+              if (peer && await user.Name === peer.name) peers.push(user)
             }
           } finally {
             // Deferred disposal can retain the enumeration lock while Add waits.
             await ReleaseObject(enumerator, true)
           }
+          const peerUser = peer && peers.length === 1 ? await cast(peers[0], bg.IBGDeductorUser) : null
+          if (peer && (!peerUser || await peerUser.UserKind !== 0 ||
+            (await bg.ProxyObjectsHelper.GetObjectId(peerUser)).toString() !== peer.objectId || await peerUser.Blocked !== false))
+            return { outcome: "not_applied", data: { code: "ADMIN_PEER_IDENTITY_CHANGED" } }
           if (!owned && matches.length || owned && (matches.length !== 1 || await matches[0].Name !== owned.name ||
             await matches[0].UserKind !== owned.userKind || (await bg.ProxyObjectsHelper.GetObjectId(matches[0])).toString() !== owned.objectId))
             return { outcome: "not_applied", data: { code: "ADMIN_USER_OWNERSHIP_CONFLICT" } }
@@ -316,7 +326,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           return { outcome: "confirmed", data: phase === "configure" ? { authModeChanged, passwordChanged, secretHash, user: observed } : { created: !owned, user: observed } }
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
-        password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null }))
+        password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null, peer: payload.peer ?? null }))
       if (["session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-storage-probe"].includes(payload.phase) && result.outcome === "confirmed") {
         const retainedPackage = ["session-package-crash-probe", "session-backup-probe"].includes(payload.phase)
         const storageRoots = payload.phase === "session-backup-probe" ? await bounded(request, page.evaluate(async () => {
@@ -375,20 +385,56 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               (await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session).CreatePackage()))
             try {
               const withPackage = await snapshot()
-              const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async item => {
+              const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
-                await session.SavePackageAs(item, "access-probe.lgp")
+                const source = peer ? "access-peer-probe.lgp" : "access-probe.lgp"
+                const target = peer ? "access-peer-copy.lgp" : "access-copy.lgp"
+                console.info("ADMIN_USER_STAGE_STORAGE_SAVE")
+                await session.SavePackageAs(item, source)
                 const storage = await session.FileStorage
-                const stream = await storage.OpenFile("access-probe.lgp", bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
+                console.info("ADMIN_USER_STAGE_STORAGE_READ")
+                const stream = await storage.OpenFile(source, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
                 const size = await stream.Size
                 const buffer = new Uint8Array(Math.min(size, 64))
                 try { await stream.ReadBuffer(buffer) }
                 finally { await ReleaseObject(stream, true) }
-                const copied = await storage.CopyFile("access-probe.lgp", "access-copy.lgp", false, false)
-                const info = await storage.GetFileInfo("access-copy.lgp")
-                try { return { readConfirmed: size > 0 && buffer.some(value => value !== 0), size, copySize: copied ? await info.Size : null } }
-                finally { await ReleaseObject(info, true) }
-              }, handle)) : null
+                console.info("ADMIN_USER_STAGE_STORAGE_COPY")
+                const copied = await storage.CopyFile(source, target, false, false)
+                const info = await storage.GetFileInfo(target)
+                const copySize = await info.Size
+                await ReleaseObject(info, true)
+                const denials = []
+                if (peer) {
+                  console.info("ADMIN_USER_STAGE_STORAGE_DENIALS")
+                  for (const [pathKind, root] of [["virtual", `/${peer.name}`], ["absolute", `/workdir/UserStorage/${peer.name}`], ["traversal", `../${peer.name}`]]) {
+                    for (const operation of ["read", "write", "copy-out", "copy-in"]) {
+                      const denied = await (async () => {
+                        try {
+                          if (operation === "read") {
+                            const stream = await storage.OpenFile(`${root}/access-probe.lgp`, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
+                            try { await stream.ReadBuffer(new Uint8Array(1)) }
+                            finally { await ReleaseObject(stream, true) }
+                            return false
+                          }
+                          if (operation === "write") {
+                            const stream = await storage.CreateFile(`${root}/access-forbidden.txt`)
+                            try { await stream.WriteBuffer(new Uint8Array([65])) }
+                            finally { await ReleaseObject(stream, true) }
+                            return false
+                          }
+                          if (operation === "copy-out") return !await storage.CopyFile(`${root}/access-probe.lgp`, `access-stolen-${pathKind}.lgp`, false, false)
+                          return !await storage.CopyFile(source, `${root}/access-forbidden.lgp`, false, false)
+                        } catch { return true }
+                      })()
+                      denials.push({ pathKind, operation, denied })
+                    }
+                  }
+                }
+                const continued = await storage.OpenFile(source, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
+                try { return { readConfirmed: size > 0 && buffer.some(value => value !== 0), size, copySize: copied ? copySize : null,
+                  continued: await continued.Size === size, denials } }
+                finally { await ReleaseObject(continued, true) }
+              }, { item: handle, peer: payload.peer ?? null })) : null
               const backup = payload.phase === "session-backup-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
                 const manager = await session.SessionBackupManager
@@ -528,7 +574,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
 await context?.close().catch(() => { process.stderr.write("ADMIN_DISPOSE_UNKNOWN\n"); process.exitCode = 2 })
 
 function traceConsole(message) {
-  if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK|BACKUP_(BASELINE|MODIFIED|PERIOD|WAIT|DRIFT))|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
+  if (/^ADMIN_USER_(STAGE_(ENUMERATE|ADD|BLOCK|CONFIGURE|ACL|ACTIVATE|READBACK|STORAGE_(SAVE|READ|COPY|DENIALS)|BACKUP_(BASELINE|MODIFIED|PERIOD|WAIT|DRIFT))|WRITE_(AUTHMODE|PASSWORD))$/.test(message.text())) process.stderr.write(message.text() + "\n")
 }
 
 function respond(id, outcome, data) {
