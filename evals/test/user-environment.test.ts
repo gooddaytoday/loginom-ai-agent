@@ -181,6 +181,30 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     expect((await stat(sessionFile)).mode & 0o777).toBe(0o600)
     expect(await recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed)).toEqual(session)
     expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toEqual(session)
+    // Data-only codec control; native Count1 qualification is exercised separately.
+    const retainedRow = { ...row, objectId: "managed-retained-74", name: "eval-a:3" }
+    const retainedBinding = { ...binding, remoteKey: retainedRow.objectId, name: retainedRow.name }
+    const retainedReply = { ...observed, id: "retained-a", data: { ...observed.data,
+      ownSession: { ...observed.data.ownSession, guid: "22222222-2222-2222-2222-222222222222" }, baseline: [row], opened: [row, retainedRow],
+      withPackage: [row, { ...retainedRow, packageCount: 1 }], afterPackage: [row, { ...retainedRow, packageCount: 1 }],
+      afterDisconnect: [row, { ...retainedRow, packageCount: 1, pendingDisconnect: true }], binding: retainedBinding } }
+    const retainedPayload = { ...probePayload, phase: "session-package-crash-probe" }
+    const retainedSource = path.join(fixture.slots.controller.stateDir, "retained-a.json")
+    await writeLeaseReceipt(retainedSource, { version: 1, kind: "loginom-admin-command", id: retainedReply.id, op: "reconcile-user", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(retainedPayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(retainedReply)).digest("hex"), settledAt: new Date().toISOString() })
+    expect(await recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, retainedPayload, retainedReply))
+      .toMatchObject({ state: "observed", binding: retainedBinding, observation: { payload: { phase: "session-package-crash-probe" } } })
+    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, retainedReply.id)).toMatchObject({ binding: retainedBinding })
+    await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, probePayload, retainedReply))
+      .rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
+    for (const afterDisconnect of [[row], [row, retainedRow], [row, { ...retainedRow, packageCount: 1 }],
+      [row, { ...retainedRow, packageCount: 1, pendingDisconnect: true, createdAt: "2026-10-14T00:00:00.000Z" }]]) {
+      await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, retainedPayload,
+        { ...retainedReply, data: { ...retainedReply.data, afterDisconnect } })).rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
+    }
+    await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, retainedPayload,
+      { ...retainedReply, data: { ...retainedReply.data, afterPackage: [row, retainedRow] } })).rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
     const originalProbe = await Bun.file(probeSource).json()
     await writeLeaseReceipt(probeSource, { ...originalProbe, settledAt: new Date(Date.parse(originalProbe.settledAt) + 1).toISOString() })
     await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_SOURCE_UNCONFIRMED")
