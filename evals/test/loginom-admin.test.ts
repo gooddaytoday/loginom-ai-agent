@@ -68,6 +68,30 @@ test("admin inventory sealing admits one transition under its held server fence"
   } finally { await server.close(); await rm(root, { recursive: true, force: true }) }
 })
 
+test("admin reconnect reaches runtime verification after normal CLI admission but refuses a sealed inventory", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-reconnect-admission-")), fixture = await parallelFixture(root)
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json"), inventory = path.join(fixture.slots.controller.stateDir, "processes-admin.json")
+  const command = { version: 2, kind: "unactivated-preparation", commandId: "reconnect", identity, slotIds: ["a"], phase: "cli_admitted", processInventory: inventory }
+  const actors = { version: 2, kind: "admin-processes", commandId: command.commandId, journal, identity, connections: [] }
+  await writeLeaseReceipt(journal, command)
+  await writeLeaseReceipt(inventory, actors)
+  const server = await acquireResourceLease({ key: `server:${identity.containerId}`, identity, journal, commandId: command.commandId, lockRoot: fixture.lockRoot })
+  try {
+    await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: server, processInventory: inventory, binary: path.join(root, "missing-runtime") }))
+      .rejects.toMatchObject({ code: "ENOENT" })
+    expect(await readLeaseReceipt(journal)).toEqual(command)
+    expect(await readLeaseReceipt(inventory)).toEqual(actors)
+    for (const changed of [{ ...command, phase: "finalizing" }, { ...command, kind: "unactivated-recovery" }]) {
+      await writeLeaseReceipt(journal, changed)
+      await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: server, processInventory: inventory, binary: path.join(root, "missing-runtime") }))
+        .rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
+      expect(await readLeaseReceipt(journal)).toEqual(changed)
+      expect(await readLeaseReceipt(inventory)).toEqual(actors)
+    }
+    await server.assertHeld()
+  } finally { await server.close(); await rm(root, { recursive: true }) }
+}, 30_000)
+
 test("admin finalization reader requires the persisted disconnect command and continuous process closure", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-finalization-")), fixture = await parallelFixture(root)
   const directory = path.join(fixture.slots.controller.stateDir, "admin-codec")

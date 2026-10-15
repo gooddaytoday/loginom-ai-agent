@@ -1894,3 +1894,11 @@ No argv, stdout or stderr are attached. The existing20s command deadline and
 mutation/read-back policy remain unchanged. A real missing-container inspect
 reproduced missing metadata (RED) then passed1 test/3 assertions (1.60s); pair
 unit11/45, typecheck/diff PASS. No container was created or removed by this test.
+
+Normal reconnect admission before sealing (2026-10-15): both openLoginomAdmin
+phase guards accept normal cli_admitted while preserving finalizing and recovery
+CLI refusal. The existing held fence, epoch/runtime verification and serialized
+register-before-spawn inventory remain mandatory. Public real-fs pre-runtime
+RED received SEALED before the missing-runtime check; GREEN1/9 and full admin
+24/87 PASS8.91s, typecheck/diff PASS. This test grants no native connection or
+registration qualification; actual sequential admin handoff remains pending.
