@@ -422,6 +422,13 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       viewport: launch.viewport,
     })
     if(original)original.context=owner.context
+    // Retain an already acquired, unambiguous own page before the settlement
+    // writer can refuse. Do not create a page to repair a failed launch record.
+    const acquiredPages=owner.context.pages()
+    if(acquiredPages.length===1) {
+      owner.page=acquiredPages[0]
+      if(original)original.page=owner.page
+    }
     })
     owner.page=owner.context.pages()[0]??await owner.context.newPage()
     if(original)original.page=owner.page
