@@ -117,6 +117,21 @@ test("runAgent masks complete credentials before truncating diagnostics and node
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("runAgent keeps operational session, artifact and revision bindings while masking diagnostic echoes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-bindings-"))
+  const secret = "binding-fragment", session = `ses_${secret}`, packagePath = `/own/${secret}.lgp`
+  try {
+    const run = await runAgent({ command: { ...fakeCommand(), cleanupSecrets: [secret, "aaaaaaaa"], cmd: [process.execPath, "-e", `
+      const sessionID=${JSON.stringify(session)};
+      console.log(JSON.stringify({type:"tool_use",sessionID,part:{type:"tool",tool:"loginom_dock_action_run",state:{status:"completed",input:{action_key:"package.save_as"},output:JSON.stringify({package_ref:{path:${JSON.stringify(packagePath)}}})}}}));
+      console.log(JSON.stringify({type:"tool_use",sessionID,part:{type:"tool",tool:"loginom_dock_prepare",state:{status:"completed",output:JSON.stringify({skillRevision:${JSON.stringify(secret)},manifest_sha256:"a".repeat(64)})}}}));
+      console.log(JSON.stringify({type:"text",sessionID,part:{text:${JSON.stringify(secret)}}}));
+    `] }, taskId: "output-bindings", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    expect(run).toMatchObject({ sessionId: session, saveReceipts: [packagePath], skillRevision: secret, actionManifestSha256: "a".repeat(64),
+      finalText: "[redacted]", processCleanup: { status: "confirmed", capture_complete: true } })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("parseEvents retains an explicit provider HTTP 429 without claiming complete transport coverage", () => {
   const parsed = parseEvents([
     { type: "error", error: { name: "APIError", data: { statusCode: 429, message: "provider-private-canary", responseBody: "private-response-canary" } } },
