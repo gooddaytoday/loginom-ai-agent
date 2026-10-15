@@ -137,3 +137,10 @@ test('capsule provider lower duplicate dispatch continuation cannot replay reade
  x.probe.callback();await x.f.settle();assert.equal(x.probe.readers,reads);assert.equal(x.probe.resolvers,resolves);
  assert.throws(()=>b.inspect(),/CONTINUATION_REPLAY/);assert.deepEqual(x.realm.native.calls,[0]);
 },true));
+
+for(const reason of [false,0,null,undefined,'',Error('lower-first',{cause:0})])test('capsule provider lower raw '+String(reason)+' wins foreign exception wrapper getter0',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();x.realm.native.fail(reason);const work=b.query();let gets=0;
+ Object.defineProperty(x.f.ss.Exception,'wrap',{get(){gets++;throw Error('foreign wrap')},configurable:true});
+ const rejected=assert.rejects(work,e=>Object.is(e,reason));await x.realm.native.drain();await rejected;
+ assert.equal(gets,0);assert.equal(x.probe.readers,1);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true));

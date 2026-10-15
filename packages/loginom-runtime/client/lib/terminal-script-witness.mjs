@@ -185,8 +185,7 @@ export function collectTerminalScriptWitness(expected){
       try{patchCheck(r.readerPatch);for(const check of readerChecks)check()}catch(value){stop(value);return}
       r.observed=true;
       try{r.outcome=apply(r.originalReader,task,[])}catch(value){first(value)}
-      if(!r.primary){try{guard()}catch(value){stop(value);return}}
-      else{try{patchCheck(r.readerPatch)}catch(value){stop(value);return}}
+      try{guard()}catch(value){stop(value);return}
       return apply(callback,this,arguments);
      }]);
     });return task;
