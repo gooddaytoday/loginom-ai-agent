@@ -124,11 +124,11 @@ export function collectTerminalScriptWitness(expected){
  const storageReaders=Object.freeze(Object.fromEntries([['get_Connected','connected'],['get_CurrentDirectory','currentDirectory'],['get_IsOwnCurrentDirectory','ownDirectory'],['get_RootPath','rootPath']].map(([key,binding])=>{const method=hold(storage,key);if(typeof method!=='function'||method!==own(bindings,binding))throw Error('TERMINAL_PROVIDER_STORAGE_METHOD');return [key,method]})));
  const storageIdentity=hold(storage,'$');for(const key of ['$OW','$O']){const value=hold(storageIdentity,key);if(!Number.isInteger(value)||value<0)throw Error('TERMINAL_PROVIDER_STORAGE_IDENTITY')}
  const messages=hold(transport,'$M');hold(messages,'GetDynamicData');hold(transport,'$R');hold(transport,'DispatchMessageAsync');
- const nativeSS=own(bindings,'ss');hold(nativeSS,'TaskCompletionSource');hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
+ const nativeSS=own(bindings,'ss');const originalCompletionConstructor=hold(nativeSS,'TaskCompletionSource');hold(originalCompletionConstructor,'prototype');hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
  let armed,creationState;const storageStates=[];
  function patchCheck(p){if(parent(p.object)!==p.prototype||!descriptorEqual(descriptor(p.object,p.key),p.active?p.temporary:p.original))throw Error('TERMINAL_PROVIDER_PATCH_CHANGED')}
  function suspendNative(check){
-  const selected=providerPatches.filter(p=>p.active&&p.object===transport);
+  const selected=providerPatches.filter(p=>p.active&&(p.object===transport||p.object===nativeSS));
   selected.forEach(patchCheck);
   for(const p of selected){if(p.original)Object.defineProperty(p.object,p.key,p.original);else delete p.object[p.key];p.active=false}
   try{return check()}finally{
@@ -154,6 +154,27 @@ export function collectTerminalScriptWitness(expected){
   const first=value=>{r.primary??={value};return r.primary.value};
   const stop=value=>{r.stopped=true;providerFailure??={value};rejectWork(r.primary?r.primary.value:providerFailure.value)};
   try{
+   // This is the actual source constructed by the original getter, not a
+   // replacement task or synthetic settlement. Hidden sources born inside
+   // Task.continueWith remain separate and cannot be reminted from this receipt.
+   r.completionPatch=patch(nativeSS,'TaskCompletionSource',original=>new Proxy(original,{
+    construct(target,args,newTarget){
+     if(!invoking)return Reflect.construct(target,args,newTarget===r.completionPatch.temporary.value?target:newTarget);
+     guard();if(target!==originalCompletionConstructor||newTarget!==r.completionPatch.temporary.value||r.completion||args.length)throw Error('TERMINAL_PROVIDER_COMPLETION_CONSTRUCTOR');
+     const source=Reflect.construct(target,args,target);r.completion=source;
+     if(parent(source)!==hold(target,'prototype'))throw Error('TERMINAL_PROVIDER_COMPLETION_SOURCE');
+     r.sourceTask=hold(source,'task');r.sourcePrototype=parent(source);r.sourceTaskPrototype=parent(r.sourceTask);
+     for(const method of ['setResult','setException'])patch(source,method,settle=>function(value){
+      if(this!==source||r.sourceSettled)throw Error('TERMINAL_PROVIDER_COMPLETION_REPLAY');
+      try{guard();if(hold(source,'task')!==r.sourceTask||parent(source)!==r.sourcePrototype||parent(r.sourceTask)!==r.sourceTaskPrototype)throw Error('TERMINAL_PROVIDER_COMPLETION_SOURCE');
+       if(method==='setResult'&&(!r.completed||value!==(readMethod?r.value:r.support)))throw Error('TERMINAL_PROVIDER_COMPLETION_RESULT');
+       r.sourceSettled=true;r.sourceMethod=method;r.sourceValue=value;
+       const result=apply(settle,this,arguments);guard();return result;
+      }catch(error){const first=r.primary?r.primary.value:error;stop(first);throw first}
+     });
+     return source;
+    }
+   }));
    if(!readMethod)r.resolverPatch=patch(transport,'$R',original=>function(w,o,type){
     if(!r.completing)return apply(original,this,arguments);
     guard();if(this!==transport||w!==r.w||o!==r.o||!Number.isInteger(type)||type<0)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
@@ -202,6 +223,7 @@ export function collectTerminalScriptWitness(expected){
    });
    guard();invoking=true;try{r.task=readMethod?apply(storageReaders[readMethod],storage,[]):apply(originalQuery,proxy,[type])}finally{invoking=false}
    if(!r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_DISPATCH_UNAVAILABLE');
+   if(!r.completion||r.sourceTask!==r.task)throw Error('TERMINAL_PROVIDER_COMPLETION_TASK');
    return r;
   }catch(value){first(value);try{restore();r.restored=true}catch{}throw r.primary.value}
  }
@@ -286,7 +308,7 @@ export function collectTerminalScriptWitness(expected){
     const task=lower.task,continuation=hold(task,'continueWith'),begin=providerChecks.length,reader=hold(task,'getAwaitedResult'),checks=providerChecks.slice(begin);let completed=false;
     apply(continuation,task,[()=>{if(completed)return;completed=true;
      try{for(const fn of checks)fn();const value=apply(reader,task,[]);restore();lower.restored=true;
-      if(!lower.completed||value!==lower.value)throw Error('TERMINAL_PROVIDER_STORAGE_COMPLETION');
+      if(!lower.completed||!lower.sourceSettled||lower.sourceMethod!=='setResult'||value!==lower.value)throw Error('TERMINAL_PROVIDER_STORAGE_COMPLETION');
       provider.checkPacket(packet);
       if(method==='get_Connected'&&value!==true)throw Error('TERMINAL_INTERFACE_DISCONNECTED');
       if(method==='get_IsOwnCurrentDirectory'&&value!==true)throw Error('TERMINAL_INTERFACE_NON_PERSONAL');
@@ -331,7 +353,7 @@ export function collectTerminalScriptWitness(expected){
       if(typeof continuation!=='function'||typeof reader!=='function')throw Error('TERMINAL_PROVIDER_TASK');
       apply(continuation,task,[()=>{if(completed)return;completed=true;
        try{for(const fn of readerChecks)fn();support=apply(reader,task,[]);restore();lower.restored=true;
-        if(!lower.completed||support!==lower.support)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
+        if(!lower.completed||!lower.sourceSettled||lower.sourceMethod!=='setResult'||support!==lower.support)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
         if(hold(support,'$S')!==transport||hold(support,'SaveToStream')!==own(bindings,'persist'))throw Error('TERMINAL_PROVIDER_SUPPORT');
         const identity=hold(support,'$'),w=hold(identity,'$OW'),o=hold(identity,'$O');if(!Number.isInteger(w)||w<0||!Number.isInteger(o)||o<0)throw Error('TERMINAL_PROVIDER_SUPPORT');
         check();resolve(support)}catch(error){const first=lower.primary?lower.primary.value:error;try{restore();lower.restored=true}catch{}rejectFirst(first)}
@@ -340,6 +362,7 @@ export function collectTerminalScriptWitness(expected){
     },
     inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,initial:armed?.initial,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType,
      lower:lower?Object.freeze({dispatchTask:lower.dispatchTask,request:lower.request,response:lower.response,continuation:lower.originalContinuation,reader:lower.originalReader,resolver:lower.resolverPatch.method,
+      completionSource:lower.completion,sourceTask:lower.sourceTask,sourceSettled:lower.sourceSettled,sourceMethod:lower.sourceMethod,sourceValue:lower.sourceValue,completionSourceCustodyVerified:lower.sourceTask===lower.task&&lower.sourceSettled===true,
       w:lower.w,o:lower.o,hresult:lower.hresult,returnedType:lower.returnedType,support:lower.support,observed:lower.observed,completed:lower.completed,restored:lower.restored}):undefined})},
    });
    // Same-realm initial custody is captured before begin/reserve/effect. The
