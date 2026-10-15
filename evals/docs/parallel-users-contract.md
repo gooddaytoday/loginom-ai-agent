@@ -823,3 +823,34 @@ Actual native autosave/SessionBackup research остаётся отдельны�
 Private600 receipt `research/evidence/native-user-b643d721-aa5f-4e29-947a-78e238db1817/storage-probe.json`,
 SHA256 `b75f68ce2ccd2f293e727da9251af647d80ecc5b5862c2fb47992c644e02b45a`;
 native1 PASS/118 (36.85s), typecheck/diff PASS, process confirmed и exact pair absent.
+
+### Unusual component filenames
+
+Fixed component probe перебирает normal +8 CSV names (space, tab, newline,
+Unicode, leading dash, dotfile, nested path, autosave suffix). Для каждого case
+сначала выполняет собственный pipeline и фиксирует native Finished/Failed,
+FileName getter read-back и выбранный output path; independent Docker reader
+проверяет каждый из18 outputs по разным A/B literal oracles. Положительный
+результат требуется до соответствующих negative cases.
+
+Common/peer input и output parent directories существуют до probe. Смена
+источника/назначения объединена в native configure boundary: complete
+deactivation→set FileName→UpdateConfiguration→exact read-back. На каждый actor
+162 neighbor/shared import/export cases, всего324; каждый требует Finished=true,
+Failed=true и целевой node status3. После matrix native pipeline возвращается
+к своему исходному input/output и успешно завершается. Full NUL SHA и topology
+всех peer/shared files неизменны. Изменений deadline/supervisor timeout нет.
+
+Private600 receipt:
+`research/evidence/native-user-5135776a-763c-45a0-a4c9-fb5330826961/component-probe.json`,
+SHA256 `0d9aba6dd7d76d32dbbda666622ccf62041702de9d2f3837738eb98afe1182de`;
+actors содержат9 native positives и162 negatives каждый. Native1 PASS/97
+(57.85s), process/dispose confirmed, exact pair independently absent.
+Файловый autosave suffix не подтверждает SessionBackup; concurrent heartbeat,
+production preparation/readiness/recovery/cleanup остаются отдельными gates.
+
+Final adjacent regression:2 native PASS/215 (93.43s),60 admin/user/slots PASS/260
+(3.16s), typecheck/diff PASS. FileStorage648 denials и component324 denials
+проверены вместе. Три superseded own green logs удалены; private600 audit
+`native-user-5135776a-763c-45a0-a4c9-fb5330826961/superseded-logs-cleanup.json`
+сохраняет их SHA и replacement log. Старые retained incidents не менялись.

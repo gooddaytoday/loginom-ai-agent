@@ -413,36 +413,45 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 const exporter = await cast(await (await output.Component).Engine, bg.IBGExportTextFile)
                 if (await importer.FileName !== "data/sales.csv" || await exporter.FileName !== "group_sum_qty.result.csv")
                   throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const configure = async (source, target) => {
+                  const deactivated = await finish(await workflow.DeactivateAllAsync())
+                  if (!deactivated.finished || deactivated.failed) throw Error("ADMIN_COMPONENT_DEACTIVATION_UNCONFIRMED")
+                  await importer.set_FileName(source)
+                  await exporter.set_FileName(target)
+                  await input.UpdateConfiguration()
+                  await output.UpdateConfiguration()
+                  if (await importer.FileName !== source || await exporter.FileName !== target) throw Error("ADMIN_COMPONENT_READBACK_UNCONFIRMED")
+                }
+                const positives = []
                 const denials = []
-                for (const resource of [...(peer ? [{ scope: "neighbor", name: peer.name }] : []), ...shared.map(name => ({ scope: `shared:${name}`, name }))]) {
-                  for (const [kind, root] of [["virtual", `/${resource.name}`], ["absolute", `/workdir/UserStorage/${resource.name}`], ["traversal", `../${resource.name}`]]) {
-                    for (const operation of ["import", "export"]) {
-                      console.info("ADMIN_USER_STAGE_COMPONENT_NEGATIVE")
-                      const deactivated = await finish(await workflow.DeactivateAllAsync())
-                      if (!deactivated.finished || deactivated.failed) throw Error("ADMIN_COMPONENT_DEACTIVATION_UNCONFIRMED")
-                      const source = operation === "import" ? `${root}/component-input.csv` : "data/sales.csv"
-                      const target = operation === "export" ? `${root}/component-forbidden.tsv` : "component-import-control.tsv"
-                      await importer.set_FileName(source)
-                      await exporter.set_FileName(target)
-                      await input.UpdateConfiguration()
-                      await output.UpdateConfiguration()
-                      if (await importer.FileName !== source || await exporter.FileName !== target) throw Error("ADMIN_COMPONENT_READBACK_UNCONFIRMED")
-                      const activation = await finish(await item.Activate(0))
-                      const targetStatus = await (operation === "import" ? input : output).Status
-                      denials.push({ pathKind: `${resource.scope}:${kind}`, operation, ...activation, targetStatus,
-                        denied: activation.finished && activation.failed && targetStatus === bg.TBGModelNodeStatus.mnsInactiveError })
+                const files = ["component-input.csv", ...["space name.csv", "tab\tname.csv", "line\nname.csv", "Юникод.csv", "-leading.csv", ".hidden.csv", "nested/file.csv", "copy.csv.autosave"].map(name => `component-input/${name}`)]
+                for (const file of files) {
+                  const relative = file === "component-input.csv" ? "normal" : file.slice("component-input/".length)
+                  const ownSource = file === "component-input.csv" ? "data/sales.csv" : file
+                  const ownTarget = file === "component-input.csv" ? "group_sum_qty.result.csv" : `component-output/${relative}.tsv`
+                  await configure(ownSource, ownTarget)
+                  const activation = await finish(await item.Activate(0))
+                  positives.push({ file, output: ownTarget, ...activation })
+                  if (!activation.finished || activation.failed) return { ...positive, continued: false, positives, denials }
+                  for (const resource of [...(peer ? [{ scope: "neighbor", name: peer.name }] : []), ...shared.map(name => ({ scope: `shared:${name}`, name }))]) {
+                    for (const [kind, root] of [["virtual", `/${resource.name}`], ["absolute", `/workdir/UserStorage/${resource.name}`], ["traversal", `../${resource.name}`]]) {
+                      for (const operation of ["import", "export"]) {
+                        console.info("ADMIN_USER_STAGE_COMPONENT_NEGATIVE")
+                        const source = operation === "import" ? `${root}/${file}` : ownSource
+                        const target = operation === "export" ? `${root}/component-output/${relative}.forbidden.tsv` : ownTarget
+                        await configure(source, target)
+                        const activation = await finish(await item.Activate(0))
+                        const targetStatus = await (operation === "import" ? input : output).Status
+                        denials.push({ pathKind: `${resource.scope}:${kind}`, file, operation, ...activation, targetStatus,
+                          denied: activation.finished && activation.failed && targetStatus === bg.TBGModelNodeStatus.mnsInactiveError })
+                      }
                     }
                   }
                 }
                 console.info("ADMIN_USER_STAGE_COMPONENT_RESET")
-                const deactivated = await finish(await workflow.DeactivateAllAsync())
-                if (!deactivated.finished || deactivated.failed) throw Error("ADMIN_COMPONENT_DEACTIVATION_UNCONFIRMED")
-                await importer.set_FileName("data/sales.csv")
-                await exporter.set_FileName("group_sum_qty.result.csv")
-                await input.UpdateConfiguration()
-                await output.UpdateConfiguration()
+                await configure("data/sales.csv", "group_sum_qty.result.csv")
                 const continued = await finish(await item.Activate(0))
-                return { ...positive, continued: continued.finished && !continued.failed, denials }
+                return { ...positive, continued: continued.finished && !continued.failed, positives, denials }
               }, { item: handle, deadline: request.deadline, shared: payload.expectedPolicy.map(directory => directory.name).sort(), peer: payload.peer ?? null })) : null
               const storage = payload.phase === "session-storage-probe" ? await bounded(request, probePage.evaluate(async ({ item, peer, shared }) => {
                 const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
