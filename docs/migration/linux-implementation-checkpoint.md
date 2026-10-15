@@ -1,14 +1,19 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-15 — подготовка release candidate v0.2.0
+## 2026-10-15 — release candidate v0.2.0 опубликован
 
 Источник: `loginom`, базовый SHA `ceb03932504e8295c9ae7669ee8cadb7c3128f94`.
 По запросу владельца версия поднята до `0.2.0` в root/Desktop manifests и lock.
 Frozen install PASS; packaging/static tests:13 PASS,2 native macOS SKIP.
 Локальный Node24.19.0 сверён с SHA256 product pin; первый запуск тестов без
 закреплённого Node/runtime dependencies не прошёл, после подготовки среды PASS.
-Следующий шаг: новый annotated tag `v0.2.0`, полный release CI, сверка assets
-и публикация GitHub pre-release по текущему поручению владельца.
+Release SHA:`0c975a73676d9aba556085dbda97e1a9ceb23cc6`,tag`v0.2.0`.
+Полный CI38715389992 PASS:три платформы,общие тесты/typecheck,Linux5/5.
+Все30 GitHub digests сверены,19 metadata файлов скачаны и хешированы;
+три manifests подтверждают один чистый source/version.15октября13:27МСК
+опубликован GitHub pre-release (`draft=false`,`prerelease=true`).
+Подробности:[отчёт](../testing/loginom-ai-agent/reports/2026-10-15-v0.2.0-release.md).
+Следующий шаг:installed/live приёмка точных бинарников при отдельном поручении.
 Новая installed/live приёмка не выполнялась; исторические результаты на0.2.0
 не переносятся. Существующие теги и пользовательская установка не меняются.
 
