@@ -872,7 +872,15 @@ Private observation связывает slot/token/preparation nonce/ownership so
 kind, ID, op, expected identity, desiredHash/replyHash/semantic source SHA). Return
 содержит только account summary и source path/SHA. Команда не изменяет users,
 не открывает evaluated-user session и не выдаёт readiness/delete/release rights.
-Reader, local-writer/archive/admin-finalization и terminal cleanup binding ещё open.
+`readUnactivatedUserObservation` повторно проверяет private canonical source и
+каталог admin0700, held configured slot/token, protected preparation/ownership,
+absence activation и exact inspect command/reply/receipt SHA. Account summary и
+отсутствие возможных user-session names вычисляются из raw observation; строки
+summary сами по себе не принимаются. Unknown command, иной token, public admin
+directory, foreign account и matching session отклоняются, включая заново
+хэшированные artifacts. Reader не изменяет источники. Producer возвращает
+результат только после этого read-back. Local-writer/archive/admin-finalization и
+terminal cleanup binding ещё open; observation не является release capability.
 
 Native RED missing method→GREEN: account absent до creation и exact owned blocked
 после повторной preparation; server fence refusal до secret/inspect, foreign
@@ -884,3 +892,8 @@ unit60 PASS/260, typecheck/diff PASS. Private600 evidence:
 SHA256 `3b57d1ebbb10111a592e0d430ada84cd2ba4ac168bfe5735fa4e354532e3c638`.
 Admin transport/process completion confirmed; exact pair independently absent.
 Existing native parent test всё ещё использует явно test-only unactivated release.
+
+Reader validation:88 unit PASS/353 (5.27s),3 native PASS/69 (60.97s),
+`bun typecheck` и diff PASS. Private native-parent-1de4cfc5-caa7-4b08-9f63-001a70ec2156
+receipt SHA256 `6f2e3d0ca3de172848f26f83803885a14cd833530470fbe0753850b65f521f96`;
+actual admin disconnect/process confirmed, exact disposable pair independently absent.

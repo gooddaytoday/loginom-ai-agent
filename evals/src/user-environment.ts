@@ -6,6 +6,63 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { parseSlots, type SlotFile, type SlotLease } from "./slots"
 import type { AdminReply } from "./loginom-admin"
 
+export async function readUnactivatedUserObservation(file: SlotFile, lease: SlotLease, secretFile: string, source: { path: string; sha256: string }) {
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const activation = path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)
+  if (await lstat(activation).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+  })) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+  const owned = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
+  }) ? await readUserOwnership(file, lease, secretFile) : null
+  const directory = path.dirname(source.path)
+  if (!/^[0-9a-f]{64}$/.test(source.sha256) || !path.isAbsolute(source.path) || path.resolve(source.path) !== source.path ||
+    path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
+    await realpath(directory).catch(() => undefined) !== directory) throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2)
+  const root = await lstat(directory).catch(() => undefined)
+  if (!root?.isDirectory() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700)
+    throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2)
+  const receipt = record(await readLeaseReceipt(source.path).catch(() => { throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2) }))
+  const reply = record(receipt.observation), data = record(reply.data), command = record(receipt.command)
+  if (new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") !== source.sha256 ||
+    Object.keys(receipt).length !== 12 || receipt.version !== 2 || receipt.kind !== "unactivated-user-observation" ||
+    JSON.stringify(receipt.identity) !== JSON.stringify(lease.identity) || receipt.slotId !== lease.slot.id || receipt.leaseToken !== lease.token ||
+    receipt.username !== lease.slot.username || receipt.serverSessions !== "absent" || receipt.preparationNonce !== prepared.nonce ||
+    JSON.stringify(receipt.ownership) !== JSON.stringify(owned?.source ?? null) || reply.v !== 1 || reply.outcome !== "confirmed" ||
+    typeof reply.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    source.path !== path.join(directory, `unactivated-${lease.slot.id}-${reply.id}.json`) ||
+    command.path !== path.join(directory, "commands", `${reply.id}.json`) ||
+    JSON.stringify(data.identity) !== JSON.stringify(lease.identity) || data.sessionIdentityQualified !== false || record(data.ownSession).isAdmin !== true ||
+    !Array.isArray(data.users) || data.users.some(user => !user || typeof user !== "object" || typeof user.name !== "string" || !user.name ||
+      typeof user.objectId !== "string" || !user.objectId || user.userKind !== 0 || typeof user.blocked !== "boolean") ||
+    !Array.isArray(data.rawSessions) || data.rawSessions.some(row => !row || typeof row !== "object" || typeof row.name !== "string" || !row.name))
+    throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2)
+  const matches = data.users.filter(user => user.name.toLowerCase() === lease.slot.username.toLowerCase())
+  const account = owned ? { objectId: owned.objectId, name: owned.username, blocked: true } : null
+  if ((!owned ? matches.length !== 0 : matches.length !== 1 || matches[0].objectId !== owned.objectId ||
+    matches[0].name !== owned.username || matches[0].blocked !== true) || JSON.stringify(receipt.account) !== JSON.stringify(account) ||
+    data.rawSessions.some(row => row.name.toLowerCase() === lease.slot.username.toLowerCase() || row.name.toLowerCase().startsWith(lease.slot.username.toLowerCase() + ":")))
+    throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2)
+  const recorded = record(await readLeaseReceipt(command.path).catch(() => { throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2) }))
+  if (Object.keys(recorded).length !== 10 || new Bun.CryptoHasher("sha256").update(JSON.stringify(recorded)).digest("hex") !== command.sha256 ||
+    recorded.version !== 1 || recorded.kind !== "loginom-admin-command" || recorded.op !== "inspect" || recorded.state !== "confirmed" ||
+    recorded.id !== reply.id || JSON.stringify(recorded.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    recorded.desiredHash !== new Bun.CryptoHasher("sha256").update("{}").digest("hex") ||
+    recorded.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
+    typeof recorded.at !== "string" || typeof recorded.settledAt !== "string" || !Number.isFinite(Date.parse(recorded.at)) ||
+    !Number.isFinite(Date.parse(recorded.settledAt)) || Date.parse(recorded.at) > Date.parse(recorded.settledAt))
+    throw new EvalFailure("UNACTIVATED_SOURCE_UNCONFIRMED", 2)
+  await lease.assertHeld()
+  if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared) ||
+    await lstat(activation).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
+    })) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+  return { identity: lease.identity, username: lease.slot.username, account, serverSessions: "absent" as const, source }
+}
+
 export async function stageUserPreparation(file: SlotFile, lease: SlotLease, desiredHash: string) {
   await lease.assertHeld()
   if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
