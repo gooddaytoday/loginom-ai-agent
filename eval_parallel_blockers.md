@@ -57,6 +57,19 @@ origin/browser-binding всех двух admin и четырёх CLI proofs; UID
 
 ## Архив после фактически прерванного check: текущий native gate закрыт, старые источники сохранены
 
+2026-10-15: retained47d... fixture jothVh убран после qualified original setup/
+interrupted check/admin closures,178 audit checks, точного same-lstat socket
+read-back, свободных custom guards и committed profile archive. Штатный
+destroyPair подтвердил nonce edbff046-09e6-484f-960b-f8a5f87b52ef и exact IDs.
+Последующий read-back на том же Docker daemon подтвердил отсутствие обоих
+контейнеров, сети и root; private retained-fixture-audit/removal/postcheck.json
+SHA6e73a3de81f3a628820cdb9acd696650211efeca053a191edd3518c54ec1f038 /
+343265542c43b4571281379e6f04f06b077df36ac2fb610eaf77ab9bcad48d8c /
+e9b5d7493107d467476ab5788d15bf06e9f17c3eb5e27af9078c3f905cf689e7.
+Это disposal собственной research fixture; normal slot/user release не выдавался,
+signals0/fixed global lock unlink0. Прежние topology/process sources сохранены
+в private evidence; MKHklA/LQKvkl/aEnKx5/старые unrelated incidents не затронуты.
+
 2026-10-15 свежий `native-cli-sessions-8196b708-d490-415e-b559-75f4e69547bf`
 после0961fe343d прошёл1/35 (116.68s): actual exit130/interrupted=true, sealed
 registry→committed archive→two targeted closes→fresh absence→admin closure.
@@ -64,13 +77,13 @@ Private audit124/12/read-back SHA102495e2bb65a35411af0cb8cc9049206794bd73c9e3aec
 terminal SHA968101397334a031aeb12097a4db9662082e5e0e323d9fbe6d726286210e3a25;
 собственная pair/root отсутствуют. Typecheck/diff PASS. Текущий gate реального
 interrupted archive/close квалифицирован. Storage deletion/release/admission
-по-прежнему запрещены; 47d... pair/root пока сохранены, их уборка отдельно.
+по-прежнему запрещены; 47d... pair/root впоследствии убраны по scoped audit выше.
 
 2026-10-15 strict control `native-cli-sessions-47d5228b-5be6-4590-95ec-5804d054ca9f`
 подтвердил exit130/interrupted=true/timedOut=false и continuous cleanup confirmed.
 Same-lstat cause: `/home/kiselev/storage/tmp/evals-cli-sessions-jothVh/profile-a/cache/tmp/org.chromium.Chromium.55uJMQ/SingletonSocket`,
 AF_UNIX socket type0140000, UID/GID1001, nlink1, dev2050/inode209997114.
-Root jothVh и exact pair сохранены; normal release не выдан. Минимальный
+При отказе root jothVh и exact pair были сохранены; subsequent disposal записан выше, normal release не выдан. Минимальный
 archive fix поддерживает rename socket object с сохранением identity и fsync
 каталога; real stopped-child socket RED→GREEN, archive12/78 PASS17.29s и
 typecheck/diff PASS. Свежий native archive/finalizer и полный source audit

@@ -2297,3 +2297,18 @@ deletion, slot release, production readiness or live model/judge admission.
 
 Related management-process-evidence + management-sessions5/73 PASS30.98s;
 typecheck/diff PASS. Private management-reconnect-regression.log retains output.
+
+The retained47d5228b... socket failure fixture jothVh has now been disposed
+without synthesizing normal slot release. Its original setup/interrupted-check/
+admin continuous closure proofs and all private source hashes were requalified;
+178 audit conditions include two fresh birth-absence passes, exact rejected
+socket identity, unchanged server epoch/topology and free original custom guards.
+The existing archive primitive committed profile evidence before the factory
+destroy. destroyPair reconciled exact nonce/IDs; fresh read-back on the same
+Docker daemon confirmed both containers/network and own root absent.
+Private retained-fixture-audit.json SHA6e73a3de81f3a628820cdb9acd696650211efeca053a191edd3518c54ec1f038,
+removal SHA343265542c43b4571281379e6f04f06b077df36ac2fb610eaf77ab9bcad48d8c,
+postcheck SHAe9b5d7493107d467476ab5788d15bf06e9f17c3eb5e27af9078c3f905cf689e7.
+Signals0, fixed global lock unlinks0; old EACCES/writer incidents/permanent pair
+remain untouched. One-shot audit/disposal helpers are retained privately with
+source receipts; their redundant temporary copies were removed after byte checks.
