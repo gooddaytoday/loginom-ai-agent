@@ -8,6 +8,7 @@ import type { RunSummary } from "../src/report"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
 import { readResourceProcessWindows } from "../src/parallel-resource-evidence"
+import { readAgentProcessInventory } from "../src/agent-process-evidence"
 
 
 
@@ -480,6 +481,11 @@ test("fixture main: one infra retry keeps the same slot and archives the initial
     const windows = await readResourceProcessWindows(sources)
     expect(windows.map(window => window.id)).toEqual(["a", "a"])
     expect(new Set(windows.map(window => `${window.launcher.pid}:${window.launcher.starttime}`)).size).toBe(2)
+    const agents = await readAgentProcessInventory({ file: path.join(input.slots.controller.stateDir, summary.run_id, "agent-processes-a.json"),
+      commandId: summary.run_id, slotId: "a", producerPid: process.pid })
+    expect(agents.processes.map(entry => `${entry.launcher.pid}:${entry.launcher.starttime}`))
+      .toEqual(windows.map(window => `${window.launcher.pid}:${window.launcher.starttime}`))
+    expect(agents.processes.map(entry => entry.source.sha256)).toEqual(sources.map(source => source.sha256))
     const slot = input.slots.slots[0]!
     const history = await Promise.all((await readdir(slot.historyDir)).map(async archive => {
       const file = Bun.file(path.join(slot.historyDir, archive, "data/loginom-ai-agent.db"))

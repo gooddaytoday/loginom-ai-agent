@@ -16,6 +16,7 @@ import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
 import { buildJobs, runSlotQueue } from "./scheduler"
 import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, inspectFixtureStorage, fenceFixtureStorage, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
+import { sealAgentProcessInventory } from "./agent-process-evidence"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
@@ -141,7 +142,8 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
           await fenceFixtureStorage(context, storage).catch((error: unknown) => { state.stopped ??= describe(error) })
         }
         if (unconfirmed.has(context.lease.slot.id)) continue
-        await context.lease.release(context.cleanup).then(() => { slotStates.get(context.lease.slot.id)!.state = "closed" },
+        await sealAgentProcessInventory(context.command.agentEvidence).then(() => context.lease.release(context.cleanup))
+          .then(() => { slotStates.get(context.lease.slot.id)!.state = "closed" },
           (error: unknown) => { state.stopped ??= describe(error) })
       }
       await Promise.all(contexts.map(context => context.lease.close()))
