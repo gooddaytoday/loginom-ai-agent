@@ -1,11 +1,11 @@
 # Приоритет стандартных узлов в loginom-automation
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыта21 candidate,
-policy PASS во всех21. Один итоговый расчёт правильный,20 результатов не получены.
-Одна сессия завершена штатно,20 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты22 candidate,
+policy PASS во всех22. Один итоговый расчёт правильный,21 результат не получен.
+Одна сессия завершена штатно,21 адресно освобождена после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось4 candidate, включая текущую campaign-roi-by-channel/3. Sequential
-runner114233/exec27782 продолжил серию2026-10-15T01:40:41.577044+00:00;
+Осталось3 candidate, включая текущую first-last-touch/3. Sequential
+runner177354/exec27014 продолжил серию2026-10-15T01:57:33.338234+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -17,6 +17,21 @@ unmet/ограничение выборки; нет extra models ради кво
 сохраняются, индивидуальные5b/locks/attempts/verdicts неизменны. Designreview
 `a6c54942…`; concrete readback `e2e714b8…` подтвердил документ/lock и
 неизменность5b/f71/97. Actualsampling пока не выполнен.
+
+Campaign-ROI/3 closed01:50:29.284Z: policy PASS `4ce5c4e8…`, mandatory
+review `46b4c6c8…`;28messages/107parts/30tools/88events/2542runtime, JS0/nochildren.
+Std Import500 исключает готовыйroi (used:false/actual4fields)→GroupCount+SUMBudget+
+SUMRevenue→Calculator(total_revenue-total_budget)/total_budget*100→SortDESC
+с output mapping SUCCEEDED4. NativeExportcompleted/readAMBIG file-search scroll
+budget exhausted; новыхapply/JS после отказа нет. CSV/LGP/oracle не получены;
+исходные CLI1/cleanupfalse/runtimefalse/APPLY_MISMATCH сохранены.
+Own296closed01:52:18.114Z/admin297logout01:52:19.788Z/browserclosed01:52:21.131Z;
+9actualPIDgone/exactguardarchive01:52:22.230825Z, unknown292+295 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+18case/26recovery readonly; descriptor `c796de15…`.
+Independent finalrelease review `486a6c06…`/readback `f235b43f…` approved;
+actualgate2026-10-15T01:57:33.153Z разрешил technical-failed.
+Originalattempt `fa577483…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Risky-approved-claims/3 closed01:36:30.535Z: policy PASS `5c555415…`, mandatory
 review `629b904a…`;26messages/100parts/28tools/83events/2225runtime, JS0/nochildren.
