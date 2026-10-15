@@ -1,11 +1,11 @@
 # Loginom Standard Node Selection Implementation Plan
 
-Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыты20 candidate,
-policy PASS во всех20. Один итоговый расчёт правильный,19 результатов не получены.
-Одна сессия завершена штатно,19 адресно освобождены после отказа.
+Текущий checkpoint новой серии `20261014T185528Z-ad0f2b`: закрыта21 candidate,
+policy PASS во всех21. Один итоговый расчёт правильный,20 результатов не получены.
+Одна сессия завершена штатно,20 адресно освобождены после отказа.
 Полная приёмка25candidate и финальная seeded выборка ещё не завершены.
-Осталось5 candidate, включая текущую risky-approved-claims/3. Sequential
-runner14366/exec74492 продолжил серию2026-10-15T01:29:07.025404+00:00;
+Осталось4 candidate, включая текущую campaign-roi-by-channel/3. Sequential
+runner114233/exec27782 продолжил серию2026-10-15T01:40:41.577044+00:00;
 следующий процесс разрешён только после strict own release предыдущего.
 Criteria/runtime/model/input прежние, без пересборки.
 
@@ -21,6 +21,22 @@ unmet/ограничение выборки; нет extra models ради кво
 - [x] Закрепить отдельное итоговое уточнение доступности seeded выборки: target3,
   min(3,N)/reviewALLN при N<3, явная невыполненная квота без extra моделей;
   independent design/readback a6c54942/e2e714b8, исходные5b/f71/97 неизменны.
+
+Risky-approved-claims/3 closed01:36:30.535Z: policy PASS `5c555415…`, mandatory
+review `629b904a…`;26messages/100parts/28tools/83events/2225runtime, JS0/nochildren.
+Std Import400→FilterApproved AND fraud_score>0.8→72→GroupCount/Sums/Avg→Sort4
+SUCCEEDED4. Первый Filter Unsupported node label NOT_APPLIED/effectfalse/0nativeevents;
+исправлен только label новой standardоперацией, предикаты ивход сохранены.
+NativeExportcompleted/readAMBIG file-search scroll budget exhausted;
+затем только same-opinspect/resume/recover/blockedSave, новыхapply/JS нет.
+CSV/LGP/oracle не получены; CLI1/cleanupfalse/runtimefalse/APPLY_MISMATCH сохранены.
+Own293closed01:39:06.112Z/admin294logout01:39:07.743Z/browserclosed01:39:08.953Z;
+9actualPIDgone/exactguardarchive01:39:09.911369Z, unknown289+292 видны вдвухreadbacks.
+Root независимо проверилscope доclose;17original bytes unchanged,
+18case/26recovery readonly; descriptor `22bd03a1…`.
+Independent finalrelease review `5ba47bdb…`/readback `c4ac2a07…` approved;
+actualgate2026-10-15T01:40:41.399Z разрешил technical-failed.
+Originalattempt `eda0ab25…` неизменен; отдельныйpolicyPASS не заменяет исходный FAIL.
 
 Monthly-demand/3 closed01:23:26.486Z: policy PASS `b0954457…`, mandatory
 review `44928acd…`;31messages/116parts/32tools/97events/2944runtime, JS0/nochildren.
