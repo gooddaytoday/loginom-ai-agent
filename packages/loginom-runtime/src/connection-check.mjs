@@ -34,8 +34,12 @@ export function loginomAddress(value) {
 export async function loginPage(page, candidate, owner) {
   // Passive diagnostics only. These events never qualify login or cleanup,
   // read application data, renew deadlines, or issue an extra Page request.
+  const scriptFailureCodes=['net::ERR_CERT_VERIFIER_CHANGED','net::ERR_FAILED','net::ERR_CERT_AUTHORITY_INVALID',
+    'net::ERR_CERT_COMMON_NAME_INVALID','net::ERR_CERT_DATE_INVALID','net::ERR_CERT_INVALID',
+    'net::ERR_SSL_PROTOCOL_ERROR','net::ERR_CONNECTION_RESET']
   const trace=owner ? (owner.evidence??={}).login_ui={revision:1,source:'original_page_events',
-    owner_id:owner.id,phase:'navigation',events:[],dropped:0,script_failures:[],script_failures_dropped:0,authority:false} : undefined
+    owner_id:owner.id,phase:'navigation',events:[],dropped:0,script_failures:[],script_failures_dropped:0,
+    script_failure_histogram:Object.fromEntries([...scriptFailureCodes,'other'].map(code=>[code,0])),authority:false} : undefined
   const context=owner?.context,ownerId=owner?.id
   const listeners=[]
   const append=event=>{
@@ -68,6 +72,8 @@ export async function loginPage(page, candidate, owner) {
     listen('requestfailed',request=>{
       const type=resourceType(request),url=request.url(),same=sameOrigin(url),errorText=String(request.failure()?.errorText??'')
       if(type==='script'&&same&&trace&&!trace.observation_closed&&owner.page===page&&owner.context===context&&owner.id===ownerId) {
+        const code=scriptFailureCodes.includes(errorText)?errorText:'other'
+        trace.script_failure_histogram[code]++
         if(trace.script_failures.length>=30)trace.script_failures_dropped++
         else {
           let text=errorText

@@ -62,3 +62,36 @@ test('script failures have an independent bounded path/error list without query 
  const raw=JSON.stringify(t.script_failures);for(const secret of ['secret-query','secret-password','secret-key','foreign.invalid','foreign-error','image-error'])assert.equal(raw.includes(secret),false);
  f.page.emit('requestfailed',{resourceType:()=> 'script',url:()=>f.candidate.url,failure:()=>({errorText:'late'})});assert.equal(t.script_failures.length,30);assert.equal(t.script_failures_dropped,6);
 });
+
+test('fixed script histogram counts every failure beyond both buffers without adding details',async()=>{
+ const primary=Error('entry timeout',{cause:0}),f=fixture(primary),go=f.page.goto;
+ const codes=['net::ERR_CERT_VERIFIER_CHANGED','net::ERR_FAILED','net::ERR_CERT_AUTHORITY_INVALID',
+  'net::ERR_CERT_COMMON_NAME_INVALID','net::ERR_CERT_DATE_INVALID','net::ERR_CERT_INVALID',
+  'net::ERR_SSL_PROTOCOL_ERROR','net::ERR_CONNECTION_RESET'];
+ const emit=(errorText,{url='https://own.invalid/private-script.js?key=secret-query',type='script',missing=false}={})=>f.page.emit('requestfailed',{
+  resourceType:()=>type,url:()=>url,failure:()=>missing?undefined:{errorText}});
+ f.page.goto=async()=>{
+  await go();for(let i=0;i<40;i++)f.page.emit('load');
+  for(let i=0;i<40;i++)emit('unknown secret-key');
+  for(let i=0;i<codes.length;i++)for(let n=0;n<=i;n++)emit(codes[i]);
+  emit('net::ERR_FAILED secret-password');emit('',{missing:true});
+  emit(codes[0],{url:'https://foreign.invalid/script.js'});emit(codes[1],{type:'image'});
+ };
+ await assert.rejects(loginPage(f.page,f.candidate,f.owner),e=>e===primary);
+ const t=f.owner.evidence.login_ui,h=t.script_failure_histogram;
+ assert.deepEqual(Object.keys(h),[...codes,'other']);codes.forEach((code,i)=>assert.equal(h[code],i+1));assert.equal(h.other,43);
+ assert.equal(t.events.length,32);assert.equal(t.script_failures.length,30);assert.equal(t.script_failures_dropped,49);
+ assert.equal(Object.values(h).reduce((a,b)=>a+b,0),t.script_failures.length+t.script_failures_dropped);
+ assert.ok(Object.values(h).every(n=>Number.isInteger(n)&&n>=0));assert.equal(t.authority,false);
+ const raw=JSON.stringify(h);for(const value of ['secret-key','secret-password','secret-query','private-script','foreign.invalid','unknown'])assert.equal(raw.includes(value),false);
+ const before=JSON.stringify(h);emit(codes[0]);assert.equal(JSON.stringify(h),before);
+ assert.deepEqual(f.events,['goto','evaluate','wait']);
+});
+for(const drift of ['page','context','id'])test('script histogram ignores owner drift: '+drift,async()=>{
+ const primary=Error('entry timeout',{cause:0}),f=fixture(primary),go=f.page.goto;
+ f.page.goto=async()=>{await go();f.owner[drift]=drift==='id'?'foreign':{};
+  f.page.emit('requestfailed',{resourceType:()=> 'script',url:()=>f.candidate.url,failure:()=>({errorText:'net::ERR_CERT_VERIFIER_CHANGED'})});};
+ await assert.rejects(loginPage(f.page,f.candidate,f.owner),e=>e===primary);
+ const t=f.owner.evidence.login_ui;assert.equal(t.script_failure_histogram['net::ERR_CERT_VERIFIER_CHANGED'],0);
+ assert.equal(t.script_failure_histogram.other,1);assert.equal(t.owner_changed,true);assert.equal(t.authority,false);
+});
