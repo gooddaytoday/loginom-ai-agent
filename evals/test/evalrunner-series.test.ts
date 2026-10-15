@@ -68,6 +68,12 @@ test("versioned series reservation survives another directory and task, and a co
     expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "BLOCKED", completed: 0, expected: 144, blockedSlot: first.id })
     await expect(admitEvalrunnerSlot(config, manifest, manifest.slots[1]!, "task-2")).rejects.toThrow("Earlier slot unresolved")
     await expect(admitEvalrunnerSlot(config, manifest, first, "task-2")).rejects.toThrow("already admitted")
+    // Child exit alone cannot stand in for validated cleanup/history/release.
+    const selected = path.join(manifest.series, "slots", first.id)
+    const child = Bun.spawn([process.execPath, "-e", `await Bun.write(${JSON.stringify(path.join(selected, "runs/one/summary.json"))},JSON.stringify({status:'completed'}))`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "BLOCKED", completed: 0, blockedSlot: first.id })
+    await expect(admitEvalrunnerSlot(config, manifest, first, "task-3")).rejects.toThrow("already admitted")
     await Bun.write(path.join(manifest.series, "manifest.json"), JSON.stringify({ ...manifest, slots: manifest.slots.slice(1) }))
     await expect(readEvalrunnerSeries(config, manifest.series)).rejects.toThrow("Manifest changed")
   } finally { await rm(root, { recursive: true, force: true }) }
