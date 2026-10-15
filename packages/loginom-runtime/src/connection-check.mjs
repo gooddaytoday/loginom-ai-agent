@@ -68,7 +68,9 @@ export async function loginPage(page, candidate, owner) {
       owner.evidence.startup_diagnostics=owner.startupDiagnostics.evidence
     }
   }
+  if(owner) owner.evidence.goto={entered_at:new Date().toISOString(),settled_at:null}
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
+  if(owner) owner.evidence.goto.settled_at=new Date().toISOString()
   if(owner) {
     await page.evaluate(o=>{
       if(location.origin!==o.origin||globalThis.__loginomStartupV1) throw Error('LOGINOM_STARTUP_IDENTITY_REQUIRED')
