@@ -65,7 +65,10 @@ export async function configureGroupingOutput(channel,configuration,parameters,m
  let initial=await channel.observe({condition:'grouping output inventory',readMappings:true,ready});
  initial=await ensureGroupingOutputSources(channel,initial);
  const planned=resolveGroupingOutput(configuration,parameters,initial.node_mapping,mapping),changes=[];
- if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
+ // Auto-sync restores the source order on a fresh execution. Freeze a custom
+ // order unless the caller explicitly requests synchronization.
+ const reordered=planned.fields&&!same(planned.fields.map(f=>f.current.record_id),initial.node_mapping.target_fields.map(f=>f.record_id));
+ if(mapping.autosync!==undefined||reordered)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
  if(planned.fields){
   // Finish table edits before exclusion introduces a separate native group.
   // Existing exclusions stay excluded; new exclusions use the same guarded

@@ -90,3 +90,12 @@ test('Grouping validates the full layout before autosync and retains the autosyn
  const drift=outputChannel();drift.channel.afterAutosync=n=>{n.target_fields[0].label='changed';};
  await assert.rejects(configureGroupingOutput(drift.channel,drift.config,drift.params,drift.mapping),/definition changed/);assert.equal(drift.actions.length,1);
 });
+test('Grouping freezes a requested field order when autosync is omitted',async()=>{
+ const f=outputChannel();await configureGroupingOutput(f.channel,f.config,f.params,{});
+ assert.equal(f.native.autosync,false);assert.equal(f.actions[0].ref,'auto');
+ assert.deepEqual(f.native.target_fields.map(f=>f.name),['Segment','Group','OtherTotal','MeanAmount','TextRows']);
+});
+test('Grouping preserves an explicit autosync choice for a requested field order',async()=>{
+ const f=outputChannel();await configureGroupingOutput(f.channel,f.config,f.params,{autosync:true});
+ assert.equal(f.native.autosync,true);assert.ok(!f.actions.some(a=>a.ref==='auto'));
+});
