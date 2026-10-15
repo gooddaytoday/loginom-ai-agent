@@ -466,7 +466,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 await storage.CreateDirectory(directory)
                 await storage.CreateDirectory(`${directory}/nested`)
                 const unusual = []
-                for (const name of ["space name.lgp", "tab\tname.lgp", "line\nname.lgp", "Юникод.lgp", "-leading.lgp", ".hidden.lgp", "nested/file.lgp"]) {
+                for (const name of ["space name.lgp", "tab\tname.lgp", "line\nname.lgp", "Юникод.lgp", "-leading.lgp", ".hidden.lgp", "nested/file.lgp", "copy.lgp.autosave"]) {
                   const copied = await storage.CopyFile(source, `${directory}/${name}`, false, false)
                   const stream = await storage.OpenFile(`${directory}/${name}`, bg.TBGFileOpenMode.fomRead, bg.TBGShareFileMode.sfmShareDenyNone)
                   try {

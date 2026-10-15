@@ -209,7 +209,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         expect(data.storage.readConfirmed).toBe(true)
         expect(data.storage.size).toBeGreaterThan(0)
         expect(data.storage.copySize).toBe(data.storage.size)
-        const names = ["space name.lgp", "tab\tname.lgp", "line\nname.lgp", "Юникод.lgp", "-leading.lgp", ".hidden.lgp", "nested/file.lgp"]
+        const names = ["space name.lgp", "tab\tname.lgp", "line\nname.lgp", "Юникод.lgp", "-leading.lgp", ".hidden.lgp", "nested/file.lgp", "copy.lgp.autosave"]
         expect(data.storage.unusual.map(row => row.name)).toEqual(names)
         expect(data.storage.unusual.map(row => [row.copied, row.written, row.readConfirmed, row.size]))
           .toEqual(names.map(() => [true, true, true, data.storage.size]))

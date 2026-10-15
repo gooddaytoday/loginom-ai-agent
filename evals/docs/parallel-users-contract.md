@@ -814,3 +814,12 @@ SHA256 `c912749eea012da5e1f50dbdad79560545b4f450f6a65565f9bae5651bb6357e`.
 Native2 PASS/197 (71.73s), unit60 PASS/260, typecheck/diff PASS; process/dispose
 confirmed, exact pair independently absent. Autosave suffix, unusual component
 paths, concurrency/cleanup и production binding остаются отдельными gates.
+
+Autosave suffix `copy.lgp.autosave` добавлен восьмым special filename. Own
+FileStorage copy/read/write controls и NUL SHA проходят; matrix648 denials
+(2×9 scopes×9 filenames×4 ops) сохраняет все peer/shared files. Это копия пакета
+под suffix-case, не native autosave generation или SessionBackup proof.
+Actual native autosave/SessionBackup research остаётся отдельным gate.
+Private600 receipt `research/evidence/native-user-b643d721-aa5f-4e29-947a-78e238db1817/storage-probe.json`,
+SHA256 `b75f68ce2ccd2f293e727da9251af647d80ecc5b5862c2fb47992c644e02b45a`;
+native1 PASS/118 (36.85s), typecheck/diff PASS, process confirmed и exact pair absent.
