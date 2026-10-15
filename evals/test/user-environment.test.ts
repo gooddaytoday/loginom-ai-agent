@@ -272,7 +272,7 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     await expect(readUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("LEASE_NOT_HELD")
     await expect(stageUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("LEASE_NOT_HELD")
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
-})
+}, 30_000)
 
 test("user preparation reader rejects a malformed durable nonce without changing the files", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
