@@ -132,3 +132,19 @@ model/judge calls ещё не квалифицированы. Отсутстви
 Этот blocker относится к model/refresh и judge live gates. `--skip-judge` не требует judge auth; немодельные и fake CLI/judge проверки могут продолжаться. Команды входа и неизменяемые пути остаются в задаче 7 плана; токены в этот файл не записывать. Вопрос пользователю отложен до завершения независимых задач.
 
 Static Studio inspection 2026-10-14 независимо от credentials закрепила RPC interface inventory (private admin-source-4905babb/rpc-inventory.json): Session.Guid и managed object ID доступны в surface, UI CloseSession использует proxy row. Это не живая квалификация: GUID↔managed-ID/CLI correlation, reconnect stability и close/read-back остаются неподтверждёнными. Дополнительный blocker несовместимости API не заявлен по одним descriptors; нужен owner-backed Loginom run из уже указанного bootstrap prerequisite. Stopped inspection container удалён, endpoints/рабочие сессии не трогались.
+
+## Retained parent-preparation RED fixture
+
+2026-10-15: `/tmp/evals-parent-prepare-XnBhbF`, nonce
+`910f1d39-4eb8-48d7-ab98-aff3c25897cc`, server
+`722e3d356803392959624c9bab58d40e3e66b560660f8b6c957e095459321b83`, Studio
+`dcee92dd8842f85da5853b30557a1743180f50692882b8783bf4e6b7781232a7`.
+Actual parent blocked create/configure/ACL confirmed; root publication failed
+USER_STORAGE_OWNERSHIP because a root appeared during native preparation.
+Admin transport/process disposal confirmed, account never activated, storage
+journal planned. The ordering defect is fixed by pre-reserving the absent
+inode and has passed fresh native composition; this old root is not adopted.
+Server/user/profile reservations, sources and secret remain retained. Removal
+requires actual recovery-only lineage plus an unactivated-account finalization
+producer, still absent; empty root alone does not authorize release/destroy.
+Diagnosis: `evals/docs/2026-10-15-user-root-reservation.md`.

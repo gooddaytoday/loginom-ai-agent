@@ -25,7 +25,7 @@ import { constants } from "node:fs"
 import { lstat, mkdir, mkdtemp, open, readdir, realpath } from "node:fs/promises"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { verifyAdminRuntime } from "./preflight"
-import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
+import { readServerIdentity, reserveUserStorage, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 import { claimUserOwnership, readServerSession, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration } from "./user-environment"
 
@@ -168,11 +168,19 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       })
       const owned = info ? await readUserOwnership(file, lease, secretFile) : null
       if (owned?.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+      const reserved = !owned && options.serverLease ? await (async () => {
+        await verifyParallelPair(file, identity)
+        const observed = await observe()
+        if (!jsonObject(observed) || !Array.isArray(observed.users)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
+        if (observed.users.some(user => jsonObject(user) && typeof user.name === "string" && user.name.toLowerCase() === lease.slot.username.toLowerCase())) return undefined
+        return reserveUserStorage(file, lease, secretFile, options.serverLease!)
+      })() : undefined
       const reply = await request("reconcile-user", { phase: "blocked", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
         desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: owned ? { objectId: owned.objectId, name: owned.username,
           userKind: owned.userKind, preparationNonce: owned.preparationNonce } : null }, async () => {
         if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared))
           throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
+        if (reserved && options.serverLease) await reserveUserStorage(file, lease, secretFile, options.serverLease)
         if (owned && JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned))
           throw new EvalFailure("USER_OWNERSHIP_CONFLICT", 2)
         if (!owned && await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
