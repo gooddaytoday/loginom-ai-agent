@@ -861,5 +861,7 @@ admin/process sources и native blocked/absent state, архивирует histo
 выпускает доказанно чистые reservations. Exit0/status released — завершение
 cleanup, ready:false. Неопределённый исход — retained/unconfirmed/exit2.
 Повтор с durable completion возвращает historical already_released без CAS/admin
-и сохраняет reservations следующего владельца. Active CLI incidents, crash до
-completion и partial terminal reconciliation пока не покрываются этим путём. Offline judge recover сохранён.
+и сохраняет reservations следующего владельца. Если completion/result ещё отсутствуют, но current server row уже released
+для этого cohort, metadata восстанавливается под guard по terminal proofs без
+CAS/admin runtime. Active CLI incidents, server-retained/partial terminal
+reconciliation и реальные SIGKILL окна ещё не покрываются этим путём. Offline judge recover сохранён.
