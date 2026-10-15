@@ -4,10 +4,11 @@ import { EvalFailure } from "./fail"
 import type { RunSummary } from "./report"
 
 export type EvalrunnerConfig = {
-  kind: "evalrunner-runtime"; version: 1; root: string; checkout: string; harnessSha: string
+  kind: "evalrunner-runtime"; version: 1 | 2; root: string; checkout: string; harnessSha: string
   cliBin: string; cliManifestSha256: string; binarySha256: string; profile: string; workspace: string
   results: string; envFile: string; judgeHome: string; containerId: string; imageDigest: string
   endpoint: string; readinessIssue: string
+  cliVersion?: string; cliSourceSha?: string
 }
 
 export function checkEvalrunnerOutcome(summary: RunSummary, node = false) {
@@ -29,7 +30,8 @@ export async function qualifyEvalrunner(config: EvalrunnerConfig) {
   const git = await Bun.$`git rev-parse HEAD`.cwd(config.checkout).quiet()
   const dirty = await Bun.$`git status --porcelain`.cwd(config.checkout).quiet()
   if (git.text().trim() !== config.harnessSha || dirty.text().trim()) throw new EvalFailure("Harness pin changed", 2)
-  const metadata = await verifyEvalrunnerCli(config.cliBin)
+  const metadata = await verifyEvalrunnerCli(config.cliBin, config.version === 2
+    ? { version: config.cliVersion!, sourceCommit: config.cliSourceSha! } : undefined)
   if (await fileHash(config.cliBin) !== config.binarySha256 ||
     await fileHash(path.join(path.dirname(path.dirname(config.cliBin)), "cli-manifest.json")) !== config.cliManifestSha256)
     throw new EvalFailure("CLI pins changed", 2)
@@ -127,14 +129,15 @@ export async function checkEvalrunnerEvidence(series: string) {
   return receipt
 }
 
-export async function verifyEvalrunnerCli(binary: string) {
+export async function verifyEvalrunnerCli(binary: string, expected = { version: "0.2.0", sourceCommit: "0c975a73676d9aba556085dbda97e1a9ceb23cc6" }) {
   const root = path.dirname(path.dirname(binary))
   const manifest = await Bun.file(path.join(root, "cli-manifest.json")).json() as {
     format: string; metadata: { version: string; sourceCommit: string; sourceDirty: boolean }
     files: { path: string; sha256: string; mode: number; link?: string }[]
   }
-  if (manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata.version !== "0.2.0" || manifest.metadata.sourceDirty ||
-    manifest.metadata.sourceCommit !== "0c975a73676d9aba556085dbda97e1a9ceb23cc6") throw new EvalFailure("Unexpected CLI build", 2)
+  if (!/^[a-f0-9]{40}$/.test(expected.sourceCommit) || !/^[\w.+-]+$/.test(expected.version) ||
+    manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata.version !== expected.version || manifest.metadata.sourceDirty !== false ||
+    manifest.metadata.sourceCommit !== expected.sourceCommit) throw new EvalFailure("Unexpected CLI build", 2)
   const actual = await payloadFiles(root)
   if (actual.length !== manifest.files.length || new Set(manifest.files.map(item => item.path)).size !== actual.length)
     throw new EvalFailure("CLI payload file set changed", 2)
@@ -173,7 +176,8 @@ export async function readEvalrunnerConfig(file: string) {
   const value: unknown = await Bun.file(file).json()
   if (!value || typeof value !== "object") throw new EvalFailure("Invalid runtime config", 2)
   const config = value as EvalrunnerConfig
-  if (config.kind !== "evalrunner-runtime" || config.version !== 1 ||
+  if (config.kind !== "evalrunner-runtime" || ![1, 2].includes(config.version) ||
+    config.version === 2 && (!/^[a-f0-9]{40}$/.test(config.cliSourceSha ?? "") || !/^[\w.+-]+$/.test(config.cliVersion ?? "")) ||
     ![config.root, config.checkout, config.cliBin, config.profile, config.workspace, config.results, config.envFile, config.judgeHome]
       .every(item => typeof item === "string" && path.isAbsolute(item) && path.resolve(item) === item) ||
     !/^[a-f0-9]{40}$/.test(config.harnessSha) ||

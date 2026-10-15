@@ -49,6 +49,24 @@ test("standalone CLI integrity rejects changed bytes and extra payload files", a
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("versioned CLI pins admit only the explicitly selected clean source while preserving legacy defaults", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-versioned-cli-"))
+  try {
+    await mkdir(path.join(root, "bin"))
+    await Bun.write(path.join(root, "bin/cli"), "candidate")
+    await chmod(path.join(root, "bin/cli"), 0o755)
+    const manifest = { format: "loginom-cli-artifact-v1", metadata: { version: "0.2.0", sourceCommit: "a".repeat(40), sourceDirty: false },
+      files: [{ path: "bin/cli", sha256: new Bun.CryptoHasher("sha256").update("candidate").digest("hex"), mode: 0o755 }] }
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).rejects.toThrow("Unexpected CLI build")
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"), { version: "0.2.0", sourceCommit: "a".repeat(40) })).resolves.toHaveProperty("sourceCommit", "a".repeat(40))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"), { version: "0.2.0", sourceCommit: "b".repeat(40) })).rejects.toThrow("Unexpected CLI build")
+    manifest.metadata.sourceDirty = true
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"), { version: "0.2.0", sourceCommit: "a".repeat(40) })).rejects.toThrow("Unexpected CLI build")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("standalone admission needs no historical baseline and rejects a second owner", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-"))
   try {
