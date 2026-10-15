@@ -1289,8 +1289,12 @@ function browserReceipt(page, task, perform) {
     operation_id: task.operation_id, phase: 'observed', effect_possible: false, output: { state, ...output }, error: null, trace: [] });
   if (task.receipt_read) {
     if (!previous) return envelope('missing');
-    if (previous.signature !== task.receipt_signature) return envelope('identity_mismatch');
-    return envelope(previous.state, previous.outcome ? { receipt: previous.outcome } : {});
+    if (previous.signature !== task.receipt_signature || previous.portOpeningPage && previous.portOpeningPage!==page) return envelope('identity_mismatch');
+    const progress=previous.portOpeningProgress;
+    if(progress&&(progress.namespace!==task.receipt_namespace||progress.id!==(task.receipt_id??task.operation_id)
+      ||progress.signature!==task.receipt_signature||JSON.stringify(progress.identity)!==previous.portOpeningIdentity))return envelope('identity_mismatch');
+    return envelope(previous.state, { ...(previous.outcome ? { receipt: previous.outcome } : {}),
+      ...(previous.portOpeningProgress ? {port_open_progress:structuredClone(previous.portOpeningProgress)} : {}) });
   }
   if (previous) {
     if (previous.signature !== task.receipt_signature) throw new Error('Browser operation receipt identity mismatch');
@@ -1305,12 +1309,39 @@ function browserReceipt(page, task, perform) {
   const entry = { state: 'running', signature: task.receipt_signature };
   ledger.set(key, entry);
   return (async () => {
-    try { const outcome = await perform(); entry.outcome = outcome; entry.state = 'completed'; return outcome; }
-    catch (error) { entry.state = 'unknown'; throw error; }
+    try { const outcome = await perform(progress => {
+      // Only the fixed serialized port helper uses this private callback. It is
+      // bound to this exact namespace/id/signature and Page ledger entry.
+      if(ledger.get(key)!==entry||entry.state!=='running'||entry.signature!==task.receipt_signature)
+        throw Error('Port progress receipt custody changed');
+      if(!progress||progress.identity?.operation_id!==(task.receipt_id??task.operation_id)
+        ||!['entry','returned','refused','intent'].includes(progress.boundary)
+        ||!['helper','helper_result','read_node','poll_wait','menu_gesture','open_gesture','confirm_gesture','menu_wait','open_trial','confirm_trial','wizard_wait',
+          'inspect_lookup','inspect_release_reserved','inspect_begin','inspect_menu_issued','inspect_menu','inspect_open_issued','inspect_await_open','inspect_deactivation_issued','inspect_finish'].includes(progress.phase))
+        throw Error('Invalid fixed port progress');
+      const owner=progress.identity,b=owner.binding;
+      if(typeof task.receipt_namespace!=='string'||!task.receipt_namespace||typeof task.receipt_signature!=='string'||!task.receipt_signature
+        ||!b?.document_id||!b.workflow_ref?.workflow_id||!b.node?.node_id
+        ||b.node.document_id!==b.document_id||b.node.workflow_id!==b.workflow_ref.workflow_id
+        ||!['input','output'].includes(owner.direction)||!Number.isInteger(owner.port)||owner.port<0||owner.port>99||!Number.isSafeInteger(owner.deadline))
+        throw Error('Port progress binding incomplete');
+      const identity=JSON.stringify(owner),retained=entry.portOpeningProgress;
+      if(retained&&JSON.stringify(retained.identity)!==identity)throw Error('Port progress owner changed');
+      const value=retained??{identity:JSON.parse(identity),namespace:task.receipt_namespace,id:task.receipt_id??task.operation_id,
+        signature:task.receipt_signature,events:[],truncated:false,authority:false};
+      // Preserve the first and latest bounded phases; no object/DOM/error text.
+      if(value.events.length>=96){value.events.splice(1,1);value.truncated=true;}
+      value.events.push({sequence:(value.sequence??0)+1,phase:progress.phase,boundary:progress.boundary,at:Date.now()});
+      value.sequence=(value.sequence??0)+1;entry.portOpeningProgress=value;entry.portOpeningPage=page;entry.portOpeningIdentity=identity;
+    }); entry.outcome = outcome; entry.state = 'completed'; return outcome; }
+    catch (error) { try{entry.state = 'unknown';}catch{}throw error; }
   })();
 }
+export function makeBrowserReceiptReadCode(options) {
+  return `async page => (${browserReceipt.toString()})(page, ${JSON.stringify({...options,receipt_read:true})})`;
+}
 export function withBrowserReceipt(body, options) {
-  return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, () => ${body})`;
+  return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, portOpeningProgress => ${body})`;
 }
 
 export function parseCapabilityResult(response) {
@@ -1438,8 +1469,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const readReceipt = async (operation,reference=operation.lastReceipt) => {
     if (!reference) return { state: 'missing' };
-    const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
-      receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
+    const code = makeBrowserReceiptReadCode({receipt_namespace:receiptNamespace,receipt_id:reference.id,receipt_signature:reference.signature,operation_id:operation.id});
     const value = await execute(code, { timeout: 10000 });
     assertActionOutcome(value);
     const state = value.output;
@@ -1549,6 +1579,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       try{operation.inputMappingRecovery=await operation.nodeApplyDrivers.inspectInputMapping({readReceipt:ref=>readReceipt(operation,ref)});}
       catch(error){operation.inputMappingRecovery={available:false,phase:'input_mapping',reason:String(error.message).slice(0,1000)};}
       finally{running=false;}
+    }
+    if(operation.lastReceipt?.action_key==='node.output_port.open.internal') {
+      try {
+        const reference=structuredClone(operation.lastReceipt),state=await readReceipt(operation,reference);
+        if(JSON.stringify(reference)!==JSON.stringify(operation.lastReceipt))throw Error('Port progress reference changed');
+        await onRecord({operation_id:operation.id,action_key:operation.action.action_key,action_revision:operation.action.revision,
+          phase:'node_port_open_receipt_observed',reference,
+          receipt_state:state.state,progress:state.port_open_progress??null,
+          progress_status:state.port_open_progress?'RETAINED_HISTORICAL':'NOT_PERSISTED',authority:false});
+      } catch { /* Diagnostic read/write never replaces the original refusal or releases custody. */ }
     }
     if(operation.nodeApply?.pending?.phase==='output_mapping'&&operation.nodeApplyDrivers?.inspectOutputMapping){
       running=true;

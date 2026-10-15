@@ -200,14 +200,24 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(now()>=operation.deadline)throw Error('Port opening deadline elapsed before mutation');
       const code=(direction==='input'?makePreparedInputPortOpenCode:makePreparedOutputPortOpenCode)(preparedNodeContext,{port,operation_id:id,origin:targetOrigin,build:targetBuild,
         deadline:Math.min(operation.deadline,now()+15000)});
-      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'port_open',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:r.error}:null,trace:r.trace}}`;
+      const envelope=`async page=>{const r=await (${code})(page,typeof portOpeningProgress==='function'?portOpeningProgress:undefined);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'port_open',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:r.error}:null,trace:r.trace}}`;
       let result;
       try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:20000});}
-      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;
+        try{await entry('node_port_open_publication',{step,internal_operation_id:id,signature,result_received:false,result_status:'UNKNOWN',authority:false});}catch{}
+        throw error;}
       if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Port opening receipt identity differs');}
-      operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
-      const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
-      if(completed?.outcome?.operation_id!==id||JSON.stringify(completed.outcome)!==JSON.stringify(result))throw Error('Port opening outcome was not durably preserved');
+      const helperCleanupConfirmed=result.cleanup_complete===true;
+      operation.cleanupConfirmed=false;operation.nodeEffectPossible ||= result.effect_possible===true;
+      // A result received from the helper is distinct from its durable outcome.
+      // Only node_step_completed's checked acknowledgement proves publication.
+      let completed;
+      try {
+        await entry('node_port_open_publication',{step,internal_operation_id:id,signature,result_received:true,result_status:result.status,authority:false});
+        completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+        if(completed?.outcome?.operation_id!==id||JSON.stringify(completed.outcome)!==JSON.stringify(result))throw Error('Port opening outcome was not durably preserved');
+      } catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      operation.cleanupConfirmed=helperCleanupConfirmed;
       const owner=result.output;
       if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||owner?.verified!==true||owner.direction!==direction||owner.port!==port
         ||owner.opening_operation_id!==id||owner.document_id!==preparedNodeContext.document_id
