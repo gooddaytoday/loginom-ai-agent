@@ -9,8 +9,11 @@ const witness=await import(new URL('terminal-script-witness.mjs',lib)),packet=aw
 const text=await readFile(new URL('terminal-script-load.test.mjs',import.meta.url),'utf8'),ast=parse(text,{ecmaVersion:'latest',sourceType:'module'}),node=ast.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='scripts');
 const scripts=runInThisContext('('+text.slice(node.start,node.end)+')');
 async function control(fn,instrument=false,realCompletion=false){const realm=await setup(60000,'retain-only');try{
- let originalCompletion;
- if(realCompletion){const c=realm.page.context;runInContext('window=globalThis',c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/mscorlib.js','utf8'),c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/Task.js','utf8'),c);originalCompletion=c.ss.TaskCompletionSource}
+ let originalCompletion;const originalSources=[];
+ if(realCompletion){const c=realm.page.context;runInContext('window=globalThis',c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/mscorlib.js','utf8'),c);runInContext(await readFile(process.env.TERMINAL_INPUT_DIR+'/Task.js','utf8'),c);originalCompletion=c.ss.TaskCompletionSource;
+  if(realCompletion.trackSources){const ctor=originalCompletion;originalCompletion=new Proxy(ctor,{construct(target,args){const source=Reflect.construct(target,args,target);originalSources.push(source);return source}})}
+  if(realCompletion.continuation){const original=c.ss.Task.prototype.continueWith;c.ss.Task.prototype.continueWith=function(callback){return realCompletion.continuation({primary:this,callback,original,sourcePrototype:originalCompletion.prototype,ss:c.ss})}}
+ }
  const s=scripts(),f=await fresh({realm,scriptContext:s,originalCompletion});
  for(const kind of ['ObjectProxy','FileStorage','StreamPersist']){s.select(kind==='ObjectProxy'?'bg/js/rpc.js':'bg/js/bg.rtl.rpc.js');const ctor=f.constructors[kind];f.ss.initClass(ctor,f.asm,ctor.prototype)}
  f.receiver.FUsername='test-account';f.c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection=f.receiver;
@@ -20,7 +23,7 @@ async function control(fn,instrument=false,realCompletion=false){const realm=awa
   transport.$R=function(){probe.resolvers++;return Reflect.apply(resolver,this,arguments)};
   transport.DispatchMessageAsync=function(request){
    const task=Reflect.apply(dispatch,this,arguments),reader=task.getAwaitedResult,continuation=task.continueWith,deliver=task.deliver;
-   probe.tasks.push(task);probe.requests.push(request);task.getAwaitedResult=function(){probe.readers++;return Reflect.apply(reader,this,arguments)};
+   probe.tasks.push(task);probe.requests.push(request);if(probe.onDispatch)probe.onDispatch(request,task);task.getAwaitedResult=function(){probe.readers++;return Reflect.apply(reader,this,arguments)};
    task.continueWith=function(callback){probe.callback=callback;return Reflect.apply(continuation,this,[function(){probe.continuations++;return Reflect.apply(callback,this,arguments)}])};
    task.deliver=function(){Reflect.apply(deliver,this,arguments);if(probe.response)probe.response(Reflect.apply(reader,task,[]))};return task;
   };
@@ -29,13 +32,13 @@ async function control(fn,instrument=false,realCompletion=false){const realm=awa
  f.c.__loginomStartupV1={document:f.c.document,id:'original',account:'test-account'};
  f.c.__witnessArgs=witness.terminalScriptWitnessArguments('original','test-account');
  const capsule=runInContext('('+witness.collectTerminalScriptWitness.toString()+')(__witnessArgs)',f.c);
- probe.tasks.length=0;probe.readers=0;probe.resolvers=0;probe.continuations=0;
+ originalSources.length=0;probe.tasks.length=0;probe.readers=0;probe.resolvers=0;probe.continuations=0;
  const provider=Object.getOwnPropertyDescriptor(capsule,'originalProvider').value;
  const request={operationId:'own-prepare',sessionId:'own-session',intent:'new_draft'};
  const prepare=()=>packet.prepareTerminalOriginalPacket(packet.captureTerminalInitialCustody({custody:realm.custody,native:realm.receivers,
   loaded:packet.captureTerminalLoadedExports(realm.loaded),preparation:realm.preparation}),{
    loginomUrl:'http://loginom.example/app?testable=true',compatibility:{profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'},platform:'darwin',sessionId:'own-session',operationId:'own-prepare'});
- await fn({realm,f,s,capsule,provider,request,prepare,probe});
+ await fn({realm,f,s,capsule,provider,request,prepare,probe,originalSources});
  }finally{await realm.native.drain();await realm.native.cleanup()}}
 test('capsule provider retains original store/user/query before creation then same original task/support, no reader replay',()=>control(async x=>{
  const before=x.provider.inspect();assert.equal(before.preparation,x.realm.preparation);assert.equal(before.receipts,x.realm.preparation.receipts);
@@ -169,7 +172,7 @@ for(const mode of ['accessor','copy','wrong-intent','late'])test('capsule fixed 
  assert.throws(()=>runInContext(entry+'(__capsule,__request)',x.f.c),/REQUEST|UNAVAILABLE|LATE/);assert.equal(x.f.c.getterCalls,0);assert.equal(x.realm.native.calls.length,0);
 }));
 
-async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invokeSdk=false,instrument=false}={}){return control(async x=>{
+async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invokeSdk=false,instrument=false,realCompletion=false}={}){return control(async x=>{
  x.f.c.__capsule=x.capsule;
  if(pageFailure){x.realm.page.page.evaluate=async()=>{pageFailure(x);throw pageFailure.value}}
  const host=await joined({pageOverride:x.realm.page.page,account:'test-account',sessionId:'own-session',originalSdk,
@@ -180,7 +183,7 @@ async function creationControl(fn,{pageFailure,phaseHook,originalSdk=false,invok
  await host.witness.retainPrepare(request,host.f.bridge);
  const options={loginomUrl:'http://loginom.example/app?testable=true',compatibility:{profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'},platform:'darwin',sessionId:'own-session',operationId:'original',timeoutMs:1};
  await fn({...x,host,options});
-},instrument)}
+},instrument,realCompletion)}
 test('creation continuation original armed request drives fixed workspace reserve/effect/verify and same query once',()=>creationControl(async x=>{
  assert.equal(x.realm.preparation.receipts.size,0);assert.equal(x.realm.native.calls.length,0);
  const work=x.host.witness.createWorkspace(x.options,x.host.f.bridge);assert.equal(x.host.witness.createWorkspace(x.options,x.host.f.bridge),work);
@@ -401,3 +404,75 @@ test('completion source foreign task and early settlement refuse without manufac
  assert.throws(()=>source.setResult({}),/COMPLETION_RESULT/);await assert.rejects(work,/COMPLETION_RESULT/);
  assert.equal(b.query(),work);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
 }));
+
+// New fixed birth window: full pinned mscorlib.js + Task.js in this same VM.
+// Descriptor/return mutation wrappers below are labelled negative fixtures.
+test('birth continuation observes one original lexical construction and restores prototype before return',()=>control(async x=>{
+ const prototype=x.f.ss.TaskCompletionSource.prototype,initial=Object.getOwnPropertyDescriptor(prototype,'task');assert.equal(initial,undefined);
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower,birth=r.continuationBirth;
+ assert(Object.isFrozen(birth));assert.equal(birth.observed,true);assert.equal(birth.assignmentObserved,true);assert.equal(birth.prototypeRestored,true);assert.equal(birth.lexicalCalleeIdentityQualified,false);
+ assert.equal(birth.primarySource,r.completionSource);assert.equal(birth.primaryTask,r.sourceTask);assert.notEqual(birth.source,r.completionSource);assert.notEqual(birth.task,r.sourceTask);
+ assert.equal(birth.returnedTask,birth.task);assert.equal(birth.source.task,birth.task);assert.equal(Object.getPrototypeOf(birth.source),prototype);assert.equal(Object.getPrototypeOf(birth.task),x.f.ss.Task.prototype);
+ assert.equal(birth.statusAtReturn,3);assert.equal(birth.task.status,3);assert.equal(r.sourceTask.status,3);
+ assert.deepEqual(Object.getOwnPropertyDescriptor(prototype,'task'),initial);
+ const d=Object.getOwnPropertyDescriptor(birth.source,'task');assert.equal(d.value,birth.task);assert.equal(d.writable,true);assert.equal(d.enumerable,true);assert.equal(d.configurable,true);
+ await x.realm.native.drain();assert.equal(await work,x.realm.native.support);assert.equal(birth.task.status,5);assert.equal(birth.task.getAwaitedResult(),undefined);assert.equal(b.query(),work);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},false,true));
+test('birth continuation fixture dispatch and missing Task definition cannot qualify lexical birth',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();await b.query();const birth=b.inspect().lower.continuationBirth;
+ assert.equal(birth.observed,false);assert.equal(birth.reason,'ORIGINAL_TASK_DEFINITION_UNAVAILABLE');assert.equal(birth.lexicalCalleeIdentityQualified,false);assert.deepEqual(x.realm.native.calls,[0]);
+}));
+for(const target of ['slot','source task','source prototype','task prototype'])test('birth continuation pending '+target+' drift refuses getter0 before resolver, original tasks pending',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower,birth=r.continuationBirth;let gets=0;
+ if(target==='slot')Object.defineProperty(x.f.ss.TaskCompletionSource.prototype,'task',{get(){gets++;throw Error('foreign slot')},configurable:true});
+ if(target==='source task')Object.defineProperty(birth.source,'task',{get(){gets++;throw Error('foreign task')},configurable:true});
+ if(target==='source prototype')Object.setPrototypeOf(birth.source,{});
+ if(target==='task prototype')Object.setPrototypeOf(birth.task,{});
+ const failed=assert.rejects(work,/CHANGED|UNAVAILABLE/);await x.realm.native.drain();await failed;
+ assert.equal(gets,0);assert.equal(r.sourceTask.status,3);assert.equal(birth.task.status,3);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);assert.equal(b.query(),work);
+},true,true));
+for(const reason of [false,0,null,undefined,'',Error('birth first',{cause:0})])test('birth continuation raw '+String(reason)+' reader rejection wins secondary birth drift',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query(),r=b.inspect().lower,birth=r.continuationBirth;let gets=0;
+ x.realm.native.fail(reason);Object.defineProperty(birth.source,'task',{get(){gets++;throw Error('secondary birth drift')},configurable:true});
+ const rejected=assert.rejects(work,e=>Object.is(e,reason));await x.realm.native.drain();await rejected;
+ assert.equal(gets,0);assert.equal(r.sourceTask.status,3);assert.equal(birth.task.status,3);assert.equal(x.probe.readers,1);assert.equal(x.probe.resolvers,0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true,true));
+for(const mode of ['wrong return','duplicate','wrong status','flags','status accessor','source prototype chain'])test('birth continuation '+mode+' refuses and preserves pending primary without replay',()=>{
+ let primary,foreign,gets=0;return control(async x=>{
+  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,/BIRTH|CHANGED|UNAVAILABLE/);await x.realm.native.drain();assert.equal(gets,0);
+  assert.equal(primary.status,3);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);assert.equal(b.query(),work);
+  if(mode==='flags')assert.deepEqual(Object.getOwnPropertyDescriptor(x.f.ss.TaskCompletionSource.prototype,'task'),foreign);
+  else assert.equal(Object.getOwnPropertyDescriptor(x.f.ss.TaskCompletionSource.prototype,'task'),undefined);
+ },false,{continuation({primary:task,callback,original,sourcePrototype}){
+  primary=task;const result=Reflect.apply(original,task,[callback]);
+  if(mode==='wrong return')return {};
+  if(mode==='duplicate')Reflect.apply(original,task,[callback]);
+  if(mode==='wrong status')result.status=5;
+  if(mode==='status accessor')Object.defineProperty(result,'status',{get(){gets++;throw Error('foreign status')},configurable:true});
+  if(mode==='source prototype chain')Object.setPrototypeOf(sourcePrototype,{});
+  if(mode==='flags'){foreign={...Object.getOwnPropertyDescriptor(sourcePrototype,'task'),enumerable:true};Object.defineProperty(sourcePrototype,'task',foreign)}
+  return result;
+ }});
+});
+for(const reason of [false,0,null,undefined,'',Error('continue first',{cause:0})])test('birth continuation first raw '+String(reason)+' original call throw survives foreign descriptor refusal',()=>{
+ let primary,foreign,gets=0;return control(async x=>{
+  const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();await assert.rejects(work,e=>Object.is(e,reason));await x.realm.native.drain();
+  assert.equal(primary.status,3);assert.equal(gets,0);assert.deepEqual(Object.getOwnPropertyDescriptor(x.f.ss.TaskCompletionSource.prototype,'task'),foreign);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+ },false,{continuation({primary:task,sourcePrototype}){
+  primary=task;foreign={get(){gets++;throw Error('foreign slot')},set:undefined,enumerable:false,configurable:true};Object.defineProperty(sourcePrototype,'task',foreign);throw reason;
+ }});
+});
+test('birth continuation pre-registration slot drift refuses getter0 with original primary task still pending',()=>control(async x=>{
+ const b=x.provider.arm(x.request);await x.prepare();let gets=0;const prototype=x.f.ss.TaskCompletionSource.prototype;
+ const foreign={get(){gets++;throw Error('foreign')},set:undefined,configurable:true,enumerable:false};
+ x.probe.onDispatch=()=>Object.defineProperty(prototype,'task',foreign);
+ x.realm.native.hold();const work=b.query();await assert.rejects(work,/BIRTH_SLOT_CHANGED|CHANGED/);await x.realm.native.drain();
+ assert.equal(gets,0);assert.equal(x.originalSources.length,1);assert.equal(x.originalSources[0].task.status,3);assert.equal(x.probe.resolvers,0);assert.deepEqual(Object.getOwnPropertyDescriptor(prototype,'task'),foreign);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true,{trackSources:true}));
+test('birth continuation real Task constructor stays linked through existing packet/control storage route',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const result=await x.host.witness.continueStorage(x.host.f.bridge);
+ const birth=x.provider.arm(x.f.c.__armInput).inspect().lower.continuationBirth;assert.equal(birth.observed,true);assert.equal(birth.statusAtReturn,3);assert.equal(birth.task.status,5);
+ assert.equal(Object.getOwnPropertyDescriptor(x.f.ss.TaskCompletionSource.prototype,'task'),undefined);
+ assert.equal(result.readonlyStorageVerified,true);assert.equal(result.componentReady,false);assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);for(const key of ['nativeAuthority','contentAuthority','saveAuthority','closeAuthority','closureIdentityQualified'])assert.equal(result[key],false);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
