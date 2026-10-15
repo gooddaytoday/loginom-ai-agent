@@ -2,6 +2,16 @@
 
 2026-10-13: контракт принят, реализация начата; live v2 ещё не квалифицирован.
 
+Текущая сверка интерфейсов2026-10-15: `parallel-env status` читает состояние,
+`prepare`/`verify` возвращают ready=false до полной qualification, `recover`
+поддерживает offline judge и ограниченные pre-CLI unactivated preparation
+incidents с подтверждёнными sources/lineage. Active eval-slot recovery и
+production `run` со slots остаются закрыты. CLI/preparation/mixed lease recovery
+12 PASS/70 assertions (26.51s); проверка не подтверждает active-child recovery.
+Native management A/B setup overlap, targeted close A при живом B и свежий check B
+прошли1/16 (167.84s), source audit584/177; delete/admission=false. Исторические
+этапы ниже сохраняют прежний фактический статус.
+
 2026-10-15: physical user-root inspection/publication реализованы как внутренние
 API под slot/server guards и protected account source; private journal + exact
 inode/epoch/marker SHA, crash reconciliation и foreign/symlink refusal проверены.
