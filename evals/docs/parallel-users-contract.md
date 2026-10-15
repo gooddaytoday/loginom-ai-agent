@@ -2419,3 +2419,21 @@ confirms all3 never-started inspection containers absent on the same daemon and
 image unchanged; temporary binary copies are removed. No new browser/model/judge
 work or permanent-pair mutation. SESSION_BACKUP_POLICY_UNPROVEN remains; the
 unsupported configuration is not manufactured from these symbol strings.
+
+Native two-user management qualification (2026-10-15): actual A/B setup lifetimes
+overlap under distinct native users/profiles/inventories. After committed archive
+of A, targeted close removes its session while verified B CLI is held by SIGSTOP;
+B's original session remains. SIGCONT and a fresh B check succeed; the global
+management finalizer closes1 A +3 B sessions. The positive case validates existing
+implementation, with no newly claimed production RED. Native1/16 PASS167.84s and
+typecheck/diff PASS. Independent private source audit584 checks over177 captured sources
+qualifies4 CLI +1 admin continuous closures, exact archive-before-close within B
+lifetime and new B check after close. SHA0ea06a6ad25f942d1553f7b59fd9fa1e188d7a449aa3f2e352e5d2064a82eea6;
+verification1c363ada3c90bfd5d812738952dab045fa30a030af21e722ebdf7d3529c2df57
+in native-two-users-6ebb9781-90c4-4057-9241-0f688b7f8c16. Exact pair/network/root
+are absent on the unchanged Docker daemon. Safe JSON sources exclude private
+credential files/admin browser profiles;4 temporary logs/helpers copied0600,
+read-back verified, then removed. This is management/session independence, with
+storageDeletionAllowed=false and nextAdmissionAllowed=false. Storage deletion,
+normal release, global readiness, full resources/licence and SessionBackup
+qualification remain open; no model/live judge calls. Old incidents are retained.
