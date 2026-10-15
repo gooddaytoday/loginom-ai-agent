@@ -5,27 +5,31 @@ import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { readAdminProcessInventory, sealAdminProcessInventory, type AdminConnection } from "./loginom-admin"
 import { inspectAbsentUserStorage, inspectUserStorage, verifyParallelPair } from "./parallel-pair"
 import { archiveProfileEvidence } from "./profile-archive"
-import { acquireEnvironmentLeases, type SlotFile, type SlotLease } from "./slots"
+import { acquireEnvironmentLeases, finalizeReleasedSlot, type SlotFile, type SlotLease } from "./slots"
 import { readUnactivatedUserObservation, readUserOwnership, readUserPreparation } from "./user-environment"
+import { readPreparationRecoverySources } from "./preparation-recovery"
 
 /** Only the pre-CLI, never-activated preparation path can use this finalizer. */
 export async function finalizeUnactivatedEnvironment(file: SlotFile, environment: Awaited<ReturnType<typeof acquireEnvironmentLeases>>, admin: AdminConnection) {
   const server = environment.server, identity = server.reservation.identity
   await server.assertHeld()
-  if (!identity || server.reservation.key !== `server:${identity.containerId}` || server.reservation.state !== "retained" ||
+  if (!identity || server.reservation.key !== `server:${identity.containerId}` || !["retained", "recovery-only"].includes(server.reservation.state) ||
     server.reservation.owner.pid !== process.pid || !environment.slots.length ||
     JSON.stringify(admin.identity) !== JSON.stringify(identity)) throw new EvalFailure("ENVIRONMENT_FINALIZATION_UNCONFIRMED", 2)
   const journal = server.reservation.journal
   const command = await readLeaseReceipt(journal)
-  if (!object(command) || Object.keys(command).length !== 7 || command.version !== 2 || command.kind !== "unactivated-preparation" ||
+  const recovered = server.reservation.state === "recovery-only"
+  if (!object(command) || Object.keys(command).length !== (recovered ? 9 : 7) || command.version !== 2 ||
+    command.kind !== (recovered ? "unactivated-recovery" : "unactivated-preparation") ||
     command.commandId !== server.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity) || command.phase !== "unactivated" ||
-    JSON.stringify(command.slotIds) !== JSON.stringify(environment.slots.map(lease => lease.slot.id)) || typeof command.processInventory !== "string" ||
+    !recovered && JSON.stringify(command.slotIds) !== JSON.stringify(environment.slots.map(lease => lease.slot.id)) || typeof command.processInventory !== "string" ||
     path.dirname(command.processInventory) !== file.controller.stateDir) throw new EvalFailure("ENVIRONMENT_FINALIZATION_UNCONFIRMED", 2)
+  const recoveryProcessInventories = recovered ? await readPreparationRecoverySources(file, environment) : []
   for (const lease of environment.slots) {
     await lease.assertHeld()
     const source = await readLeaseReceipt(lease.receipt)
-    if (lease.recoveryOnly || JSON.stringify(lease.identity) !== JSON.stringify(identity) || !object(source) || source.journal !== journal ||
-      source.commandId !== command.commandId) throw new EvalFailure("ENVIRONMENT_FINALIZATION_UNCONFIRMED", 2)
+    if (lease.recoveryOnly !== recovered || JSON.stringify(lease.identity) !== JSON.stringify(identity) || !object(source) ||
+      !recovered && (source.journal !== journal || source.commandId !== command.commandId)) throw new EvalFailure("ENVIRONMENT_FINALIZATION_UNCONFIRMED", 2)
   }
   const sealed = await sealAdminProcessInventory(file, server, hash(command))
   const prepared = []
@@ -48,6 +52,8 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   if (prepared.some(entry => !processes.connections.some(connection => path.dirname(connection.source.path) === path.dirname(entry.observation.source.path))))
     throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
   await verifyParallelPair(file, identity)
+  if (recovered && JSON.stringify(await readPreparationRecoverySources(file, environment)) !== JSON.stringify(recoveryProcessInventories))
+    throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_CHANGED", 2)
   const slots = []
   for (const entry of prepared) {
     const lease = entry.lease
@@ -66,9 +72,15 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
       serverEpoch: identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true,
       nextAdmissionAllowed: true, command: { path: journal, sha256: hash(sealed) }, processInventory: processes.source,
       observation: entry.observation.source, profileArchive: { ...archive, sha256: hash(await readLeaseReceipt(archive.journal)) }, storage: observed }
-    await writeLeaseReceipt(cleanup, receipt)
+    const completed = { ...receipt, ...(recovered ? { recoveryProcessInventories } : {}) }
+    await writeLeaseReceipt(cleanup, completed)
     await lease.release(cleanup)
-    slots.push({ slotId: lease.slot.id, cleanup: { path: cleanup, sha256: hash(receipt) } })
+    if (recovered) {
+      const source = await readLeaseReceipt(lease.receipt)
+      if (!object(source) || typeof source.incident !== "string") throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+      await finalizeReleasedSlot(file, lease.slot, identity, source.incident, path.dirname(server.receipt))
+    }
+    slots.push({ slotId: lease.slot.id, cleanup: { path: cleanup, sha256: hash(completed) } })
   }
   await server.assertHeld()
   const target = `${journal}.server-finalization.json`
