@@ -36,6 +36,13 @@ caller list не исключает записанные запуски. Missing
 Component38/338 и policy/sampler/collector/judge58/350 PASS, typecheck/diff PASS.
 Полный runtime census остальных actors и production admission ещё открыты.
 
+Fixture judge --version теперь следует после home lease. Version/exec пишутся
+в один protected inventory; release требует его seal и сохраняет captured SHA
+со всеми canonical proofs. BUSY не запускает version; unknown cleanup удерживает
+fence. Judge/process/offline57/267 и current main/recovery/admission31/233 PASS,
+typecheck/diff PASS. Старые snapshots остаются unsealed; resource aggregation
+этих judge sources и live private-home qualification ещё открыты.
+
 ## Подготовка и границы
 
 Целевой host — lg-pc-75/10.200.2.58. Новая пара на отдельной сети и loopback-порту,
