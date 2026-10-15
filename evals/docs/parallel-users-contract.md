@@ -2202,3 +2202,14 @@ PASS. Logs judge-fixture-seal-{red,green} and judge-census-main-recovery.log.
 This closes the synthetic judge census; the resource coordinator must still
 consume it alongside complete native management/admin sources. Live auth/home
 qualification and production model admission remain unchanged gates.
+
+ARCHIVE_TOPOLOGY now carries only same-lstat diagnostic metadata in Error.cause:
+path, normalized kind/POSIX type, mode/nlink, UID/GID and device/inode. The native
+fixture persists that cause solely for this code in its private failure receipt.
+No file contents are read for diagnostics; the original message/exit2 and refusal
+before move/publication remain. Actual external hardlink RED lacked cause;
+GREEN matches the exact inode/nlink2 metadata while both names/bytes survive and
+no journal is created. Full archive11/69 PASS18.02s, typecheck/diff PASS; logs
+archive-topology-metadata-{red,green}. The historical missing native topology is
+still unknown; this instrumentation is for the next actual failure, without
+weakening hardlink/foreign/special-file refusal.

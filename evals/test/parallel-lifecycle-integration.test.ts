@@ -387,6 +387,7 @@ for (const mode of ["manual", "finalizer", "reconnected-finalizer", "unknown"] a
       settlement.preserve = error instanceof Error && error.message === "ARCHIVE_TOPOLOGY"
       await writeLeaseReceipt(path.join(evidence, "native-primary-failure.json"), {
         code: error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : "NATIVE_ASSERTION_FAILED",
+        topology: error instanceof Error && error.message === "ARCHIVE_TOPOLOGY" ? error.cause ?? null : null,
         location: error instanceof Error ? error.stack?.match(/parallel-lifecycle-integration\.test\.ts:\d+:\d+/)?.[0] ?? null : null })
       throw error
     } finally {
