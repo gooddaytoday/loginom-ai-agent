@@ -1475,3 +1475,30 @@ Native1 PASS/22 (53.97s), typecheck/diff PASS. Private600
 195 full source/closure checks PASS, exact own pair/root absent. Следующий
 ledger должен сохранять frozen descriptor каждой management-команды: mutable
 whole-inventory SHA меняется при append и не должен инвалидировать старую сессию.
+
+### Durable management-session ownership ledger
+
+`recordManagementSession` / `readManagementSession` связывают held normal slot
+lease, protected preparation/user generation/activation, verified CLI outcome и
+continuous process proof с exactly one новой own managed row относительно
+before snapshot. Setup использует свой exact process/result; check — preceding
+verified setup того же profile/username/endpoint. Remote ID/Name/CreateTime
+остаются неизменными в observed window, Count0; after row не может сменить
+identity. Actor содержит run/slot, management owner/operation и attemptId:null.
+
+Frozen process и connection descriptors входят в private session record.
+Общий `readManagementProcess` qualifier проверяет frozen sources по тем же
+правилам, что live inventory. Поздний append не инвалидирует старую запись;
+exact retry сохраняет её, changed binding отказан. Kind owned-management-session
+пока содержит state observed; targeted close, failed CLI/recover/status sessions
+и recovery-only lineage остаются открытыми. Native CreateTime остаётся opaque,
+sessionGuid не выдумывается. Общая readiness не изменена.
+
+TDD missing module RED→GREEN; exclusive native1 PASS/31 (52.46s),166 related
+unit PASS/618 (68.88s), typecheck/diff PASS. Private600
+`native-cli-sessions-429167f3-9b12-4ccd-aa10-ae3899687aba/cli.json` SHA256
+`b9d9e6a26bb80fbcf8c19fe5626c95218a68428cd00e36451263fe0a99954e71`:
+204 independent source/generation/actor/closure checks, own pair/root absent.
+Предыдущий combined native+unit run получил EACCES от proc-denial control:
+fixture00q2hZ retained в blockers. Native browser qualification выполнять
+отдельно также от unit suite с nondumpable/proc controls; proof не ослаблен.

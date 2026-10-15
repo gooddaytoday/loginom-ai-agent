@@ -1,5 +1,18 @@
 # Блокеры parallel evals
 
+## Native ledger fixture: global proc scan пересёк nondumpable unit control
+
+2026-10-15: `/tmp/evals-cli-sessions-00q2hZ`, parent admin-J0anbT завершил
+disconnect/dispose ACK, но process proof quarantined: EACCES на
+`/proc/2551505/exe`, PID отсутствует среди own/origin/admission entries;
+unknown=[] и final00 не отменяют error. Ledger native assertions31 прошли,
+teardown отказал ADMIN_DISPOSE_UNKNOWN, pair/root сохранены. Одновременно шёл
+profile unit negative с prctl(PR_SET_DUMPABLE,0); точная атрибуция исследуется
+по сохранённым данным. Не переписывать failed proof и не выпускать владение
+вручную. Нужен квалифицируемый reconciliation contract, если source attribution
+не позволяет текущему API завершить incident. Native browser проверки впредь
+не совмещаются также с unit suite, содержащей nondumpable/proc-denial controls.
+
 ## Mixed recovery: quarantine после пересечения собственных browser-проверок
 
 2026-10-15: `/tmp/evals-recover-mixed-dyI2ST`, собственная disposable pair
