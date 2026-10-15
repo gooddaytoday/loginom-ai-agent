@@ -40,16 +40,34 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
       ...(before ? { sessions: { before: before.source } } : {}) }
     await evidence.lease.assertHeld()
     await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, entry] })
-    const result = await superviseProcess({ ...input, owner })
+    const state = { finished: false }
+    const during: Awaited<ReturnType<AdminConnection["inspectSessionInventory"]>>[] = []
+    const running = superviseProcess({ ...input, owner }).finally(() => { state.finished = true })
+    const observed = (async () => {
+      if (!before || !evidence.admin) return
+      while (!state.finished) {
+        during.push(await evidence.admin.inspectSessionInventory())
+        await evidence.lease.assertHeld()
+        await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, { ...entry,
+          sessions: { before: before.source, during: during.map(snapshot => snapshot.source) } }] })
+        if (!state.finished) await Bun.sleep(100)
+      }
+    })()
+    const settled = await Promise.allSettled([running, observed])
+    if (settled[0].status === "rejected") throw settled[0].reason
+    const result = settled[0].value
     const proof = path.join(evidence.directory, "process-cleanup.json")
     await writeLeaseReceipt(proof, result.processCleanup)
     await evidence.lease.assertHeld()
     const qualified = qualifyClosedProcessEvidence(result.processCleanup, { owner, producerPid: process.pid })
-    const after = qualified ? await evidence.admin?.inspectSessionInventory() : undefined
+    const after = qualified && settled[1].status === "fulfilled" ? await evidence.admin?.inspectSessionInventory() : undefined
+    const snapshots = qualified ? during.filter(snapshot => Date.parse(snapshot.observation.startedAt) <= Date.parse(qualified.finishedAt) &&
+      Date.parse(snapshot.observation.finishedAt) >= Date.parse(qualified.startedAt)) : during
     await writeLeaseReceipt(evidence.file, { ...inventory, processes: [...inventory.processes, { ...entry,
-      state: qualified ? "confirmed" : "unconfirmed", proof: { path: proof, sha256: hash(result.processCleanup) },
-      ...(before && after ? { sessions: { before: before.source, after: after.source } } : {}) }] })
+      state: qualified && settled[1].status === "fulfilled" ? "confirmed" : "unconfirmed", proof: { path: proof, sha256: hash(result.processCleanup) },
+      ...(before ? { sessions: { before: before.source, during: snapshots.map(snapshot => snapshot.source), ...(after ? { after: after.source } : {}) } } : {}) }] })
     if (!qualified) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
+    if (settled[1].status === "rejected") throw new EvalFailure("MANAGEMENT_SESSION_OBSERVATION_UNCONFIRMED", 2)
     return result
   } finally { active.delete(evidence.file) }
 }
@@ -77,17 +95,21 @@ export async function readManagementProcessInventory(input: InventoryInput) {
 }
 
 async function readManagementSessions(input: InventoryInput, value: unknown, window: { startedAt: string; finishedAt: string }) {
-  if (!object(value) || Object.keys(value).length !== 2) throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
+  if (!object(value) || Object.keys(value).length !== (value.during === undefined ? 2 : 3) || value.during !== undefined && !Array.isArray(value.during))
+    throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
   const { readAdminSessionInventory } = await import("./loginom-admin")
-  const snapshots = await Promise.all([value.before, value.after].map(source => {
+  const snapshots = await Promise.all([value.before, value.after, ...(value.during as unknown[] ?? [])].map(source => {
     if (!object(source) || Object.keys(source).length !== 2 || typeof source.path !== "string" || typeof source.sha256 !== "string")
       throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
     return readAdminSessionInventory({ controller: { stateDir: path.dirname(input.file) } }, input.identity, { path: source.path, sha256: source.sha256 })
   }))
   const before = snapshots[0]!, after = snapshots[1]!
   if (before.source.path === after.source.path || Date.parse(before.observation.finishedAt) > Date.parse(window.startedAt) ||
-    Date.parse(after.observation.startedAt) < Date.parse(window.finishedAt)) throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
-  return { before, after }
+    Date.parse(after.observation.startedAt) < Date.parse(window.finishedAt) ||
+    new Set(snapshots.map(snapshot => snapshot.source.path)).size !== snapshots.length || snapshots.slice(2).some(snapshot =>
+      Date.parse(snapshot.observation.startedAt) > Date.parse(window.finishedAt) || Date.parse(snapshot.observation.finishedAt) < Date.parse(window.startedAt)))
+    throw new EvalFailure("MANAGEMENT_SESSION_SCOPE_INVALID", 2)
+  return { before, during: snapshots.slice(2), after }
 }
 
 async function readInventory(input: InventoryInput) {

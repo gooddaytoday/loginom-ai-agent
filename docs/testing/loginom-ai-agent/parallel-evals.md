@@ -889,3 +889,14 @@ recover сохранён. Browser qualification запускать послед�
 проверяет source hashes/temporal order. Оба snapshots остаются unqualified;
 setup/check/recover и actual user-session attribution требуют следующих gates.
 Process-only fake/FS tests остаются в management-process-evidence.test.ts.
+
+Control `-t 'native CLI setup and check'` требует также действующий
+LOGINOM_DOCK_API_KEY из private project environment. Ключ передаётся CLI через
+stdin setup; profile/diagnostics остаются private, stdout/stderr проверяются на
+утечку. На собственной disposable pair actual native account создаётся и
+активируется через research adapter. Sampler сохраняет snapshots во время
+actual CLI process; test требует по одной новой row на setup/check сверх
+baseline. Positive browser verification не означает закрытия серверной сессии:
+обе pending rows наблюдались после завершения CLI. Этот control не включает
+model/judge calls и не снимает production readiness gates; recover и адресное
+закрытие настоящих CLI sessions ещё требуют проверки.
