@@ -943,3 +943,47 @@ exact pair independently absent. Test inventory basename `admin-processes.json`
 конфликтовал с prefix lookup каталога; исправлен на `processes-admin.json`.
 Неуспешный own fixture jkdzDM сохранён и описан в blocker file; его старый
 receipt не получает новую command binding задним числом.
+
+### Normal unactivated preparation finalization
+
+`finalizeUnactivatedEnvironment` завершает normal held environment только для
+private command kind `unactivated-preparation` с exact commandId/identity/slotIds,
+phase `unactivated` и обязательным admin process inventory. Slot manifests должны
+указывать на этот journal; recovery-only ownership этим путём не завершается.
+До CLI admission новый command producer обязан durably сменить phase. Этот
+finalizer не принимает `cli_admitted` и не закрывает активированные accounts.
+
+Под held server fence `sealAdminProcessInventory` переводит journal в
+`finalizing` через ту же очередь, что регистрирует admin processes. После seal
+новые connections команды отвергаются до runtime/secret/launch. Для этого kind
+нельзя открыть admin без объявленного inventory. Concurrent seal допускает один
+переход; stale command hash или closed lease дают отказ без переписывания journal.
+
+Finalizer подтверждает exact owned Blocked account и never-activation, фиксирует
+native no-matching-session observation, архивирует каждый профиль через durable
+archive producer, затем закрывает admin transport/processes. Проверяются все
+зарегистрированные owners, в том числе directory исходного observation. После
+этого повторно проверяются protected user/storage sources, native root inode и
+пустота только собственного storage, committed archive и sealed journal. Slot
+cleanup содержит source SHA, а не принятые от вызывающего кода terminal flags.
+Реальный `SlotLease.release` публикует tombstones; server release следует только
+после всех выбранных слотов. Root/files не удаляются. Любой отказ сохраняет
+неразрешённые reservations; внешний recover и авария в середине release требуют
+отдельной reconciliation. Sealed journal — admission fence; terminal completion
+публикуется в slot/server release proofs.
+
+Это pre-CLI finalization primitive для standalone prepare, а не readiness.
+Публичные prepare/verify, active CLI/probe inventory, recovery-only finalization,
+SessionBackup policy и модельная приёмка остаются открытыми.
+
+Finalizer TDD missing module/unsealed completion/missing inventory before runtime
+RED→GREEN.102 unit PASS/457 (15.27s),3 native PASS/81 (61.19s), typecheck/diff
+PASS. Current native parent test использует production finalizer вместо test-only
+cleanup flags. Native canary архивирован до dispose; cli_admitted отказал без
+переноса canary; соседний filesystem B control сохранил bytes (не active B).
+Private600 native-parent-b6417f5a-a733-45c0-b6b0-5b0a5f3249c2 receipt SHA256
+`455426c0296b2958cda7fdd5ac15e71fd981ce4ec9415cdcc78e8ba2235279bf`
+содержит command/cleanup/archive/observation/command/inventory sources; независимый
+пересчёт всех SHA и archive≤dispose совпал, slot released/server proof confirmed,
+exact own pair independently absent. Four superseded own green logs удалены с
+private audit; retained incidents не изменялись.

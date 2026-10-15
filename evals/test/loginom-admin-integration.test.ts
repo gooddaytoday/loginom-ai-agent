@@ -3,13 +3,14 @@ import path from "node:path"
 import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
-import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, type AdminOperation } from "../src/loginom-admin"
+import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, sealAdminProcessInventory, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease, type SlotFile, type ServerIdentity } from "../src/slots"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
 import { stageUserPreparation } from "../src/user-environment"
+import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -53,6 +54,13 @@ liveIntegration("trusted bridge: held user preparation without its pair journal 
         await expect(fenced.reconcileUser(lease, prepared.secretFile)).rejects.toThrow("ADMIN_USER_OWNERSHIP_CONFLICT")
         expect(await Bun.file(path.join(file.controller.stateDir, "user-a.json")).exists()).toBe(false)
       } finally { await fenced.dispose() }
+      const inventory = path.join(file.controller.stateDir, "processes-sealed.json"), journal = serverLease.reservation.journal
+      const command = { version: 2, kind: "unactivated-preparation", commandId: "prepare", identity, slotIds: [lease.slot.id], phase: "unactivated", processInventory: inventory }
+      await writeLeaseReceipt(journal, command)
+      await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "prepare", journal, identity, connections: [] })
+      await sealAdminProcessInventory(file, serverLease, new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex"))
+      await expect(openLoginomAdmin(file, identity, { serverLease, processInventory: inventory })).rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
+      expect(await readLeaseReceipt(inventory)).toMatchObject({ connections: [] })
     } finally { await serverLease.close() }
     expect(await readServerIdentity(file)).toEqual(identity)
   } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
@@ -702,11 +710,12 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
   const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
   const pair = await createPair(file, options)
   const journal = path.join(file.controller.stateDir, "prepare-command.json")
-  await writeLeaseReceipt(journal, { version: 2, commandId: "parent-prepare" })
+  const inventory = path.join(file.controller.stateDir, "processes-admin.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "parent-prepare", identity: pair.identity,
+    slotIds: [file.slots[0]!.id], phase: "unactivated", processInventory: inventory })
   const { acquireEnvironmentLeases } = await import("../src/slots")
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot)
   const lease = environment.slots[0]!
-  const inventory = path.join(file.controller.stateDir, "processes-admin.json")
   await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "parent-prepare", journal, identity: pair.identity, connections: [] })
   let verified = false
   const observations: unknown[] = []
@@ -756,10 +765,22 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
       expect(await readdir(lease.slot.profileDir)).toEqual(["data"])
       expect(await Bun.file(path.join(file.controller.stateDir, `activation-${lease.slot.id}.json`)).exists()).toBe(false)
       observations.push(await inspect())
+      await Bun.write(path.join(lease.slot.profileDir, "data", "unused-history-canary"), "archive-before-admin-close")
+      // Filesystem-only neighbor canary; this is not an active-user concurrency control.
+      await Bun.$`docker exec ${pair.identity.containerId} sh -c ${'mkdir /workdir/UserStorage/eval-b; printf preserve > /workdir/UserStorage/eval-b/finalization-control'}`.quiet()
+      const commandBefore = await readLeaseReceipt(journal) as Record<string, unknown>
+      await writeLeaseReceipt(journal, { ...commandBefore, phase: "cli_admitted" })
+      await expect(finalizeUnactivatedEnvironment(file, environment, connection)).rejects.toThrow("ENVIRONMENT_FINALIZATION_UNCONFIRMED")
+      expect(await Bun.file(path.join(lease.slot.profileDir, "data", "unused-history-canary")).text()).toBe("archive-before-admin-close")
+      await writeLeaseReceipt(journal, commandBefore)
+      const finished = await finalizeUnactivatedEnvironment(file, environment, connection)
+      expect(finished).toMatchObject({ status: "released", slots: [{ slotId: lease.slot.id }] })
+      expect(await Bun.file(path.join(lease.slot.profileDir, "data", "unused-history-canary")).exists()).toBe(false)
+      expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-b/finalization-control`.quiet()).text()).toBe("preserve")
       verified = true
     } finally { await connection.dispose() }
     // No evaluated-user login is admitted: native read-back requires Blocked=true throughout.
-    // The sole real admin transport and process have completed before this test-only release.
+    // Production finalization has archived history and released the completed reservations.
     expect(verified).toBe(true)
     const adminDirectory = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
     const disposal = await readLeaseReceipt(path.join(file.controller.stateDir, adminDirectory, "connection.json")) as { status: string; transportDisconnect: string; processes: { status: string; capture_complete: boolean } }
@@ -773,24 +794,25 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
     const finalizationReceipt = await readLeaseReceipt(path.join(file.controller.stateDir, adminDirectory, "connection.json")) as {
       finalization: { command: { path: string; sha256: string } }
     }
-    const finalizationCommand = await readLeaseReceipt(finalizationReceipt.finalization.command.path)
+    const finalizationCommand = await readLeaseReceipt(finalizationReceipt.finalization.command.path) as { at: string }
+    const finalCommand = await readLeaseReceipt(journal) as { phase: string }
+    const cleanup = await readLeaseReceipt(`${lease.receipt}.cleanup.json`) as { profileArchive: { archive: string; journal: string }; observation: { path: string } }
+    const archive = await readLeaseReceipt(cleanup.profileArchive.journal) as { committedAt: string }
+    const cleanupObservation = await readLeaseReceipt(cleanup.observation.path) as { command: { path: string } }
+    expect(Date.parse(archive.committedAt)).toBeLessThanOrEqual(Date.parse(finalizationCommand.at))
+    expect(await Bun.file(path.join(cleanup.profileArchive.archive, "data", "unused-history-canary")).text()).toBe("archive-before-admin-close")
     const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-parent-${crypto.randomUUID()}`)
     await mkdir(evidence, { mode: 0o700 })
     await writeLeaseReceipt(path.join(evidence, "blocked-preparation.json"), { version: 2, kind: "native-parent-blocked-preparation", identity: pair.identity,
       slotId: lease.slot.id, accountBlockedThroughout: true, repeatedWithoutPasswordRotation: true, physicalRoot: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
+      environmentFinalization: { command: finalCommand, cleanup, archive, slot: await readLeaseReceipt(lease.receipt),
+        server: await readLeaseReceipt(`${journal}.server-finalization.json`), archivedCanary: "archive-before-admin-close", neighborCanary: "preserve",
+        observation: { receipt: cleanupObservation, command: await readLeaseReceipt(cleanupObservation.command.path) } },
       admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes, finalization,
         sources: { receipt: finalizationReceipt, command: finalizationCommand, inventory: await readLeaseReceipt(inventory) } }, observations, liveQualified: false })
-    const cleanup = path.join(file.controller.stateDir, "unactivated-test-cleanup.json")
-    await writeLeaseReceipt(cleanup, { version: 2, kind: "native-unactivated-test-finalization", status: "confirmed", slotId: lease.slot.id,
-      leaseToken: lease.token, serverEpoch: pair.identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed", archive: "committed",
-      storageDeletionAllowed: true, nextAdmissionAllowed: true })
-    await lease.release(cleanup)
-    const release = path.join(file.controller.stateDir, "test-server-release.json")
-    await writeLeaseReceipt(release, { version: 2, status: "confirmed", key: environment.server.reservation.key,
-      token: environment.server.reservation.token, revision: environment.server.reservation.revision, serverEpoch: pair.identity.serverEpoch })
-    await environment.server.release(release)
     await destroyPair(file, options)
     await rm(root, { recursive: true, force: true })
+    expect(finalCommand.phase).toBe("finalizing")
     expect(observations).toMatchObject([
       { value: { identity: pair.identity, username: lease.slot.username, account: null, serverSessions: "absent",
         receipt: { kind: "unactivated-user-observation", slotId: lease.slot.id, leaseToken: lease.token } } },
