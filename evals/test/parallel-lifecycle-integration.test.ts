@@ -123,6 +123,72 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
       }
       await writeLeaseReceipt(path.join(evidence, "readonly.json"), { identity: pair.identity, observations: readonly })
       await writeLeaseReceipt(path.join(evidence, "cli.json"), { identity: pair.identity, captures, liveQualified: false })
+      const admitted = (await readLeaseReceipt(inventoryFile) as { processes: unknown[] }).processes.length
+      const abort = new AbortController(), stopped = { value: false }
+      settlement.cli = false
+      const interrupted = management(command, ["loginom", "check", "--format", "json"], undefined, 60_000, abort.signal)
+        .finally(() => { stopped.value = true })
+      const observed = (async () => {
+        const deadline = Date.now() + 30_000
+        while (!stopped.value && Date.now() < deadline) {
+          const raw = await readLeaseReceipt(inventoryFile) as { processes: { state: string; sessions?: { before: { path: string }; during?: { path: string }[] } }[] }
+          const current = raw.processes.at(-1)
+          if (raw.processes.length > admitted && current?.state === "planned" && current.sessions?.during?.length) {
+            const before = await readLeaseReceipt(current.sessions.before.path) as { sessions: { objectId: string }[] }
+            const source = current.sessions.during.at(-1)!
+            const snapshot = await readLeaseReceipt(source.path) as { sessions: { objectId: string; name: string }[] }
+            const row = snapshot.sessions.find(row => row.name.startsWith(credentials.username + ":") && !before.sessions.some(previous => previous.objectId === row.objectId))
+            if (row) { abort.abort(); return { source, row } }
+          }
+          await Bun.sleep(25)
+        }
+        throw Error("CANCELLED_CHECK_ROW_NOT_OBSERVED")
+      })().catch(error => { abort.abort(); throw error })
+      const cancelled = await Promise.allSettled([interrupted, observed])
+      if (cancelled[0].status === "rejected") throw cancelled[0].reason
+      settlement.cli = cancelled[0].value.processCleanup.status === "confirmed" && cancelled[0].value.processCleanup.capture_complete
+      if (cancelled[1].status === "rejected") throw cancelled[1].reason
+      expect({ interrupted: cancelled[0].value.interrupted, timedOut: cancelled[0].value.timedOut, settled: settlement.cli })
+        .toEqual({ interrupted: true, timedOut: false, settled: true })
+      expect([cancelled[0].value.stdout, cancelled[0].value.stderr].some(value => command.cleanupSecrets.some(secret => value.includes(secret)))).toBe(false)
+      const inventory = await readManagementProcessInventory({ file: inventoryFile, journal, commandId: "native-cli-sessions", identity: pair.identity,
+        leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, producerPid: process.pid })
+      const current = inventory.processes.at(-1)!, snapshots = current.sessions!
+      expect(current.result).toMatchObject({ interrupted: true, timedOut: false })
+      expect(current.result?.exitCode).not.toBe(0)
+      expect(current.result?.reply?.browser).not.toBe("verified")
+      const cancelledEvidence = { observed: cancelled[1].value, inventory, manifest: await readLeaseReceipt(inventoryFile), processes: cancelled[0].value.processCleanup,
+        resultReceipt: await readLeaseReceipt(current.result!.source.path), sources: await Promise.all([snapshots.before, ...snapshots.during, snapshots.after].map(async snapshot => {
+          const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
+          return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
+        })) }
+      await writeLeaseReceipt(path.join(evidence, "cancelled-check.json"), cancelledEvidence)
+      // Data-only result controls around actual native sources; restore the original producer receipts.
+      const manifest = cancelledEvidence.manifest as { processes: Record<string, unknown>[] }
+      for (const flags of [{ interrupted: false }, { timedOut: true }]) {
+        const changed = { ...cancelledEvidence.resultReceipt as Record<string, unknown>, ...flags }
+        await writeLeaseReceipt(current.result!.source.path, changed)
+        await writeLeaseReceipt(inventoryFile, { ...manifest, processes: [...manifest.processes.slice(0, -1), { ...manifest.processes.at(-1),
+          result: { path: current.result!.source.path, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changed)).digest("hex") } }] })
+        try { await expect(recordManagementSession(file, lease, secretFile, inventoryFile, current.owner.id)).rejects.toThrow("MANAGEMENT_SESSION_UNCONFIRMED") }
+        finally {
+          await writeLeaseReceipt(current.result!.source.path, cancelledEvidence.resultReceipt as Record<string, unknown>)
+          await writeLeaseReceipt(inventoryFile, manifest)
+        }
+      }
+      const cancelledSession = await recordManagementSession(file, lease, secretFile, inventoryFile, current.owner.id)
+      expect(cancelledSession.binding.remoteKey).toBe(cancelled[1].value.row.objectId)
+      await admin.closeManagementSession(lease, secretFile, cancelledSession.id)
+      const cancelledClosed = await readManagementSession(file, lease, secretFile, cancelledSession.id)
+      if (cancelledClosed.state !== "closed") throw Error("MANAGEMENT_CLOSE_EXPECTED")
+      const survivors = await admin.inspectSessionInventory()
+      expect(survivors.sessions.some(row => row.objectId === cancelledSession.binding.remoteKey)).toBe(false)
+      expect(captures.every(capture => survivors.sessions.some(row => row.objectId === capture.session.binding.remoteKey))).toBe(true)
+      const survivorSource = await readLeaseReceipt(survivors.source.path) as { command: { path: string } }
+      await writeLeaseReceipt(path.join(evidence, "cancelled-check.json"), { ...cancelledEvidence, session: cancelledSession, closed: cancelledClosed,
+        survivors: { value: survivors, receipt: survivorSource, command: await readLeaseReceipt(survivorSource.command.path) },
+        terminal: await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${cancelledSession.id}.closed.json`)),
+        command: await readLeaseReceipt(cancelledClosed.close.path) })
       for (const capture of captures) {
         expect(await readManagementSession(file, lease, secretFile, capture.session.id)).toEqual(capture.session)
         expect(await recordManagementSession(file, lease, secretFile, inventoryFile, capture.session.actor.owner.id)).toEqual(capture.session)

@@ -752,16 +752,19 @@ async function readManagementBinding(payload, identity, claim) {
       result.version !== 2 || result.kind !== "management-command-result" || !same(result.identity, identity) || result.leaseToken !== claim.leaseToken ||
       result.slotId !== claim.slotId || result.profileDir !== lease.slot.profileDir || result.commandId !== claim.actor.runId ||
       !same(result.owner, entry.owner) || !same(result.operation, entry.operation) || !same(result.process, entry.proof) ||
-      result.exitCode !== 0 || result.timedOut !== false || result.interrupted !== false || result.reply?.browser !== "verified")
+      !Number.isSafeInteger(result.exitCode) || typeof result.timedOut !== "boolean" || typeof result.interrupted !== "boolean")
       throw Error("SESSION_SOURCE_UNCONFIRMED")
     results.push(result)
   }
   const connection = results[0], command = results[1], entry = claim.source.command
-  if (!same(connection.operation, ["loginom", "setup"]) || connection.reply.username !== claim.binding.username ||
+  const interruptedCheck = same(command.operation, ["loginom", "check"]) && command.interrupted === true && command.timedOut === false
+  if (!same(connection.operation, ["loginom", "setup"]) || connection.exitCode !== 0 || connection.timedOut || connection.interrupted ||
+    connection.reply?.browser !== "verified" || connection.reply.username !== claim.binding.username ||
     connection.reply.url !== prepared.endpoint || connection.reply.hasApiKey !== true || !same(command.owner, claim.actor.owner) ||
     !same(command.operation, claim.actor.operation) || !["loginom setup", "loginom check"].includes(command.operation.join(" ")) ||
+    !interruptedCheck && (command.exitCode !== 0 || command.timedOut || command.interrupted || command.reply?.browser !== "verified") ||
     command.operation[1] === "setup" && !same(entry.proof, claim.source.connection.proof) ||
-    command.operation[1] === "check" && (command.reply.code !== "LOGINOM_CONNECTION_VALID" || command.reply.ok !== true))
+    command.operation[1] === "check" && !interruptedCheck && (command.reply?.code !== "LOGINOM_CONNECTION_VALID" || command.reply.ok !== true))
     throw Error("SESSION_SOURCE_UNCONFIRMED")
   const snapshots = []
   if (!entry.sessions?.during?.length) throw Error("SESSION_SOURCE_UNCONFIRMED")
