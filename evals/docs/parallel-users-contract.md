@@ -987,3 +987,32 @@ Private600 native-parent-b6417f5a-a733-45c0-b6b0-5b0a5f3249c2 receipt SHA256
 пересчёт всех SHA и archive≤dispose совпал, slot released/server proof confirmed,
 exact own pair independently absent. Four superseded own green logs удалены с
 private audit; retained incidents не изменялись.
+
+### Standalone preparation controller
+
+`prepareEnvironment({ slotsFile, parallel })` загружает canonical private config,
+проверяет owned pair и свежий epoch, записывает command intent/admin inventory,
+затем получает единый набор server/user/profile reservations. Один admin context
+создаёт или переиспользует только owned blocked users, конфигурацию и published
+root. Native configuration read-back определяет changedPasswords; generation,
+native user ID и secret сохраняются при повторе.
+
+Текущая session capability не квалифицирована: native `inspect` возвращает
+`SESSION_IDENTITY_UNSUPPORTED`. Контроллер выпускает preparation receipt с
+`code:2`, `ready:false`, `status:blocked` и фактической причиной, после production
+unactivated finalization. Если session gate будет пройден, остальные обязательные
+CLI/effective-access/backup/fingerprint gates всё ещё запрещают readiness через
+`PREPARATION_READINESS_UNPROVEN`. Оцениваемый CLI, модель и судья не запускаются.
+Ошибка provisioning сохраняет private failed receipt и unresolved reservations;
+нет возврата частично подготовленного окружения как готового. Полный public CLI,
+verify и crash/recovery reconciliation ещё не завершены.
+
+Prepare controller TDD missing module RED→GREEN.105 unit PASS/465 (13.75s),
+native1 PASS/9 (59.63s), typecheck/diff PASS. Actual N2→N1 сохраняет A nonce,
+userKey/native ID; changed users/passwords2→0, normal reservations released,
+ready:false/code2 с SESSION_IDENTITY_UNSUPPORTED. Private600
+`research/evidence/native-standalone-32e214cf-061a-4b14-b946-4b73fe4eccf7/preparation.json`
+SHA256 `aba025a4c9c4aa7b9592dc9aac155b22f7701e610d658903b4e0f6dedeec1ff6`
+сохраняет command/admin inventory/server/slot cleanup/archive/observation sources.
+23 independent source/status checks совпали; exact own pair independently absent.
+Это не model N2→N1 acceptance и не full readiness.
