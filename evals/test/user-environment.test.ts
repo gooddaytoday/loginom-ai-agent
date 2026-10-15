@@ -1,14 +1,85 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireSlotLease } from "../src/slots"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { claimUserOwnership, readServerSession, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("unactivated observation reader binds private native reply and command sources without changing them", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-unactivated-read-")), fixture = await parallelFixture(root)
+  await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
+  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  try {
+    const prepared = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
+    const directory = path.join(fixture.slots.controller.stateDir, "admin-codec")
+    await mkdir(directory, { mode: 0o700 }); await mkdir(path.join(directory, "commands"), { mode: 0o700 })
+    // Data-only source codec fixture; this test makes no Loginom or admin readiness claim.
+    const reply = { v: 1, id: "inspect-a", outcome: "confirmed", data: { identity, sessionIdentityQualified: false,
+      ownSession: { isAdmin: true }, users: [], rawSessions: [] } }
+    const command = { version: 1, kind: "loginom-admin-command", id: reply.id, op: "inspect", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update("{}").digest("hex"), state: "confirmed", at: new Date().toISOString(),
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex"), settledAt: new Date().toISOString() }
+    const commandFile = path.join(directory, "commands", `${reply.id}.json`)
+    await writeLeaseReceipt(commandFile, command)
+    const receipt = { version: 2, kind: "unactivated-user-observation", identity, username: lease.slot.username, account: null,
+      serverSessions: "absent", slotId: lease.slot.id, leaseToken: lease.token, preparationNonce: prepared.nonce, ownership: null,
+      observation: reply, command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") } }
+    const target = path.join(directory, `unactivated-${lease.slot.id}-${reply.id}.json`)
+    await writeLeaseReceipt(target, receipt)
+    const source = { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") }
+    const bytes = await Bun.file(target).text(), commandBytes = await Bun.file(commandFile).text()
+    expect(await readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, source))
+      .toEqual({ identity, username: lease.slot.username, account: null, serverSessions: "absent", source })
+    expect(await Bun.file(target).text()).toBe(bytes)
+    expect(await Bun.file(commandFile).text()).toBe(commandBytes)
+    await chmod(directory, 0o755)
+    await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, source)).rejects.toThrow("UNACTIVATED_SOURCE_UNCONFIRMED")
+    await chmod(directory, 0o700)
+    await writeLeaseReceipt(commandFile, { ...command, settledAt: new Date(Date.parse(command.settledAt) + 1).toISOString() })
+    await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, source)).rejects.toThrow("UNACTIVATED_SOURCE_UNCONFIRMED")
+    await writeLeaseReceipt(commandFile, command)
+    for (const data of [
+      { ...reply.data, rawSessions: [{ name: lease.slot.username.toUpperCase() + ":2" }] },
+      { ...reply.data, ownSession: { isAdmin: false } },
+      { ...reply.data, users: [{ objectId: "foreign-user", name: lease.slot.username, userKind: 0, blocked: true }] },
+    ]) {
+      const observation = { ...reply, data }
+      const changedCommand = { ...command, replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(observation)).digest("hex") }
+      await writeLeaseReceipt(commandFile, changedCommand)
+      const changedReceipt = { ...receipt, observation, command: { path: commandFile,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changedCommand)).digest("hex") } }
+      await writeLeaseReceipt(target, changedReceipt)
+      await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, { path: target,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changedReceipt)).digest("hex") }))
+        .rejects.toThrow("UNACTIVATED_SOURCE_UNCONFIRMED")
+    }
+    const unknown = { ...command, state: "unknown" }
+    await writeLeaseReceipt(commandFile, unknown)
+    const unresolved = { ...receipt, command: { path: commandFile,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(unknown)).digest("hex") } }
+    await writeLeaseReceipt(target, unresolved)
+    await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, { path: target,
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(unresolved)).digest("hex") }))
+      .rejects.toThrow("UNACTIVATED_SOURCE_UNCONFIRMED")
+    await writeLeaseReceipt(commandFile, command)
+    await writeLeaseReceipt(target, { ...receipt, leaseToken: "foreign" })
+    const changed = { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(target))).digest("hex") }
+    await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, changed)).rejects.toThrow("UNACTIVATED_SOURCE_UNCONFIRMED")
+    await writeLeaseReceipt(target, receipt)
+    await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "activation-a.json"), { kind: "negative-canary" })
+    await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, source)).rejects.toThrow("USER_IDLE_UNCONFIRMED")
+    expect(await Bun.file(target).text()).toBe(bytes)
+    await rm(path.join(fixture.slots.controller.stateDir, "activation-a.json"))
+    await lease.close()
+    await expect(readUnactivatedUserObservation(fixture.slots, lease, prepared.secretFile, source)).rejects.toThrow("LEASE_NOT_HELD")
+    expect(await Bun.file(target).text()).toBe(bytes)
+  } finally { await lease.close(); await rm(root, { recursive: true, force: true }) }
+})
 
 test("user ownership publishes a private generation-bound claim from a confirmed creation journal", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-claim-"))

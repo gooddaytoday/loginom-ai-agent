@@ -27,7 +27,7 @@ import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "./lea
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity, reserveUserStorage, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
-import { claimUserOwnership, readServerSession, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration } from "./user-environment"
+import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
@@ -204,7 +204,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") } }
       const target = path.join(directory, `unactivated-${lease.slot.id}-${observation.reply.id}.json`)
       await writeLeaseReceipt(target, receipt)
-      return { ...result, source: { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } }
+      return readUnactivatedUserObservation(file, lease, secretFile, { path: target,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") })
     },
     async reconcileUser(lease, secretFile) {
       // Readiness activates the user only after storage and effective-access probes.
