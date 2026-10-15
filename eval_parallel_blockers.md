@@ -157,3 +157,32 @@ Server/user/profile reservations, sources and secret remain retained. Removal
 requires actual recovery-only lineage plus an unactivated-account finalization
 producer, still absent; empty root alone does not authorize release/destroy.
 Diagnosis: `evals/docs/2026-10-15-user-root-reservation.md`.
+
+## Installed judge launcher does not preserve the dedicated home
+
+2026-10-15: a supervised `codex login status` with requested
+`CODEX_HOME=/home/kiselev/.local/state/loginom-evals/parallel/judge-codex`
+returned exit0, but this is **not evidence for that home**. The actual executable
+`/home/kiselev/.local/bin/codex` is a bash VPN/systemd-run wrapper which sets
+`CODEX_HOME=/home/kiselev/.codex` in its env-i child. Its reported logged-in state
+therefore must not qualify the dedicated judge account. No judge/model request
+was made, no auth files were copied or changed, and the global wrapper was not
+modified or bypassed.
+
+The same invocation failed strict process qualification: `CLI executable identity
+differs PID 150092`, observed executable `/usr/bin/bash`, birth136642524,
+continuous capture complete, process status failed. Dedicated judge reservation
+remains retained at the fixed global lock root, journal
+`/home/kiselev/.local/state/loginom-evals/research/controller/judge-status-A00yuH/journal.json`,
+command585940be-5c1b-4bff-a7c6-00459a4f7fa3. Initial observation, failed process
+proof and superseding diagnosis are preserved in that directory. Diagnosis
+receipt600 SHA46713e3d02201e572d4596f80b7dba03e0bbc0119fbabe71cd0097ce0b706004,
+read-back confirmed; initial reported login is explicitly unqualified.
+
+Required resolution: an approved judge launcher that preserves the dedicated
+CODEX_HOME and existing VPN/network restrictions, plus actual launcher/process
+ownership qualification. Simply allowing arbitrary bash/systemd processes or
+running codex-real outside the network policy is not an acceptable fix. The
+retained status incident also needs a qualified cleanup/recovery producer before
+release. Other non-model work continues; user action is deferred until only
+external blockers remain.
