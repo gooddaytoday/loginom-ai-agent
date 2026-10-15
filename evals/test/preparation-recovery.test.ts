@@ -53,3 +53,36 @@ test("preparation recovery adopts the exited controller server and both slots wi
     } finally { await Promise.all([recovered.server.close(), ...recovered.slots.map(lease => lease.close())]) }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("mixed preparation recovery preserves released A while adopting only retained B", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-mixed-recovery-")), fixture = await parallelFixture(root)
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json"), inventory = path.join(fixture.slots.controller.stateDir, "processes.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "mixed", identity,
+    slotIds: ["a", "b"], phase: "finalizing", processInventory: inventory })
+  await writeLeaseReceipt(inventory, { version: 2, kind: "admin-processes", commandId: "mixed", journal, identity, connections: [] })
+  // Data-only release codec; real OS leases/process exit, no native Loginom cleanup claim.
+  const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+    const {writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    const environment=await acquireEnvironmentLeases(${JSON.stringify(fixture.slots)},2,${JSON.stringify(identity)},${JSON.stringify(journal)},${JSON.stringify(fixture.lockRoot)});
+    const lease=environment.slots[0],cleanup=lease.receipt+".cleanup.json";
+    await writeLeaseReceipt(cleanup,{status:"confirmed",slotId:lease.slot.id,leaseToken:lease.token,serverEpoch:lease.identity.serverEpoch,
+      processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true});
+    await lease.release(cleanup);console.log(lease.receipt);
+    await Promise.all([environment.server.close(),...environment.slots.map(lease=>lease.close())]);`],
+    { cwd: root, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+  try {
+    expect(await child.exited).toBe(0)
+    const incident = (await new Response(child.stdout).text()).trim()
+    const original = await readLeaseReceipt(incident) as { resources: { receipt: string }[] }
+    const before = await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))
+    const recovered = await recoverPreparationLeases(fixture.slots, identity, journal, fixture.lockRoot)
+    try {
+      expect(recovered.slots.map(lease => lease.slot.id)).toEqual(["b"])
+      expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
+      expect(await readLeaseReceipt(recovered.journal)).toMatchObject({ completedSlots: [{ slotId: "a", incident }],
+        slotRecoveries: recovered.slots.map(lease => lease.receipt) })
+      await recovered.server.assertHeld()
+      expect(recovered.server.reservation.state).toBe("recovery-only")
+    } finally { await Promise.all([recovered.server.close(), ...recovered.slots.map(lease => lease.close())]) }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
