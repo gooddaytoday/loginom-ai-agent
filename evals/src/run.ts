@@ -72,7 +72,13 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   }, null, 2))
   const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
-  const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal)
+  const inputsHash = await agentInputsHash(tasks)
+  const rubric = await rubricHash(tasks)
+  const contexts = fixture && !config.dryRun ? await prepareFixture(config, fixture, runId, runDir) : undefined
+  const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal).catch(async (error: unknown) => {
+    if (contexts) await Promise.all([...contexts.map(context => context.lease.close()), contexts[0]!.judgeLease?.close()])
+    throw error
+  })
   const settings: JudgeSettings | undefined = judge
     ? {
         command: config.judge.command,
@@ -84,14 +90,11 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
       }
     : undefined
   const judgeGate = createJudgeGate()
-  const inputsHash = await agentInputsHash(tasks)
-  const rubric = await rubricHash(tasks)
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
   const slotStates = new Map<string, { state: "closed" | "quarantined"; lease_receipt: string; cleanup_receipt: string; storage_root: string; storage_leftovers: string[] | null; storage_error: string | null }>()
   const state: { stopped: string | null } = { stopped: null }
-  if (fixture && !config.dryRun) {
-    const contexts = await prepareFixture(config, fixture, runId, runDir)
+  if (contexts) {
     const unconfirmed = new Set<string>()
     try {
       const queued = await runSlotQueue({ jobs: buildJobs(tasks.map(task => task.id), config.repeat),
