@@ -7,7 +7,7 @@ import { readEnvironmentStatus } from "../src/parallel-status"
 import { acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
-import { prepareEnvironment } from "../src/environment-preparation"
+import { prepareEnvironment, verifyEnvironment } from "../src/environment-preparation"
 
 test("preparation rejects an invalid slot count before controller or runtime side effects", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-prepare-count-")), fixture = await parallelFixture(root)
@@ -18,6 +18,19 @@ test("preparation rejects an invalid slot count before controller or runtime sid
     for (const parallel of [0, 3, 1.5]) {
       await expect(prepareEnvironment({ slotsFile, parallel }, fixture.lockRoot)).rejects.toThrow("SLOT_COUNT")
       expect(await readdir(fixture.slots.controller.stateDir)).toEqual(before)
+      expect(await readdir(fixture.lockRoot)).toEqual([])
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("verification rejects an invalid slot count without preparing users or starting runtime", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-verify-count-")), fixture = await parallelFixture(root)
+  const slotsFile = path.join(root, "slots.json")
+  await writeLeaseReceipt(slotsFile, fixture.slots)
+  try {
+    for (const parallel of [0, 3, 1.5]) {
+      await expect(verifyEnvironment({ slotsFile, parallel }, fixture.lockRoot)).rejects.toThrow("SLOT_COUNT")
+      expect(await readdir(fixture.slots.controller.stateDir)).toEqual([])
       expect(await readdir(fixture.lockRoot)).toEqual([])
     }
   } finally { await rm(root, { recursive: true, force: true }) }
@@ -98,6 +111,23 @@ test("prepare CLI records a private admission failure without a measured summary
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "SLOT_PATH_PRIVATE" })
     expect(await Bun.file(path.join(out, "receipt.json")).json()).toMatchObject({ version: 2, kind: "environment-preparation", ready: false,
+      status: "failed", reason: "SLOT_PATH_PRIVATE" })
+    expect(await readdir(out)).toEqual(["receipt.json"])
+    expect(await readdir(fixture.slots.controller.stateDir)).toEqual([])
+    expect(await readdir(fixture.lockRoot)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("verify CLI records an admission failure without preparing or modifying user state", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-verify-failure-")), fixture = await parallelFixture(root)
+  const config = path.join(root, "slots.json"), out = path.join(root, "output")
+  await writeLeaseReceipt(config, fixture.slots)
+  try {
+    const child = Bun.spawn([process.execPath, path.join(evalsRoot, "script/parallel-env.ts"), "verify", "--config", config, "--out", out],
+      { cwd: evalsRoot, env: { PATH: process.env.PATH ?? "", HOME: root }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "SLOT_PATH_PRIVATE" })
+    expect(await Bun.file(path.join(out, "receipt.json")).json()).toMatchObject({ version: 2, kind: "environment-verification", ready: false,
       status: "failed", reason: "SLOT_PATH_PRIVATE" })
     expect(await readdir(out)).toEqual(["receipt.json"])
     expect(await readdir(fixture.slots.controller.stateDir)).toEqual([])

@@ -12,9 +12,9 @@ try {
     config: { type: "string" }, incident: { type: "string" }, out: { type: "string" }, parallel: { type: "string" },
   } })
   const command = args.positionals[0]
-  if (args.positionals.length !== 1 || !["status", "recover", "prepare"].includes(command ?? "") || !args.values.config ||
+  if (args.positionals.length !== 1 || !["status", "recover", "prepare", "verify"].includes(command ?? "") || !args.values.config ||
     command === "recover" && (!args.values.incident || !args.values.out || args.values.parallel) ||
-    command === "prepare" && (!args.values.out || args.values.incident || args.values.parallel !== undefined &&
+    (command === "prepare" || command === "verify") && (!args.values.out || args.values.incident || args.values.parallel !== undefined &&
       (!/^[1-9][0-9]*$/.test(args.values.parallel) || !Number.isSafeInteger(Number(args.values.parallel)))) ||
     command === "status" && (args.values.incident || args.values.out || args.values.parallel))
     throw new EvalFailure("PARALLEL_ENV_ARGUMENTS", 2)
@@ -36,10 +36,12 @@ try {
       await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "offline-judge-recovery-result", ...receipt })
       console.log(JSON.stringify(receipt))
     }
-    if (command === "prepare") {
-      const { prepareEnvironment } = await import("../src/environment-preparation")
-      const receipt = await prepareEnvironment({ slotsFile, parallel: Number(args.values.parallel ?? "1") }).catch(async error => {
-        await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "environment-preparation", status: "failed", ready: false,
+    if (command === "prepare" || command === "verify") {
+      const { prepareEnvironment, verifyEnvironment } = await import("../src/environment-preparation")
+      const check = command === "prepare" ? prepareEnvironment : verifyEnvironment
+      const receipt = await check({ slotsFile, parallel: Number(args.values.parallel ?? "1") }).catch(async error => {
+        await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2,
+          kind: command === "prepare" ? "environment-preparation" : "environment-verification", status: "failed", ready: false,
           reason: error instanceof EvalFailure ? error.message : "PREPARATION_FAILED" })
         throw error
       })
