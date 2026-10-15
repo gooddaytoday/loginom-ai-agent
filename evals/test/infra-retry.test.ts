@@ -43,6 +43,19 @@ async function waitForFile(directory: string, pattern: string) {
   throw Error(`Fixture did not create ${pattern}`)
 }
 
+test("main: zero infrastructure retry budget dispatches exactly once", async () => {
+  const id = "infra-retry-success"
+  const context = await fixture([id])
+  try {
+    const run = await main(["--skip-judge", "--tasks", context.tasks], { ...context.env, EVAL_INFRA_RETRIES: "0" })
+    const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+    expect(summary.config.infra_retries).toBe(0)
+    expect(summary.tasks[0]!.attempts[0]!.status).toBe("infra_error")
+    expect(summary.tasks[0]!.attempts[0]!.infra_retry).toBeUndefined()
+    expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(1)
+  } finally { await context.close() }
+}, 30_000)
+
 test("main: один startup timeout повторяется после cleanup и даёт одну quality-попытку", async () => {
   const id = "infra-retry-success"
   const context = await fixture([id])
