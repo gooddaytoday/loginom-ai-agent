@@ -8,6 +8,14 @@ const full = {
   JUDGE_MODEL: "gpt-6-astra",
 }
 
+test("loadConfig: infrastructure retry budget is explicit and legacy default stays one", () => {
+  expect(loadConfig([], full).infraRetries).toBe(1)
+  expect(loadConfig([], { ...full, EVAL_INFRA_RETRIES: "0" }).infraRetries).toBe(0)
+  for (const value of ["-1", "2", "0.5", "x", ""]) {
+    expect(() => loadConfig([], { ...full, EVAL_INFRA_RETRIES: value })).toThrow("EVAL_INFRA_RETRIES")
+  }
+})
+
 test("loadConfig: значения по умолчанию при полном .env", () => {
   const config = loadConfig([], full)
   expect(config.agent.cliMode).toBe("source")
