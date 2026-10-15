@@ -2,8 +2,36 @@ import path from "node:path"
 import { readdir, readFile } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, writeLeaseReceipt } from "./lease"
-import { acquireEnvironmentLeases, parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
-import { readAdminProcessInventory } from "./loginom-admin"
+import { acquireEnvironmentLeases, loadSlots, parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
+import { openLoginomAdmin, readAdminProcessInventory } from "./loginom-admin"
+import { readServerIdentity, verifyParallelPair } from "./parallel-pair"
+
+export async function recoverUnactivatedPreparation(input: { slotsFile: string; incident: string }, lockRoot = globalLockRoot) {
+  const file = await loadSlots(input.slotsFile, 1)
+  const identity = await readServerIdentity(file)
+  await verifyParallelPair(file, identity)
+  const environment = await recoverPreparationLeases(file, identity, input.incident, lockRoot)
+  const receipt = `${environment.journal}.result.json`
+  try {
+    const command = await readLeaseReceipt(environment.journal)
+    if (!object(command) || typeof command.processInventory !== "string") throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    const admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, processInventory: command.processInventory })
+    try {
+      const { finalizeUnactivatedEnvironment } = await import("./environment-finalization")
+      const finalization = await finalizeUnactivatedEnvironment(file, environment, admin)
+      const result = { version: 2, kind: "preparation-recovery", status: "released", ready: false, identity,
+        incident: input.incident, journal: environment.journal, receipt, finalization }
+      await writeLeaseReceipt(receipt, result)
+      return result
+    } finally { await admin.dispose() }
+  } catch (error) {
+    const { EnvironmentFailure } = await import("./environment-preparation")
+    const reason = error instanceof EvalFailure ? error.message : "PREPARATION_RECOVERY_FAILED"
+    await writeLeaseReceipt(receipt, { version: 2, kind: "preparation-recovery", status: "failed", ready: false, identity,
+      incident: input.incident, journal: environment.journal, receipt, reason, finalization: { status: "unconfirmed" } })
+    throw new EnvironmentFailure(reason, receipt)
+  } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
+}
 
 /** Adopts reservations only; native/process/archive proof is required before release. */
 export async function recoverPreparationLeases(file: SlotFile, identity: ServerIdentity, incident: string, lockRoot = globalLockRoot) {

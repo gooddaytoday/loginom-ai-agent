@@ -134,3 +134,20 @@ test("verify CLI records an admission failure without preparing or modifying use
     expect(await readdir(fixture.lockRoot)).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("recover CLI routes a pre-CLI preparation incident and records an unconfirmed admission failure", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-recover-preparation-cli-")), fixture = await parallelFixture(root)
+  const config = path.join(root, "slots.json"), out = path.join(root, "output"), incident = path.join(fixture.slots.controller.stateDir, "prepare-command.json")
+  await writeLeaseReceipt(config, fixture.slots)
+  await writeLeaseReceipt(incident, { version: 2, kind: "unactivated-preparation" })
+  try {
+    const child = Bun.spawn([process.execPath, path.join(evalsRoot, "script/parallel-env.ts"), "recover", "--config", config, "--incident", incident, "--out", out],
+      { cwd: evalsRoot, env: { PATH: process.env.PATH ?? "", HOME: root }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "SLOT_PATH_PRIVATE" })
+    expect(await Bun.file(path.join(out, "receipt.json")).json()).toMatchObject({ version: 2, kind: "preparation-recovery", ready: false,
+      status: "failed", finalization: { status: "unconfirmed" } })
+    expect(await readdir(out)).toEqual(["receipt.json"])
+    expect(await readdir(fixture.lockRoot)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

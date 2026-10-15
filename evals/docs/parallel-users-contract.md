@@ -1196,3 +1196,28 @@ Native exited controller/blocked account/history/B canary qualified; green pair
 removed. RED fixture /tmp/evals-recover-preparation-CrWNk2 остаётся для public
 recover/resumption. Полная source capture, CLI command, idempotency и partial
 terminal reconciliation ещё open.
+
+
+### Public pre-CLI recover
+
+`parallel-env recover --config <private config> --incident <original prepare
+journal> --out <new private directory>` распознаёт unactivated-preparation
+incident, перечитывает config/pair/identity и выполняет recovery-only CAS + native
+finalizer. Phase cli_admitted/active account не получают этот путь. Exit0 и
+status released означают только cleanup; ready:false сохраняется. Failure
+receipt явно unconfirmed/exit2; private controller receipt сохраняется целиком
+при известной ссылке. Offline judge recovery сохраняет прежний route.
+
+TDD wrong offline-judge routing RED→GREEN.100 unit PASS/433 (7.00s), offline
+judge2 PASS/37 (7.29s), typecheck/diff PASS. Public command принял сохранённую
+RED fixture CrWNk2 после выхода первого recovery owner. Проверены sources двух
+прежних controllers, continuous proofs/fresh absence, original terminal slot,
+archive canary и B bytes. Private600 `native-recovery-red-resume-20261015/qualified-recovery.json`
+SHA256 `49794de02d5a9ab022c1128aa0d62521054ed81ec2ac8bb4e171d3930d315895`;
+31 independent checks, cleanup-audit и exact own pair absence PASS. Own pair
+удалена через destroyPair после release, test root удалён. Это public cleanup
+never-activated incident; fully terminal idempotency и partial-release
+reconciliation ещё необходимы. Старые incidents не затронуты.
+
+После recovery extension обычный native parent path также PASS:1/31 assertions
+(41.16s), log600 /tmp/evals-recovery-normal-regression-native.log.
