@@ -231,13 +231,36 @@ cross-context closure journal/mandatory adopt SHA. Recovery-only и active Count
 adoption остаются закрытыми.
 
 Следующий отдельный gate — finalization собственных administrator sessions.
-Pinned bg/ts/CustomClient.js:39–43 вызывает FServerConnector.Disconnect() из
-Finalize без await; bg/js/rpc.js:6234–6299 возвращает Task из Disconnect.
-Это наблюдение исходников, не установленная причина прежнего retained incident.
-Нужен bounded native контроль awaited own disconnect и независимый managed
-read-back; browser/process exit сам по себе не подтверждает server closure.
+Pinned bg/ts/CustomClient.js:39–43 вызывает connector Disconnect() из Finalize.
+Этот connector — bg.DeductorServer: bg/js/bg.server.rpc.js:289–301 вызывает
+RPC session.dispose() без ожидания и сам возвращает void. Awaitable нижний
+rpc.TBGSession.Disconnect() находится в bg/js/rpc.js:6234–6299;
+Task.js:49–50 адаптирует Task к Promise. Поэтому await void-wrapper не решает
+эту границу. Причина прежнего retained incident этим ещё не установлена.
+
+Driver dispose для initialized context теперь ожидает собственный
+FServerConnector.$FSession.Disconnect() Task, затем закрывает browser context;
+pagehide отключается после завершённого Task, чтобы не запускать второй
+неожидаемый dispose. Ответ различает transportDisconnect=confirmed и простое
+local context disposal. Parent сохраняет поле; после successful initialization
+отсутствие подтверждения quarantines connection. Unknown исход не выдаёт
+server cleanup/release authority.
+
+Native positive control: admin A до входа B сохраняет полный managed baseline;
+после входа B появляется ровно один новый admin Count0 row. После awaited B
+disconnect независимый A выполняет bounded read-back и подтверждает отсутствие
+этой tuple, затем продолжает package probe. Это квалификация controlled Count0
+admin disposal; runtime serverSessions/grants и full prepare ещё требуют
+отдельного inventory/closure evidence. Browser/process exit не подменяет его.
 
 Последний reconnect evidence: research/evidence/native-user-104a011e-bbee-422f-bd5d-a28f5abd36aa
 (reconnected-session-close.json, reconnected/native-driver-result.json,
 original/reconnected command hashes и оба local process proofs). Native target
 1 PASS/108 (41.63s),103 unit/codec/preflight/lease PASS/342 (10.67s), typecheck/diff PASS.
+
+Awaited-admin-disconnect evidence:
+research/evidence/native-user-33bdcaed-e911-4a6b-afb8-ef2f151c32e4/
+admin-disconnect-observation.json содержит baseline/opened/causal peer/after и
+actual dispose reply; оба local process proofs сохранены рядом. Native controlled
+case1 PASS/118 (45.36s), полный связанный suite110 PASS/573 (139.76s), typecheck/diff PASS.
+Контроль не завершает общую SessionBackup policy либо полный slot cleanup.
