@@ -1,0 +1,7 @@
+Id;Category;Code;Amount;Keep
+1;North;1;1.25;A
+2;north;2;1.2501;B
+3;NULL;3;2.5;C
+4;"";4;0;D
+5;null;5;-1.5;E
+6;Other;6;3.75;F

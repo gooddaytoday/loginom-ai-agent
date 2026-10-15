@@ -138,3 +138,34 @@ test("IPC disconnect rejects in-flight requests even while the runtime stays ali
     await rm(directory, { recursive: true, force: true })
   }
 }, 12000)
+
+test("runtime accepts an acknowledged clean shutdown after five seconds", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-slow-close-"))
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+  try {
+    const entry = join(directory, "runtime.mjs")
+    await writeFile(
+      entry,
+      `process.on('message', m => {
+      if(m.operation==='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+      if(m.operation==='close') setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),6000);
+    });`,
+    )
+    const runtime = await supervise({
+      node,
+      entry,
+      resources: directory,
+      stateDir: directory,
+      generation: 1,
+      chat: "slow-close",
+      endpoint: "https://example.test",
+      connection: { apiKey: "fixture", password: "", url: "https://example.test", username: "test" },
+    })
+    await runtime.close()
+    await runtime.close()
+    expect(await runtime.exited).toEqual({ code: 0, signal: null })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 12000)

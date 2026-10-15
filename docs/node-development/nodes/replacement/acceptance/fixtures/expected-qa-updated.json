@@ -1,0 +1,77 @@
+{
+  "description": "Independent partial update expected: Category is replaced completely, unrequested Key rule and mappings preserved.",
+  "names": [
+    "Memo",
+    "Group",
+    "Hit",
+    "Key",
+    "KeyHit",
+    "Amount"
+  ],
+  "labels": [
+    "Same",
+    "Same",
+    "Flag",
+    "Key Result",
+    "Flag",
+    "Amount"
+  ],
+  "types": [
+    "string",
+    "string",
+    "boolean",
+    "integer",
+    "boolean",
+    "real"
+  ],
+  "rows": [
+    [
+      "A",
+      "Changed",
+      true,
+      "-9223372036854775808",
+      true,
+      1.25
+    ],
+    [
+      "B",
+      "Changed",
+      true,
+      null,
+      true,
+      1.2501
+    ],
+    [
+      "C",
+      "Rest",
+      true,
+      "-9223372036854775808",
+      true,
+      2.5
+    ],
+    [
+      "D",
+      "Rest",
+      true,
+      "-9223372036854775808",
+      true,
+      0
+    ],
+    [
+      "E",
+      "Rest",
+      true,
+      "-9223372036854775808",
+      true,
+      -1.5
+    ],
+    [
+      "F",
+      "Rest",
+      true,
+      "-9223372036854775808",
+      true,
+      3.75
+    ]
+  ]
+}

@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
+import {pathToFileURL} from 'node:url';
+const {makeWorkspaceUiCode,validateUiAction,workspaceUiCapability}=await import(process.env.WORKSPACE_UI_UNDER_TEST
+  ?pathToFileURL(process.env.WORKSPACE_UI_UNDER_TEST).href:'../lib/workspace-ui.mjs');
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
@@ -1494,6 +1496,33 @@ function wizardStepFixture(page,direction='next') {
   const advance=()=>{marker.remove();page.add('div',base+';TuneDataSourceInputPortWizard;btnAddMappingColumn','',undefined,form);};
   return {base,form,marker,button,advance};
 }
+
+for(const slowInside of [false,true])test('rooted wizard step control scan: slow '+(slowInside?'owned':'foreign')+' control',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
+ // Avatar is retained by the fixed global guard queries even in a rooted read.
+ const outside=page.avatar;
+ const initial=await page.observe(),snapshot=(await page.execute({mode:'observe',root_ref:initial.wizard.root_ref})).output;
+ assert.equal(snapshot.observation_root.ref,snapshot.wizard.root_ref);
+ const button=snapshot.ui.elements.find(e=>e.wizard_step),costly=slowInside?c.button:outside;let classificationReads=0;
+ const original=costly.matches.bind(costly);costly.matches=selector=>{
+  if(page.events.includes('click')&&selector.startsWith('button,input,textarea,select,')&&!selector.includes('[data-tid]')){
+   classificationReads++;clock.advance(600);
+  }
+  return original(selector);
+ };
+ page.waitForTimeout=async()=>{};const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();};
+ const outcome=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ if(slowInside){
+  assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.error.code,'UI_SCAN_LIMIT');
+  assert.ok(classificationReads>0);assert.ok(outcome.trace.some(e=>e.event==='ui_scan_limit'&&e.scan_stage==='controls'));
+  assert.ok(!outcome.trace.some(e=>e.event==='wizard_step_verified'));
+ }else{
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));assert.equal(classificationReads,0);
+  assert.ok(outcome.trace.some(e=>e.event==='wizard_step_settled'&&e.quiet_samples===3));
+  assert.ok(!outcome.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnAvatar'));
+ }
+});
 
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
   for(const direction of ['next','previous']) {

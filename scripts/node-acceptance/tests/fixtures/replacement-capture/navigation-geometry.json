@@ -1,0 +1,158 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "breadcrumbs": [
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер",
+      "text": "",
+      "visible": true,
+      "box": {
+        "x": 182,
+        "y": 41,
+        "width": 47,
+        "height": 24,
+        "top": 41,
+        "right": 229,
+        "bottom": 65,
+        "left": 182
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты",
+      "text": "Пакеты",
+      "visible": true,
+      "box": {
+        "x": 229,
+        "y": 41,
+        "width": 94.875,
+        "height": 24,
+        "top": 41,
+        "right": 323.875,
+        "bottom": 65,
+        "left": 229
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564",
+      "text": "replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564",
+      "visible": true,
+      "box": {
+        "x": 324,
+        "y": 41,
+        "width": 424.796875,
+        "height": 24,
+        "top": 41,
+        "right": 748.796875,
+        "bottom": 65,
+        "left": 324
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1",
+      "text": "Модуль1",
+      "visible": true,
+      "box": {
+        "x": 749,
+        "y": 41,
+        "width": 101.984375,
+        "height": 24,
+        "top": 41,
+        "right": 850.984375,
+        "bottom": 65,
+        "left": 749
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1>Сценарий",
+      "text": "Сценарий",
+      "visible": true,
+      "box": {
+        "x": 851,
+        "y": 41,
+        "width": 110.03125,
+        "height": 24,
+        "top": 41,
+        "right": 961.03125,
+        "bottom": 65,
+        "left": 851
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1>Сценарий>NullDiagnostic",
+      "text": "NullDiagnostic",
+      "visible": true,
+      "box": {
+        "x": 962,
+        "y": 41,
+        "width": 133.328125,
+        "height": 24,
+        "top": 41,
+        "right": 1095.328125,
+        "bottom": 65,
+        "left": 962
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1>Сценарий>NullDiagnostic>Входные_порты",
+      "text": "Входные порты",
+      "visible": false,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1>Сценарий>NullDiagnostic>Входные_порты>Входной_источник_данных",
+      "text": "Входной источник данных",
+      "visible": false,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    },
+    {
+      "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1>Сценарий>NullDiagnostic>Входные_порты>Входной_источник_данных>Настройка",
+      "text": "Настройка",
+      "visible": false,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      }
+    }
+  ],
+  "panels": [
+    {
+      "id": "navigationpanel-1551",
+      "box": {
+        "x": 182,
+        "y": 35,
+        "width": 1054,
+        "height": 36,
+        "top": 35,
+        "right": 1236,
+        "bottom": 71,
+        "left": 182
+      }
+    }
+  ]
+}

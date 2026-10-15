@@ -5,6 +5,14 @@ const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Obje
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
 const normalized=r=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(({from,to})=>({from,to})),other:r.other,...(r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
 const pairKeys=ps=>ps.map(p=>[replacementValueKey(p.from),replacementValueKey(p.to)]);
+export function assertReplacementEditorPair(actual,pair){
+ need(actual&&same(pairKeys([actual]),pairKeys([pair])),'Replacement native editor value differs');
+}
+export function replacementRealEditorText(value,separator){
+ need(typeof value==='number'&&Number.isFinite(value),'Finite replacement real required');
+ need(['.',','].includes(separator),'Observed replacement real decimal separator required');
+ return String(value).replace('.',separator);
+}
 export async function revealReplacementAdd(channel,observe,ready){
  let s=await observe('replacement add header');
  for(let attempt=0;attempt<130;attempt++){
@@ -104,10 +112,20 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
     if(value.value===null)await act(suffix+';trg_SetNullTrigger');
     else{
      const s=await observe('typed replacement editor');const es=s.ui.elements.filter(e=>e.allowed_actions.includes('fill')&&(e.identity?.anchor_tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid?.startsWith(s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix+';')));
-     need(es.length===1,'Typed replacement input unavailable');await channel.perform({condition:'fill typed replacement value',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id,side}),resolve:()=>({verb:'fill',ref:es[0].ref,text:rule.type==='real'?String(value.value).replace('.',','):String(value.value)})});
+     need(es.length===1,'Typed replacement input unavailable');const text=rule.type==='real'?replacementRealEditorText(value.value,s.node_replacement.real_decimal_separators?.[side==='ReplaceEditor'?'from':'to']):String(value.value);await channel.perform({condition:'fill typed replacement value',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id,side}),resolve:()=>({verb:'fill',ref:es[0].ref,text})});
     }
    }
-   const s=await observe('replacement row ready to commit');await channel.perform({condition:'commit replacement row',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid==='roweditorbuttons;update'&&e.allowed_actions.includes('click'));need(es.length===1,'Replacement row update unavailable');return {verb:'click',ref:es[0].ref};}});
+   const s=await observe('replacement row ready to commit'),owner=s.node_replacement.node_context,root=s.wizard.root_tid,inputId=s.node_replacement.input_fields.find(f=>f.name===rule.field.name)?.record_id;
+   await channel.perform({condition:'commit replacement row',initialObservation:s,ready,
+    identity:()=>({field:rule.field.name,row:added[0].record_id,inputId,owner,root}),resolve:current=>{
+     const r=current.node_replacement;
+     need(current.wizard.root_tid===root&&same(r.node_context,owner)&&r.selected===rule.field.name&&r.editor_open&&r.editor_record_id===added[0].record_id&&r.pairs.filter(p=>p.record_id===added[0].record_id).length===1,'Replacement commit editor binding differs');
+     assertReplacementEditorPair(r.editor_values,pair);
+     const field=r.input_fields.find(f=>f.name===rule.field.name);
+     need(field?.record_id===inputId&&field?.type===rule.type,'Replacement commit input type differs');
+     const es=current.ui.elements.filter(e=>e.tid==='roweditorbuttons;update'&&e.allowed_actions.includes('click')&&e.replacement_field?.field_key===rule.field.name&&e.replacement_field.record_id===field.record_id&&e.replacement_field.selected_record_id===field.record_id&&e.replacement_field.role==='control'&&e.replacement_field.part==='update'&&e.replacement_field.wizard_root_ref===current.wizard.root_ref);
+     need(es.length===1,'Replacement row update unavailable');return {verb:'click',ref:es[0].ref};
+    }});
    r=(await observe('replacement pair committed',r=>!r.editor_open&&r.pairs.some(p=>p.record_id===added[0].record_id&&same(pairKeys([p]),pairKeys([pair]))))).node_replacement;
   }
   if(rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
@@ -116,7 +134,8 @@ export async function configureReplacement(channel,p,{newNode=false}={}){
   if(rule.other.mode==='value'){
    need(rule.other.value.value!==null,'Use remaining null mode for Null');
    const suffix=rule.type==='string'?'edtReplaceOther':rule.type==='real'?'edtReplaceOtherFloat':'edtReplaceOtherInt';
-   await act(suffix,'fill',{text:rule.type==='real'?String(rule.other.value.value).replace('.',','):String(rule.other.value.value)});
+   const current=await observe('remaining replacement editor format');
+   await act(suffix,'fill',{text:rule.type==='real'?replacementRealEditorText(rule.other.value.value,current.node_replacement.real_decimal_separators?.other):String(rule.other.value.value)});
    await act('cbxReplaceOther','press',{key:'Tab'});
   }
   r=(await observe('complete replacement field readback')).node_replacement;

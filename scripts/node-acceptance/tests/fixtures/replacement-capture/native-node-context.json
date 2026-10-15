@@ -1,0 +1,98 @@
+{
+  "binding": {
+    "document_id": "0c184aed-17ff-40e9-8765-aeb82a673746",
+    "workflow_ref": {
+      "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-3",
+      "prefix": "MF;TF-3",
+      "navigation_path": [
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+          "label": "replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ],
+      "workflow_id": "0c184aed-17ff-40e9-8765-aeb82a673746-2"
+    },
+    "node": {
+      "document_id": "0c184aed-17ff-40e9-8765-aeb82a673746",
+      "workflow_id": "0c184aed-17ff-40e9-8765-aeb82a673746-2",
+      "node_id": "d8ecc584-9d56-4e27-bd64-da8040754820"
+    }
+  },
+  "result": {
+    "verified": true,
+    "navigation_rebinding": {
+      "prepared_path": [
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+          "label": "replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ],
+      "observed_path": [
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564",
+          "label": "replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-3;cnrNaviMode;b.s_Сервер>Пакеты>replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ]
+    },
+    "document_id": "0c184aed-17ff-40e9-8765-aeb82a673746",
+    "workflow_id": "0c184aed-17ff-40e9-8765-aeb82a673746-2",
+    "node_id": "d8ecc584-9d56-4e27-bd64-da8040754820",
+    "surface": "wizard",
+    "tid": "MF;TF-3;WizrdMCF",
+    "input_port": {
+      "direction": "input",
+      "port": 0,
+      "native_index": 0,
+      "port_guid": "9dc72a3f-56bf-3bfc-84ec-f979daf4da6b",
+      "opening_operation_id": "new-live-replacement:n9"
+    }
+  }
+}

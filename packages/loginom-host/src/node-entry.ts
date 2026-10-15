@@ -85,8 +85,22 @@ async function dispatch(message: unknown) {
         ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
+      if (capture !== undefined && (!capture || typeof capture !== "object"
+          || ![Object.prototype, null].includes(Object.getPrototypeOf(capture))
+          || Reflect.ownKeys(capture).some(key => typeof key !== "string"
+            || !Object.getOwnPropertyDescriptor(capture, key)?.enumerable
+            || !("value" in Object.getOwnPropertyDescriptor(capture, key)!))
+          || !(["authorization,packagePath", "authorization,harness,packagePath"].includes(Object.keys(capture).sort().join(",")))
+          || ("harness" in capture && capture.harness !== "replacement-input0-readonly-v1")
+          || !("authorization" in capture) || typeof capture.authorization !== "string" || !/^[a-f0-9]{64}$/.test(capture.authorization)
+          || !("packagePath" in capture) || typeof capture.packagePath !== "string"
+          || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
+          || capture.packagePath.split("/").some(x => x === "." || x === "..")))
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
+        acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "replacement-input0-readonly-v1" } | undefined,
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,

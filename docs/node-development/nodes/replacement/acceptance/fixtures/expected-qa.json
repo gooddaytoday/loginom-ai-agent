@@ -1,0 +1,7 @@
+{
+ "description":"Independent fixture before live QA: case-insensitive North, replace mode, integer other Int64 min, exact integer to Null, input alias and duplicate labels, output rename/order/exclusion.",
+ "names":["Memo","Group","Hit","Key","KeyHit","Amount"],
+ "labels":["Same","Same","Flag","Key Result","Flag","Amount"],
+ "types":["string","string","boolean","integer","boolean","real"],
+ "rows":[["A","N",true,"-9223372036854775808",true,1.25],["B","N",true,null,true,1.2501],["C",null,false,"-9223372036854775808",true,2.5],["D","",false,"-9223372036854775808",true,0],["E","null",false,"-9223372036854775808",true,-1.5],["F","Other",false,"-9223372036854775808",true,3.75]]
+}

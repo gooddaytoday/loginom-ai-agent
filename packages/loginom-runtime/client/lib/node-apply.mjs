@@ -154,6 +154,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       effect_possible:false,cleanup_complete:true,resumes:0,started_at:now(),deadline:now()+request.budgets.total_ms};
     await acknowledge({phase:'node_apply_prepared',signature,request:structuredClone(request),deadline_at:state.deadline});
     operation.nodeApply=state;
+    operation.captureNodeState=state;
+    operation.captureDeadline=state.deadline;
   }
   const context=()=>({operation_id:operation.id,document_id:request.document_id,workflow_ref:request.workflow_ref,
     node:state.node,execution:state.execution,deadline:state.deadline,signal,stopSignal});
@@ -271,6 +273,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // an ambiguous configuration effect.
     if(name==='workflow')state.effect_possible=previousEffect||value.effect_possible===true;
     state.phases.push(receipt);state.pending=null;state.cleanup_complete=true;
+    if(name==='open') {
+      operation.captureOpening=receipt;
+      operation.captureOpeningBytes=JSON.stringify(receipt);
+    }
+    if(name==='target')operation.captureTargetNodeBytes=JSON.stringify(receipt.value.node);
     if(name==='execute')delete state.execution_wait;
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
@@ -283,6 +290,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
       value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
+    operation.captureNode=state.node;
     const readingOnly=request.mode===NODE_READ_MODE;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));

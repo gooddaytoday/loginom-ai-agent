@@ -80,6 +80,9 @@ class Page {
     this.dialog = null; this.fileValue = ''; this.storage = new Map(); this.conflict = false;
     this.graph = { scrollLeft: 0, scrollTop: 0 };
     this.dom={createTreeWalker:root=>{function* walk(node){for(const child of node.children??[]){yield child;yield* walk(child);}}const iterator=walk(root);return {nextNode:()=>iterator.next().value??null};}};
+    this.dom.documentElement={children:[{visible:true,parentElement:null,
+      getAttribute:name=>name==='data-tid'?'MF;cntMain;tlbMainToolbar;btnAvatar':null,
+      getBoundingClientRect:()=>({width:10,height:10}),hasAttribute:()=>false,matches:()=>false}]};
     this.diagramOffset = { x: 0, y: 0 };
     this.viewScale = 1;
     this.packagePath = null;
@@ -284,11 +287,12 @@ class Page {
   async execute(code) {
     const page = this;
     class Clock extends Date { static now() { return page.clock; } }
-    this.context ??= vm.createContext({ Date: Clock, bg: { app: this.app },
+    this.context ??= vm.createContext({ Date: Clock, URL, location:{origin:'https://loginom.invalid'},document:this.dom,bg: { app: this.app },
       getComputedStyle: element => ({ display: element.visible ? 'block' : 'none', visibility: element.visible ? 'visible' : 'hidden' }) });
     const fn = vm.runInContext(`(${code})`, this.context);
     return clone(await fn(this));
   }
+  url() { return 'https://loginom.invalid/?testable=true'; }
 }
 
 const nodeParameters = { component_key: 'imports.text', target_position: { x: 104, y: 104 }, expected_label: 'Источник' };

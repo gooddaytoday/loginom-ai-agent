@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {validateReplacementParameters,validateReplacementValue,resolveReplacementParameters} from '../../../../../packages/loginom-runtime/client/lib/replacement-parameters.mjs';
+
+const typed=(value,type='string')=>({type,value});
+const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
+const parameters=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:typed('A'),to:typed('Alpha')}],other:{mode:'keep'}}]});
+const results=[];
+const refuse=(name,run,reason)=>{assert.throws(run,reason);results.push({name,status:'PASS',scope:'local_preflight_refusal'});};
+refuse('case-fold duplicate',()=>{const p=parameters();p.rules[0].case_sensitive=false;p.rules[0].pairs.push({from:typed('a'),to:typed('Beta')});validateReplacementParameters(p,'exact',request);},/Duplicate replacement key/);
+refuse('non-ASCII insensitive key',()=>{const p=parameters();p.rules[0].case_sensitive=false;p.rules[0].pairs[0].from.value='Я';validateReplacementParameters(p,'exact',request);},/Non-ASCII/);
+for(const value of [NaN,Infinity,-Infinity])refuse('non-finite '+String(value),()=>validateReplacementValue(typed(value,'real'),'real'),/Finite real/);
+for(const value of ['9223372036854775808','-9223372036854775809'])refuse('Int64 boundary '+value,()=>validateReplacementValue(typed(value,'integer'),'integer'),/outside Int64/);
+refuse('typed replacement mismatch',()=>validateReplacementValue(typed('1'),'integer'),/typed value/);
+for(const value of ['line\nbreak','line\rbreak','nul\0byte','x'.repeat(2049)])refuse('invalid string '+value.length,()=>validateReplacementValue(typed(value),'string'),/Invalid replacement string/);
+refuse('rounded remaining real',()=>{const p=parameters();p.rules=[{field:{kind:'input_field',name:'Amount'},type:'real',precision:0,pairs:[],other:{mode:'value',value:typed(1.234,'real')}}];validateReplacementParameters(p,'exact',request);},/two decimal places/);
+for(const suffix of ['_Replace','_Replaced'])refuse('derived collision '+suffix,()=>resolveReplacementParameters(parameters(),[{name:'Category',type:'string'},{name:'Category'+suffix,type:'string'}]),/collision/);
+for(const mode of ['regex','external'])refuse('unsupported mode '+mode,()=>validateReplacementParameters(parameters(),mode,request),/exact internal/);
+for(const type of ['boolean','datetime'])refuse('unsupported type '+type,()=>{const p=parameters();p.rules[0].type=type;validateReplacementParameters(p,'exact',request);},/type unsupported/);
+for(const value of ['-9223372036854775808','9223372036854775807'])assert.doesNotThrow(()=>validateReplacementValue(typed(value,'integer'),'integer'));
+assert.doesNotThrow(()=>validateReplacementValue(typed(9.125,'real'),'real'));
+console.log(JSON.stringify({status:'PASS',checks:results,live_node_acceptance:false},null,2));

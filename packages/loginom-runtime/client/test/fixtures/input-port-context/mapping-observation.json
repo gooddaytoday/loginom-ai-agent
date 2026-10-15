@@ -1,0 +1,638 @@
+{
+  "status": "SUCCEEDED",
+  "action_key": "workspace.observe",
+  "action_revision": "1",
+  "operation_id": "2cd32a20-b105-42aa-9c55-c2ffdc6d895a",
+  "phase": "observed",
+  "effect_possible": false,
+  "output": {
+    "origin": "https://app.loginom.ai",
+    "authenticated": true,
+    "loginom_build": "7.4.2",
+    "workflow_ref": {
+      "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-3",
+      "prefix": "MF;TF-3"
+    },
+    "active_identity": "Настройка",
+    "active_tab_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-106",
+    "navigation_context": {
+      "status": "unobserved"
+    },
+    "wizard_pending_owner": {
+      "status": "unobserved"
+    },
+    "workflow_navigation": {
+      "status": "unobserved"
+    },
+    "node_context": {
+      "status": "unobserved",
+      "opening_verified": false
+    },
+    "graph_identity": {
+      "status": "unobserved"
+    },
+    "package_identity": {
+      "path": "/lab-73-monkey-47274bad-b33b-4a2a-bf2d-60b0c951c36e/replacement-null-live-27a78ab0-3818-4426-b376-a0410a8f7564.lgp",
+      "name": "replacement_null_live_27a78ab0_3818_4426_b376_a0410a8f7564"
+    },
+    "workarea": null,
+    "scan": {
+      "complete": true,
+      "mutation_counts": {
+        "cursor_style": 0,
+        "other_style": 4716,
+        "attributes": 7190,
+        "child_list": 3476,
+        "text": 79,
+        "other": 0,
+        "unclassified": 17815,
+        "ignored_cursor_blink": 0
+      },
+      "visited_elements": 542,
+      "detail_elements": 498,
+      "max_elements": 6000,
+      "max_work": 250000,
+      "max_ms": 500
+    },
+    "dom_epoch": {
+      "document": "76c79df5-e0a1-459e-ae27-7364df79ee9b",
+      "revision": 33276
+    },
+    "observation_root": {
+      "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1059",
+      "identity": {
+        "anchor_tid": "MF;TF-3;WizrdMCF",
+        "path": []
+      },
+      "detail_scope": "elements_and_cells",
+      "global_scan": false,
+      "global_guards": "fixed_native_queries"
+    },
+    "file_storage": {
+      "status": "unobserved",
+      "directory": null,
+      "listing_complete": false,
+      "reason": "storage_container_not_observed"
+    },
+    "wizard": {
+      "status": "observed",
+      "root_tid": "MF;TF-3;WizrdMCF",
+      "root_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1059",
+      "title": "Настройка соответствия между столбцами",
+      "title_status": "observed",
+      "stage": "input_mapping",
+      "stage_status": "observed",
+      "controls": {
+        "btnPrev": {
+          "status": "unobserved",
+          "enabled": null
+        },
+        "btnNext": {
+          "status": "unobserved",
+          "enabled": null
+        },
+        "btnDone": {
+          "status": "observed",
+          "enabled": true
+        },
+        "btnExecute": {
+          "status": "unobserved",
+          "enabled": null
+        },
+        "btnClose": {
+          "status": "observed",
+          "enabled": true
+        },
+        "btnError": {
+          "status": "unobserved",
+          "enabled": null
+        }
+      },
+      "owner_context": {
+        "status": "unobserved",
+        "opening_verified": false
+      },
+      "input_port_context": {
+        "status": "unobserved",
+        "direction": "input",
+        "port_key": null,
+        "port_index": null,
+        "source_identity_verified": false,
+        "opening_verified": false
+      },
+      "output_columns": {
+        "status": "rendered_rows",
+        "complete": false,
+        "settings_applied": false,
+        "fields": [
+          {
+            "status": "observed",
+            "name": "Id",
+            "label": "Id",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "usage": "Не задано",
+            "source": {
+              "status": "rendered_source",
+              "identity_verified": false,
+              "cell_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1066",
+              "label": "Id",
+              "type": "integer"
+            },
+            "selected": false,
+            "name_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1067",
+            "label_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1068",
+            "row_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1069"
+          },
+          {
+            "status": "observed",
+            "name": "Category",
+            "label": "Category",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "usage": "Не задано",
+            "source": {
+              "status": "rendered_source",
+              "identity_verified": false,
+              "cell_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1070",
+              "label": "Category",
+              "type": "string"
+            },
+            "selected": false,
+            "name_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1071",
+            "label_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1072",
+            "row_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1073"
+          },
+          {
+            "status": "observed",
+            "name": "Code",
+            "label": "Code",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "usage": "Не задано",
+            "source": {
+              "status": "rendered_source",
+              "identity_verified": false,
+              "cell_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1074",
+              "label": "Code",
+              "type": "integer"
+            },
+            "selected": false,
+            "name_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1075",
+            "label_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1076",
+            "row_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1077"
+          },
+          {
+            "status": "observed",
+            "name": "Amount",
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "usage": "Не задано",
+            "source": {
+              "status": "rendered_source",
+              "identity_verified": false,
+              "cell_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1078",
+              "label": "Amount",
+              "type": "real"
+            },
+            "selected": false,
+            "name_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1079",
+            "label_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1080",
+            "row_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1081"
+          },
+          {
+            "status": "observed",
+            "name": "Keep",
+            "label": "Keep",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "usage": "Не задано",
+            "source": {
+              "status": "rendered_source",
+              "identity_verified": false,
+              "cell_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1082",
+              "label": "Keep",
+              "type": "string"
+            },
+            "selected": false,
+            "name_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1083",
+            "label_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1084",
+            "row_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1085"
+          }
+        ],
+        "auto_sync": {
+          "status": "observed",
+          "value": true,
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1086"
+        },
+        "definition_coverage": {
+          "status": "partial",
+          "source_identity_verified": false
+        }
+      },
+      "input_mapping": {
+        "status": "unobserved",
+        "reason": "links_mode_unverified",
+        "links": [],
+        "complete": false,
+        "source_identity_verified": false,
+        "settings_applied": false
+      }
+    },
+    "table_settings": {
+      "status": "unobserved",
+      "settings_applied": false,
+      "result_complete": false,
+      "execution_verified": false
+    },
+    "table_coverage": {
+      "status": "unobserved",
+      "complete_result_verified": false
+    },
+    "process_console": {
+      "status": "unobserved",
+      "top_groups": [],
+      "rows": [],
+      "top_level_complete": false,
+      "details_complete": false,
+      "execution_verified": false,
+      "owner_verified": false
+    },
+    "geometry": {
+      "device_pixel_ratio": 1,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "screen": {
+        "width": 1280,
+        "height": 800,
+        "x": 10,
+        "y": 10
+      },
+      "visual_viewport": {
+        "width": 1280,
+        "height": 800,
+        "scale": 1,
+        "offset_left": 0,
+        "offset_top": 0
+      }
+    },
+    "operation": {
+      "operation_id": "new-live-replacement",
+      "state": "pending",
+      "cleanup_confirmed": false,
+      "effect_state": "partial_or_unverified",
+      "recovery_options": [],
+      "next_steps": [
+        {
+          "tool": "dock_operation_inspect",
+          "arguments": {
+            "operation_id": "new-live-replacement"
+          },
+          "required_fields": [],
+          "requires": [],
+          "provides": [
+            "completion_receipt",
+            "cleanup_state"
+          ]
+        },
+        {
+          "tool": "dock_workspace_observe",
+          "arguments": {},
+          "required_fields": [],
+          "requires": [],
+          "provides": [
+            "observation_id",
+            "fresh_ui_refs"
+          ]
+        }
+      ],
+      "outcome_summary": {
+        "status": "AMBIGUOUS",
+        "action_key": "node.apply",
+        "operation_id": "new-live-replacement",
+        "detail_tool": "dock_operation_inspect"
+      }
+    },
+    "observation_id": "234ac7de-f6d4-437b-b575-d26463813e1e",
+    "observation_revision": "ada456f2729cb776b9385cc95cd4dc1f9c63195c80fb477c77d12817dd53def7",
+    "nodes": [],
+    "links": [],
+    "ui": {
+      "elements": [
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1131",
+          "tid": "MF;TF-3;WizrdMCF;btnClose",
+          "kind": "control",
+          "role": null,
+          "label": "",
+          "scope": "workflow",
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 1259,
+              "y": 89
+            }
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag"
+          ],
+          "signature": {
+            "tag": "a"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1132",
+          "tid": "MF;TF-3;WizrdMCF;btnDone",
+          "kind": "control",
+          "role": null,
+          "label": "",
+          "scope": "workflow",
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 1240,
+              "y": 411.5
+            }
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag"
+          ],
+          "signature": {
+            "tag": "a"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1133",
+          "tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbTable;InputEl",
+          "kind": "control",
+          "role": "radio",
+          "label": "",
+          "scope": "workflow",
+          "check_state": {
+            "kind": "radio",
+            "checked": true,
+            "indeterminate": false,
+            "source": "loginom_ext",
+            "owner_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1096"
+          },
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_not_observed",
+            "point": null,
+            "covering": [
+              {
+                "tag": "span",
+                "tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbTable;DisplayEl",
+                "anchor_tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbTable;DisplayEl",
+                "role": null
+              }
+            ]
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ],
+          "signature": {
+            "tag": "input"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1134",
+          "tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbLinks;InputEl",
+          "kind": "control",
+          "role": "radio",
+          "label": "",
+          "scope": "workflow",
+          "check_state": {
+            "kind": "radio",
+            "checked": false,
+            "indeterminate": false,
+            "source": "loginom_ext",
+            "owner_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1098"
+          },
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_not_observed",
+            "point": null,
+            "covering": [
+              {
+                "tag": "span",
+                "tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbLinks;DisplayEl",
+                "anchor_tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbLinks;DisplayEl",
+                "role": null
+              }
+            ]
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ],
+          "signature": {
+            "tag": "input"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1135",
+          "tid": null,
+          "identity": {
+            "anchor_tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;TargetFilter",
+            "path": [
+              1,
+              0,
+              0,
+              0
+            ]
+          },
+          "kind": "field",
+          "role": "textbox",
+          "label": "Фильтрация",
+          "scope": "workflow",
+          "value": "",
+          "value_truncated": false,
+          "value_length_utf16": 0,
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 813,
+              "y": 183.5
+            }
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "fill"
+          ],
+          "signature": {
+            "tag": "input"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1136",
+          "tid": "MF;TF-3;WizrdMCF;rgpBottom;radiofield;InputEl",
+          "kind": "control",
+          "role": "radio",
+          "label": "",
+          "scope": "workflow",
+          "check_state": {
+            "kind": "radio",
+            "checked": true,
+            "indeterminate": false,
+            "source": "loginom_ext",
+            "owner_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1130"
+          },
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 664,
+              "y": 775
+            }
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ],
+          "signature": {
+            "tag": "input"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1137",
+          "tid": "MF;TF-3;WizrdMCF;btnResize",
+          "kind": "control",
+          "role": null,
+          "label": "",
+          "scope": "workflow",
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 1178,
+              "y": 90
+            }
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag"
+          ],
+          "signature": {
+            "tag": "a"
+          }
+        },
+        {
+          "ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1097",
+          "tid": "MF;TF-3;WizrdMCF;TuneDataSourceMappingWizard;rbTable;DisplayEl",
+          "kind": "control",
+          "role": null,
+          "label": "",
+          "scope": "workflow",
+          "check_state": {
+            "kind": "radio",
+            "checked": true,
+            "indeterminate": false,
+            "source": "loginom_ext",
+            "owner_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1096"
+          },
+          "enabled": true,
+          "visible": true,
+          "interaction": {
+            "state": "point_observed",
+            "point": {
+              "x": 166,
+              "y": 147
+            }
+          },
+          "allowed_actions": [
+            "click",
+            "double_click",
+            "right_click",
+            "press",
+            "drag",
+            "set_checked"
+          ],
+          "signature": {
+            "tag": "span"
+          }
+        }
+      ],
+      "dialogs": [],
+      "masks": [],
+      "messages": [],
+      "table_cells": [],
+      "truncated": {
+        "elements": true,
+        "nodes": true,
+        "links": true,
+        "ports": true,
+        "dialogs": false,
+        "messages": true,
+        "masks": false,
+        "table_cells": true
+      }
+    },
+    "page": {
+      "schema_version": 1,
+      "scope": "all",
+      "offset": 0,
+      "returned": 8,
+      "total_records": 58,
+      "next_cursor": "5d3aa634-c4bb-4be6-90c8-022ac168ca99",
+      "captured_snapshot_complete": false,
+      "full_dom_complete": false
+    }
+  },
+  "error": null,
+  "trace": [
+    {
+      "at_ms": 0,
+      "event": "ui_observation_started"
+    },
+    {
+      "event": "observation_scope_selected",
+      "requested_scope": "wizard",
+      "delivered_scope": "all",
+      "root_ref": "ui-76c79df5-e0a1-459e-ae27-7364df79ee9b-1059",
+      "reason": "unique_observed_wizard"
+    }
+  ],
+  "cleanup_complete": true
+}

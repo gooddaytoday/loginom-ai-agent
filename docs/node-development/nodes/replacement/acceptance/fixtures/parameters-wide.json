@@ -1,0 +1,308 @@
+{
+  "output_mode": "add",
+  "rules": [
+    {
+      "field": {
+        "kind": "input_field",
+        "name": "Category"
+      },
+      "type": "string",
+      "case_sensitive": false,
+      "pairs": [
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused00"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value00"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused01"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value01"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused02"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value02"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused03"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value03"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused04"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value04"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused05"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value05"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused06"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value06"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused07"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value07"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused08"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value08"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused09"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value09"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused10"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value10"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused11"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value11"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused12"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value12"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused13"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value13"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused14"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value14"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused15"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value15"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused16"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value16"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused17"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value17"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused18"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value18"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused19"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value19"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused20"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value20"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused21"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value21"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "Unused22"
+          },
+          "to": {
+            "type": "string",
+            "value": "Value22"
+          }
+        },
+        {
+          "from": {
+            "type": "string",
+            "value": "North"
+          },
+          "to": {
+            "type": "string",
+            "value": "Wide"
+          }
+        }
+      ],
+      "other": {
+        "mode": "keep"
+      }
+    },
+    {
+      "field": {
+        "kind": "input_field",
+        "name": "Code"
+      },
+      "type": "integer",
+      "precision": 0,
+      "pairs": [
+        {
+          "from": {
+            "type": "integer",
+            "value": 1
+          },
+          "to": {
+            "type": "integer",
+            "value": "9223372036854775807"
+          }
+        }
+      ],
+      "other": {
+        "mode": "keep"
+      }
+    },
+    {
+      "field": {
+        "kind": "input_field",
+        "name": "Amount"
+      },
+      "type": "real",
+      "precision": 0,
+      "pairs": [
+        {
+          "from": {
+            "type": "real",
+            "value": 1.25
+          },
+          "to": {
+            "type": "real",
+            "value": 9.125
+          }
+        }
+      ],
+      "other": {
+        "mode": "value",
+        "value": {
+          "type": "real",
+          "value": -5.25
+        }
+      }
+    }
+  ]
+}
