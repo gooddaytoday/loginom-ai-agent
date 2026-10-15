@@ -70,7 +70,7 @@ export async function finalizeSlotAttempt(file: SlotFile, server: Awaited<Return
     JSON.stringify(intent) !== JSON.stringify({ ...base, before: intent.before, at: intent.at })) throw new EvalFailure("ATTEMPT_FINALIZATION_UNCONFIRMED", 2)
   const first = await readAdminSessionInventory(file, lease.identity, record(intent.before) as { path: string; sha256: string })
   if (Date.parse(first.observation.finishedAt) > Date.parse(intent.at)) throw new EvalFailure("ATTEMPT_FINALIZATION_UNCONFIRMED", 2)
-  if (existing && [...accounted.management, ...accounted.agents].some(session => session.state !== "closed"))
+  if (completed && [...accounted.management, ...accounted.agents].some(session => session.state !== "closed"))
     throw new EvalFailure("ATTEMPT_FINALIZATION_PENDING", 2)
   await server.assertHeld()
   await lease.assertHeld()
@@ -79,9 +79,9 @@ export async function finalizeSlotAttempt(file: SlotFile, server: Awaited<Return
   for (const session of accounted.agents) {
     const archive = archives.find(archive => archive.process.id === session.actor.attemptId)
     if (!archive) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
-    await admin.closeAgentSession(lease, secretFile, session.id, archive.source)
+    await admin.closeAgentSession(lease, secretFile, session.id, archive.source, existing ? "confirm-absent" : undefined)
   }
-  for (const session of accounted.management) await admin.closeManagementSession(lease, secretFile, session.id)
+  for (const session of accounted.management) await admin.closeManagementSession(lease, secretFile, session.id, existing ? "confirm-absent" : undefined)
   const after = await admin.inspectSessionInventory()
   const closed = await collectSlotSessions(file, lease, secretFile, sources, after.source)
   const sessions = await Promise.all([...closed.management, ...closed.agents].map(async session => {

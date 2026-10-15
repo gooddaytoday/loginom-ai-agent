@@ -1158,3 +1158,18 @@ Related50/266 PASS60.53s, typecheck/syntax/diff PASS. Private6e3edf07…
 audit45845c1a…1782/116/17 causal frames and19bc4ebe… auditd9c562fc…229/92/5;
 all16 pins and exact own pair/network/controller-root absence verified. The expanded
 finalizer fixture gets240s; normal native tests and production deadlines stay fixed.
+
+
+Automatic normal pending finalization (2026-10-16): an existing close intent
+selects `confirm-absent` exclusively. Missing sidecar/final receipts are rebuilt
+from native absence without manual confirmation or another CloseSession. A
+published terminal with a missing proof still refuses; live/unknown rows grant
+no completion. This is held-controller filesystem receipt-loss reconstruction,
+with no SIGKILL/lost wire-response/recovery-lineage claim.
+
+RED pending19 assertions119.12s→native browser/text2/50 PASS294.22s;
+related50/266 PASS54.90s, typecheck/diff PASS. Privateeda67412… audit2a2c433b…
+1772/112/14 causal frames and7bcba6eb… auditb5d45025…227/93/6 preserve all16
+pins and original history/SDK rows; own pairs/networks/controller roots absent.
+Joint249 read-backs SHA2fd4cc4a…. Backend operations/locks, storage/backup cleanup,
+release, validated unpause, active recovery and production admission remain open.
