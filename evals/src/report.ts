@@ -1,5 +1,7 @@
 import { rename } from "node:fs/promises"
 import path from "node:path"
+import type { AgentRun } from "./cli"
+import { assessParallelLimits } from "./parallel-acceptance"
 
 export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error" | "infra_error"
 export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
@@ -32,6 +34,7 @@ export function statusFor(
 }
 
 export type AttemptResult = {
+  limit_evidence?: AgentRun["limitEvidence"]
   slot_id?: string
   task_id: string
   attempt: number
@@ -120,6 +123,15 @@ function runsOf(attempts: AttemptResult[]) {
   return attempts.flatMap((item) => item.infra_retry ? [item.infra_retry.initial, item] : [item])
 }
 
+export function aggregateLimits(attempts: AttemptResult[]) {
+  const runs = runsOf(attempts)
+  return assessParallelLimits({
+    coverage: Object.fromEntries((["provider", "dock", "judge"] as const).map(source =>
+      [source, runs.length && runs.every(run => run.limit_evidence?.coverage[source] === "complete") ? "complete" : "unavailable"])),
+    events: runs.flatMap(run => run.limit_evidence?.events ?? []),
+  })
+}
+
 export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
   const base = aggregate(attempts, skipJudge)
   const scores = scoresOf(attempts.filter((item) => item.status !== "interrupted" && item.status !== "harness_error" && item.status !== "infra_error"))
@@ -144,6 +156,7 @@ export type RubricSnapshot = {
   oracle_tolerance: number
 }
 export type RunSummary = {
+  parallel_limits?: ReturnType<typeof aggregateLimits>
   slots?: { id: string; username: string; profileDir: string; workspaceRoot: string; historyDir: string; liveQualified: boolean; state?: "planned" | "closed" | "quarantined"; lease_receipt?: string; cleanup_receipt?: string; storage_root?: string; storage_leftovers?: string[] | null; storage_error?: string | null }[]
   run_id: string
   label: string | null
@@ -194,6 +207,7 @@ export function renderReport(summary: RunSummary) {
     "",
     `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · CLI ${summary.agent.cli_version ?? "неизвестен"} · variant ${summary.agent.variant ?? "неизвестен"} · source ${summary.agent.source_commit ?? (summary.agent.cli_mode === "source" ? summary.agent.git_sha : null) ?? "неизвестен"}${summary.agent.source_dirty ? "-dirty" : ""} · binary sha256 ${summary.agent.binary_sha256 ?? "—"}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
     `Параллельность: ${summary.config.parallel ?? 1}. Длительность прогона: ${Number.isFinite(wall) && wall >= 0 ? (wall / 1000).toFixed(1) + "s" : "—"}. Сумма времени агентов: ${(m.total_duration_ms / 1000).toFixed(1)}s.`,
+    ...(summary.parallel_limits ? [`Проверка лимитов: ${summary.parallel_limits.status} · ${cell(summary.parallel_limits.codes.join(", ") || "—")}`] : []),
     summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
     summary.stopped_reason ? `**Прогон остановлен: ${cell(summary.stopped_reason)}**` : "",
     "",

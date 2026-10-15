@@ -18,7 +18,7 @@ import { reserveRunDirectory } from "./run-directory"
 import { buildJobs, runSlotQueue } from "./scheduler"
 import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, inspectFixtureStorage, fenceFixtureStorage, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
 import { sealAgentProcessInventory } from "./agent-process-evidence"
-import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
+import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
   const config: EvalConfig = loadConfig(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env)
@@ -273,6 +273,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
       keep_storage: config.keepStorage,
     },
     metrics: aggregate(attempts, config.skipJudge),
+    parallel_limits: aggregateLimits(attempts),
     tasks: tasks.map((task) => {
       const own = attempts.filter((item) => item.task_id === task.id)
       return { id: task.id, rubric_snapshot: rubricSnapshot(task), metrics: aggregateTask(own, config.skipJudge), attempts: own }
@@ -370,7 +371,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   // This measured checkpoint survives failures in artifact/judge/evidence persistence.
   Object.assign(base, { status: early.status, exit_code: run.exitCode, timed_out: run.timedOut, interrupted: run.interrupted,
     duration_ms: run.durationMs, cost: run.cost, tokens: run.tokens, counters: run.counters,
-    session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead })
+    session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead, limit_evidence: run.limitEvidence })
   const fetched =
     early.status === "interrupted" || early.status === "harness_error" || early.status === "infra_error"
       ? undefined
