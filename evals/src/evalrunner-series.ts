@@ -2,6 +2,7 @@ import path from "node:path"
 import { lstat, readdir, readFile, realpath, mkdir, open, link, unlink } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { loadTasks } from "./task"
+import { constants } from "node:fs"
 
 export type EvalrunnerCollection = "regular" | "analytic" | "node"
 export type EvalrunnerCorpus = Awaited<ReturnType<typeof loadEvalrunnerCorpus>>
@@ -65,12 +66,12 @@ export async function reserveEvalrunnerSeries(config: SeriesRoots, manifest: Eva
 export async function readEvalrunnerSeries(config: SeriesRoots, series: string) {
   if (path.resolve(series) !== series || !series.startsWith(config.results + path.sep) || await realpath(series) !== series)
     throw new EvalFailure("Series boundary changed", 2)
-  const raw = await readFile(path.join(series, "manifest.json"), "utf8")
+  const raw = await readEvalrunnerDocument(path.join(series, "manifest.json"))
   const manifest = JSON.parse(raw) as EvalrunnerSeriesManifest
   if (manifest.kind !== "evalrunner-full-series" || manifest.version !== 2 || manifest.series !== series ||
     !["full", "readiness-calc", "readiness-node"].includes(manifest.scope) || !/^[\w-]+$/.test(manifest.issue))
     throw new EvalFailure("Invalid series manifest", 2)
-  const reservation = await Bun.file(registryPath(config, manifest)).json() as { series: string; sha256: string }
+  const reservation = JSON.parse(await readEvalrunnerDocument(registryPath(config, manifest))) as { series: string; sha256: string }
   if (reservation.series !== series || reservation.sha256 !== evalrunnerHash(raw) || JSON.stringify(manifest.policy) !== JSON.stringify(policy))
     throw new EvalFailure("Manifest changed", 2)
   const expected = createEvalrunnerManifest(manifest).slots
@@ -106,26 +107,39 @@ export async function durableEvalrunnerJson(file: string, data: unknown) {
 export async function durableEvalrunnerBytes(file: string, bytes: string | Uint8Array) {
   const parent = path.dirname(file)
   if (await realpath(parent) !== parent) throw new EvalFailure("Persistence parent is not canonical", 2)
-  const directory = await open(parent, "r"), parentIdentity = await directory.stat()
-  const temporary = path.join(parent, `.evalrunner-atomic-${path.basename(file)}-${crypto.randomUUID()}`)
-  const handle = await open(temporary, "wx", 0o600)
-  const identity = await handle.stat()
+  const directory = await open(parent, "r")
   try {
-    try { await handle.writeFile(bytes); await handle.sync() } finally { await handle.close() }
-    await link(temporary, file)
-    await directory.sync()
-    const current = await lstat(parent)
-    if (current.isSymbolicLink() || current.dev !== parentIdentity.dev || current.ino !== parentIdentity.ino)
-      throw new EvalFailure("Persistence parent identity changed", 2)
-  } finally {
+    const parentIdentity = await directory.stat()
+    const temporary = path.join(parent, `.evalrunner-atomic-${path.basename(file)}-${crypto.randomUUID()}`)
+    const handle = await open(temporary, "wx", 0o600)
+    const identity = await handle.stat().catch(async error => { await handle.close(); throw error })
     try {
+      try { await handle.writeFile(bytes); await handle.sync() } finally { await handle.close() }
+      await link(temporary, file)
+      await directory.sync()
+      const current = await lstat(parent)
+      if (current.isSymbolicLink() || current.dev !== parentIdentity.dev || current.ino !== parentIdentity.ino)
+        throw new EvalFailure("Persistence parent identity changed", 2)
+    } finally {
       const current = await lstat(temporary)
       if (current.isSymbolicLink() || current.dev !== identity.dev || current.ino !== identity.ino)
         throw new EvalFailure("Persistence journal identity changed; preserve it", 2)
-      await unlink(temporary)
-      await directory.sync()
-    } finally { await directory.close() }
-  }
+      await unlink(temporary); await directory.sync()
+    }
+  } finally { await directory.close() }
+}
+
+export async function readEvalrunnerDocument(file: string) {
+  const before = await lstat(file)
+  if (!before.isFile() || before.isSymbolicLink() || before.uid !== process.getuid?.() || before.mode & 0o077 || await realpath(file) !== file)
+    throw new EvalFailure("Unsafe controller document", 2)
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const opened = await handle.stat(), raw = await handle.readFile("utf8"), after = await lstat(file)
+    if ([opened, after].some(item => !item.isFile() || item.isSymbolicLink() || item.dev !== before.dev || item.ino !== before.ino ||
+      item.size !== before.size || item.mtimeMs !== before.mtimeMs || item.ctimeMs !== before.ctimeMs)) throw new EvalFailure("Controller document identity changed", 2)
+    return raw
+  } finally { await handle.close() }
 }
 
 function registryPath(config: SeriesRoots, manifest: Pick<EvalrunnerSeriesManifest, "issue" | "scope">) {

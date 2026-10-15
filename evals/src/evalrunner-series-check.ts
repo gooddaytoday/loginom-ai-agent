@@ -1,7 +1,7 @@
 import path from "node:path"
 import { readFile, realpath, lstat } from "node:fs/promises"
 import { checkEvalrunnerEvidence, checkEvalrunnerOutcome } from "./evalrunner"
-import { readEvalrunnerSeries, evalrunnerHash, type EvalrunnerSlot, type EvalrunnerSeriesManifest } from "./evalrunner-series"
+import { readEvalrunnerSeries, readEvalrunnerDocument, evalrunnerHash, type EvalrunnerSlot, type EvalrunnerSeriesManifest } from "./evalrunner-series"
 import type { verifyEvalrunnerModel } from "./evalrunner-model"
 import type { RunSummary } from "./report"
 import { loadTasks } from "./task"
@@ -26,11 +26,11 @@ export async function inspectEvalrunnerSeries(config: Roots, series: string) {
     }
     try {
       if (next) throw Error("Admission after an unadmitted slot")
-      const raw = await readFile(admission, "utf8")
+      const raw = await readEvalrunnerDocument(admission)
       const data = JSON.parse(raw)
       if (data.manifestSha256 !== evalrunnerHash(JSON.stringify(manifest, null, 2)) ||
         JSON.stringify(data.slot) !== JSON.stringify(slot) || data.issue !== manifest.issue || data.scope !== manifest.scope ||
-        raw !== await readFile(path.join(series, "slots", slot.id, "manifest.json"), "utf8")) throw Error("Admission changed")
+        raw !== await readEvalrunnerDocument(path.join(series, "slots", slot.id, "manifest.json"))) throw Error("Admission changed")
       measurements.push(await verifyEvalrunnerSlot(config, manifest, slot))
     } catch (error) {
       return { status: "BLOCKED" as const, completed: measurements.length, expected: manifest.slots.length, next: null, blockedSlot: slot.id,
@@ -97,7 +97,7 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
   if (requireModel) {
     const proofFile = path.join(manifest.series, "completions", `${slot.id}.json`)
     if (!await Bun.file(proofFile).exists()) throw Error("Actual model proof missing; verify existing history without redispatch")
-    const record = await Bun.file(proofFile).json() as { releaseSha256: string; model: Awaited<ReturnType<typeof verifyEvalrunnerModel>> }
+    const record = JSON.parse(await readEvalrunnerDocument(proofFile)) as { releaseSha256: string; model: Awaited<ReturnType<typeof verifyEvalrunnerModel>> }
     const model = record.model
     if (!config.profile || record.releaseSha256 !== evalrunnerHash(await readFile(path.join(selected, "release.json"))) ||
       model.status !== "VERIFIED" || model.sessionId !== release.sessionId || !model.assistantMessages ||

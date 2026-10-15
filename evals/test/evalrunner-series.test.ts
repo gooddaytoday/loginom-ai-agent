@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { evalsRoot } from "../src/config"
-import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, rm, rename, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { loadEvalrunnerCorpus, buildEvalrunnerSlots, createEvalrunnerManifest, reserveEvalrunnerSeries, readEvalrunnerSeries, admitEvalrunnerSlot, durableEvalrunnerJson } from "../src/evalrunner-series"
@@ -57,6 +57,10 @@ test("versioned series reservation survives another directory and task, and a co
       series: path.join(config.results, "v02-full-LAB-77"), pins: { configSha256: "a".repeat(64) }, corpus })
     await reserveEvalrunnerSeries(config, manifest)
     expect((await readEvalrunnerSeries(config, manifest.series)).slots.length).toBe(144)
+    const manifestFile = path.join(manifest.series, "manifest.json"), saved = path.join(manifest.series, "manifest.saved")
+    await rename(manifestFile, saved); await symlink("manifest.saved", manifestFile)
+    await expect(readEvalrunnerSeries(config, manifest.series)).rejects.toThrow("Unsafe controller document")
+    await rm(manifestFile); await rename(saved, manifestFile)
     expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "READY", completed: 0, expected: 144, next: manifest.slots[0] })
     await expect(reserveEvalrunnerSeries(config, { ...manifest, series: path.join(config.results, "another"), task: "task-2" })).rejects.toThrow()
     const first = manifest.slots[0]!
