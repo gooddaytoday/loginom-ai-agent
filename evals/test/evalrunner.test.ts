@@ -1,8 +1,18 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli } from "../src/evalrunner"
+import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome } from "../src/evalrunner"
+import type { RunSummary } from "../src/report"
+
+test("standalone outcome blocks infrastructure and missing cleanup, preserves measured product FAIL", () => {
+  const summary = { interrupted: false, stopped_reason: null, storage_leftovers: [],
+    config: { repeat: 1, infra_retries: 0 }, tasks: [{ id: "calc-data-double", attempts: [{ attempt: 1, status: "no_artifact", judge_status: "skipped",
+      environment_cleanup: { status: "confirmed" } }] }] } as unknown as RunSummary
+  expect(checkEvalrunnerOutcome(summary)).toBe("FAIL")
+  expect(() => checkEvalrunnerOutcome({ ...summary, storage_leftovers: null })).toThrow("cleanup")
+  expect(() => checkEvalrunnerOutcome({ ...summary, tasks: [{ ...summary.tasks[0]!, attempts: [{ ...summary.tasks[0]!.attempts[0]!, status: "infra_error" }] }] })).toThrow("infrastructure")
+})
 
 test("standalone CLI integrity rejects changed bytes and extra payload files", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-cli-"))
@@ -12,6 +22,10 @@ test("standalone CLI integrity rejects changed bytes and extra payload files", a
     await chmod(path.join(root, "bin/cli"), 0o755)
     const manifest = { format: "loginom-cli-artifact-v1", metadata: { version: "0.2.0", sourceCommit: "0c975a73676d9aba556085dbda97e1a9ceb23cc6", sourceDirty: false },
       files: [{ path: "bin/cli", sha256: new Bun.CryptoHasher("sha256").update("product").digest("hex"), mode: 0o755 }] }
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).resolves.toHaveProperty("version", "0.2.0")
+    await symlink("cli", path.join(root, "bin/alias"))
+    manifest.files.push({ path: "bin/alias", sha256: manifest.files[0]!.sha256, mode: 0o777, link: "cli" } as typeof manifest.files[number])
     await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
     await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).resolves.toHaveProperty("version", "0.2.0")
     await Bun.write(path.join(root, "extra"), "hidden")
