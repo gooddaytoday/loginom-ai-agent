@@ -45,13 +45,19 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
   const selected = path.join(manifest.series, "slots", slot.id)
   if (!await Bun.file(path.join(selected, "release.json")).exists()) throw Error("Admitted slot has no confirmed release; do not redispatch")
   const release = await checkEvalrunnerEvidence(selected) as Awaited<ReturnType<typeof checkEvalrunnerEvidence>> & {
-    runDir: string; case: string; sessionId: string; verdict: string; code: number; summarySha256: string
+    runDir: string; case: string; sessionId: string; verdict: string; code: number; summarySha256: string; configSha256: string
   }
   if (release.case !== slot.case || !release.runDir.startsWith(selected + path.sep) || await realpath(release.runDir) !== release.runDir)
     throw Error("Slot release boundary differs")
   const summaryFile = path.join(release.runDir, "summary.json")
   if (evalrunnerHash(await readFile(summaryFile)) !== release.summarySha256) throw Error("Slot summary changed")
   const summary = await Bun.file(summaryFile).json() as RunSummary
+  const pins = JSON.parse(await readEvalrunnerDocument(path.join(selected, "pins.json"))) as Record<string, unknown>
+  const { taskSha256, ...measuredPins } = pins
+  const prefix = slot.collection === "regular" ? "" : slot.collection === "analytic" ? "analytic/" : "node-evals/"
+  const taskPin = manifest.corpus.files.find(file => file.path === prefix + slot.case + "/task.json")
+  if (!taskPin || taskSha256 !== taskPin.sha256 || release.configSha256 !== manifest.pins.configSha256 ||
+    JSON.stringify(measuredPins) !== JSON.stringify(manifest.pins)) throw Error("Measured slot admission/config/CLI/environment pins differ")
   const node = slot.collection === "node"
   const outcome = checkEvalrunnerOutcome(summary, node)
   if (summary.config.repeat !== 1 || summary.task_ids.length !== 1 || summary.task_ids[0] !== slot.case || summary.tasks.length !== 1 ||

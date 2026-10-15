@@ -19,7 +19,7 @@ test("143/144 cannot release; 144 measured quality FAILs with closed model histo
   await cp(path.join(evalsRoot, "tasks"), path.join(config.checkout, "evals/tasks"), { recursive: true })
   try {
     const corpus = await loadEvalrunnerCorpus(evalsRoot)
-    const pins = { cli: { sourceCommit: "a".repeat(40), version: "0.2.0" }, binarySha256: "b".repeat(64), imageDigest: "sha256:" + "c".repeat(64), harnessSha: "d".repeat(40) }
+    const pins = { cli: { sourceCommit: "a".repeat(40), version: "0.2.0" }, binarySha256: "b".repeat(64), imageDigest: "sha256:" + "c".repeat(64), harnessSha: "d".repeat(40), configSha256: "e".repeat(64) }
     const manifest = createEvalrunnerManifest({ issue: "LAB-77", task: "fixture", scope: "full", pins, corpus, series: path.join(config.results, "v02-full-LAB-77") })
     await reserveEvalrunnerSeries(config, manifest)
     const lease = await acquireEvalrunnerSeriesLease(config, manifest)
@@ -46,12 +46,15 @@ test("143/144 cannot release; 144 measured quality FAILs with closed model histo
         agent: { cli_mode: "binary", cli_version: pins.cli.version, model: "openai/gpt-6.1-sol", variant: "medium", source_dirty: false, source_commit: pins.cli.sourceCommit, binary_sha256: pins.binarySha256 },
         judge: node ? null : { model: "gpt-6-sol", reasoning: "xhigh" }, loginom: { image_digest: pins.imageDigest }, task_ids: [slot.case], tasks: [{ id: slot.case, attempts: [result] }] }
       await durableEvalrunnerJson(path.join(run, "summary.json"), summary)
+      const taskPrefix = slot.collection === "regular" ? "" : slot.collection === "analytic" ? "analytic/" : "node-evals/"
+      const taskHash = corpus.files.find(file => file.path === taskPrefix + slot.case + "/task.json")!.sha256
+      await durableEvalrunnerJson(path.join(selected, "pins.json"), { ...pins, taskSha256: taskHash })
       if (node) {
         const code = await validateNodeRun(run, [slot.case], path.join(config.checkout, "evals/tasks/node-evals"))
         expect(code.code).toBe(1)
         await durableEvalrunnerJson(path.join(run, "code-verdict.json"), code)
       }
-      await durableEvalrunnerJson(path.join(selected, "release.json"), { status: "RELEASED", verdict: "FAIL", code: node ? 1 : 0, case: slot.case, runDir: run, sessionId: session,
+      await durableEvalrunnerJson(path.join(selected, "release.json"), { status: "RELEASED", verdict: "FAIL", code: node ? 1 : 0, case: slot.case, runDir: run, sessionId: session, configSha256: pins.configSha256,
         summarySha256: evalrunnerHash(await Bun.file(path.join(run, "summary.json")).bytes()), evidence: await sealEvalrunnerEvidence(selected) })
       if (index === 0) {
         const releaseHash = evalrunnerHash(await Bun.file(path.join(selected, "release.json")).bytes())

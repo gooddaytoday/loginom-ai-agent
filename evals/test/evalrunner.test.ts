@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence, dispatchEvalrunner, type EvalrunnerConfig, qualifyEvalrunner } from "../src/evalrunner"
+import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence, dispatchEvalrunner, executeEvalrunner, type EvalrunnerConfig, qualifyEvalrunner } from "../src/evalrunner"
 import type { RunSummary } from "../src/report"
 
 test("shared executor refuses dispatch without a durable admission", async () => {
@@ -11,6 +11,11 @@ test("shared executor refuses dispatch without a durable admission", async () =>
     await expect(dispatchEvalrunner({} as EvalrunnerConfig, { series: root, case: "calc-data-double", issue: "LAB-77", task: "task" },
       {} as Awaited<ReturnType<typeof qualifyEvalrunner>>, async () => {})).rejects.toThrow("Durable admission required")
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("version 2 cannot bypass versioned admissions through the legacy single-case entry", async () => {
+  await expect(executeEvalrunner({ version: 2 } as EvalrunnerConfig, { series: "/no-dispatch", case: "calc-data-double", issue: "LAB-77", task: "task" }))
+    .rejects.toThrow("Version 2 requires versioned series admission")
 })
 
 test("standalone release verifies raw artifact bytes, not only summary", async () => {

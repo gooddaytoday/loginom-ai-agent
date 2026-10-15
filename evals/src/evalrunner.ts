@@ -66,7 +66,9 @@ export async function qualifyEvalrunner(config: EvalrunnerConfig) {
 export type EvalrunnerInput = { series: string; case: string; issue: string; task: string; collection?: string }
 
 export async function executeEvalrunner(config: EvalrunnerConfig, input: EvalrunnerInput) {
+  if (config.version === 2) throw new EvalFailure("Version 2 requires versioned series admission", 2)
   const proof = await qualifyEvalrunner(config)
+  await selectedEvalrunnerTask(config, input)
   const admitted = await admitEvalrunner(config, input)
   return dispatchEvalrunner(config, input, proof, admitted.release)
 }
@@ -81,18 +83,17 @@ export async function dispatchEvalrunner(config: EvalrunnerConfig, input: Evalru
       admission.kind !== "evalrunner-slot-admission" || admission.slot?.case !== input.case || admission.slot?.collection !== input.collection))
     throw new EvalFailure("Durable admission differs", 2)
   if (admission.kind === "evalrunner-slot-admission") {
-    const { readEvalrunnerSeries, evalrunnerHash } = await import("./evalrunner-series")
+    const { readEvalrunnerSeries, readEvalrunnerDocument, loadEvalrunnerCorpus, evalrunnerHash } = await import("./evalrunner-series")
     const manifest = await readEvalrunnerSeries(config, admission.series)
     const global = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`, `${admission.slot.id}.json`)
-    if (JSON.stringify(await Bun.file(global).json()) !== JSON.stringify(admission) ||
+    if (JSON.stringify(JSON.parse(await readEvalrunnerDocument(global))) !== JSON.stringify(admission) ||
       admission.manifestSha256 !== evalrunnerHash(JSON.stringify(manifest, null, 2)) ||
       input.series !== path.join(manifest.series, "slots", admission.slot.id) || manifest.pins.configSha256 !== proof.configSha256)
       throw new EvalFailure("Durable series admission differs", 2)
+    if ((await loadEvalrunnerCorpus(path.join(config.checkout, "evals"))).sha256 !== manifest.corpus.sha256)
+      throw new EvalFailure("Corpus changed before dispatch; admission retained", 2)
   }
-  const node = input.collection === "node" || input.case === "crosstable-fixed-sum"
-  const tasks = path.join(config.checkout, "evals/tasks", node ? "node-evals" : input.collection === "analytic" ? "analytic" : "")
-  const taskFile = path.join(tasks, input.case, "task.json")
-  if (!(await Bun.file(taskFile).exists())) throw new EvalFailure("Unknown selected case", 2)
+  const { node, tasks, taskFile } = await selectedEvalrunnerTask(config, input)
   await Bun.write(path.join(input.series, "pins.json"), JSON.stringify({ ...proof, env: undefined, taskSha256: await fileHash(taskFile) }, null, 2), { mode: 0o600 })
   const env = { ...proof.env, EVAL_CLI_MODE: "binary", EVAL_INFRA_RETRIES: "0", EVAL_EXECUTION_POLICY: "evalrunner-v1",
     EVAL_RESULTS_DIR: path.join(input.series, "runs"), EVAL_HARNESS_LEASE_RECEIPT: path.join(input.series, "harness-lease.json"),
@@ -140,6 +141,16 @@ export async function dispatchEvalrunner(config: EvalrunnerConfig, input: Evalru
   await writeFile(path.join(input.series, "release.json"), JSON.stringify(receipt, null, 2), { flag: "wx", mode: 0o600 })
   await release()
   return receipt
+}
+
+async function selectedEvalrunnerTask(config: EvalrunnerConfig, input: EvalrunnerInput) {
+  if (!/^[\w-]+$/.test(input.case) || input.collection && !["regular", "analytic", "node"].includes(input.collection))
+    throw new EvalFailure("Unknown selected case", 2)
+  const node = input.collection === "node" || input.case === "crosstable-fixed-sum"
+  const tasks = path.join(config.checkout, "evals/tasks", node ? "node-evals" : input.collection === "analytic" ? "analytic" : "")
+  const taskFile = path.join(tasks, input.case, "task.json")
+  if (!await Bun.file(taskFile).exists()) throw new EvalFailure("Unknown selected case", 2)
+  return { node, tasks, taskFile }
 }
 
 export async function sealEvalrunnerEvidence(series: string) {
