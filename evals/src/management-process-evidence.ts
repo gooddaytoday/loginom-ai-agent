@@ -87,24 +87,27 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
 export async function readManagementProcessInventory(input: InventoryInput) {
   const inventory = await readInventory(input)
   const processes = []
-  for (const entry of inventory.processes) {
-    if (!object(entry) || Object.keys(entry).length !== 5 + Number(entry.sessions !== undefined) + Number(entry.result !== undefined) || entry.state !== "confirmed" || !object(entry.owner) || entry.owner.kind !== "slot" ||
-      typeof entry.owner.id !== "string" || !entry.owner.id.startsWith(`${input.commandId}:${input.slotId}:`) || typeof entry.directory !== "string" ||
-      !Array.isArray(entry.operation) || entry.operation.length !== 2 || !entry.operation.every(value => typeof value === "string") ||
-      !operations.has(entry.operation.join(" ")) || !object(entry.proof) ||
-      entry.proof.path !== path.join(entry.directory, "process-cleanup.json") || typeof entry.proof.sha256 !== "string")
-      throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
-    await privateDirectory(entry.directory)
-    const proof = await readLeaseReceipt(entry.proof.path).catch(() => null)
-    const qualified = qualifyClosedProcessEvidence(proof, { owner: { kind: "slot", id: entry.owner.id }, producerPid: input.producerPid })
-    if (!qualified || hash(proof) !== entry.proof.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
-    const sessions = entry.sessions === undefined ? undefined : await readManagementSessions(input, entry.sessions, qualified)
-    const result = entry.result === undefined ? undefined : await readManagementResult(input, entry)
-    processes.push({ owner: qualified.owner, operation: entry.operation, launcher: qualified.launcher, identities: qualified.identities,
-      source: { path: entry.proof.path, sha256: entry.proof.sha256 }, ...(sessions ? { sessions } : {}), ...(result ? { result } : {}) })
-  }
+  for (const entry of inventory.processes) processes.push(await readManagementProcess(input, entry))
   if (JSON.stringify(await readInventory(input)) !== JSON.stringify(inventory)) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
   return { processes, source: { path: input.file, sha256: hash(inventory) } }
+}
+
+export async function readManagementProcess(input: InventoryInput, entry: unknown) {
+  if (!object(entry) || Object.keys(entry).length !== 5 + Number(entry.sessions !== undefined) + Number(entry.result !== undefined) || entry.state !== "confirmed" || !object(entry.owner) || entry.owner.kind !== "slot" ||
+    typeof entry.owner.id !== "string" || !entry.owner.id.startsWith(`${input.commandId}:${input.slotId}:`) || typeof entry.directory !== "string" ||
+    !Array.isArray(entry.operation) || entry.operation.length !== 2 || !entry.operation.every(value => typeof value === "string") ||
+    !operations.has(entry.operation.join(" ")) || !object(entry.proof) ||
+    entry.proof.path !== path.join(entry.directory, "process-cleanup.json") || typeof entry.proof.sha256 !== "string")
+    throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
+  await privateDirectory(entry.directory)
+  const proof = await readLeaseReceipt(entry.proof.path).catch(() => null)
+  const qualified = qualifyClosedProcessEvidence(proof, { owner: { kind: "slot", id: entry.owner.id }, producerPid: input.producerPid })
+  if (!qualified || hash(proof) !== entry.proof.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
+  const sessions = entry.sessions === undefined ? undefined : await readManagementSessions(input, entry.sessions, qualified)
+  const result = entry.result === undefined ? undefined : await readManagementResult(input, entry)
+  return { owner: qualified.owner, operation: entry.operation, launcher: qualified.launcher, identities: qualified.identities,
+    startedAt: qualified.startedAt, finishedAt: qualified.finishedAt,
+    source: { path: entry.proof.path, sha256: entry.proof.sha256 }, ...(sessions ? { sessions } : {}), ...(result ? { result } : {}) }
 }
 
 async function readManagementResult(input: InventoryInput, entry: Record<string, unknown>) {

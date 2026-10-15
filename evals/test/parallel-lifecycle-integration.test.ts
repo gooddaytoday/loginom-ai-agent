@@ -20,6 +20,7 @@ import { superviseProcess } from "../src/process-supervisor"
 import { readManagementProcessInventory } from "../src/management-process-evidence"
 import { management } from "../src/profile"
 import { claimUserOwnership, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { readManagementSession, recordManagementSession } from "../src/management-sessions"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 
@@ -121,8 +122,11 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         expect(execution).toMatchObject({ exitCode: 0, timedOut: false, interrupted: false,
           stdoutSha256: new Bun.CryptoHasher("sha256").update(result.stdout).digest("hex"), reply: operation === "setup" ?
             { username: credentials.username, url, browser: "verified" } : { ok: true, code: "LOGINOM_CONNECTION_VALID", browser: "verified" } })
+        const session = await recordManagementSession(file, lease, secretFile, inventoryFile, inventory.processes.at(-1)!.owner.id)
+        expect(session.binding.username).toBe(credentials.username)
+        expect(await readManagementSession(file, lease, secretFile, session.id)).toEqual(session)
         captures.push({ operation, output: JSON.parse(result.stdout), inventory, manifest: await readLeaseReceipt(inventoryFile), processes: result.processCleanup,
-          resultReceipt: await readLeaseReceipt(execution.source.path),
+          resultReceipt: await readLeaseReceipt(execution.source.path), session,
           sources: await Promise.all([sessions.before, ...sessions.during, sessions.after].map(async snapshot => {
             const value = await readLeaseReceipt(snapshot.source.path) as { command: { path: string } }
             return { source: snapshot.source, value, command: await readLeaseReceipt(value.command.path) }
@@ -130,6 +134,8 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
       }
       await writeLeaseReceipt(path.join(evidence, "cli.json"), { identity: pair.identity, captures, liveQualified: false })
       for (const capture of captures) {
+        expect(await readManagementSession(file, lease, secretFile, capture.session.id)).toEqual(capture.session)
+        expect(await recordManagementSession(file, lease, secretFile, inventoryFile, capture.session.actor.owner.id)).toEqual(capture.session)
         const sessions = capture.inventory.processes.at(-1)!.sessions!
         const created = sessions.during.flatMap(snapshot => snapshot.sessions.filter(row => row.name.startsWith(credentials.username + ":") &&
           !sessions.before.sessions.some(previous => previous.objectId === row.objectId)))
@@ -137,6 +143,11 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         expect(created.every(row => row.name === created[0]!.name && row.createdAt === created[0]!.createdAt && row.packageCount === 0)).toBe(true)
         expect(created[0]!.createdAt).toBeString()
       }
+      const ledgerFile = path.join(file.controller.stateDir, `management-session-${captures[0]!.session.id}.json`)
+      const saved = await readLeaseReceipt(ledgerFile) as { binding: { name: string } }
+      await writeLeaseReceipt(ledgerFile, { ...saved, binding: { ...saved.binding, name: credentials.username + ":999" } })
+      await expect(readManagementSession(file, lease, secretFile, captures[0]!.session.id)).rejects.toThrow("MANAGEMENT_SESSION_UNCONFIRMED")
+      await writeLeaseReceipt(ledgerFile, saved)
     } finally {
       await admin.dispose()
       settlement.admin = true
