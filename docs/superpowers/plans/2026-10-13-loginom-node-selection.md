@@ -1,5 +1,22 @@
 # Loginom Standard Node Selection Implementation Plan
 
+### Исправления ревью 2026-10-15
+
+Область: аудит и тестовая сборка Host; обработчики узлов и runtime не меняются.
+Критерии policy-v2/final-review-v1, замороженные исходники, attempt-файлы и
+исторические вердикты сохраняются. Новый hash аудитора не подменяет старый.
+
+- [x] Через RED→GREEN учитывать полные запросы node_resume при выборе узлов,
+  включая отказ до runtime admission; resume только с operation_id не создаёт
+  нового решения о типе узла. Проверить также остановку live-монитора.
+- [x] Через RED→GREEN связывать source cursor с предшествующим начальным
+  запросом той же Session/Dock/operation, с проверкой digest и исходного узла;
+  чужое, отсутствующее или неоднозначное начало остаётся отказом.
+- [x] Изолировать Bun.build timeout-теста и Host-фикстуры в дочерних Bun-процессах;
+  полный Host-набор на закреплённом Node24.19.0: 363pass/7platform-skip/0fail.
+- [x] Затронутые eval-тесты: 188pass/0fail; typecheck обоих пакетов и diff-check PASS.
+  Новые модели, Loginom-сессии и пересборка неизменного runtime не нужны.
+
 Итог новой серии `20261014T185528Z-ad0f2b`: **политика выбора узлов принята**
 по node-selection-policy-v2 и отдельному final-review-v1. Все25candidate policyPASS,
 необоснованных JS-попыток0; покрыты6стандартныхсценариев×3,explicit3,gap3,recovery1.

@@ -390,6 +390,19 @@ test("a durable running JavaScript apply is caught before CLI emits its terminal
   expect(inspectSeriesLiveParts(text, "standard", { ...snapshot, sessionID: "foreign" }).reason).toBe("LIVE_SESSION_UNBOUND")
 })
 
+test("the live guard stops rejected and durable running JavaScript resume requests", () => {
+  const part = { id: "prt_resume", sessionID: "ses_own", type: "tool", tool: "loginom_dock_node_resume",
+    state: { status: "error", input: { operation_id: "unknown-js", target: { kind: "new", type: "programming.javascript" } }, error: "refused" } }
+  const text = JSON.stringify({ type: "tool_use", sessionID: "ses_own", part }) + "\n"
+  expect(inspectSeriesLiveParts(text, "standard")).toEqual({ stop: true, reason: "JAVASCRIPT_NOT_ALLOWED" })
+  const started = JSON.stringify({ type: "step_start", sessionID: "ses_own" }) + "\n"
+  const snapshot = { sessionID: "ses_own", parentID: null, childSessionIDs: [], messages: [], parts: [
+    { ...part, state: { ...part.state, status: "running" } },
+  ] }
+  expect(inspectSeriesLiveParts(started, "standard-recovery", snapshot)).toEqual({ stop: true, reason: "JAVASCRIPT_NOT_ALLOWED" })
+  expect(inspectSeriesLiveParts(text, "explicit-js").stop).toBe(false)
+})
+
 test("an observed CLI error halts, and a corrected candidate anomaly requires explicit closed-artifact review", () => {
   expect(inspectSeriesLiveParts(JSON.stringify({ type: "error", sessionID: "ses_own", error: { name: "APIError", data: { message: "quota" } } }) + "\n", "standard"))
     .toEqual({ stop: true, reason: "CLI_ERROR_EVENT" })

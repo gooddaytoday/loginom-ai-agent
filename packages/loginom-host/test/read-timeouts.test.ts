@@ -3,9 +3,17 @@ import { expect, test } from "bun:test"
 test("actual adapter waits for bounded source/context replies beyond the ordinary transport limit", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
-  const built = await Bun.build({ entrypoints: [new URL("../src/adapter.ts", import.meta.url).pathname], target: "node" })
-  if (!built.success) throw Error("Adapter test bundle failed")
-  const module = "data:text/javascript;base64," + Buffer.from(await built.outputs[0].text()).toString("base64")
+  // Repeated in-process Bun builds can retain invalid file metadata (EISDIR).
+  // Keep the real adapter bundle, but give its build a fresh Bun process.
+  const builder = Bun.spawn([process.execPath, "--eval", `
+    const built = await Bun.build(${JSON.stringify({ entrypoints: [new URL("../src/adapter.ts", import.meta.url).pathname], target: "node" })});
+    if (!built.success) throw new AggregateError(built.logs, "Adapter test bundle failed");
+    process.stdout.write(await built.outputs[0].text());
+  `], { stdout: "pipe", stderr: "pipe" })
+  const [buildExit, bundle, buildErrors] = await Promise.all([builder.exited,
+    new Response(builder.stdout).text(), new Response(builder.stderr).text()])
+  expect(buildExit, buildErrors).toBe(0)
+  const module = "data:text/javascript;base64," + Buffer.from(bundle).toString("base64")
   const child = Bun.spawn([node, "--input-type=module"], { stdin: "pipe", stdout: "pipe", stderr: "pipe" })
   child.stdin.write(`
     import assert from 'node:assert/strict';

@@ -173,10 +173,30 @@ export function inspectSelectionRuntime(input: { parts: unknown[]; runtime: Sele
     if (record(result) && ["source", "context"].includes(String(result.kind))) {
       const owner = record(result.owner) ? result.owner : undefined
       const request = part.state.input
-      const node = record(request.node) ? request.node : undefined
+      const continuation = Object.hasOwn(request, "cursor")
+      const previous = calls.slice(0, index).filter((call) => call.dockID === dockID && call.part.sessionID === part.sessionID
+        && call.part.tool === "loginom_dock_node_read" && record(call.part.state) && call.part.state.status === "completed"
+        && record(call.part.state.input) && call.part.state.input.operation_id === request.operation_id
+        && record(call.result) && call.result.kind === "source")
+      const starts = continuation ? previous.filter((call) => record(call.part.state) && record(call.part.state.input)
+        && call.part.state.input.kind === "source" && !Object.hasOwn(call.part.state.input, "cursor")) : [calls[index]!]
+      const initial = starts[0]?.part
+      const initialRequest = record(initial?.state) && record(initial.state.input) ? initial.state.input : undefined
+      const node = record(initialRequest?.node) ? initialRequest.node : undefined
+      const bound = starts.length > 0 && starts.every((call) => {
+        const input = record(call.part.state) && record(call.part.state.input) ? call.part.state.input : undefined
+        return sameNode(input?.node, node) && input?.document_id === owner?.document_id
+          && record(input?.workflow_ref) && input.workflow_ref.workflow_id === owner?.workflow_id
+          && record(call.result) && JSON.stringify(call.result.owner) === JSON.stringify(owner)
+      })
+      const cursorVerified = !continuation || request.kind === "source" && result.kind === "source"
+        && typeof request.cursor === "string" && request.expected_source_sha256 === result.source_sha256
+        && starts.every((call) => record(call.result) && call.result.source_sha256 === result.source_sha256)
+        && previous.some((call) => record(call.result) && call.result.cursor === request.cursor
+          && call.result.source_sha256 === result.source_sha256 && JSON.stringify(call.result.owner) === JSON.stringify(owner))
       const events = input.runtime.filter((runtime) => record(runtime.session) && runtime.session.sessionId === dockID)
         .flatMap((runtime) => runtime.events).filter(record).filter((event) => JSON.stringify(event.owner) === JSON.stringify(owner))
-      if (!owner || owner.operation_id !== request.operation_id || !node
+      if (!owner || owner.operation_id !== request.operation_id || !node || !bound || !cursorVerified || request.kind !== result.kind
         || !["document_id", "workflow_id", "node_id"].every((key) => typeof owner[key] === "string" && owner[key] === node[key])
         || !Number.isSafeInteger(owner.ui_epoch) || !events.some((event) => event.phase === "source_discard_settled")
         || (result.kind === "source" ? !events.some((event) => event.phase === "source_delivery_verified"
@@ -315,9 +335,14 @@ export function inspectSelection(input: {
 }
 
 function readApply(part: unknown, parts: unknown[]) {
-  if (!record(part) || part.type !== "tool" || part.tool !== "loginom_dock_node_apply") return []
+  if (!record(part) || part.type !== "tool"
+    || !["loginom_dock_node_apply", "loginom_dock_node_resume"].includes(String(part.tool))) return []
   const state = record(part.state) ? part.state : undefined
   const request = record(state?.input) ? state.input : undefined
+  // An ID-only resume retains the original selection; a full rejected request
+  // still records the model's attempted choice before runtime admission.
+  if (part.tool === "loginom_dock_node_resume" && request
+    && Object.keys(request).every((key) => key === "operation_id")) return []
   const target = record(request?.target) ? request.target : undefined
   const reference = record(target?.ref) ? target.ref : undefined
   const terminalPart = parts.filter(record).filter((candidate) => candidate.sessionID === part.sessionID

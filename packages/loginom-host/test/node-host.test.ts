@@ -3,7 +3,6 @@ import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fr
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { buildNodeHost } from "../script/build-node-host"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
@@ -14,7 +13,14 @@ const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_T
 beforeAll(async () => {
   if (!fixture.node) throw new Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-node-host-"))
-  fixture.entry = await buildNodeHost(fixture.directory)
+  // Match connection-validation: isolate Bun's build cache from this test runner.
+  const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory], {
+    stdout: "pipe", stderr: "pipe",
+  })
+  const [code, output, errors] = await Promise.all([builder.exited,
+    new Response(builder.stdout).text(), new Response(builder.stderr).text()])
+  expect({ code, output, errors }).toEqual({ code: 0, output: "", errors: "" })
+  fixture.entry = join(fixture.directory, "node-host.mjs")
 })
 afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })

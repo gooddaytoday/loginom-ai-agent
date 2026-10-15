@@ -192,6 +192,46 @@ function sourceReadEvidence(kind: string) {
   return { parts, runtime, node }
 }
 
+function sourceCursorEvidence() {
+  const evidence = sourceReadEvidence("source")
+  const initial = evidence.parts.at(-1) as { id: string; sessionID: string; type: string; tool: string;
+    state: { status: string; input: Record<string, unknown>; output: string } }
+  const source = JSON.parse(initial.state.output)
+  const cursor = "00000000-0000-4000-8000-000000000000"
+  initial.state.output = JSON.stringify({ ...source, cursor })
+  const next = { ...initial, id: "source-next", state: { status: "completed",
+    input: { kind: "source", operation_id: "source-read", cursor, expected_source_sha256: source.source_sha256 },
+    output: JSON.stringify({ ...source, cursor: null }),
+  } }
+  evidence.parts.push(next)
+  return { evidence, initial, next, source }
+}
+
+test.each(["valid", "retry", "missing-start", "future-start", "foreign-session", "foreign-dock", "foreign-node", "wrong-digest", "unissued-cursor", "conflicting-start"])(
+  "source cursor continuation binds its prior initial request, owner and digest: %s", (kind) => {
+    const value = sourceCursorEvidence()
+    if (kind === "retry") value.evidence.parts.splice(-1, 0, { ...value.initial, id: "source-initial-retry" })
+    if (kind === "missing-start") value.evidence.parts.splice(-2, 1)
+    if (kind === "future-start") value.evidence.parts.splice(-2, 2, value.next, value.initial)
+    if (kind === "foreign-session") value.initial.sessionID = "foreign-session"
+    if (kind === "foreign-dock") value.evidence.parts.splice(-1, 0, {
+      type: "tool", tool: "loginom_dock_prepare", sessionID: value.next.sessionID,
+      state: { status: "completed", input: {}, output: JSON.stringify({ prepared: true, sessionId: "foreign-dock" }) },
+    })
+    if (kind === "foreign-node") value.next.state.output = JSON.stringify({ ...value.source,
+      owner: { ...value.source.owner, node_id: "foreign-node" }, cursor: null })
+    if (kind === "wrong-digest") value.next.state.input.expected_source_sha256 = "b".repeat(64)
+    if (kind === "unissued-cursor") value.next.state.input.cursor = "00000000-0000-4000-8000-000000000001"
+    if (kind === "conflicting-start") value.evidence.parts.splice(-1, 0, { ...value.initial, id: "conflicting-source-initial",
+      state: { ...value.initial.state, input: { ...value.initial.state.input,
+        node: { ...value.evidence.node, node_id: "foreign-node" } } },
+    })
+    const result = inspectSelectionRuntime(value.evidence)
+    if (["valid", "retry"].includes(kind)) expect(result).toEqual({ runtimeSettled: true, failures: [] })
+    if (!["valid", "retry"].includes(kind)) expect(result.failures).toContain("SOURCE_RECEIPT_UNVERIFIED")
+  },
+)
+
 test.each([true, false])("source wait uses its progress cleanup contract: %s", (cleanup) => {
   const evidence = sourceReadEvidence("source")
   evidence.parts.push({ id: "read-wait", type: "tool", tool: "loginom_dock_node_wait", sessionID: pilotHistory.snapshot.sessionID,
@@ -448,6 +488,30 @@ test.each(["pending", "running", "completed", "error"])(
     expect(result.failures).toContain("JAVASCRIPT_NOT_ALLOWED")
   },
 )
+
+test.each(["pending", "running", "completed", "error"])(
+  "standard rejects a full JavaScript resume request in state %s before runtime admission",
+  (status) => {
+    const parts = [{
+      id: "resume-js", sessionID: "session", type: "tool", tool: "loginom_dock_node_resume",
+      state: { status, input: { operation_id: "unknown-js", target: { kind: "new", type: "programming.javascript" } } },
+    }]
+    for (const mode of ["standard", "standard-recovery"] as const) {
+      const result = inspectSelection({ mode, nodeTypes: [], parts })
+      expect(result.jsCalls).toBe(1)
+      expect(result.successfulJsCalls).toBe(0)
+      expect(result.failures).toContain("JAVASCRIPT_NOT_ALLOWED")
+    }
+    expect(inspectSelection({ mode: "explicit-js", nodeTypes: [], parts }).failures).not.toContain("JAVASCRIPT_NOT_ALLOWED")
+  },
+)
+
+test("an ID-only standard resume does not invent a new node-selection request", () => {
+  expect(inspectSelection({ mode: "standard", nodeTypes: [], parts: [{
+    id: "resume-owned", sessionID: "session", type: "tool", tool: "loginom_dock_node_resume",
+    state: { status: "completed", input: { operation_id: "owned-standard" } },
+  }] })).toEqual({ jsNodes: 0, jsCalls: 0, successfulJsCalls: 0, failures: [] })
+})
 
 test.each(["TBGJavaScriptEngine", "TBGCodeModelComponentEngine"])(
   "standard rejects persisted JavaScript engine %s even without tool calls",
