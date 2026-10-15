@@ -83,7 +83,8 @@ export function collectTerminalScriptWitness(expected){
  const capsule={...summary},capsuleParent=parent(capsule);
  // Fixed same-realm provider. Native refs stay here, never in the projection.
  // Its only production host entry below inspects custody; it cannot dispatch.
- const providerChecks=[];
+ const providerChecks=[],providerPatches=[];
+ const descriptorEqual=(a,b)=>!a&&!b||!!a&&!!b&&Reflect.ownKeys(b).every(k=>Object.is(a[k],b[k]))&&Reflect.ownKeys(a).length===Reflect.ownKeys(b).length;
  function hold(object,key){
   const chain=[];let value;
   for(let p=object;p;p=parent(p)){
@@ -93,7 +94,8 @@ export function collectTerminalScriptWitness(expected){
   if(!chain.at(-1)?.d)throw Error('TERMINAL_PROVIDER_MISSING_'+key);
   if(value&&['object','function'].includes(typeof value)){const prototype=parent(value);providerChecks.push(()=>{if(parent(value)!==prototype)throw Error('TERMINAL_PROVIDER_CHANGED')})}
   providerChecks.push(()=>{let p=object;for(const x of chain){const d=descriptor(p,key);
-   if(p!==x.p||parent(p)!==x.prototype||(!x.d?d!==undefined:!d||Reflect.ownKeys(x.d).some(k=>!Object.is(d[k],x.d[k]))))throw Error('TERMINAL_PROVIDER_CHANGED');p=parent(p)}});
+   const patch=providerPatches.find(v=>v.active&&v.object===p&&v.key===key),expected=patch?patch.temporary:x.d;
+   if(p!==x.p||parent(p)!==x.prototype||!descriptorEqual(d,expected))throw Error('TERMINAL_PROVIDER_CHANGED');p=parent(p)}});
   return value;
  }
  let provider,providerFailure;
@@ -120,9 +122,79 @@ export function collectTerminalScriptWitness(expected){
    ||hold(applicationSession,'$S')!==transport||hold(connection,'FUsername')!==account||hold(storage,'$S')!==transport
    ||hold(storage,'QueryInterface')!==originalQuery)throw Error('TERMINAL_PROVIDER_NATIVE_REFS');
  const messages=hold(transport,'$M');hold(messages,'GetDynamicData');hold(transport,'$R');hold(transport,'DispatchMessageAsync');
+ const nativeSS=own(bindings,'ss');hold(nativeSS,'TaskCompletionSource');hold(nativeSS,'mkdel');hold(hold(nativeSS,'Exception'),'wrap');
  let armed;
+ function patchCheck(p){if(parent(p.object)!==p.prototype||!descriptorEqual(descriptor(p.object,p.key),p.active?p.temporary:p.original))throw Error('TERMINAL_PROVIDER_PATCH_CHANGED')}
+ function suspendNative(check){
+  const selected=providerPatches.filter(p=>p.active&&p.object===transport);
+  selected.forEach(patchCheck);
+  for(const p of selected){if(p.original)Object.defineProperty(p.object,p.key,p.original);else delete p.object[p.key];p.active=false}
+  try{return check()}finally{
+   // Inspect is synchronous. Never restore over a descriptor it changed/refused.
+   selected.forEach(patchCheck);
+   for(const p of selected){Object.defineProperty(p.object,p.key,p.temporary);p.active=true}
+  }
+ }
  function guard(){if(providerFailure)throw providerFailure.value;
-  try{checkOriginal.call(capsule);for(const check of providerChecks)check()}catch(value){providerFailure??={value};throw providerFailure.value}
+  try{providerPatches.forEach(patchCheck);suspendNative(()=>checkOriginal.call(capsule));for(const check of providerChecks)check()}catch(value){providerFailure??={value};throw providerFailure.value}
+ }
+ function patch(object,key,make){
+  const original=descriptor(object,key),method=hold(object,key);
+  if(typeof method!=='function'||original&&!original.configurable&&!original.writable)throw Error('TERMINAL_PROVIDER_PATCH_UNAVAILABLE');
+  const temporary={value:make(method),writable:true,enumerable:original?.enumerable??false,configurable:original?.configurable??true};
+  const p={object,key,prototype:parent(object),original,method,temporary,active:true};Object.defineProperty(object,key,temporary);providerPatches.push(p);return p;
+ }
+ function restore(){providerPatches.forEach(patchCheck);for(const p of providerPatches.slice().reverse())if(p.active){
+  if(p.original)Object.defineProperty(p.object,p.key,p.original);else delete p.object[p.key];p.active=false;
+ }providerPatches.forEach(patchCheck)}
+ function startLower(proxy,type,rejectWork){
+  const r={proxy,type,transport,observed:false,completed:false,restored:false};let invoking=false;
+  const first=value=>{r.primary??={value};return r.primary.value};
+  const stop=value=>{r.stopped=true;providerFailure??={value};rejectWork(r.primary?r.primary.value:providerFailure.value)};
+  try{
+   r.resolverPatch=patch(transport,'$R',original=>function(w,o,type){
+    if(!r.completing)return apply(original,this,arguments);
+    guard();if(this!==transport||w!==r.w||o!==r.o||!Number.isInteger(type)||type<0)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
+    r.returnedType=type;
+    try{r.support=apply(original,this,arguments)}catch(value){throw first(value)}
+    guard();r.completed=true;r.completing=false;return r.support;
+   });
+   r.dispatchPatch=patch(transport,'DispatchMessageAsync',original=>function(request){
+    if(!invoking)return apply(original,this,arguments);
+    guard();if(this!==transport||r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_REPLAY');r.request=request;
+    patch(request,'Release',release=>function(){guard();const value=apply(release,this,arguments);guard();return value});
+    const task=apply(original,this,arguments);r.dispatchTask=task;
+    const begin=providerChecks.length;r.originalReader=hold(task,'getAwaitedResult');const readerChecks=providerChecks.slice(begin);
+    r.readerPatch=patch(task,'getAwaitedResult',()=>function(){
+     if(this!==task||!r.observed||r.delivered)throw Error('TERMINAL_PROVIDER_QUERY_READER_REPLAY');
+     r.delivered=true;if(r.primary)throw r.primary.value;guard();r.response=r.outcome;
+     hold(r.response,'set_StaticDataSize');
+     patch(r.response,'ReadParameterInt32',read=>function(offset){
+      guard();if(this!==r.response||![0,4,8].includes(offset))throw Error('TERMINAL_PROVIDER_QUERY_RESPONSE');
+      const value=apply(read,this,arguments);guard();if(offset===0)r.w=value;else if(offset===4)r.o=value;else r.hresult=value;return value;
+     });
+     patch(r.response,'Release',release=>function(){guard();const value=apply(release,this,arguments);guard();return value});
+     r.completing=true;return r.response;
+    });
+    r.continuationPatch=patch(task,'continueWith',continuation=>function(callback){
+     if(this!==task||r.originalContinuation)throw Error('TERMINAL_PROVIDER_QUERY_REPLAY');r.originalContinuation=callback;
+     return apply(continuation,this,[function(){
+      if(r.observed){r.replayed=true;stop(Error('TERMINAL_PROVIDER_QUERY_CONTINUATION_REPLAY'));return}
+      // Qualify the original reader before reading it; unrelated post-await
+      // drift cannot replace its raw rejection. A foreign reader is never called.
+      try{patchCheck(r.readerPatch);for(const check of readerChecks)check()}catch(value){stop(value);return}
+      r.observed=true;
+      try{r.outcome=apply(r.originalReader,task,[])}catch(value){first(value)}
+      if(!r.primary){try{guard()}catch(value){stop(value);return}}
+      else{try{patchCheck(r.readerPatch)}catch(value){stop(value);return}}
+      return apply(callback,this,arguments);
+     }]);
+    });return task;
+   });
+   guard();invoking=true;try{r.task=apply(originalQuery,proxy,[type])}finally{invoking=false}
+   if(!r.dispatchTask)throw Error('TERMINAL_PROVIDER_QUERY_DISPATCH_UNAVAILABLE');
+   return r;
+  }catch(value){first(value);try{restore();r.restored=true}catch{}throw r.primary.value}
  }
  function readReceipt(operationId){guard();return apply(mapGet,receipts,[operationId])}
  function retainRequest(request){
@@ -141,7 +213,7 @@ export function collectTerminalScriptWitness(expected){
    if(armed){if(armed.request!==request)throw Error('TERMINAL_PROVIDER_REPLAY');armed.check();return armed.binding}
    const entry=retainRequest(request),prior=readReceipt(entry.operationId);
    if(prior&&(own(prior,'phase')!=='reserved'||Object.hasOwn(prior,'terminalOriginalCreation')))throw Error('TERMINAL_PROVIDER_LATE');
-   let creation,receipt,proxy,task,work,failed,support;
+   let creation,receipt,proxy,task,work,failed,support,lower;
    const check=()=>{guard();entry.check();if(creation){
     if(readReceipt(entry.operationId)!==receipt||own(receipt,'terminalOriginalCreation')!==creation||own(receipt,'phase')!=='verified'
       ||own(creation,'packageProxy')!==proxy||own(receipt,'tab')!==own(creation,'tab')||own(receipt,'packageNode')!==own(creation,'packageNode'))throw Error('TERMINAL_PROVIDER_CREATION_CHANGED');
@@ -166,18 +238,21 @@ export function collectTerminalScriptWitness(expected){
      let resolve,reject;work=new Promise((yes,no)=>{resolve=yes;reject=no});
      const rejectFirst=value=>{failed??={value};reject(failed.value)};
      try{
-      check();task=apply(originalQuery,proxy,[streamType]);
-      const continuation=hold(task,'continueWith'),reader=hold(task,'getAwaitedResult');let completed=false;
+      check();lower=startLower(proxy,streamType,rejectFirst);task=lower.task;
+      const continuation=hold(task,'continueWith'),begin=providerChecks.length,reader=hold(task,'getAwaitedResult'),readerChecks=providerChecks.slice(begin);let completed=false;
       if(typeof continuation!=='function'||typeof reader!=='function')throw Error('TERMINAL_PROVIDER_TASK');
       apply(continuation,task,[()=>{if(completed)return;completed=true;
-       try{for(const fn of providerChecks)fn();support=apply(reader,task,[]);
+       try{for(const fn of readerChecks)fn();support=apply(reader,task,[]);restore();lower.restored=true;
+        if(!lower.completed||support!==lower.support)throw Error('TERMINAL_PROVIDER_QUERY_COMPLETION');
         if(hold(support,'$S')!==transport||hold(support,'SaveToStream')!==own(bindings,'persist'))throw Error('TERMINAL_PROVIDER_SUPPORT');
         const identity=hold(support,'$'),w=hold(identity,'$OW'),o=hold(identity,'$O');if(!Number.isInteger(w)||w<0||!Number.isInteger(o)||o<0)throw Error('TERMINAL_PROVIDER_SUPPORT');
-        check();resolve(support)}catch(error){rejectFirst(error)}
+        check();resolve(support)}catch(error){const first=lower.primary?lower.primary.value:error;try{restore();lower.restored=true}catch{}rejectFirst(first)}
       }]);
      }catch(error){rejectFirst(error)}return work;
     },
-    inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType})},
+    inspect(){if(this!==binding)throw Error('TERMINAL_PROVIDER_RECEIVER');check();return Object.freeze({request,preparation,receipts,creation,receipt,proxy,task,work,support,transport,query:originalQuery,streamType,
+     lower:lower?Object.freeze({dispatchTask:lower.dispatchTask,request:lower.request,response:lower.response,continuation:lower.originalContinuation,reader:lower.originalReader,resolver:lower.resolverPatch.method,
+      w:lower.w,o:lower.o,hresult:lower.hresult,returnedType:lower.returnedType,support:lower.support,observed:lower.observed,completed:lower.completed,restored:lower.restored}):undefined})},
    });
    armed={...entry,check,binding};return binding;
   },
