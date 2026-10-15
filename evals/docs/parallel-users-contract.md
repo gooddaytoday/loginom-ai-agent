@@ -2850,3 +2850,33 @@ admission remain unqualified. Old incidents are unchanged.
 Joint verification252 source/pin/exact absence checks:
 6e3edf07…/verification.json SHA256
 `0c20af3738a43d0861c56bb3086a724ea258f136ed0b3b515a354e67f10cdcf3`.
+
+
+### Automatic normal pending-attempt reconciliation — 2026-10-16
+
+`finalizeSlotAttempt` now uses only `confirm-absent` when its durable close intent
+already exists. It retains the full producer/archive/native accounting and epoch
+checks. Missing close sidecars can be rebuilt from confirmed native absence,
+then a missing final receipt can be published. A matching live row refuses in the
+driver before CloseSession; unknown same-user rows refuse complete accounting.
+An already published terminal with a missing close proof still returns PENDING,
+so reconciliation cannot silently reinterpret that completed result.
+
+The native receipt-loss tests now call the finalizer directly, with no manual
+absence-confirmation step. Both retain the original terminal/sidecar, test the
+existing-terminal refusal, remove the terminal and require automatic read-back
+and stable repeat. This remains filesystem receipt-loss reconstruction under a
+held normal controller, with actual native RPC. Actual lost wire responses,
+SIGKILL and recovery-only lineage remain unqualified. Cleanup/deletion, release,
+backend operations/locks, backups, unpause and admission remain separate gates.
+
+TDD old pending refusal RED19 assertions119.12s → native browser/text2/50
+PASS294.22s. Related50/266 PASS54.90s, typecheck/diff PASS. Production diff3 lines.
+Browsereda67412-337b-4523-add1-a7dda8c782ef audit
+`2a2c433bcd730a024bec3acee891700db3f764d7ad0695deb58ff5b554bec9ec`
+checks1772/112 sources/14 causal frames; text7bcba6eb-debf-49f8-ba94-3964494cab1f
+audit `b5d45025f204006354b37e7d005487881d953b8f3b26abfbed2beb386e54b1d7`
+checks227/93/6. Both16 pins, no additional close RPC, retained archived SDK session
+and exact own pair/network/controller-root absence pass. Joint249 source/pin/
+absence checks: eda67412…/verification.json SHA256
+`2fd4cc4ae1111efd11933479192fc16a3060724032f48b5ddb56b772f15e5fb3`.
