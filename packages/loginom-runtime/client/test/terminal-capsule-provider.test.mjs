@@ -587,3 +587,49 @@ test('callee pair raw throw restores through retained intrinsic without foreign 
   throw reason;
  }});
 });
+
+// Actual original initClass wrapper calls; constructor/assembly/DOM/native are
+// explicit doubles here. A separate browser control executes complete IIFEs.
+test('initializer call retains pre-original function/args and completions through packet/control',()=>creationControl(async x=>{
+ const records=x.f.inspect().acquisition.loadedDefinitions.initializers.records;
+ assert.equal(records.length,3);for(let i=0;i<3;i++){
+  const r=records[i],c=r.call;assert(Object.isFrozen(c));assert(Object.isFrozen(r.completion));assert.equal(c.ordinal,i);assert.equal(c.beforeOriginalCall,true);
+  for(const key of ['initializer','receiver','ctor','assembly','members','baseType','interfaces'])assert.equal(c[key],r[key]);
+  assert.equal(c.values[0],r.ctor);assert.equal(c.values[1],r.assembly);assert.equal(c.values[2],r.members);assert.equal(c.arguments[0],r.ctor);assert.equal(c.arguments[1],r.assembly);assert.equal(c.arguments[2],r.members);
+  assert.equal(r.completion.call,c);assert.equal(r.completion.originalReturned,true);assert.equal(r.completion.returned,undefined);assert.equal(c.closureIdentityQualified,false);assert.equal(c.nativeReceiversQualified,false);
+ }
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const initial=x.provider.arm(x.f.c.__armInput).inspect().initial;
+ for(let i=0;i<3;i++){assert.equal(initial.initializerCalls[i],records[i].call);assert.equal(initial.initializerCompletions[i],records[i].completion)}
+ const result=await x.host.witness.continueStorage(x.host.f.bridge);assert.equal(result.reason,'NATIVE_LEXICAL_QUALIFICATION_MISSING');assert.equal(result.componentReady,false);assert.equal(result.readonlyStorageVerified,true);
+ assert.deepEqual(x.realm.native.calls,[0,907,909,910,911]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
+for(const target of ['arguments','argument flags','members','initializer','constructor alias','assembly'])test('initializer call pending '+target+' drift refuses getter0 before reader',()=>control(async x=>{
+ const records=x.f.inspect().acquisition.loadedDefinitions.initializers.records,r=records[1];
+ const b=x.provider.arm(x.request);await x.prepare();x.realm.native.hold();const work=b.query();let gets=0;
+ if(target==='arguments')Object.defineProperty(r.call.arguments,'1',{get(){gets++;throw Error('foreign argument')},configurable:true});
+ if(target==='argument flags')Object.defineProperty(r.call.arguments,'0',{...Object.getOwnPropertyDescriptor(r.call.arguments,'0'),writable:false});
+ if(target==='members')Object.defineProperty(r.members,'get_Connected',{get(){gets++;throw Error('foreign member')},configurable:true});
+ if(target==='initializer')Object.setPrototypeOf(r.call.initializer,{});
+ if(target==='constructor alias')x.f.c.bg.rpc.TIBGFileStorage_Proxy=function foreign(){};
+ if(target==='assembly')Object.defineProperty(r.assembly,'name',{get(){gets++;throw Error('foreign assembly')},configurable:true});
+ const rejected=assert.rejects(work,/UNAVAILABLE|CHANGED/);await x.realm.native.drain();await rejected;assert.equal(gets,0);assert.equal(x.probe.resolvers,0);assert.equal(x.realm.native.writes(),0);assert.deepEqual(x.realm.native.calls,[0]);assert.equal(b.query(),work);
+},true,true));
+test('initializer call late constructor alias refuses before workspace creation',()=>control(async x=>{
+ const original=x.f.constructors.ObjectProxy;x.f.c.rpc.TBGObjectProxy=function foreign(){};
+ assert.throws(()=>x.provider.arm(x.request),/UNAVAILABLE|CHANGED/);assert.notEqual(x.f.c.rpc.TBGObjectProxy,original);assert.equal(x.realm.page.events.includes('create_draft'),false);assert.equal(x.realm.native.calls.length,0);
+},true,true));
+for(const reason of [false,0,null,undefined,'',Error('initializer first',{cause:0})])test('initializer call original throw '+String(reason)+' remains raw before completion',async()=>{
+ // Negative original-base fixture; no native/session acquisition is performed.
+ const f=await fresh({initializer(){throw reason}});let threw=false,first;
+ try{f.init('ObjectProxy')}catch(error){threw=true;first=error}assert.equal(threw,true);assert.equal(first,reason);
+ let gets=0;Object.defineProperty(f.ss,'initClass',{get(){gets++;throw Error('foreign initializer')},configurable:true});
+ let refused=false,caught;try{f.inspect()}catch(error){refused=true;caught=error}assert.equal(refused,true);assert.equal(caught,reason);assert.equal(gets,0);
+});
+
+test('initializer call copied receipts or host DTO cannot replace original packet custody',()=>creationControl(async x=>{
+ await x.host.witness.createWorkspace(x.options,x.host.f.bridge);const original=x.provider.packet();
+ const copied={...original,initial:{...original.initial,initializerCalls:original.initial.initializerCalls.map(call=>Object.freeze({...call}))}};
+ assert.throws(()=>x.provider.checkPacket(copied),/FOREIGN/);assert.equal(x.provider.packet(),original);
+ const dto=witness.projectTerminalScriptWitness(x.capsule);assert.equal(Object.hasOwn(dto,'initializerCalls'),false);assert.equal(Object.hasOwn(dto,'initializerCompletions'),false);
+ assert.deepEqual(x.realm.native.calls,[0]);assert.equal(x.realm.native.writes(),0);
+},{originalSdk:true,invokeSdk:true,realCompletion:true}));
