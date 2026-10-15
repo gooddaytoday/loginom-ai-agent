@@ -27,7 +27,8 @@ function fixture(overrides = {}) {
       return state.closeResult;
     }};
   const dialog = {getBoundingClientRect:() => ({width:10,height:10})};
-  const doc = {querySelectorAll:() => state.dialog ? [dialog] : []};
+  const tab = {getAttribute:()=> 'own-tab', getBoundingClientRect:()=> ({width:state.hiddenTab?0:10,height:10})};
+  const doc = {querySelectorAll:query => query==='[data-tid]' ? Array.from({length:state.tabCount??1},()=>tab) : state.dialog ? [dialog] : []};
   const context = vm.createContext({document:doc, location:{origin:'http://loginom.invalid'},
     getComputedStyle:() => ({visibility:'visible'}), bg:{app:{Version:'7.4.2', Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
   vm.runInContext(`globalThis.__loginomDockPreparationV1={document,id:'owned-document',receipts:new Map([['prepare',{request:JSON.stringify({session:'owned-session'})}]])}`,context);
@@ -63,7 +64,8 @@ for (const [change,reason] of [
   [{modified:true},'UNSAVED_CHANGES'], [{running:true},'RUNNING_NODES'],
   [{account:'another-user'},'ACCOUNT_CHANGED'], [{path:'/other/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
   [{readonly:true},'PACKAGE_IDENTITY_CHANGED'], [{count:2},'PACKAGE_INVENTORY_CHANGED'],
-  [{dialog:true},'DIALOG_OR_OPERATION_OPEN'], [{racePath:'/changed/result.lgp'},'PACKAGE_CHANGED_DURING_CHECK'],
+  [{dialog:true},'DIALOG_OR_OPERATION_OPEN'], [{tabCount:0},'CURRENT_TAB_CHANGED'],
+  [{tabCount:2},'CURRENT_TAB_CHANGED'], [{hiddenTab:true},'CURRENT_TAB_CHANGED'], [{racePath:'/changed/result.lgp'},'PACKAGE_CHANGED_DURING_CHECK'],
 ]) test('refuses before closing: '+reason, async () => {
   const f=fixture(change),result=await f.run();
   assert.equal(result.status,'BLOCKED');assert.equal(result.reason,reason);

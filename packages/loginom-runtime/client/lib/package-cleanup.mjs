@@ -64,6 +64,8 @@ async function closeOwnedPackage(page, options) {
       // answers it; independent QA can explicitly discard its temporary views.
       if (m.PackageNodes.Count !== 1 || m.PackageNodes.Items(0) !== node || normalized(node.PackageFileName) !== o.packagePath
           || node.ReadOnly !== o.diagnosticReadOnly || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
+      const tabs = [...document.querySelectorAll('[data-tid]')].filter(el => el.getAttribute('data-tid') === o.tabTid);
+      if (tabs.length !== 1 || !visible(tabs[0])) return {reason:'CURRENT_TAB_CHANGED'};
       const state = globalThis.__loginomDockCleanupV1 = {identity, document, done:false, closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;
