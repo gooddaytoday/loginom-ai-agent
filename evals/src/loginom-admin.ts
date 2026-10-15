@@ -27,6 +27,7 @@ import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "./lea
 import { verifyAdminRuntime } from "./preflight"
 import { readServerIdentity, reserveUserStorage, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
+import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration } from "./user-environment"
 
 export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "dispose"
@@ -70,6 +71,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   await mkdir(path.join(directory, "profile"), { mode: 0o700 })
   const driver = path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")
   const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "starting", initialization: "not_started", dispose: "not_started",
+    finalization: null as { reply: AdminReply; command: { path: string; sha256: string } } | null,
     transportDisconnect: null as "confirmed" | "unknown" | null,
     initializationCode: null as string | null, initializationStage: null as string | null, passwordState: null as string | null, disposeCode: null as string | null,
     runtimeManifestHash: runtime.manifestHash, driverHash: new Bun.CryptoHasher("sha256").update(await Bun.file(driver).bytes()).digest("hex"),
@@ -366,6 +368,12 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         await channel.close().catch(stop)
         options.signal?.removeEventListener("abort", stop)
         receipt.processes = result?.processCleanup ?? null
+        if (ack) {
+          const command = path.join(directory, "commands", `${ack.id}.json`)
+          const source = await readLeaseReceipt(command).catch(() => undefined)
+          if (source) receipt.finalization = { reply: ack, command: { path: command,
+            sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(source)).digest("hex") } }
+        }
         receipt.initializationStage = result?.stderr.split("\n").filter(line =>
           /^ADMIN_INIT_STAGE_(BROWSER|NAVIGATION|FORM|USERNAME|PASSWORD|BLUR|LOGIN|SESSION|ROLE)$/.test(line)).at(-1)?.slice("ADMIN_INIT_STAGE_".length) ?? null
         receipt.passwordState = result?.stderr.split("\n").filter(line =>
@@ -397,6 +405,40 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
 function requireAdminReply(reply: AdminReply): unknown {
   if (reply.outcome === "confirmed") return reply.data
   throw new EvalFailure(adminReplyCode(reply), 2)
+}
+
+export async function readAdminFinalization(file: SlotFile, identity: ServerIdentity, directory: string, producerPid: number) {
+  const root = await lstat(directory).catch(() => undefined)
+  if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
+    !root?.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
+    await realpath(directory).catch(() => undefined) !== directory) throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
+  const source = path.join(directory, "connection.json")
+  const receipt = await readLeaseReceipt(source).catch(() => null)
+  if (!jsonObject(receipt) || receipt.version !== 1 || receipt.kind !== "loginom-admin-connection" ||
+    JSON.stringify(receipt.identity) !== JSON.stringify(identity) || receipt.status !== "disposed" || receipt.initialization !== "confirmed" ||
+    receipt.dispose !== "confirmed" || receipt.transportDisconnect !== "confirmed" || !jsonObject(receipt.finalization) ||
+    !jsonObject(receipt.finalization.reply) || !jsonObject(receipt.finalization.command))
+    throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
+  const processes = qualifyClosedProcessEvidence(receipt.processes, { owner: { kind: "admin", id: directory }, producerPid })
+  if (!processes) throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
+  const reply = receipt.finalization.reply, command = receipt.finalization.command
+  if (reply.v !== 1 || reply.outcome !== "confirmed" || typeof reply.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
+    !jsonObject(reply.data) || reply.data.disposed !== true || reply.data.transportDisconnect !== "confirmed" ||
+    command.path !== path.join(directory, "commands", `${reply.id}.json`) || typeof command.sha256 !== "string")
+    throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
+  const recorded = await readLeaseReceipt(command.path).catch(() => null)
+  if (!jsonObject(recorded) || Object.keys(recorded).length !== 10 || recorded.version !== 1 || recorded.kind !== "loginom-admin-command" ||
+    recorded.id !== reply.id || recorded.op !== "dispose" || recorded.state !== "confirmed" ||
+    JSON.stringify(recorded.expectedIdentity) !== JSON.stringify(identity) ||
+    recorded.desiredHash !== new Bun.CryptoHasher("sha256").update("{}").digest("hex") ||
+    recorded.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
+    new Bun.CryptoHasher("sha256").update(JSON.stringify(recorded)).digest("hex") !== command.sha256 ||
+    typeof recorded.at !== "string" || typeof recorded.settledAt !== "string" || !Number.isFinite(Date.parse(recorded.at)) ||
+    !Number.isFinite(Date.parse(recorded.settledAt)) || Date.parse(recorded.at) > Date.parse(recorded.settledAt) ||
+    Date.parse(recorded.at) < Date.parse(processes.startedAt) || Date.parse(recorded.settledAt) > Date.parse(processes.finishedAt))
+    throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
+  return { status: "confirmed" as const, identity, transportDisconnect: "confirmed" as const, processes: "confirmed" as const,
+    source: { path: source, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } }
 }
 
 function adminReplyCode(reply: AdminReply) {

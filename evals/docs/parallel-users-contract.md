@@ -897,3 +897,24 @@ Reader validation:88 unit PASS/353 (5.27s),3 native PASS/69 (60.97s),
 `bun typecheck` и diff PASS. Private native-parent-1de4cfc5-caa7-4b08-9f63-001a70ec2156
 receipt SHA256 `6f2e3d0ca3de172848f26f83803885a14cd833530470fbe0753850b65f521f96`;
 actual admin disconnect/process confirmed, exact disposable pair independently absent.
+
+### Admin finalization source
+
+`dispose()` сохраняет фактический whitelisted reply и semantic SHA исходного
+dispose command в private `connection.json`. `readAdminFinalization` проверяет
+canonical admin0700/receipt600, exact identity, confirmed initialization/dispose и
+native transportDisconnect, confirmed command/reply/hash и его время внутри
+наблюдённой lifetime. Existing `qualifyClosedProcessEvidence` требует continuous
+capture, exact producer PID и admin directory owner, launcher ancestry и две
+проверки отсутствия собственных процессов после завершения. Reader только читает
+источники и возвращает их SHA; не выполняет takeover/delete/release. Caller
+finalizer обязан связать этот source с inventory исходной команды и её lineage.
+Старые receipts без dispose source не получают задним числом новое доказательство.
+
+TDD missing export и command timestamp outside process lifetime RED→GREEN.
+90 unit PASS/373 (8.40s),3 native PASS/69 (57.76s), дополнительный preserved
+native1 PASS/21 (36.36s), typecheck/diff PASS. Private600
+`research/evidence/native-parent-d0b109ca-9a5d-4ef9-9dfd-fd9ada3b2e0d/blocked-preparation.json`
+SHA256 `3c780acaf1e8be306e1b072761460e247253dbcb527a221ea063cd69074210a8`
+содержит full receipt+dispose command; receipt/command/reply SHA independently
+совпали. Exact own pair independently absent; external retained incidents preserved.

@@ -1,12 +1,60 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { createAdminChannel, createJournaledAdminChannel, selectOwnedSessions } from "../src/loginom-admin"
+import { createAdminChannel, createJournaledAdminChannel, readAdminFinalization, selectOwnedSessions } from "../src/loginom-admin"
+import { writeLeaseReceipt } from "../src/lease"
+import { superviseProcess } from "../src/process-supervisor"
+import { parallelFixture } from "./helpers/parallel-fixture"
 
 const owned = { remoteKey: "session-41", userKey: "user-a", username: "eval-a", serverEpoch: "epoch-1", pendingDisconnect: true, activeOperations: 0 }
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("admin finalization reader requires the persisted disconnect command and continuous process closure", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-finalization-")), fixture = await parallelFixture(root)
+  const directory = path.join(fixture.slots.controller.stateDir, "admin-codec")
+  await mkdir(directory, { mode: 0o700 })
+  await mkdir(path.join(directory, "commands"), { mode: 0o700 })
+  try {
+    // A real supervised OS child supplies process evidence; the native reply below is a data-only codec fixture.
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: directory,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 3000, owner: { kind: "admin", id: directory } })
+    expect(run.processCleanup.status).toBe("confirmed")
+    const reply = { v: 1, id: "dispose-a", outcome: "confirmed", data: { disposed: true, transportDisconnect: "confirmed" } }
+    const command = { version: 1, kind: "loginom-admin-command", id: reply.id, op: "dispose", expectedIdentity: identity,
+      desiredHash: new Bun.CryptoHasher("sha256").update("{}").digest("hex"), state: "confirmed", at: run.processCleanup.lifetime!.started_at,
+      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex"), settledAt: run.processCleanup.lifetime!.finished_at! }
+    const commandFile = path.join(directory, "commands", `${reply.id}.json`), target = path.join(directory, "connection.json")
+    await writeLeaseReceipt(commandFile, command)
+    const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "disposed", initialization: "confirmed", dispose: "confirmed",
+      transportDisconnect: "confirmed", processes: run.processCleanup, finalization: { reply,
+        command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") } } }
+    await writeLeaseReceipt(target, receipt)
+    const bytes = await Bun.file(target).text()
+    expect(await readAdminFinalization(fixture.slots, identity, directory, process.pid)).toMatchObject({ status: "confirmed", processes: "confirmed",
+      transportDisconnect: "confirmed", source: { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } })
+    expect(await Bun.file(target).text()).toBe(bytes)
+    await expect(readAdminFinalization(fixture.slots, identity, directory, process.pid + 1)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
+    await writeLeaseReceipt(commandFile, { ...command, state: "unknown" })
+    await expect(readAdminFinalization(fixture.slots, identity, directory, process.pid)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
+    await writeLeaseReceipt(commandFile, command)
+    const late = { ...command, settledAt: new Date(Date.parse(run.processCleanup.lifetime!.finished_at!) + 1000).toISOString() }
+    await writeLeaseReceipt(commandFile, late)
+    await writeLeaseReceipt(target, { ...receipt, finalization: { reply,
+      command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(late)).digest("hex") } } })
+    await expect(readAdminFinalization(fixture.slots, identity, directory, process.pid)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
+    await writeLeaseReceipt(commandFile, command)
+    for (const changed of [
+      { ...receipt, transportDisconnect: "unknown" },
+      { ...receipt, processes: { ...run.processCleanup, observation_mode: "unit_after_exit" } },
+      { ...receipt, processes: { ...run.processCleanup, lifetime: { ...run.processCleanup.lifetime, owner: { kind: "admin", id: "foreign" } } } },
+    ]) {
+      await writeLeaseReceipt(target, changed)
+      await expect(readAdminFinalization(fixture.slots, identity, directory, process.pid)).rejects.toThrow("ADMIN_FINALIZATION_UNCONFIRMED")
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 10000)
 
 async function pipe(program: string, fragmented = false, journalDir?: string) {
   // A protocol peer exercises real OS pipes; it implements no Loginom operation.
