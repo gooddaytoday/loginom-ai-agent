@@ -284,6 +284,28 @@ test("SlotLease: dead-controller partial release is adopted only as recovery own
           lineage: [{ token: resource.token, revision: resource.revision, identity }] })
       }
       await expect(stageUserPreparation(file, recovered, "e".repeat(64))).rejects.toThrow("SLOT_RECOVERY_ONLY")
+      const terminal = path.join(item.root, "recovery-cleanup.json")
+      await writeFile(terminal, JSON.stringify({ status: "confirmed", slotId: recovered.slot.id, leaseToken: recovered.token, serverEpoch: identity.serverEpoch,
+        processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true, nextAdmissionAllowed: true }), { mode: 0o600 })
+      const recoveryManifest = await readLeaseReceipt(recovered.receipt)
+      await recovered.release(terminal)
+      // Codec reconstruction of a crash before the recovery composite's terminal write.
+      await writeFile(recovered.receipt, JSON.stringify(recoveryManifest), { mode: 0o600 })
+      const admission = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+        .then(next => ({ lease: next, error: null }), (error: unknown) => ({ lease: null, error }))
+      await admission.lease?.close()
+      expect(admission.error instanceof Error ? admission.error.message : null).toBe("RECOVERY_FINALIZATION_REQUIRED")
+      expect(await finalizeReleasedSlot(file, file.slots[0]!, identity, incident, lockRoot)).toMatchObject({ status: "released", cleanupReceipt: terminal })
+      expect(await readLeaseReceipt(incident)).toMatchObject({ state: "released", releaseReceipt: recovered.receipt, cleanupReceipt: terminal })
+      expect(await readLeaseReceipt(recovered.receipt)).toMatchObject({ state: "released", cleanupReceipt: terminal })
+      expect(await finalizeReleasedSlot(file, file.slots[0]!, identity, incident, lockRoot)).toMatchObject({ status: "already_released" })
+      const next = await acquireSlotLease(file, file.slots[0]!, identity, lockRoot)
+      try {
+        expect(next.recoveryOnly).toBe(false)
+        await next.assertHeld()
+        await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, incident, lockRoot)).rejects.toThrow("BUSY")
+      } finally { await next.close() }
+      await expect(finalizeReleasedSlot(file, file.slots[0]!, identity, incident, lockRoot)).rejects.toThrow("SLOT_RELEASE_UNCONFIRMED")
     } finally { await recovered.close() }
   } finally { await rm(item.root, { recursive: true, force: true }) }
 })
