@@ -4,7 +4,8 @@ import { EvalFailure } from "./fail"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 import { superviseProcess } from "./process-supervisor"
-import type { ServerIdentity, SlotLease } from "./slots"
+import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
+import type { acquireResourceLease } from "./lease"
 import type { AdminConnection } from "./loginom-admin"
 
 export type ManagementProcessEvidence = { file: string; lease: SlotLease; admin?: AdminConnection }
@@ -87,19 +88,11 @@ export async function superviseManagementProcess(input: Parameters<typeof superv
 }
 
 async function registerManagementInventory(input: InventoryInput, lease: SlotLease) {
-  const pending = (registrations.get(input.journal) ?? Promise.resolve()).then(async () => {
+  return withManagementInventoryWrite(input.journal, async () => {
     const command = await readLeaseReceipt(input.journal)
     if (!object(command) || command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted" || command.commandId !== input.commandId ||
       JSON.stringify(command.identity) !== JSON.stringify(input.identity)) throw new EvalFailure("MANAGEMENT_ADMISSION_UNCONFIRMED", 2)
-    const saved = command.managementInventories === undefined ? [] : command.managementInventories
-    if (!Array.isArray(saved)) throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
-    const registered = saved.filter(object)
-    if (registered.length !== saved.length || registered.some(entry => Object.keys(entry).length !== 4 ||
-      typeof entry.file !== "string" || path.resolve(entry.file) !== entry.file || path.dirname(entry.file) !== path.dirname(input.file) ||
-      typeof entry.slotId !== "string" || !entry.slotId || typeof entry.leaseToken !== "string" || !entry.leaseToken ||
-      typeof entry.profileDir !== "string" || !path.isAbsolute(entry.profileDir) || path.resolve(entry.profileDir) !== entry.profileDir) ||
-      ["file", "slotId", "leaseToken", "profileDir"].some(key => new Set(registered.map(entry => entry[key])).size !== registered.length))
-      throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    const registered = managementBindings(command.managementInventories, path.dirname(input.file))
     const entry = { file: input.file, leaseToken: input.leaseToken, slotId: input.slotId, profileDir: input.profileDir }
     const existing = registered.find(candidate => candidate.slotId === input.slotId)
     if (existing && JSON.stringify(existing) !== JSON.stringify(entry) || registered.some(candidate => candidate.slotId !== input.slotId &&
@@ -109,9 +102,72 @@ async function registerManagementInventory(input: InventoryInput, lease: SlotLea
     if (JSON.stringify(await readLeaseReceipt(input.journal)) !== JSON.stringify(command)) throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
     if (!existing) await writeLeaseReceipt(input.journal, { ...command, managementInventories: [...registered, entry] })
   })
+}
+
+/** Called under the admin inventory lock; closes producer admission, without granting cleanup or release. */
+export async function sealManagementProcessInventories(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, slots: SlotLease[], expectedHash: string) {
+  return withManagementInventoryWrite(server.reservation.journal, async () => {
+    await server.assertHeld()
+    const journal = server.reservation.journal, identity = server.reservation.identity
+    const command = await readLeaseReceipt(journal)
+    if (!identity || server.reservation.state !== "retained" || server.reservation.owner.pid !== process.pid ||
+      server.reservation.key !== `server:${identity.containerId}` || !object(command) || command.version !== 2 ||
+      command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted" || command.commandId !== server.reservation.commandId ||
+      JSON.stringify(command.identity) !== JSON.stringify(identity) || hash(command) !== expectedHash || !slots.length ||
+      JSON.stringify(command.slotIds) !== JSON.stringify(slots.map(lease => lease.slot.id)) || new Set(slots.map(lease => lease.slot.id)).size !== slots.length)
+      throw new EvalFailure("MANAGEMENT_ADMISSION_UNCONFIRMED", 2)
+    const bindings = managementBindings(command.managementInventories, file.controller.stateDir)
+    if (bindings.some(entry => !slots.some(lease => lease.slot.id === entry.slotId && lease.token === entry.leaseToken && lease.slot.profileDir === entry.profileDir)))
+      throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    const sources = []
+    for (const lease of slots) {
+      await lease.assertHeld()
+      const origin = await readLeaseReceipt(lease.receipt)
+      if (lease.recoveryOnly || JSON.stringify(lease.identity) !== JSON.stringify(identity) || !object(origin) || origin.journal !== journal ||
+        origin.commandId !== command.commandId || !file.slots.some(slot => JSON.stringify(slot) === JSON.stringify(lease.slot)))
+        throw new EvalFailure("MANAGEMENT_ADMISSION_UNCONFIRMED", 2)
+      const entry = bindings.find(entry => entry.slotId === lease.slot.id)
+      if (!entry) continue
+      if (active.has(entry.file)) throw new EvalFailure("MANAGEMENT_PROCESS_BUSY", 2)
+      const inventory = await readManagementProcessInventory({ ...entry, journal, commandId: server.reservation.commandId, identity, producerPid: process.pid })
+      if (new Set(inventory.processes.map(process => process.owner.id)).size !== inventory.processes.length ||
+        new Set(inventory.processes.map(process => process.source.path)).size !== inventory.processes.length)
+        throw new EvalFailure("MANAGEMENT_PROCESS_PROOF_UNCONFIRMED", 2)
+      sources.push(inventory.source)
+    }
+    for (const source of sources) {
+      if (hash(await readLeaseReceipt(source.path)) !== source.sha256) throw new EvalFailure("MANAGEMENT_PROCESS_INVENTORY_CHANGED", 2)
+    }
+    if (bindings.some(entry => active.has(entry.file))) throw new EvalFailure("MANAGEMENT_PROCESS_BUSY", 2)
+    await server.assertHeld()
+    await Promise.all(slots.map(lease => lease.assertHeld()))
+    if (hash(await readLeaseReceipt(journal)) !== expectedHash) throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    const sealed = { ...command, phase: "finalizing", managementSources: sources }
+    await writeLeaseReceipt(journal, sealed)
+    return sealed
+  })
+}
+
+function managementBindings(value: unknown, directory: string) {
+  const saved = value === undefined ? [] : value
+  if (!Array.isArray(saved)) throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+  const entries = saved.map((entry: unknown) => {
+    if (!object(entry) || Object.keys(entry).length !== 4 || typeof entry.file !== "string" || path.resolve(entry.file) !== entry.file ||
+      path.dirname(entry.file) !== directory || typeof entry.slotId !== "string" || !entry.slotId || typeof entry.leaseToken !== "string" || !entry.leaseToken ||
+      typeof entry.profileDir !== "string" || !path.isAbsolute(entry.profileDir) || path.resolve(entry.profileDir) !== entry.profileDir)
+      throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+    return { file: entry.file, leaseToken: entry.leaseToken, slotId: entry.slotId, profileDir: entry.profileDir }
+  })
+  if (["file", "slotId", "leaseToken", "profileDir"].some(key => new Set(entries.map(entry => entry[key as keyof typeof entry])).size !== entries.length))
+    throw new EvalFailure("MANAGEMENT_INVENTORY_CONFLICT", 2)
+  return entries
+}
+
+async function withManagementInventoryWrite<T>(journal: string, callback: () => Promise<T>) {
+  const pending = (registrations.get(journal) ?? Promise.resolve()).then(callback)
   const settled = pending.then(() => {}, () => {})
-  registrations.set(input.journal, settled)
-  try { await pending } finally { if (registrations.get(input.journal) === settled) registrations.delete(input.journal) }
+  registrations.set(journal, settled)
+  try { return await pending } finally { if (registrations.get(journal) === settled) registrations.delete(journal) }
 }
 
 export async function readManagementProcessInventory(input: InventoryInput) {

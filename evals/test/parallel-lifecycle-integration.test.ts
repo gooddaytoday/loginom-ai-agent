@@ -13,7 +13,7 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
-import { openLoginomAdmin, readAdminFinalization } from "../src/loginom-admin"
+import { openLoginomAdmin, readAdminFinalization, sealAdminProcessInventory } from "../src/loginom-admin"
 
 import { readManagementProcessInventory } from "../src/management-process-evidence"
 import { management } from "../src/profile"
@@ -197,6 +197,18 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         source: { path: journal, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex") },
         inventories: [{ value: registeredInventory, source: { path: inventoryFile,
           sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") } }] })
+      const sealed = await sealAdminProcessInventory(file, environment.server,
+        new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredCommand)).digest("hex"), environment.slots)
+      expect(sealed).toMatchObject({ phase: "finalizing", managementSources: [{ path: inventoryFile,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") }] })
+      await expect(management(command, ["loginom", "status", "--format", "json"], undefined, 60_000))
+        .rejects.toThrow("MANAGEMENT_ADMISSION_UNCONFIRMED")
+      await expect(openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory,
+        binary: "/unreadable-runtime" })).rejects.toThrow("ADMIN_PROCESS_INVENTORY_SEALED")
+      expect(await readLeaseReceipt(inventoryFile)).toEqual(registeredInventory)
+      expect(await readLeaseReceipt(journal)).toEqual(sealed)
+      await writeLeaseReceipt(path.join(evidence, "sealed.json"), { value: sealed, source: { path: journal,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(sealed)).digest("hex") } })
       for (const capture of captures) {
         expect(await readManagementSession(file, lease, secretFile, capture.session.id)).toEqual(capture.session)
         expect(await recordManagementSession(file, lease, secretFile, inventoryFile, capture.session.actor.owner.id)).toEqual(capture.session)
