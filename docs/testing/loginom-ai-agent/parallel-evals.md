@@ -1060,3 +1060,20 @@ verificationd0512a31… rechecks79 source/pin hashes and exact own resource abse
 
 A/B private native-two-users-79a7ca24… audit5d6da801… verifies634 checks/183
 sources, continuous closures/archive order and exact own resource absence.
+
+
+Combined session accounting (2026-10-16): the native agent fixture now records
+its real setup/status calls in a management inventory and registers the agent
+inventory in the command journal. `collectSlotSessions` accepts the setup and
+browser-agent causal ledgers together, requires a sealed inventory and an
+observation window for every invocation, and reads the closed agent alongside
+the still-present setup after targeted close. Management-only accounting still
+refuses the agent row; unknown same-user rows remain errors.
+
+Native1/36 PASS150.78s; private native-agent-replay-ca96f759… audit0546e73b…
+checks1658 facts/113 sources,20 overlapping snapshots/15 source+binary pins.
+Exact own pair/network/controller root absence and retained history verified.
+Empty/non-browser invocation qualification and normal finalizer/recovery wiring
+remain open; no release/admission or live acceptance follows from the collector.
+
+Related48 PASS/245 assertions55.60s, typecheck/diff PASS.

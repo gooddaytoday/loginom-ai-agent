@@ -2631,3 +2631,43 @@ Private native-two-users-79a7ca24-8890-473d-aedb-792c884b62bd/source-audit.json
 SHA256 `5d6da801c8ef9bd9da0fdac201118d59426a15a1c608aced638558f85780d1ab`
 checks634 facts/183 sources, continuous closures/archive order and exact own
 pair/network/root absence.
+
+
+### Combined management/browser-agent accounting — 2026-10-16
+
+`collectSlotSessions(file, lease, secretFile, sources, observation)` accounts for
+normal management and browser-agent actors together. Sources identify the
+management inventory and optionally `{file, observations}` for the agent
+inventory. The command journal must register the exact agent file/slot/token/
+profile binding. The agent inventory must be sealed with qualified continuous
+proofs, and each invocation must have one immutable observation window. Missing
+windows, duplicates and sources from another inventory fail before accounting.
+`readAgentSessionInventory` revalidates/records these causal ledgers and binds
+all native snapshots to the sealed inventory source.
+
+Every same-user row in management and agent historical snapshots must match one
+known ledger. Fresh rows require a ledger that remains open; a closed ledger
+cannot account for a present row. Exact Name/CreateTime identify a row across
+admin proxy contexts, with case-normalized duplicate detection. Management rows
+remain Count0; agent package count/pending eligibility belongs to the targeted
+close API. The collector requires the fresh observation after all selected CLI
+lifetimes, then rechecks command/seals/inventory hashes under the held lease.
+It returns separate management/agent records and source references.
+
+The existing `collectManagementSessions` retains its management-only output and
+strict refusal for an agent row. Empty/non-browser invocations still require a
+separate positive qualification before this collector can support every agent
+run. Finalizer, storage/backup cleanup, reservation release and admission are
+separate gates.
+
+TDD missing export RED → codec GREEN rejects unknown same-user rows (including
+uppercase/bare names) and an unregistered agent inventory, while ignoring peer
+user rows. Native1/36 PASS150.78s used genuine CLI setup and runAgent, refused
+unsealed/missing invocation evidence and the management-only path, then retained
+the setup ledger after agent closure. Private
+native-agent-replay-ca96f759-6ac6-4466-aa25-dd64c0c4ef0c/source-audit.json SHA256
+`0546e73b94f2e023c1749b023059297d7ff321a252841124712766726224039c`
+checks1658 facts/113 sources,20 causal snapshots and15 source/binary pins. Own
+pair/network/controller root are absent; the private history archive remains.
+
+Related48 PASS/245 assertions55.60s, typecheck/diff PASS.
