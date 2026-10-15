@@ -147,7 +147,21 @@ async function startupFingerprint(path) {
   try {const bytes=await readFile(path);return {available:true,size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}}
   catch(error){return {available:false,rejection:startupRejection(error)}}
 }
+function startupPhaseTiming(owner,name,started) {
+  const now=Date.now(),initial=owner.initialReadiness;
+  const nonnegative=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+  owner.phaseTiming??=[];
+  if(owner.phaseTiming.length>=32){owner.phaseTimingTruncated=true;return}
+  owner.phaseTiming.push({name,at_ms:nonnegative(now-(initial?.local_deadline-initial?.budget_ms)),
+    ...(started===undefined?{}:{duration_ms:nonnegative(now-started)})});
+}
 async function startupEvidence(owner) {
+  // Freeze only already completed timing marks. The current write's durations
+  // remain beside evidence until the NEXT write; no second persistence pass.
+  owner.evidence.phase_timing=(owner.phaseTiming??[]).map(mark=>({...mark}));
+  owner.evidence.phase_timing_truncated=owner.phaseTimingTruncated===true;
+  startupPhaseTiming(owner,'evidence_before');
+  try {
   // The producer owns durability. A collector syncing a later copy cannot
   // authorize this owner's context exit. Retry only storage/confirmed results.
   owner.evidencePendingClose??=[];
@@ -161,7 +175,8 @@ async function startupEvidence(owner) {
     file=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
     created=true;phase='write';
     await file.writeFile(JSON.stringify(owner.evidence,null,2)+'\n');
-    phase='file_sync';await file.sync();
+    phase='file_sync';const syncStarted=Date.now();
+    try {await file.sync()} finally {startupPhaseTiming(owner,'file_sync',syncStarted)}
   }catch(error){failed=true;primary=error}
   if(file) {
     try {await file.close()}
@@ -169,9 +184,12 @@ async function startupEvidence(owner) {
   }
   if(!failed) {
     try {
-      phase='rename';await rename(temporary,join(owner.directory,'startup-cleanup.json'));created=false;
+      phase='rename';const renameStarted=Date.now();
+      try {await rename(temporary,join(owner.directory,'startup-cleanup.json'))} finally {startupPhaseTiming(owner,'rename',renameStarted)}
+      created=false;
       phase='directory_open';directory=await open(owner.directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
-      phase='directory_sync';await directory.sync();
+      phase='directory_sync';const syncStarted=Date.now();
+      try {await directory.sync()} finally {startupPhaseTiming(owner,'directory_sync',syncStarted)}
     }catch(error){failed=true;primary=error}
   }
   if(directory) {
@@ -189,6 +207,7 @@ async function startupEvidence(owner) {
     owner.evidence.persistence_failure??=failure.rejection;
     throw primary;
   }
+  } finally {startupPhaseTiming(owner,'evidence_after')}
 }
 // Shared initial read-only gate. Reuse the same owner budget, never renew it.
 async function startupReadiness(owner, initial=true, persist=true) {
@@ -216,6 +235,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
     if(owner.guardReadOperation?.state==='pending')throw Error('LOGINOM_INITIAL_READINESS_READ_PENDING');
     const reading={state:'pending'};
     owner.guardReadOperation=reading;
+    startupPhaseTiming(owner,'observe_before');
     reading.promise=owner.page.evaluate(o=>{
       const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
       const exact=value=>({type:typeof value,is_undefined:value===undefined,value:value===undefined?null:value});
@@ -264,7 +284,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
     let observed;
     try {observed=await Promise.race([reading.promise,interrupted])}
     catch(value){owner.evidence.guard_read={state:reading.state,read_only:true,rejection:startupRejection(value)};throw value}
-    finally {clearTimeout(timer);binding.signal?.removeEventListener('abort',stop)}
+    finally {clearTimeout(timer);binding.signal?.removeEventListener('abort',stop);startupPhaseTiming(owner,'observe_after')}
     if(observed.guardFailure && !owner.guardFailure) {
       const detail=observed.guardFailure.rejection;
       let value=observed.guardFailure.value;
@@ -300,7 +320,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
     if(observed.guardFailure) throw owner.guardFailure.value
     
     if(!observed.authenticated&&!observed.unauthenticated)owner.evidence.initial_refusal ??= {snapshot:observed.snapshot,reason:observed.reason??null};
-    guard();
+    try {guard()} finally {startupPhaseTiming(owner,'post_guard')}
     if(observed.authenticated||observed.unauthenticated){if(initial)owner.initialReadinessCompleted=true;return observed}
     owner.evidence.initial_refusal ??= {snapshot:observed.snapshot,reason:observed.reason??null};
     const x=observed.snapshot,unknown=v=>v?.is_undefined===true||v?.value===null;
@@ -314,7 +334,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
     if(!pending)return observed;
     owner.evidence.initial_readiness={...budget,status:'pending',observations:++iteration};
     await startupEvidence(owner);
-    guard();
+    try {guard()} finally {startupPhaseTiming(owner,'post_guard')}
     const delay=Math.min(10*2**Math.min(iteration-1,4),budget.effective_deadline-Date.now());
     await new Promise((resolve,reject)=>{
       const signal=binding.signal;

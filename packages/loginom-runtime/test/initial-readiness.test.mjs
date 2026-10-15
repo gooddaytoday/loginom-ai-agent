@@ -12,9 +12,10 @@ const code=source.slice(source.indexOf('export function browserEnvironment')).re
 const managed=await readFile(process.env.STARTUP_MANAGED??new URL('../src/managed-entry.mjs',import.meta.url),'utf8');
 const managedCode=managed.slice(managed.indexOf('function closeRejection('),managed.indexOf('const stop ='));
 const values=[Error('original startup refusal'),undefined,null,false,0,''];
-function fixture(directory,phase,rejected){
+function fixture(directory,phase,rejected,controls={}){
+ const ClockDate=controls.clock?class extends Date{constructor(...args){super(...(args.length?args:[controls.clock()]))}static now(){return controls.clock()}}:Date;
  const events=[],document={querySelectorAll:()=>[]},connection={Connected:false,UserName:'user'};
- const pageState=vm.createContext({document,location:{href:'about:blank',origin:'null'},getComputedStyle:()=>({visibility:'visible'}),Error});
+ const pageState=vm.createContext({document,location:{href:'about:blank',origin:'null'},getComputedStyle:()=>({visibility:'visible'}),Error,Date:ClockDate});
  const native=()=>{pageState.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection,PackageNodes:{Count:phase==='packages'?1:0},HasRunningNodes:()=>false}}}}}}};
  const owner={directory};let logout=0,contextClose=0;
  const page={
@@ -46,7 +47,7 @@ function fixture(directory,phase,rejected){
  class Client {async connect(){events.push('knowledge');if(phase==='knowledge')throw rejected}async close(){events.push('knowledge-close');if(phase==='knowledge-close')throw rejected}}
  const require=name=>{if(phase==='require'||phase==='knowledge-require')throw rejected;return name==='playwright-core'?{chromium:{async launchPersistentContext(){events.push('launch');if(phase==='launch')throw rejected;return context}}}:
   name.includes('streamableHttp')?{StreamableHTTPClientTransport:class{}}:{Client}};
- const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection,startupReadiness})',{require,mkdir,open,rename,unlink,constants,writeFile,readFile,createHash,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,
+ const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection,startupReadiness,startupEvidence})',{require,mkdir,open:controls.open??open,rename,unlink,constants,writeFile,readFile,createHash,Date:ClockDate,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,
   setTimeout,clearTimeout,AbortController,browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>''});
  const options={profile:directory,browserPath:'/fixture',candidate:{url:'https://loginom.invalid/app',username:'user',password:'',apiKey:'fixture'},endpoint:'https://knowledge.invalid',owner};
  return {owner,options,functions,events,context,page,pageState,connection,logout:()=>logout,contextClose:()=>contextClose};
@@ -139,6 +140,29 @@ for(const [kind,value] of Object.entries({error:Error('joint running',{cause:0})
   assert.equal(rejected,true);assert.equal(raw,value);assert.equal(f.owner.guardFailure.value,value);assert.equal(reads,1);
   if(kind==='error')assert.equal(f.owner.evidence.guard_rejection.cause.value,0);
   if(persistence)assert.ok(f.owner.evidence.guard_persistence_failure);
+  assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+ }finally{await rm(root,{recursive:true,force:true})}
+});
+
+test('file sync crosses same initial clock deadline without publishing ready; next receipt carries duration',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'initial-sync-deadline-'));let now=1000000,armed=false;
+ const timedOpen=async(...args)=>{const file=await open(...args);return {
+  writeFile:file.writeFile.bind(file),close:file.close.bind(file),async sync(){await file.sync();if(armed&&args[0]!==root){armed=false;now+=5001;}}
+ };};
+ const f=fixture(root,undefined,undefined,{clock:()=>now,open:timedOpen});
+ try{
+  await f.functions.loginBrowser({...f.options,keepOpen:true});
+  delete f.owner.initialReadiness;f.owner.evidence={stages:[]};f.owner.phaseTiming=[];f.owner.phaseTimingTruncated=false;
+  f.page.onGuard=()=>{f.pageState.bg.app.Application.FInstance.FMainForm.FMapTree.HasRunningNodes=()=>undefined;};armed=true;
+  await assert.rejects(f.functions.startupReadiness(f.owner),{message:'LOGINOM_INITIAL_READINESS_DEADLINE'});
+  assert.equal(f.owner.evidence.initial_readiness.status,'not_ready');assert.equal('guard_read'in f.owner.evidence,false);
+  assert.equal('persistence_failure'in f.owner.evidence,false);assert.equal(f.owner.evidence.initial_readiness.budget_ms,5000);
+  const first=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));assert.equal(JSON.stringify(first),JSON.stringify(f.owner.evidence));
+  assert.equal(first.phase_timing.some(x=>x.name==='file_sync'),false);
+  await f.functions.startupEvidence(f.owner);const next=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));
+  assert.equal(next.phase_timing.find(x=>x.name==='file_sync').duration_ms,5001);
+  assert.equal(next.phase_timing.find(x=>x.name==='post_guard').at_ms,5001);
+  assert.equal(next.initial_readiness.status,'not_ready');assert.equal('guard_read'in next,false);
   assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
  }finally{await rm(root,{recursive:true,force:true})}
 });

@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 const path=process.env.STARTUP_SOURCE;
 const source=await fs.readFile(path,'utf8');
 const text=source.slice(source.indexOf('function startupRejection('),source.indexOf('// Internal foreground owner'));
-async function fixture({phase,rejected,secondary=false,fixedUUID}={}) {
+async function fixture({phase,rejected,secondary=false,fixedUUID,clock=Date.now,onSync,onRename}={}) {
  const directory=await fs.mkdtemp(join(tmpdir(),'review-atomic-startup-'));
  const final=join(directory,'startup-cleanup.json'),old='{"previous_receipt":true}\n';
  await fs.writeFile(final,old,{mode:0o600});
@@ -20,11 +20,11 @@ async function fixture({phase,rejected,secondary=false,fixedUUID}={}) {
   const label=p===directory?'directory':'file';events.push(label+'_open');fail(label+'_open');
   const real=await fs.open(p,flags,mode);handles.push(real);
   return {async writeFile(bytes){events.push('write');fail('write');await real.writeFile(bytes)},
-   async sync(){events.push(label+'_sync');fail(label+'_sync');await real.sync()},
+   async sync(){events.push(label+'_sync');fail(label+'_sync');await real.sync();onSync?.(label)},
    async close(){events.push(label+'_close');if(secondary&&label==='file'&&!secondaryInjected){secondaryInjected=true;throw Error('secondary',{cause:false})}fail(label+'_close');await real.close()}};
  };
- const rename=async(a,b)=>{events.push('rename');fail('rename');await fs.rename(a,b)};
- const {startupEvidence}=vm.runInNewContext(text+';({startupEvidence})',{open,rename,unlink:fs.unlink,constants,randomUUID:fixedUUID?()=>fixedUUID:randomUUID,join,Error});
+ const rename=async(a,b)=>{events.push('rename');fail('rename');await fs.rename(a,b);onRename?.()};
+ const {startupEvidence}=vm.runInNewContext(text+';({startupEvidence})',{open,rename,unlink:fs.unlink,constants,randomUUID:fixedUUID?()=>fixedUUID:randomUUID,join,Error,Date:class extends Date{static now(){return clock()}}});
  return {owner,directory,final,old,events,write:()=>startupEvidence(owner),
   async dispose(){await Promise.allSettled(handles.map(h=>h.close()));await fs.rm(directory,{recursive:true,force:true})}};
 }
@@ -34,7 +34,7 @@ async function save(f,label,extra={}) {
 test('atomic producer success uses real file/directory sync and private mode',async()=>{
  const f=await fixture();try{
   await f.write();assert.deepEqual(f.events,['file_open','write','file_sync','file_close','rename','directory_open','directory_sync','directory_close']);
-  assert.equal((await fs.stat(f.final)).mode&0o777,0o600);assert.deepEqual(JSON.parse(await fs.readFile(f.final,'utf8')),f.owner.evidence);
+  assert.equal((await fs.stat(f.final)).mode&0o777,0o600);assert.equal(await fs.readFile(f.final,'utf8'),JSON.stringify(f.owner.evidence,null,2)+'\n');
   await save(f,'atomic-success');
  }finally{await f.dispose()}
 });
@@ -72,5 +72,39 @@ test('atomic replacement does not follow an existing receipt symlink',async()=>{
   const foreign=join(f.directory,'other-original');await fs.writeFile(foreign,'UNCHANGED');await fs.unlink(f.final);await fs.symlink(foreign,f.final);
   await f.write();assert.equal(await fs.readFile(foreign,'utf8'),'UNCHANGED');assert.equal((await fs.lstat(f.final)).isSymbolicLink(),false);
   assert.equal((await fs.stat(f.final)).mode&0o777,0o600);await save(f,'receipt-symlink-replaced-without-following');
+ }finally{await f.dispose()}
+});
+
+test('timing remains beside evidence until next atomic write, with no added IO',async()=>{
+ let now=1000;const f=await fixture({clock:()=>now,onSync:label=>{now+=label==='file'?17:23},onRename:()=>{now+=5}});
+ f.owner.initialReadiness={local_deadline:6000,budget_ms:5000};
+ try{
+  await f.write();assert.equal(f.owner.evidence.phase_timing.length,0);
+  assert.equal(await fs.readFile(f.final,'utf8'),JSON.stringify(f.owner.evidence,null,2)+'\n');
+  assert.equal(f.owner.phaseTiming.find(x=>x.name==='file_sync').duration_ms,17);
+  await f.write();const receipt=JSON.parse(await fs.readFile(f.final,'utf8'));
+  assert.equal(JSON.stringify(receipt),JSON.stringify(f.owner.evidence));
+  assert.equal(receipt.phase_timing.find(x=>x.name==='file_sync').duration_ms,17);
+  assert.equal(receipt.phase_timing.find(x=>x.name==='rename').duration_ms,5);
+  assert.equal(receipt.phase_timing.find(x=>x.name==='directory_sync').duration_ms,23);
+  assert.deepEqual(f.events,Array(2).fill(['file_open','write','file_sync','file_close','rename','directory_open','directory_sync','directory_close']).flat());
+ }finally{await f.dispose()}
+});
+test('timing caps at 32 and next receipt preserves truncated flag',async()=>{
+ const f=await fixture({clock:()=>1000});f.owner.initialReadiness={local_deadline:6000,budget_ms:5000};
+ try{
+  for(let i=0;i<10;i++)await f.write();
+  assert.equal(f.owner.phaseTiming.length,32);const receipt=JSON.parse(await fs.readFile(f.final,'utf8'));
+  assert.equal(receipt.phase_timing.length,32);assert.equal(receipt.phase_timing_truncated,true);
+  for(const mark of receipt.phase_timing){assert.ok(['evidence_before','file_sync','rename','directory_sync','evidence_after'].includes(mark.name));assert.deepEqual(Object.keys(mark).sort(),['file_sync','rename','directory_sync'].includes(mark.name)?['at_ms','duration_ms','name']:['at_ms','name']);}
+  assert.equal(f.events.length,80);
+ }finally{await f.dispose()}
+});
+test('negative and fractional clock differences become null in next receipt',async()=>{
+ let now=1000;const f=await fixture({clock:()=>now,onSync:label=>{now=label==='file'?1000.5:999}});
+ f.owner.initialReadiness={local_deadline:6000,budget_ms:5000};
+ try{
+  await f.write();now=1000;await f.write();const receipt=JSON.parse(await fs.readFile(f.final,'utf8'));
+  for(const name of ['file_sync','directory_sync']){const mark=receipt.phase_timing.find(x=>x.name===name);assert.equal(mark.at_ms,null);assert.equal(mark.duration_ms,null);}
  }finally{await f.dispose()}
 });
