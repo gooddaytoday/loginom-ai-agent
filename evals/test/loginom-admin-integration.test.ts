@@ -514,6 +514,24 @@ liveIntegration("trusted bridge: configured research admin login reads the role 
     expect(policy.identity).toEqual(identity)
     expect(policy.sharedDirectories).toHaveLength(2)
     expect(policy.sharedDirectories.every(directory => directory.permissions.some(principal => principal.name === "Everyone" && principal.userKind === 2))).toBe(true)
+    const baseline = await connection.inspectSessionInventory()
+    const baselineBytes = await Bun.file(baseline.source.path).text()
+    expect(baseline.identity).toEqual(identity)
+    expect(baseline.sessionIdentityQualified).toBe(false)
+    const repeated = await connection.inspectSessionInventory()
+    expect(repeated.source.path).not.toBe(baseline.source.path)
+    expect(await Bun.file(baseline.source.path).text()).toBe(baselineBytes)
+    for (const snapshot of [baseline, repeated]) {
+      const receipt = await readLeaseReceipt(snapshot.source.path) as { sessions: unknown[]; command: { path: string; sha256: string }; reply: { id: string; sha256: string } }
+      const command = await readLeaseReceipt(receipt.command.path) as { replyHash: string; op: string; state: string }
+      expect(snapshot.source.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex"))
+      expect(receipt.sessions).toEqual(snapshot.sessions)
+      expect(receipt.command.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex"))
+      expect(command).toMatchObject({ op: "inspect", state: "confirmed" })
+      expect(command.replyHash).toBe(receipt.reply.sha256)
+      expect(path.basename(receipt.command.path)).toBe(`${receipt.reply.id}.json`)
+      expect((await stat(snapshot.source.path)).mode & 0o777).toBe(0o600)
+    }
     await expect(connection.inspect()).rejects.toThrow("SESSION_IDENTITY_UNSUPPORTED")
     const root = await mkdtemp(path.join(tmpdir(), "evals-admin-closed-lease-"))
     const fixture = await parallelFixture(root)

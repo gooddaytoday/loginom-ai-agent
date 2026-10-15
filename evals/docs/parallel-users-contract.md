@@ -1365,3 +1365,22 @@ Native1 PASS/19 (62.30s), typecheck/diff PASS. Новый сценарий кв�
 `5d6342704929af7ef91a1052c5e0ae39ededce88f5a92a6406d82a04615015f1`:
 21 source hashes,31 независимая проверка в partial-audit.json, exact pair absent.
 Active CLI writers/сессии/backup и остальные crash windows этим не проверены.
+
+### Immutable native session inventory
+
+`AdminConnection.inspectSessionInventory()` сохраняет отдельный command-bound
+whitelist snapshot с sessionIdentityQualified:false, в отличие от diagnostic
+latest-view session-observations.json. Последующий inspect не меняет snapshot.
+`readAdminSessionInventory` проверяет private/canonical admin root, source SHA,
+exact identity/schema, unique remote row IDs, native inspect command SHA,
+desired/reply hashes и ordered command timestamps. SessionGuid и CreatedAt
+могут быть null; activeOperations всегда unknown/null. Это наблюдение, без
+ownership/close/delete/readiness grants; generic inspect остаётся fail-closed.
+
+TDD missing API/export RED→GREEN; malformed/changed sources, wrong epoch и
+negative count refused.92 unit PASS/396 (15.58s),1 installed CLI SKIP; native1
+PASS/57 (15.48s), typecheck/diff PASS. Два immutable snapshots и command hashes
+проверены с continuous native admin closure; research pair не изменялась.
+Private600 `native-session-inventory-6cfbb015-71ba-493d-b20c-adb94d632330/snapshots.json`
+SHA256 `354e282c8e435279c017a08655ee81a195904962c357651a77564b68fea801b3`.
+Actual CLI before/after correlation и durable runtime session ledger ещё open.

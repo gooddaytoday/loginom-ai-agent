@@ -36,10 +36,14 @@ export type AdminReply = { v: 1; id: string; outcome: "confirmed" | "not_applied
 const frameLimit = 1024 * 1024
 
 export type SharedDirectoryPolicy = { objectId: string; name: string; permissions: { objectId: string; name: string; userKind: 0 | 1 | 2 }[] }[]
+type AdminSessionRow = { objectId: string; sessionGuid: string | null; name: string; createdAt: string | null;
+  pendingDisconnect: boolean; packageCount: number; activeOperations: null }
 
 export type AdminConnection = {
   identity: ServerIdentity
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
+  inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
+    source: { path: string; sha256: string } }>
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
   inspectUnactivatedUser(lease: SlotLease, secretFile: string): Promise<{ identity: ServerIdentity; username: string;
     account: { objectId: string; name: string; blocked: boolean } | null; serverSessions: "absent";
@@ -183,6 +187,22 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       const data = (await observe()).data
       if (!jsonObject(data) || data.sessionIdentityQualified !== true || !Array.isArray(data.sessions)) throw new EvalFailure("SESSION_IDENTITY_UNSUPPORTED", 2)
       return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
+    },
+    async inspectSessionInventory() {
+      const observation = await observe()
+      const data = observation.data
+      if (!jsonObject(data) || data.sessionIdentityQualified !== false || !Array.isArray(data.rawSessions) ||
+        !jsonObject(data.ownSession) || data.ownSession.isAdmin !== true) throw new EvalFailure("ADMIN_PROTOCOL", 2)
+      const commandFile = path.join(directory, "commands", `${observation.reply.id}.json`)
+      const sessions = (data.rawSessions as AdminSessionRow[]).map(row => ({ objectId: row.objectId, sessionGuid: row.sessionGuid, name: row.name,
+        createdAt: typeof row.createdAt === "string" ? row.createdAt : null, pendingDisconnect: row.pendingDisconnect,
+        packageCount: row.packageCount, activeOperations: null }))
+      const receipt = { version: 2, kind: "admin-session-inventory", identity, sessionIdentityQualified: false, sessions,
+        command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(commandFile))).digest("hex") },
+        reply: { id: observation.reply.id, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(observation.reply)).digest("hex") } }
+      const target = path.join(directory, `session-inventory-${observation.reply.id}.json`)
+      await writeLeaseReceipt(target, receipt)
+      return readAdminSessionInventory(file, identity, { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") })
     },
     async inspectUnactivatedUser(lease, secretFile) {
       const current = async () => {
@@ -459,6 +479,40 @@ async function withAdminInventoryWrite<T>(file: string, callback: () => Promise<
   const settled = pending.then(() => {}, () => {})
   inventoryWrites.set(file, settled)
   try { return await pending } finally { if (inventoryWrites.get(file) === settled) inventoryWrites.delete(file) }
+}
+
+/** Immutable native observations; this reader grants no session ownership or cleanup authority. */
+export async function readAdminSessionInventory(file: SlotFile, identity: ServerIdentity, source: { path: string; sha256: string }) {
+  const directory = path.dirname(source.path)
+  if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
+    path.resolve(source.path) !== source.path || !/^[a-f0-9]{64}$/.test(source.sha256)) throw new EvalFailure("SESSION_INVENTORY_UNCONFIRMED", 2)
+  const root = await lstat(directory).catch(() => undefined)
+  if (!root?.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
+    await realpath(directory).catch(() => undefined) !== directory) throw new EvalFailure("SESSION_INVENTORY_UNCONFIRMED", 2)
+  const hash = (value: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
+  const receipt = await readLeaseReceipt(source.path).catch(() => null)
+  if (!jsonObject(receipt) || Object.keys(receipt).length !== 7 || receipt.version !== 2 || receipt.kind !== "admin-session-inventory" ||
+    hash(receipt) !== source.sha256 || JSON.stringify(receipt.identity) !== JSON.stringify(identity) || receipt.sessionIdentityQualified !== false ||
+    !Array.isArray(receipt.sessions) || !jsonObject(receipt.command) || Object.keys(receipt.command).length !== 2 ||
+    !jsonObject(receipt.reply) || Object.keys(receipt.reply).length !== 2 || typeof receipt.reply.id !== "string" ||
+    !/^[a-zA-Z0-9_-]{1,128}$/.test(receipt.reply.id) || typeof receipt.reply.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(receipt.reply.sha256) ||
+    path.basename(source.path) !== `session-inventory-${receipt.reply.id}.json` ||
+    receipt.command.path !== path.join(directory, "commands", `${receipt.reply.id}.json`) || receipt.sessions.some(value => {
+      if (!jsonObject(value)) return true
+      return Object.keys(value).length !== 7 || typeof value.objectId !== "string" || !value.objectId ||
+        value.sessionGuid !== null && (typeof value.sessionGuid !== "string" || !value.sessionGuid) || typeof value.name !== "string" || !value.name ||
+        value.createdAt !== null && (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) ||
+        typeof value.pendingDisconnect !== "boolean" || !Number.isSafeInteger(value.packageCount) || Number(value.packageCount) < 0 || value.activeOperations !== null
+    }) || new Set(receipt.sessions.map(value => (value as AdminSessionRow).objectId)).size !== receipt.sessions.length)
+    throw new EvalFailure("SESSION_INVENTORY_UNCONFIRMED", 2)
+  const command = await readLeaseReceipt(receipt.command.path as string).catch(() => null)
+  if (!jsonObject(command) || Object.keys(command).length !== 10 || command.version !== 1 || command.kind !== "loginom-admin-command" ||
+    hash(command) !== receipt.command.sha256 || command.op !== "inspect" || command.state !== "confirmed" || command.id !== receipt.reply.id ||
+    JSON.stringify(command.expectedIdentity) !== JSON.stringify(identity) || command.desiredHash !== hash({}) || command.replyHash !== receipt.reply.sha256 ||
+    typeof command.at !== "string" || !Number.isFinite(Date.parse(command.at)) || typeof command.settledAt !== "string" ||
+    !Number.isFinite(Date.parse(command.settledAt)) || Date.parse(command.settledAt) < Date.parse(command.at))
+    throw new EvalFailure("SESSION_INVENTORY_UNCONFIRMED", 2)
+  return { identity, sessionIdentityQualified: false as const, sessions: receipt.sessions as AdminSessionRow[], source }
 }
 
 export async function readAdminProcessInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {
