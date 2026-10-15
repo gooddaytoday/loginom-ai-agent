@@ -1759,3 +1759,39 @@ The independent audit links nine artifacts and passed188 process/source/archive
 manifest/order/session/cleanup checks; exact own pair/root are absent. Automated
 all-owner session accounting and unknown same-user refusal remain the next
 finalizer step; backup/storage/recovery gates still prohibit release.
+
+### Complete normal management session accounting
+
+collectManagementSessions consumes one held normal slot, a finalizing inventory
+whose semantic hash is frozen in the command, and an immutable native observation
+after all recorded local lifetimes. It derives every setup/check ownership ledger
+through the existing qualifier, including the narrow interrupted-check case.
+Readonly outcomes require successful non-interrupted/non-timeout completion.
+Every historical/current same-user row must match an exact known remote ID, Name,
+CreateTime and zero package count; a closed ledger cannot account for a current
+row. Duplicate IDs or remote bindings refuse accounting. User matching follows
+the existing case-insensitive Loginom guard and catches a bare username as well
+as username:sequence. Peer users remain outside this slot's ownership.
+
+Accounting rechecks command/inventory hashes before return and grants no close,
+archive, deletion, readiness or release authority. It does not qualify failed
+setup, timeout, pending recoveries or recovery-only lineage.
+
+Native missing API RED occurred after46 assertions (153.66s). A separate GREEN
+attempt failed before this API on setup's continuous Writer owner unavailable
+proof; retained root/source/failed public writer-settlement are in blockers.
+Casefold unknown-current-row codec reproduced an accepted EVAL-A:9 (RED), now
+three case/bare/prefix controls and peer preservation pass3/6. Related37 unit
+PASS/185 (48.89s), typecheck/diff PASS. Final exact-source cold native qualification passed1/71 (185.02s); it does
+not repair or override the earlier writer proof. Unknown-row
+and nonzero-package controls in that fixture are explicitly data-only around
+genuine native snapshot sources, restored before any actual server close.
+
+Private600 native-cli-sessions-333b6dc5-ed1b-4368-80d2-04477e2890d1/accounted.json
+SHA256 3b79a699bb0ab24a4b2a1521bd4a114af25b8899a32f114189bfaeb5408c5a24.
+The audit passed217 checks across ten linked artifacts: complete inventory and
+fresh observation, three observed ledger hashes matching later close authority,
+archive-before-close and exact own pair/root absence. The fixture still calls
+targeted close primitives explicitly; an all-slot finalizer must consume this
+accounting for every slot before any close. Actual unknown external-session
+acceptance, backup/storage and recovery gates remain open.

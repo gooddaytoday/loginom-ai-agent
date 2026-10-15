@@ -210,7 +210,26 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
       const beforeClose = await admin.inspectSessionInventory()
       expect([...captures.map(capture => capture.session), cancelledSession].every(session =>
         beforeClose.sessions.some(row => row.objectId === session.binding.remoteKey))).toBe(true)
-      const beforeCloseReceipt = await readLeaseReceipt(beforeClose.source.path) as { command: { path: string } }
+      const { collectManagementSessions } = await import("../src/management-sessions")
+      const accounted = await collectManagementSessions(file, lease, secretFile, inventoryFile, beforeClose.source)
+      expect(accounted.sessions.map(session => session.id).sort()).toEqual([...captures.map(capture => capture.session.id), cancelledSession.id].sort())
+      expect(accounted.source).toEqual({ path: inventoryFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(registeredInventory)).digest("hex") })
+      const beforeCloseReceipt = await readLeaseReceipt(beforeClose.source.path) as { command: { path: string }; sessions: typeof beforeClose.sessions }
+      // Data-only snapshot controls around genuine native sources; restore before any server close.
+      const ownRow = beforeClose.sessions.find(row => row.objectId === cancelledSession.binding.remoteKey)!
+      for (const changed of [
+        { ...beforeCloseReceipt, sessions: [...beforeCloseReceipt.sessions, { ...ownRow, objectId: "unaccounted", name: credentials.username + ":999" }] },
+        { ...beforeCloseReceipt, sessions: beforeCloseReceipt.sessions.map(row => row.objectId === ownRow.objectId ? { ...row, packageCount: 1 } : row) },
+      ]) {
+        await writeLeaseReceipt(beforeClose.source.path, changed)
+        try { await expect(collectManagementSessions(file, lease, secretFile, inventoryFile, { path: beforeClose.source.path,
+          sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changed)).digest("hex") })).rejects.toThrow("MANAGEMENT_SESSION_UNKNOWN") }
+        finally { await writeLeaseReceipt(beforeClose.source.path, beforeCloseReceipt) }
+      }
+      await writeLeaseReceipt(path.join(evidence, "accounted.json"), { value: accounted, records: await Promise.all(accounted.sessions.map(async session => {
+        const target = path.join(file.controller.stateDir, `management-session-${session.id}.json`), value = await readLeaseReceipt(target)
+        return { value, source: { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex") } }
+      })) })
       await writeLeaseReceipt(path.join(evidence, "archived.json"), { source: archived.source, value: await readLeaseReceipt(archived.source.path),
         profiles: [{ source: { path: archived.profiles[0]!.journal, sha256: archived.profiles[0]!.sha256 }, value: archiveManifest }],
         beforeClose: { value: beforeClose, receipt: beforeCloseReceipt, command: await readLeaseReceipt(beforeCloseReceipt.command.path) } })
