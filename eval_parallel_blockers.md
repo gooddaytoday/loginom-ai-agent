@@ -55,6 +55,39 @@ Read-only signal audit: PID4086419 отсутствует в own/peer/unknown/ad
 origin/browser-binding всех двух admin и четырёх CLI proofs; UID/starttime не
 сохранены, сейчас PID отсутствует. Exec/exit/zombie/владелец не атрибутированы.
 
+## Native A/B setup: UID-change observation остаётся неквалифицированной
+
+2026-10-15: новый per-slot seal native case остановился до самого seal, во время
+параллельных начальных setup. Оба CLI вернули exit0; A proof failed с
+`Cannot inspect process identity PID 1452885: Process UID changed`, B continuous
+proof qualified. Числовой PID есть среди B browser processes с birth142588744,
+но failing frame не сохранил birth/state/UID value. Поэтому peer attribution,
+причина UID observation и closure A не доказаны; две fresh zero-remaining passes
+и исчезнувший PID не исправляют исходный proof. Простой собственный zombie
+control с dumpable0/1 дал UID1001 в обоих случаях и не воспроизвёл UID mismatch.
+Ослабления process guards и повторного native dispatch не было.
+
+Test1 FAIL/2 assertions93.16s; unit producer-seal/related71 PASS412 assertions,
+typecheck PASS не заменяют native qualification. Research pair и temporary
+controller `/home/kiselev/storage/tmp/evals-two-users-eR7Snq` сохранены;
+nonce `6648414e-dd88-47b4-9910-3072697d5103` подтверждён private fixture receipt.
+Server CID `f36e216c34e29c6934f35e9ae3283564a969f05a4650619fee3c242835513d10`,
+Studio CID `f87fb14926b6dd891de72d1d82765a361f7875de6e139ff4c08ff1597e1e881a`,
+network ID `b18f48a07f2cf2012db09e69500674b2a9814dfd308aaedb549ec96ec7b4fdfd`.
+Disposable provisioning использовал global guards, а environment ownership —
+отдельный fixture-local lock root; local reservations retained/OS guards closed.
+Global fixed guard files не удалялись и released provisioning proof не принимался
+за environment cleanup authority.
+
+Private `native-two-users-eeba0d80-30f4-4e22-b284-4c04e9012b7a/preservation.json`
+SHAb0ee250a05bd91126c45fcc27c66e1a2c2b17cde989cb1a591a22a68118fbfe7
+связывает88 raw/canonical source hashes, original proofs, server reservation и
+fresh unchanged pair identity. Known active secrets проверены до копирования;
+оригиналы не менялись. Sidecars отсутствуют; неисполненный собственный audit
+helper удалён с hash, положительного source-audit.json нет. Нужен полный источник
+UID-change frame либо квалифицированный recovery producer; retained reservations
+и данные не удаляются по гипотезе. Delete/admission=false, model/judge calls0.
+
 ## Архив после фактически прерванного check: текущий native gate закрыт, старые источники сохранены
 
 2026-10-15: retained47d... fixture jothVh убран после qualified original setup/

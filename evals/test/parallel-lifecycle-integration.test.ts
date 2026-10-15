@@ -15,7 +15,7 @@ import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
 import { archiveManagementEnvironment, finalizeUnactivatedEnvironment } from "../src/environment-finalization"
 import { openLoginomAdmin, readAdminFinalization, readAdminSessionInventory, sealAdminProcessInventory } from "../src/loginom-admin"
 
-import { readManagementProcessInventory } from "../src/management-process-evidence"
+import { readManagementProcessInventory, sealManagementProcessInventory } from "../src/management-process-evidence"
 import { management } from "../src/profile"
 import { readUserActivation, stageUserPreparation } from "../src/user-environment"
 import { readManagementSession, recordManagementSession } from "../src/management-sessions"
@@ -604,6 +604,11 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
           if (!held.cli && cli && scope?.processes?.some(process => process.executable.endsWith("/chrome")) && await signalProcess(cli, "SIGSTOP")) held.cli = cli
           await Bun.sleep(25)
         }
+        const seal = { ...await sealManagementProcessInventory(file, environment.server, a.lease, a.inventoryFile), observedAt: new Date().toISOString() }
+        const sealedInventory = await Bun.file(a.inventoryFile).text()
+        await expect(management(a.command, ["loginom", "status", "--format", "json"]))
+          .rejects.toThrow("MANAGEMENT_PROCESS_INVENTORY_SEALED")
+        expect(await Bun.file(a.inventoryFile).text()).toBe(sealedInventory)
         const { archiveProfileEvidence } = await import("../src/profile-archive")
         const archived = await archiveProfileEvidence(a.lease.slot.profileDir, await mkdtemp(path.join(a.lease.slot.historyDir, "before-close-")), path.join(file.controller.stateDir, "a-before-close.archive.json"))
         await admin.closeManagementSession(a.lease, a.secretFile, sessions[0]!.id)
@@ -611,7 +616,7 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
         expect(after.sessions.some(row => row.name.startsWith(a.credentials.username + ":"))).toBe(false)
         expect(after.sessions.some(row => row.name === sessions[1]!.binding.name && row.createdAt === sessions[1]!.binding.createdAt)).toBe(true)
         expect(running.done).toBe(false)
-        await writeLeaseReceipt(path.join(evidence, "addressed-close.json"), { archived, source: after.source, held: held.cli,
+        await writeLeaseReceipt(path.join(evidence, "addressed-close.json"), { archived, seal, source: after.source, held: held.cli,
           a: await readManagementSession(file, a.lease, a.secretFile, sessions[0]!.id), b: sessions[1], storageDeletionAllowed: false, nextAdmissionAllowed: false })
       } finally {
         if (held.cli) await signalProcess(held.cli, "SIGCONT")
