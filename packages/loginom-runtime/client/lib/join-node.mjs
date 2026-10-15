@@ -32,9 +32,9 @@ export async function preflightJoin(options,ctx,config){
  }
  try{
   resolveJoinKeys(request.parameters,schemas);
-  const fields=joinOutputFields({input_fields:schemas,...request.parameters});
-  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field');
   const output=request.mappings.find(m=>m.direction==='output');
+  const fields=joinOutputFields({input_fields:schemas,...request.parameters},output);
+  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field');
   if(output?.fields)need(output.fields.length===fields.length&&output.fields.every(f=>fields.some(s=>s.name===f.source.name)),'Join output mapping is incomplete');
  }catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  return {verified:true,proofs};
