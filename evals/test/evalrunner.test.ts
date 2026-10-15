@@ -2,8 +2,16 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence } from "../src/evalrunner"
+import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence, dispatchEvalrunner, type EvalrunnerConfig, qualifyEvalrunner } from "../src/evalrunner"
 import type { RunSummary } from "../src/report"
+
+test("shared executor refuses dispatch without a durable admission", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-no-admission-"))
+  try {
+    await expect(dispatchEvalrunner({} as EvalrunnerConfig, { series: root, case: "calc-data-double", issue: "LAB-77", task: "task" },
+      {} as Awaited<ReturnType<typeof qualifyEvalrunner>>, async () => {})).rejects.toThrow("Durable admission required")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("standalone release verifies raw artifact bytes, not only summary", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-evidence-"))

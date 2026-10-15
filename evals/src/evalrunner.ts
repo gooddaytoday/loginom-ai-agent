@@ -53,13 +53,36 @@ export async function qualifyEvalrunner(config: EvalrunnerConfig) {
     containerId: config.containerId, imageDigest: config.imageDigest, comparison: "INCOMPARABLE", env }
 }
 
-export async function executeEvalrunner(config: EvalrunnerConfig, input: { series: string; case: string; issue: string; task: string; collection?: string }) {
+export type EvalrunnerInput = { series: string; case: string; issue: string; task: string; collection?: string }
+
+export async function executeEvalrunner(config: EvalrunnerConfig, input: EvalrunnerInput) {
   const proof = await qualifyEvalrunner(config)
+  const admitted = await admitEvalrunner(config, input)
+  return dispatchEvalrunner(config, input, proof, admitted.release)
+}
+
+/** Both legacy smoke and versioned controller use this one dispatch/validation boundary. */
+export async function dispatchEvalrunner(config: EvalrunnerConfig, input: EvalrunnerInput,
+  proof: Awaited<ReturnType<typeof qualifyEvalrunner>>, release: () => Promise<void>) {
+  if (!await Bun.file(path.join(input.series, "manifest.json")).exists()) throw new EvalFailure("Durable admission required", 2)
+  const admission = await Bun.file(path.join(input.series, "manifest.json")).json()
+  if (admission.issue !== input.issue || admission.task !== input.task ||
+    (admission.kind === "evalrunner-series" ? admission.case !== input.case :
+      admission.kind !== "evalrunner-slot-admission" || admission.slot?.case !== input.case || admission.slot?.collection !== input.collection))
+    throw new EvalFailure("Durable admission differs", 2)
+  if (admission.kind === "evalrunner-slot-admission") {
+    const { readEvalrunnerSeries, evalrunnerHash } = await import("./evalrunner-series")
+    const manifest = await readEvalrunnerSeries(config, admission.series)
+    const global = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`, `${admission.slot.id}.json`)
+    if (JSON.stringify(await Bun.file(global).json()) !== JSON.stringify(admission) ||
+      admission.manifestSha256 !== evalrunnerHash(JSON.stringify(manifest, null, 2)) ||
+      input.series !== path.join(manifest.series, "slots", admission.slot.id) || manifest.pins.configSha256 !== proof.configSha256)
+      throw new EvalFailure("Durable series admission differs", 2)
+  }
   const node = input.collection === "node" || input.case === "crosstable-fixed-sum"
   const tasks = path.join(config.checkout, "evals/tasks", node ? "node-evals" : input.collection === "analytic" ? "analytic" : "")
   const taskFile = path.join(tasks, input.case, "task.json")
   if (!(await Bun.file(taskFile).exists())) throw new EvalFailure("Unknown selected case", 2)
-  const admitted = await admitEvalrunner(config, input)
   await Bun.write(path.join(input.series, "pins.json"), JSON.stringify({ ...proof, env: undefined, taskSha256: await fileHash(taskFile) }, null, 2), { mode: 0o600 })
   const env = { ...proof.env, EVAL_CLI_MODE: "binary", EVAL_INFRA_RETRIES: "0", EVAL_EXECUTION_POLICY: "evalrunner-v1",
     EVAL_RESULTS_DIR: path.join(input.series, "runs"), EVAL_HARNESS_LEASE_RECEIPT: path.join(input.series, "harness-lease.json"),
@@ -69,13 +92,15 @@ export async function executeEvalrunner(config: EvalrunnerConfig, input: { serie
     "--repeat", "1", "--timeout-ms", "1800000", "--label", input.issue]
   const child = Bun.spawn(cmd, { cwd: path.join(config.checkout, "evals"), env,
     stdout: Bun.file(path.join(input.series, "stdout.log")), stderr: Bun.file(path.join(input.series, "stderr.log")) })
-  await Bun.write(path.join(input.series, "dispatch.json"), JSON.stringify({ pid: child.pid, command: cmd, at: new Date().toISOString() }), { mode: 0o600 })
+  const recorded = await Bun.write(path.join(input.series, "dispatch.json"), JSON.stringify({ pid: child.pid, command: cmd, at: new Date().toISOString() }), { mode: 0o600 })
+    .then(() => true, () => false)
   const interrupt = () => child.kill("SIGINT")
   process.once("SIGINT", interrupt)
   process.once("SIGTERM", interrupt)
   const code = await child.exited
   process.removeListener("SIGINT", interrupt)
   process.removeListener("SIGTERM", interrupt)
+  if (!recorded) throw new EvalFailure("Dispatch receipt failed; child collected; admission retained", 2)
   const directories = await readdir(env.EVAL_RESULTS_DIR)
   if (directories.length !== 1) throw new EvalFailure("Run directory unconfirmed; stand retained", 2)
   const runDir = path.join(env.EVAL_RESULTS_DIR, directories[0]!)
@@ -103,7 +128,7 @@ export async function executeEvalrunner(config: EvalrunnerConfig, input: { serie
     evidence: await sealEvalrunnerEvidence(input.series),
     configSha256: proof.configSha256, comparison: "INCOMPARABLE", at: new Date().toISOString() }
   await writeFile(path.join(input.series, "release.json"), JSON.stringify(receipt, null, 2), { flag: "wx", mode: 0o600 })
-  await admitted.release()
+  await release()
   return receipt
 }
 
