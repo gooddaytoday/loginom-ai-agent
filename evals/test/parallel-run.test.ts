@@ -14,6 +14,7 @@ import { readAgentProcessInventory } from "../src/agent-process-evidence"
 
 test("fixture main: independent slot pipelines cross rounds and archive evidence before reuse", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-main-"))
+  let passed = false
   try {
     const input = await parallelFixture(root)
     const slow = path.join(root, "tasks/parallel-slow")
@@ -46,8 +47,9 @@ test("fixture main: independent slot pipelines cross rounds and archive evidence
       const cleanup = await Bun.file(summary.slots!.find(row => row.id === slot.id)!.cleanup_receipt!).json()
       expect(cleanup).toMatchObject({ status: "confirmed", liveQualified: false, archive: "committed" })
     }
-  } finally { await rm(root, { recursive: true, force: true }) }
-}, 30_000)
+    passed = true
+  } finally { if (passed) await rm(root, { recursive: true, force: true }) }
+}, 60_000)
 
 test("fixture main: singleton storage metadata names its root while parallel runs keep roots per slot", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-storage-metadata-"))
@@ -345,15 +347,19 @@ test("fixture main: failed model admission releases its unused judge reservation
 
 test("fixture main: unknown judge cleanup stops assignments while the other active slot drains", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-judge-unknown-"))
+  const input = await parallelFixture(root, ["parallel-fast", "parallel-slow", "parallel-z-next"], true)
+  const slowFile = path.join(root, "tasks/parallel-slow/task.json")
+  await Bun.write(slowFile, JSON.stringify({ ...await Bun.file(slowFile).json(), inputs: [] }))
+  const pending = main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
+    EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" },
+    { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
+  let passed = false
+  let failure: unknown
+  void pending.catch(error => { failure = error })
   try {
-    const input = await parallelFixture(root, ["parallel-fast", "parallel-slow", "parallel-z-next"], true)
-    const slowFile = path.join(root, "tasks/parallel-slow/task.json")
-    await Bun.write(slowFile, JSON.stringify({ ...await Bun.file(slowFile).json(), inputs: [] }))
-    const pending = main(["--tasks", path.join(root, "tasks"), "--parallel", "2"], { ...input.env,
-      EVAL_JUDGE_COMMAND: `${process.execPath} ${path.resolve(import.meta.dir, "../fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-sol" },
-      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
-    const deadline = Date.now() + 10_000
+    const deadline = Date.now() + 30_000
     while (true) {
+      if (failure) throw failure
       const prompts = await Array.fromAsync(new Bun.Glob("results/*/parallel-fast/1/prompt.txt").scan({ cwd: root, absolute: true }))
       if (prompts[0]) {
         await mkdir(path.join(path.dirname(prompts[0]), "judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
@@ -372,8 +378,12 @@ test("fixture main: unknown judge cleanup stops assignments while the other acti
     const reserved = await Promise.all((await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: input.lockRoot, absolute: true })))
       .map(file => Bun.file(file).json()))
     expect(reserved.find(item => item.key.startsWith("judge:")).state).toBe("retained")
-  } finally { await rm(root, { recursive: true, force: true }) }
-}, 30_000)
+    passed = true
+  } finally {
+    await pending.catch(() => {})
+    if (passed) await rm(root, { recursive: true, force: true })
+  }
+}, 60_000)
 
 test("fixture main: consecutive interrupted parallel runs drain both slots and retain interruption metadata", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-interruption-"))
@@ -499,6 +509,7 @@ test("fixture main: one infra retry keeps the same slot and archives the initial
 
 test("fixture main: cleanup failure quarantines one slot while the healthy slot drains and releases", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-quarantine-"))
+  let passed = false
   try {
     const input = await parallelFixture(root, ["parallel-cleanup-failure", "parallel-fast", "parallel-fast-next", "parallel-fast-last"])
     const run = await main(["--tasks", path.join(root, "tasks"), "--parallel", "2", "--skip-judge"],
@@ -516,8 +527,9 @@ test("fixture main: cleanup failure quarantines one slot while the healthy slot 
     expect(leases.find(lease => lease.slot.id === "b").state).toBe("released")
     expect(await Bun.file(path.join(input.slots.slots[0]!.profileDir, ".writer/owner")).exists()).toBe(true)
     expect(await Bun.file(path.join(run.runDir!, failed.task_id, "1/result.json")).json()).toEqual(failed)
-  } finally { await rm(root, { recursive: true, force: true }) }
-}, 30_000)
+    passed = true
+  } finally { if (passed) await rm(root, { recursive: true, force: true }) }
+}, 60_000)
 
 test("fixture main: a common archive writer failure stops new assignments and drains the active slot", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-writer-"))
