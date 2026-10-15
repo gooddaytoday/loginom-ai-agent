@@ -2274,3 +2274,26 @@ typecheck/diff PASS. Private management-registry-20261015/resource-judge-*.log
 retains RED/GREEN/full output. Native management/admin census, full runtime
 resource windows/budgets/quotas and production admission remain unqualified;
 SLOTS_ADMISSION_UNAVAILABLE/live model+judge calls0 are unchanged.
+
+The reconnect native control now continues CLI work: setup under admin A,
+confirmed A disposal, new admin B, check in the same profile, then sealing and
+finalization under B. RED f27c606c...1 failure/28 assertions122.61s exposed
+MANAGEMENT_SESSION_UNKNOWN: historical check snapshots contained the known setup
+session with B's proxy ID, which the collector compared to A's saved proxy ID.
+The collector now matches historical observations by the already qualified
+server/user Name+CreateTime tuple, requiring zero packages and rejecting tuple
+duplicates within every snapshot. Global remoteKey uniqueness is removed because
+those IDs have observation-local scope; unique durable origin IDs/native tuples,
+all command/result/continuous process proofs, server epoch and CAS remain required.
+
+GREEN999b11fc-5bfc-4d22-85bc-33cf20378923 PASS1/39 (129.82s) proves old admin
+closed before next CLI, changed proxy ID with identical native tuple, two CLI
+origins/two owned ledgers, archive-before-two-targeted-closes/fresh absence, both
+continuous admin closures and exact disposable pair/root absence. Private
+finalizer-audit.json124 checks/14 source hashes/read-back SHA6c2153838a71dabe3551ba65c2e448feec6b262e2238237a95de28a66d0a5e31,
+terminal SHA84eb06ca040d27e9ef2d2d74f73ff773caae474c3499d1194c3d350ca4b08006.
+This does not combine reconnect with actual interruption or grant storage
+deletion, slot release, production readiness or live model/judge admission.
+
+Related management-process-evidence + management-sessions5/73 PASS30.98s;
+typecheck/diff PASS. Private management-reconnect-regression.log retains output.
