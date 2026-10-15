@@ -5,6 +5,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
+import { executionJournalAcknowledgement } from './execution-journal.mjs';
 import { makeWorkspaceUiCode, validateUiAction } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
@@ -423,14 +424,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
         const sampledAt=observationNow();
-        await entry('node_observation_sample', { step, sample, internal_operation_id: id,
+        const sampleAcknowledgement = await entry('node_observation_sample', { step, sample, internal_operation_id: id,
           readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: timeoutMs, elapsed_ms: sampledAt - started },
           outcome: structuredClone(result) });
         const acknowledgedAt=observationNow();
         lastSampleAcknowledgement={sample,satisfied,required_samples:confirmIdentity?2:1,
           confirmations,sampled_elapsed_ms:sampledAt-started,
           acknowledgement_elapsed_ms:acknowledgedAt-sampledAt,
-          acknowledged_elapsed_ms:acknowledgedAt-started};
+          acknowledged_elapsed_ms:acknowledgedAt-started,
+          ...(executionJournalAcknowledgement(sampleAcknowledgement)
+            ? { journal: executionJournalAcknowledgement(sampleAcknowledgement) } : {})};
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
         // without making that check stronger.
