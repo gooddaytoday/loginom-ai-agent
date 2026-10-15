@@ -3,9 +3,9 @@ import { lstat, mkdir, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { readAdminProcessInventory, sealAdminProcessInventory, type AdminConnection } from "./loginom-admin"
-import { inspectUserStorage, verifyParallelPair } from "./parallel-pair"
+import { inspectAbsentUserStorage, inspectUserStorage, verifyParallelPair } from "./parallel-pair"
 import { archiveProfileEvidence } from "./profile-archive"
-import { acquireEnvironmentLeases, type SlotFile } from "./slots"
+import { acquireEnvironmentLeases, type SlotFile, type SlotLease } from "./slots"
 import { readUnactivatedUserObservation, readUserOwnership, readUserPreparation } from "./user-environment"
 
 /** Only the pre-CLI, never-activated preparation path can use this finalizer. */
@@ -31,10 +31,7 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   const prepared = []
   for (const lease of environment.slots) {
     const secretFile = path.join(file.controller.stateDir, `prepare-${lease.slot.id}.secret.json`)
-    const ownership = await readUserOwnership(file, lease, secretFile)
-    if (ownership.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
     const observation = await admin.inspectUnactivatedUser(lease, secretFile)
-    if (!observation.account) throw new EvalFailure("USER_OWNERSHIP_UNCONFIRMED", 2)
     const history = await lstat(lease.slot.historyDir)
     if (!history.isDirectory() || history.isSymbolicLink() || history.uid !== process.getuid?.() || (history.mode & 0o777) !== 0o700 ||
       await realpath(lease.slot.historyDir) !== lease.slot.historyDir) throw new EvalFailure("ARCHIVE_ROOT_PRIVATE", 2)
@@ -56,20 +53,10 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
     const lease = entry.lease
     await lease.assertHeld()
     const preparation = await readUserPreparation(file, lease, entry.secretFile)
-    const owned = await readUserOwnership(file, lease, entry.secretFile)
-    if (owned.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
     await readUnactivatedUserObservation(file, lease, entry.secretFile, entry.observation.source)
     const source = path.join(file.controller.stateDir, `storage-${lease.slot.id}.json`)
-    const storage = await readLeaseReceipt(source)
-    const expected = { version: 2, kind: "owned-user-storage", state: "published", slotId: lease.slot.id, username: lease.slot.username,
-      identity, preparationNonce: preparation.nonce, userKey: owned.userKey, ownerSource: owned.source.sha256,
-      root: `${file.server.storageRoot}/${lease.slot.username}` }
-    if (!object(storage) || Object.entries(expected).some(([key, value]) => JSON.stringify(storage[key]) !== JSON.stringify(value)))
-      throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
-    const observed = await inspectUserStorage(file, identity, lease.slot, preparation.nonce)
-    if (["device", "inode", "uid", "gid"].some(key => storage[key] !== observed[key as keyof typeof observed]) ||
-      JSON.stringify(await readLeaseReceipt(source)) !== JSON.stringify(storage)) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
-    if (observed.entries.length) throw new EvalFailure("USER_STORAGE_NOT_EMPTY", 2)
+    const observed = entry.observation.account ? await inspectPublishedStorage(file, lease, entry.secretFile, source, preparation.nonce) :
+      await inspectUnusedStorage(file, lease)
     const archive = await archiveProfileEvidence(lease.slot.profileDir, entry.archived.archive, entry.archived.journal)
     await server.assertHeld()
     await lease.assertHeld()
@@ -90,6 +77,33 @@ export async function finalizeUnactivatedEnvironment(file: SlotFile, environment
   await writeLeaseReceipt(target, receipt)
   await server.release(target)
   return { status: "released" as const, slots, server: { path: target, sha256: hash(receipt) } }
+}
+
+async function inspectUnusedStorage(file: SlotFile, lease: SlotLease) {
+  for (const name of [`storage-${lease.slot.id}.json`, `storage-${lease.slot.id}.reserve.json`]) {
+    const saved = await lstat(path.join(file.controller.stateDir, name)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+    if (saved) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  }
+  return inspectAbsentUserStorage(file, lease.identity, lease.slot)
+}
+
+async function inspectPublishedStorage(file: SlotFile, lease: SlotLease, secretFile: string, source: string, nonce: string) {
+  const owned = await readUserOwnership(file, lease, secretFile)
+  if (owned.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+  const storage = await readLeaseReceipt(source)
+  const expected = { version: 2, kind: "owned-user-storage", state: "published", slotId: lease.slot.id, username: lease.slot.username,
+    identity: lease.identity, preparationNonce: nonce, userKey: owned.userKey, ownerSource: owned.source.sha256,
+    root: `${file.server.storageRoot}/${lease.slot.username}` }
+  if (!object(storage) || Object.entries(expected).some(([key, value]) => JSON.stringify(storage[key]) !== JSON.stringify(value)))
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  const observed = await inspectUserStorage(file, lease.identity, lease.slot, nonce)
+  if (["device", "inode", "uid", "gid"].some(key => storage[key] !== observed[key as keyof typeof observed]) ||
+    JSON.stringify(await readLeaseReceipt(source)) !== JSON.stringify(storage)) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  if (observed.entries.length) throw new EvalFailure("USER_STORAGE_NOT_EMPTY", 2)
+  return observed
 }
 
 function object(value: unknown): value is Record<string, unknown> {
