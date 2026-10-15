@@ -18,6 +18,17 @@ inode/epoch/marker SHA, crash reconciliation и foreign/symlink refusal пров
 сведение run.ts выполняется последовательно. Семь исходных untracked-файлов
 не включаются в коммиты; node-selection работает в отдельном worktree 4118.
 
+Многофайловые проверки из `evals/` запускать через `bun run test` или
+`bun run test:unit`: оба scripts передают `--isolate` установленному Bun1.3.14.
+Отказные CLI-тесты намеренно оставляют failed scopes в process-local supervisor
+registry; общий module cache переносил их в следующий файл и корректно давал
+RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE для чужого неполного набора proofs.
+Изоляция сохраняет этот production guard и failed scopes внутри файла.
+Actual two-file module-cache smoke: без flag1 PASS/1 FAIL, с flag2 PASS;
+связанный resource module с flag6 PASS. `[test] isolate=true` в bunfig этого
+установленного Bun эффекта не дал. Изоляция не устраняет timeout или ошибку
+ownership внутри одного файла и не означает успешную полную регрессию.
+
 ## Подготовка и границы
 
 Целевой host — lg-pc-75/10.200.2.58. Новая пара на отдельной сети и loopback-порту,
