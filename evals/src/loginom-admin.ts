@@ -63,7 +63,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
   if (options.serverLease) {
     const command = await readLeaseReceipt(options.serverLease.reservation.journal)
-    if (jsonObject(command) && command.kind === "unactivated-preparation") {
+    if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind))) {
       await options.serverLease.assertHeld()
       if (options.processInventory !== command.processInventory || typeof options.processInventory !== "string" ||
         command.commandId !== options.serverLease.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
@@ -99,7 +99,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       await lease.assertHeld()
       const current = await readAdminInventory(file, identity, { file: inventory, journal: lease.reservation.journal, commandId: lease.reservation.commandId })
       const command = await readLeaseReceipt(lease.reservation.journal)
-      if (jsonObject(command) && command.kind === "unactivated-preparation" && command.phase !== "unactivated")
+      if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) && command.phase !== "unactivated")
         throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
       await writeLeaseReceipt(inventory, { ...current, connections: [...current.connections, { directory, producerPid: process.pid }] })
       await lease.assertHeld()
@@ -444,7 +444,7 @@ export async function sealAdminProcessInventory(file: SlotFile, server: Awaited<
   return withAdminInventoryWrite(initial.processInventory, async () => {
     await readAdminInventory(file, identity, { file: initial.processInventory as string, journal: server.reservation.journal, commandId: server.reservation.commandId })
     const command = await readLeaseReceipt(server.reservation.journal)
-    if (!jsonObject(command) || command.kind !== "unactivated-preparation" || command.phase !== "unactivated" ||
+    if (!jsonObject(command) || !["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) || command.phase !== "unactivated" ||
       new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") !== expectedHash)
       throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
     const sealed = { ...command, phase: "finalizing" }
@@ -525,7 +525,7 @@ export async function readAdminFinalization(file: SlotFile, identity: ServerIden
     Date.parse(recorded.at) < Date.parse(processes.startedAt) || Date.parse(recorded.settledAt) > Date.parse(processes.finishedAt))
     throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
   return { status: "confirmed" as const, identity, transportDisconnect: "confirmed" as const, processes: "confirmed" as const,
-    source: { path: source, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } }
+    identities: processes.identities, source: { path: source, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } }
 }
 
 function adminReplyCode(reply: AdminReply) {

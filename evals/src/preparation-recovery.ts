@@ -1,8 +1,9 @@
 import path from "node:path"
-import { readdir } from "node:fs/promises"
+import { readdir, readFile } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, writeLeaseReceipt } from "./lease"
-import { parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
+import { acquireEnvironmentLeases, parseSlots, recoverSlotLease, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
+import { readAdminProcessInventory } from "./loginom-admin"
 
 /** Adopts reservations only; native/process/archive proof is required before release. */
 export async function recoverPreparationLeases(file: SlotFile, identity: ServerIdentity, incident: string, lockRoot = globalLockRoot) {
@@ -64,6 +65,66 @@ export async function recoverPreparationLeases(file: SlotFile, identity: ServerI
     await Promise.all([server.close(), ...slots.map(lease => lease.close())])
     throw error
   }
+}
+
+/** Revalidates every earlier controller's admin closure before archive or release. */
+export async function readPreparationRecoverySources(file: SlotFile, environment: Awaited<ReturnType<typeof acquireEnvironmentLeases>>) {
+  const server = environment.server, identity = server.reservation.identity
+  await server.assertHeld()
+  const command = await readLeaseReceipt(server.reservation.journal)
+  if (!identity || server.reservation.state !== "recovery-only" || server.reservation.owner.pid !== process.pid ||
+    server.reservation.key !== `server:${identity.containerId}` || !object(command) || Object.keys(command).length !== 9 ||
+    command.kind !== "unactivated-recovery" || command.commandId !== server.reservation.commandId ||
+    !["unactivated", "finalizing"].includes(String(command.phase)) || JSON.stringify(command.identity) !== JSON.stringify(identity) ||
+    !object(command.incident) || typeof command.incident.path !== "string" || path.dirname(command.incident.path) !== file.controller.stateDir ||
+    !Array.isArray(command.slotIncidents) || JSON.stringify(command.slotRecoveries) !== JSON.stringify(environment.slots.map(lease => lease.receipt)))
+    throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+  const incidentPath = command.incident.path
+  const original = await readLeaseReceipt(incidentPath)
+  if (!object(original) || Object.keys(original).length !== 7 || original.kind !== "unactivated-preparation" || original.version !== 2 ||
+    hash(original) !== command.incident.sha256 || JSON.stringify(original.identity) !== JSON.stringify(identity) ||
+    !["unactivated", "finalizing"].includes(String(original.phase)) ||
+    JSON.stringify(original.slotIds) !== JSON.stringify(environment.slots.map(lease => lease.slot.id)) ||
+    command.slotIncidents.length !== environment.slots.length)
+    throw new EvalFailure("PREPARATION_RECOVERY_INCIDENT_CHANGED", 2)
+  for (const [index, lease] of environment.slots.entries()) {
+    await lease.assertHeld()
+    const source = await readLeaseReceipt(lease.receipt), incident = command.slotIncidents[index]
+    if (!lease.recoveryOnly || !object(source) || source.kind !== "slot-recovery" || source.incident !== incident || typeof incident !== "string" ||
+      path.dirname(incident) !== file.controller.stateDir || JSON.stringify(lease.identity) !== JSON.stringify(identity))
+      throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    const prior = await readLeaseReceipt(incident)
+    if (!object(prior) || prior.journal !== command.incident.path || prior.commandId !== original.commandId || prior.token !== source.incidentToken ||
+      prior.state !== "retained" || JSON.stringify(prior.slot) !== JSON.stringify(lease.slot) || JSON.stringify(prior.identity) !== JSON.stringify(identity))
+      throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+  }
+  const position = server.reservation.lineage.findIndex(entry => entry.journal === incidentPath && entry.commandId === original.commandId)
+  if (position < 0) throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+  const sources = []
+  for (const [index, entry] of server.reservation.lineage.slice(position).entries()) {
+    const prior = await readLeaseReceipt(entry.journal)
+    if (!object(prior) || prior.commandId !== entry.commandId || JSON.stringify(prior.identity) !== JSON.stringify(identity) ||
+      typeof prior.processInventory !== "string" || index === 0 && hash(prior) !== command.incident.sha256 ||
+      index > 0 && (prior.kind !== "unactivated-recovery" || JSON.stringify(prior.incident) !== JSON.stringify(command.incident)))
+      throw new EvalFailure("PREPARATION_RECOVERY_LINEAGE_INVALID", 2)
+    const inventory = await readAdminProcessInventory(file, identity, { file: prior.processInventory, journal: entry.journal,
+      commandId: entry.commandId, producerPid: entry.owner.pid })
+    if ((await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim() === entry.owner.bootId) {
+      for (const identity of inventory.connections.flatMap(connection => connection.identities)) {
+        const raw = await readFile(`/proc/${identity.pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return null
+          throw new EvalFailure("PREPARATION_PROCESS_LIVENESS_UNCONFIRMED", 2)
+        })
+        if (raw === null) continue
+        const fields = raw.slice(raw.lastIndexOf(")") + 2).trim().split(/\s+/)
+        if (fields.length < 20 || fields[19] === identity.starttime && !["Z", "X"].includes(fields[0]!))
+          throw new EvalFailure("PREPARATION_PROCESS_STILL_LIVE", 2)
+      }
+    }
+    sources.push({ command: { path: entry.journal, sha256: hash(prior) }, processInventory: inventory.source,
+      connections: inventory.connections.map(connection => connection.source) })
+  }
+  return sources
 }
 
 function object(value: unknown): value is Record<string, unknown> {
