@@ -140,6 +140,21 @@ confirmed/capture-complete proof без unknown; writer-settlement exception т�
 
 ## Положительная SessionBackup policy остаётся неквалифицированной
 
+2026-10-15, дополнительный restart control: после реального named/modified
+package и ненулевого native autosave старый admin подтвердил transport disconnect
+и continuous process closure; остановлен и запущен только собственный disposable
+server CID. StartedAt/serverEpoch изменились, IDs server/Studio сохранились.
+Новый independently supervised admin успешно выполнил init/inspect на новой
+эпохе и подтвердил disconnect/closure. SessionBackup пуст после stop и после
+готового native входа; `/workdir/SessionBackup.cfg` отсутствует. Это проверяет
+новый путь graceful stop→startup, но не даёт положительного backup control или
+disabled policy. Hard-crash/startup этим опытом не проверен.
+Native test1 PASS/70 assertions65.18s, typecheck/diff PASS. Private
+`native-user-72d4968d-8965-4308-8c3d-a13b6c979513/source-audit.json`
+SHA6e1029b0f0d616178a5b3e0cec23047984b3e1fd2b26cd820bb3ec1aae63b655:
+17 independent checks,30 source hashes, both continuous closures and exact
+pair/network/root absence. Production grants неизменны; model/judge calls0.
+
 Дополнительный primary boundary2026-10-15: public pinned server image содержит
 `SessionBackup.cfg`/`SessionBackupConfiguration`, User/Name/Session map/list,
 backup status/finalize enums и package-autosave event flags. Binary SHA256
