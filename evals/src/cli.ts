@@ -107,6 +107,10 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
   )
   const isolated: Record<string, string> = {
     ...Object.fromEntries(inherited),
+    ...(env.LOGINOM_AI_AGENT_MODELS_PATH && env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH === "1" ? {
+      LOGINOM_AI_AGENT_MODELS_PATH: env.LOGINOM_AI_AGENT_MODELS_PATH,
+      LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
+    } : {}),
     LOGINOM_AI_AGENT_CLI_PROFILE: config.profileDir,
     LOGINOM_AI_AGENT_PURE: "1",
     LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
