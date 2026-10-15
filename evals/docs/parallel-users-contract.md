@@ -918,3 +918,28 @@ native1 PASS/21 (36.36s), typecheck/diff PASS. Private600
 SHA256 `3c780acaf1e8be306e1b072761460e247253dbcb527a221ea063cd69074210a8`
 содержит full receipt+dispose command; receipt/command/reply SHA independently
 совпали. Exact own pair independently absent; external retained incidents preserved.
+
+### Command admin process inventory
+
+Controller передаёт `processInventory` в `openLoginomAdmin`. Существующий
+private inventory связывает commandId/journal/ServerIdentity. Под exact held
+server fence новый admin directory и producer PID записываются до запуска
+`superviseProcess`. Записи одного inventory сериализованы внутри процесса;
+server OS guard исключает другого владельца. Connection receipt содержит ту же
+привязку inventory/journal/commandId. Failed start оставляет регистрацию и не
+превращается в доказательство пустого набора процессов.
+
+`readAdminProcessInventory` проверяет finalization каждой записи и source SHA,
+отвергает duplicate directories/foreign producer/command, затем перечитывает
+inventory. Starting/unknown connections не подтверждаются. Outer finalizer ещё
+должен связать inventory с resource lineage, CLI/probe owners, archive и storage
+proofs. Старые receipts без привязки inventory этим путём не квалифицируются.
+
+Inventory validation:90 unit PASS/379 (9.07s),3 native PASS/71 (59.56s),
+typecheck/diff PASS. Private600 native-parent-3f77ff84-0f9f-47e3-a0e2-76a8a22fa59a
+receipt SHA256 `b628d2c7ea7ffd157fc095cac8587f6d260542b3943aef83e36a14cf3b018038`
+сохраняет inventory/connection/dispose sources; три SHA independently matched,
+exact pair independently absent. Test inventory basename `admin-processes.json`
+конфликтовал с prefix lookup каталога; исправлен на `processes-admin.json`.
+Неуспешный own fixture jkdzDM сохранён и описан в blocker file; его старый
+receipt не получает новую command binding задним числом.

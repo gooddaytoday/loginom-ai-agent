@@ -55,8 +55,10 @@ export type AdminConnection = {
   dispose(): Promise<void>
 }
 
+const inventoryWrites = new Map<string, Promise<void>>()
+
 export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity, options: {
-  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>
+  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>; processInventory?: string
 } = {}): Promise<AdminConnection> {
   if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
   const binary = options.binary ?? process.env.EVAL_CLI_BIN ?? Bun.which("loginom-ai-agent-cli")
@@ -72,11 +74,26 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   const driver = path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")
   const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "starting", initialization: "not_started", dispose: "not_started",
     finalization: null as { reply: AdminReply; command: { path: string; sha256: string } } | null,
+    processInventory: options.processInventory && options.serverLease ? { file: options.processInventory,
+      journal: options.serverLease.reservation.journal, commandId: options.serverLease.reservation.commandId } : null,
     transportDisconnect: null as "confirmed" | "unknown" | null,
     initializationCode: null as string | null, initializationStage: null as string | null, passwordState: null as string | null, disposeCode: null as string | null,
     runtimeManifestHash: runtime.manifestHash, driverHash: new Bun.CryptoHasher("sha256").update(await Bun.file(driver).bytes()).digest("hex"),
     processes: null as ProcessCleanup | null }
   await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
+  if (options.processInventory) {
+    const inventory = options.processInventory, lease = options.serverLease
+    if (!lease || lease.reservation.key !== `server:${identity.containerId}` || JSON.stringify(lease.reservation.identity) !== JSON.stringify(identity))
+      throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
+    const pending = (inventoryWrites.get(inventory) ?? Promise.resolve()).catch(() => {}).then(async () => {
+      await lease.assertHeld()
+      const current = await readAdminInventory(file, identity, { file: inventory, journal: lease.reservation.journal, commandId: lease.reservation.commandId })
+      await writeLeaseReceipt(inventory, { ...current, connections: [...current.connections, { directory, producerPid: process.pid }] })
+      await lease.assertHeld()
+    })
+    inventoryWrites.set(inventory, pending)
+    try { await pending } finally { if (inventoryWrites.get(inventory) === pending) inventoryWrites.delete(inventory) }
+  }
   let stopInput = (_error: EvalFailure) => {}, stopOutput = (_error: EvalFailure) => {}
   const input = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopInput = error => controller.error(error) } })
   const output = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopOutput = error => controller.error(error) } })
@@ -405,6 +422,39 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
 function requireAdminReply(reply: AdminReply): unknown {
   if (reply.outcome === "confirmed") return reply.data
   throw new EvalFailure(adminReplyCode(reply), 2)
+}
+
+export async function readAdminProcessInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {
+  const inventory = await readAdminInventory(file, identity, input)
+  const connections = []
+  for (const entry of inventory.connections) {
+    if (entry.producerPid !== input.producerPid) throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+    const finalization = await readAdminFinalization(file, identity, entry.directory, input.producerPid)
+    const receipt = await readLeaseReceipt(finalization.source.path)
+    if (!jsonObject(receipt) || JSON.stringify(receipt.processInventory) !== JSON.stringify({ file: input.file, journal: input.journal, commandId: input.commandId }) ||
+      new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") !== finalization.source.sha256)
+      throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+    connections.push(finalization)
+  }
+  if (JSON.stringify(await readAdminInventory(file, identity, input)) !== JSON.stringify(inventory))
+    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_CHANGED", 2)
+  return { commandId: input.commandId, connections,
+    source: { path: input.file, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(inventory)).digest("hex") } }
+}
+
+async function readAdminInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string }) {
+  if (path.dirname(input.file) !== file.controller.stateDir || !input.journal.startsWith(file.controller.stateDir + path.sep) ||
+    path.resolve(input.journal) !== input.journal) throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+  const journal = await readLeaseReceipt(input.journal).catch(() => null)
+  const inventory = await readLeaseReceipt(input.file).catch(() => null)
+  if (!jsonObject(journal) || journal.commandId !== input.commandId || !input.commandId || !jsonObject(inventory) || Object.keys(inventory).length !== 6 ||
+    inventory.version !== 2 || inventory.kind !== "admin-processes" || inventory.commandId !== input.commandId || inventory.journal !== input.journal ||
+    JSON.stringify(inventory.identity) !== JSON.stringify(identity) || !Array.isArray(inventory.connections) || inventory.connections.some(entry =>
+      !jsonObject(entry) || Object.keys(entry).length !== 2 || typeof entry.directory !== "string" || path.dirname(entry.directory) !== file.controller.stateDir ||
+      !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(entry.directory)) || !Number.isSafeInteger(entry.producerPid) || Number(entry.producerPid) < 1) ||
+    new Set(inventory.connections.map(entry => entry.directory)).size !== inventory.connections.length)
+    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+  return inventory as Record<string, unknown> & { connections: { directory: string; producerPid: number }[] }
 }
 
 export async function readAdminFinalization(file: SlotFile, identity: ServerIdentity, directory: string, producerPid: number) {
