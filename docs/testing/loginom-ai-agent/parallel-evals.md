@@ -1121,3 +1121,21 @@ This does not resume a slot. The next implementation must compose normal
 slot/attempt finalization, backend/storage/backup proofs and a validated unpause;
 sessions_closed alone grants no next admission or release. Active recovery and
 production/live gates remain open.
+
+
+Normal slot/attempt finalization (2026-10-16): `finalizeSlotAttempt` now composes
+pause, full invocation/session accounting, committed archives, a durable close
+intent, agent then management target closes, fresh absence and a stable private
+receipt. Completed repeat dispatches no additional close RPC. Missing invocation
+observations and recovery-only leases refuse before archive/close. Empty browser
+results still require an archive of their actual physical invocation.
+
+Native browser/text2/38 PASS269.12s; related50/263 PASS54.48s, typecheck/diff PASS.
+Private477594c6… audit696f7948…1789/103/15 causal frames and1c75c612…
+audit215fe870…186/73/5 retain all16 pins and original histories/SDK rows. Own
+pairs/networks/controller roots are absent. The fixture now preserves root/pair
+when any original profile history remains unarchived.
+
+This is a normal sessions_closed fence. Storage deletion, backend operations/
+package locks, SessionBackup, release, validated unpause and active uncertain-close
+recovery require separate proofs. Main admission remains unavailable.

@@ -27,7 +27,7 @@ export async function recordAgentSessions(file: SlotFile, lease: SlotLease, secr
   return Promise.all(sessions.map(session => readAgentSession(file, lease, secretFile, session.id)))
 }
 
-/** Requires an observation window for every invocation in the sealed slot inventory. */
+/** Requires an observation window for every invocation in a frozen slot boundary. */
 export async function readAgentSessionInventory(file: SlotFile, lease: SlotLease, secretFile: string, inventoryFile: string, observations: AgentSessionSource[]) {
   await lease.assertHeld()
   if (lease.recoveryOnly || path.dirname(inventoryFile) !== file.controller.stateDir) throw new EvalFailure("AGENT_SESSION_INVENTORY_UNCONFIRMED", 2)
@@ -67,7 +67,12 @@ export async function readAgentSession(file: SlotFile, lease: SlotLease, secretF
 
 export async function readAgentArchive(file: SlotFile, lease: SlotLease, secretFile: string, id: string, source: Reference) {
   const entry = await readAgentSession(file, lease, secretFile, id)
-  const archive = await readArchiveSource(file, lease, entry, source)
+  return readAgentInvocationArchive(file, lease, entry.source.process, source)
+}
+
+/** Also qualifies archives for invocations which created no server session. */
+export async function readAgentInvocationArchive(file: SlotFile, lease: SlotLease, processSource: AgentSessionSource["process"], source: Reference) {
+  const archive = await readArchiveSource(file, lease, processSource, source)
   await archiveProfileEvidence(lease.slot.profileDir, archive.archive, source.path)
   await lease.assertHeld()
   if (hash(await readLeaseReceipt(source.path)) !== source.sha256) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
@@ -88,14 +93,24 @@ export async function recordAgentSessionClosed(file: SlotFile, lease: SlotLease,
   return readAgentSession(file, lease, secretFile, id)
 }
 
-async function readArchiveSource(file: SlotFile, lease: SlotLease, entry: Session, source: Reference) {
-  if (!source || source.path !== path.join(file.controller.stateDir, `agent-archive-${entry.actor.attemptId}.json`) ||
+async function readArchiveSource(file: SlotFile, lease: SlotLease, processSource: AgentSessionSource["process"], source: Reference) {
+  await lease.assertHeld()
+  if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
+  const origin = object(await readLeaseReceipt(lease.receipt))
+  if (typeof origin.commandId !== "string" || typeof origin.journal !== "string" || path.dirname(processSource.path) !== file.controller.stateDir)
+    throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+  const command = object(await readLeaseReceipt(origin.journal))
+  if (command.kind !== "unactivated-preparation" || command.commandId !== origin.commandId ||
+    !["cli_admitted", "finalizing"].includes(String(command.phase)) || JSON.stringify(command.identity) !== JSON.stringify(lease.identity) ||
+    !Array.isArray(command.slotIds) || !command.slotIds.includes(lease.slot.id)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
+  if (!source || source.path !== path.join(file.controller.stateDir, `agent-archive-${processSource.id}.json`) ||
     !/^[a-f0-9]{64}$/.test(source.sha256)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
   const saved = await readLeaseReceipt(source.path).catch(() => null)
   if (!saved || hash(saved) !== source.sha256) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
   const archive = object(saved)
-  const processEntry = await readAgentProcess({ file: entry.source.process.path, commandId: entry.actor.runId,
-    slotId: lease.slot.id, producerPid: process.pid }, entry.actor.attemptId)
+  const processEntry = await readAgentProcess({ file: processSource.path, commandId: origin.commandId,
+    slotId: lease.slot.id, producerPid: process.pid }, processSource.id)
+  if (JSON.stringify(processEntry.entrySource) !== JSON.stringify(processSource)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
   if (archive.version !== 1 || archive.kind !== "profile-archive" || archive.status !== "committed" || archive.profile !== lease.slot.profileDir ||
     typeof archive.archive !== "string" || path.dirname(archive.archive) !== lease.slot.historyDir ||
     typeof archive.at !== "string" || typeof archive.committedAt !== "string" ||
@@ -106,7 +121,7 @@ async function readArchiveSource(file: SlotFile, lease: SlotLease, entry: Sessio
 }
 
 async function agentClosure(file: SlotFile, lease: SlotLease, entry: Session, archive: Reference, commandFile: string, reply: AdminReply) {
-  const savedArchive = await readArchiveSource(file, lease, entry, archive)
+  const savedArchive = await readArchiveSource(file, lease, entry.source.process, archive)
   const data = object(reply.data), directory = path.dirname(path.dirname(commandFile))
   if (Object.keys(reply).length !== 4 || reply.v !== 1 || reply.outcome !== "confirmed" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
     path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||

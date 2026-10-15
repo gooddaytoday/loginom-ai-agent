@@ -2769,3 +2769,45 @@ nextAdmissionAllowed from a paused prefix or sessions_closed alone.
 Joint verification200 source/pin read-backs and exact absence of both own pairs:
 149f6bd8…/verification.json SHA256
 `6d41ac70ca9623d75a2ca6d371d2cf6d293a40682f9b94b3627501dd0610b63d`.
+
+
+### Normal slot/attempt session finalizer — 2026-10-16
+
+`finalizeSlotAttempt` composes the normal held slot/server leases, current pair,
+management seal and paused agent prefix. Before moving profile data it requires
+complete observations for every physical invocation and accounts for all
+same-user rows. It releases only the qualified stopped writer, commits/replays
+the current invocation archive and validates every invocation archive, including
+invocations which opened no browser. `readAgentInvocationArchive` provides this
+last check without requiring a server-session ledger.
+
+A durable close intent binds the exact prefix, archives, full target set and
+native before snapshot before the first RPC. Agent sessions close first, then
+management sessions. Fresh complete accounting requires all ledgers closed and
+all same-user rows absent. The private terminal binds the intent, archive and
+observed/closed sources. Repeating a completed finalization returns its original
+receipt source and dispatches no additional close RPC. A pending intent with an
+unconfirmed target refuses blind retry; active uncertainty recovery remains
+unqualified. The shared admin connection remains with the caller.
+
+The receipt is `sessions_closed`, with storageDeletionAllowed=false and
+nextAdmissionAllowed=false. It supplies no backend-operation/package-lock,
+SessionBackup, storage cleanup, normal release or validated unpause proof.
+Production admission and active recovery remain open.
+
+TDD missing-module RED → native browser/text2 PASS/38 assertions269.12s.
+Recovery-only and incomplete-observation controls refuse before archival/close
+and preserve the original DB and session rows. Related50/263 PASS54.48s,
+typecheck/diff PASS. Private browser477594c6-fad5-441e-bd05-d5c219fb965d audit
+`696f7948af3af1e667a665154a6c56d0f31805404ad80b4eb6ddb66213d06f26`
+checks1789 facts/103 sources/15 causal frames; text1c75c612-72b7-49c4-b8d1-22ff91154c4a
+audit `215fe87094725f4dbb388fe125d4316575aafca7a20c5b895442cf11cda73587`
+checks186/73/5. Both16 source/binary pins, exact own pair/network/controller-root
+absence, admin continuous closure and original archived SDK session are verified.
+Browser SQLite includes DB/WAL/SHM; the text invocation has one valid DB. SQLite
+inspection uses a private copy and leaves originals unchanged. Test teardown
+preserves the root and pair if profile history remains unarchived.
+
+Joint verification220 read-backs/exact absence checks:
+477594c6…/verification.json SHA256
+`f5ef36009f7cf4496780ded2c656431c7bcc9d6efee89b25063efb6803b95ba8`.
