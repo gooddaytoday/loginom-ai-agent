@@ -13,13 +13,11 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { recoverUnactivatedPreparation } from "../src/preparation-recovery"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
-import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, type AdminOperation } from "../src/loginom-admin"
-import { verifyAdminRuntime } from "../src/preflight"
-import { superviseProcess } from "../src/process-supervisor"
+import { openLoginomAdmin, readAdminFinalization } from "../src/loginom-admin"
 
 import { readManagementProcessInventory } from "../src/management-process-evidence"
 import { management } from "../src/profile"
-import { claimUserOwnership, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { readUserActivation, stageUserPreparation } from "../src/user-environment"
 import { readManagementSession, recordManagementSession } from "../src/management-sessions"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
@@ -37,7 +35,6 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
   const pair = await createPair(file, options)
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-cli-sessions-${crypto.randomUUID()}`)
   await mkdir(evidence, { mode: 0o700 })
-  const runtime = await verifyAdminRuntime(process.env.EVAL_CLI_BIN!)
   const journal = path.join(file.controller.stateDir, "cli-command.json"), inventoryFile = path.join(file.controller.stateDir, "management.json")
   const adminInventory = path.join(file.controller.stateDir, "admin-processes.json")
   // Temporary slot authority for external native research; no production release/readiness claim.
@@ -47,65 +44,29 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
   const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot), lease = environment.slots[0]!
   const prepared = await stageUserPreparation(file, lease, "e".repeat(64)), secretFile = prepared.secretFile
   const credentials = await readLeaseReceipt(secretFile) as { username: string; password: string }
-  const wireProfile = path.join(root, "wire-profile"), wireCommands = path.join(file.controller.stateDir, "wire-commands")
-  await mkdir(wireProfile, { mode: 0o700 })
-  await mkdir(wireCommands, { mode: 0o700 })
-  const input = new TransformStream<Uint8Array, Uint8Array>(), output = new TransformStream<Uint8Array, Uint8Array>()
-  const abort = new AbortController()
-  const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
-    env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
-    timeoutMs: 60_000, profileDir: wireProfile, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: wireProfile } })
-  const channel = createJournaledAdminChannel(output.readable, input.writable, wireCommands)
-  const request = (op: AdminOperation, payload: unknown) => channel.request({ v: 1, id: crypto.randomUUID(), op, payload,
-    expectedIdentity: pair.identity, deadline: Date.now() + 30_000 })
-  const settlement = { wire: false, cli: true, admin: false }
+  const settlement = { cli: true, admin: false }
   try {
-    try {
-      expect((await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
-        credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(wireProfile, "loginom/runtime/admin/attempts/context/browser-profile") })).outcome).toBe("confirmed")
-      const payload = { phase: "blocked", slot: file.slots[0]!, secretFile, preparationNonce: prepared.nonce, desiredHash: prepared.desiredHash,
-        secretHash: prepared.secretHash, owned: null }
-      const created = await request("reconcile-user", payload)
-      expect(created.outcome).toBe("confirmed")
-      const user = (created.data as { user: { objectId: string; name: string; userKind: number } }).user
-      const claimed = await claimUserOwnership(file, lease, secretFile, path.join(wireCommands, `${created.id}.json`), created)
-      expect(claimed.objectId).toBe(user.objectId)
-      const owned = { objectId: user.objectId, name: user.name, userKind: 0, preparationNonce: payload.preparationNonce, secretHash: null }
-      const configuration = { ...payload, phase: "configure", owned }
-      const configured = await request("reconcile-user", configuration)
-      expect(configured.outcome).toBe("confirmed")
-      const recorded = await recordUserConfiguration(file, lease, secretFile, path.join(wireCommands, `${configured.id}.json`), configuration, configured)
-      expect(recorded.objectId).toBe(claimed.objectId)
-      const policy = (await request("inspect", {})).data as { sharedDirectories: unknown[] }
-      const acl = await request("reconcile-user", { ...payload, phase: "acl", owned: { ...owned, secretHash: payload.secretHash }, expectedPolicy: policy.sharedDirectories })
-      expect(acl.outcome).toBe("confirmed")
-      const activation = await stageUserActivation(file, lease, secretFile)
-      const activated = await request("reconcile-user", { ...payload, phase: "activate", owned: { ...owned, secretHash: payload.secretHash },
-        expectedPolicy: (acl.data as { policy: unknown[] }).policy })
-      expect(activated.outcome).toBe("confirmed")
-      await writeLeaseReceipt(path.join(evidence, "authority.json"), { prepared, claimed, configured: recorded, activation, activated,
-        activationCommand: await readLeaseReceipt(path.join(wireCommands, `${activated.id}.json`)) })
-    } finally {
-      const disposed = await request("dispose", {}).catch(() => undefined)
-      if (disposed?.outcome !== "confirmed") abort.abort()
-      await channel.end().catch(() => abort.abort())
-      const wire = await pending
-      await channel.close().catch(() => undefined)
-      settlement.wire = disposed?.outcome === "confirmed" && wire.exitCode === 0 && wire.processCleanup.status === "confirmed" && wire.processCleanup.capture_complete
-      await writeLeaseReceipt(path.join(evidence, "wire.json"), { disposed, processes: wire.processCleanup, exitCode: wire.exitCode })
-      await mkdir(path.join(evidence, "wire-commands"), { mode: 0o700 })
-      await Promise.all((await readdir(wireCommands)).map(async name => writeLeaseReceipt(path.join(evidence, "wire-commands", name),
-        await readLeaseReceipt(path.join(wireCommands, name)) as Record<string, unknown>)))
-      expect(settlement.wire).toBe(true)
-    }
-    await rm(path.join(file.slots[0]!.profileDir, "data/auth.json"))
-    await rmdir(path.join(file.slots[0]!.profileDir, "data"))
-    await writeLeaseReceipt(inventoryFile, { version: 2, kind: "management-processes", commandId: "native-cli-sessions", journal, identity: pair.identity,
-      leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
     const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
-    const commandIntent = await readLeaseReceipt(journal) as Record<string, unknown>
-    await writeLeaseReceipt(journal, { ...commandIntent, phase: "cli_admitted" })
     try {
+      const claimed = await admin.createBlockedUser(lease, secretFile)
+      const configured = await admin.configureOwnedUser(lease, secretFile)
+      const acl = await admin.reconcileOwnedAcl(lease, secretFile)
+      const storage = await prepareUserStorage(file, lease, secretFile, environment.server)
+      const activated = await admin.activateOwnedUser(lease, secretFile)
+      expect(activated).toMatchObject({ activated: true, userKey: claimed.userKey })
+      expect(await Bun.file(path.join(file.controller.stateDir, "activate-a.receipt.json")).exists()).toBe(true)
+      await writeLeaseReceipt(path.join(evidence, "authority.json"), { prepared, claimed, configured, acl, storage,
+        activation: await readUserActivation(file, lease, secretFile), activated,
+        receipt: await readLeaseReceipt(path.join(file.controller.stateDir, "activate-a.receipt.json")),
+        published: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
+        commands: await Promise.all([claimed, configured, acl, activated].map(async entry => ({ source: entry.source,
+          value: await readLeaseReceipt(entry.source.path) }))) })
+      await rm(path.join(file.slots[0]!.profileDir, "data/auth.json"))
+      await rmdir(path.join(file.slots[0]!.profileDir, "data"))
+      await writeLeaseReceipt(inventoryFile, { version: 2, kind: "management-processes", commandId: "native-cli-sessions", journal, identity: pair.identity,
+        leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
+      const commandIntent = await readLeaseReceipt(journal) as Record<string, unknown>
+      await writeLeaseReceipt(journal, { ...commandIntent, phase: "cli_admitted" })
       const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!, EVAL_PROFILE_DIR: lease.slot.profileDir,
         EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: process.env.LOGINOM_DOCK_API_KEY! })
       const command = { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, "captures"), cleanupSecrets: [credentials.password, config.dock.apiKey],
@@ -193,7 +154,7 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API
     }
   } finally {
     await Promise.all([environment.server.close(), lease.close()])
-    if (settlement.wire && settlement.cli && settlement.admin) {
+    if (settlement.cli && settlement.admin) {
       await destroyPair(file, options)
       await rm(root, { recursive: true, force: true })
     } else console.error(`native CLI session fixture retained: ${root}`)

@@ -1559,3 +1559,22 @@ SHA256 80b317a3e940c978a34c1e61d8b7fa48670638ce0a27392fcf566cc74bfe0c46;
 RED fixture dGorw5 was recovered through public recoverUnactivatedPreparation,
 released, destroyed and removed; private recovery evidence preserved. The
 permanent research pair and other incidents were not changed.
+
+### Composed parent and installed CLI qualification
+
+The disposable native CLI fixture now provisions through the public trusted
+parent APIs: createBlockedUser, configureOwnedUser, reconcileOwnedAcl,
+prepareUserStorage and activateOwnedUser. The same fenced administrative context
+then observes actual installed setup/check, persists the ownership ledger and
+closes each exact session. Raw wire provisioning has been removed. Evidence
+retains protected storage/activation receipts and their actual source commands.
+
+Missing parent activation receipt RED→GREEN native1 PASS/33 (59.50s),
+typecheck/diff PASS. Existing retry, corrupted source/terminal and peer-row
+preservation controls remain. Private600
+native-cli-sessions-d31c525d-97b8-47e1-a742-2bffa28585b2/cli.json SHA256
+015203931b70d774bc0e85afe4c1be421e51e19708ab6dd7e4124f7a1ad2ba49;
+240 source/generation/process/closure/cleanup audit checks, own pair/root absent.
+This is normal management composition under temporary research slot authority;
+production preparation, release, failed CLI/recovery lineage, active attempts
+and SessionBackup remain unqualified. Model/judge calls remain zero.
