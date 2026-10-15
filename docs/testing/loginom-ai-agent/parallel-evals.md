@@ -935,3 +935,14 @@ baseline. Positive browser verification не означает закрытия �
 обе pending rows наблюдались после завершения CLI. Этот control не включает
 model/judge calls и не снимает production readiness gates; recover и адресное
 закрытие настоящих CLI sessions ещё требуют проверки.
+
+2026-10-15 private configuration bootstrap: acceptance `parallel/slots.json`
+соответствует принятому примеру, research config имеет отдельные names/network/
+port/roots/bootstrap file; оба0600 и проходят public loader.12 отсутствовавших
+profile/work/history leaf directories созданы empty0700 под4 actual global
+profile guards после проверки отсутствия reservations. Повторный guarded
+read-back:26 paths private, inode/empty state подтверждены, config bytes unchanged,
+reservation writes0. Credentials и OAuth bytes не читались/не менялись; fixed
+guard files сохранены. Private postcheck78d0039f... и config3310afcc... в
+native-two-users-6ebb9781. Acceptance pair journal ещё отсутствует, readiness=false;
+это разовая подготовка private paths, без нового CLI flag или live admission.
