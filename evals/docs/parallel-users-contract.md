@@ -1532,3 +1532,30 @@ and changed close-command replyHash refuse; exact restored sources read back.
 private600 native-cli-sessions-25f6d5cd-06c2-4c3b-bbd2-d6e6fa2acdbe/cli.json
 SHA256 254bec2fac4bbf48ebabf6f793341a00c3d490a8e2c101f22f8dc9651139fb2f;
 212 source/close/cleanup audit checks, exact pair and root absent.
+
+### Parent activation prerequisite
+
+`activateOwnedUser` admits only a normal held slot with protected preparation,
+owned native account and confirmed configuration. Its published physical root
+must match the protected generation and native inode/device/owner, be empty,
+and coexist with a full empty shared-directory policy. Only then is the
+activation intent persisted. Serialized fenced dispatch rechecks sources and
+physical storage; native activation checks exact account, LocalAuth, safe roles
+and full ACL before and after unblocking. A private activation receipt binds
+nonce/user generation and the actual command/payload/reply semantic hashes.
+
+Repeat calls preserve intent nonce and configuration/password; the native reply
+reports activated:false after the first confirmed activated:true. This per-user
+primitive grants no all-slot readiness, production dispatch or cleanup release.
+The preparation journal stays non-ready; activation intent fences the
+unactivated finalizer. Failed/unknown activation retains its evidence.
+
+Missing API RED→GREEN native1 PASS/10 (40.76s); final native2 PASS/71 (44.48s)
+includes missing owner/configuration/root, dirty root and closed/recovery-only
+lease refusals.67 related unit PASS/328 (5.47s), typecheck/diff PASS. Private600
+native-parent-activation-c7e5cde7-2c2f-4afa-8eff-d0a12b556f2b/activation.json
+SHA256 80b317a3e940c978a34c1e61d8b7fa48670638ce0a27392fcf566cc74bfe0c46;
+28 source/closure/cleanup audit checks; exact own pair/root absent. Earlier own
+RED fixture dGorw5 was recovered through public recoverUnactivatedPreparation,
+released, destroyed and removed; private recovery evidence preserved. The
+permanent research pair and other incidents were not changed.
