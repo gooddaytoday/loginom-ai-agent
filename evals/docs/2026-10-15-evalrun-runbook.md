@@ -9,7 +9,7 @@ R=`/home/kartai/.local/share/loginom-evals-runtime`, host=`10.200.9.134`, user=`
 Собственный checkout: `R/checkouts/evalrunner`; команды ниже выполняются из его `evals/`.
 Конфигурация: `R/roles/evalrunner/runtime.json` (0600), приватное окружение: `eval.env.json` рядом.
 `runtime.json` закрепляет чистый SHA harness, все пути, SHA256 binary/CLI manifest, container ID/image и readinessIssue.
-CLI: `R/cli/v0.2.0/bin/loginom-ai-agent`, официальный source `0c975a73676d9aba556085dbda97e1a9ceb23cc6`.
+CLI: `R/cli/v0.2.0/bin/loginom-ai-agent-cli`, официальный source `0c975a73676d9aba556085dbda97e1a9ceb23cc6`.
 Release tar SHA256 `82e99934dd6dc56e5b549207c9f70e12fc207af081d56f825b6b1edced3fd42f`.
 Продукт: `openai/gpt-6.1-sol/medium`; судья: standalone Codex 0.159.3, `gpt-6-sol/xhigh`.
 Управляющий EvalRunner: `gpt-6.1-sol/xhigh`, concurrency=1.
