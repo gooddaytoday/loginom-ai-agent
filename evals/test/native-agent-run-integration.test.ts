@@ -1,0 +1,141 @@
+import { expect, test } from "bun:test"
+import path from "node:path"
+import { tmpdir } from "node:os"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { agentCommand, runAgent } from "../src/cli"
+import { loadConfig } from "../src/config"
+import { readAgentProcessInventory, sealAgentProcessInventory } from "../src/agent-process-evidence"
+import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
+import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { openLoginomAdmin } from "../src/loginom-admin"
+import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
+import { archiveProfileEvidence } from "../src/profile-archive"
+import { ensureProfile } from "../src/profile"
+import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
+import { stageUserPreparation } from "../src/user-environment"
+import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
+
+test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(
+  "native agent replay: actual sandboxed CLI activates Loginom through a local provider", async () => {
+    const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
+    const root = await mkdtemp(path.join(tmpdir(), "evals-native-agent-"))
+    const name = `evals-agent-${crypto.randomUUID().slice(0, 8)}`
+    const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+    const url = `http://127.0.0.1:${listener.port}/app/`
+    listener.stop(true)
+    const file = parseSlots({ version: 2,
+      server: { container: `${name}-server`, studioContainer: `${name}-studio`, network: name, alias: "loginom-server-7.4.2-test", url,
+        storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" },
+      controller: { stateDir: path.join(root, "controller"), adminCredentialsFile: source.controller.adminCredentialsFile },
+      judge: { codexHome: path.join(root, "judge") }, slots: [{ id: "a", username: "eval-a", profileDir: path.join(root, "profile"),
+        workspaceRoot: path.join(root, "work"), historyDir: path.join(root, "history") }],
+    }, 1)
+    await Promise.all([file.controller.stateDir, file.judge.codexHome, path.join(root, "locks"),
+      ...file.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])].map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
+    const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-agent-replay-${crypto.randomUUID()}`)
+    await mkdir(evidence, { mode: 0o700 })
+    console.error(`native agent replay evidence: ${evidence}`)
+    const sources = await Promise.all(["native-agent-run-integration.test.ts", "helpers/loginom-replay-provider.ts", "../src/cli.ts",
+      "../src/agent-process-evidence.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
+      "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", process.env.EVAL_CLI_BIN!].map(async file => {
+      const source = path.resolve(import.meta.dir, file)
+      return { path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }
+    }))
+    await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources })
+    const options = { purpose: "research" as const, out: path.join(root, "pair-evidence"), lockRoot: globalLockRoot }
+    const pair = await createPair(file, options)
+    const journal = path.join(file.controller.stateDir, "command.json"), processInventory = path.join(file.controller.stateDir, "admin-processes.json")
+    const commandId = crypto.randomUUID()
+    await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity: pair.identity,
+      slotIds: ["a"], phase: "unactivated", processInventory })
+    await writeLeaseReceipt(processInventory, { version: 2, kind: "admin-processes", commandId, journal, identity: pair.identity, connections: [] })
+    const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, path.join(root, "locks")), lease = environment.slots[0]!
+    const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
+    const credentials = await readLeaseReceipt(prepared.secretFile) as { username: string; password: string }
+    const settlement = { cli: true, admin: false }
+    const provider = loginomReplayProvider()
+    try {
+      const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory })
+      try {
+        await admin.createBlockedUser(lease, prepared.secretFile)
+        await admin.configureOwnedUser(lease, prepared.secretFile)
+        await admin.reconcileOwnedAcl(lease, prepared.secretFile)
+        await prepareUserStorage(file, lease, prepared.secretFile, environment.server)
+        await admin.activateOwnedUser(lease, prepared.secretFile)
+        await writeLeaseReceipt(journal, { ...await readLeaseReceipt(journal) as Record<string, unknown>, phase: "cli_admitted" })
+        const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!,
+          EVAL_PROFILE_DIR: lease.slot.profileDir, EVAL_WORKSPACE_ROOT: lease.slot.workspaceRoot, EVAL_AGENT_MODEL: "native-replay/replay",
+          EVAL_AGENT_PROVIDER_ID: "native-replay", EVAL_AGENT_PROVIDER_MODEL_ID: "replay", EVAL_AGENT_PROVIDER_API_KEY: "native-fixture-only",
+          EVAL_AGENT_PROVIDER_BASE_URL: provider.server.url.href, LOGINOM_URL: url, LOGINOM_USERNAME: credentials.username,
+          LOGINOM_PASSWORD: credentials.password, LOGINOM_DOCK_API_KEY: process.env.LOGINOM_DOCK_API_KEY! })
+        const command = { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, "management"),
+          cleanupSecrets: [credentials.password, config.dock.apiKey, config.agent.provider!.apiKey] }
+        settlement.cli = false
+        await ensureProfile(config, command)
+        settlement.cli = true
+        const settings = path.join(lease.slot.profileDir, "config/loginom-ai-agent.json")
+        await Bun.write(settings, JSON.stringify({ ...await Bun.file(settings).json(), permission: { "loginom_*": "allow", skill: "allow" }, model: config.agent.model,
+          small_model: config.agent.model, enabled_providers: ["native-replay"] }))
+        await mkdir(path.join(lease.slot.historyDir, "initial"), { mode: 0o700 })
+        await archiveProfileEvidence(lease.slot.profileDir, path.join(lease.slot.historyDir, "initial"), path.join(file.controller.stateDir, "initial.archive.json"))
+        const agents = path.join(file.controller.stateDir, "agents.json")
+        await writeLeaseReceipt(agents, { version: 2, kind: "eval-agent-processes", commandId, slotId: "a", producerPid: process.pid, state: "open", processes: [] })
+        const agentEvidence = { file: agents, commandId, slotId: "a", assertHeld: lease.assertHeld }
+        const before = await admin.inspectSessionInventory()
+        const during: Awaited<ReturnType<typeof admin.inspectSessionInventory>>[] = []
+        const state = { done: false }
+        await mkdir(path.join(file.controller.stateDir, "agent-result"), { mode: 0o700 })
+        settlement.cli = false
+        const pending = runAgent({ command: { ...command, agentEvidence }, taskId: "native-replay", model: config.agent.model,
+          prompt: "Activate the bundled Loginom skill and return Native replay complete.", files: [], workdir: lease.slot.workspaceRoot,
+          timeoutMs: 60_000, outDir: path.join(file.controller.stateDir, "agent-result"), profileDir: lease.slot.profileDir, slotId: "a" })
+          .finally(() => { state.done = true })
+        const observed = (async () => {
+          while (!state.done) {
+            during.push(await admin.inspectSessionInventory())
+            if (!state.done) await Bun.sleep(100)
+          }
+        })()
+        const settled = await Promise.allSettled([pending, observed])
+        if (settled[0].status === "rejected") throw settled[0].reason
+        const run = settled[0].value
+        settlement.cli = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+        const after = settlement.cli ? await admin.inspectSessionInventory() : null
+        await writeLeaseReceipt(path.join(evidence, "observation.json"), { version: 1, kind: "native-agent-replay", identity: pair.identity,
+          root, commandId, run, before, during, after, requests: provider.requests, liveQualified: false, sessionOwnershipQualified: false })
+        expect(settlement.cli).toBe(true)
+        expect(settled[1].status).toBe("fulfilled")
+        expect(run).toMatchObject({ exitCode: 0, timedOut: false, interrupted: false, finalText: "Native replay complete" })
+        expect(run.tools).toContainEqual(expect.objectContaining({ tool: "skill", status: "completed" }))
+        expect(run.tools).toContainEqual(expect.objectContaining({ tool: "loginom_dock_prepare", status: "completed" }))
+        expect(provider.requests.some(row => row.activation)).toBe(true)
+        expect(provider.requests.some(row => row.toolReply)).toBe(true)
+        expect(provider.requests.every(row => row.model === "replay")).toBe(true)
+        const qualified = qualifyClosedProcessEvidence(run.processCleanup, { owner: { kind: "slot", id: "a" }, producerPid: process.pid })
+        expect(qualified).not.toBeNull()
+        expect(run.processCleanup.browserBindings?.length ?? 0).toBeGreaterThan(0)
+        expect(during.some(snapshot => snapshot.sessions.some(row => row.name.startsWith(credentials.username + ":") &&
+          !before.sessions.some(previous => previous.objectId === row.objectId)))).toBe(true)
+        const sealed = await sealAgentProcessInventory(agentEvidence)
+        expect((await readAgentProcessInventory({ ...agentEvidence, producerPid: process.pid })).source).toEqual(sealed)
+        expect(await readServerIdentity(file)).toEqual(pair.identity)
+        expect(await Promise.all(sources.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
+          .toEqual(sources.map(source => source.sha256))
+      } finally {
+        await admin.dispose()
+        settlement.admin = true
+      }
+    } finally {
+      provider.server.stop(true)
+      await cp(file.controller.stateDir, path.join(evidence, "controller"), { recursive: true, filter: source =>
+        !source.endsWith(".secret.json") && !path.relative(file.controller.stateDir, source).split(path.sep).includes("profile") })
+      await writeLeaseReceipt(path.join(evidence, "settlement.json"), { settlement, identity: pair.identity, resources: pair.resources, root,
+        liveQualified: false, normalRelease: false, deletionAllowed: false })
+      await Promise.all([...environment.slots.map(slot => slot.close()), environment.server.close()])
+      if (settlement.cli && settlement.admin) {
+        await destroyPair(file, options)
+        await rm(root, { recursive: true })
+      }
+    }
+  }, 180_000,
+)

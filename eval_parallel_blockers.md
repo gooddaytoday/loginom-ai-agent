@@ -552,3 +552,44 @@ container identity bookends, read-back сохранённого JSON. Raw HTML �
 включающие key identifiers, отброшены; страницы серийных номеров не запрашивались.
 Нет settings/rescan/restart/key changes, Loginom login/model calls0. Evidence
 не является квалифицированным licence producer и не открывает admission.
+
+## Native agent replay: ранние fixtures retained до квалифицированного cleanup
+
+2026-10-15: первый новый local provider fixture не обрабатывал debugger discovery
+`GET /json/version`; его request.json() дал unhandled error, Bun завершился до
+публикации finally/settlement. Native admin connection остаётся ready с
+dispose=not_started/processes=null; inventory агента пуст. Original producer
+1812785/birth143189040 больше не наблюдается, что не даёт cleanup authority.
+Root `/home/kiselev/storage/tmp/evals-native-agent-bKNVO2`, nonce
+`2d5819e0-6cb6-4399-bb32-c7a1b7a228d7`, Server
+`747465344a21c622499841d4bc9750d0f719e34570fbd238380243fb08cf265c`, Studio
+`2763f8af2df2caf5c35bd75c1a5550e49d4e0f3f74294511599259580dd82cb3`, network
+`63fb39bf189abc8723424f1ca3b92d2b91f4bbe71ae3052833bc646788386134`
+сохранены. Private native-agent-replay-bd6e06b2-971c-488a-95f4-0ba4ffe64a5a/
+incident.json SHA256 `94ca9f37c64903d3f6a3facd062b54f210c6b750cd9264263fc787a091e3193d`
+и copied controller sources сохраняют исходное состояние. Секретный preparation
+файл не копировался. Нет сигналов guessed PID либо ручного release/unlink.
+
+После GET404 RED→GREEN второй fixture дошёл до runAgent, но outDir ещё не был
+создан. Generic sandbox refusal, planned agent inventory без опубликованного
+process proof; native admin dispose/continuous closure подтверждены, CLI
+settlement=false. Root `/home/kiselev/storage/tmp/evals-native-agent-YRV2I1`,
+Server `48e14d5f710d1a15441c248085ea61719a8bae74d33f883469ac8f0845fc2ea2`, Studio
+`e896b1acaac3c45db36bf65969bc34c2a9dbccbc2b684fc599c040591ef3d67f`, network
+`72494dd707b5ba41c6cf819b2afacf5090c099c3a6ea4b17bcd1ec1abd53ba36` retained.
+Private native-agent-replay-44875d4e-ec67-43c2-9319-ce83c5f61939/settlement.json
+SHA256 `a1fec20d41a9a4bdacfe45a2c41c45925ecccd0aaedb9c4a20ae23270b72104a`.
+Source order открывает capture files до launcher spawn; отсутствие каталога и
+пустой registration marker согласуются с pre-spawn отказом. Исторический hidden
+cause не сохранён, поэтому это не заменяет qualified cleanup/recovery evidence.
+Резервации этих двух environments находятся в собственных root/locks; fixed
+global provisioning guard и normal environment release — разные scopes.
+
+Fixture теперь создаёт outDir до runAgent, durably отмечает cli_admitted и
+обрабатывает CDP GET; local-provider TDD1/13 PASS. Skill-only control eaced503…
+завершился exit0 и подтвердил local closure, но не создал browser/session; его
+own pair/root удалены. Полный skill→prepare replay6b26e673… затем PASS1/14,
+audit87/45 подтвердил новую active Count1 row и все closures/own pair absence.
+Это квалифицирует новый recipe, но не исправляет предыдущие два incidents.
+Нужен recovery producer для incomplete local actor/pre-spawn registrations;
+production run и normal release этими исследованиями не разрешены.
