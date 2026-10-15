@@ -5,7 +5,7 @@ import path from "node:path"
 import os from "node:os"
 import { evalsRoot } from "../src/config"
 import { loadEvalrunnerCorpus, createEvalrunnerManifest, reserveEvalrunnerSeries, admitEvalrunnerSlot, durableEvalrunnerJson, evalrunnerHash } from "../src/evalrunner-series"
-import { acquireEvalrunnerSeriesLease, checkEvalrunnerSeries } from "../src/evalrunner-controller"
+import { acquireEvalrunnerSeriesLease, checkEvalrunnerSeries, completeEvalrunnerSlot } from "../src/evalrunner-controller"
 import { inspectEvalrunnerSeries } from "../src/evalrunner-series-check"
 import { sealEvalrunnerEvidence } from "../src/evalrunner"
 import { verifyEvalrunnerModel } from "../src/evalrunner-model"
@@ -53,8 +53,17 @@ test("143/144 cannot release; 144 measured quality FAILs with closed model histo
       }
       await durableEvalrunnerJson(path.join(selected, "release.json"), { status: "RELEASED", verdict: "FAIL", code: node ? 1 : 0, case: slot.case, runDir: run, sessionId: session,
         summarySha256: evalrunnerHash(await Bun.file(path.join(run, "summary.json")).bytes()), evidence: await sealEvalrunnerEvidence(selected) })
-      const model = await verifyEvalrunnerModel(config, { sessionId: session, cleanupFile: path.join(attempt, "cleanup.json") })
-      await durableEvalrunnerJson(path.join(manifest.series, "completions", slot.id + ".json"), { model, releaseSha256: evalrunnerHash(await Bun.file(path.join(selected, "release.json")).bytes()) })
+      if (index === 0) {
+        const releaseHash = evalrunnerHash(await Bun.file(path.join(selected, "release.json")).bytes())
+        expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "BLOCKED", completed: 0 })
+        await completeEvalrunnerSlot(config, manifest, slot)
+        expect((await inspectEvalrunnerSeries(config, manifest.series)).completed).toBe(1)
+        expect(evalrunnerHash(await Bun.file(path.join(selected, "release.json")).bytes())).toBe(releaseHash)
+        expect(await Bun.file(path.join(selected, "dispatch.json")).exists()).toBe(false)
+      } else {
+        const model = await verifyEvalrunnerModel(config, { sessionId: session, cleanupFile: path.join(attempt, "cleanup.json") })
+        await durableEvalrunnerJson(path.join(manifest.series, "completions", slot.id + ".json"), { model, releaseSha256: evalrunnerHash(await Bun.file(path.join(selected, "release.json")).bytes()) })
+      }
       if (index === 142) {
         expect(await inspectEvalrunnerSeries(config, manifest.series)).toMatchObject({ status: "READY", completed: 143, expected: 144 })
         await expect(lease.release()).rejects.toThrow("Series coverage unconfirmed")
@@ -80,4 +89,4 @@ test("143/144 cannot release; 144 measured quality FAILs with closed model histo
     await Bun.write(path.join(manifest.series, "slots", manifest.slots[0]!.id, "runs/one/summary.json"), "changed")
     await expect(checkEvalrunnerSeries(config, manifest.series)).rejects.toThrow("Incomplete series")
   } finally { await rm(root, { recursive: true, force: true }) }
-}, 120_000)
+}, 180_000)

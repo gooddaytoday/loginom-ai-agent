@@ -134,7 +134,7 @@ async function realpathQualification(file: string) {
   return realpath(file)
 }
 
-async function completeEvalrunnerSlot(config: EvalrunnerConfig, manifest: EvalrunnerSeriesManifest, slot: EvalrunnerSlot) {
+export async function completeEvalrunnerSlot(config: Pick<EvalrunnerConfig, "root" | "profile" | "checkout" | "results">, manifest: EvalrunnerSeriesManifest, slot: EvalrunnerSlot) {
   const record = path.join(manifest.series, "completions", `${slot.id}.json`)
   if (await Bun.file(record).exists()) return verifyEvalrunnerSlot(config, manifest, slot)
   const measured = await verifyEvalrunnerSlot(config, manifest, slot, false)
