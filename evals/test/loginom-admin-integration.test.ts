@@ -156,18 +156,26 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         const neighbor = await preparePeer()
         const peer = neighbor.user
         const peerActivation = neighbor.activation
+        const names = ["space name.csv", "tab\tname.csv", "line\nname.csv", "Юникод.csv", "-leading.csv", ".hidden.csv", "nested/file.csv", "copy.csv.autosave"]
+        const files = ["component-input.csv", ...names.map(name => `component-input/${name}`)]
+        const outputs = ["group_sum_qty.result.csv", ...names.map(name => `component-output/${name}.tsv`)]
         for (const [actor, csv] of [[user, "Item,Qty\nA,2\nA,7\nB,11\n"], [peer, "Item,Qty\nA,3\nA,8\nB,19\n"]] as const) {
           const storage = `${file.server.storageRoot}/${actor.name}`
           const input = path.join(root, `sales-${actor.name}.csv`)
           await writeFile(input, csv, { mode: 0o600 })
-          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${storage}/data`}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${storage}/data`} ${`${storage}/component-input/nested`} ${`${storage}/component-output/nested`}`.quiet()
           await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")} ${`${pair.identity.containerId}:${storage}/component-probe.lgp`}`.quiet()
           await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/data/sales.csv`}`.quiet()
           await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/component-input.csv`}`.quiet()
+          for (const name of names) await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${storage}/component-input/${name}`}`.quiet()
         }
         const shared = after.map(directory => directory.name).sort()
         expect(shared).toEqual(["common", "temp"])
-        for (const name of shared) await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.join(root, `sales-${user.name}.csv`)} ${`${pair.identity.containerId}:${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()
+        for (const name of shared) {
+          await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.join(root, `sales-${user.name}.csv`)} ${`${pair.identity.containerId}:${file.server.storageRoot}/${name}/component-input.csv`}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} mkdir -p ${`${file.server.storageRoot}/${name}/component-input/nested`} ${`${file.server.storageRoot}/${name}/component-output/nested`}`.quiet()
+          await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cp -R -- ${`${file.server.storageRoot}/${user.name}/component-input/.`} ${`${file.server.storageRoot}/${name}/component-input`}`.quiet()
+        }
         const actors = []
         for (const [owner, target, payload, expected] of [[user, peer, activation, "Item\tQty|Сумма\nA\t9\nB\t11\n"],
           [peer, user, peerActivation, "Item\tQty|Сумма\nA\t11\nB\t19\n"]] as const) {
@@ -178,19 +186,26 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
           await writeLeaseReceipt(path.join(evidence, `component-probe-${owner.name}.json`), probe)
           expect(probe).toMatchObject({ outcome: "confirmed", data: { ownSession: { username: owner.name }, components: { finished: true, failed: false } } })
           const components = (probe.data as { components: { continued: boolean;
-            denials: { pathKind: string; operation: string; finished: boolean; failed: boolean; targetStatus: number; denied: boolean }[] } }).components
+            positives: { file: string; output: string; finished: boolean; failed: boolean }[];
+            denials: { pathKind: string; file: string; operation: string; finished: boolean; failed: boolean; targetStatus: number; denied: boolean }[] } }).components
           expect(components.continued).toBe(true)
-          expect(components.denials.map(row => [row.pathKind, row.operation])).toEqual(
+          expect(components.positives.map(row => [row.file, row.output, row.finished, row.failed]))
+            .toEqual(files.map((file, index) => [file, outputs[index]!, true, false]))
+          expect(components.denials.map(row => [row.pathKind, row.file, row.operation])).toEqual(files.flatMap(file =>
             ["neighbor", ...shared.map(name => `shared:${name}`)].flatMap(scope =>
-              ["virtual", "absolute", "traversal"].flatMap(kind => ["import", "export"].map(operation => [`${scope}:${kind}`, operation]))))
+              ["virtual", "absolute", "traversal"].flatMap(kind => ["import", "export"].map(operation => [`${scope}:${kind}`, file, operation])))))
           expect(components.denials.every(row => row.denied)).toBe(true)
-          expect(components.denials.map(row => [row.finished, row.failed, row.targetStatus])).toEqual(Array.from({ length: 18 }, () => [true, true, 3]))
+          expect(components.denials.map(row => [row.finished, row.failed, row.targetStatus])).toEqual(Array.from({ length: files.length * 18 }, () => [true, true, 3]))
           for (const before of baseline) {
             expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${before.name}`} -type f -exec sha256sum -z -- ${"{}"} +`.quiet()).text()).toBe(before.hash)
             expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find ${`${file.server.storageRoot}/${before.name}`} -mindepth 1 -printf ${"%P\\0%y\\0%s\\0"}`.quiet()).text()).toBe(before.entries)
           }
           const csv = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cat ${`${file.server.storageRoot}/${owner.name}/group_sum_qty.result.csv`}`.quiet()).text()
           expect(csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")).toBe(expected)
+          for (const output of outputs.slice(1)) {
+            const csv = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cat ${`${file.server.storageRoot}/${owner.name}/${output}`}`.quiet()).text()
+            expect(csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")).toBe(expected)
+          }
           expect(await request("close-session", { proofId: probe.id, session: (probe.data as { binding: unknown }).binding }))
             .toMatchObject({ outcome: "confirmed", data: { closed: true } })
           actors.push({ username: owner.name, peer: target.name, ...components, csvSha256: new Bun.CryptoHasher("sha256").update(csv).digest("hex") })
