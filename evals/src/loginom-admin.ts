@@ -588,7 +588,7 @@ export async function readAdminSessionInventory(file: { controller: { stateDir: 
     observation: { startedAt: command.at, finishedAt: command.settledAt }, source }
 }
 
-export async function readAdminProcessInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {
+export async function readAdminProcessInventory(file: { controller: { stateDir: string } }, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {
   const inventory = await readAdminInventory(file, identity, input)
   const connections = []
   for (const entry of inventory.connections) {
@@ -606,7 +606,7 @@ export async function readAdminProcessInventory(file: SlotFile, identity: Server
     source: { path: input.file, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(inventory)).digest("hex") } }
 }
 
-async function readAdminInventory(file: SlotFile, identity: ServerIdentity, input: { file: string; journal: string; commandId: string }) {
+async function readAdminInventory(file: { controller: { stateDir: string } }, identity: ServerIdentity, input: { file: string; journal: string; commandId: string }) {
   if (path.dirname(input.file) !== file.controller.stateDir || !input.journal.startsWith(file.controller.stateDir + path.sep) ||
     path.resolve(input.journal) !== input.journal) throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
   const journal = await readLeaseReceipt(input.journal).catch(() => null)
@@ -621,7 +621,7 @@ async function readAdminInventory(file: SlotFile, identity: ServerIdentity, inpu
   return inventory as Record<string, unknown> & { connections: { directory: string; producerPid: number }[] }
 }
 
-export async function readAdminFinalization(file: SlotFile, identity: ServerIdentity, directory: string, producerPid: number) {
+export async function readAdminFinalization(file: { controller: { stateDir: string } }, identity: ServerIdentity, directory: string, producerPid: number) {
   const root = await lstat(directory).catch(() => undefined)
   if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
     !root?.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||

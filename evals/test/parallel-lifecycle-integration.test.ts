@@ -386,6 +386,19 @@ for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected
           return { observed: capture.session, closed, terminal: await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${capture.session.id}.closed.json`)),
             command: await readLeaseReceipt(closed.close.path) }
         })) })
+        if (mode === "reconnected-finalizer") {
+          const { readResourceNativeCensus } = await import("../src/parallel-resource-evidence")
+          const census = await readResourceNativeCensus({ manifest: { state_dir: file.controller.stateDir, run_id: "native-cli-sessions",
+            command_journal: journal, slots: [lease.slot], coverage: { containers: [
+              { role: "server", id: pair.identity.containerId, startedAt: pair.identity.startedAt },
+              { role: "studio", id: pair.identity.studioContainerId, startedAt: pair.identity.studioStartedAt },
+            ] } }, source: { file: finalized.source.path, sha256: finalized.source.sha256, producerPid: process.pid } })
+          expect(census.proofs.map(proof => proof.sha256)).toEqual(inventory.processes.map(process => process.source.sha256))
+          expect(census.adminWindows).toHaveLength(2)
+          expect(census.adminSources).toHaveLength(2)
+          expect(census.adminWindows.every(window => window.kind === "admin" && window.producerPid === process.pid)).toBe(true)
+          await writeLeaseReceipt(path.join(evidence, "native-resource-census.json"), census)
+        }
         return
       }
       await admin.closeManagementSession(lease, secretFile, cancelledSession.id)
