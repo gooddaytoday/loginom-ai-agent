@@ -2020,3 +2020,32 @@ listing and retry targets passed3/33 in51.92s; typecheck/diff PASS. Historical
 55/2 logs remain unchanged. The single listing timeout did not recur across
 isolated, complete-module and final target reruns; its exact cause is not
 attributed. A new full repository/package regression has not been claimed.
+
+Per-slot eval-agent inventory now records a planned entry under the held slot
+lease before the actual supervisor can spawn. Each launch gets its own private
+controller directory and a canonical copy of the original continuous process
+proof; moving an initial attempt into infra-error does not change that source.
+The sealed reader rechecks command/slot/producer, source SHA, private topology
+and the shared continuous closure qualifier. Concurrent launch/seal and late
+launch are refused. Unconfirmed entries retain the open inventory/fence.
+Fixture runAgent consumes this producer; healthy slots seal it before release.
+This is agent-process evidence, without storage/release/admission authority.
+
+Actual short CLI observed its planned entry before its own work; cold1/10 PASS
+2.40s. Actual main retry RED missing inventory→GREEN1/13 PASS19.06s; the later
+related run also passed29.79s and matched both canonical launcher births/SHA
+against moved/current original proofs. Typecheck/diff PASS. Full resource actor
+aggregation, production main admission and live qualification remain open.
+
+Related shared-cache run:66 PASS/1 FAIL/389 assertions400.40s; missing proofs
+for earlier intentionally failed CLI scopes were correctly refused. Test scripts
+now use Bun --isolate (0026c5ecd6), preserving the production registry/guard.
+The isolated related run passed that resource gate but ended62 PASS/5 FAIL,
+1 unhandled error/379 assertions411.75s: crossing and quarantine hit explicit30s;
+clean-stop refused profile-owner PID457454, and the agent primitive baseline
+refused EACCES /proc/457454/exe. Its subsequent cold rerun passed. A separate
+JUDGE_VERSION_UNCONFIRMED source was not saved, so it is not attributed to that
+PID. The PID was absent on later readback; no ownership inference or signal is
+permitted. Exact timeout phases were not preserved by old fixture teardown.
+Private logs agent-process-inventory-{related,isolated,cold}.log under
+management-registry-20261015 retain these outcomes. No full-suite PASS is claimed.
