@@ -1,5 +1,5 @@
 import type { ServerIdentity } from "./slots"
-import type { readResourceProcessWindows } from "./parallel-resource-evidence"
+import type { readResourceAgentInventories, readResourceProcessWindows } from "./parallel-resource-evidence"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
@@ -30,12 +30,15 @@ export async function checkResourceEvidence(input: {
   view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: { file: string; sha256: string } | null
   manifest?: { file: string; sha256: string }
   processProofs?: Parameters<typeof readResourceProcessWindows>[0]
+  agentInventories?: Parameters<typeof readResourceAgentInventories>[0]["sources"]
 }) {
-  const { readResourceProcessWindows, readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
+  const { readResourceAgentInventories, readResourceProcessWindows, readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
   const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
   const manifest = input.manifest ? await readFrozenResourceManifest({ ...input.manifest, runId: input.runId, startedAt: input.startedAt }) : null
   const coverage = { ...input.coverage, ...(manifest?.coverage ?? {}) }
-  const processWindows = input.processProofs ? await readResourceProcessWindows(input.processProofs) : input.processWindows
+  const inventories = manifest && input.agentInventories ? await readResourceAgentInventories({ manifest, sources: input.agentInventories }) : null
+  const processProofs = inventories ? [...inventories.flatMap(inventory => inventory.proofs), ...(input.processProofs ?? [])] : input.processProofs
+  const processWindows = processProofs ? await readResourceProcessWindows(processProofs) : input.processWindows
   const budgetSource = manifest?.budget ?? input.budget
   const budget = budgetSource ? await readFrozenResourceBudget({ ...budgetSource, runId: input.runId, startedAt: input.startedAt }) : null
   const groups = evidence.samples.flatMap(value => {
@@ -50,7 +53,9 @@ export async function checkResourceEvidence(input: {
   const checks = {
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
     coverage: assessResourceCoverage({ ...coverage, samples: evidence.samples }),
-    processTimeline: manifest && (!input.processProofs || manifest.slots.some(slot =>
+    processTimeline: manifest && (!inventories || manifest.slots.some(slot => !inventories.some(inventory => inventory.slotId === slot.id)))
+      ? { status: "incomplete" as const, codes: ["RESOURCE_AGENT_INVENTORIES_INCOMPLETE"] }
+      : manifest && (!processProofs || manifest.slots.some(slot =>
       !processWindows.some(window => window.kind === "slot" && window.id === slot.id)))
       ? { status: "incomplete" as const, codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] }
       : manifest && evidence.samples.some(value => {
@@ -77,7 +82,8 @@ export async function checkResourceEvidence(input: {
   const results = Object.values(checks)
   return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
     codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: budgetSource, ...(input.manifest ? { manifest_source: input.manifest } : {}),
-    ...(input.processProofs ? { process_sources: input.processProofs } : {}) }
+    ...(processProofs ? { process_sources: processProofs } : {}),
+    ...(inventories ? { agent_inventory_sources: inventories.map(inventory => inventory.source) } : {}) }
 }
 
 export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {

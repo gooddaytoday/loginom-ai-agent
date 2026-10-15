@@ -36,6 +36,28 @@ export async function readResourceProcessWindows(sources: { file: string; sha256
   }))
 }
 
+export async function readResourceAgentInventories(input: {
+  manifest: Pick<ResourceManifest, "state_dir" | "run_id" | "slots">
+  sources: { file: string; sha256: string; slotId: string; producerPid: number }[]
+}) {
+  const { readAgentProcessInventory } = await import("./agent-process-evidence")
+  const directory = path.join(input.manifest.state_dir, input.manifest.run_id)
+  if (path.dirname(directory) !== input.manifest.state_dir || path.basename(directory) !== input.manifest.run_id ||
+    new Set(input.sources.map(source => source.slotId)).size !== input.sources.length)
+    throw new EvalFailure("RESOURCE_AGENT_INVENTORY_INVALID", 2)
+  return Promise.all(input.sources.map(async source => {
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(source.slotId) || !input.manifest.slots.some(slot => slot.id === source.slotId) ||
+      source.file !== path.join(directory, `agent-processes-${source.slotId}.json`))
+      throw new EvalFailure("RESOURCE_AGENT_INVENTORY_PATH_MISMATCH", 2)
+    const inventory = await readAgentProcessInventory({ file: source.file, commandId: input.manifest.run_id,
+      slotId: source.slotId, producerPid: source.producerPid })
+    if (inventory.source.sha256 !== source.sha256) throw new EvalFailure("RESOURCE_SOURCE_HASH_MISMATCH", 2)
+    return { slotId: inventory.slotId, source: { file: inventory.source.path, sha256: inventory.source.sha256, slotId: inventory.slotId, producerPid: source.producerPid },
+      proofs: inventory.processes.map(process => ({ file: process.source.path, sha256: process.source.sha256,
+        owner: process.owner, producerPid: source.producerPid })) }
+  }))
+}
+
 type ResourceManifest = {
   version: 1; kind: "parallel-resource-manifest"; run_id: string; fixed_at: string; interval_ms: 1000
   parallel: number; slots: SlotDefinition[]; state_dir: string
