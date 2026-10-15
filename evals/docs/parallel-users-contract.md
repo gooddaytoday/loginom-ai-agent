@@ -332,6 +332,12 @@ active/admin collection остаётся открытым. Node wrapper help, st
 programmatic --parallel уже реализованы и подтверждены8 node-runner cases внутри
 composed87-test набора; source реализации не менялся при этой сверке.
 
+Snapshot copy masking (2026-10-15): `redact(config)` также маскирует known
+Loginom/Dock/provider значения, повторённые в других строковых config fields,
+включая URI variants в URLs. Password/apiKey markers сохраняются; runtime config
+не изменяется. Public RED→GREEN2/14, общий run/calibrate caller и composed87/592
+PASS, typecheck/diff PASS. Private controller config не добавлен в snapshot.
+
 Новые eval-прогоны: агент `openai/gpt-6-luna/high`, судья `gpt-6-sol/xhigh`.
 Приёмка на lg-pc-75: новая acceptance pair и отдельная research pair, затем
 немодельные ACL/crash/cleanup/supervisor/backup gates, полный LLM N=2 → N=1
