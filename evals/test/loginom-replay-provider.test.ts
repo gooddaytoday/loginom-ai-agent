@@ -1,6 +1,19 @@
 import { expect, test } from "bun:test"
 import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
 
+test("text replay finishes without activating browser tools", async () => {
+  const provider = loginomReplayProvider("text")
+  try {
+    const response = await fetch(new URL("chat/completions", provider.server.url), { method: "POST",
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "replay",
+        messages: [{ role: "user", content: "Return Native replay complete" }], tools: [{ function: { name: "skill" } }] }) })
+    const output = await response.text()
+    expect(output).toContain('"content":"Native replay complete"')
+    expect(output).not.toContain("tool_calls")
+    expect(provider.requests).toMatchObject([{ activation: false, preparation: false }])
+  } finally { provider.server.stop(true) }
+})
+
 test("native replay provider activates Loginom once and ends after the real tool reply", async () => {
   const provider = loginomReplayProvider()
   const request = async (messages: { role: string; tool_call_id?: string; content: string }[], tools?: { function: { name: string } }[]) => {

@@ -1,5 +1,5 @@
 // Deterministic local provider for native CLI research; it never calls a model.
-export function loginomReplayProvider() {
+export function loginomReplayProvider(mode: "prepare" | "text" = "prepare") {
   const requests: { model: string | null; tools: string[]; activation: boolean; preparation: boolean; toolReply: boolean; preparedReply: boolean }[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
     if (request.method !== "POST" || new URL(request.url).pathname !== "/chat/completions") return new Response(null, { status: 404 })
@@ -8,8 +8,8 @@ export function loginomReplayProvider() {
     const tools = body.tools?.map(tool => tool.function.name) ?? []
     const toolReply = body.messages.some(message => message.role === "tool" && message.tool_call_id === "native-activation")
     const preparedReply = body.messages.some(message => message.role === "tool" && message.tool_call_id === "native-preparation")
-    const activation = tools.includes("skill") && !toolReply
-    const preparation = tools.includes("loginom_dock_prepare") && toolReply && !preparedReply
+    const activation = mode === "prepare" && tools.includes("skill") && !toolReply
+    const preparation = mode === "prepare" && tools.includes("loginom_dock_prepare") && toolReply && !preparedReply
     requests.push({ model: body.model ?? null, tools, activation, preparation, toolReply, preparedReply })
     const delta = activation || preparation ? { tool_calls: [{ index: 0, id: activation ? "native-activation" : "native-preparation", type: "function",
       function: { name: activation ? "skill" : "loginom_dock_prepare",
