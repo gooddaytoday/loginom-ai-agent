@@ -1,9 +1,10 @@
 import path from "node:path"
 import { lstat, mkdir, open, readFile, realpath, readdir, rename } from "node:fs/promises"
-import type { ServerIdentity, SlotDefinition, SlotFile } from "./slots"
+import type { ServerIdentity, SlotDefinition, SlotFile, SlotLease } from "./slots"
 import { EvalFailure } from "./fail"
 import { acquireResourceLease, readLeaseReceipt, recoverResourceLease, writeLeaseReceipt } from "./lease"
 import type { Reservation } from "./lease"
+import { readUserOwnership, readUserPreparation } from "./user-environment"
 
 const ownerNonce = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 
@@ -166,6 +167,89 @@ export async function inspectUserStorage(file: SlotFile, identity: ServerIdentit
   if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
   return { version: 2, kind: "user-storage-observation", identity, username: slot.username, ownerNonce: owner, root,
     markerHash: new Bun.CryptoHasher("sha256").update(markerBytes).digest("hex"), device: device!, inode: Number(inode), uid: Number(uid), gid: Number(gid), entries }
+}
+
+export async function prepareUserStorage(file: SlotFile, lease: SlotLease, secretFile: string, serverLease: Awaited<ReturnType<typeof acquireResourceLease>>) {
+  const assertHeld = async () => {
+    await lease.assertHeld()
+    if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
+    if (serverLease.reservation.key !== `server:${lease.identity.containerId}` || serverLease.reservation.state !== "retained" ||
+      JSON.stringify(serverLease.reservation.identity) !== JSON.stringify(lease.identity)) throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
+    await serverLease.assertHeld()
+    if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(lease.identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
+  }
+  await assertHeld()
+  const prepared = await readUserPreparation(file, lease, secretFile)
+  const owned = await readUserOwnership(file, lease, secretFile)
+  if (owned.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
+  await verifyParallelPair(file, lease.identity)
+  const target = path.join(file.controller.stateDir, `storage-${lease.slot.id}.json`)
+  const saved = await readLeaseReceipt(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  }) as Record<string, unknown> | undefined
+  const markerFile = "/workdir/.loginom-evals-isolated.json"
+  const markerBytes = await dockerText(["exec", lease.identity.containerId, "cat", markerFile])
+  const marker = JSON.parse(markerBytes) as ReturnType<typeof usersMarker>
+  const root = `${file.server.storageRoot}/${lease.slot.username}`
+  const base = { version: 2, kind: "owned-user-storage", slotId: lease.slot.id, username: lease.slot.username, identity: lease.identity,
+    preparationNonce: prepared.nonce, userKey: owned.userKey, ownerSource: owned.source.sha256, root }
+  if (saved !== undefined && (!saved || typeof saved !== "object" || Array.isArray(saved) || Object.entries(base).some(([key, value]) => JSON.stringify(saved[key]) !== JSON.stringify(value)) ||
+    !["planned", "created", "published"].includes(String(saved.state)) || typeof saved.markerBefore !== "string" || !/^[a-f0-9]{64}$/.test(saved.markerBefore)))
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  const row = marker.inventory.find(row => row.username === lease.slot.username)
+  if (row && (!saved || saved.state === "planned" || row.storage_dir !== root || row.owner_nonce !== prepared.nonce))
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  if (saved?.state === "published") {
+    const observed = await inspectUserStorage(file, lease.identity, lease.slot, prepared.nonce)
+    if (["device", "inode", "uid", "gid"].some(key => saved[key] !== observed[key as keyof typeof observed]))
+      throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+    return observed
+  }
+  const markerBefore = new Bun.CryptoHasher("sha256").update(markerBytes).digest("hex")
+  if (saved && !row && saved.markerBefore !== markerBefore) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  if (!saved) await writeLeaseReceipt(target, { ...base, state: "planned", markerBefore })
+  // Planned intent does not grant ownership of a directory left by an unknown mkdir.
+  const created = saved?.state === "created" ? saved : await (async () => {
+    const service = await dockerText(["exec", lease.identity.containerId, "cat", "/proc/1/status"])
+    const uid = service.match(/^Uid:\s+\d+\s+\d+\s+\d+\s+(\d+)$/m)?.[1]
+    const gid = service.match(/^Gid:\s+\d+\s+\d+\s+\d+\s+(\d+)$/m)?.[1]
+    if (!uid || !gid) throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+    await assertHeld()
+    if (JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned)) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+    const result = await docker(["exec", lease.identity.containerId, "env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C", "sh", "-c",
+      'set -eu; for dir in / /workdir /workdir/UserStorage; do test -d "$dir" && ! test -L "$dir" && test "$(readlink -f -- "$dir")" = "$dir" || exit 1; done; ' +
+      'test ! -e "$1" && ! test -L "$1" || exit 73; mkdir -m 700 -- "$1"; chown -- "$2:$3" "$1"; stat --printf "%d:%i:%u:%g" -- "$1"', "user-storage", root, uid, gid])
+    if (result.code !== 0) throw new EvalFailure(result.code === 73 ? "USER_STORAGE_OWNERSHIP" : "USER_STORAGE_UNVERIFIED", 2)
+    const metadata = result.text.split(":")
+    if (metadata.length !== 4 || !metadata.every(value => /^\d+$/.test(value) && Number.isSafeInteger(Number(value))) || Number(metadata[1]) < 1 || metadata[2] !== uid || metadata[3] !== gid)
+      throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+    const created = { ...base, state: "created", markerBefore, device: metadata[0]!, inode: Number(metadata[1]), uid: Number(uid), gid: Number(gid) }
+    await writeLeaseReceipt(target, created)
+    return created
+  })()
+  await assertHeld()
+  if (JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned)) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  const physical = await docker(["exec", lease.identity.containerId, "env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C", "sh", "-c",
+    'set -eu; for dir in / /workdir /workdir/UserStorage "$1"; do test -d "$dir" && ! test -L "$dir" && test "$(readlink -f -- "$dir")" = "$dir" || exit 1; done; stat --printf "%d:%i:%u:%g" -- "$1"', "user-storage", root])
+  if (physical.code !== 0 || physical.text !== `${created.device}:${created.inode}:${created.uid}:${created.gid}`)
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  if (!row) {
+    const updated = { ...marker, inventory: [...marker.inventory, { username: lease.slot.username, storage_dir: root, owner_nonce: prepared.nonce }] }
+    const temporary = `${markerFile}.${prepared.nonce}.tmp`
+    const result = await docker(["exec", lease.identity.containerId, "env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C", "sh", "-c",
+      'set -eu; test -f "$1" && ! test -L "$1" && test "$(stat -c %h -- "$1")" = 1 || exit 1; hash=$(sha256sum -- "$1"); test "${hash%% *}" = "$4"; ' +
+      'if test -e "$3" || test -L "$3"; then test -f "$3" && ! test -L "$3" && test "$(stat -c %u:%g:%a:%h -- "$3")" = "$(id -u):$(id -g):600:1" || exit 1; ' +
+      'hash=$(sha256sum -- "$3"); test "${hash%% *}" = "$5"; else set -C; umask 077; printf %s "$2" > "$3"; fi; sync "$3"; mv -T -- "$3" "$1"; sync /workdir',
+      "user-storage-marker", markerFile, JSON.stringify(updated), temporary, markerBefore, new Bun.CryptoHasher("sha256").update(JSON.stringify(updated)).digest("hex")])
+    if (result.code !== 0) throw new EvalFailure("USER_STORAGE_UNVERIFIED", 2)
+  }
+  const observed = await inspectUserStorage(file, lease.identity, lease.slot, prepared.nonce)
+  if (["device", "inode", "uid", "gid"].some(key => created[key as keyof typeof created] !== observed[key as keyof typeof observed]))
+    throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  await assertHeld()
+  await writeLeaseReceipt(target, { ...created, state: "published" })
+  return observed
 }
 
 async function usePair(file: SlotFile, options: PairOptions, action: "create" | "destroy") {

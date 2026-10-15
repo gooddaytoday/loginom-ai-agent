@@ -599,5 +599,15 @@ verified pair/epoch и inventory owner nonce, canonical ancestors/root, stable
 device/inode и fs UID/GID service PID1. NUL-safe traversal сохраняет unusual
 имена и metadata; symlink не раскрывается, hardlink/foreign ownership/unknown
 type отказывают. Это observation без delete/release/readiness authority.
-Native Docker controls проверены с synthetic inventory; production publication
-и positive native user→root binding ещё требуют отдельной квалификации.
+Native Docker controls проверены с synthetic inventory. `prepareUserStorage`
+публикует новый root под held normal slot/server leases и protected never-activated
+account ownership. Private planned→created→published journal связывает source,
+generation и physical device/inode/fs owner. Existing unowned root не принимается;
+planned intent не даёт права присвоить оставшийся после unknown mkdir каталог.
+Inventory меняется через SHA-bound atomic rename после проверки journaled inode.
+Matching private600/single-link temporary marker либо уже опубликованный marker
+согласуются из created состояния без повторного mkdir; conflicting/symlink temp,
+null journal или заменённый inode сохраняют прежнее владение без публикации.
+Epoch перечитывается перед mutations. Результат — observation, не ready receipt.
+Эта граница проверена на native Docker filesystem с data-only account authority;
+positive native parent account→root/effective ACL и full prepare/cleanup ещё open.
