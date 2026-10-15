@@ -331,10 +331,12 @@ test("fixture main: judge version and execution are both registered before home 
     const directory = path.join(input.slots.controller.stateDir, summary.run_id)
     const inventory = await readJudgeProcessInventory({ file: path.join(directory, "judge-processes.json"),
       commandId: summary.run_id, producerPid: process.pid })
+    expect(inventory.sealed).toBe(true)
     expect(inventory.processes).toHaveLength(2)
     expect(new Set(inventory.processes.map(process => `${process.launcher.pid}:${process.launcher.starttime}`)).size).toBe(2)
     expect(await Bun.file(path.join(path.dirname(inventory.processes[0]!.source.path), "events.jsonl")).text()).toBe("fake-codex 0.0.0\n")
     const cleanup = await Bun.file(path.join(directory, "judge-release.json")).json()
+    expect(cleanup.inventory_source).toEqual(inventory.source)
     expect(cleanup.proofs).toEqual(inventory.processes.map(process => process.source))
     const attemptProof = await Bun.file(path.join(run.runDir!, "parallel-fast/1/judge-processes-1/process-cleanup.json")).json()
     expect(inventory.processes[1]!.source.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(attemptProof)).digest("hex"))

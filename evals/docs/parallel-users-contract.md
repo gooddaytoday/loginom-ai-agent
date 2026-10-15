@@ -2191,3 +2191,14 @@ the child marker. Judge/process/offline environment related57/267 PASS111.48s
 across3 files, typecheck/diff PASS. Logs judge-inventory-seal-{red,green,related}
 and judge-inventory-state-red. Fixture finalization still needs to call seal;
 resource admission does not yet consume this closed census.
+
+Fixture home release now seals the complete judge inventory and rechecks its
+captured SHA before writing inventory_source plus every qualified process proof
+to the release receipt. Actual main RED previously returned sealed=false after
+release; GREEN returns sealed=true with matching source. Unknown cleanup skips
+sealing and retains its home fence. Target2/15 PASS30.18s; complete current
+main/recovery/offline-admission31/233 PASS351.90s across3 files, typecheck/diff
+PASS. Logs judge-fixture-seal-{red,green} and judge-census-main-recovery.log.
+This closes the synthetic judge census; the resource coordinator must still
+consume it alongside complete native management/admin sources. Live auth/home
+qualification and production model admission remain unchanged gates.
