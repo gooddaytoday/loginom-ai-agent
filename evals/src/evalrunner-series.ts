@@ -1,11 +1,17 @@
 import path from "node:path"
-import { lstat, readdir, readFile, realpath } from "node:fs/promises"
+import { lstat, readdir, readFile, realpath, mkdir, open } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import { loadTasks } from "./task"
 
 export type EvalrunnerCollection = "regular" | "analytic" | "node"
 export type EvalrunnerCorpus = Awaited<ReturnType<typeof loadEvalrunnerCorpus>>
 export type EvalrunnerSlot = { id: string; collection: EvalrunnerCollection; case: string; round: number }
+export type EvalrunnerSeriesScope = "full" | "readiness-calc" | "readiness-node"
+export type EvalrunnerSeriesManifest = ReturnType<typeof createEvalrunnerManifest>
+type SeriesRoots = { root: string; results: string }
+
+const policy = { model: "openai/gpt-6.1-sol", variant: "medium", judge: "gpt-6-sol/xhigh", threshold: 70,
+  nodeJudge: "code-only", repeat: 1, infraRetries: 0, productTimeoutMs: 1_800_000, judgeTimeoutMs: 300_000, managementTimeoutMs: 600_000 }
 
 export const evalrunnerHash = (text: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(text).digest("hex")
 
@@ -24,6 +30,79 @@ export async function loadEvalrunnerCorpus(evals: string) {
 export function buildEvalrunnerSlots(corpus: EvalrunnerCorpus): EvalrunnerSlot[] {
   return [1, 2, 3].flatMap(round => corpus.cases.map(item => ({ id: `r${round}-${item.collection}-${item.id}`,
     collection: item.collection, case: item.id, round })))
+}
+
+export function createEvalrunnerManifest(input: { issue: string; task: string; series: string; scope: EvalrunnerSeriesScope;
+  pins: Record<string, unknown>; corpus: EvalrunnerCorpus }) {
+  if (![input.issue, input.task].every(value => /^[\w-]+$/.test(value)) || !["full", "readiness-calc", "readiness-node"].includes(input.scope))
+    throw new EvalFailure("Invalid series identity", 2)
+  const slots = input.scope === "full" ? buildEvalrunnerSlots(input.corpus) : [{
+    id: `${input.scope}-r1`, round: 1, collection: input.scope === "readiness-calc" ? "regular" as const : "node" as const,
+    case: input.scope === "readiness-calc" ? "calc-data-double" : "crosstable-fixed-sum" }]
+  if (input.corpus.cases.length !== 48 || input.scope === "full" && (slots.length !== 144 || new Set(slots.map(slot => slot.id)).size !== 144))
+    throw new EvalFailure("Series coverage differs", 2)
+  return { kind: "evalrunner-full-series" as const, version: 2 as const, ...input, slots, policy,
+    nonce: crypto.randomUUID(), createdAt: new Date().toISOString() }
+}
+
+/** Registry and admissions are global to issue/scope, independent of task or output directory. */
+export async function reserveEvalrunnerSeries(config: SeriesRoots, manifest: EvalrunnerSeriesManifest) {
+  const expected = path.join(config.results, manifest.scope === "full" ? `v02-full-${manifest.issue}` : `v02-${manifest.scope}-${manifest.issue}`)
+  if (manifest.series !== expected || path.resolve(expected) !== expected || !expected.startsWith(config.root + path.sep))
+    throw new EvalFailure("Noncanonical series directory", 2)
+  const raw = JSON.stringify(manifest, null, 2)
+  await mkdir(path.dirname(registryPath(config, manifest)), { recursive: true, mode: 0o700 })
+  await durableEvalrunnerJson(registryPath(config, manifest), { kind: "evalrunner-series-reservation", series: expected, sha256: evalrunnerHash(raw), manifest })
+    .catch(() => { throw new EvalFailure("Series already reserved; inspect original evidence", 2) })
+  // A crash after global reservation never permits another manifest or location.
+  await mkdir(expected, { mode: 0o700 })
+  await durableEvalrunnerJson(path.join(expected, "manifest.json"), manifest)
+  await mkdir(path.join(expected, "slots"), { mode: 0o700 })
+  await mkdir(path.join(expected, "completions"), { mode: 0o700 })
+  return manifest
+}
+
+export async function readEvalrunnerSeries(config: SeriesRoots, series: string) {
+  if (path.resolve(series) !== series || !series.startsWith(config.results + path.sep) || await realpath(series) !== series)
+    throw new EvalFailure("Series boundary changed", 2)
+  const raw = await readFile(path.join(series, "manifest.json"), "utf8")
+  const manifest = JSON.parse(raw) as EvalrunnerSeriesManifest
+  if (manifest.kind !== "evalrunner-full-series" || manifest.version !== 2 || manifest.series !== series ||
+    !["full", "readiness-calc", "readiness-node"].includes(manifest.scope) || !/^[\w-]+$/.test(manifest.issue))
+    throw new EvalFailure("Invalid series manifest", 2)
+  const reservation = await Bun.file(registryPath(config, manifest)).json() as { series: string; sha256: string }
+  if (reservation.series !== series || reservation.sha256 !== evalrunnerHash(raw) || JSON.stringify(manifest.policy) !== JSON.stringify(policy))
+    throw new EvalFailure("Manifest changed", 2)
+  const expected = createEvalrunnerManifest(manifest).slots
+  if (JSON.stringify(expected) !== JSON.stringify(manifest.slots)) throw new EvalFailure("Manifest coverage changed", 2)
+  return manifest
+}
+
+export async function admitEvalrunnerSlot(config: SeriesRoots, manifest: EvalrunnerSeriesManifest, slot: EvalrunnerSlot, task: string) {
+  const saved = await readEvalrunnerSeries(config, manifest.series)
+  if (saved.nonce !== manifest.nonce || !/^[\w-]+$/.test(task) || !saved.slots.some(item => JSON.stringify(item) === JSON.stringify(slot)))
+    throw new EvalFailure("Slot identity differs", 2)
+  const directory = path.join(config.root, "operations/series-admissions", `${manifest.issue}-${manifest.scope}`)
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  const admission = { kind: "evalrunner-slot-admission", version: 2, manifestSha256: evalrunnerHash(JSON.stringify(saved, null, 2)),
+    issue: manifest.issue, scope: manifest.scope, slot, task, series: manifest.series, at: new Date().toISOString() }
+  await durableEvalrunnerJson(path.join(directory, `${slot.id}.json`), admission)
+    .catch(() => { throw new EvalFailure("Slot already admitted; unresolved admission is BLOCKED", 2) })
+  const selected = path.join(manifest.series, "slots", slot.id)
+  await mkdir(selected, { mode: 0o700 })
+  await durableEvalrunnerJson(path.join(selected, "manifest.json"), admission)
+  return selected
+}
+
+export async function durableEvalrunnerJson(file: string, data: unknown) {
+  const handle = await open(file, "wx", 0o600)
+  try { await handle.writeFile(JSON.stringify(data, null, 2)); await handle.sync() } finally { await handle.close() }
+  const directory = await open(path.dirname(file), "r")
+  try { await directory.sync() } finally { await directory.close() }
+}
+
+function registryPath(config: SeriesRoots, manifest: Pick<EvalrunnerSeriesManifest, "issue" | "scope">) {
+  return path.join(config.root, "operations/series-registry", `${manifest.issue}-${manifest.scope}.json`)
 }
 
 async function inventory(root: string, relative = ""): Promise<{ path: string; sha256: string }[]> {
