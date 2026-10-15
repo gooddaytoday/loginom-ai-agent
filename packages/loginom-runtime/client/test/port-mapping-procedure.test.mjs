@@ -139,18 +139,22 @@ test('output reorder refuses incomplete goals and stops after an unexpected nati
  assert.equal(r.verified,true);assert.equal(r.edits.length,1);assert.equal(f.mutations(),4);
  });
 
-function exclusionFixture() {
+function exclusionFixture({links=false}={}) {
  const sources=['A','B','C'].map((name,index)=>({record_id:'s'+index,field_id:String(index),index,name,label:name,type:'string',required:false}));
  const native={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,source_fields:sources,
   target_fields:sources.map((source,index)=>({...source,record_id:'t'+index,source,group_index:index,excluded:false,inherited:false,exclusion_source:null,data_kind:'Дискретный'})),rendered_indices:[0,1,2]};
+ const hasView=links;
+ if(hasView){native.source_selection={verified:true,record_ids:[]};native.node_context={verified:true,node_id:'owned'};}
  let selected=null,count=0;
  const state=()=>({node_mapping:structuredClone(native),wizard:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'root',output_columns:{
   page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:native.target_fields.length,returned:native.target_fields.length,next_offset:null},
   fields:native.target_fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:selected===f.record_id}))}},
- ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:['click']}]}});
+ ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:['click']},
+  ...(hasView?['Table','Links'].map(name=>({ref:name,tid:'W;DerivedDataSourceOutputSocketWizard;rb'+name+';DisplayEl',allowed_actions:['click'],signature:{check_state:{kind:'radio',source:'loginom_ext',checked:name==='Links'?links:!links}}})):[])]}});
  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
   const s=state();assert.ok(o.ready(s));const a=o.resolve(s);count++;
-  if(a.ref==='exclude'){
+  if(a.ref==='Table'){links=false;delete native.source_selection;channel.afterTable?.(native);}
+  else if(a.ref==='exclude'){
    const field=native.target_fields.find(f=>f.record_id===selected),source=field.source;
    const groups=new Map();native.target_fields=native.target_fields.filter(f=>f!==field).map((f,index)=>{
     const group_index=groups.get(f.excluded)??0;groups.set(f.excluded,group_index+1);return {...f,index,group_index};
@@ -161,6 +165,16 @@ function exclusionFixture() {
  }};
  return {channel,native,count:()=>count};
 }
+test('exclusion binds its unchanged-mapping baseline after the owned Links to Table switch',async()=>{
+ const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=exclusionFixture({links:true}),r=await excludeOutputField(f.channel,'s1');
+ assert.equal(r.verified,true);assert.equal(r.source_identity_verified,true);assert.equal(f.count(),3);
+ assert.equal(r.definition.source_selection,undefined);assert.equal(r.excluded_source.record_id,'s1');
+ for(const change of [n=>{n.autosync=false;},n=>{n.source_fields[0].name='changed';},n=>{n.node_context.node_id='foreign';}]){
+  const bad=exclusionFixture({links:true});bad.channel.afterTable=change;
+  await assert.rejects(excludeOutputField(bad.channel,'s1'));assert.equal(bad.count(),1);
+ }
+});
 test('optional exclusion creates one source exclusion, preserves all other fields and is idempotent',async()=>{
  const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
  const f=exclusionFixture(),r=await excludeOutputField(f.channel,'s1');assert.equal(r.verified,true);assert.equal(f.count(),2);
