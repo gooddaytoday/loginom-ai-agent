@@ -1696,3 +1696,37 @@ SHA256 f266cea3f13072a740b8ae6132ce149d9d9560ea03bc1bb9fa326e82e260d4d6.
 The independent audit passed177 checks across seven linked artifacts; exact own
 pair/root are absent. The completed-success cancellation race occurred in this
 run; the earlier1d3cde44 source retains the actual interrupted outcome.
+
+### Management admission seal
+
+`sealAdminProcessInventory` accepts the held normal slot set for a command in
+cli_admitted. Under the admin inventory lock and the management registration
+queue, it validates exact command hash, server identity/current producer, complete
+slot set and original composite manifests. Each registered file must bind one
+held slot/token/profile; all process proofs must qualify, with unique owners and
+proof files. Active or changed producers prevent the transition.
+
+Only after these checks does phase become finalizing with frozen managementSources
+hashes. Registration shares the same queue: a producer waiting for registration
+sees finalizing and refuses before dispatch. New admin admission also remains
+sealed. The pre-CLI unactivated path remains unchanged. This transition grants no
+session ownership, archive, deletion, readiness or lease release. Recovery-only
+management finalization remains unsupported.
+
+TDD: two actual OS slot producers first failed at the old phase gate; GREEN1/8.
+A duplicate process-proof control then reproduced an accepted ambiguous source
+(RED), now rejected before journal mutation (GREEN1/10). Full held-slot/hash,
+active-producer and post-seal dispatch controls passed25 unit/120 (26.71s).
+The live OS probe stays alive1s for durable subreaper CLI admission. An earlier
+short probe ended with a retained pending CLI identity and correctly failed the
+continuous proof; no ownership rule or deadline was weakened. Final-source expanded
+regression passed69/370 (105.74s), typecheck/diff PASS. Native seal qualification
+passed1/62 (186.23s), separately from all unit suites. The independent audit
+passed184 checks across eight linked artifacts; own pair/root are absent.
+New CLI/admin admission fails before dispatch, while the existing trusted admin
+retains the ability to close proven owned sessions.
+
+Private600 native-cli-sessions-5317c73a-d9aa-4c0f-b16f-6637328f4169/sealed.json
+SHA256 e17d353f25a16dc5fdeb53094f834ab9108fe736cf648e720763ec3538200d45.
+The native fixture still exercises separate close primitives; an activated
+all-owner finalizer with archive-before-close remains the next step.
