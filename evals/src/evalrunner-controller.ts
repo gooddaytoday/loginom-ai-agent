@@ -80,12 +80,23 @@ export async function runEvalrunnerSeries(config: EvalrunnerConfig, input: { ser
 
 export async function checkEvalrunnerSeries(config: { root: string; results: string; checkout?: string; profile?: string }, series: string) {
   const manifest = await readEvalrunnerSeries(config, series)
+  if (config.checkout && (await loadEvalrunnerCorpus(path.join(config.checkout, "evals"))).sha256 !== manifest.corpus.sha256)
+    throw new EvalFailure("Corpus changed", 2)
   const progress = await inspectEvalrunnerSeries(config, series)
   if (!await Bun.file(path.join(series, "release.json")).exists()) return { ...progress, released: false }
   if (progress.status !== "COMPLETE" || progress.completed !== (manifest.scope === "full" ? 144 : 1))
     throw new EvalFailure("Incomplete series cannot be RELEASED", 2)
   const receipt = await checkEvalrunnerEvidence(series) as Awaited<ReturnType<typeof checkEvalrunnerEvidence>> & { completed: number; expected: number }
   if (receipt.completed !== progress.completed || receipt.expected !== progress.expected) throw new EvalFailure("Release coverage differs", 2)
+  const extras = new Set(["release.json", "comparison.json", "comparison.md", "comparison-receipt.json"])
+  const files = (await sealEvalrunnerEvidence(series)).map(item => item.path).filter(file => !extras.has(file)).sort()
+  if (JSON.stringify(files) !== JSON.stringify(receipt.evidence.map(item => item.path).sort())) throw new EvalFailure("Series evidence file set changed", 2)
+  if (await Bun.file(path.join(series, "comparison.json")).exists()) {
+    const comparison = await Bun.file(path.join(series, "comparison-receipt.json")).json()
+    if (comparison.releaseSha256 !== evalrunnerHash(await readFile(path.join(series, "release.json"))) ||
+      comparison.jsonSha256 !== evalrunnerHash(await readFile(path.join(series, "comparison.json"))) ||
+      comparison.markdownSha256 !== evalrunnerHash(await readFile(path.join(series, "comparison.md")))) throw new EvalFailure("Comparison evidence changed", 2)
+  }
   const owner = path.join(config.root, "operations/stand.lease/owner.json")
   if (await Bun.file(owner).exists() && (await Bun.file(owner).json()).nonce === manifest.nonce) throw new EvalFailure("Series stand lease still held", 2)
   const executor = path.join(config.root, "operations/series-executor.lock/owner.json")

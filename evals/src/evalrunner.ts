@@ -173,7 +173,7 @@ export async function verifyEvalrunnerCli(binary: string, expected = { version: 
   if (!/^[a-f0-9]{40}$/.test(expected.sourceCommit) || !/^[\w.+-]+$/.test(expected.version) ||
     manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata.version !== expected.version || manifest.metadata.sourceDirty !== false ||
     manifest.metadata.sourceCommit !== expected.sourceCommit) throw new EvalFailure("Unexpected CLI build", 2)
-  const actual = await payloadFiles(root)
+  const actual = await payloadFiles(root, "", true)
   if (actual.length !== manifest.files.length || new Set(manifest.files.map(item => item.path)).size !== actual.length)
     throw new EvalFailure("CLI payload file set changed", 2)
   for (const item of manifest.files) {
@@ -188,11 +188,11 @@ export async function verifyEvalrunnerCli(binary: string, expected = { version: 
   return manifest.metadata
 }
 
-async function payloadFiles(root: string, relative = ""): Promise<string[]> {
+async function payloadFiles(root: string, relative = "", excludeManifest = false): Promise<string[]> {
   return (await Promise.all((await readdir(path.join(root, relative), { withFileTypes: true })).map(async item => {
     const file = path.join(relative, item.name)
-    if (file === "cli-manifest.json") return []
-    return item.isDirectory() ? payloadFiles(root, file) : [file]
+    if (excludeManifest && file === "cli-manifest.json") return []
+    return item.isDirectory() ? payloadFiles(root, file, excludeManifest) : [file]
   }))).flat()
 }
 

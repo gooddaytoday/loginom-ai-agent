@@ -57,6 +57,8 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
   if (summary.config.repeat !== 1 || summary.task_ids.length !== 1 || summary.task_ids[0] !== slot.case || summary.tasks.length !== 1 ||
     summary.tasks[0]?.id !== slot.case || summary.tasks[0].attempts.length !== 1 || summary.config.keep_storage ||
     summary.config.timeout_ms !== 1_800_000 || summary.config.judge_timeout_ms !== 300_000 || summary.config.pass_threshold !== 70 ||
+    summary.agent.cli_mode !== "binary" || summary.agent.cli_version !== (manifest.pins.cli as { version: string } | undefined)?.version ||
+    !summary.harness?.git_sha || summary.harness.dirty !== false || !String(manifest.pins.harnessSha).startsWith(summary.harness.git_sha) ||
     summary.agent.model !== "openai/gpt-6.1-sol" || summary.agent.variant !== "medium" || summary.agent.source_dirty !== false ||
     summary.agent.source_commit !== (manifest.pins.cli as { sourceCommit: string } | undefined)?.sourceCommit ||
     summary.agent.binary_sha256 !== manifest.pins.binarySha256 || summary.loginom.image_digest !== manifest.pins.imageDigest ||
@@ -66,6 +68,9 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
   const cleanupFile = path.join(release.runDir, slot.case, "1/cleanup.json")
   const cleanup = await Bun.file(cleanupFile).json()
   if (cleanup.result?.status !== "confirmed" || cleanup.processes?.status !== "confirmed" || cleanup.processes?.observation_mode === "unit_after_exit" ||
+    cleanup.processes?.capture_complete !== true || cleanup.processes?.unknownProcesses?.length ||
+    !Array.isArray(cleanup.processes?.verification) || cleanup.processes.verification.length < 2 ||
+    cleanup.processes.verification.some((pass: { owned_remaining: number }) => pass.owned_remaining !== 0) ||
     !["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].every(stage => cleanup.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")))
     throw Error("Slot native cleanup/history unconfirmed")
   if (!config.checkout) throw Error("Verifier checkout required")
@@ -97,6 +102,7 @@ export async function verifyEvalrunnerSlot(config: Roots, manifest: EvalrunnerSe
     if (!config.profile || record.releaseSha256 !== evalrunnerHash(await readFile(path.join(selected, "release.json"))) ||
       model.status !== "VERIFIED" || model.sessionId !== release.sessionId || !model.assistantMessages ||
       model.messages.length !== model.assistantMessages || model.messages.some(item => item.providerID !== "openai" || item.modelID !== "gpt-6.1-sol" || item.variant !== "medium") ||
+      !model.sourceHashesBefore.some(item => item.file === "loginom-ai-agent.db") ||
       JSON.stringify(model.sourceHashesBefore) !== JSON.stringify(model.sourceHashesAfter) ||
       !model.archive.startsWith(config.profile + ".history/") || await realpath(model.archive) !== model.archive) throw Error("Actual model proof differs")
     for (const source of model.sourceHashesBefore) {

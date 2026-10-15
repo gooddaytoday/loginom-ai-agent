@@ -18,7 +18,9 @@ test("standalone release verifies raw artifact bytes, not only summary", async (
   try {
     await Bun.write(path.join(root, "runs/one/summary.json"), "summary")
     await Bun.write(path.join(root, "runs/one/case/1/artifact/result.lgp"), "original")
+    await Bun.write(path.join(root, "cli-manifest.json"), "full installed manifest")
     const evidence = await sealEvalrunnerEvidence(root)
+    expect(evidence.map(item => item.path)).toContain("cli-manifest.json")
     await Bun.write(path.join(root, "release.json"), JSON.stringify({ status: "RELEASED", evidence }))
     await expect(checkEvalrunnerEvidence(root)).resolves.toHaveProperty("status", "RELEASED")
     await Bun.write(path.join(root, "runs/one/case/1/artifact/result.lgp"), "changed")
