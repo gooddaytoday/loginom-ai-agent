@@ -531,6 +531,128 @@ for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected
   // Bounded CLI calls plus native provisioning/teardown and durable evidence writes.
 }, 360_000)
 
+test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)("native two-user management closes A while B continues on its own profile", async () => {
+  const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 2)
+  const root = await mkdtemp(path.join(tmpdir(), "evals-two-users-")), fixture = await parallelFixture(root)
+  const name = `evals-two-${crypto.randomUUID().slice(0, 8)}`
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  const url = `http://127.0.0.1:${listener.port}/app/`
+  listener.stop(true)
+  const file = parseSlots({ ...fixture.slots, server: { ...fixture.slots.server, container: `${name}-server`, studioContainer: `${name}-studio`,
+    network: name, alias: "loginom-server-7.4.2-test", url }, controller: { ...fixture.slots.controller, adminCredentialsFile: source.controller.adminCredentialsFile } }, 2)
+  const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: globalLockRoot }
+  const pair = await createPair(file, options)
+  const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-two-users-${crypto.randomUUID()}`)
+  await mkdir(evidence, { mode: 0o700 })
+  console.error(`native two-user evidence: ${evidence}`)
+  await writeLeaseReceipt(path.join(evidence, "fixture.json"), { root, file, pair, options })
+  const journal = path.join(file.controller.stateDir, "two-user-command.json"), adminInventory = path.join(file.controller.stateDir, "admin-processes.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "native-two-users", identity: pair.identity,
+    slotIds: file.slots.map(slot => slot.id), phase: "unactivated", processInventory: adminInventory })
+  await writeLeaseReceipt(adminInventory, { version: 2, kind: "admin-processes", commandId: "native-two-users", journal, identity: pair.identity, connections: [] })
+  const environment = await acquireEnvironmentLeases(file, 2, pair.identity, journal, fixture.lockRoot)
+  const settlement = { cli: true, admin: false, complete: false }
+  try {
+    const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory: adminInventory })
+    try {
+      const contexts = []
+      for (const lease of environment.slots) {
+        const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
+        await admin.createBlockedUser(lease, prepared.secretFile)
+        await admin.configureOwnedUser(lease, prepared.secretFile)
+        await admin.reconcileOwnedAcl(lease, prepared.secretFile)
+        await prepareUserStorage(file, lease, prepared.secretFile, environment.server)
+        const credentials = await readLeaseReceipt(prepared.secretFile) as { username: string; password: string }
+        await rm(path.join(lease.slot.profileDir, "data/auth.json")); await rmdir(path.join(lease.slot.profileDir, "data"))
+        const inventoryFile = path.join(file.controller.stateDir, `management-${lease.slot.id}.json`)
+        await writeLeaseReceipt(inventoryFile, { version: 2, kind: "management-processes", commandId: "native-two-users", journal, identity: pair.identity,
+          leaseToken: lease.token, slotId: lease.slot.id, profileDir: lease.slot.profileDir, processes: [] })
+        const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.env.EVAL_CLI_BIN!, EVAL_PROFILE_DIR: lease.slot.profileDir,
+          EVAL_AGENT_MODEL: "openai/gpt-6-luna", LOGINOM_DOCK_API_KEY: process.env.LOGINOM_DOCK_API_KEY! })
+        contexts.push({ lease, credentials, secretFile: prepared.secretFile, inventoryFile,
+          command: { ...agentCommand(config), cleanupDir: path.join(file.controller.stateDir, `captures-${lease.slot.id}`),
+            cleanupSecrets: [credentials.password, config.dock.apiKey], managementEvidence: { file: inventoryFile, lease, admin } } })
+      }
+      for (const context of contexts) expect(await admin.activateOwnedUser(context.lease, context.secretFile)).toMatchObject({ activated: true })
+      await writeLeaseReceipt(journal, { ...await readLeaseReceipt(journal) as Record<string, unknown>, phase: "cli_admitted" })
+      settlement.cli = false
+      const setups = await Promise.allSettled(contexts.map(context => management(context.command,
+        ["loginom", "setup", "--stdin-json", "--format", "json"], JSON.stringify({ url, ...context.credentials, apiKey: process.env.LOGINOM_DOCK_API_KEY! }), 60_000)))
+      const runs = setups.map(result => { if (result.status === "rejected") throw result.reason; return result.value })
+      settlement.cli = runs.every(run => run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete)
+      expect(settlement.cli).toBe(true)
+      for (const run of runs) expect(run.exitCode).toBe(0)
+      expect(Math.max(...runs.map(run => run.startedAt))).toBeLessThan(Math.min(...runs.map(run => run.startedAt + run.durationMs)))
+      const sessions = await Promise.all(contexts.map(async context => {
+        const raw = await readLeaseReceipt(context.inventoryFile) as { processes: { owner: { id: string } }[] }
+        return recordManagementSession(file, context.lease, context.secretFile, context.inventoryFile, raw.processes[0]!.owner.id)
+      }))
+      expect(new Set(sessions.map(session => session.binding.username)).size).toBe(2)
+      const a = contexts[0]!, b = contexts[1]!, running = { done: false }, held: { cli?: ProcessIdentity } = {}
+      settlement.cli = false
+      const pending = management(b.command, ["loginom", "check", "--format", "json"], undefined, 60_000).finally(() => { running.done = true })
+      void pending.catch(() => {})
+      try {
+        const deadline = Date.now() + 30_000
+        while (!held.cli || !await observeCliSession(b.inventoryFile, 1, b.credentials.username)) {
+          if (running.done || Date.now() > deadline) throw Error("TWO_USER_ACTIVE_CHECK_UNOBSERVED")
+          const inventory = await Bun.file(b.inventoryFile).json() as { processes: { owner: { id: string }; state: string }[] }
+          const entry = inventory.processes.at(-1)
+          const scope = inventory.processes.length > 1 && entry?.state === "planned"
+            ? supervisedProcesses().scopes.find(scope => scope.owner.id === entry.owner.id && scope.status === "observed") : undefined
+          const cli = scope?.processes?.find(process => process.device === runs[1]!.processCleanup.selectedCli?.device && process.inode === runs[1]!.processCleanup.selectedCli?.inode)
+          if (!held.cli && cli && scope?.processes?.some(process => process.executable.endsWith("/chrome")) && await signalProcess(cli, "SIGSTOP")) held.cli = cli
+          await Bun.sleep(25)
+        }
+        const { archiveProfileEvidence } = await import("../src/profile-archive")
+        const archived = await archiveProfileEvidence(a.lease.slot.profileDir, await mkdtemp(path.join(a.lease.slot.historyDir, "before-close-")), path.join(file.controller.stateDir, "a-before-close.archive.json"))
+        await admin.closeManagementSession(a.lease, a.secretFile, sessions[0]!.id)
+        const after = await admin.inspectSessionInventory()
+        expect(after.sessions.some(row => row.name.startsWith(a.credentials.username + ":"))).toBe(false)
+        expect(after.sessions.some(row => row.name === sessions[1]!.binding.name && row.createdAt === sessions[1]!.binding.createdAt)).toBe(true)
+        expect(running.done).toBe(false)
+        await writeLeaseReceipt(path.join(evidence, "addressed-close.json"), { archived, source: after.source, held: held.cli,
+          a: await readManagementSession(file, a.lease, a.secretFile, sessions[0]!.id), b: sessions[1], storageDeletionAllowed: false, nextAdmissionAllowed: false })
+      } finally {
+        if (held.cli) await signalProcess(held.cli, "SIGCONT")
+        const checked = await pending
+        settlement.cli = checked.processCleanup.status === "confirmed" && checked.processCleanup.capture_complete
+      }
+      expect((await pending).exitCode).toBe(0)
+      const continued = await management(b.command, ["loginom", "check", "--format", "json"], undefined, 60_000)
+      settlement.cli = settlement.cli && continued.processCleanup.status === "confirmed" && continued.processCleanup.capture_complete
+      expect(continued.exitCode).toBe(0)
+      expect(JSON.parse(continued.stdout)).toMatchObject({ ok: true, code: "LOGINOM_CONNECTION_VALID" })
+      const { finalizeManagementEnvironment } = await import("../src/environment-finalization")
+      const finalized = await finalizeManagementEnvironment(file, environment, admin)
+      expect(finalized.slots.map(slot => slot.slotId)).toEqual(["a", "b"])
+      expect(finalized.slots.every(slot => slot.sessions.every(session => session.state === "closed"))).toBe(true)
+      const terminal = await readLeaseReceipt(finalized.source.path)
+      expect(terminal).toMatchObject({ storageDeletionAllowed: false, nextAdmissionAllowed: false })
+      const sources = []
+      for await (const relative of new Bun.Glob("**/*.json").scan({ cwd: file.controller.stateDir, onlyFiles: true, followSymlinks: false })) {
+        if (relative.split(path.sep).includes("profile") || relative.endsWith(".secret.json")) continue
+        const text = await Bun.file(path.join(file.controller.stateDir, relative)).text()
+        if (contexts.flatMap(context => context.command.cleanupSecrets).some(secret => secret &&
+          [secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1, -1)].some(value => text.includes(value)))) throw Error("TWO_USER_EVIDENCE_SECRET")
+        sources.push({ path: path.join(file.controller.stateDir, relative), text,
+          sha256: new Bun.CryptoHasher("sha256").update(text).digest("hex"), canonicalSha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(JSON.parse(text))).digest("hex") })
+      }
+      await writeLeaseReceipt(path.join(evidence, "sources.json"), { identity: pair.identity, producerPid: process.pid, finalized, sources, liveQualified: false })
+      settlement.complete = settlement.cli
+    } finally {
+      await admin.dispose()
+      const inventory = await readLeaseReceipt(adminInventory) as { connections: { directory: string }[] }
+      for (const connection of inventory.connections) await readAdminFinalization(file, pair.identity, connection.directory, process.pid)
+      settlement.admin = true
+    }
+  } finally {
+    await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())])
+    if (settlement.complete && settlement.cli && settlement.admin) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+    else console.error(`native two-user fixture retained: ${root}`)
+  }
+}, 360_000)
+
 async function observeCliSession(inventoryFile: string, admitted: number, username: string) {
   // This live cancellation hint can race atomic replacement; settled evidence is validated strictly below.
   const raw = await Bun.file(inventoryFile).json() as { processes: { state: string; sessions?: { before: { path: string }; during?: { path: string }[] } }[] }
