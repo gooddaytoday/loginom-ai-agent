@@ -1,5 +1,18 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-15 — Desktop и CLI v0.2.0 установлены пользователю
+
+Точные опубликованные DEB/CLI из `0c975a73676d9aba556085dbda97e1a9ceb23cc6`
+скачаны, SHA256 сверены. Desktop apt upgrade0.1.17→0.2.0,dpkg verify и
+static5018 PASS; installed GUI first-launch smoke в отдельном профиле PASS.
+CLI `/opt/loginom-ai-agent-cli/0.2.0`:installed manifest/version/help/status
+PASS; global/user launcher переключены,старый cbc0ee47e6 удалён.
+3487 durable profile files unchanged; runtime/cache/logs из hash snapshot исключены.
+Оба Chromium sandbox root:root4755. Bundled AppArmor profile неприменим
+к текущему хосту; GUI smoke PASS. Live Loginom/provider не запускались.
+Следующий шаг:обычный пользовательский запуск; полная live приёмка отдельно.
+Подробности:[отчёт](../testing/loginom-ai-agent/reports/2026-10-15-v0.2.0-release.md#установка-в-текущую-систему-linux).
+
 ## 2026-10-15 — release candidate v0.2.0 опубликован
 
 Источник: `loginom`, базовый SHA `ceb03932504e8295c9ae7669ee8cadb7c3128f94`.
