@@ -737,6 +737,22 @@ liveIntegration("standalone preparation: repeated two-to-one preparation preserv
   const markers = (await readdir(file.controller.stateDir)).filter(name => /^(prepare-[ab](\.secret)?|user-[ab]|configure-[ab]\.receipt|storage-[ab])\.json$/.test(name))
   const beforeVerify = await Promise.all(markers.map(async name => ({ name,
     sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(file.controller.stateDir, name)).bytes()).digest("hex") })))
+  const configuration = path.join(file.controller.stateDir, "configure-a.receipt.json")
+  const configurationBytes = await Bun.file(configuration).text()
+  await rm(configuration)
+  const failedOut = path.join(root, "failed-verify-output")
+  const failedVerify = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "verify", "--config", slotsFile, "--out", failedOut],
+    { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe", env: { HOME: root,
+      ...Object.fromEntries(["PATH", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "EVAL_CLI_BIN"]
+        .flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])) } })
+  const [failedCode, failedStdout, failedStderr] = await Promise.all([failedVerify.exited, new Response(failedVerify.stdout).text(), new Response(failedVerify.stderr).text()])
+  const failedVerification = await Bun.file(path.join(failedOut, "receipt.json")).json() as { journal: string; receipt: string;
+    finalization: Awaited<ReturnType<typeof prepareEnvironment>>["finalization"] }
+  expect({ code: failedCode, stdout: failedStdout, stderr: failedStderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "USER_CONFIGURATION_UNCONFIRMED" })
+  expect(failedVerification).toMatchObject({ kind: "environment-verification", status: "failed", ready: false,
+    reason: "USER_CONFIGURATION_UNCONFIRMED", finalization: { status: "released" } })
+  expect(await readLeaseReceipt(failedVerification.receipt)).toEqual(failedVerification)
+  await writeLeaseReceipt(configuration, JSON.parse(configurationBytes))
   const verifiedOut = path.join(root, "verify-output")
   const verify = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/parallel-env.ts"), "verify", "--config", slotsFile, "--out", verifiedOut],
     { cwd: path.resolve(import.meta.dir, ".."), stdin: "ignore", stdout: "pipe", stderr: "pipe", env: { HOME: root,
@@ -760,7 +776,7 @@ liveIntegration("standalone preparation: repeated two-to-one preparation preserv
   expect(verifyOperations.every(op => ["init", "inspect", "dispose"].includes(op))).toBe(true)
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-standalone-${crypto.randomUUID()}`)
   await mkdir(evidence, { mode: 0o700 })
-  const sources = await Promise.all([first, second, third, fourth].map(async result => {
+  const sources = await Promise.all([first, second, third, failedVerification, fourth].map(async result => {
     const command = await readLeaseReceipt(result.journal) as { processInventory: string }
     const inventory = await readLeaseReceipt(command.processInventory) as { connections: { directory: string }[] }
     return { command, inventory, admins: await Promise.all(inventory.connections.map(connection => readLeaseReceipt(path.join(connection.directory, "connection.json")))),
@@ -771,8 +787,8 @@ liveIntegration("standalone preparation: repeated two-to-one preparation preserv
       })) }
   }))
   await writeLeaseReceipt(path.join(evidence, "preparation.json"), { version: 2, kind: "native-standalone-preparation", identity: pair.identity,
-    first, second, third, fourth, sources, verifyMarkers: beforeVerify, verifyOperations,
-    receipts: await Promise.all([first, second, third, fourth].map(result => readLeaseReceipt(result.receipt))), liveQualified: false })
+    first, second, third, failedVerification, fourth, sources, verifyMarkers: beforeVerify, verifyOperations,
+    receipts: await Promise.all([first, second, third, failedVerification, fourth].map(result => readLeaseReceipt(result.receipt))), liveQualified: false })
   await destroyPair(file, options)
   await rm(root, { recursive: true, force: true })
 }, 120_000)
