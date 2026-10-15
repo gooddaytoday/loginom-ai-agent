@@ -34,6 +34,7 @@ export type ProcessCleanup = {
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   sandboxNamespace?: { device: number; inode: number; owner: ProcessIdentity }
   namespaceMembers?: { pid: number; starttime: string; device: number; inode: number; observed_at: string }[]
+  launchTransitions?: { before: ProcessIdentity; after: ProcessIdentity; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
 }
 
@@ -166,6 +167,23 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
 async function snapshot(owners: ProcessIdentity[] = []) {
   return (await Promise.all((await readdir("/proc")).filter((name) => /^\d+$/.test(name))
     .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
+}
+
+/** Observe the receipt-bound fork before its first admission; never signal it. */
+export async function observeLauncherExec(saved: ProcessIdentity, parent: ProcessIdentity, wrapper: { device: number; inode: number }) {
+  if (saved.parent !== parent.pid || saved.uid !== parent.uid || saved.group !== parent.group || saved.session !== parent.session ||
+    saved.device !== parent.device || saved.inode !== parent.inode) throw Error("Launcher exec identity differs")
+  for (let attempt = 0; attempt < 26; attempt++) {
+    const owner = await processView(parent.pid)
+    const current = await processView(saved.pid)
+    if (!owner || !sameIdentity(owner, parent) || !current || key(current) !== key(saved) ||
+      current.parent !== parent.pid || current.uid !== saved.uid || current.group !== saved.group || current.session !== saved.session)
+      throw Error("Launcher exec identity differs")
+    if (current.device === wrapper.device && current.inode === wrapper.inode) return current
+    if (current.device !== saved.device || current.inode !== saved.inode) throw Error("Launcher exec identity differs")
+    if (attempt < 25) await Bun.sleep(10)
+  }
+  throw Error("Launcher exec unconfirmed")
 }
 
 /** Kernel membership is birth-bound evidence, independent of a transient parent chain. */
@@ -481,6 +499,16 @@ export async function superviseProcess(input: {
   let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
     const live = await snapshot([...ledger.values()].filter((entry) => entry.origin).map((entry) => entry.process))
+    if (wrapper && root && reaperReady && cliPid !== undefined) {
+      const index = live.findIndex(entry => entry.pid === cliPid && entry.parent === root.pid &&
+        entry.device === root.device && entry.inode === root.inode && !ledger.has(key(entry)))
+      if (index >= 0) {
+        const before = identity(live[index]!)
+        live[index] = await observeLauncherExec(before, root, { device: wrapper.dev, inode: wrapper.ino })
+        cleanup.launchTransitions ??= []
+        cleanup.launchTransitions.push({ before, after: identity(live[index]!), observed_at: new Date().toISOString() })
+      }
+    }
     for (const entry of ledger.values()) {
       if (!entry.origin) continue
       const current = live.find((candidate) => candidate.pid === entry.process.pid)

@@ -1,5 +1,5 @@
 import path from "node:path"
-import { realpath, readFile } from "node:fs/promises"
+import { realpath, readFile, lstat } from "node:fs/promises"
 import { repoRoot } from "./config"
 import { EvalFailure } from "./fail"
 
@@ -32,9 +32,18 @@ export async function sandboxCommand(input: {
     "--ro-bind", installation, installation, "--bind", profile, profile, "--bind", workspace, workspace, "--chdir", workspace]
   for (const file of ["/etc/ld.so.cache", "/etc/nsswitch.conf", "/etc/resolv.conf", "/etc/hosts", "/etc/passwd", "/etc/group", "/etc/fonts", "/etc/ssl/certs"])
     cmd.push("--ro-bind", await realpath(file), file)
+  const catalog = input.env.LOGINOM_AI_AGENT_MODELS_PATH
+  if (catalog) {
+    const info = await lstat(catalog)
+    if (input.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH !== "1" || !path.isAbsolute(catalog) ||
+      path.resolve(catalog) !== catalog || await realpath(catalog) !== catalog || !info.isFile() || info.isSymbolicLink() ||
+      info.uid !== process.getuid?.() || info.mode & 0o022 || [repoRoot, profile, workspace, installation, "/usr", "/etc", "/proc", "/dev", "/tmp"]
+        .some(root => inside(catalog, root))) throw new SandboxFailure("небезопасный public model catalog")
+    cmd.push("--ro-bind", catalog, catalog)
+  }
   cmd.push("--", binary, ...input.cmd.slice(1))
   const inherited = Object.fromEntries(Object.entries(input.env).flatMap(([name, value]) =>
-    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT|STRICT_RECOVERY|DISABLE_EXTERNAL_SKILLS|DISABLE_CLAUDE_CODE_SKILLS|EXPERIMENTAL_WEBSOCKETS))$/.test(name)
+    value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:MODELS_PATH|DISABLE_MODELS_FETCH|CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT|STRICT_RECOVERY|DISABLE_EXTERNAL_SKILLS|DISABLE_CLAUDE_CODE_SKILLS|EXPERIMENTAL_WEBSOCKETS))$/.test(name)
       ? [[name, value]] : []))
   // Bundled Node needs this startup switch to use the inherited proxy settings.
   if (Object.entries(inherited).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))

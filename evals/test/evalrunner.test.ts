@@ -2,15 +2,30 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence } from "../src/evalrunner"
+import { admitEvalrunner, readEvalrunnerConfig, verifyEvalrunnerCli, checkEvalrunnerOutcome, sealEvalrunnerEvidence, checkEvalrunnerEvidence, dispatchEvalrunner, executeEvalrunner, type EvalrunnerConfig, qualifyEvalrunner } from "../src/evalrunner"
 import type { RunSummary } from "../src/report"
+
+test("shared executor refuses dispatch without a durable admission", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-no-admission-"))
+  try {
+    await expect(dispatchEvalrunner({} as EvalrunnerConfig, { series: root, case: "calc-data-double", issue: "LAB-77", task: "task" },
+      {} as Awaited<ReturnType<typeof qualifyEvalrunner>>, async () => {})).rejects.toThrow("Durable admission required")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("version 2 cannot bypass versioned admissions through the legacy single-case entry", async () => {
+  await expect(executeEvalrunner({ version: 2 } as EvalrunnerConfig, { series: "/no-dispatch", case: "calc-data-double", issue: "LAB-77", task: "task" }))
+    .rejects.toThrow("Version 2 requires versioned series admission")
+})
 
 test("standalone release verifies raw artifact bytes, not only summary", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-evidence-"))
   try {
     await Bun.write(path.join(root, "runs/one/summary.json"), "summary")
     await Bun.write(path.join(root, "runs/one/case/1/artifact/result.lgp"), "original")
+    await Bun.write(path.join(root, "cli-manifest.json"), "full installed manifest")
     const evidence = await sealEvalrunnerEvidence(root)
+    expect(evidence.map(item => item.path)).toContain("cli-manifest.json")
     await Bun.write(path.join(root, "release.json"), JSON.stringify({ status: "RELEASED", evidence }))
     await expect(checkEvalrunnerEvidence(root)).resolves.toHaveProperty("status", "RELEASED")
     await Bun.write(path.join(root, "runs/one/case/1/artifact/result.lgp"), "changed")
@@ -25,6 +40,7 @@ test("standalone outcome blocks infrastructure and missing cleanup, preserves me
   expect(checkEvalrunnerOutcome(summary)).toBe("FAIL")
   expect(() => checkEvalrunnerOutcome({ ...summary, storage_leftovers: null })).toThrow("cleanup")
   expect(() => checkEvalrunnerOutcome({ ...summary, tasks: [{ ...summary.tasks[0]!, attempts: [{ ...summary.tasks[0]!.attempts[0]!, status: "infra_error" }] }] })).toThrow("infrastructure")
+  expect(() => checkEvalrunnerOutcome({ ...summary, tasks: [{ ...summary.tasks[0]!, attempts: [{ ...summary.tasks[0]!.attempts[0]!, status: "failed", failure_kind: "provider" }] }] })).toThrow("infrastructure")
 })
 
 test("standalone CLI integrity rejects changed bytes and extra payload files", async () => {
@@ -49,6 +65,24 @@ test("standalone CLI integrity rejects changed bytes and extra payload files", a
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("versioned CLI pins admit only the explicitly selected clean source while preserving legacy defaults", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-versioned-cli-"))
+  try {
+    await mkdir(path.join(root, "bin"))
+    await Bun.write(path.join(root, "bin/cli"), "candidate")
+    await chmod(path.join(root, "bin/cli"), 0o755)
+    const manifest = { format: "loginom-cli-artifact-v1", metadata: { version: "0.2.0", sourceCommit: "a".repeat(40), sourceDirty: false },
+      files: [{ path: "bin/cli", sha256: new Bun.CryptoHasher("sha256").update("candidate").digest("hex"), mode: 0o755 }] }
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"))).rejects.toThrow("Unexpected CLI build")
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"), { version: "0.2.0", sourceCommit: "a".repeat(40) })).resolves.toHaveProperty("sourceCommit", "a".repeat(40))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"), { version: "0.2.0", sourceCommit: "b".repeat(40) })).rejects.toThrow("Unexpected CLI build")
+    manifest.metadata.sourceDirty = true
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyEvalrunnerCli(path.join(root, "bin/cli"), { version: "0.2.0", sourceCommit: "a".repeat(40) })).rejects.toThrow("Unexpected CLI build")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("standalone admission needs no historical baseline and rejects a second owner", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-"))
   try {
@@ -61,6 +95,12 @@ test("standalone admission needs no historical baseline and rejects a second own
     await Bun.write(path.join(root, "config.json"), JSON.stringify(config))
     await chmod(path.join(root, "config.json"), 0o600)
     const read = await readEvalrunnerConfig(path.join(root, "config.json"))
+    const versioned = { ...config, version: 2, cliVersion: "0.2.0", cliSourceSha: "f".repeat(40) }
+    await Bun.write(path.join(root, "config.json"), JSON.stringify(versioned))
+    await expect(readEvalrunnerConfig(path.join(root, "config.json"))).rejects.toThrow("Invalid runtime config")
+    await Bun.write(path.join(root, "config.json"), JSON.stringify({ ...versioned, judgeBin: path.join(root, "bin/codex"),
+      judgeVersion: "codex-cli 0.159.3", judgeSha256: "1".repeat(64), bunSha256: "2".repeat(64) }))
+    await expect(readEvalrunnerConfig(path.join(root, "config.json"))).resolves.toHaveProperty("version", 2)
     const first = await admitEvalrunner(read, { series: path.join(root, "results/first"), case: "calc-data-double", issue: "ready", task: "task-1" })
     expect(first.manifest.case).toBe("calc-data-double")
     expect(first.manifest.infraRetries).toBe(0)

@@ -99,3 +99,35 @@ test('export download epoch refresh is bounded',async()=>{
  await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>f.snapshot,download:async()=>{attempts++;return f.refusal;}});
  assert.equal(attempts,3);
 });
+
+test('export refreshes a settled UI epoch refusal at the download gesture boundary',async()=>{
+ const f=downloadFixture();let attempts=0,refreshes=0;
+ const refused={status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:{code:'DOWNLOAD_GESTURE_NOT_CONFIRMED'},
+  trace:[{event:'download_gesture_result',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error_code:'UI_EPOCH_CHANGED'},
+   {event:'download_event_failure',step:'download.event',causes:[{kind:'TimeoutError',timeout:true}]}]};
+ const result=await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>{refreshes++;return f.snapshot;},
+  download:async()=>++attempts===1?refused:{status:'SUCCEEDED'}});
+ assert.equal(result.status,'SUCCEEDED');assert.equal(attempts,2);assert.equal(refreshes,1);
+});
+
+test('gesture epoch refresh refuses uncertainty, duplicate traces and changed ownership',async()=>{
+ const refused=()=>({status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:{code:'DOWNLOAD_GESTURE_NOT_CONFIRMED'},
+  trace:[{event:'download_gesture_result',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error_code:'UI_EPOCH_CHANGED'}]});
+ for(const change of [r=>r.status='AMBIGUOUS',r=>r.effect_possible=true,r=>r.cleanup_complete=false,
+  r=>r.trace[0].status='AMBIGUOUS',r=>r.trace[0].effect_possible=true,r=>r.trace[0].cleanup_complete=false,
+  r=>r.trace[0].error_code='UI_REFERENCE_STALE',r=>r.trace.push({...r.trace[0]}),r=>r.trace=[]]){
+  const f=downloadFixture(),outcome=refused();change(outcome);let calls=0;
+  assert.equal(await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>assert.fail('Unsafe refresh'),
+   download:async()=>{calls++;return outcome;}}),outcome);assert.equal(calls,1);
+ }
+ for(const change of [s=>s.ui.elements[0].storage_entry.bytes++,s=>s.file_storage.directory='/foreign',
+  s=>s.dom_epoch.document='foreign',s=>s.workflow_ref.prefix='foreign',s=>s.active_tab_ref='foreign',
+  s=>s.package_identity={foreign:true},s=>s.ui.elements[0].ref='replaced',s=>s.ui.masks.push({ref:'busy'})]){
+  const f=downloadFixture(),fresh=structuredClone(f.snapshot);change(fresh);let calls=0;
+  await assert.rejects(downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>fresh,
+   download:async()=>{calls++;return refused();}}),/target changed/);assert.equal(calls,1);
+ }
+ const f=downloadFixture();let calls=0;
+ await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>f.snapshot,download:async()=>{calls++;return refused();}});
+ assert.equal(calls,3);
+});

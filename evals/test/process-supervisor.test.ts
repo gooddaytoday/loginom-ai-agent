@@ -5,8 +5,42 @@ import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { signalProcess, superviseProcess, confirmProcessNamespace, type ProcessIdentity } from "../src/process-supervisor"
+import { signalProcess, superviseProcess, confirmProcessNamespace, observeLauncherExec, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
+
+test("launcher exec observes only a birth-bound inherited executable becoming the pinned wrapper", async () => {
+  for (const changed of [false, true]) {
+    const child = spawn(process.execPath, ["-e", `
+      const {dlopen,ptr}=await import('bun:ffi');
+      const libc=dlopen('libc.so.6',{execl:{args:['ptr','ptr','ptr','ptr'],returns:'i32'}});
+      process.stdout.write('ready\\n');await Bun.sleep(100);
+      libc.symbols.execl(ptr(Buffer.from('/usr/bin/sleep\\0')),ptr(Buffer.from('sleep\\0')),ptr(Buffer.from('0.1\\0')),0);
+      process.exit(2);
+    `], { stdio: ["ignore", "pipe", "ignore"] })
+    const exit = new Promise(resolve => child.once("exit", resolve))
+    const read = async (pid: number): Promise<ProcessIdentity> => {
+      const fields = (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")
+      const info = await stat(`/proc/${pid}/exe`)
+      return { pid, starttime: fields[19]!, uid: process.getuid!(), parent: Number(fields[1]),
+        group: Number(fields[2]), session: Number(fields[3]), device: info.dev, inode: info.ino,
+        executable: await readlink(`/proc/${pid}/exe`) }
+    }
+    try {
+      await new Promise<void>(resolve => child.stdout!.once("data", () => resolve()))
+      const parent = await read(process.pid), saved = await read(child.pid!)
+      const wrapper = await stat(changed ? "/usr/bin/true" : "/usr/bin/sleep")
+      for (const different of [{ ...saved, starttime: "different" }, { ...saved, parent: parent.pid + 1 },
+        { ...saved, uid: saved.uid + 1 }, { ...saved, group: saved.group + 1 }, { ...saved, session: saved.session + 1 },
+        { ...saved, inode: saved.inode + 1 }])
+        await expect(observeLauncherExec(different, parent, { device: wrapper.dev, inode: wrapper.ino })).rejects.toThrow("Launcher exec identity differs")
+      await expect(observeLauncherExec(saved, { ...parent, starttime: "different" }, { device: wrapper.dev, inode: wrapper.ino })).rejects.toThrow("Launcher exec identity differs")
+      expect(child.exitCode).toBeNull()
+      const observed = observeLauncherExec(saved, parent, { device: wrapper.dev, inode: wrapper.ino })
+      if (changed) await expect(observed).rejects.toThrow("Launcher exec identity differs")
+      if (!changed) expect(await observed).toMatchObject({ pid: saved.pid, starttime: saved.starttime, device: wrapper.dev, inode: wrapper.ino })
+    } finally { await exit }
+  }
+}, 5_000)
 
 test("namespace evidence requires the exact live process birth and kernel namespace", async () => {
   const pid = process.pid

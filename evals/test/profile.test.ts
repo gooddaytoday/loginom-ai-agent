@@ -13,7 +13,10 @@ import { Database } from "bun:sqlite"
 test("writerIdentity: bounded initial owner creation is captured instead of mistaken for replacement", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-acquire-"))
   try {
-    const dispatchedAt = Date.now() - 1
+    // Inode birth times use the filesystem clock; a freshly created inode
+    // can trail Date.now() by more than 1 ms. Use this earlier inode's clock
+    // for the fixture boundary without relaxing the production guard.
+    const dispatchedAt = (await stat(profile)).birthtimeMs
     await mkdir(path.join(profile, ".writer"), { mode: 0o700 })
     const created = new Promise<void>(resolve => setTimeout(async () => {
       await Bun.write(path.join(profile, ".writer/owner"), "new-owner")
