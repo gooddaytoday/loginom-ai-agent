@@ -4,10 +4,12 @@ export function parseExpectedOutputs(expected){
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
- const outputs=multiple?expected.outputs:[{output_node_type:expected.output_node_type,columns:expected.columns,rows:expected.rows}];
+ const fields=['output_node_type','output_node_label','columns','rows','ordered'];
+ const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
  need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=32,'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
-  need(output&&['columns,output_node_type,rows','columns,output_node_label,output_node_type,rows'].includes(Object.keys(output).sort().join(','))
+  need(output&&Object.keys(output).every(k=>fields.includes(k))
+   &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
    &&typeof output.output_node_type==='string'&&output.output_node_type.length>0
    &&Array.isArray(output.columns)&&output.columns.length>0&&output.columns.length<=1000
@@ -31,6 +33,8 @@ export function matchesExpectedOutput(data,expected){
  if(indices.size!==expected.columns.length||expected.columns.some(c=>{
   const f=data.schema[indices.get(c.name)];return !f||f.label!==(c.label??c.name)||f.type!==c.type;
  }))return false;
+ const matchesRow=(row,want)=>expected.columns.every(c=>matchesCell(row[indices.get(c.name)],c,want[c.name]));
+ if(expected.ordered)return expected.rows.every((want,i)=>matchesRow(data.sample[i],want));
  const unused=data.sample.slice();
  for(const want of expected.rows){
   const index=unused.findIndex(row=>expected.columns.every(c=>matchesCell(row[indices.get(c.name)],c,want[c.name])));

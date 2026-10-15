@@ -12,6 +12,7 @@
     {
       "output_node_type": "transform.sorting",
       "output_node_label": "Ключ вверх",
+      "ordered": true,
       "columns": [
         {
           "name": "Id",
@@ -72,6 +73,7 @@
     {
       "output_node_type": "transform.sorting",
       "output_node_label": "Ключ вниз",
+      "ordered": true,
       "columns": [
         {
           "name": "Id",
@@ -132,6 +134,7 @@
     {
       "output_node_type": "transform.sorting",
       "output_node_label": "Текст",
+      "ordered": true,
       "columns": [
         {
           "name": "Id",

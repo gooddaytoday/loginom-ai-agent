@@ -24,7 +24,7 @@ def expected(package_path, path=FIXTURE):
     for label, key in specifications:
         ordered = [dict(row, Key=None if row['Key'] is None else float(row['Key']))
                    for row in sorted(rows, key=key)]
-        outputs.append(dict(output_node_type='transform.sorting', output_node_label=label,
+        outputs.append(dict(output_node_type='transform.sorting', output_node_label=label, ordered=True,
                             columns=[dict(name='Id', type='integer'), dict(name='Key', type='real'),
                                      dict(name='Text', type='string')], rows=ordered))
     return dict(package_path=package_path,
