@@ -415,3 +415,25 @@ Nonce `eaf68d07-28ba-40e6-a226-f5c9eac601a2`, server
 `2a3fb5698f038f86478b3a5d5c9e406c597b38f78ce487d0de1e7e4238a1e612`, Studio
 `07169c9dd729f15a434fb296065cde626d6d58ac8952efaa0882d2d6c00b6bd1`.
 Normal proof не исправлен, closure/release/delete не квалифицированы.
+
+## Лицензионная ёмкость: поддержанный read-back пока не квалифицирован
+
+2026-10-15: дополнительно хэшированы1817 JS-файлов локальной client copy
+admin-source-4905babb;6 прежних primary hashes совпали. Identifier search после
+comment stripping выделил30 файлов. `bg/app/Licenses.js` читает
+`licenses/index.json` и тексты соглашений/third-party notices;
+`MAX_SESSION_TIMEOUT_SEC` относится к MaxDisconnectedSessionKeepAlive, а quota
+в analytics-модулях — к аналитическим настройкам. Числовой либо явно unlimited
+лимит и его counting scope из этих наблюдений не получены. Поиск идентификаторов
+не является AST-анализом либо полной server API coverage и не доказывает
+отсутствия другого licensing API.
+
+Private600 `management-registry-20261015/licence-client-surface-58d2bf88-b108-4ca5-ac62-bcba1212421a.json`
+SHA256 c0f3fe431efaa3781921552a5602e49cd2f57f7699c6c004b8b4ea4d8f7ca3df
+содержит перечень/хэши, candidate identifiers и границы вывода; runtime calls,
+serial/key reads0. Новый genuine A/B management native1/16 и audit584/177
+подтвердили два пользователя и независимое адресное закрытие сессии A, но не
+заменяют фактическую выдачу/тип лицензии, max/unlimited и учёт admin/retained
+сессий. Нужен поддержанный производителем read-back либо достоверные issuance
+данные с явным лимитом и scope; числовой порог не выводится из отсутствия отказа.
+Production admission и полная приёмка остаются закрытыми.
