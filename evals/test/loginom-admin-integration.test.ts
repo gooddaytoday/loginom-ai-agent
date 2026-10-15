@@ -3,7 +3,7 @@ import path from "node:path"
 import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { verifyAdminRuntime } from "../src/preflight"
-import { createJournaledAdminChannel, openLoginomAdmin, type AdminOperation } from "../src/loginom-admin"
+import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, type AdminOperation } from "../src/loginom-admin"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease, type SlotFile, type ServerIdentity } from "../src/slots"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
@@ -759,11 +759,19 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
     const adminDirectory = (await readdir(file.controller.stateDir)).find(name => name.startsWith("admin-"))!
     const disposal = await readLeaseReceipt(path.join(file.controller.stateDir, adminDirectory, "connection.json")) as { status: string; transportDisconnect: string; processes: { status: string; capture_complete: boolean } }
     expect(disposal).toMatchObject({ status: "disposed", transportDisconnect: "confirmed", processes: { status: "confirmed", capture_complete: true } })
+    const finalization = await readAdminFinalization(file, pair.identity, path.join(file.controller.stateDir, adminDirectory), process.pid)
+      .then(value => ({ value }), error => ({ error: error instanceof Error ? error.message : String(error) }))
+    observations.push(finalization)
+    const finalizationReceipt = await readLeaseReceipt(path.join(file.controller.stateDir, adminDirectory, "connection.json")) as {
+      finalization: { command: { path: string; sha256: string } }
+    }
+    const finalizationCommand = await readLeaseReceipt(finalizationReceipt.finalization.command.path)
     const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-parent-${crypto.randomUUID()}`)
     await mkdir(evidence, { mode: 0o700 })
     await writeLeaseReceipt(path.join(evidence, "blocked-preparation.json"), { version: 2, kind: "native-parent-blocked-preparation", identity: pair.identity,
       slotId: lease.slot.id, accountBlockedThroughout: true, repeatedWithoutPasswordRotation: true, physicalRoot: await readLeaseReceipt(path.join(file.controller.stateDir, "storage-a.json")),
-      admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes }, observations, liveQualified: false })
+      admin: { status: disposal.status, transportDisconnect: disposal.transportDisconnect, processes: disposal.processes, finalization,
+        sources: { receipt: finalizationReceipt, command: finalizationCommand } }, observations, liveQualified: false })
     const cleanup = path.join(file.controller.stateDir, "unactivated-test-cleanup.json")
     await writeLeaseReceipt(cleanup, { version: 2, kind: "native-unactivated-test-finalization", status: "confirmed", slotId: lease.slot.id,
       leaseToken: lease.token, serverEpoch: pair.identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed", archive: "committed",
@@ -781,6 +789,8 @@ liveIntegration("parent preparation: blocked account, configuration, ACL and phy
       { error: "USER_IDLE_UNCONFIRMED" },
       { value: { identity: pair.identity, username: lease.slot.username, account: { name: lease.slot.username, blocked: true }, serverSessions: "absent",
         receipt: { kind: "unactivated-user-observation", slotId: lease.slot.id, leaseToken: lease.token } } },
+      { value: { status: "confirmed", transportDisconnect: "confirmed", processes: "confirmed",
+        source: { path: path.join(file.controller.stateDir, adminDirectory, "connection.json") } } },
     ])
   } finally { await Promise.all([environment.server.close(), lease.close()]) }
 }, 120_000)
