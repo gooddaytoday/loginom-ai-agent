@@ -143,7 +143,7 @@ async function managementClosure(file: SlotFile, lease: SlotLease, entry: Pick<A
     sha256: hash(await readLeaseReceipt(path.join(file.controller.stateDir, `management-session-${entry.id}.json`))) }
   const source = object(await readLeaseReceipt(commandFile))
   if (Object.keys(source).length !== 10 || source.version !== 1 || source.kind !== "loginom-admin-command" || source.id !== reply.id ||
-    source.op !== "close-session" || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
+    (source.op !== "close-session" && (source.op !== "confirm-session-absent" || data.disposition !== "observed_absent")) || source.state !== "confirmed" || JSON.stringify(source.expectedIdentity) !== JSON.stringify(lease.identity) ||
     source.desiredHash !== hash({ proofId: entry.id, session: entry.binding, adopt: authority }) || source.replyHash !== hash(reply) ||
     typeof source.at !== "string" || typeof source.settledAt !== "string" || !Number.isFinite(Date.parse(source.at)) ||
     !Number.isFinite(Date.parse(source.settledAt)) || Date.parse(source.at) > Date.parse(source.settledAt)) throw new EvalFailure("SESSION_CLOSE_UNCONFIRMED", 2)

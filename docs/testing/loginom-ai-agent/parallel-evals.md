@@ -1139,3 +1139,22 @@ when any original profile history remains unarchived.
 This is a normal sessions_closed fence. Storage deletion, backend operations/
 package locks, SessionBackup, release, validated unpause and active uncertain-close
 recovery require separate proofs. Main admission remains unavailable.
+
+
+Read-only closure reconciliation (2026-10-16): explicit `confirm-absent` mode in
+agent/management close sends `confirm-session-absent`, which refuses a live target
+and confirms only native absence, without CloseSession. It retains all ownership,
+epoch, process and archive guards. Unknown journal mutations still block later
+mutations; read-only confirmation does not grant cleanup or clear quarantine.
+
+Channel RED→1/8 GREEN; native old-driver RED18 assertions117.00s→browser/text2/50
+PASS297.29s. Actual native closures precede an explicit filesystem receipt-loss
+control. One lost sidecar is rebuilt by read-only confirmation, then the normal
+finalizer republishes/reuses its terminal without another close. Original receipts
+and history are retained. This does not claim SIGKILL or a lost native wire reply;
+automatic pending-finalizer/recovery integration remains open.
+
+Related50/266 PASS60.53s, typecheck/syntax/diff PASS. Private6e3edf07…
+audit45845c1a…1782/116/17 causal frames and19bc4ebe… auditd9c562fc…229/92/5;
+all16 pins and exact own pair/network/controller-root absence verified. The expanded
+finalizer fixture gets240s; normal native tests and production deadlines stay fixed.
