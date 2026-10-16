@@ -1178,7 +1178,8 @@ release, validated unpause, active recovery and production admission remain open
 Native package tree (2026-10-16): readonly driver `inspect({packages:true})` now
 returns all Dispatcher collections and their package paths, readOnly,
 referenceCount and nullable Progress. Default inspect is unchanged. Actual
-sessionType0/1/2/3 user/admin/shared/pool groups were observed; Shared/Pool were
+sessionType0/1/2/3 client/self/shared/pool groups were observed; self identifies
+the observer session, independently of user roles. Shared/Pool were
 empty in this trial. The native referenceCount=-1 sentinel is preserved.
 
 Missing tree RED47 assertions50.05s→invalid nonnegative oracle RED52/51.35s→
@@ -1189,6 +1190,35 @@ LGP/autosave and command/reply/continuous closure sources. Before target close,
 all collections. Exact own pair/network/root absence verified for all3 trials.
 Primary installed sources: native-package-schema-7ba115e0… SHA c32bff0e….
 
-Parent durable reader and cleanup consumption, positive running/shared/pool
-controls and actual operation/lock quiescence remain separate work. No cleanup,
+Parent durable reader is qualified below. Cleanup consumption, positive
+running/shared/pool controls and actual operation/lock quiescence remain open. No cleanup,
 backup, release, unpause or admission grant is issued by this descriptor mode.
+
+
+Parent package inventory (2026-10-16): `AdminConnection.inspectPackageInventory()`
+persists the complete native reply and canonical command reference/hash.
+`readAdminPackageInventory` replays that private receipt, checks server epoch,
+full reply/request hashes and command times, nested types/counts/duplicates,
+and rereads both sources. Negative referenceCount and nullable progress remain
+unchanged. Unit data with positive Progress qualifies only the codec.
+
+The native fixture opens its parent admin before creating the designer session,
+then verifies durable replay with the named/modified package present and absent
+after targeted CloseSession. Both admin transports/continuous process closures
+are checked before fixture removal. Native1/67 PASS67.56s; related49/160
+PASS21.68s, typecheck/syntax/diff PASS. Private9bcdf36b… source-audit SHA256
+`0e6fc145fa8c5fadafe0e8eac129a42aa14310894e16764bfbeb5268947af7b0`
+checks67 facts/23 sources+6 pins; original package/autosave retained, exact own
+pair/network/controller root absent.
+
+Opening the parent after designer disconnect yielded PendingDisconnect=false
+with the expected Count1; close refused SESSION_NOT_IDLE. The ordering control
+above passes; the underlying cause remains unresolved in eval_parallel_blockers.md.
+No idle guard was relaxed. All five failed/diagnostic fixtures have verified
+admin closures and exact own pair/root absence, with original evidence retained.
+
+Installed bg.model.js defines client0/self1/shared2/pool3/backup4; sessionType
+is not an admin-role marker. Read-only primary copy native-session-types-f9e4d339…/
+source.json SHA256 `0cc2dadf184aba07af8cb30a2fd7b83074a8aca9f651d96f4869d737cfcd5768`
+preserves exact source before/after hashes. No research sessions were opened.
+The receipt grants no operation/lock quiescence, cleanup or admission authority.

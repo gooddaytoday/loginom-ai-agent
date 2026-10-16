@@ -21,6 +21,7 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
 import { EvalFailure } from "./fail"
 import { readManagementSession, recordManagementSessionClosed } from "./management-sessions"
 import { readAgentArchive, readAgentSession, recordAgentSessionClosed } from "./agent-sessions"
+import { readAdminPackageInventory } from "./package-inventory"
 import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
@@ -44,6 +45,7 @@ type AdminSessionRow = { objectId: string; sessionGuid: string | null; name: str
 export type AdminConnection = {
   identity: ServerIdentity
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
+  inspectPackageInventory(): Promise<Awaited<ReturnType<typeof readAdminPackageInventory>>>
   inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
     observation: { startedAt: string; finishedAt: string }; source: { path: string; sha256: string } }>
   inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
@@ -210,6 +212,16 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       const target = path.join(directory, `session-inventory-${observation.reply.id}.json`)
       await writeLeaseReceipt(target, receipt)
       return readAdminSessionInventory(file, identity, { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") })
+    },
+    async inspectPackageInventory() {
+      const reply = await request("inspect", { packages: true })
+      requireAdminReply(reply)
+      const commandFile = path.join(directory, "commands", `${reply.id}.json`)
+      const receipt = { version: 2, kind: "admin-package-inventory", identity, reply,
+        command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(commandFile))).digest("hex") } }
+      const target = path.join(directory, `package-inventory-${reply.id}.json`)
+      await writeLeaseReceipt(target, receipt)
+      return readAdminPackageInventory(file, identity, { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") })
     },
     async inspectUnactivatedUser(lease, secretFile) {
       const current = async () => {
