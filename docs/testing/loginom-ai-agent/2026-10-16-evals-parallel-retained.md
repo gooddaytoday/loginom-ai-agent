@@ -98,7 +98,9 @@ research labels/nonces и сохранёнными записями. Во все
   `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex` — `retained`,
   command `585940be-5c1b-4bff-a7c6-00459a4f7fa3`. Старый launcher подменял home;
   status не квалифицирует выделенный home. Владелец разрешил переиспользовать home и снять ровно эту бронь;
-  A00yuH не удалять, проверка входа без модели через исправленную обёртку.
+  A00yuH не удалён; проверка через исправленную repo-обёртку дала loggedIn=true/exit0,
+  clean unit и0 model calls. Новая status reservation освобождена, старый journal
+  byte-for-byte неизменён. Конфиг прежнего home теперь совпадает с lockdown/private600.
 - **aeGGa8**: `/home/kiselev/storage/tmp/evals-agent-inventory-aeGGa8` существует.
   Старый process inventory отказ с неполной атрибуцией. Происхождение — эта цель;
   сохраняется для разбора, в новом пути не используется.
@@ -106,7 +108,7 @@ research labels/nonces и сохранёнными записями. Во все
   `evals/docs/2026-10-14-admin-design-capability-diagnosis.md`; текущая активность
   controller по этому перечню не устанавливалась. Происхождение — эта цель,
   сохраняем без признания cleanup; новый run на него не опирается.
-- **Global lock root** `/var/lib/loginom-evals/locks`: 822 reservation-файла,
+- **Global lock root** `/var/lib/loginom-evals/locks`: первоначальный снимок822 reservation-файла,
   из них 818 `released`, три `recovery-only` для mixed dyI2ST
   (server/profile/user), один `retained` для judge A00yuH. Это снимок состояния
   файлов, а не проверка свободного OS guard. Guard/reservation-файлы не удалять;
