@@ -3072,3 +3072,32 @@ phase, failed positive expectation, cross-observer oracle and fixture-counter
 runs retain their original failures. Production cleanup/delete/unpause/admission
 remain blocked. Next investigate PackagePoolSize=0 before work on a fresh pair;
 its exposed unsigned setter alone does not prove disabled retention.
+
+### Preventive Pool retention policy research (2026-10-16)
+
+The next Pool implementation path is PackagePoolSize=0 before user work.
+The guarded `session-pool-disabled-probe` requires empty package collections and
+only the current admin's client/self rows before setting this server-wide value.
+On a fresh owned pair, native socket settings read10, the setter writes0, and
+immediate and post-job getters both read0. An actual own once-only Scheduler
+job completes, its exact GUID is deleted with fresh empty enumeration, and its
+package is absent in every collection before and after creator CloseSession.
+No global pool clear or server restart is used.
+
+Missing phase RED41/51.90s→native1/54 PASS63.23s. Private2df05c6e…
+source-audit SHA256 `ca4df30304e01a5ec3af779da2138c4b08024cc225f89f0fba674d2d963c22a9`
+checks70/23 sources+8 pins: actual settings/source/job/log, complete package
+bookends, both continuous admin closures/transport ACKs, retained input and
+exact own pair/network/root absence. Primary settings UI/RPC manifest
+2683f213…/source.json SHAf9292a8b… preserves the supported unsigned setter.
+
+This qualifies a preventive native recipe. Production must still apply it before
+user work and bind fresh read-back/drift guards to the frozen server epoch.
+It grants no operation/lock, backup, storage deletion or next-admission authority.
+Targeted ClosePackage remains unsupported in the recorded Pool control; the
+implementation should use the preventive path rather than repeat that RPC.
+
+Same-source default-retention control62335c26…:1/54 PASS66.51s,
+audit7e614cb9…74/25 verifies the same package retained after creator close.
+Both cases freeze the identical8 code/binary/input pins. Related49/160
+PASS21.15s; typecheck/syntax/diff PASS.

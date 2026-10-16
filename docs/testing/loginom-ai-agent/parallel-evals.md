@@ -1291,3 +1291,16 @@ Private63e4e2dc… audit17f23462…93/43+8 pins
 with both admin closures/ACKs and own pair/network/root absence. This refusal
 blocks scoped Pool cleanup; see eval_parallel_blockers.md. No global pool clear
 was used. PackagePoolSize=0 remains an unqualified candidate for pre-work policy.
+
+The follow-up `native pool disabled policy: zero retains no completed job package`
+qualifies a preventive recipe: on a fresh empty owned pair PackagePoolSize10→0,
+immediate/post-job getters0, actual completed/deleted own job, no package in any
+collection before/after creator close. Native1/54 PASS63.23s; private2df05c6e…
+auditca4df303…70/23+8pins verifies both admin closures/ACKs, retained input and
+exact own pair/network/root absence. Production preparation and frozen-policy
+drift checks still need wiring; no cleanup/admission grant follows from this test.
+
+Same-source default-retention control62335c26…:1/54 PASS66.51s,
+audit7e614cb9…74/25 verifies the same package retained after creator close.
+Both cases freeze the identical8 code/binary/input pins. Related49/160
+PASS21.15s; typecheck/syntax/diff PASS.

@@ -659,3 +659,23 @@ PASS21.98s, typecheck/syntax/diff PASS. Private63e4e2dc… source-audit
 SHA256 `17f23462c0b57a6f77072a64780ae85453e5cb3c149c89a668e2bd4848782e12`
 checks93/43 sources+8 pins, both admin closures/transport ACKs and own pair/root
 absence verified. This closes the research control, not the cleanup blocker.
+
+### Pool follow-up: preventive native policy qualified (2026-10-16)
+
+The research obstacle has a verified preventive path: on a fresh empty owned
+pair, PackagePoolSize10→0 with immediate and post-job native getters0. The own
+Scheduler job completes3, exact GUID deletion has fresh empty read-back, and
+the package is absent across every collection before and after creator closure.
+Native1/54 PASS63.23s; private2df05c6e… audit
+`ca4df30304e01a5ec3af779da2138c4b08024cc225f89f0fba674d2d963c22a9`
+checks70/23 sources+8 pins, both admin closures/ACKs and own pair/network/root
+absence. Missing-phase REDe83d02ea…41/51.90s is settled with original sources.
+Do not repeat the unsupported selected Pool ClosePackage recipe. Remaining
+work is production configuration before user work plus frozen-epoch read-back
+and drift guards. Package/lock quiescence, backup and storage cleanup remain
+separate gates; this control grants neither delete nor next admission.
+
+Same-source default-retention control62335c26…:1/54 PASS66.51s,
+audit7e614cb9…74/25 verifies the same package retained after creator close.
+Both cases freeze the identical8 code/binary/input pins. Related49/160
+PASS21.15s; typecheck/syntax/diff PASS.
