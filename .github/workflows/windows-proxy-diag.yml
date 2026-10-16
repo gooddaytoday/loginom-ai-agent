@@ -1,0 +1,85 @@
+name: Windows proxy diagnostics
+on:
+  push:
+    branches: [windows-proxy-diag]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+defaults:
+  run:
+    shell: bash
+jobs:
+  diagnostics:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: packages/loginom-runtime/client/.node-version
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Prepare isolated Linux desktop
+        if: runner.os == 'Linux'
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          sudo apt-get install -y xvfb xauth dbus-x11 dconf-gsettings-backend gsettings-desktop-schemas
+          # Preserve the Chromium sandbox, as in the existing Linux release matrix.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # WinINET is shared by every process on this disposable runner. Mozilla's
+      # scheduled agents can otherwise send telemetry to our proxy trap while
+      # Chromium is being checked; retain the strict zero-traffic assertion.
+      - name: Isolate Windows proxy acceptance from Mozilla background tasks
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $mozillaTasks = @(Get-ScheduledTask | Where-Object { $_.TaskPath -eq '\Mozilla\' })
+          foreach ($task in $mozillaTasks) {
+            Write-Host "Disabling background task: $($task.TaskPath)$($task.TaskName)"
+            $task | Disable-ScheduledTask | Out-Null
+            $task | Stop-ScheduledTask
+            if ((Get-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath).State -ne 'Disabled') {
+              throw 'Mozilla background tasks must be disabled before proxy acceptance'
+            }
+          }
+          $mozillaProcesses = @(Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue)
+          foreach ($process in $mozillaProcesses) {
+            Write-Host "Stopping background process: $($process.ProcessName) PID=$($process.Id)"
+            $process | Stop-Process -Force -ErrorAction Stop
+            if (-not $process.WaitForExit(10000)) {
+              throw "Mozilla background process did not exit: PID=$($process.Id)"
+            }
+          }
+          if (Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue) {
+            throw 'Mozilla background processes remain active before proxy acceptance'
+          }
+
+      - name: Instrument proxy request ownership
+        working-directory: packages/loginom-runtime/client
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" ../../../script/windows-proxy-diag.mjs'
+
+      - name: Verify direct Chromium and browser downloads
+        working-directory: packages/loginom-runtime/client
+        env:
+          LOGINOM_DOCK_TEST_PUBLIC_APP: "1"
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" test/support/run-direct-browser-tests.mjs 2>&1 | tee "$RUNNER_TEMP/direct-browser-tests.log"
+
+      - name: Upload native browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-proxy-diag-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/direct-browser-tests.log
+          if-no-files-found: error
+          retention-days: 14
