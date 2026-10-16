@@ -64,16 +64,15 @@ jobs:
             throw 'Mozilla background processes remain active before proxy acceptance'
           }
 
-      - name: Instrument proxy request ownership
-        working-directory: packages/loginom-runtime/client
-        run: '"$LOGINOM_AI_AGENT_TEST_NODE" ../../../script/windows-proxy-diag.mjs'
-
       - name: Verify direct Chromium and browser downloads
         working-directory: packages/loginom-runtime/client
         env:
           LOGINOM_DOCK_TEST_PUBLIC_APP: "1"
         run: |
-          "$LOGINOM_AI_AGENT_TEST_NODE" test/support/run-direct-browser-tests.mjs 2>&1 | tee "$RUNNER_TEMP/direct-browser-tests.log"
+          for repetition in 1 2 3; do
+            echo "Independent cold browser suite $repetition/3"
+            "$LOGINOM_AI_AGENT_TEST_NODE" test/support/run-direct-browser-tests.mjs 2>&1 | tee -a "$RUNNER_TEMP/direct-browser-tests.log"
+          done
 
       - name: Upload native browser evidence
         if: always()
