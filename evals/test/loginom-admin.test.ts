@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, readAdminPoolPolicy, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
+import { closeUserSessions, createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, readAdminPoolPolicy, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -10,6 +10,36 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 const owned = { remoteKey: "session-41", userKey: "user-a", username: "eval-a", serverEpoch: "epoch-1", pendingDisconnect: true, activeOperations: 0 }
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("slot closure uses exact native names, preserves peers and verifies fresh absence", async () => {
+  // The native service boundary owns these rows; no actor inventory qualifies them.
+  const sessions = ["admin:1", "eval-a:2", "eval-a:3", "eval-ab:4", "eval-b:5"].map(name => ({ name }))
+  const closed: string[] = []
+  const admin = {
+    async inspectSessionInventory() { return { sessions: sessions.filter(row => !closed.includes(row.name)) } },
+    async closeUserSession(username: string, name: string) {
+      expect(username).toBe("eval-a")
+      closed.push(name)
+    },
+  }
+  expect(await closeUserSessions(admin, "eval-a")).toEqual(["eval-a:2", "eval-a:3"])
+  expect((await admin.inspectSessionInventory()).sessions.map(row => row.name)).toEqual(["admin:1", "eval-ab:4", "eval-b:5"])
+  expect(await closeUserSessions(admin, "eval-a")).toEqual([])
+})
+
+test("ambiguous slot names refuse closure and a remaining session refuses completion", async () => {
+  const closed: string[] = []
+  const admin = {
+    async inspectSessionInventory() { return { sessions: [{ name: "eval-a:1" }, { name: "eval-a:1" }] } },
+    async closeUserSession(_username: string, name: string) { closed.push(name) },
+  }
+  await expect(closeUserSessions(admin, "eval-a")).rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
+  expect(closed).toEqual([])
+  await expect(closeUserSessions({ ...admin, async inspectSessionInventory() {
+    return { sessions: [{ name: "eval-a:1" }] }
+  } }, "eval-a")).rejects.toThrow("SESSION_STILL_PRESENT")
+  expect(closed).toEqual(["eval-a:1"])
+})
 
 test("session inventory reader preserves unqualified snapshots and refuses changed sources", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-session-inventory-")), fixture = await parallelFixture(root)

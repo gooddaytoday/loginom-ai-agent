@@ -4,6 +4,7 @@ import { lstat, mkdir, open, readFile, readdir, realpath } from "node:fs/promise
 import { createHash } from "node:crypto"
 import { createRequire } from "node:module"
 import { createInterface } from "node:readline"
+import { closeSlotUserSession } from "./loginom-admin-slots.mjs"
 
 const operations = ["init", "inspect", "reconcile-user", "configure-pool", "close-session", "confirm-session-absent", "dispose"]
 let context
@@ -139,6 +140,12 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "POOL_POLICY_UNKNOWN" } } }
       }, configure))
       respond(id, result.outcome, result.outcome === "confirmed" ? { identity, ...result.data } : result.data)
+      continue
+    }
+    if (request.op === "close-session" && request.payload?.username !== undefined) {
+      dispatched = true
+      const result = await bounded(request, page.evaluate(closeSlotUserSession, request.payload))
+      respond(id, result.outcome, result.data)
       continue
     }
     if (request.op === "close-session" || request.op === "confirm-session-absent") {
