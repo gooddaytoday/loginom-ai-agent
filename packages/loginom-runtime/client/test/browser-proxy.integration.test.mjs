@@ -11,6 +11,7 @@ import {networkInterfaces, tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {systemProxyFixture} from './support/system-proxy-fixture.mjs';
+import {isWindowsCryptoRequest, isWindowsCryptSvcOwner, observeWindowsCryptSvc} from './support/windows-crypto-probe.mjs';
 
 const execute = promisify(execFile);
 function trackSocket(socket, sockets) {
@@ -87,6 +88,8 @@ test('Loginom Chromium connects directly with a configured proxy', {
   const directory = await mkdtemp(join(tmpdir(), 'direct-browser-'));
   const requests = [];
   const connectivityProbes = [];
+  const certificateProbes = [];
+  const certificateObservations = [];
   const pacReads = [];
   const sockets = new Set();
   const origin = createServer((request, response) => {
@@ -110,10 +113,20 @@ test('Loginom Chromium connects directly with a configured proxy', {
       response.end('Microsoft Connect Test');
       return;
     }
+    // CryptSvc shares WinINET with the runner and retrieves these root CRLs.
+    // An URL/User-Agent match alone cannot exempt browser or unknown traffic.
+    if (process.platform === 'win32' && isWindowsCryptoRequest(request)) {
+      certificateObservations.push(observeWindowsCryptSvc(request.socket).then(owner => {
+        if (isWindowsCryptSvcOwner(owner, process.env.SystemRoot)) certificateProbes.push({url:request.url, owner});
+        else requests.push(request.url);
+      }).finally(() => response.end('PROXY')));
+      return;
+    }
     requests.push(request.url); response.end('PROXY');
   });
   const state = {};
   t.after(async () => {
+    await Promise.allSettled(certificateObservations);
     try { await state.native?.restore(); }
     finally {
       for (const socket of sockets) socket.destroy();
@@ -178,10 +191,12 @@ test('Loginom Chromium connects directly with a configured proxy', {
         const pacBefore = pacReads.length;
         await run('managed');
         await run('mcp');
+        await Promise.all(certificateObservations);
         assert.deepEqual(requests.slice(before), [], 'Product navigation must never reach the proxy');
         assert.equal(pacReads.length, pacBefore, 'Product browsers must not load a PAC');
       });
     }
   }
   if (connectivityProbes.length) t.diagnostic(`Separate Windows NCSI probes: ${connectivityProbes.length}`);
+  if (certificateProbes.length) t.diagnostic(`Separate Windows CryptSvc probes: ${JSON.stringify(certificateProbes)}`);
 });
