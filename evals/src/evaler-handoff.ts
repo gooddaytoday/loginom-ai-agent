@@ -32,12 +32,23 @@ export type HandoffReport = {
   status: "READY_FOR_BEN" | "ACCEPT" | "REJECT" | "BLOCKED"
   evidence?: HandoffEvidence
 }
-export type HandoffInput = { state: HandoffState; event: HandoffReport | { kind: "dispatch"; id: string; root_trigger: string | null } |
+export type HandoffInput = { state: HandoffState; event: HandoffReport |
+    { kind: "continue_after_evaler"; id: string; issue_id: string; report_id: string; sha: string; target: "Rich" | "Ben"; stand_ready?: boolean } | { kind: "dispatch"; id: string; root_trigger: string | null } |
     { kind: "receipt"; dispatch_id: string; outcome: NonNullable<HandoffState["last_dispatch"]>["outcome"]; task_id: string | null }; pending_tasks: { issue_id: string; phase: "rich" | "ben"; sha: string; task_id: string }[] }
 export type HandoffDecision = { action: "ready_to_dispatch" | "dispatch" | "no_action" | "blocked" | "in_review"; reason: string; state: HandoffState; target?: "Rich" | "Ben" }
 
 export function evaluateHandoff(value: unknown): HandoffDecision {
   const input = parseInput(value)
+  if (input.event.kind === "continue_after_evaler") {
+    if (input.state.processed_report_ids.includes(input.event.id)) return { action: "no_action", reason: "decision already processed", state: input.state }
+    const blocked = input.state.blocked_context
+    if (input.state.phase !== "blocked" || !blocked || input.event.issue_id !== input.state.issue_id ||
+      input.event.report_id !== blocked.report_id || input.event.sha !== blocked.sha)
+      return { action: "no_action", reason: "continuation requires the current blocked issue/report/SHA", state: input.state }
+    return { action: "ready_to_dispatch", target: input.event.target, reason: "Evaler decision recorded; dispatch separately",
+      state: { ...input.state, phase: input.event.target === "Rich" ? "rich" : "ben", executor: input.event.target,
+        blocked_context: undefined, last_dispatch: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
+  }
   if (input.event.kind === "receipt") {
     if (input.event.dispatch_id !== input.state.last_dispatch?.id) return { action: "no_action", reason: "stale dispatch receipt", state: input.state }
     if (["queued", "coalesced", "deferred"].includes(input.state.last_dispatch.outcome) &&
@@ -133,6 +144,9 @@ function parseInput(value: unknown): HandoffInput {
     return { issue_id: text(task.issue_id), phase: member(task.phase, ["rich", "ben"]), sha: sha(task.sha), task_id: text(task.task_id) }
   })
   const event = record(input.event)
+  if (event.kind === "continue_after_evaler") return { state, pending_tasks, event: { kind: "continue_after_evaler", id: text(event.id),
+    issue_id: text(event.issue_id), report_id: text(event.report_id), sha: sha(event.sha), target: member(event.target, ["Rich", "Ben"]),
+    ...(event.stand_ready !== undefined ? { stand_ready: flag(event.stand_ready) } : {}) } }
   if (event.kind === "dispatch") return { state, pending_tasks, event: { kind: "dispatch", id: text(event.id), root_trigger: event.root_trigger === null ? null : text(event.root_trigger) } }
   if (event.kind === "receipt") return { state, pending_tasks, event: { kind: "receipt", dispatch_id: text(event.dispatch_id),
     outcome: member(event.outcome, ["queued", "coalesced", "deferred", "ambiguous", "not_queued"]), task_id: event.task_id === null ? null : text(event.task_id) } }

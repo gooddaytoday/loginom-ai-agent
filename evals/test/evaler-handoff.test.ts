@@ -314,3 +314,23 @@ test("a blocked worker report retains its cause and actual SHA without changing 
   expect(result.state.reject_count).toBe(1)
   expect(JSON.stringify(input)).toBe(original)
 })
+
+test("Evaler's bound decision resumes the stopped worker without resetting counters", () => {
+  const stopped = evaluateHandoff({ state: { ...state, review_cycle: 2, reject_count: 1, rework_limit: 3 },
+    event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+  const event = { kind: "continue_after_evaler", id: "evaler-decision", issue_id: state.issue_id,
+    report_id: report.id, sha: next, target: "Rich" }
+  const result = evaluateHandoff({ state: stopped, event, pending_tasks: [] })
+  expect(result.action).toBe("ready_to_dispatch")
+  expect(result.target).toBe("Rich")
+  expect(result.state.phase).toBe("rich")
+  expect(result.state.executor).toBe("Rich")
+  expect(result.state.blocked_context).toBeUndefined()
+  expect(result.state.last_dispatch).toBeNull()
+  expect(result.state.base_sha).toBe(sha)
+  expect(result.state.frozen_sha).toBeNull()
+  expect(result.state.reject_count).toBe(1)
+  expect(result.state.review_cycle).toBe(2)
+  expect(result.state.rework_limit).toBe(3)
+  expect(result.state.processed_report_ids).toEqual([report.id, event.id])
+})
