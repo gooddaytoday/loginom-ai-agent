@@ -93,8 +93,8 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
   if (input.event.status === "REJECT") {
     const reject_count = input.state.reject_count + 1
     const next = { ...input.state, reject_count, processed_report_ids: [...input.state.processed_report_ids, input.event.id] }
-    if (reject_count >= 2) return { action: "in_review", reason: "OWNER_ACTION_REQUIRED: two consecutive REJECT",
-      state: { ...next, phase: "in_review", executor: null } }
+    if (reject_count >= 2) return { action: "blocked", reason: "EVALER_DECISION_REQUIRED: rework limit reached",
+      state: { ...next, phase: "blocked", executor: null } }
     return { action: "ready_to_dispatch", target: "Rich", reason: "REJECT: corrections require a new SHA",
       state: { ...next, phase: "rich", executor: "Rich" } }
   }

@@ -75,7 +75,7 @@ test("unknown cleanup and unverified results block handoff", () => {
   }
 })
 
-test("duplicate REJECT does not spend the budget; the second review rejects to the owner", () => {
+test("default rework limit stops the second fresh REJECT for Evaler without spending duplicates", () => {
   const reject = { ...verdict, status: "REJECT" as const }
   const first = evaluateHandoff({ state: reviewing(), event: reject, pending_tasks: [] })
   expect(first.action).toBe("ready_to_dispatch")
@@ -86,8 +86,9 @@ test("duplicate REJECT does not spend the budget; the second review rejects to t
   expect(replay.state.reject_count).toBe(1)
   const second = evaluateHandoff({ state: { ...reviewing(), reject_count: 1, review_cycle: 2 },
     event: { ...reject, id: "second-verdict" }, pending_tasks: [] })
-  expect(second.action).toBe("in_review")
-  expect(second.reason).toBe("OWNER_ACTION_REQUIRED: two consecutive REJECT")
+  expect(second.action).toBe("blocked")
+  expect(second.state.phase).toBe("blocked")
+  expect(second.reason).toBe("EVALER_DECISION_REQUIRED: rework limit reached")
   expect(second.state.reject_count).toBe(2)
 })
 
