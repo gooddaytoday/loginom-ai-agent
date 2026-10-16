@@ -3010,3 +3010,38 @@ auditfd2c5ff4… checks67/23 sources before the retained-idle assertion was adde
 This qualifies native Progress delivery and its completion transition. Populated
 Pool, backend operation/lock quiescence, interrupted work, targeted storage/backup
 cleanup and production admission remain open. No cleanup/operation grant follows.
+
+
+### Populated Pool outlives its creator — 2026-10-16
+
+The guarded research phase `session-pool-probe` accepts only the ephemeral
+`eval-pool-probe` account. Its local modes change design1→design/run3, with
+admin/global file access false. Normal eval accounts and permanent resources
+are unchanged. A source-checked own package is closed before the Scheduler job.
+The job is enabled for one manual ForceStart, PeriodNone with its automatic
+start one day ahead, startup/missed execution false and stop timeout10s.
+ApplyChanges takes `Ref(config)`. Only its returned GUID is deleted after an
+actual completed3 log; fresh own-job enumeration must be empty.
+
+After the creator's native session closes, the same package objectId/path still
+appears in Pool type3. Actual ReadOnly=false/referenceCount=-1/Progress=null are
+preserved without permission/reference-free inference. User-session absence is
+therefore insufficient for package quiescence. No global ClearPackagePool call
+is made and this test grants no slot cleanup or backend-lock authority.
+
+Missing-phase RED41/54.32s; normal-user/admin permission refusals retained;
+mutable Ref and disabled-job corrections; fresh-deletion RED42/62.05s→GREEN.
+Final ordinary/Progress/Pool3/174 PASS202.77s; related49/160 PASS22.14s,
+typecheck/syntax/diff PASS. Private71f121cd… source-audit SHA256
+`c8983e29af999ddabf6e02b77c87fd7127b5d5ebcedc65e78ff54d6b0c0cb700`
+checks69 facts/23 sources+8 pins: actual job/user/log, fresh deletion, retained
+Pool before/after causal creator close, both admin continuous closures/transport
+ACKs, exact own pair/network/root absence and retained input. Ordinaryb04f5f9f…
+audit70844392…67/23 and Progress48d3d0d9… audit5f1f3d77…69/23 pass on final
+sources. Seven failed/diagnostic fixtures retain executed sources/input and
+verified safe boundaries. Initialfac878fb… audit26865189…73/25 remains historical.
+
+Primary enums/UI are preserved in native-pool-schema-f6236ca2…/source.json SHA256
+`7a68a6b3c8afab41bc9a01acbf19062fc2daa3b1854fe09f59b227dfa70c5a01`;
+installed model RPC source was already frozen. Interrupted work, selected Pool
+closure, operation/lock quiescence, storage/backup and production remain open.
