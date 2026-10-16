@@ -3289,3 +3289,16 @@ Its independent audit9c9c3af9…61/16 preserves both verdicts/source snapshots
 and proves all own resources/roots absent. This is collector visibility, not
 a qualification of workload-wide quiescence. One never-started configuration
 fixture was removed after retaining its manifest and confirming empty journals.
+
+
+Fenced kernel snapshot receipt (2026-10-16): `captureServerFiles` and
+`readServerFiles` use the shared `src/server-files.ts` collector. A private,
+fsynced version1 receipt stores the raw NUL stream and ordered controller times,
+exact ServerIdentity, server command/token/revision/journal, slot/token and
+collector script SHA. Capture and replay recheck both held leases and current
+pair epoch; replay checks the immutable semantic source hash, protocol tags and
+single ordered outer boundaries before deriving process/FD/maps/lock data.
+`storageDeletionAllowed` and `nextAdmissionAllowed` remain false: this is one
+observation, not a session-close, operation-cessation or no-regrowth proof.
+Recovery requires a fresh observation under its current fences; old-token data
+is not silently adopted. Finalizer/cleanup consumption remains open.

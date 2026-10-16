@@ -806,7 +806,8 @@ First diagnostic7d37a6a8… preserved its callback-shadowing failure and complet
 metadata; audit18791214…82/28 checked teardown and recovered the minimal close
 reply only through an exact immutable journal replyHash match. Its resources/root
 are absent too. This establishes a positive package FD/FLOCK control. Durable
-fenced observation consumption, B-active filesystem controls, no-regrowth and
+finalizer/cleanup consumption of fenced observations, B-active filesystem
+controls, no-regrowth and
 general workload coverage remain open; operationsQualified and cleanupAllowed
 stay false. Final collector repeat7841a66a…1/65 PASS84.80s, auditf6eff982…
 82/28+11 pins confirms the same native control with the newline fix (controller
@@ -817,3 +818,13 @@ Its independent audit9c9c3af9…61/16 preserves both verdicts/source snapshots
 and proves all own resources/roots absent. This is collector visibility, not
 a qualification of workload-wide quiescence. One never-started configuration
 fixture was removed after retaining its manifest and confirming empty journals.
+
+
+Fenced kernel evidence producer/reader is now implemented (2026-10-16) in
+`src/server-files.ts`. Actual held-lease/raw-stream control c8719560… passes12
+assertions; audit6a282b8a…78/22 binds both original boundary RED and GREEN,
+8 tested sources each and full own resource/root absence. Source SHA, foreign
+slot and closed guard controls refuse; malformed protocol tags/boundaries refuse
+even with a recomputed hash. This resolves the durable point-observation gap.
+Finalizer binding, operation/package accounting, no-regrowth/B-active filesystem
+controls and actual cleanup consumption still remain; no grants were enabled.
