@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 
 test("cold reader rejects a different CLI source pin before loading browser resources", async () => {
@@ -99,3 +99,19 @@ test.skipIf(!process.env.EVAL_TEXT_IMPORT_COLD_REGRESSION)("cold reader without 
   expect(checked).toBe(0)
   expect(JSON.parse(verdict)).toEqual({ errors: [], failures: [] })
 }, 900_000)
+
+
+test("cold reader provenance inventories the actual integrated sources and declarations", async () => {
+  const root = path.join(evalsRoot, "script/text-import-cold")
+  const provenance = await Bun.file(path.join(root, "provenance.json")).json() as {
+    source_sha: string; files: { file: string; source: string; original_sha256: string; sha256: string }[]
+  }
+  expect(provenance.source_sha).toBe("5cd74d8ee5d6125692d953eb327b4d4f833c27a1")
+  for (const entry of provenance.files) {
+    const file = entry.file
+    expect(entry).toBeDefined()
+    expect(entry!.original_sha256).toMatch(/^[0-9a-f]{64}$/)
+    expect(entry!.sha256).toBe(new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(root, file)).bytes()).digest("hex"))
+  }
+  expect(provenance.files.map(entry => entry.file).sort()).toEqual((await readdir(root)).filter(file => file.endsWith(".mjs") || file.endsWith(".d.mts") || file === "cli-pins.json").sort())
+})

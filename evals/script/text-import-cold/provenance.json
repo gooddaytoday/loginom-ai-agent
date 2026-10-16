@@ -14,9 +14,11 @@
       "source": "scripts/node-acceptance/static-source-proof.mjs",
       "original_sha256": "1bfc8ca6d5ee9e36b805949e38d387926217b41086c7b9819fd1c23c73186b27",
       "adaptations": [
-        "extract independent server download verifier without unused CrossTable/collapse helpers"
+        "extract independent server download verifier without unused CrossTable/collapse helpers",
+        "integrated accepted pilot headless/viewport/CLI-tuple/navigation changes through eb1c2b0da0"
       ],
-      "sha256": "8c9f89ec1d2914c427c822b8cdac508b5496bafc1326ce805810f164d2341213"
+      "sha256": "a4c076104a96ac3db23dfc946163f2cfed431ca277fb36cb790d5aa97e95b159",
+      "integrated_source_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
     },
     {
       "file": "reader.mjs",
@@ -30,9 +32,11 @@
         "bind unique import by original GUID rather than optional node label",
         "headless:true through exact CLI launcher for runtime without a display server",
         "1920x1080 viewport through supported page API inside diagnostic session before workspace preparation; native ownership remains mandatory",
-        "explicit approved immutable CLI source/manifest/binary tuple, with original legacy pins preserved"
+        "explicit approved immutable CLI source/manifest/binary tuple, with original legacy pins preserved",
+        "integrated accepted pilot headless/viewport/CLI-tuple/navigation changes through eb1c2b0da0"
       ],
-      "sha256": "49d1fbefeec9430608579a65cf2a19a4378358cdedb90df9365acaf987ecd940"
+      "sha256": "e06843d12a30e370904ce6e504b00877f3ded63badb6d490a36fb00765a6eb82",
+      "integrated_source_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
     },
     {
       "file": "cli-pin.mjs",
@@ -41,7 +45,9 @@
       "adaptations": [
         "bind separate exact5cd and approved d73 prefix without changing upstream source/original hashes"
       ],
-      "sha256": "86da67324a41ced59f4c270dbbe273b8c1c53d315fe71ad12ec9e0ca8776df12"
+      "sha256": "86da67324a41ced59f4c270dbbe273b8c1c53d315fe71ad12ec9e0ca8776df12",
+      "source_sha": "b99d6f872e770eb7a7f4aa3b5498ce073013d734",
+      "original_sha256": "86da67324a41ced59f4c270dbbe273b8c1c53d315fe71ad12ec9e0ca8776df12"
     },
     {
       "file": "cli-pins.json",
@@ -51,7 +57,28 @@
         "bind separate exact5cd and approved d73 prefix without changing upstream source/original hashes",
         "diagnostic-only startup failure projection pin; runtime manifest remains byte-identical to d73"
       ],
-      "sha256": "8a4b10194310a5b405fd468c2afac5ca8eed5147dd3eef4d33d399ed2cb252ad"
+      "sha256": "8a4b10194310a5b405fd468c2afac5ca8eed5147dd3eef4d33d399ed2cb252ad",
+      "source_sha": "4fad349e7d8645f384d4a15dbafbd04db9a7b190",
+      "original_sha256": "8a4b10194310a5b405fd468c2afac5ca8eed5147dd3eef4d33d399ed2cb252ad"
+    },
+    {
+      "file": "source-navigation.d.mts",
+      "source": "evals/script/text-import-cold/source-navigation.d.mts",
+      "source_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "original_sha256": "f9e998c4ed90557352ebd650efa1e3d1334cf08a5db3b04e7c61fa19b6019266",
+      "adaptations": [],
+      "sha256": "f9e998c4ed90557352ebd650efa1e3d1334cf08a5db3b04e7c61fa19b6019266"
+    },
+    {
+      "file": "source-navigation.mjs",
+      "source": "evals/script/text-import-cold/source-navigation.mjs",
+      "source_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "original_sha256": "c30451c9333efddc2be96d2e4e0fd40cbb64c29ff020fb9ad51b0f33cf77ed1d",
+      "adaptations": [],
+      "sha256": "c30451c9333efddc2be96d2e4e0fd40cbb64c29ff020fb9ad51b0f33cf77ed1d"
     }
-  ]
+  ],
+  "integrated_from_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+  "historical_provenance_sha256": "d97abcf19e238f2205345330b5d14b2fb35fa447377c919917610df49d2aa905",
+  "integration_note": "Source inventory only; historical source_sha/original_sha256 and runtime claim retained. No new cold/reference/model run."
 }
