@@ -1,13 +1,20 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-16 — подготовлен выпуск v0.2.1
+## 2026-10-16 — выпуск v0.2.1 заблокирован Windows proxy gate
 
 Ветка `loginom`, база `b33555fee8`, изменение настройки `5ea6daf224`.
 Новые установки включают «Выбор агента»; сохранённый выбор не сбрасывается.
 Root/Desktop manifests и lock:0.2.1; frozen install PASS.
 Настройки/persist/agent:34 PASS; App typecheck PASS; review без замечаний.
 Packaging/static/notes:14 PASS,2 native macOS SKIP; pinned Node hash PASS.
-Следующий шаг:push annotated tag,полный CI,сверка assets и публикация pre-release.
+Release SHA:`aae2c5d35b87d4ce30a903b9101fe252ae0bbb66`;tag v0.2.1 и ветка pushed.
+CI38862534170:три build,unit/HttpApi,typecheck,e2e PASS;Linux matrix5/5 PASS.
+Windows:попытка1 LoginForm timeout15s;попытки2/3 CRL Microsoft в proxy trap.
+Diagnostic91369bfab2/run38866284961 подтвердил CryptSvc/svchost,CryptoAPI UA.
+Gate считает системные CRL продуктовым трафиком;исключения не добавлялись.
+Draft/release не создан;логи/snapshots сохранены в storage/tmp/release-v0.2.1.
+Следующий шаг:согласовать уточнение gate и замену неопубликованного тега0.2.1,
+затем проверка исправления,полный CI,сверка assets и публикация.
 Installed GUI/live приёмка не выполнялась; пользовательская установка не меняется.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-16-v0.2.1-release.md).
 
