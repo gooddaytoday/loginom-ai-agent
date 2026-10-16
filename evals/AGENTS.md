@@ -1,37 +1,43 @@
 # Eval harness
 
-## Контракт пользовательских слотов — 2026-10-13
+## Контракт пользовательских слотов — 2026-10-16
 
-Для нового режима нормативен [контракт v2](docs/parallel-users-contract.md), фактический статус —
-[runbook](../docs/testing/loginom-ai-agent/parallel-evals.md). Реализация начата; live v2 ещё не квалифицирован. Без
-EVAL_SLOTS_FILE остаётся legacy exclusive; прежние инструкции широкой очистки,
-миграции стенда и R/operations/stand.lease ниже относятся только к legacy.
-V2 создаёт новую пару на lg-pc-75 со своей сетью/портом; dev/legacy/remote
-стенды, исторические results и pins начатых серий сохраняются. Marker по
-/workdir/.loginom-evals-isolated.json имеет kind loginom-evals-users/version 2;
-совместимый v1 не создаётся, старые broad-cleanup executors на новой паре запрещены.
+Нормативны [контракт](docs/parallel-users-contract.md) и решения владельца
+от 2026-10-16; [короткий план](../docs/superpowers/plans/2026-10-16-evals-parallel.md)
+заменяет прежний план, [runbook](../docs/testing/loginom-ai-agent/parallel-evals.md)
+содержит команды. Старые правила и хроника — в
+[архиве](../docs/archive/2026-10-16-evals-parallel-history.md).
+Production slots admission пока закрыт; документы не доказывают готовность.
 
-Standalone prepare/verify выпускают доказанно чистые durable reservations и OS
-guards; readiness не резервирует среду. Crash освобождает guard, но retained
-reservation запрещает новый run. Recover требует incident/lineage/recovery-only
-CAS и новых proofs; отсутствие PID не разрешает takeover. Постоянный root
-/var/lib/loginom-evals/locks создаётся разовым bootstrap, prepare только проверяет
-его; stateDir и env/config не переносят global fence. Архив history/БД/WAL/SHM/inputs
-предшествует server close/readback; удаление только своего user root/backups
-требует closure proof. Unknown outcome сохраняет данные/fence; restart сервера
-для слота и широкая очистка запрещены. Admission failure до попыток — exit 2
-и preparation receipt без measured summary; карантин после dispatch — summary/exit 1.
+Одна server lock с долговечной бронью на run, locks профилей и judge home;
+без user lock. Prepare создаёт недостающее/проверяет права; run только проверяет.
+PackagePoolSize=0 до работы пользователя. Одно admin-соединение открывается
+до слотов; все сессии пользователя слота принадлежат ему, закрываются по точным
+native именам с перечитыванием списка. До удаления непосредственно проверить
+отсутствие открытых файлов в своём root; SessionBackup только читать,
+непустой/нечитаемый — остановка без удаления. Unknown ownership — без delete.
 
-Node-evals выбирает архив по доверенному slot_id без fallback.
-interrupted_cleanup — null без interrupted попыток, иначе OR profile_recovered
-только interrupted попыток. Приёмка: немодельные session/ACL/backup/process
-gates, затем полный LLM N=2 → N=1 и node-evals с неизменными pins/условиями.
-Новые eval-прогоны используют openai/gpt-6-luna/high и судью gpt-6-sol/xhigh;
-исторические модели/defaults ниже описывают прежние серии. Admin secrets/state
-остаются вне mounts/env/results; shared model OAuth и private judge CODEX_HOME
-проверяются отдельно. Skip и исторический PASS не доказывают готовность v2.
+Внутри run слоты не восстанавливать: карантин с сохранением результатов,
+здоровый продолжает очередь. Остатки разбираются одной повторяемой процедурой
+перед следующим run; неизвестность сохраняет бронь и данные. Сохраняются marker
+v2, subreaper, pid+starttime перед сигналом и запрет restart общего сервера.
+Полностью прочитанная чужая ancestry — без сигнала/карантина; нечитаемая — отказ.
 
-- Весь код harness живёт здесь; остальной репозиторий не менять. Runtime-зависимостей нет; dev-зависимости ставятся `bun install` в этом каталоге.
+Агент openai/gpt-6-luna/high, судья gpt-6-sol/xhigh. N=1 даёт замер порогов,
+владелец утверждает их до реального N=2 на трёх небольших задачах. Сравнение
+качества N=1/N=2 не входит в эту цель. Обязательная ресурсная приёмка — бюджет,
+host/container CPU/RAM, диск/OOM, лицензия/provider errors; процессы диагностические.
+Не развивать эпохи, user locks, process inventories/telemetry, FD/kernel receipts
+и server-storage archives. Только четыре обязательных live A/B сценария;
+прочие native tests по явному флагу. Новый код — unit TDD, отдельные коммиты.
+
+До реализации получить независимое ревью короткого плана, показать владельцу
+план и удержанные ресурсы и ждать ответа. Блокер сквозного пути, изменение
+требования или удаление кроме собственных временных файлов текущего хода —
+запрос владельцу и остановка до ответа. Старые incident-данные/чужие изменения
+сохранять; согласование плана не разрешает удалять удержанные стенды.
+
+- Весь код harness живёт здесь; вне него меняются только затронутые документы и явно разрешённый владельцем judge launcher в отдельном репозитории. Runtime-зависимостей нет; dev-зависимости ставятся `bun install` в этом каталоге.
 - Разработка строго по TDD (`/tdd`): один падающий тест поведения → минимальная реализация → зелёный → коммит. Тесты через публичные интерфейсы модулей из спеки; без моков и `globalThis.*`. Внешние процессы подменяются только `EVAL_CLI_MODE=fake`, `EVAL_ARTIFACT_SOURCE=dir:`, `EVAL_JUDGE_COMMAND`.
 - Команды выполняются из `evals/`: `bun test`, `bun typecheck`, `bun run src/run.ts`. Из корня репозитория тесты не запускать.
 - Контракт данных (статусы, `judge_status`, `failure_kind`, поля `summary.json`) описан в `docs/superpowers/specs/2026-09-18-evals-design.md`; при расхождении сначала правится спека.
@@ -41,7 +47,7 @@ gates, затем полный LLM N=2 → N=1 и node-evals с неизменн
 - Калибровка исключает requires_run. Positive с oracle.csv и near-miss с синтетическим CSV включают requires_result_file и oracle; чужой эталон и positive без oracle исключают result-пункты. Near-miss требует всех expected_failed и точного expected_oracle_pass; score/отказ oracle не заменяют обнаружение ошибки судьёй. Корпус и независимый пересчёт — calibration/ и script/check-calibration-corpus.py. Для подготовки требуются zip/unzip/xmllint; XML изменённых файлов проверяется после всех замен до пересборки архива и вызовов судьи. Невалидный XML или отсутствие xmllint дают exit 2. Python нужен только независимому пересчёту.
 - Для новых прогонов с 2026-10-12 использовать судью `gpt-6-sol/xhigh` (`JUDGE_MODEL=gpt-6-sol`, `JUDGE_REASONING=xhigh`). Исторические результаты и pins начатых серий сохраняют прежнего судью. Для 30 новых analytic-кейсов обычная калибровка 2026-10-20 прошла: positive 100/oracle=true, foreign negative 0–25, пороги 90/40; [pins и результат](docs/2026-10-20-analytic-evals-import.md). Эта серия не содержит near-miss; полная near-miss приёмка прежних 35 на новой модели этим не подтверждается. Всего analytic-кейсов 65, near-miss покрывает 35 задач / 114 мутаций.
 - Полная near-miss приёмка 2026-10-06: 183/183, gpt-6-astra/high, exit 0; SHA и хэши в [отчёте](../docs/testing/loginom-ai-agent/reports/2026-10-06-calibration-near-miss.md). При смене промпта весь корпус пересуживается; рубрики и ожидания не ослабляются ради прохождения.
-- Дочерние процессы агента и судьи не наследуют `LOGINOM_*` / `EVAL_*` / `JUDGE_*` / `FAKE_CODEX_*`; агенту заново выставляются четыре базовых `LOGINOM_AI_AGENT_*`; v2 дополнительно задаёт `LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS=false` и только настроенный `auth.sharedDir` через `LOGINOM_AI_AGENT_SHARED_AUTH_DIR`, судье можно явно передать ключи через `judge.env`.
+- Дочерние процессы агента и судьи не наследуют `LOGINOM_*` / `EVAL_*` / `JUDGE_*` / `FAKE_CODEX_*`; агенту заново выставляются четыре базовых `LOGINOM_AI_AGENT_*`; v2 дополнительно задаёт `LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS=false` и только настроенный `auth.sharedDir` через `LOGINOM_AI_AGENT_SHARED_AUTH_DIR`, судье через `judge.env` передаются только несекретные настройки; секреты остаются вне окружения агента/судьи и results.
 - В полном режиме preflight вызывает `checkStorage` (листинг `dir:` или docker-хранилища); ошибка — `EvalFailure` код 2.
 - Если листинг остатков не удался, `storage_leftovers` в `summary.json` равен `null` (не пустой массив).
 - Уточнения после review PR #61: процентные пороги конфигурации — целые `1..100`; `--version` судьи использует тот же фильтр окружения и явные overrides, что исполнение судьи; каталоги run/calibrate атомарно резервируются с уникальным суффиксом к прежнему префиксу; одинаковые basename в `inputs` запрещены до dispatch, плоские workspace-имена сохранены. Решения и проверки: [контрольная точка](docs/2026-10-12-pr61-review-fixes.md).
@@ -56,10 +62,10 @@ gates, затем полный LLM N=2 → N=1 и node-evals с неизменн
   абсолютный профиль и закреплённый публичный MODELS_PATH; секреты не копируются
   в pins/evidence. Требования общего runner выше не изменяются.
 
-- При настроенном v2 `auth.sharedDir` readiness проверяет публичный `providers status --provider <id> --format json` установленного CLI (`shared-oauth-status-v1`), а не local auth.json. Ответ допускается только при совпадающем provider, UUID generation, principal hash, boolean refresh requirement и успешном exit; ошибки не раскрывают raw provider output. Capability и успешный немодельный status не заменяют live OAuth/forced-refresh qualification.
+- При настроенном v2 `auth.sharedDir` readiness проверяет публичный `providers status --provider <id> --format json` установленного CLI (`shared-oauth-status-v1`), а не local auth.json. Ответ допускается только при совпадающем provider, UUID generation, principal hash, boolean refresh requirement и успешном exit; ошибки не раскрывают raw provider output. Capability и немодельный status не заменяют реальное исполнение модели; отдельная forced-refresh проба не входит в новую обязательную приёмку.
 
 - Решение и последовательность: [план](docs/2026-10-07-analytic-evals-isolation-plan.md). Отклонение от внешней спеки фиксируется здесь, чтобы изменения оставались внутри `evals/`: default `EVAL_CLI_MODE=source` сохраняется для совместимости конфигурации, но live-вызовы `main()` допускают только установленный binary CLI в обязательной Linux bubblewrap-границе. Это касается и node-evals/LAB-16; fake/dry-run, judge-only и калибровка не запускают оцениваемого агента и сохраняют свой путь.
 - Агенту доступны только prompt, inputs текущей попытки, подготовленный writable-профиль и ресурсы продукта. Harness/судья, корпус, Git, исходный agent-validation, результаты и закрытый архив истории остаются вне mounts. Ошибка установки или исполнения границы — `harness_error`, остановка без судьи/retry/fallback.
-- OAuth и `cli-profile.json` сохраняются на запись. После подтверждённого завершения процессов/recovery история **каждой** попытки (включая retry), БД с WAL/SHM и inputs переносятся в закрытый архив вне mounts. Это изменяет прежнюю политику долговечности в `profile.test.ts`: история долговечна в архиве, а не в рабочем профиле. Pending recovery или ошибка переноса запрещают следующую попытку.
+- OAuth и `cli-profile.json` сохраняются на запись. После подтверждённого завершения своих процессов история **каждой** попытки (включая retry), БД с WAL/SHM и inputs переносятся в закрытый архив вне mounts. Это изменяет прежнюю политику долговечности в `profile.test.ts`: история долговечна в архиве, а не в рабочем профиле. Неопределённый cleanup или ошибка переноса запрещают следующую попытку в этом слоте.
 - Live требует выделенный чистый Loginom и эксклюзивное окно endpoint без внешних отладчиков. Широкая очистка разрешена только после повторной проверки маркера подготовки, container ID, фиксированных корней и отсутствия host bind mounts. Прежняя адресная очистка остальных источников сохраняется; default container и `.env` не разрешают широкое удаление.
 - Старый неизолированный и новый изолированный прогоны не являются контролируемым сравнением, даже если `compare` допускает его по модели/хэшам/судье. Архивная БД сохраняет доказательство модели LAB-16; параллельные live-приёмки на том же endpoint несовместимы с эксклюзивным окном.
