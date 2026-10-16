@@ -63,3 +63,15 @@ rechecks birth/UID/executable/group/session at the syscall boundary. The measure
 result is137 without timeout/interrupted; the AbortController stays unused.
 Both active cases retain120s CLI/300s aggregate bounds. The RED control deliberately
 used abort and failed its137 expectation after safe archive/finalization.
+
+The kernel file control uses the same detached twenty-second native package.
+`server-files.sh` reads process stat/maps, matching UserStorage/SessionBackup FD
+targets with stat/fdinfo, and kernel locks before/after the bounded scan. It
+excludes the inspector process and checks process-set/birth stability. Loginom
+retains an advisory write FLOCK on `.progress-probe.lgp.lck` in PID1; the LGP
+contents need not retain a data FD. The test checks that exact lock inode and
+own-root descriptors disappear after active CloseSession. A separate disposable
+pair holds an FD with a trailing-LF name and runs an executable copied under
+its own storage root: exact path and non-daemon mmap are visible before natural
+exit and absent afterward. `readlink -n` plus a sentinel preserves the trailing
+LF through shell substitution. Normal cleanup/admission consumption remains open.
