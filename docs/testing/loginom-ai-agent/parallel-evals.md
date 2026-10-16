@@ -1399,3 +1399,33 @@ research namespaces; normalRelease, storageDeletionAllowed and nextAdmissionAllo
 remain false. Production recovery, FD/locks/no-regrowth and live admission keep
 their existing gates. Older unrelated incidents were preserved. Four duplicate
 temporary logs were removed only after matching retained SHA256 copies.
+
+
+Native package FD/flock follow-up (2026-10-16): a bounded read-only kernel
+observer on the ordinary unprivileged research pair enumerates container
+processes, brackets their births, and records scoped FD targets/stat/fdinfo,
+raw maps and `/proc/locks`. The collector excludes its own PID. The native
+package retains a PID1 sidecar `.progress-probe.lgp.lck`; fdinfo and both kernel
+lock snapshots positively identify FLOCK ADVISORY WRITE on its exact inode.
+After active bound CloseSession and fresh package absence, both post-close kernel
+lock snapshots lack that tuple and no own-root descriptors remain; daemon birth
+is unchanged. A directory FD appeared only in the earlier diagnostic sample.
+Native1/65 PASS71.90s; private7b3fb852… audit77f25169…82 checks/28 sources+11
+source/binary/input pins, both admin closures/transport ACKs and exact own
+pair/network/root absence. Source start→native absence3640ms is a controller
+observation interval. Related50/162 PASS25.04s, typecheck/shell syntax/diff PASS.
+First diagnostic7d37a6a8… preserved its callback-shadowing failure and complete
+metadata; audit18791214…82/28 checked teardown and recovered the minimal close
+reply only through an exact immutable journal replyHash match. Its resources/root
+are absent too. This establishes a positive package FD/FLOCK control. Durable
+fenced observation consumption, B-active filesystem controls, no-regrowth and
+general workload coverage remain open; operationsQualified and cleanupAllowed
+stay false. Final collector repeat7841a66a…1/65 PASS84.80s, auditf6eff982…
+82/28+11 pins confirms the same native control with the newline fix (controller
+source start→absence5567ms). A separate real child control3193c23f… RED→
+4210e0e9… GREEN1/9 PASS30.52s qualifies exact trailing-LF FD targets and a
+positive executable mmap; sentinel-preserving readlink fixes shell trimming.
+Its independent audit9c9c3af9…61/16 preserves both verdicts/source snapshots
+and proves all own resources/roots absent. This is collector visibility, not
+a qualification of workload-wide quiescence. One never-started configuration
+fixture was removed after retaining its manifest and confirming empty journals.
