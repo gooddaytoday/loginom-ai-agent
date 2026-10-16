@@ -1,4 +1,5 @@
 import path from "node:path"
+import os from "node:os"
 import { parseArgs } from "node:util"
 import { EvalFailure } from "./fail"
 import type { JudgeProcessEvidence } from "./judge-process-evidence"
@@ -98,7 +99,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       cliMode: mode,
       cliBin: env.EVAL_CLI_BIN,
       bundle: path.resolve(evalsRoot, env.EVAL_CLI_BUNDLE ?? ".bundle"),
-      workspaceRoot: env.EVAL_WORKSPACE_ROOT ?? "/tmp/loginom-evals",
+      workspaceRoot: env.EVAL_WORKSPACE_ROOT ?? path.join(os.tmpdir(), "loginom-evals"),
       provider: providerId
         ? {
             id: providerId,
