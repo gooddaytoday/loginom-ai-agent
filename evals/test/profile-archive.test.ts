@@ -3,6 +3,7 @@ import path from "node:path"
 import { chmod, link, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { archiveProfileEvidence } from "../src/profile-archive"
+import { superviseProcess } from "../src/process-supervisor"
 
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), "evals-durable-archive-"))
@@ -28,6 +29,42 @@ test("durable archive: DB/WAL/SHM and inputs move under a committed private mani
     expect(await Bun.file(path.join(context.profile, "data/auth.json")).text()).toBe("retained-auth-fixture")
     expect(await Bun.file(context.journal).json()).toMatchObject({ version: 1, kind: "profile-archive", status: "committed", profile: context.profile, archive: context.archive })
   } finally { await context.close() }
+})
+
+test("durable archive: stopped pending recovery is preserved before backend closure", async () => {
+  const context = await fixture()
+  const pending = "loginom/recovery/interrupted.tmp"
+  try {
+    await Bun.write(path.join(context.profile, pending), "unresolved native operation")
+    expect(await archiveProfileEvidence(context.profile, context.archive, context.journal)).toMatchObject({ status: "committed" })
+    expect(await Bun.file(path.join(context.archive, pending)).text()).toBe("unresolved native operation")
+    expect(await Bun.file(path.join(context.profile, pending)).exists()).toBe(false)
+    expect((await Bun.file(context.journal).json()).roots.some((root: { name: string }) => root.name === "loginom/recovery")).toBe(true)
+  } finally { await context.close() }
+})
+
+test("durable archive: a live profile process prevents pending recovery from moving", async () => {
+  const context = await fixture()
+  const abort = new AbortController()
+  const ready = path.join(context.root, "ready")
+  const pending = superviseProcess({ cmd: [process.execPath, "-e", `await Bun.write(${JSON.stringify(ready)}, "ready"); await Bun.sleep(10000)`, context.profile],
+    cwd: context.profile, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 15_000, outDir: context.root,
+    owner: { kind: "command", id: crypto.randomUUID() }, signal: abort.signal })
+  try {
+    const deadline = Date.now() + 5000
+    while (!await Bun.file(ready).exists() && Date.now() < deadline) await Bun.sleep(25)
+    expect(await Bun.file(ready).exists()).toBe(true)
+    await Bun.write(path.join(context.profile, "loginom/recovery/interrupted.tmp"), "preserve live state")
+    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("ARCHIVE_PROFILE_BUSY")
+    expect(await Bun.file(path.join(context.profile, "loginom/recovery/interrupted.tmp")).text()).toBe("preserve live state")
+    expect(await Bun.file(context.journal).exists()).toBe(false)
+    expect(await Bun.file(path.join(context.profile, "data/loginom-ai-agent.db")).exists()).toBe(true)
+  } finally {
+    abort.abort()
+    const run = await pending
+    if (run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete) await context.close()
+    expect(run.processCleanup.status).toBe("confirmed")
+  }
 })
 
 test("durable archive: a committed archive is reused without replacing its manifest with an empty one", async () => {
@@ -181,7 +218,7 @@ test("durable archive: a live env-only writer preserves history and creates no i
     { cwd: context.profile, env: { PATH: process.env.PATH, LOGINOM_AI_AGENT_CLI_PROFILE: context.profile }, stdout: "pipe", stderr: "pipe" })
   try {
     expect(new TextDecoder().decode((await child.stdout.getReader().read()).value)).toContain("ready")
-    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("незавершённое")
+    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("ARCHIVE_PROFILE_BUSY")
     expect(await Bun.file(context.journal).exists()).toBe(false)
     expect(await Bun.file(path.join(context.profile, "data/loginom-ai-agent.db")).text()).toBe("database")
     expect(process.kill(child.pid, 0)).toBe(true)

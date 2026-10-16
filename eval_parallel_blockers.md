@@ -709,3 +709,36 @@ Failed011628b4… was safely settled from actual closure/transport proofs after
 fixing the fixture's object-vs-boolean check; original failure remains.
 Actual CLI crash, FD/locks/no-regrowth, backup/storage and full cleanup/runtime
 admission still require qualification.
+
+
+Actual CLI interruption probe (2026-10-16, pending): private
+`native-agent-replay-f5473183-f4fe-4df9-9b2d-d10ac61244e9` used real sandboxed
+CLI and local deterministic provider. New Calculator correctly refused an
+inactive upstream output before mutation. The research provider kept waiting on
+that terminal refusal until the unchanged60s invocation deadline; measured run
+is timedOut=true/interrupted=false, not an active-operation interruption proof.
+Local CLI/admin settlement is confirmed, but a134-byte recovery `.tmp` keeps
+`assertProfileSettled` closed. `finalizeSlotAttempt` refused archive-before-close;
+no backend close, storage cleanup, next admission or normal release was granted.
+Root `/home/kiselev/storage/tmp/evals-native-agent-ZjdFIE`, history
+`/home/kiselev/storage/tmp/evals-native-history-V0RmVF`, server3167e2b4…,
+studio7a62a607…, network84ae04a9… are retained with original evidence and pending
+reservations. Do not unlink the marker or infer recovery from a dead PID. Needed:
+source-qualified handling of pending stopped-writer history before native close;
+current archive API intentionally requires a settled profile. Independently fix
+the provider terminal wait and exercise an already linked Calculator so its
+existing-node path can activate the bounded source without the new-node preflight.
+
+Pending archive follow-up (2026-10-16): the primitive now archives pending history
+after writer-marker absence and two fresh idle checks, preserving bytes/inodes
+in its durable manifest. Unit RED→GREEN14/88 PASS24.77s; strict admission and native
+closure authority remain separate. This resolves the archive-vs-admission
+conflation, pending native finalizer rerun. Existing f547 incident is not released.
+Additional original retained probes:2f0726d8-7274-4980-9007-e64ce2f25b9a, root
+`/home/kiselev/storage/tmp/evals-native-agent-5FqIMa`, historyUURaKz, server56d46800…/
+studio3d3d88d1…/network0447fd87… timed out at60s before execution; and
+dc751ee6-eb90-4fda-9338-e4d4b7d73a38, root
+`/home/kiselev/storage/tmp/evals-native-agent-fHXu1g`, actually interrupted on
+Progress at77.681s (new scenario budget120s), backend active after local closure.
+Both failed at the old archive barrier and retain reservations/history/resources.
+They require source-qualified recovery; no PID-only or reservation unlink cleanup.

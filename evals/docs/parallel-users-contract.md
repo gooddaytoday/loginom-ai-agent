@@ -3198,3 +3198,15 @@ after all three actual closure/transport sources qualified; original failures
 remain intact. Peer teardown uncertainty now prevents fixture deletion.
 This qualifies native JS/user independence; actual CLI crash, backend FD/locks,
 backup/storage/no-regrowth and durable evaluated cleanup/admission remain open.
+
+
+Pending local recovery and evidence archive (2026-10-16): durable evidence
+archival is separate from readiness/admission. With the exclusive profile lease
+held, archiveProfileEvidence rejects a writer marker or a live profile process
+(two fresh idle observations). Quiescent recovery .tmp/.json and pending connection
+files are moved intact as history under the existing inode/hash manifest; this
+does not resolve their native effects. assertProfileSettled and admission retain
+their strict checks. The finalizer still requires qualified process closure,
+committed archive-before-close and exact native session absence, and keeps both
+storageDeletionAllowed and nextAdmissionAllowed false. Unit controls cover
+pending history, actual argv/env-only live writers, interrupted moves and replay.
