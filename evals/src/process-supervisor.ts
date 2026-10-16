@@ -181,7 +181,7 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
   } catch (error) {
     if (gone(error)) return undefined
     const denied = ["EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")
-    if (!relevant && denied) return undefined
+    if (denied && !required && !await hasOwnedAncestry(pid, owners)) return undefined
     // exec can briefly reset dumpability. A fresh complete read must still
     // establish identity; persistent denial consumes the same bounded budget.
     if (relevant && denied && retries) {
@@ -191,6 +191,24 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     // These reads only use /proc paths; retain the cause without exposing argv.
     throw Error(`Cannot inspect process identity PID ${pid}: ${message(error)}`, { cause: error })
   }
+}
+
+/** Read only kernel ancestry; foreign executable/env permissions cannot confer ownership. */
+export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity, "pid" | "starttime">[]) {
+  if (!Number.isSafeInteger(pid) || pid < 1) throw Error("Invalid process identity")
+  const seen = new Set<number>()
+  let current = pid
+  while (current) {
+    if (seen.has(current)) throw Error("Process parent chain changed")
+    seen.add(current)
+    const raw = await readFile(`/proc/${current}/stat`, "utf8")
+    const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+    const parent = Number(fields[1])
+    if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
+    if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true
+    current = parent
+  }
+  return false
 }
 
 async function snapshot(owners: ProcessIdentity[] = []) {
@@ -623,9 +641,11 @@ export async function superviseProcess(input: {
       }
       // An adopted process with a lost chain may be a browser helper outside the
       // bundle. Adoption cannot bypass executable admission, including its children.
-      const native = live.filter((entry) => !peerIds.has(key(entry)) && !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
+      const native = (await Promise.all(live.filter((entry) => !peerIds.has(key(entry)) && !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
         inside(entry.executable, browser.directory) || ledger.has(key(entry)) &&
           (browserAncestor(ledger.get(key(entry))!, false) || cliPid !== undefined && entry.pid !== cliPid && ledger.get(key(entry))!.origin?.via === "subreaper")))
+        .map(async entry => ledger.get(key(entry))?.origin || root && await hasOwnedAncestry(entry.pid, [root]) ? entry : undefined)))
+        .filter(entry => entry !== undefined)
       // Establish exact root bindings first. Helpers cannot supply a missing
       // root proof, even when the kernel has adopted them to our launcher.
       for (const current of native) {
