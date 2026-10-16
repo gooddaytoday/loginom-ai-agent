@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { closeUserSessions, createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, readAdminPoolPolicy, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
+import { closeUserSessions, createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, readAdminPoolPolicy, requireSlotUserPolicy, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -10,6 +10,47 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 const owned = { remoteKey: "session-41", userKey: "user-a", username: "eval-a", serverEpoch: "epoch-1", pendingDisconnect: true, activeOperations: 0 }
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
   studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+
+test("fresh slot policy refuses missing users and rights drift without changing the observation", () => {
+  const user = Object.freeze({ objectId: "fresh-proxy", name: "eval-a", userKind: 0, authMode: 1,
+    isAdmin: false, isDesigner: true, isViewer: false, blocked: false, useGlobalFileStorage: false,
+    schedulerFullAccess: false, allowPublish: false })
+  const observed = Object.freeze({ users: Object.freeze([user]), sharedDirectories: Object.freeze([]) })
+  expect(requireSlotUserPolicy(observed, "eval-a")).toEqual(user)
+  expect(() => requireSlotUserPolicy(observed, "eval-b")).toThrow("SLOT_USER_MISSING")
+  for (const drift of [{ isAdmin: true }, { isDesigner: false }, { isViewer: true }, { blocked: true },
+    { useGlobalFileStorage: true }, { schedulerFullAccess: true }, { allowPublish: true }, { authMode: 0 }])
+    expect(() => requireSlotUserPolicy({ ...observed, users: [{ ...user, ...drift }] }, "eval-a")).toThrow("SLOT_USER_POLICY_DRIFT")
+  expect(() => requireSlotUserPolicy({ ...observed, sharedDirectories: [{ permissions: [{ name: "Everyone" }] }] }, "eval-a"))
+    .toThrow("SLOT_ACL_DRIFT")
+  expect(() => requireSlotUserPolicy({ ...observed, users: [user, { ...user, name: "Eval-a" }] }, "eval-a"))
+    .toThrow("SLOT_USER_IDENTITY_AMBIGUOUS")
+  expect(observed.users[0]).toBe(user)
+})
+
+test("the working admin driver rejects research operations without starting a browser", async () => {
+  const child = Bun.spawn([process.execPath, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], {
+    env: { PATH: "/usr/bin:/bin" }, stdin: "pipe", stdout: "pipe", stderr: "pipe",
+  })
+  child.stdin.write(JSON.stringify({ v: 1, id: "research-refused", op: "reconcile-user", expectedIdentity: identity,
+    deadline: Date.now() + 5000, payload: { phase: "session-backup-probe" } }) + "\n")
+  child.stdin.end()
+  expect(JSON.parse(await new Response(child.stdout).text())).toMatchObject({ outcome: "not_applied", data: { code: "ADMIN_CAPABILITY_UNSUPPORTED" } })
+  expect(await child.exited).toBe(0)
+  expect(await new Response(child.stderr).text()).toBe("")
+})
+
+test("preparation without a diagnostic inventory reaches runtime verification under its server guard", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-admin-direct-")), fixture = await parallelFixture(root)
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "direct", identity, phase: "unactivated" })
+  const server = await acquireResourceLease({ key: `server:${identity.containerId}`, identity, journal, commandId: "direct", lockRoot: fixture.lockRoot })
+  try {
+    await expect(openLoginomAdmin(fixture.slots, identity, { serverLease: server, binary: path.join(root, "missing-runtime") }))
+      .rejects.toMatchObject({ code: "ENOENT" })
+    await server.assertHeld()
+  } finally { await server.close(); await rm(root, { recursive: true }) }
+})
 
 test("slot closure uses exact native names, preserves peers and verifies fresh absence", async () => {
   // The native service boundary owns these rows; no actor inventory qualifies them.

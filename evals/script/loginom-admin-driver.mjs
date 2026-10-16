@@ -27,6 +27,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
   try {
     if (!valid || disposed) throw Error("ADMIN_REQUEST_INVALID")
     if (request.deadline <= Date.now()) throw Error("ADMIN_DEADLINE")
+    if (request.op === "reconcile-user" && request.payload?.phase?.startsWith("session-") && process.env.LOGINOM_EVALS_ADMIN_RESEARCH !== "1")
+      throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
     if (request.op === "dispose") {
       dispatched = Boolean(context)
       const transportDisconnect = context && identity ? await bounded(request, page.evaluate(async () => {
@@ -878,7 +880,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const listed = await cast(await enumerator.Current, bg.IBGDeductorUser)
             users.push({ objectId: (await bg.ProxyObjectsHelper.GetObjectId(listed)).toString(), name: await listed.Name, userKind: await listed.UserKind,
               isAdmin: await listed.IsAdmin, isDesigner: await listed.IsDesigner, isViewer: await listed.IsViewer, blocked: await listed.Blocked,
-              useGlobalFileStorage: await listed.UseGlobalFileStorage, schedulerFullAccess: await listed.SchedulerFullAccess })
+              useGlobalFileStorage: await listed.UseGlobalFileStorage, schedulerFullAccess: await listed.SchedulerFullAccess,
+              authMode: await listed.AuthMode, allowPublish: await listed.AllowPublish })
           }
         } finally { await ReleaseObject(enumerator, true) }
         const sharedDirectories = []

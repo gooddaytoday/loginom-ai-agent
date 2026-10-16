@@ -71,6 +71,8 @@
   проверить весь prepare/verify/run путь без создания пользователей во время run.
 - [ ] RED: prepare создаёт только недостающее/проверяет права; verify/run отказывают
   на missing user, ACL drift, Pool!=0 и непустой SessionBackup без исправлений/delete.
+  Свежая read-only проверка пользователя/ролей/ACL реализована; подключение
+  prepare/verify/run и проверки Pool/SessionBackup ещё впереди.
 - [ ] GREEN: переиспользовать рабочие lease/preparation primitives; исключить user
   lock из нового пути. Одна повторяемая startup-процедура сверяет остатки прошлого
   run; неизвестность сохраняет карантин. Не расширять recovery/epoch API.
@@ -93,8 +95,11 @@
   архивировать профиль/результаты, закрыть свои сессии, перечитать и непосредственно
   проверить открытые файлы перед очисткой своего root. Не развивать замороженный
   server-storage archive diff; после разрешённого отката модуль не подключать.
-- [ ] Исключить research phases из рабочих операций admin-драйвера; не вводить
+- [x] Исключить research phases из рабочих операций admin-драйвера; не вводить
   заменяющий probe protocol. Их окончательное удаление — только после N=2.
+  Драйвер требует явный LOGINOM_EVALS_ADMIN_RESEARCH=1 для старых probes;
+  штатный openLoginomAdmin его не передаёт. Read-only/native boundary32/131
+  unit PASS10.82s, typecheck/diff PASS.
 - [ ] Проверить `bun run test test/loginom-admin.test.ts test/artifact.test.ts test/profile-archive.test.ts`
   и `bun typecheck`; коммит `feat(evals): close slot user sessions before cleanup`.
 
@@ -236,4 +241,5 @@ private config/budget/results вне Git; операторские команд�
 14. Writer diagnostic: profile75/218 PASS47.34s +typecheck;2 proc-denial cases исключены.
 15. Foreign ancestry: ownership/management25 PASS/125 assertions109.40s +typecheck,82 filtered.
 16. Exact-name close:53/221 unit PASS29.31s +typecheck/diff; native A/B ещё не выполнен.
-17. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
+17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
+18. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
