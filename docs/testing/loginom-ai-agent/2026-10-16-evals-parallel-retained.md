@@ -97,7 +97,8 @@ research labels/nonces и сохранёнными записями. Во все
   Происхождение — эта цель. Global reservation для
   `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex` — `retained`,
   command `585940be-5c1b-4bff-a7c6-00459a4f7fa3`. Старый launcher подменял home;
-  status не квалифицирует выделенный home. Для нового run этот home не используется.
+  status не квалифицирует выделенный home. Владелец разрешил переиспользовать home и снять ровно эту бронь;
+  A00yuH не удалять, проверка входа без модели через исправленную обёртку.
 - **aeGGa8**: `/home/kiselev/storage/tmp/evals-agent-inventory-aeGGa8` существует.
   Старый process inventory отказ с неполной атрибуцией. Происхождение — эта цель;
   сохраняется для разбора, в новом пути не используется.
@@ -132,7 +133,8 @@ research labels/nonces и сохранёнными записями. Во все
   не подменяет этот FAIL на PASS; исправление теста по новой цели не выполняется.
 - Незакоммиченные `evals/src/attempt-finalization.ts` и
   `evals/test/native-agent-run-integration.test.ts` относятся к server-storage
-  archive. Сохранены byte-for-byte, не завершаются и не включаются в docs commit.
+  archive. Владелец разрешил сохранить один private diff и откатить только их;
+  модуль не подключается, его удаление — шаг7.
 - Чужой `docs/2026-10-15-evals-parallel-overengineering-review.md` не изменён
   и не включается в коммит. Чужая текстовая правка старого плана сохранена
   verbatim внутри архивного снимка вместе с остальным старым планом.
@@ -153,7 +155,7 @@ Dev `loginom-server-7.4.2-test`/`loginom-client-7.4.2-test`, legacy
 
 Создать новую acceptance pair и private root
 `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/` по короткому плану.
-На момент проверки root и имена контейнеров отсутствуют. Новый judge home
-обходит retained старый home без его освобождения или удаления. Для нового run
+На момент проверки root и имена контейнеров отсутствуют. Прежний judge home
+переиспользуется после разрешённого снятия точной брони, A00yuH сохраняется. Для нового run
 старые 12 пар не нужны, но их отключение/удаление сейчас не запрашивается.
 Любая будущая очистка старого ресурса требует отдельного конкретного запроса.
