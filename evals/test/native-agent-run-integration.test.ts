@@ -22,11 +22,12 @@ import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { stageUserPreparation } from "../src/user-environment"
 import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
 
-for (const finalizer of [false, true, "interrupted", "killed"] as const) for (const browser of [true, false]) {
-  const active = typeof finalizer === "string"
+for (const finalizer of [false, true, "interrupted", "killed", "mapped"] as const) for (const browser of [true, false]) {
+  const active = finalizer === "interrupted" || finalizer === "killed"
   if (active && !browser) continue
+  if (finalizer === "mapped" && browser) continue
   test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(
-  `native agent replay: actual sandboxed CLI ${active ? `is ${finalizer === "killed" ? "killed" : "interrupted"} during server execution` : browser ? "activates Loginom through a local provider" : "finishes without a browser"}${finalizer ? " with slot finalizer" : ""}`, async () => {
+  `native agent replay: actual sandboxed CLI ${active ? `is ${finalizer === "killed" ? "killed" : "interrupted"} during server execution` : browser ? "activates Loginom through a local provider" : "finishes without a browser"}${finalizer ? " with slot finalizer" : ""}${finalizer === "mapped" ? " and mapped file" : ""}`, async () => {
     const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
     const root = await mkdtemp(path.join(tmpdir(), "evals-native-agent-"))
     const history = await mkdtemp(path.join(tmpdir(), "evals-native-history-"))
@@ -206,7 +207,7 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
           const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, untouched.source)
           const absenceOnly = await admin.closeManagementSession(lease, prepared.secretFile, accounted.management[0]!.id, "confirm-absent")
             .then(() => "unexpected confirmation", (error: Error) => error.message)
-          if (!browser) {
+          if (!browser && finalizer !== "mapped") {
             const target = `${storage.root}/fd-control-${crypto.randomUUID()}`
             await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sh -c ${'printf fd-control > "$1"'} sh ${target}`.quiet()
             const holder = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", "-i", pair.identity.containerId,
@@ -233,7 +234,7 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
               expect(released.files.some(entry => entry.target === target)).toBe(false)
             }
           }
-          if (!browser) {
+          if (!browser && finalizer !== "mapped") {
             const names = ["white space", "tab\tfile", "line\nfile", "Юникод", "-leading", ".hidden", "draft.lgp.autosave", "nested/ordinary"]
             await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sh -c ${'mkdir -- "$1/nested" /workdir/UserStorage/eval-b; printf B > /workdir/UserStorage/eval-b/control; root=$1; shift; for name do printf A > "$root/$name"; done; ln -s ../eval-b "$root/neighbor"; ln /workdir/UserStorage/eval-b/control "$root/hardlink"'} storage-control ${storage.root} ${names}`.quiet()
             const raw = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find -P ${storage.root} -mindepth 1 -printf ${"%P\\0%y\\0%n\\0%D\\0%i\\0"}`.quiet()).text()
@@ -251,6 +252,37 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
               await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} rm -- ${`${storage.root}/hardlink`}`.quiet()
             }
             expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()).toBe(neighbor)
+          }
+          if (finalizer === "mapped") {
+            const target = `${storage.root}/mapped control-Юникод\u2028-${crypto.randomUUID()}`
+            await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} cp -- /bin/cat ${target}`.quiet()
+            const metadata = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} stat --printf ${"%d\\0%i\\0%h\\0%u\\0%g\\0%s\\0"} -- ${target}`.quiet()).text()
+            const holder = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", "-i", pair.identity.containerId, target],
+              { stdin: "pipe", stdout: "pipe", stderr: "pipe", timeout: 60_000 })
+            try {
+              holder.stdin.write("ready\n")
+              expect(new TextDecoder().decode((await holder.stdout.getReader().read()).value)).toBe("ready\n")
+              const opened = await serverFileObservation(pair.identity.containerId)
+              expect(opened.complete).toBe(true)
+              expect(opened.processes.some(process => process.maps.includes(target))).toBe(true)
+              expect(opened.files.some(entry => entry.target === storage.root || entry.target.startsWith(storage.root + "/"))).toBe(false)
+              const attempted = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+                .then(completed => ({ completed, error: null }), (error: Error) => ({ completed: null, error: error.message }))
+              await writeLeaseReceipt(path.join(evidence, "finalization-mapped-file.json"), { target, metadata, opened, attempted,
+                storageDeletionAllowed: false, nextAdmissionAllowed: false })
+              expect(attempted.error).toBe("ATTEMPT_SERVER_MAPPINGS_ACTIVE")
+              expect(await Bun.file(path.join(file.controller.stateDir, `agent-finalization-${entry.entrySource.id}.json`)).exists()).toBe(false)
+            } finally {
+              holder.stdin.end()
+              const exitCode = await holder.exited
+              const released = await serverFileObservation(pair.identity.containerId)
+              const after = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} stat --printf ${"%d\\0%i\\0%h\\0%u\\0%g\\0%s\\0"} -- ${target}`.quiet()).text()
+              await writeLeaseReceipt(path.join(evidence, "finalization-mapping-released.json"), { target, exitCode, released, metadata, after })
+              expect(exitCode).toBe(0)
+              expect(released.complete).toBe(true)
+              expect(released.processes.some(process => process.maps.includes(target))).toBe(false)
+              expect(after).toBe(metadata)
+            }
           }
           const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
           expect(completed.sessions).toHaveLength(browser ? 2 : 1)
