@@ -2,12 +2,41 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readdir, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { evalsRoot } from "../src/config"
+import { evalsRoot, loadConfig } from "../src/config"
 import { readEnvironmentStatus } from "../src/parallel-status"
-import { acquireSlotLease } from "../src/slots"
+import { acquireEnvironmentLeases, acquireSlotLease } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
-import { prepareEnvironment, verifyEnvironment } from "../src/environment-preparation"
+import { prepareEnvironment, scopedSlotConfig, verifyEnvironment } from "../src/environment-preparation"
+import { stageUserPreparation } from "../src/user-environment"
+import { agentCommand } from "../src/cli"
+
+test("prepared slot configuration reads private credentials and binds each distinct runtime without exposing passwords in env", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-prepared-config-")), fixture = await parallelFixture(root)
+  const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+  const journal = path.join(fixture.slots.controller.stateDir, "command.json")
+  await writeLeaseReceipt(journal, { commandId: "scoped-config" })
+  const environment = await acquireEnvironmentLeases(fixture.slots, 2, identity, journal, fixture.lockRoot)
+  const base = loadConfig([], { EVAL_SLOTS_FILE: path.join(root, "slots.json"), EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+    EVAL_AGENT_MODEL: "openai/gpt-6-luna", JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "controller-dock-canary" })
+  try {
+    for (const lease of environment.slots) {
+      const prepared = await stageUserPreparation(fixture.slots, lease, "d".repeat(64))
+      const scoped = await scopedSlotConfig(base, fixture.slots, lease)
+      expect(scoped.profileDir).toBe(lease.slot.profileDir)
+      expect(scoped.agent.workspaceRoot).toBe(lease.slot.workspaceRoot)
+      expect(scoped.loginom).toMatchObject({ username: lease.slot.username, url: fixture.slots.server.url,
+        container: identity.containerId, storageDir: `/workdir/UserStorage/${lease.slot.username}` })
+      const credentials = await Bun.file(prepared.secretFile).json()
+      expect(scoped.loginom.password === credentials.password).toBe(true)
+      const values = Object.values(agentCommand(scoped, { LOGINOM_PASSWORD: credentials.password, PRIVATE_TOKEN: "controller-dock-canary" }).env)
+      expect(values.includes(credentials.password)).toBe(false)
+      expect(values.includes("controller-dock-canary")).toBe(false)
+    }
+    expect(base.loginom.username).toBe("user")
+  } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]); await rm(root, { recursive: true }) }
+})
 
 test("preparation rejects an invalid slot count before controller or runtime side effects", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-prepare-count-")), fixture = await parallelFixture(root)
