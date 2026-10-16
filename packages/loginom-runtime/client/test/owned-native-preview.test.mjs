@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {verifyOwnedNativePreview,reuseOwnedNativePreview} from '../lib/collapse-native-output.mjs';
+import {verifyOwnedNativePreview,reuseOwnedNativePreview,verifyFrontends,nativeFrontendPins} from '../lib/collapse-native-output.mjs';
 const fixture=()=>{
  const node={document_id:'doc',workflow_id:'wf',node_id:'node'},port={port_guid:'port',tid:'owned;Output_Data-0',index:0,active:true};
  const preview={verified:true,inventory_complete:true,port:0,node_id:node.node_id,port_guid:port.port_guid,
@@ -9,6 +9,43 @@ const fixture=()=>{
 };
 test('a previously opened own Preview is reusable only after a fresh identical complete observation',()=>{
  const {handle,ctx,port,preview}=fixture();assert.doesNotThrow(()=>verifyOwnedNativePreview(handle,ctx,port,preview));
+});
+
+for(const stage of ['headers','body'])test('native frontend timeout gets one fresh readonly fetch: '+stage,async t=>{
+ let calls=0,lookups=0;
+ const timeout=new DOMException('fixture timeout','TimeoutError');
+ t.mock.method(globalThis,'fetch',async(_url,options)=>{
+  calls++;assert.equal(options.redirect,'error');assert.ok(options.signal instanceof AbortSignal);
+  if(calls===1){if(stage==='headers')throw timeout;return {ok:true,body:(async function*(){yield new Uint8Array([1]);throw timeout;})()};}
+  return {ok:false};
+ });
+ await assert.rejects(verifyFrontends(async()=>{lookups++;return Object.fromEntries(Object.keys(nativeFrontendPins).map(n=>[n,'https://example.test/'+n]));},'https://example.test',undefined,1000,()=>0),/Native frontend fetch failed/);
+ assert.equal(calls,2);assert.equal(lookups,1);
+});
+test('native frontend retry keeps the exact hash check and never trusts a partial first body',async t=>{
+ let calls=0;
+ t.mock.method(globalThis,'fetch',async()=>{
+  if(++calls===1)return {ok:true,body:(async function*(){yield new Uint8Array([1]);throw new DOMException('fixture timeout','TimeoutError');})()};
+  return {ok:true,body:(async function*(){yield new Uint8Array([2]);})()};
+ });
+ await assert.rejects(verifyFrontends(async()=>({'rpc.js':'https://example.test/rpc.js'}),'https://example.test',undefined,1000,()=>0),/Native frontend changed: rpc.js/);
+ assert.equal(calls,2);
+});
+for(const fault of ['timeout_again','network','parent_cancel','deadline'])test('native frontend fetch does not retry '+fault,async t=>{
+ let calls=0,clock=0;const controller=new AbortController(),cancel=Error('parent cancelled');
+ t.mock.method(globalThis,'fetch',async()=>{
+  calls++;if(fault==='network')throw Error('network failure');
+  if(fault==='parent_cancel')controller.abort(cancel);
+  if(fault==='deadline')clock=1000;
+  throw new DOMException('fixture timeout','TimeoutError');
+ });
+ await assert.rejects(verifyFrontends(async()=>({'rpc.js':'https://example.test/rpc.js'}),'https://example.test',controller.signal,1000,()=>clock),fault==='parent_cancel'?e=>e===cancel:/fixture timeout|network failure/);
+ assert.equal(calls,fault==='timeout_again'?2:1);
+});
+test('expired native frontend verification cannot start even its readonly browser lookup',async()=>{
+ let lookups=0;
+ await assert.rejects(verifyFrontends(async()=>{lookups++;return {};},'https://example.test',undefined,1000,()=>1000),/deadline elapsed/);
+ assert.equal(lookups,0);
 });
 test('reuse requests the existing own Preview observation scope and rechecks the active port with its schema',async()=>{
  const f=fixture();let calls=0;

@@ -69,19 +69,31 @@ export async function reuseOwnedNativePreview(channel,handle,ctx) {
  verifyOwnedNativePreview(handle,ctx,port,state.node_preview_schema);
  return {port,preview:state.node_preview_schema};
 }
-async function verifyFrontends(execute,origin,signal) {
+export async function verifyFrontends(execute,origin,signal,deadline,now) {
+ signal?.throwIfAborted();const budget=Math.floor(deadline-now());need(budget>0,'Exact read deadline elapsed');
  const urls=await execute(`async page=>page.evaluate(names=>Object.fromEntries(names.map(name=>{
   const urls=[...document.scripts].map(s=>s.src).filter(u=>u&&new URL(u).pathname.split('/').at(-1)===name);
   if(urls.length!==1)throw Error('Unique pinned frontend required');return [name,urls[0]];
- })),${JSON.stringify(Object.keys(nativeFrontendPins))})`,{timeout:10000});
+ })),${JSON.stringify(Object.keys(nativeFrontendPins))})`,{timeout:Math.min(10000,budget)});
  const proofs=[];
  for(const [name,url] of Object.entries(urls)) {
-  signal?.throwIfAborted();need(new URL(url).origin===origin,'Foreign native frontend');
-  const response=await fetch(url,{redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)});
-  need(response.ok,'Native frontend fetch failed');
-  let size=0;const hash=createHash('sha256');
-  for await(const chunk of response.body){size+=chunk.length;need(size<=10000000,'Native frontend byte bound');hash.update(chunk);}
-  const sha256=hash.digest('hex');need(sha256===nativeFrontendPins[name],'Native frontend changed: '+name);proofs.push({name,url,sha256});
+  need(new URL(url).origin===origin,'Foreign native frontend');
+  for(let attempt=0;attempt<2;attempt++){
+   signal?.throwIfAborted();
+   const remaining=Math.floor(deadline-now());need(remaining>0,'Exact read deadline elapsed');
+   try {
+    const timeout=AbortSignal.timeout(Math.min(10000,remaining));
+    const response=await fetch(url,{redirect:'error',signal:signal?AbortSignal.any([signal,timeout]):timeout});
+    need(response.ok,'Native frontend fetch failed');
+    let size=0;const hash=createHash('sha256');
+    for await(const chunk of response.body){size+=chunk.length;need(size<=10000000,'Native frontend byte bound');hash.update(chunk);}
+    signal?.throwIfAborted();need(now()<deadline,'Exact read deadline elapsed');
+    const sha256=hash.digest('hex');need(sha256===nativeFrontendPins[name],'Native frontend changed: '+name);proofs.push({name,url,sha256});break;
+   }catch(error){
+    signal?.throwIfAborted();
+    if(attempt!==0||error?.name!=='TimeoutError'||now()>=deadline)throw error;
+   }
+  }
  }
  need(proofs.length===5,'Incomplete native frontend provenance');return proofs;
 }
@@ -92,7 +104,7 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const imports=options.coldStaticSources?.imports??completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
  const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields,crossTableConfiguration.input_mapping,crossTableConfiguration.node_context):null;
  if(crossSources)verifyCrossTableExecutionOwner(options.nativeExecutionProof,ctx);
- const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal);
+ const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal,ctx.deadline,now);
  let handle;
  if(options.ownedPreview){
   handle=await reuseOwnedNativePreview(channel,options.ownedPreview,ctx);
