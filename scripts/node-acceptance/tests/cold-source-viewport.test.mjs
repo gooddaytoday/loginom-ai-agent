@@ -21,7 +21,7 @@ test('source navigation serializes the real bounded UI navigator and retains the
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.graph_unchanged,true);assert.equal(r.fully_visible,true);
  assert.equal(r.settings_applied,false);assert.equal(r.zoom_steps,0);assert.deepEqual(p.graph,graph());
 });
-for(const type of ['imports.text','transform.join'])test(`an offscreen ${type} is revealed through the bounded native zoom control without moving its model node`,async()=>{
+for(const type of ['imports.text','transform.join_data'])test(`an offscreen ${type} is revealed through the bounded native zoom control without moving its model node`,async()=>{
  const p=page();p.graph.nodes[0].type=type;p.graph.nodes[0].position.x=1200;const before=structuredClone(p.graph);let scale=1,clicks=0;
  const zoom={count:async()=>1,isVisible:async()=>true,getAttribute:async()=> 'Уменьшить масштаб',
   click:async()=>{scale*=0.9;clicks++;}};

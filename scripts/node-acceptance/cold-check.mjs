@@ -157,7 +157,7 @@ try {
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
-  if(target.type==='transform.join')await revealSource(target);
+  if(target.type==='transform.join_data')await revealSource(target);
   const channel = createNodeProcedure({
     operation,
     execute,
