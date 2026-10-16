@@ -1449,3 +1449,26 @@ audita89ad84f…61/16; active native FD/FLOCK f7f4c786…1/65 PASS77.16s,
 audit76cc72e1…82/28+11 pins. Related lease/slots/user/package69/334 PASS70.27s,
 typecheck/shell syntax/diff PASS. Private verificationd9837842… retains all
 three controls; finalizer/cleanup/admission gates stay closed.
+
+
+Post-close finalizer kernel source (2026-10-16): actual hard-kill CLI control
+REDcd27cb3e…1/6 FAIL237.33s lacked terminal.serverFiles after successful session
+closure. Its original failed verdict, paused prefix and history are retained;
+audit73bc5816…2262/200/28 causal frames+20 source/binary pins confirms teardown.
+GREENb5e3bb27…1/20 PASS237.31s binds the raw point after source-qualified native
+absence, observes no own-root FD/mapping and preserves source on repeat;
+audit57566cdf…2304/219/30+20 pins. Text5a6780c2…1/27 PASS161.10s rejects an
+altered source hash and synthetic backdated point, restores original receipts,
+then reconstructs a lost terminal with its own fresh post-absence point.
+Audit593d3fe8…289/121/6+20 pins confirms exactly two captures and no duplicate
+close RPC; original SDK histories/SQLite families and all own teardown preserved.
+Related agent/management process/session15/166 PASS56.49s, typecheck/diff PASS;
+private verificationd6b6fea2…. Cleanup/admission flags remain false.
+
+A preceding text setup1e06a8e1… failed health before CLI. The read-only collector
+found later HTTP200/wsproxy=true3/3; Apache ready was40.206s after Studio start
+and6.761s after the failed log ended. Original HTTP error/startup-delay cause
+remain unproven. The30s guard was retained; public factory resumed this same
+configured research pair without restart and disposed it (4 released factory
+claims,3 IDs and bpTCqq root absent). Original FAIL/report and unlocated history
+were preserved. This setup refusal is separate from the passing finalizer checks.
