@@ -510,7 +510,7 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
       [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
     evidence.stages.push({ stage: "diagnostics", status: "confirmed" })
     if (!(await waitProfileIdle(config.profileDir, 1_000))) throw Error("Profile still has process owners")
-    const released = await releaseStaleWriter(config.profileDir, evidence.processes.writer)
+    const released = await releaseStaleWriter(config.profileDir, evidence.processes.writerRefusal ? undefined : evidence.processes.writer)
     evidence.stages.push({ stage: "writer", status: "confirmed" })
     const recovery = await recoverIfNeeded(command, 1)
     result.profile_recovered = released || recovery.recovered

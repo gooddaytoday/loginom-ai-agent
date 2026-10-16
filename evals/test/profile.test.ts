@@ -901,3 +901,20 @@ test("writerIdentity: symlink owner не читает конфигурацию �
   await symlink(authorization, path.join(profile, ".writer/owner"))
   await expect(writerIdentity(profile)).rejects.toThrow("Writer owner")
 })
+
+test("management: missing writer owner is diagnostic after confirmed process cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-diagnostic-"))
+  const profile = path.join(root, "profile")
+  try {
+    await mkdir(path.join(root, "fixtures"))
+    await mkdir(profile)
+    const script = path.join(root, "fixtures/fake-cli.ts")
+    await Bun.write(script, `import { mkdir } from "node:fs/promises"; await mkdir(${JSON.stringify(path.join(profile, ".writer"))}); await Bun.sleep(300); console.log("done")`)
+    const result = await management({ mode: "fake", cmd: [process.execPath, script], cwd: root,
+      env: { PATH: process.env.PATH ?? "", LOGINOM_AI_AGENT_CLI_PROFILE: profile } }, ["diagnostic"], undefined, 5000)
+    expect(result.exitCode).toBe(0)
+    expect(result.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, unknownProcesses: [] })
+    expect(result.processCleanup.writerRefusal).toBeDefined()
+    await expect(stat(path.join(profile, ".writer"))).rejects.toMatchObject({ code: "ENOENT" })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
