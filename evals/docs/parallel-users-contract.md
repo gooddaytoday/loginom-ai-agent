@@ -3175,3 +3175,26 @@ This qualifies one actual JavaScript operation after client-context loss. Actual
 CLI crash, simultaneous B activity, backend file descriptors/locks, backup and
 storage/no-regrowth plus durable cleanup consumption remain unqualified. The
 component evidence keeps operationsQualified=false and cleanupAllowed=false.
+
+### Concurrent native operation isolation during A stop (2026-10-16)
+
+The active-peer fixture runs ordinary designers A/B on one owned pair. A uses
+the detached20s source; B uses connected10s peer-probe.js with a successful
+work-item result. Both native packages must show Progress before A is stopped.
+The existing bound CloseSession removes A; the same B package remains active
+through the same observer, then completes with finished=true/failed=false/status4
+8108ms after A closure. B's file-canary hash is unchanged and B closes separately
+only after this success. All admin connections precede active execution.
+
+Native1/75 PASS83.41s; related50/162 PASS21.52s, typecheck/syntax/diff PASS.
+Privateb36aa5a7… source-audit SHA256
+`f175c946a4bec5dbc33d6bfbc6c20cc21cda1e88ea019fc50f819fcd3830a464`
+checks69/33 sources+11 pins: actual full replies/journals, simultaneous Progress,
+B successful continuation, unchanged canary, all three continuous admin closures
+and transport ACKs, exact own pair/network/root absence and retained input.
+The first missing-phase RED was masked by an incorrect fixture boolean assertion:
+the qualifier returns a proof object. That original fixture was settled only
+after all three actual closure/transport sources qualified; original failures
+remain intact. Peer teardown uncertainty now prevents fixture deletion.
+This qualifies native JS/user independence; actual CLI crash, backend FD/locks,
+backup/storage/no-regrowth and durable evaluated cleanup/admission remain open.

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
+import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
 import { verifyAdminRuntime } from "../src/preflight"
 import { readAdminPackageInventory } from "../src/package-inventory"
 import { createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, sealAdminProcessInventory, type AdminOperation } from "../src/loginom-admin"
@@ -85,11 +86,12 @@ liveIntegration("native pool preparation: held controller disables retention and
 liveIntegration("native pool environment: prepare applies policy and verify only reads it", () => nativeUserCapability("pool-environment"), 120_000)
 liveIntegration("native active backend control: bounded node continues after its client disconnects", () => nativeUserCapability("active-control"), 120_000)
 liveIntegration("native active backend close: CloseSession stops the node after client loss", () => nativeUserCapability("active-close"), 120_000)
+liveIntegration("native active peer: stopping A preserves B execution and file", () => nativeUserCapability("active-peer"), 180_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy" | "pool-environment" | "active-control" | "active-close", hardCrash = false) {
-  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy" || mode === "pool-environment" || ["active-control", "active-close"].includes(mode)
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy" | "pool-environment" | "active-control" | "active-close" | "active-peer", hardCrash = false) {
+  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy" || mode === "pool-environment" || ["active-control", "active-close", "active-peer"].includes(mode)
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -103,7 +105,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
   const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
   const pair = await createPair(file, options)
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-user-${crypto.randomUUID()}`)
-  const settlement = { admin: false, packageParent: true, environment: true }
+  const settlement = { admin: false, packageParent: true, environment: true, peer: true }
   let policyLease: Awaited<ReturnType<typeof acquireResourceLease>> | undefined
   let packageParent: Awaited<ReturnType<typeof openLoginomAdmin>> | undefined
   try {
@@ -115,8 +117,9 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       path.resolve(import.meta.dir, "../src/loginom-admin.ts"), path.resolve(import.meta.dir, "../src/package-inventory.ts"),
       path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!,
       ...(mode === "pool-environment" ? [path.resolve(import.meta.dir, "../src/environment-preparation.ts"), path.resolve(import.meta.dir, "../src/environment-finalization.ts"), path.resolve(import.meta.dir, "../src/user-environment.ts")] : []),
-      ...(["progress", "pool", "pool-close", "pool-disabled", "active-control", "active-close"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : []),
-      ...(["active-control", "active-close"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")] : [])]
+      ...(["progress", "pool", "pool-close", "pool-disabled", "active-control", "active-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : []),
+      ...(["active-control", "active-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")] : []),
+      ...(mode === "active-peer" ? [path.resolve(import.meta.dir, "../fixtures/peer-probe.js"), path.resolve(import.meta.dir, "../src/closed-process-evidence.ts")] : [])]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
     if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
       resources: pair.resources, root, pairNonce: pair.nonce })
@@ -129,13 +132,13 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     const input = new TransformStream<Uint8Array, Uint8Array>()
     const output = new TransformStream<Uint8Array, Uint8Array>()
     const abort = new AbortController()
-    if (["active-control", "active-close"].includes(mode)) {
+    if (["active-control", "active-close", "active-peer"].includes(mode)) {
       settlement.packageParent = false
       packageParent = await openLoginomAdmin(file, pair.identity)
     }
     const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
       env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
-      timeoutMs: ["peer-close", "pool-close"].includes(mode) ? 90_000 : 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
+      timeoutMs: ["peer-close", "pool-close", "active-peer"].includes(mode) ? 90_000 : 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
     const channel = createJournaledAdminChannel(output.readable, input.writable, journal)
     const request = async (op: AdminOperation, payload: unknown) => {
       if (op !== "dispose") expect(await readServerIdentity(file)).toEqual(pair.identity)
@@ -258,6 +261,78 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
         complete = true
         return
+      }
+      if (mode === "active-peer") {
+        const neighbor = await preparePeer()
+        const input = path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp")
+        for (const name of [credentials.username, neighbor.user.name])
+          expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${input} ${`${pair.identity.containerId}:${file.server.storageRoot}/${name}/progress-probe.lgp`}`.quiet().nothrow()).exitCode).toBe(0)
+        const artifact = path.join(evidence, "progress-probe.lgp")
+        await Bun.write(artifact, await Bun.file(input).bytes())
+        await chmod(artifact, 0o600)
+        const canary = crypto.randomUUID(), canaryPath = `${file.server.storageRoot}/${neighbor.user.name}/peer-preserve.txt`
+        await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sh -c ${'printf %s "$1" > "$2"'} sh ${canary} ${canaryPath}`.quiet()
+        const canaryBefore = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${canaryPath}`.quiet()).text()
+        expect(canaryBefore.split(" ")[0]).toBe(new Bun.CryptoHasher("sha256").update(canary).digest("hex"))
+        settlement.peer = false
+        const peer = await nativeAdminPeer(runtime, file, pair.identity, root, evidence, "active-user")
+        try {
+          expect(await peer.request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
+            credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(peer.profile, "loginom/runtime/admin/attempts/context/browser-profile") }))
+            .toMatchObject({ outcome: "confirmed" })
+          let settled = false
+          const pending = peer.request("reconcile-user", { ...neighbor.activation, phase: "session-peer-probe" }).finally(() => { settled = true })
+          try {
+            const writer = await request("reconcile-user", { ...activation, phase: "session-active-probe" })
+            await writeLeaseReceipt(path.join(evidence, "active-peer-writer.json"), writer)
+            expect(writer.outcome).toBe("confirmed")
+            if (settled) expect((await pending).outcome).toBe("confirmed")
+            const data = writer.data as { binding: { name: string }; progress: { source: string; finished: boolean; startedAt: string } }
+            expect(data.progress).toMatchObject({ finished: false, source: await Bun.file(path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")).text() })
+            const samples: Awaited<ReturnType<typeof readAdminPackageInventory>>[] = [], deadline = Date.now() + 10_000
+            while (Date.now() < deadline) {
+              const snapshot = await packageParent!.inspectPackageInventory()
+              samples.push(snapshot)
+              if ([credentials.username, neighbor.user.name].every(name => snapshot.collections.some(row => row.name.startsWith(name + ":") && row.packages.some(item => item.path === `/${name}/progress-probe.lgp` && item.progress !== null)))) break
+              await Bun.sleep(100)
+            }
+            const before = samples.at(-1)!
+            const rows = [credentials.username, neighbor.user.name].map(name => before.collections.filter(row => row.name.startsWith(name + ":")))
+            expect(rows.every(rows => rows.length === 1 && rows[0]!.packageCount === 1 && rows[0]!.packages[0]!.progress !== null)).toBe(true)
+            const closed = await request("close-session", { proofId: writer.id, session: data.binding })
+            expect(closed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+            const after = await packageParent!.inspectPackageInventory()
+            expect(after.collections.some(row => row.name === data.binding.name)).toBe(false)
+            const surviving = after.collections.find(row => row.objectId === rows[1]![0]!.objectId)
+            expect(surviving?.packages[0]?.objectId).toBe(rows[1]![0]!.packages[0]!.objectId)
+            const continued = await pending
+            await writeLeaseReceipt(path.join(evidence, "active-peer-continued.json"), continued)
+            expect(continued).toMatchObject({ outcome: "confirmed", data: { binding: { username: neighbor.user.name, serverEpoch: pair.identity.serverEpoch },
+              progress: { source: await Bun.file(path.resolve(import.meta.dir, "../fixtures/peer-probe.js")).text(), finished: true, failed: false, status: 4 } } })
+            const peerData = continued.data as { binding: { name: string }; progress: { startedAt: string; finishedAt: string } }
+            const closeCommand = await readLeaseReceipt(path.join(journal, closed.id + ".json")) as { settledAt: string }
+            expect(Date.parse(peerData.progress.finishedAt)).toBeGreaterThan(Date.parse(closeCommand.settledAt))
+            expect(Date.parse(peerData.progress.finishedAt) - Date.parse(peerData.progress.startedAt)).toBeGreaterThanOrEqual(9_000)
+            const canaryAfter = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${canaryPath}`.quiet()).text()
+            expect(canaryAfter).toBe(canaryBefore)
+            const peerClosed = await peer.request("close-session", { proofId: continued.id, session: peerData.binding })
+            expect(peerClosed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+            const absent = await packageParent!.inspectPackageInventory()
+            expect(absent.collections.some(row => [data.binding.name, peerData.binding.name].includes(row.name))).toBe(false)
+            await writeLeaseReceipt(path.join(evidence, "active-peer.json"), { identity: pair.identity, writer, samples, before, closed, after, continued, peerClosed, absent,
+              canary: { path: canaryPath, before: canaryBefore, after: canaryAfter }, operationsQualified: false, cleanupAllowed: false })
+            expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
+            complete = true
+            return
+          } finally { await pending.catch(() => undefined) }
+        } finally {
+          const disposed = await peer.dispose()
+          await writeLeaseReceipt(path.join(evidence, "active-peer-disposed.json"), disposed!)
+          expect(disposed).toMatchObject({ outcome: "confirmed", data: { transportDisconnect: "confirmed" } })
+          const run = await readLeaseReceipt(path.join(evidence, "reconnected/native-driver-result.json")) as { processCleanup: Parameters<typeof qualifyClosedProcessEvidence>[0] }
+          expect(qualifyClosedProcessEvidence(run.processCleanup, { owner: { kind: "admin", id: path.join(evidence, "reconnected") }, producerPid: process.pid })).toBeTruthy()
+          settlement.peer = true
+        }
       }
       if (mode === "peer-close") {
         const neighbor = await preparePeer()
@@ -478,7 +553,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         complete = true
         return
       }
-      if (mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || ["active-control", "active-close"].includes(mode)) {
+      if (mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || ["active-control", "active-close", "active-peer"].includes(mode)) {
         const artifact = path.join(evidence, "progress-probe.lgp")
         await Bun.write(artifact, await Bun.file(path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp")).bytes())
         await chmod(artifact, 0o600)
@@ -498,7 +573,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         if (peerBefore) await writeLeaseReceipt(path.join(evidence, "pool-close-peer-before.json"), peerBefore)
         const observations: Awaited<ReturnType<typeof readAdminPackageInventory>>[] = []
         let settled = false
-        const pendingProbe = request("reconcile-user", { ...activation, phase: ["active-control", "active-close"].includes(mode) ? "session-active-probe" : mode === "pool-disabled" ? "session-pool-disabled-probe" : mode === "pool-close" ? "session-pool-close-probe" : mode === "pool" ? "session-pool-probe" : "session-progress-probe" }).finally(() => { settled = true })
+        const pendingProbe = request("reconcile-user", { ...activation, phase: ["active-control", "active-close", "active-peer"].includes(mode) ? "session-active-probe" : mode === "pool-disabled" ? "session-pool-disabled-probe" : mode === "pool-close" ? "session-pool-close-probe" : mode === "pool" ? "session-pool-probe" : "session-progress-probe" }).finally(() => { settled = true })
         const deadline = Date.now() + 25_000
         while (!settled && Date.now() < deadline) {
           const inventory = await packageParent.inspectPackageInventory()
@@ -548,7 +623,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
           complete = true
           return
         }
-        if (["active-control", "active-close"].includes(mode)) {
+        if (["active-control", "active-close", "active-peer"].includes(mode)) {
           const data = probe.data as typeof observed & { progress: { finished: boolean; source: string; startedAt: string } }
           expect(data.progress).toMatchObject({ finished: false, source: await Bun.file(path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")).text() })
           const before = await packageParent.inspectPackageInventory()
@@ -888,8 +963,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(mode === "pool-environment" ? 0 : ["storage", "components", "peer-close", "pool-close"].includes(mode) ? 2 : 1)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(mode === "pool-environment" ? 0 : ["storage", "components", "peer-close", "pool-close"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(mode === "pool-environment" ? 0 : ["storage", "components", "peer-close", "pool-close", "active-peer"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(mode === "pool-environment" ? 0 : ["storage", "components", "peer-close", "pool-close", "active-peer"].includes(mode) ? 2 : 1)
       }
     }
   } finally {
@@ -904,7 +979,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       settlement.packageParent = true
     }
     await policyLease?.close()
-    if ((!packages || settlement.admin && settlement.packageParent) && settlement.environment) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+    if ((!packages || settlement.admin && settlement.packageParent) && settlement.environment && settlement.peer) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
     else console.error(`native package inventory fixture retained: ${root}`)
   }
 }
