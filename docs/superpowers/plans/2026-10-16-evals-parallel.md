@@ -91,6 +91,10 @@
   сохраняется отказом. Проверка native A/B и подключение к run ещё впереди.
 - [ ] RED: неизвестное владение/root, активный открытый файл или непустой/нечитаемый
   SessionBackup оставляют файлы неизменными; история/inputs сохраняются вне mounts.
+  RED→GREEN guards4/29 unit PASS: отказ при unknown/unconfirmed процессах,
+  неполном FD scan/open file/mapping, nonempty/unreadable/symlink backup,
+  неверном inode и чужом namespace. Cleanup координатор подключён к проверенным
+  guards; native A/B и вызов из queue ещё не выполнены.
 - [ ] GREEN: в новом пути заменить actor-ledger admission точным пользователем,
   архивировать профиль/результаты, закрыть свои сессии, перечитать и непосредственно
   проверить открытые файлы перед очисткой своего root. Не развивать замороженный
@@ -247,4 +251,5 @@ private config/budget/results вне Git; операторские команд�
 16. Exact-name close:53/221 unit PASS29.31s +typecheck/diff; native A/B ещё не выполнен.
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
-19. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
+19. Slot storage guards4/29 unit PASS +typecheck/diff; native cleanup ещё не проверен.
+20. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
