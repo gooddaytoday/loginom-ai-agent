@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { createRequire } from "node:module"
 import { createInterface } from "node:readline"
 
-const operations = ["init", "inspect", "reconcile-user", "close-session", "confirm-session-absent", "dispose"]
+const operations = ["init", "inspect", "reconcile-user", "configure-pool", "close-session", "confirm-session-absent", "dispose"]
 let context
 let page
 let identity
@@ -107,6 +107,38 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (!context || !identity) throw Error("ADMIN_NOT_INITIALIZED")
     if (JSON.stringify(request.expectedIdentity) !== JSON.stringify(identity)) throw Error("SERVER_EPOCH_CHANGED")
+    if (request.op === "configure-pool" || request.op === "inspect" && request.payload?.poolPolicy === true) {
+      const configure = request.op === "configure-pool"
+      if (!request.payload || Object.keys(request.payload).length !== (configure ? 0 : 1)) throw Error("ADMIN_REQUEST_INVALID")
+      dispatched = true
+      const result = await bounded(request, page.evaluate(async configure => {
+        let applied = false
+        try {
+          const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+          const user = await session.CurrentUser
+          if (!await user.IsAdmin) return { outcome: "not_applied", data: { code: "ADMIN_IDENTITY_CHANGED" } }
+          const observer = await user.Name
+          const manager = await (await bg.ScopeGetObjectAsync(session, bg.IBGDeductorSessionsManagerContainer)).GetSessionsManager()
+          await manager.UpdateSessionInfos()
+          const collections = []
+          for (let index = 0; index < await manager.Count; index++) {
+            const row = await manager.SessionInfo(index)
+            collections.push({ name: await row.Name, sessionType: await row.SessionType, packageCount: await row.Count })
+          }
+          if (configure && collections.some(row => row.packageCount !== 0 ||
+            [bg.TBGManagedSessionType.mstClient, bg.TBGManagedSessionType.mstSelf].includes(row.sessionType) && !row.name.startsWith(observer + ":")))
+            return { outcome: "not_applied", data: { code: "POOL_POLICY_ACTIVE" } }
+          const settings = await cast(await session.Settings, bg.IBGSocketDeductorServerSettings)
+          const before = await settings.PackagePoolSize
+          if (configure && before !== 0) { applied = true; await settings.set_PackagePoolSize(0) }
+          const packagePoolSize = await settings.PackagePoolSize
+          if (packagePoolSize !== 0) return { outcome: applied ? "unknown" : "not_applied", data: { code: "POOL_POLICY_DRIFT" } }
+          return { outcome: "confirmed", data: { before, packagePoolSize, changed: applied, observer, collections } }
+        } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "POOL_POLICY_UNKNOWN" } } }
+      }, configure))
+      respond(id, result.outcome, result.outcome === "confirmed" ? { identity, ...result.data } : result.data)
+      continue
+    }
     if (request.op === "close-session" || request.op === "confirm-session-absent") {
       if (typeof request.payload?.proofId !== "string") throw Error("SESSION_IDENTITY_UNSUPPORTED")
       const binding = request.payload.adopt === undefined ? sessionBindings.get(request.payload.proofId)
