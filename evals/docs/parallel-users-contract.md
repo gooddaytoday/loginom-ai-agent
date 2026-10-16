@@ -3210,3 +3210,16 @@ their strict checks. The finalizer still requires qualified process closure,
 committed archive-before-close and exact native session absence, and keeps both
 storageDeletionAllowed and nextAdmissionAllowed false. Unit controls cover
 pending history, actual argv/env-only live writers, interrupted moves and replay.
+
+
+Actual CLI consumption of pending-history archive (2026-10-16) is now positive:
+real sandboxed CLI, local deterministic provider, native bounded JS execution
+through the existing Calculator handler, supervisor interruption on Progress,
+fresh backend activity after local closure, committed archive including recovery
+.tmp, exact agent/setup session closure and fresh absence. Private d9c44aac…
+audits2191 checks/168 sources/26 causal frames and18 source/binary pins. Session
+close settled17.661s after the first observed active command and11.704s after
+the post-CLI active observation; these intervals are not native RPC durations.
+Native1/14 PASS180.97s, all own disposable resources/root absent and history
+retained. Both storageDeletionAllowed and nextAdmissionAllowed stay false; hard
+crash, backend FD/locks/no-regrowth and full cleanup consumption are still open.
