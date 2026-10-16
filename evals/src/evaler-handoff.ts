@@ -45,7 +45,7 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     const blocked = input.state.blocked_context
     if (input.state.phase !== "blocked" || !blocked || input.event.issue_id !== input.state.issue_id ||
       input.event.report_id !== blocked.report_id || input.event.sha !== blocked.sha ||
-      input.event.target === "Ben" && input.event.sha !== input.state.frozen_sha)
+      (input.event.target === "Ben" && input.event.sha !== input.state.frozen_sha))
       return { action: "no_action", reason: "continuation requires the current blocked issue/report/SHA", state: input.state }
     if (blocked.cleanup_required && input.event.stand_ready !== true)
       return { action: "blocked", reason: "confirmed free and healthy stand required", state: input.state }
@@ -109,10 +109,10 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     state: { ...state, phase: "in_review", executor: null, processed_report_ids: [...state.processed_report_ids, input.event.id] } }
   if (input.event.status === "REJECT") {
     const reject_count = state.reject_count + 1
-    const next = { ...state, reject_count, processed_report_ids: [...state.processed_report_ids, input.event.id] }
+    const next = { ...state, reject_count }
     if (reject_count > (state.rework_limit ?? 1)) return blockReport(next, input.event, "EVALER_DECISION_REQUIRED: rework limit reached")
     return { action: "ready_to_dispatch", target: "Rich", reason: "REJECT: corrections require a new SHA",
-      state: { ...next, phase: "rich", executor: "Rich" } }
+      state: { ...next, phase: "rich", executor: "Rich", processed_report_ids: [...state.processed_report_ids, input.event.id] } }
   }
   return { action: "ready_to_dispatch", target: "Ben", reason: "READY_FOR_BEN",
     state: { ...state, phase: "ben", executor: "Ben", frozen_sha: input.event.actual_sha, delivery_sha: null,
@@ -122,7 +122,7 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
 function blockReport(state: HandoffState, event: HandoffReport, reason: string): HandoffDecision {
   return { action: "blocked", reason, state: { ...state, phase: "blocked", executor: null,
     blocked_context: { reason, report_id: event.id, sha: event.actual_sha, cleanup_required: event.evidence?.cleanup !== "confirmed" },
-    processed_report_ids: state.processed_report_ids.includes(event.id) ? state.processed_report_ids : [...state.processed_report_ids, event.id] } }
+    processed_report_ids: [...state.processed_report_ids, event.id] } }
 }
 
 function parseInput(value: unknown): HandoffInput {
@@ -144,8 +144,8 @@ function parseInput(value: unknown): HandoffInput {
     last_dispatch: dispatch ? { id: text(dispatch.id), phase: member(dispatch.phase, ["rich", "ben"]), sha: sha(dispatch.sha),
       root_trigger: dispatch.root_trigger === null ? null : text(dispatch.root_trigger), task_id: dispatch.task_id === null ? null : text(dispatch.task_id),
       outcome: member(dispatch.outcome, ["queued", "coalesced", "deferred", "ambiguous", "not_queued"]) } : null }
-  if (phase === "ben" && state.frozen_sha === null || phase === "blocked" && executor !== null || blocked && phase !== "blocked") invalid()
-  if (state.resume_sha !== undefined && (!["rich", "ben"].includes(phase) || phase === "ben" && state.resume_sha !== state.frozen_sha)) invalid()
+  if ((phase === "ben" && state.frozen_sha === null) || (phase === "blocked" && executor !== null) || (blocked && phase !== "blocked")) invalid()
+  if (state.resume_sha !== undefined && (!["rich", "ben"].includes(phase) || (phase === "ben" && state.resume_sha !== state.frozen_sha))) invalid()
   const pending_tasks = array(input.pending_tasks).map(value => {
     const task = record(value)
     return { issue_id: text(task.issue_id), phase: member(task.phase, ["rich", "ben"]), sha: sha(task.sha), task_id: text(task.task_id) }

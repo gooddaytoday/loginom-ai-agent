@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { evaluateHandoff } from "../src/evaler-handoff"
+import { evaluateHandoff, type HandoffState } from "../src/evaler-handoff"
 
 const sha = "a".repeat(40)
 const next = "b".repeat(40)
@@ -399,4 +399,127 @@ test("malformed continuation state cannot redirect Ben or carry a stop into a ru
     { ...state, blocked_context: stopped.blocked_context },
     { ...stopped, executor: "Rich" },
   ]) expect(() => evaluateHandoff({ state: current, event: dispatch, pending_tasks: [] })).toThrow("invalid handoff input")
+})
+
+function acceptedDispatch(current: HandoffState, id: string, task_id: string) {
+  const proposed = evaluateHandoff({ state: current, event: { kind: "dispatch", id, root_trigger: null }, pending_tasks: [] }).state
+  return evaluateHandoff({ state: proposed, event: { kind: "receipt", dispatch_id: id, outcome: "queued", task_id }, pending_tasks: [] }).state
+}
+
+test("stale decisions cannot resume another issue, another stop, or completed work", () => {
+  const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+  const event = { kind: "continue_after_evaler", id: "decision", issue_id: state.issue_id, report_id: report.id, sha: next, target: "Rich" }
+  for (const wrong of [{ ...event, issue_id: "LAB-OTHER" }, { ...event, report_id: "old-stop" }, { ...event, sha }]) {
+    const result = evaluateHandoff({ state: stopped, event: wrong, pending_tasks: [] })
+    expect(result.action).toBe("no_action")
+    expect(result.state).toEqual(stopped)
+  }
+  const accepted = evaluateHandoff({ state: reviewing(), event: verdict, pending_tasks: [] }).state
+  for (const current of [state, reviewing(), accepted, { ...state, phase: "admission" as const, executor: null },
+    { ...stopped, blocked_context: undefined }]) {
+    const result = evaluateHandoff({ state: current, event, pending_tasks: [] })
+    expect(result.action).toBe("no_action")
+    expect(result.state).toEqual(current)
+  }
+})
+
+test("a resumed worker still respects the stand queue and ignores old routing receipts", () => {
+  const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+  const resumed = evaluateHandoff({ state: stopped, event: { kind: "continue_after_evaler", id: "resume",
+    issue_id: state.issue_id, report_id: report.id, sha: next, target: "Rich" }, pending_tasks: [] }).state
+  const event = { kind: "dispatch", id: "resume-dispatch", root_trigger: null }
+  const matching = evaluateHandoff({ state: resumed, event,
+    pending_tasks: [{ issue_id: state.issue_id, phase: "rich", sha: next, task_id: "already-queued" }] })
+  expect(matching.reason).toBe("matching task pending")
+  expect(matching.state).toEqual(resumed)
+  const foreign = evaluateHandoff({ state: resumed, event,
+    pending_tasks: [{ issue_id: "OTHER", phase: "ben", sha, task_id: "foreign" }] })
+  expect(foreign.action).toBe("blocked")
+  expect(foreign.state).toEqual(resumed)
+  expect(evaluateHandoff({ state: resumed, event: { kind: "receipt", dispatch_id: "dispatch-rich",
+    outcome: "queued", task_id: "rich-task" }, pending_tasks: [] }).state).toEqual(resumed)
+})
+
+test("an Evaler decision after the fourth REJECT does not replenish automatic reworks", () => {
+  const stopped = evaluateHandoff({ state: { ...reviewing(), rework_limit: 3, reject_count: 3, review_cycle: 4 },
+    event: { ...verdict, id: "fourth-reject", status: "REJECT" }, pending_tasks: [] }).state
+  const event = { kind: "continue_after_evaler", id: "decision-after-four", issue_id: state.issue_id,
+    report_id: "fourth-reject", sha: next, target: "Rich" }
+  const resumed = evaluateHandoff({ state: stopped, event, pending_tasks: [] }).state
+  expect(resumed.reject_count).toBe(4)
+  expect(resumed.review_cycle).toBe(4)
+  expect(resumed.rework_limit).toBe(3)
+  const author = acceptedDispatch(resumed, "author-after-four", "author-after-four-task")
+  const actual_sha = "d".repeat(40)
+  const ready = evaluateHandoff({ state: author, event: { ...report, id: "ready-after-four", task_id: "author-after-four-task",
+    actual_sha, evidence: { ...report.evidence, checked_sha: actual_sha } }, pending_tasks: [] }).state
+  const reviewer = acceptedDispatch(ready, "ben-after-four", "ben-after-four-task")
+  const rejected = evaluateHandoff({ state: reviewer, event: { ...verdict, id: "fifth-reject", status: "REJECT",
+    task_id: "ben-after-four-task", actual_sha, evidence: { ...report.evidence, checked_sha: actual_sha } }, pending_tasks: [] })
+  expect(rejected.action).toBe("blocked")
+  expect(rejected.state.reject_count).toBe(5)
+  expect(rejected.state.review_cycle).toBe(5)
+  expect(evaluateHandoff({ state: rejected.state, event, pending_tasks: [] }).state).toEqual(rejected.state)
+})
+
+test("Ben continuation keeps the original evidence checks and never converts product ERROR to ACCEPT", () => {
+  const stopped = evaluateHandoff({ state: reviewing(), event: { ...verdict, status: "BLOCKED",
+    evidence: { ...verdict.evidence, product: "ERROR", cleanup: "unknown" } }, pending_tasks: [] }).state
+  const resumed = evaluateHandoff({ state: stopped, event: { kind: "continue_after_evaler", id: "resume-review",
+    issue_id: state.issue_id, report_id: verdict.id, sha: next, target: "Ben", stand_ready: true }, pending_tasks: [] }).state
+  expect(resumed.review_cycle).toBe(stopped.review_cycle)
+  const current = acceptedDispatch(resumed, "continued-ben", "continued-ben-task")
+  for (const product of ["ERROR", "FAIL"] as const) {
+    const result = evaluateHandoff({ state: current, event: { ...verdict, id: "continued-verdict", task_id: "continued-ben-task",
+      evidence: { ...verdict.evidence, product } }, pending_tasks: [] })
+    expect(result.action).toBe(product === "ERROR" ? "blocked" : "in_review")
+    expect(result.state.resume_sha).toBeUndefined()
+    expect(result.state.reject_count).toBe(stopped.reject_count)
+  }
+})
+
+test("only the current worker report consumes resume SHA, including a new stop or incomplete delivery", () => {
+  const current = { ...state, resume_sha: next }
+  const stale = evaluateHandoff({ state: current, event: { ...report, task_id: "stale-task" }, pending_tasks: [] })
+  expect(stale.state.resume_sha).toBe(next)
+  for (const event of [{ ...report, status: "BLOCKED" }, { ...report, status: "ACCEPT" },
+    { ...report, evidence: { ...report.evidence, cleanup: "unknown" } },
+    { ...report, evidence: { ...report.evidence, attachment_id: "" } }]) {
+    const result = evaluateHandoff({ state: current, event, pending_tasks: [] })
+    expect(result.state.resume_sha).toBeUndefined()
+    expect(result.state.processed_report_ids).toContain(report.id)
+  }
+})
+
+test("new state and decision fields reject malformed values instead of dropping them", () => {
+  for (const rework_limit of [-1, 0.5, "3", null, Number.MAX_SAFE_INTEGER + 1])
+    expect(() => evaluateHandoff({ state: { ...state, rework_limit }, event: report, pending_tasks: [] })).toThrow("invalid handoff input")
+  const zero = evaluateHandoff({ state: { ...reviewing(), rework_limit: 0 }, event: { ...verdict, status: "REJECT" }, pending_tasks: [] })
+  expect(zero.action).toBe("blocked")
+  const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+  for (const blocked_context of [{ ...stopped.blocked_context, sha: "bad" }, { ...stopped.blocked_context, cleanup_required: "false" },
+    { ...stopped.blocked_context, report_id: "" }, { ...stopped.blocked_context, reason: "" }])
+    expect(() => evaluateHandoff({ state: { ...stopped, blocked_context }, event: { kind: "dispatch", id: "invalid", root_trigger: null }, pending_tasks: [] })).toThrow("invalid handoff input")
+  for (const stand_ready of ["true", null, 1])
+    expect(() => evaluateHandoff({ state: stopped, event: { kind: "continue_after_evaler", id: "invalid",
+      issue_id: state.issue_id, report_id: report.id, sha: next, target: "Rich", stand_ready }, pending_tasks: [] })).toThrow("invalid handoff input")
+})
+
+test("offline CLI continues a bound stop without rewriting its input or exposing extra context", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evaler-continuation-"))
+  try {
+    const filename = path.join(directory, "input.json")
+    const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED", evidence: undefined }, pending_tasks: [] }).state
+    for (const stand_ready of [false, true]) {
+      const source = JSON.stringify({ state: { ...stopped, blocked_context: { ...stopped.blocked_context, private_secret: "must-not-echo" } },
+        event: { kind: "continue_after_evaler", id: "cli-decision", issue_id: state.issue_id, report_id: report.id, sha: next, target: "Rich", stand_ready }, pending_tasks: [] })
+      await Bun.write(filename, source)
+      const child = Bun.spawn([process.execPath, path.resolve("script/evaler-handoff.ts"), filename], { stdout: "pipe", stderr: "pipe" })
+      const output = await new Response(child.stdout).text()
+      expect(await child.exited).toBe(stand_ready ? 0 : 2)
+      expect(JSON.parse(output).action).toBe(stand_ready ? "ready_to_dispatch" : "blocked")
+      expect(output).not.toContain("must-not-echo")
+      expect(await Bun.file(filename).text()).toBe(source)
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
