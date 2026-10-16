@@ -106,9 +106,11 @@
 
 - [ ] RED/GREEN: полностью прочитанная чужая ancestry не сигналится и не карантинится;
   ошибка чтения отказывает; own descendant проходит subreaper/pid+starttime guards.
-- [ ] RED/GREEN: при подтверждённом дереве и пустом unknown ошибка
+- [x] RED/GREEN: при подтверждённом дереве и пустом unknown ошибка
   `Writer owner unavailable` не проваливает попытку; `.writer` снимается через
   существующий `releaseStaleWriter`, непроверенное дерево/unknown по-прежнему отказ.
+  Profile75 PASS/218 assertions47.34s,2 proc-denial cases не запускались для
+  предотвращения помех другим агентам; typecheck/diff PASS.
 - [ ] Проверить `bun run test test/process-supervisor.test.ts test/judge-environment.test.ts`
   и `bun typecheck`; отдельный коммит `fix(evals): ignore proven foreign process ancestry`.
 - [x] RED/GREEN wrapper unit: разрешённый canonical caller CODEX_HOME с тем же
@@ -228,4 +230,5 @@ private config/budget/results вне Git; операторские команд�
 11. Harness unit boundary0e6994f736; scoped login status exit0/clean unit/0 model calls, A00yuH journal unchanged.
 12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
 13. Server/profile guard: slots31/127 PASS33.22s/typecheck; user lock исключён из environment.
-14. Следующий шаг: supervisor writer/foreign cleanup, затем подготовка/cleanup/очередь.
+14. Writer diagnostic: profile75/218 PASS47.34s +typecheck;2 proc-denial cases исключены.
+15. Следующий шаг: foreign ancestry, затем новый prepare/verify/cleanup/queue без inventories.

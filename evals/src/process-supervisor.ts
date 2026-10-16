@@ -595,7 +595,12 @@ export async function superviseProcess(input: {
         entry.admission = "allowed"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
-      const writer = await writerIdentity(profile)
+      const writer = await writerIdentity(profile).catch(error => {
+        if (!(error instanceof WriterUnavailable)) throw error
+        // The process tree still has to drain; stale-writer removal belongs to the profile owner.
+        cleanup.writerRefusal ??= error.refusal
+        return null
+      })
       if (writer && !cleanup.writer) cleanup.writer = writer
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
