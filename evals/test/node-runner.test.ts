@@ -73,3 +73,33 @@ test("text import live admission refuses inherited non-Luna model before touchin
     expect(await Bun.file(path.join(root, "profile.harness-lease/owner.json")).exists()).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+
+test("node CLI: инфраструктурная ошибка расходует единственный вызов даже с --repeat 2", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-single-call-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ result: { revision: "fixture" } }) })
+  try {
+    const tasks = path.join(directory, "tasks"), id = "crosstable-fixed-sum"
+    await cp(path.join(evalsRoot, "tasks/node-evals", id), path.join(tasks, id), { recursive: true })
+    const child = Bun.spawn([process.execPath, path.join(evalsRoot, "script/run-node-evals.ts"), "--tasks", tasks, "--repeat", "2"], {
+      env: { PATH: process.env.PATH, FAKE_NODE_INFRA_RETRY: "1", EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model",
+        EVAL_PROFILE_DIR: path.join(directory, "profile"), EVAL_RESULTS_DIR: path.join(directory, "results"),
+        EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"), EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`,
+        LOGINOM_DOCK_API_KEY: "fixture", LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+        EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture",
+        EVAL_AGENT_PROVIDER_MODEL_ID: "model" }, stdout: "ignore", stderr: "ignore",
+    })
+    expect(await child.exited).toBe(2)
+    const files = await Array.fromAsync(new Bun.Glob("*/summary.json").scan({ cwd: path.join(directory, "results"), absolute: true }))
+    expect(files).toHaveLength(1)
+    const summary = await Bun.file(files[0]!).json(), run = path.dirname(files[0]!)
+    expect(summary.config.repeat).toBe(1)
+    expect((await Bun.file(path.join(run, "config.json")).json()).infraRetry).toBe(false)
+    expect(summary.tasks[0].attempts).toHaveLength(1)
+    expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "infra_error", score: null,
+      environment_cleanup: { status: "confirmed" }, stderr_head: "LOGINOM_HOST_TIMEOUT\n" })
+    expect(summary.tasks[0].attempts[0].infra_retry).toBeUndefined()
+    expect(await Bun.file(path.join(directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(1)
+    expect(await Bun.file(path.join(run, "code-verdict.json")).json()).toMatchObject({ code: 2, verdict: "ERROR" })
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+}, 30_000)

@@ -5,7 +5,7 @@ import { chmod, mkdir, rm } from "node:fs/promises"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
-const infraRetry = command === "run" && process.env.EVAL_TASK_ID?.startsWith("infra-retry-")
+const infraRetry = command === "run" && (process.env.EVAL_TASK_ID?.startsWith("infra-retry-") || process.env.FAKE_NODE_INFRA_RETRY === "1")
 const launch = infraRetry ? await (async () => {
   const file = Bun.file(path.join(Bun.argv[Bun.argv.indexOf("--dir") + 1]!, "fake-launches.json"))
   const count = await file.json().catch(() => 0) as number

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { watch } from "node:fs"
 import { cp, mkdtemp, rm } from "node:fs/promises"
 import path from "node:path"
+import os from "node:os"
 import { evalsRoot } from "../src/config"
 import { compare } from "../src/compare"
 import { parseComparisonSummary } from "../src/compare-analysis"
@@ -9,7 +10,7 @@ import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
 
 async function fixture(ids: string[]) {
-  const directory = await mkdtemp(path.join("/home/kiselev/storage/tmp/", "evals-infra-retry-"))
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-infra-retry-"))
   const profile = path.join(directory, "profile")
   const tasks = path.join(directory, "tasks")
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })

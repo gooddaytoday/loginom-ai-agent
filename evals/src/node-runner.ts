@@ -15,7 +15,7 @@ export async function runNodeEvals(argv: string[], env: Record<string, string | 
 async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   if (argv.some((arg) => ["--calibrate", "--judge-only", "--keep-storage", "--dry-run", "--reset-profile"].includes(arg.split("=")[0]!)))
     return { code: 2, runDir: null, error: "unsupported mode: code-only live runner" }
-  const args = ["--tasks", path.join(evalsRoot, "tasks/node-evals"), ...argv, "--skip-judge", "--repeat", "1"]
+  const args = ["--tasks", path.join(evalsRoot, "tasks/node-evals"), ...argv, "--skip-judge", "--repeat", "1", "--no-infra-retry"]
   const config = loadConfig(args, env)
   const tasks = await loadTasks(config.tasksDir, config.only)
   if (tasks.some(task => textImportIds.includes(task.id))) assertTextImportModel(config)

@@ -2,7 +2,7 @@
 
 Общий рабочий порядок — [runbook](evaler-orchestration.md), текущее назначение — шапка карточки. Модели, CLI/helper/config и checkout определяет активный runbook серии; общих продуктовых пинов в этой инструкции нет. Методика — из назначенного checkout. Для импорта использовать её `references/text-import.md` и проверку text-import, для Кросс-таблицы — описанные ниже проверки.
 
-Из `evals/` собственного checkout выполняются необходимые unit/typecheck и существующие offline checkers. Модельные команды разрешены только назначением, в собственном role env, профиле и захвате стенда. `script/run-node-evals.ts --tasks <collection> --only <assigned-ids>` принудительно задаёт skip-judge/repeat=1; общий main пока допускает infra retry. При бюджете одного физического вызова нужна отдельная правка до запуска серии, см. [план ускорения](2026-10-16-node-evals-speedup-proposal.md). Повторы ради PASS и резервные кейсы запрещены.
+Из `evals/` собственного checkout выполняются необходимые unit/typecheck и существующие offline checkers. Модельные команды разрешены только назначением, в собственном role env, профиле и захвате стенда. `script/run-node-evals.ts --tasks <collection> --only <assigned-ids>` принудительно задаёт skip-judge/repeat=1/--no-infra-retry: инфраструктурная ошибка не запускает продукт повторно. Общий harness без этого флага сохраняет прежнее поведение. Повторы ради PASS и резервные кейсы запрещены.
 
 ## Кодовый verdict
 
@@ -59,7 +59,7 @@ bun script/check-node-artifacts.ts ./tasks/node-evals/crosstable-reconfigure <ev
 
 `reference.lgp` каждого кейса совпадает с artifact/package.lgp в evidence по SHA256. Provenance содержит modelConfirmed, реальные input bytes, CLI check, cold rerun и finalize gates. Для независимого холодного выполнения открыть сохранённый reference через Playwright MCP в своём контексте Loginom, предварительно убедиться, что input FileName доступен и соответствует dataset; выполнить весь граф, проверить вновь созданный CSV со своим расчётом. Не менять shared author reference, его input или чужой writer. Если путь/стенд недоступен, указать конкретный BLOCKED; не засчитывать static XML вместо выполнения.
 
-Ben выполняет только первоначально разрешённый продуктовый вызов каждого кейса и сохраняет свой runDir; repeat=1 сам по себе не доказывает отсутствие внутреннего инфраструктурного повтора. Повторно прочитать его кодовый verdict можно без новых модельных попыток:
+Ben выполняет только первоначально разрешённый продуктовый вызов каждого кейса и сохраняет свой runDir; выполняет её через script/run-node-evals.ts с принудительным отключением инфраструктурного повтора. Новый вызов runner не даёт нового бюджета; расход сверяется по карточке и результатам. Повторно прочитать его кодовый verdict можно без новых модельных попыток:
 
 ```sh
 bun script/check-node-run.ts <runDir> crosstable-fixed-sum,crosstable-reconfigure,crosstable-sliding-average
