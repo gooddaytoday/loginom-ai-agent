@@ -34,7 +34,20 @@ Production run с `EVAL_SLOTS_FILE` пока возвращает `SLOTS_ADMISSI
    Harness автоматически удаляет только своё на новом стенде после проверок;
    созданное не им требует разрешения. Правила — контракт п.20.
 
-## Подготовка и проверка
+## Настройки controller и подготовка
+
+До prepare/verify и запуска задать несекретные параметры в доверенном controller:
+
+```bash
+export EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/slots.json
+export EVAL_CLI_MODE=binary
+export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/parallel/candidate-home/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610140002-dev/bin/loginom-ai-agent-cli
+export EVAL_AGENT_MODEL=openai/gpt-6-luna
+export EVAL_AGENT_VARIANT=high
+export EVAL_JUDGE_COMMAND=/home/kiselev/git/codex-vpn-lockdown/bin/codex
+export JUDGE_MODEL=gpt-6-sol
+export JUDGE_REASONING=xhigh
+```
 
 После реализации использовать команды из `evals/`, передавая config явно:
 
@@ -67,17 +80,14 @@ proc permissions/dumpability, не совмещать с native/browser пров
 
 ## N=1 замер и утверждение порогов
 
-Перед запуском задать в доверенном controller окружении эти несекретные параметры:
+До запуска выбрать private JSON-файл с массивом ResourceBound: scope, metric,
+minimum/maximum (одна из границ может быть null). Указать все обязательные scopes
+из существующего requireResourceBudgetScopes; container scopes содержат полный
+container ID и startedAt. Это исходный бюджет, run сохраняет его фиксированную копию
+до dispatch. Для N=2 файл содержит только утверждённые владельцем пороги.
 
 ```bash
-export EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/slots.json
-export EVAL_CLI_MODE=binary
-export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/parallel/candidate-home/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610140002-dev/bin/loginom-ai-agent-cli
-export EVAL_AGENT_MODEL=openai/gpt-6-luna
-export EVAL_AGENT_VARIANT=high
-export EVAL_JUDGE_COMMAND=/home/kiselev/git/codex-vpn-lockdown/bin/codex
-export JUDGE_MODEL=gpt-6-sol
-export JUDGE_REASONING=xhigh
+export EVAL_RESOURCE_BUDGET_FILE=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/n1-budget.json
 ```
 
 Controller получает требуемые credentials через существующий private способ;
