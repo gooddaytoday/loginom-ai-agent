@@ -7,6 +7,7 @@ export type HandoffState = {
   executor: "Rich" | "Ben" | null
   review_cycle: number
   reject_count: number
+  rework_limit?: number
   processed_report_ids: string[]
   last_dispatch: { id: string; phase: "rich" | "ben"; sha: string; root_trigger: string | null; task_id: string | null;
     outcome: "queued" | "coalesced" | "deferred" | "ambiguous" | "not_queued" } | null
@@ -93,7 +94,7 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
   if (input.event.status === "REJECT") {
     const reject_count = input.state.reject_count + 1
     const next = { ...input.state, reject_count, processed_report_ids: [...input.state.processed_report_ids, input.event.id] }
-    if (reject_count >= 2) return { action: "blocked", reason: "EVALER_DECISION_REQUIRED: rework limit reached",
+    if (reject_count > (input.state.rework_limit ?? 1)) return { action: "blocked", reason: "EVALER_DECISION_REQUIRED: rework limit reached",
       state: { ...next, phase: "blocked", executor: null } }
     return { action: "ready_to_dispatch", target: "Rich", reason: "REJECT: corrections require a new SHA",
       state: { ...next, phase: "rich", executor: "Rich" } }
@@ -114,6 +115,7 @@ function parseInput(value: unknown): HandoffInput {
     frozen_sha: raw.frozen_sha === null ? null : sha(raw.frozen_sha), executor,
     ...(raw.delivery_sha !== undefined ? { delivery_sha: raw.delivery_sha === null ? null : sha(raw.delivery_sha) } : {}),
     review_cycle: count(raw.review_cycle), reject_count: count(raw.reject_count),
+    ...(raw.rework_limit !== undefined ? { rework_limit: count(raw.rework_limit) } : {}),
     processed_report_ids: array(raw.processed_report_ids).map(value => text(value)),
     last_dispatch: dispatch ? { id: text(dispatch.id), phase: member(dispatch.phase, ["rich", "ben"]), sha: sha(dispatch.sha),
       root_trigger: dispatch.root_trigger === null ? null : text(dispatch.root_trigger), task_id: dispatch.task_id === null ? null : text(dispatch.task_id),

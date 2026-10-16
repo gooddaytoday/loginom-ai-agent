@@ -287,3 +287,16 @@ test('recovered author admission cannot waive incomplete evidence stale SHA clea
  for(const resolution_sha256 of ['', 'bad', 'F'.repeat(64)])expect(()=>evaluateHandoff({state,event:{...report,evidence:{...evidence,
   review_admission:{kind:'recovered_author',resolution_sha256}}},pending_tasks:[]})).toThrow('invalid handoff input');
 });
+
+test("a series can allow three automatic reworks and stop its fourth fresh REJECT", () => {
+  for (const reject_count of [0, 1, 2, 3]) {
+    const current = { ...reviewing(), rework_limit: 3, reject_count, review_cycle: reject_count + 1 }
+    const event = { ...verdict, id: `reject-${reject_count + 1}`, status: "REJECT" as const }
+    const result = evaluateHandoff({ state: current, event, pending_tasks: [] })
+    expect(result.action).toBe(reject_count < 3 ? "ready_to_dispatch" : "blocked")
+    expect(result.state.reject_count).toBe(reject_count + 1)
+    expect(result.state.rework_limit).toBe(3)
+    expect(result.state.review_cycle).toBe(current.review_cycle)
+    expect(evaluateHandoff({ state: result.state, event, pending_tasks: [] }).state).toEqual(result.state)
+  }
+})
