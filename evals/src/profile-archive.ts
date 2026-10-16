@@ -1,7 +1,8 @@
 import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, mkdir, open, readdir, readlink, realpath, rename } from "node:fs/promises"
-import { assertProfileClean, assertProfileSettled, profileHistory } from "./profile"
+import { assertProfileClean, profileHistory, waitProfileIdle } from "./profile"
+import { writerIdentity } from "./process-supervisor"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { EvalFailure } from "./fail"
 
@@ -9,7 +10,7 @@ type Snapshot = { kind: "file" | "directory" | "link" | "socket"; device: string
 type Manifest = { version: 1; kind: "profile-archive"; profile: string; archive: string;
   bindings: { directory: string; device: string; inode: string }[]; roots: { name: string; snapshot: Snapshot }[]; status: "intent" | "committed"; at: string; committedAt?: string }
 
-/** The caller holds the profile lease and supplies a private, empty archive target. */
+/** The caller holds the profile lease. Pending recovery is archived as evidence, not resolved. */
 export async function archiveProfileEvidence(profile: string, archive: string, journal: string) {
   const directories = [profile, archive, path.dirname(journal)]
   const bindings = await Promise.all(directories.map(async directory => {
@@ -22,7 +23,7 @@ export async function archiveProfileEvidence(profile: string, archive: string, j
   if (directories.some((directory, index) => directories.slice(index + 1).some(other =>
     directory === other || directory.startsWith(other + path.sep) || other.startsWith(directory + path.sep))))
     throw new EvalFailure("ARCHIVE_ROOT_OVERLAP", 2)
-  await assertProfileSettled(profile)
+  if (await writerIdentity(profile) || !await waitProfileIdle(profile, 1_000)) throw new EvalFailure("ARCHIVE_PROFILE_BUSY", 2)
   const saved = await readLeaseReceipt(journal).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined
     throw new EvalFailure("ARCHIVE_MANIFEST_INVALID", 2)
