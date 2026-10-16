@@ -893,3 +893,57 @@ temporary files removed after retained SHA read-back. This refuses an observed
 own-root FD; it does not qualify all mappings, operations, SessionBackup or
 autosave no-regrowth. Storage deletion/release/unpause and production admission
 remain closed, with both grants false.
+
+
+Autosave crash research in progress (2026-10-16): RED72b91324… unsupported
+phase is retained with audit a0591997…44/22 and exact own teardown. Initial
+GREEN63059c76… failed before Loginom init; no-auth short→long→short confirmed
+Chromium SingletonSocket108 bytes causes Socket path too long at TMPDIR63
+bytes (diagnosis549495dc…). Original launch error was erased by the generic
+adapter, so direct native error attribution remains inferred. Harness now uses
+private fixture root49 bytes. Its own failed pair was decommissioned through
+public factory (4 released claims/3 IDs/iomNdf root absent,24f9218d…); startup
+dump/meta retained. A second diagnostic1df172fa… reached autosave but returned
+unknown before writer proof, then process closure failed due unsupported
+context/crash-browser-profile layout (10 exact birth-tracked binding refusals).
+Corrected new context to attempts/autosave-crash/browser-profile. Original
+failed proof is not repaired. QO5TL6 pair/root retained pending full original
+process absence evidence and research-only decommission; no production grants.
+Awaiting no-auth CDP crash-error control before next native attempt. This is
+active debugging; no user action requested, no global restart/guard weakening.
+
+Follow-up: fresh25 original process identities are absent (811edf44… plus
+immediate pre-disposal check). Own QO5TL6 research pair/network/root have been
+retired through public factory with4 released claims; original LGP/autosave
+bytes preserved, original process proof remains failed. No-auth component
+exposed unsupported Browser.waitForEvent (TypeError); switched new crash phase
+to once(disconnected) with bounded Promise.all. Corrected CDP control pending.
+
+
+Autosave/no-regrowth qualification completed (2026-10-16): native28ca68f5…
+1/101 PASS180.55s, audit77f73737…123 checks/42 sources+12 pins. B runs a bounded
+40s native node before A starts. A reads back PackageAutoSavePeriod5000ms,
+creates real named/modified LGP+autosave, then its separate browser main
+process crashes through CDP Browser.crash (372ms event). Bound CloseSession A
+is followed by all-collection absence and own-root FD release before deleting
+only the2 controlled regular nlink1 files via argv. Three raw empty NUL
+listings/native package/kernel points span10817ms (2 actual periods). B keeps
+its exact session/package/sidecar inode+FLOCK and canary SHA, then finishes
+successfully after the window. Root canonical path/metadata/epoch stay stable;
+both browser roots and all3 driver/observer/peer actors have qualified closures.
+Own pair/network/root absent. Legacy A/B fa3c4190…1/103 PASS157.21s,
+audite2b47872…123/38+13 pins; related admin/preflight/package50/162 PASS24.26s,
+typecheck/syntax/diff PASS. Private verification retains all original RED and
+diagnostic verdicts/source snapshots. Short private TMPDIR avoids the
+component-proven63byte/108byte socket limit; strict attempts/id/browser-profile
+layout remains required. Pinned Browser lacks waitForEvent; once(disconnected)
+works while Browser.crash RPC remains pending, so only the event is awaited
+under deadline. Scenario budgets240/120/90/70 include the40s B node and both
+autosave phases; existing controls retain their deadlines. All3 own diagnostic
+pairs/roots retired after qualified closure or fresh original-birth absence;
+failed process proofs stayed failed. PAIR_REMOVE_UNKNOWN was reconciled by
+public factory from the same durable lineage after exact Studio absence,
+without restart. Nine duplicate temp files and one unnecessary copied browser
+cache removed. This completes the controlled research test. Arbitrary user
+traversal, SessionBackup, all-workload operation/mmap coverage, production
+cleanup/release/unpause and admission remain open; both grants remain false.

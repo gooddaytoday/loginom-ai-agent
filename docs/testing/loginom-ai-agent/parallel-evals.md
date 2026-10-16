@@ -1508,3 +1508,32 @@ temporary files removed after retained SHA read-back. This refuses an observed
 own-root FD; it does not qualify all mappings, operations, SessionBackup or
 autosave no-regrowth. Storage deletion/release/unpause and production admission
 remain closed, with both grants false.
+
+
+Autosave/no-regrowth qualification completed (2026-10-16): native28ca68f5…
+1/101 PASS180.55s, audit77f73737…123 checks/42 sources+12 pins. B runs a bounded
+40s native node before A starts. A reads back PackageAutoSavePeriod5000ms,
+creates real named/modified LGP+autosave, then its separate browser main
+process crashes through CDP Browser.crash (372ms event). Bound CloseSession A
+is followed by all-collection absence and own-root FD release before deleting
+only the2 controlled regular nlink1 files via argv. Three raw empty NUL
+listings/native package/kernel points span10817ms (2 actual periods). B keeps
+its exact session/package/sidecar inode+FLOCK and canary SHA, then finishes
+successfully after the window. Root canonical path/metadata/epoch stay stable;
+both browser roots and all3 driver/observer/peer actors have qualified closures.
+Own pair/network/root absent. Legacy A/B fa3c4190…1/103 PASS157.21s,
+audite2b47872…123/38+13 pins; related admin/preflight/package50/162 PASS24.26s,
+typecheck/syntax/diff PASS. Private verification retains all original RED and
+diagnostic verdicts/source snapshots. Short private TMPDIR avoids the
+component-proven63byte/108byte socket limit; strict attempts/id/browser-profile
+layout remains required. Pinned Browser lacks waitForEvent; once(disconnected)
+works while Browser.crash RPC remains pending, so only the event is awaited
+under deadline. Scenario budgets240/120/90/70 include the40s B node and both
+autosave phases; existing controls retain their deadlines. All3 own diagnostic
+pairs/roots retired after qualified closure or fresh original-birth absence;
+failed process proofs stayed failed. PAIR_REMOVE_UNKNOWN was reconciled by
+public factory from the same durable lineage after exact Studio absence,
+without restart. Nine duplicate temp files and one unnecessary copied browser
+cache removed. This completes the controlled research test. Arbitrary user
+traversal, SessionBackup, all-workload operation/mmap coverage, production
+cleanup/release/unpause and admission remain open; both grants remain false.
