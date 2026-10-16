@@ -687,3 +687,14 @@ typecheck/syntax/diff PASS. Private51f765be… audit9c6e5d40…83/45+9pins confi
 three closed admin actors/transport ACKs, two released pre-CLI finalizers and
 exact own pair/network/root absence. This resolves prepare/verify wiring;
 runtime frozen-policy admission/drift and evaluated-attempt cleanup remain open.
+
+Active backend follow-up (2026-10-16): one actual JavaScript CPU node is now
+qualified after creator-context loss. Existing bound CloseSession removes the
+active session/package before normal completion: browser/controller start→fresh
+absence3051ms versus same-source/image control21456ms. Close1/53 PASS61.68s,
+control1/54 PASS79.82s, related50/162 PASS22.75s, typecheck/syntax/diff PASS.
+Private05c609b2… audit48d6b749…64/25 and0ff79e61…192a52d3…184/73 preserve
+full replies, both admin closures/ACKs, exact own pair/network/root absence and
+input. No ownership/pending guard or deadline changed. Actual CLI crash, B-active
+continuation, FD/locks, backup/storage/no-regrowth and durable cleanup consumption
+remain open; this component evidence keeps operation/cleanup authority false.
