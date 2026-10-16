@@ -178,12 +178,13 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
     }
     if (request.op === "reconcile-user") {
       const payload = request.payload
-      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (!["blocked", "configure", "acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(payload?.phase)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+      if (payload.phase === "session-pool-probe" && payload.slot?.username !== "eval-pool-probe") throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
       if (payload.peer !== undefined && (!["session-storage-probe", "session-component-probe"].includes(payload.phase) || !payload.peer || Object.keys(payload.peer).length !== 2 ||
         typeof payload.peer.name !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(payload.peer.name) || payload.peer.name === payload.slot?.username ||
         typeof payload.peer.objectId !== "string" || !payload.peer.objectId)) throw Error("ADMIN_REQUEST_INVALID")
       if (!payload || Object.keys(payload).length !== (payload.peer !== undefined ? 9 :
-        ["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
+        ["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) ? 8 : 7) || !payload.slot || typeof payload.slot.username !== "string" ||
         !payload.slot.username || payload.slot.username.includes("\0") || typeof payload.secretFile !== "string" ||
         typeof payload.preparationNonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(payload.preparationNonce) ||
         [payload.desiredHash, payload.secretHash].some(hash => typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) ||
@@ -192,7 +193,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           payload.owned.name !== payload.slot.username || payload.owned.userKind !== 0 || payload.owned.preparationNonce !== payload.preparationNonce ||
           payload.phase !== "blocked" && payload.owned.secretHash !== null && (typeof payload.owned.secretHash !== "string" || !/^[0-9a-f]{64}$/.test(payload.owned.secretHash))))
         throw Error("ADMIN_REQUEST_INVALID")
-      if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
+      if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) && (!Array.isArray(payload.expectedPolicy) || payload.expectedPolicy.some(directory => !directory ||
         Object.keys(directory).length !== 3 || typeof directory.objectId !== "string" || !directory.objectId || typeof directory.name !== "string" || !directory.name ||
         !Array.isArray(directory.permissions) || directory.permissions.some(principal => !principal || Object.keys(principal).length !== 3 ||
           typeof principal.objectId !== "string" || !principal.objectId || typeof principal.name !== "string" || !principal.name || ![0, 1, 2].includes(principal.userKind)))))
@@ -235,8 +236,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
           console.info("ADMIN_USER_STAGE_ADD")
           const user = await cast(owned ? matches[0] : await users.Add(username, bg.TBGDeductorUserKind.dukUser), bg.IBGDeductorUser)
           const flags = [["IsAdmin", false], ["IsDesigner", true], ["IsViewer", false], ["UseGlobalFileStorage", false], ["SchedulerFullAccess", false], ["AllowPublish", false]]
-          if (owned && !["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
-          if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(phase)) {
+          if (owned && !["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(phase) && await user.Blocked !== true) return { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_IDLE" } }
+          if (["acl", "activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(phase)) {
             stage = "ACL"
             console.info("ADMIN_USER_STAGE_ACL")
             const snapshot = async () => {
@@ -268,7 +269,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             const before = await snapshot()
             if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(expectedPolicy)))
               return { outcome: "not_applied", data: { code: "ADMIN_ACL_POLICY_CHANGED" } }
-            if (["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(phase)) {
+            if (["activate", "session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(phase)) {
               const safePolicy = async () => owned.secretHash === secretHash && await user.AuthMode === bg.TBGDeductorUserAuthMode.uamLocal &&
                 (await Promise.all(flags.map(async ([name, value]) => await user[name] === value))).every(Boolean)
               if (before.some(directory => directory.permissions.length) || !await safePolicy())
@@ -277,6 +278,15 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               console.info("ADMIN_USER_STAGE_ACTIVATE")
               const blocked = await user.Blocked
               if (typeof blocked !== "boolean") throw Error("readback")
+              if (phase === "session-pool-probe" && !blocked) {
+                if (username !== "eval-pool-probe" || await user.AllowedApplicationModes !== bg.TBGApplicationModes.amDesign) throw Error("readback")
+                applied = true
+                await user.set_AllowedApplicationModes(bg.TBGApplicationModes.amDesign | bg.TBGApplicationModes.amRun)
+                if (await user.AllowedApplicationModes !== 3 || !await safePolicy()) throw Error("readback")
+                return { outcome: "confirmed", data: { probeAllowed: true,
+                  poolPolicy: { userName: username, before: 1, after: await user.AllowedApplicationModes,
+                    isAdmin: await user.IsAdmin, useGlobalFileStorage: await user.UseGlobalFileStorage } } }
+              }
               if (phase !== "activate") return blocked ? { outcome: "not_applied", data: { code: "ADMIN_USER_NOT_ACTIVE" } }
                 : { outcome: "confirmed", data: { probeAllowed: true } }
               if (blocked) { applied = true; await user.set_Blocked(false) }
@@ -331,7 +341,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "ADMIN_USER_" + stage + "_UNKNOWN" } } }
       }, { username: payload.slot.username, owned: payload.owned, phase: payload.phase,
         password: payload.phase === "configure" ? credentials.password : null, secretHash: payload.secretHash, expectedPolicy: payload.expectedPolicy ?? null, peer: payload.peer ?? null }))
-      if (["session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) && result.outcome === "confirmed") {
+      if (["session-probe", "session-crash-probe", "session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe", "session-pool-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase) && result.outcome === "confirmed") {
         const retainedPackage = ["session-package-crash-probe", "session-backup-probe", "session-shared-probe", "session-progress-probe"].includes(payload.phase)
         const storageRoots = ["session-backup-probe", "session-shared-probe"].includes(payload.phase) ? await bounded(request, page.evaluate(async () => {
           const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
@@ -387,11 +397,84 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             process.stderr.write("ADMIN_USER_PROBE_STAGE_CREATE\n")
             const handle = await bounded(request, probePage.evaluateHandle(async phase => {
               const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
-              return ["session-component-probe", "session-progress-probe"].includes(phase)
-                ? session.OpenPackage(phase === "session-progress-probe" ? "progress-probe.lgp" : "component-probe.lgp") : session.CreatePackage()
+              return ["session-component-probe", "session-progress-probe", "session-pool-probe"].includes(phase)
+                ? session.OpenPackage(phase !== "session-component-probe" ? "progress-probe.lgp" : "component-probe.lgp") : session.CreatePackage()
             }, payload.phase))
             try {
               const withPackage = await snapshot()
+              const pool = payload.phase === "session-pool-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline, nonce }) => {
+                const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
+                const user = await session.CurrentUser
+                const userName = await user.Name, allowedApplicationModes = await user.AllowedApplicationModes
+                const fileName = await item.FileName
+                const unit = await (await (await item.ModelUnits).getItem(0)).ModelUnit
+                const nodes = await (await unit.WorkFlow).Nodes
+                if (await nodes.Count !== 1) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const engine = await cast(await (await (await nodes.getItem(0)).Component).Engine, bg.IBGCodeModelComponentEngine)
+                const source = await engine.Code
+
+                await session.ClosePackage(new Ref(item), 5000)
+
+                const jobs = await (await session.GetScheduler()).Jobs
+
+                const config = await jobs.BeginAdd()
+                const guid = String(await config.Guid)
+                await config.set_Caption("pool-probe-" + nonce)
+                await config.set_PackageFileName(fileName)
+                await config.set_Enabled(true)
+                await config.set_StartTime(new Date(Date.now() + 86_400_000))
+                await config.set_StartOnServerStartup(false)
+                await config.set_StartIfMissedSchedule(false)
+                await config.set_PeriodType(bg.TBGSchedulerPeriodType.sptNone)
+                await config.set_HistoryCount(1)
+                await config.set_StopTimeoutUnit(bg.TBGSchedulerPeriodType.sptSecond)
+                await config.set_StopTimeoutCount(10)
+
+                const applied = await jobs.ApplyChanges(new Ref(config), false)
+                if (applied !== bg.TBGSchedulerJobApplyChangesResult.acrSuccess) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+
+                const matches = [], enumerator = await jobs.GetEnumerator()
+                try {
+                  while (await enumerator.MoveNext()) {
+                    const value = await enumerator.Current
+                    if (String(await value.Guid) === guid) matches.push(value)
+                  }
+                } finally { await ReleaseObject(enumerator, true) }
+                if (matches.length !== 1) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const job = matches[0]
+                const observed = { guid, userName: await job.UserName, enabled: await job.Enabled, periodType: await job.PeriodType,
+                  fileName: await job.PackageFileName, caption: await job.Caption, startTime: await job.StartTime,
+                  startOnServerStartup: await job.StartOnServerStartup, startIfMissedSchedule: await job.StartIfMissedSchedule }
+                if (observed.userName !== userName || observed.enabled !== true || observed.periodType !== 0 || observed.fileName !== fileName || observed.caption !== "pool-probe-" + nonce)
+                  throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                const read = async () => {
+                  const reader = await job.GetLogReader(bg.TBGSchedulerLogColumn.slcRowID, bg.TBGSortDirection.sdDesc)
+                  try { return (await reader.GetRange(0, Math.min(4, await reader.Count))).map(row => ({ guid: String(row.Guid), userName: row.UserName,
+                    jobGuid: String(row.JobGuid), sessionID: row.SessionID, status: row.Status, startedAt: row.StartTime,
+                    finishedAt: row.FinishTime, processTime: row.ProcessTime, error: row.ErrorMessage })) }
+                  finally { await ReleaseObject(reader, true) }
+                }
+                const before = await read(), samples = []
+                if (before.length) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+
+                await jobs.ForceStart(guid)
+
+                while (Date.now() < deadline) {
+                  const log = await read()
+                  samples.push(log)
+                  if (log.length === 1 && log[0].status >= bg.TBGProgressTrackerProcessStatus.ptpsCompleted) {
+
+                    await jobs.Delete(guid)
+                    const jobsAfter = [], remaining = await jobs.GetEnumerator()
+                    try { while (await remaining.MoveNext()) jobsAfter.push(String(await (await remaining.Current).Guid)) }
+                    finally { await ReleaseObject(remaining, true) }
+                    if (jobsAfter.includes(guid)) throw Error("ADMIN_CAPABILITY_UNSUPPORTED")
+                    return { source, allowedApplicationModes, job: observed, before, samples, log, deleted: true, jobsAfter }
+                  }
+                  await new Promise(resolve => setTimeout(resolve, 50))
+                }
+                throw Error("ADMIN_DEADLINE")
+              }, { item: handle, deadline: request.deadline, nonce: payload.preparationNonce })) : null
               const progress = payload.phase === "session-progress-probe" ? await bounded(request, probePage.evaluate(async ({ item, deadline }) => {
                 const unit = await (await (await item.ModelUnits).getItem(0)).ModelUnit
                 const nodes = await (await unit.WorkFlow).Nodes
@@ -591,7 +674,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
                 }
                 return { ...(shared ? { shared } : {}), periodMs, modified, before, after: await snapshot(), nonemptyObserved: false, reason: "not_observed" }
               }, { item: handle, deadline: request.deadline, phase: payload.phase })) : null
-              if (!retainedPackage) {
+              if (!retainedPackage && payload.phase !== "session-pool-probe") {
                 process.stderr.write("ADMIN_USER_PROBE_STAGE_CLOSE\n")
                 await bounded(request, probePage.evaluate(async item => {
                   const session = await bg.app.Application.FInstance.FServerConnection.ServerContainer.Session
@@ -601,7 +684,7 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
               const afterPackage = await snapshot()
               // Interrupt only this owned renderer's orderly logout; the native server/RPC remains real.
               if (!["session-probe", "session-storage-probe", "session-component-probe"].includes(payload.phase)) await probePage.evaluate(() => { window.onpagehide = null })
-              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false, ...(storage ? { storage } : {}), ...(components ? { components } : {}), ...(progress ? { progress } : {}), ...(backup ? { backup, storageRoots } : {}) }
+              return { ownSession, baseline, opened, withPackage, afterPackage, sessionIdentityQualified: false, ...(storage ? { storage } : {}), ...(components ? { components } : {}), ...(progress ? { progress } : {}), ...(pool ? { pool: { ...pool, policy: result.data.poolPolicy } } : {}), ...(backup ? { backup, storageRoots } : {}) }
             } finally { await handle.dispose() }
           } finally { await probeContext.close() }
         })()
