@@ -16,9 +16,10 @@ import { archiveDiagnostics } from "./diagnostics"
 import { acquireHarnessLease, retireRecordedHarnessLease } from "./lease"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
-type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string }
-export type NodeOpsConfig = { version: 1; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths }; offline?: OfflinePaths }
-export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
+type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
+type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string }
+export type NodeOpsConfig = { version: 1 | 2; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths }; offline?: OfflinePaths }
+export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
 export type NodeStandLease = NodeStandOwner & { version: 1; token: string; device: number; inode: number; endpoint: string; containerId: string; acquiredAt: string; configSha256: string }
 export type NodeStandCompletion = { version: 1; owner: NodeStandOwner; acquiredAt: string } & (
   { kind: "unit"; checks: { command: string; exitCode: number; processes: ProcessCleanup }[] } |
@@ -43,6 +44,7 @@ const directory = (config: NodeOpsConfig) => path.join(config.runtimeRoot, "oper
 export async function acquireNodeStand(config: NodeOpsConfig, owner: NodeStandOwner): Promise<NodeStandLease> {
   await validateConfig(config)
   validateOwner(owner)
+  nodeRole(config, owner.role)
   await mkdir(path.dirname(directory(config)), { recursive: true, mode: 0o700 })
   const operations = await lstat(path.dirname(directory(config)))
   if (await realpath(path.dirname(directory(config))) !== path.dirname(directory(config)) || operations.uid !== process.getuid?.() || (operations.mode & 0o077))
@@ -60,7 +62,7 @@ export async function acquireNodeStand(config: NodeOpsConfig, owner: NodeStandOw
 export async function acquireNodeHarnessLease(config: NodeOpsConfig, lease: NodeStandLease, profile: string) {
   await assertNodeStandOwner(config, lease)
   await assertOriginalAdmission(config, lease)
-  if (![config.roles[lease.role].referenceProfile, config.roles[lease.role].evalProfile].includes(profile)) throw new NodeOpsFailure("HARNESS_OWNER_UNKNOWN")
+  if (!roleProfiles(nodeRole(config, lease.role)).includes(profile)) throw new NodeOpsFailure("HARNESS_OWNER_UNKNOWN")
   const receipt = path.join(directory(config), `harness-${crypto.randomUUID()}.json`)
   const lock = await acquireHarnessLease(profile, receipt)
   await writeFile(receipt + ".stand", JSON.stringify({ version: 1, owner: ownerOf(lease), acquiredAt: lease.acquiredAt,
@@ -165,7 +167,7 @@ async function executeOps(argv: string[], env: Record<string, string | undefined
     const receipt = required("receipt")
     const owner = { issue: required("issue"), task: required("task"), role: required("role"), phase: required("phase"), sha: required("sha") } as NodeStandOwner
     validateOwner(owner)
-    const roots = config.roles[owner.role].workRoots
+    const roots = nodeRole(config, owner.role).workRoots
     if (!path.isAbsolute(receipt) || !roots.some(root => inside(receipt, root)) || await realpath(path.dirname(receipt)) !== path.dirname(receipt))
       throw new NodeOpsFailure("RECEIPT_PATH_REFUSED")
     const lease = await acquireNodeStand(config, owner)
@@ -190,7 +192,7 @@ async function executeOps(argv: string[], env: Record<string, string | undefined
   await assertNodeStandOwner(config, lease)
   if (typeof values.diagnostic === "string") {
     const file = values.diagnostic
-    if (!path.isAbsolute(file) || !config.roles[lease.role].workRoots.some(root => inside(file, root)) ||
+    if (!path.isAbsolute(file) || !nodeRole(config, lease.role).workRoots.some(root => inside(file, root)) ||
       await realpath(path.dirname(file)) !== path.dirname(file)) throw new NodeOpsFailure("RECEIPT_PATH_REFUSED")
     diagnostic.file = file
   } else diagnostic.file = path.join(directory(config), `diagnostic-${crypto.randomUUID()}.json`)
@@ -236,7 +238,7 @@ export async function runNodeUnitChecks(config: NodeOpsConfig, lease: NodeStandL
     await mkdir(unit, { mode: 0o700 })
     for (const command of ["test", "typecheck"]) {
       const outDir = await nodeProcessOutput(config, lease, command === "test" ? "unit-test" : "unit-typecheck")
-      const run = await superviseProcess({ cmd: [process.execPath, command], cwd: path.join(config.roles[lease.role].checkout, "evals"),
+      const run = await superviseProcess({ cmd: [process.execPath, command], cwd: path.join(nodeRole(config, lease.role).checkout, "evals"),
         env: Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined &&
           /^(PATH|HOME|LANG|LC_[A-Z_]+|TMPDIR|https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|NODE_USE_ENV_PROXY|EVAL_TEST_LOGINOM_IMAGE)$/.test(entry[0]))),
         timeoutMs: 900_000, outDir, observationMode: "unit_after_exit" })
@@ -263,7 +265,7 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
   return exclusive(config, lease, async () => {
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
-    const git = await checkoutIdentity(config.roles[lease.role].checkout)
+    const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
     if (git.sha !== lease.sha) throw new NodeOpsFailure("BASE_SHA_CHANGED")
     const storage = await checkIsolatedStorage(source(config))
     if (storage.containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
@@ -273,13 +275,13 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
       cleanupSecrets: [current.loginom.password, current.dock.apiKey, current.agent.provider?.apiKey ?? ""] }
     await assertAuth(current, command)
     const admission = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, containerId: storage.containerId, configSha256: configDigest(config),
-      profiles: Object.values(config.roles).flatMap(role => [role.referenceProfile, role.evalProfile]), checkedAt: new Date().toISOString() }
+      profiles: Object.values(config.roles).flatMap(roleProfiles), checkedAt: new Date().toISOString() }
     await writeFile(path.join(directory(config), "admission.json"), JSON.stringify(admission), { mode: 0o600 })
     const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
     if (view?.state !== "ready" || view.recoveries?.length) throw new NodeOpsFailure("PROFILE_NOT_READY")
     // Validate Loginom credentials, websocket and licence with the installed product's real browser.
     // No run/model command is admitted here, and no settings or credentials are replaced.
-    const workdir = await mkdtemp(path.join(config.roles[lease.role].workRoots[0]!, ".ops-check-"))
+    const workdir = await mkdtemp(path.join(nodeRole(config, lease.role).workRoots[0]!, ".ops-check-"))
     const checkDir = await nodeProcessOutput(config, lease, "native-check")
     const cmd = [...command.cmd, "loginom", "check", "--format", "json"]
     const boundary = await sandboxCommand({ cmd, profileDir: current.profileDir, workdir, env: command.env })
@@ -304,7 +306,7 @@ async function assertOriginalAdmission(config: NodeOpsConfig, lease: NodeStandLe
   const admission = await readPrivateJson(path.join(directory(config), "admission.json")).catch(() => undefined) as
     { owner?: NodeStandOwner; acquiredAt?: string; containerId?: string; profiles?: string[]; configSha256?: string } | undefined
   if (!admission || !ownerMatches(admission.owner, lease) || admission.acquiredAt !== lease.acquiredAt || admission.containerId !== lease.containerId ||
-    admission.configSha256 !== configDigest(config) || JSON.stringify(admission.profiles) !== JSON.stringify(Object.values(config.roles).flatMap(role => [role.referenceProfile, role.evalProfile])))
+    admission.configSha256 !== configDigest(config) || JSON.stringify(admission.profiles) !== JSON.stringify(Object.values(config.roles).flatMap(roleProfiles)))
     throw new NodeOpsFailure("ADMISSION_PROOF_REQUIRED")
 }
 
@@ -314,22 +316,22 @@ export async function settleNodeWriterRelease(config: NodeOpsConfig, lease: Node
     await assertOriginalAdmission(config, lease)
     if (!safeName(incident) || !safeName(followupTask) || !["reference", "eval"].includes(profileName)) throw new NodeOpsFailure("INVALID_SETTLEMENT_REQUEST")
     await evidencePath(config, lease, original)
-    if (!path.isAbsolute(receipt) || !config.roles[lease.role].workRoots.some(root => inside(receipt, root)) ||
+    if (!path.isAbsolute(receipt) || !nodeRole(config, lease.role).workRoots.some(root => inside(receipt, root)) ||
       await realpath(path.dirname(receipt)) !== path.dirname(receipt)) throw new NodeOpsFailure("RECEIPT_PATH_REFUSED")
     if (await Bun.file(path.join(directory(config), "writer-release-settlement.json")).exists()) throw new NodeOpsFailure("SETTLEMENT_ALREADY_RECORDED")
     const bytes = await readFile(original)
     const proof = JSON.parse(bytes.toString()) as { processes: ProcessCleanup; result?: { status: string; error: string } }
     if (proof.result?.status !== "failed" || proof.result.error !== "Writer owner unavailable") throw new NodeOpsFailure("SETTLEMENT_SOURCE_INELIGIBLE")
-    const cli = await stat(config.cliBin)
-    if (proof.processes.selectedCli?.executable !== await realpath(config.cliBin) || proof.processes.selectedCli.device !== cli.dev ||
+    const cli = await stat(nodeRoleCli(config, lease.role))
+    if (proof.processes.selectedCli?.executable !== await realpath(nodeRoleCli(config, lease.role)) || proof.processes.selectedCli.device !== cli.dev ||
       proof.processes.selectedCli.inode !== cli.ino) throw new NodeOpsFailure("SETTLEMENT_CLI_CHANGED")
     const resultFile = path.join(path.dirname(original), "result.json")
     const result = await Bun.file(resultFile).json() as { status: string; session_id: string; package_path: string; environment_cleanup: { status: string; error: string } }
     if (result.status !== "completed" || !result.session_id || result.environment_cleanup?.status !== "failed" ||
       result.environment_cleanup.error !== "Writer owner unavailable" || !/^\/user\/[a-zA-Z0-9][a-zA-Z0-9._-]*\.lgp$/.test(result.package_path))
       throw new NodeOpsFailure("SETTLEMENT_SOURCE_INELIGIBLE")
-    const profile = profileName === "reference" ? config.roles[lease.role].referenceProfile : config.roles[lease.role].evalProfile
-    for (const role of Object.values(config.roles)) for (const candidate of [role.referenceProfile, role.evalProfile]) {
+    const profile = nodeProfile(config, lease.role, profileName as "reference" | "eval")
+    for (const role of Object.values(config.roles)) for (const candidate of roleProfiles(role)) {
       if (!await waitProfileIdle(candidate, 1_000)) throw new NodeOpsFailure("PROCESSES_BUSY")
       if (candidate !== profile) await assertProfileClean(candidate).catch(() => { throw new NodeOpsFailure("PROFILE_NOT_CLEAN") })
     }
@@ -404,9 +406,9 @@ export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLe
     const processes = (proof.processes ?? proof) as ProcessCleanup
     const settledOriginal = await verifyWriterReleaseSettlement(config, lease, proof, recovery.processEvidence, incident)
     await verifyProcesses(processes, lease)
-    const profile = recovery.profile === "reference" ? config.roles[lease.role].referenceProfile : config.roles[lease.role].evalProfile
+    const profile = nodeProfile(config, lease.role, recovery.profile)
     if (processes.runtimeDirectories.some(root => !inside(root, profile))) throw new NodeOpsFailure("RECOVERY_OWNER_UNKNOWN")
-    for (const role of Object.values(config.roles)) for (const candidate of [role.referenceProfile, role.evalProfile]) {
+    for (const role of Object.values(config.roles)) for (const candidate of roleProfiles(role)) {
       if (!await waitProfileIdle(candidate, 1_000)) throw new NodeOpsFailure("PROCESSES_BUSY")
       if (candidate !== profile) await assertProfileClean(candidate).catch(() => { throw new NodeOpsFailure("PROFILE_NOT_CLEAN") })
     }
@@ -434,7 +436,7 @@ export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLe
 /** The normal non-model chain, shared verbatim by the narrowly admitted continuation. */
 async function completeNodeRecovery(config: NodeOpsConfig, lease: NodeStandLease, incident: string, recovery: NodeStandRecovery,
   receipt: string, settledOriginal: string | undefined, env: Record<string, string | undefined>, diagnostic?: OperationDiagnostic, harnessReceipt?: string) {
-    const profile = recovery.profile === "reference" ? config.roles[lease.role].referenceProfile : config.roles[lease.role].evalProfile
+    const profile = nodeProfile(config, lease.role, recovery.profile)
     if (diagnostic) diagnostic.stage = "management_configuration"
     const current = evalConfig(config, lease, env, recovery.profile)
     const command = { ...agentCommand(current, env), cleanupDir: path.join(directory(config), "recovery", incident),
@@ -526,8 +528,8 @@ export async function continueLab31OwnedRegistration(config: NodeOpsConfig, leas
     const original = await verifyWriterReleaseSettlement(config, lease, previous, recovery.processEvidence, registrationIncident)
     if (!original) throw new NodeOpsFailure("SETTLEMENT_SOURCE_INELIGIBLE")
     const raw = await Bun.file(original).json() as { processes: ProcessCleanup }
-    const cli = await stat(config.cliBin)
-    if (raw.processes.selectedCli?.executable !== await realpath(config.cliBin) || raw.processes.selectedCli.device !== cli.dev || raw.processes.selectedCli.inode !== cli.ino)
+    const cli = await stat(nodeRoleCli(config, lease.role))
+    if (raw.processes.selectedCli?.executable !== await realpath(nodeRoleCli(config, lease.role)) || raw.processes.selectedCli.device !== cli.dev || raw.processes.selectedCli.inode !== cli.ino)
       throw new NodeOpsFailure("SETTLEMENT_CLI_CHANGED")
     const attempted = await readPrivateJson(recoveryReceiptPath(config, lease)) as { at: string }
     if (await digest(recoveryReceiptPath(config, lease)) !== admission.original_recovery_receipt_sha256) throw new NodeOpsFailure("CONTINUATION_RESERVATION_UNKNOWN")
@@ -540,7 +542,7 @@ export async function continueLab31OwnedRegistration(config: NodeOpsConfig, leas
       history: await noHistoryMutations(`${profile}.history`, Date.parse(attempted.at)) }
     if (histories.profile.entries !== admission.inventories.profile_metadata.entries || histories.history.entries !== admission.inventories.history_metadata.entries)
       throw new NodeOpsFailure("CONTINUATION_HISTORY_CHANGED")
-    for (const role of Object.values(config.roles)) for (const candidate of [role.referenceProfile, role.evalProfile]) {
+    for (const role of Object.values(config.roles)) for (const candidate of roleProfiles(role)) {
       if (!await waitProfileIdle(candidate, 1000)) throw new NodeOpsFailure("PROCESSES_BUSY")
       if (candidate !== profile) await assertProfileClean(candidate)
     }
@@ -612,9 +614,9 @@ export function ownedRecoveryEntry(item: { name: string; kind?: string; package_
 
 function evalConfig(config: NodeOpsConfig, lease: NodeStandLease, env: Record<string, string | undefined>, profile: "reference" | "eval" = "eval") {
   if (env.LOGINOM_URL !== undefined && env.LOGINOM_URL !== config.endpoint) throw new NodeOpsFailure("ENDPOINT_OVERRIDE_REFUSED")
-  const role = config.roles[lease.role]
-  return loadConfig(["--skip-judge", "--repeat", "1"], { ...env, EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: config.cliBin,
-    EVAL_PROFILE_DIR: profile === "reference" ? role.referenceProfile : role.evalProfile, EVAL_WORKSPACE_ROOT: role.workRoots[0],
+  const role = nodeRole(config, lease.role)
+  return loadConfig(["--skip-judge", "--repeat", "1"], { ...env, EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: nodeRoleCli(config, lease.role),
+    EVAL_PROFILE_DIR: nodeProfile(config, lease.role, profile), EVAL_WORKSPACE_ROOT: role.workRoots[0],
     EVAL_RESULTS_DIR: role.resultsRoot, EVAL_ARTIFACT_SOURCE: "docker", LOGINOM_URL: config.endpoint,
     LOGINOM_CONTAINER: config.container.name, LOGINOM_STORAGE_DIR: config.container.storageDir })
 }
@@ -667,7 +669,7 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
       throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     await verifyWriterReleaseSettlement(config, lease, cleanup, completion.processEvidence)
     await verifyProcesses(cleanup.processes ?? cleanup, lease)
-    await verifyHistoryArchive(completion.profile === "reference" ? config.roles[lease.role].referenceProfile : config.roles[lease.role].evalProfile, completion.historyArchive)
+    await verifyHistoryArchive(nodeProfile(config, lease.role, completion.profile), completion.historyArchive)
     return
   }
   if (completion.kind === "unit") {
@@ -681,18 +683,18 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     await evidencePath(config, lease, completion.runDir)
     if (!/^[0-9a-f]{40}$/.test(completion.runSha) || !completion.caseIds.length || completion.caseIds.some(id => !/^[a-z0-9][a-z0-9-]*$/.test(id)))
       throw new NodeOpsFailure("INVALID_EVAL_PROOF")
-    const git = await checkoutIdentity(config.roles[lease.role].checkout)
+    const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
     const summary = await Bun.file(path.join(completion.runDir, "summary.json")).json() as RunSummary
     if (git.sha !== completion.runSha || git.dirty || typeof summary.harness?.git_sha !== "string" || !/^[0-9a-f]{7,40}$/.test(summary.harness.git_sha) ||
       !completion.runSha.startsWith(summary.harness.git_sha) || summary.harness.dirty ||
       !Number.isFinite(Date.parse(summary.started_at)) || Date.parse(summary.started_at) < Date.parse(lease.acquiredAt)) throw new NodeOpsFailure("STALE_EVAL_PROOF")
-    const result = await validateNodeRun(completion.runDir, completion.caseIds, path.join(config.roles[lease.role].checkout, "evals/tasks/node-evals"))
+    const result = await validateNodeRun(completion.runDir, completion.caseIds, path.join(nodeRole(config, lease.role).checkout, "evals/tasks/node-evals"))
     if (result.code === 2) throw new NodeOpsFailure("EVAL_EVIDENCE_ERROR")
     for (const task of summary.tasks) for (const attempt of task.attempts) {
       const cleanup = await Bun.file(path.join(completion.runDir, task.id, String(attempt.attempt), "cleanup.json")).json()
       await verifyProcesses(cleanup.processes, lease)
       const archive = cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history")?.path
-      await verifyHistoryArchive(config.roles[lease.role].evalProfile, archive)
+      await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile, archive)
       if (!cleanup.stages.some((stage: { stage: string; status: string }) => stage.stage === "storage" && stage.status === "confirmed"))
         throw new NodeOpsFailure("STORAGE_CLEANUP_UNKNOWN")
     }
@@ -704,7 +706,7 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     await evidencePath(config, lease, completion.processEvidence)
     const cleanup = await Bun.file(completion.processEvidence).json()
     await verifyProcesses(cleanup.processes ?? cleanup, lease)
-    await verifyHistoryArchive(config.roles[lease.role].referenceProfile, completion.historyArchive)
+    await verifyHistoryArchive(nodeProfile(config, lease.role, "reference"), completion.historyArchive)
     if (completion.browserCloseEvidence) await verifyBrowserClose(config, lease, completion.browserCloseEvidence)
   }
 }
@@ -750,13 +752,13 @@ async function verifyStorageLedger(config: NodeOpsConfig, lease: NodeStandLease,
 
 async function evidencePath(config: NodeOpsConfig, lease: NodeStandLease, file: string, allowLease = false) {
   if (typeof file !== "string" || !path.isAbsolute(file) || await realpath(file) !== file ||
-    ![...config.roles[lease.role].workRoots, config.roles[lease.role].resultsRoot, ...(allowLease ? [directory(config)] : [])].some(root => inside(file, root)))
+    ![...nodeRole(config, lease.role).workRoots, nodeRole(config, lease.role).resultsRoot, ...(allowLease ? [directory(config)] : [])].some(root => inside(file, root)))
     throw new NodeOpsFailure("EVIDENCE_PATH_REFUSED")
   return file
 }
 
 async function assertAllProfilesClean(config: NodeOpsConfig, ownedHarnessProfile?: string) {
-  for (const role of Object.values(config.roles)) for (const profile of [role.referenceProfile, role.evalProfile]) {
+  for (const role of Object.values(config.roles)) for (const profile of roleProfiles(role)) {
     if (profile !== ownedHarnessProfile && await lstat(`${profile}.harness-lease`).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return undefined
       throw error
@@ -828,34 +830,55 @@ async function readLease(config: NodeOpsConfig) {
 
 function validateOwner(owner: NodeStandOwner) {
   if (![owner.issue, owner.task].every(id => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(id)) ||
-    !["rich", "ben"].includes(owner.role) || !["unit", "reference", "cold", "eval", "recovery"].includes(owner.phase) || !/^[0-9a-f]{40}$/.test(owner.sha))
+    !["rich", "ben", "evalbaseline"].includes(owner.role) || owner.role === "evalbaseline" && ["reference", "cold"].includes(owner.phase) || !["unit", "reference", "cold", "eval", "recovery"].includes(owner.phase) || !/^[0-9a-f]{40}$/.test(owner.sha))
     throw new NodeOpsFailure("INVALID_OWNER")
 }
 
 async function validateConfig(config: NodeOpsConfig) {
-  if (config.version !== 1 || !path.isAbsolute(config.runtimeRoot) || !/^[0-9a-f]{64}$/.test(config.container.id) ||
+  if (![1, 2].includes(config.version) || !path.isAbsolute(config.runtimeRoot) || !/^[0-9a-f]{64}$/.test(config.container.id) ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.name) || !/^\/workdir\/UserStorage\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.storageDir) ||
-    Object.keys(config.roles).sort().join(",") !== "ben,rich" || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
+    Object.keys(config.roles).sort().join(",") !== (config.version === 1 ? "ben,rich" : "ben,evalbaseline,rich") || config.version === 2 && !config.roles.evalbaseline?.cliBin || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
     throw new NodeOpsFailure("INVALID_CONFIG")
   const endpoint = new URL(config.endpoint)
   if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash)
     throw new NodeOpsFailure("INVALID_CONFIG")
   if (await realpath(config.runtimeRoot) !== config.runtimeRoot) throw new NodeOpsFailure("INVALID_CONFIG_PATH")
-  const profiles = Object.values(config.roles).flatMap(role => [role.referenceProfile, role.evalProfile])
-  const installation = path.dirname(path.dirname(config.cliBin))
-  if (!path.isAbsolute(config.cliBin) || !inside(config.cliBin, config.runtimeRoot) || await realpath(config.cliBin) !== config.cliBin)
+  const profiles = Object.values(config.roles).flatMap(roleProfiles)
+  const bins = [...new Set([config.cliBin, ...Object.values(config.roles).flatMap(role => role.cliBin ? [role.cliBin] : [])])]
+  const installations = bins.map(bin => path.dirname(path.dirname(bin)))
+  for (const bin of bins) if (!path.isAbsolute(bin) || !inside(bin, config.runtimeRoot) || await realpath(bin) !== bin)
     throw new NodeOpsFailure("INVALID_CONFIG_PATH")
-  for (const role of Object.values(config.roles)) for (const root of [role.checkout, role.referenceProfile, role.evalProfile, ...role.workRoots, role.resultsRoot]) {
+  for (const role of Object.values(config.roles)) for (const root of [role.checkout, ...roleProfiles(role), ...role.workRoots, role.resultsRoot]) {
     if (!path.isAbsolute(root) || !inside(root, config.runtimeRoot) || await realpath(root) !== root || inside(directory(config), root))
       throw new NodeOpsFailure("INVALID_CONFIG_PATH")
   }
   if (config.offline) for (const root of [config.offline.checkout, ...config.offline.workRoots, config.offline.resultsRoot]) {
     if (!path.isAbsolute(root) || !inside(root, config.runtimeRoot) || await realpath(root) !== root || profiles.some(profile => inside(root, profile) || inside(profile, root)) ||
-      inside(root, installation) || inside(directory(config), root)) throw new NodeOpsFailure("INVALID_CONFIG_PATH")
+      installations.some(installation => inside(root, installation)) || inside(directory(config), root)) throw new NodeOpsFailure("INVALID_CONFIG_PATH")
   }
-  const roots = Object.values(config.roles).flatMap(role => [role.checkout, role.referenceProfile, `${role.referenceProfile}.history`, role.evalProfile, `${role.evalProfile}.history`, ...role.workRoots, role.resultsRoot])
+  const roots = Object.values(config.roles).flatMap(role => [role.checkout, ...roleProfiles(role).flatMap(profile => [profile, `${profile}.history`]), ...role.workRoots, role.resultsRoot])
   const offline = config.offline ? [config.offline.checkout, ...config.offline.workRoots, config.offline.resultsRoot] : []
-  const boundaries = [...roots, ...offline, installation, path.join(config.runtimeRoot, "operations")]
+  const boundaries = [...roots, ...offline, ...installations, path.join(config.runtimeRoot, "operations")]
   if (boundaries.some((root, index) => root === config.runtimeRoot || boundaries.some((other, otherIndex) =>
     index !== otherIndex && (inside(root, other) || inside(other, root))))) throw new NodeOpsFailure("INVALID_CONFIG_PATH")
+}
+
+function nodeRole(config: NodeOpsConfig, role: NodeStandOwner["role"]) {
+  const paths = config.roles[role]
+  if (!paths || role === "evalbaseline" && config.version !== 2) throw new NodeOpsFailure("ROLE_NOT_CONFIGURED")
+  return paths
+}
+
+export function nodeRoleCli(config: NodeOpsConfig, role: NodeStandOwner["role"]) {
+  return nodeRole(config, role).cliBin ?? config.cliBin
+}
+
+function nodeProfile(config: NodeOpsConfig, role: NodeStandOwner["role"], kind: "reference" | "eval") {
+  const profile = kind === "reference" ? nodeRole(config, role).referenceProfile : nodeRole(config, role).evalProfile
+  if (!profile) throw new NodeOpsFailure("REFERENCE_ROLE_REFUSED")
+  return profile
+}
+
+function roleProfiles(role: RolePaths | BaselinePaths) {
+  return [...(role.referenceProfile ? [role.referenceProfile] : []), role.evalProfile]
 }
