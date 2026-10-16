@@ -300,3 +300,17 @@ test("a series can allow three automatic reworks and stop its fourth fresh REJEC
     expect(evaluateHandoff({ state: result.state, event, pending_tasks: [] }).state).toEqual(result.state)
   }
 })
+
+test("a blocked worker report retains its cause and actual SHA without changing the input", () => {
+  const current = { ...state, review_cycle: 2, reject_count: 1, rework_limit: 3 }
+  const event = { ...report, status: "BLOCKED" as const }
+  const input = { state: current, event, pending_tasks: [] }
+  const original = JSON.stringify(input)
+  const result = evaluateHandoff(input)
+  expect(result.action).toBe("blocked")
+  expect(result.state.blocked_context).toEqual({ reason: result.reason, report_id: event.id, sha: next, cleanup_required: false })
+  expect(result.state.processed_report_ids).toEqual([event.id])
+  expect(result.state.review_cycle).toBe(2)
+  expect(result.state.reject_count).toBe(1)
+  expect(JSON.stringify(input)).toBe(original)
+})
