@@ -711,7 +711,7 @@ Actual CLI crash, FD/locks/no-regrowth, backup/storage and full cleanup/runtime
 admission still require qualification.
 
 
-Actual CLI interruption probe (2026-10-16, pending): private
+Actual CLI interruption probe (2026-10-16; research fixture now decommissioned): private
 `native-agent-replay-f5473183-f4fe-4df9-9b2d-d10ac61244e9` used real sandboxed
 CLI and local deterministic provider. New Calculator correctly refused an
 inactive upstream output before mutation. The research provider kept waiting on
@@ -733,14 +733,14 @@ Pending archive follow-up (2026-10-16): the primitive now archives pending histo
 after writer-marker absence and two fresh idle checks, preserving bytes/inodes
 in its durable manifest. Unit RED→GREEN14/88 PASS24.77s; strict admission and native
 closure authority remain separate. This resolves the archive-vs-admission
-conflation, pending native finalizer rerun. Existing f547 incident is not released.
+conflation, pending native finalizer rerun. Original f547 attempt has no normal release; its research namespace was later decommissioned as recorded below.
 Additional original retained probes:2f0726d8-7274-4980-9007-e64ce2f25b9a, root
 `/home/kiselev/storage/tmp/evals-native-agent-5FqIMa`, historyUURaKz, server56d46800…/
 studio3d3d88d1…/network0447fd87… timed out at60s before execution; and
 dc751ee6-eb90-4fda-9338-e4d4b7d73a38, root
 `/home/kiselev/storage/tmp/evals-native-agent-fHXu1g`, actually interrupted on
 Progress at77.681s (new scenario budget120s), backend active after local closure.
-Both failed at the old archive barrier and retain reservations/history/resources.
+Both failed at the old archive barrier; their original records and histories are retained. Research resources were later decommissioned as recorded below.
 They require source-qualified recovery; no PID-only or reservation unlink cleanup.
 
 Native pending-history archive follow-up (2026-10-16): fixed path verified with
@@ -768,3 +768,22 @@ The wrong-abort RED966365c1… failed safely; auditfdcf3641…2223/179 and all o
 resources/root absent. Related22/160 PASS30.09s, signal identity/refusal3/6
 PASS0.217s. This resolves the controlled hard-CLI-crash component; FD/locks,
 no-regrowth, backup, full N2/live runtime and normal admission remain open.
+
+
+Resolved research archive incidents (2026-10-16): own f5473183…/ZjdFIE,
+2f0726d8…/5FqIMa and dc751ee6…/fHXu1g have been decommissioned. Read-only
+preflight verified original actor inventories, continuous CLI/management/admin
+closures, admin transport ACK and unchanged exact pair epochs. Public CAS acquired
+recovery-only server and composite profile/user claims; durable archive preserved
+pending history before public factory teardown. Fresh checks prove all9 original
+container/network IDs and3 scratch roots absent. Original failed tests, old/new
+lineage, factory commands/releases and SDK histories remain in private evidence.
+Independent read-back: f547 auditfe65226a…1685/34,2f audit3de7c127…1864/36,
+dc audita1f808b2…1875/34 (5424 checks/104 sources total), including original
+archive inode/bytes, SQLite private-copy integrity, exact CAS lineage, persistent
+global factory release proofs and current absence. Support scripts and9 public
+controller source pins are bound to589f32a7ca. This disposal covers dedicated
+research namespaces; normalRelease, storageDeletionAllowed and nextAdmissionAllowed
+remain false. Production recovery, FD/locks/no-regrowth and live admission keep
+their existing gates. Older unrelated incidents were preserved. Four duplicate
+temporary logs were removed only after matching retained SHA256 copies.
