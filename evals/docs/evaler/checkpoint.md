@@ -12,6 +12,6 @@ C: ../node-eval-cleanup.md; COMPLETE → RELEASED → FREE, 0 model.
 Перед стартом: FREE, закреплённый контейнер работает, шесть профилей/архив целы.
 Тексты squad/трёх агентов и шапка/metadata LAB-58 сверены побайтно.
 Старт только LAB-58 разрешён владельцем; routed comment 01a144dd-d7c6-74b0-8f8d-feb0d4ddf7d7.
-Evaler running: 01a144dd-d7ec-77af-ab8d-2ac969aa3819, старт 16:19 МСК; один dispatch.
-Первый этап Rich: status/acquire/preflight без модели; до успеха модель запрещена.
+LAB-58 in_progress, phase=rich; Rich running: 01a144e3-52bd-715a-9672-487f96b50193.
+Evaler completed; queued receipt сохранён, SHA/бюджеты прежние; первый шаг Rich — немодельный preflight.
 LAB-59–63 остаются backlog без разрешения; done/merge/release не назначены.
