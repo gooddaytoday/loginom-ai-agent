@@ -110,7 +110,12 @@ export function assessResourceIncidents(input: { samples: readonly unknown[]; su
   if (codes.length) return { status: "failed" as const, codes }
   if (containers.some(inspect => typeof inspect.oom_killed !== "boolean"))
     return { status: "incomplete" as const, codes: ["CONTAINER_OOM_OBSERVATIONS_INCOMPLETE"] }
-  // Applicability and entirely unavailable counters are handled by the cgroup coverage gate.
+  if (input.samples.length < 2 || input.samples.some(value => {
+    const sample = acceptanceObject(value), host = acceptanceObject(acceptanceObject(sample.host).collector_cgroup)
+    const groups = [host, ...(Array.isArray(sample.containers) ? sample.containers.map(value => acceptanceObject(acceptanceObject(value).cgroup)) : [])]
+    return groups.some((group, index) => typeof group.path !== "string" || !group.path ||
+      !(index === 0 && group.path === "/") && !resourceNumbersObserved(group.memory_events, ["oom", "oom_kill"]))
+  })) return { status: "incomplete" as const, codes: ["CGROUP_OOM_OBSERVATIONS_INCOMPLETE"] }
   if (counters.some(series => series.observed > 0 && (series.observed < 2 || series.missing > 0 || (series.counter_resets ?? 0) > 0)))
     return { status: "incomplete" as const, codes: ["CGROUP_OOM_OBSERVATIONS_INCOMPLETE"] }
   return { status: "passed" as const, codes: [] }
