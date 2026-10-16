@@ -1279,3 +1279,15 @@ checks69/23 sources+8 pins; normalb04f5f9f…70844392…67/23 and Progress48d3d0
 5f1f3d77…69/23 also pass. All own pairs/roots and seven RED/diagnostic fixtures
 have qualified boundaries and retained sources/input. Actual operation/lock
 quiescence, scoped pool closure, cleanup and production admission remain open.
+
+Selected Pool close research now has a negative native control:
+`native pool package close: refuses the pooled object and preserves another user`.
+The exact owned completed-job Pool item refuses one manager.ClosePackage RPC
+and remains after read-back and creator close. B's complete package row remains
+unchanged within one observer and is then closed by its own bound operation.
+SessionInfo proxy IDs differ across admin observers; compare preservation within
+one observer. Native1/70 PASS68.76s; related49/160 PASS21.98s, typecheck/syntax/diff PASS.
+Private63e4e2dc… audit17f23462…93/43+8 pins
+with both admin closures/ACKs and own pair/network/root absence. This refusal
+blocks scoped Pool cleanup; see eval_parallel_blockers.md. No global pool clear
+was used. PackagePoolSize=0 remains an unqualified candidate for pre-work policy.
