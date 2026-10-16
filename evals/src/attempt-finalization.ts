@@ -107,6 +107,11 @@ export async function finalizeSlotAttempt(file: SlotFile, server: Awaited<Return
   const root = `${file.server.storageRoot}/${lease.slot.username}`
   if (files.snapshot.files.some(entry => entry.target === root || entry.target.startsWith(root + "/")))
     throw new EvalFailure("ATTEMPT_SERVER_FILES_ACTIVE", 2)
+  if (files.snapshot.processes.some(entry => entry.maps.split("\n").some(row => {
+    // Kernel maps has five metadata columns before the pathname.
+    const pathname = row.match(/^(?:\S+\s+){5}(.*)$/s)?.[1]
+    return pathname === root || pathname?.startsWith(root + "/")
+  }))) throw new EvalFailure("ATTEMPT_SERVER_MAPPINGS_ACTIVE", 2)
   await inspectUserStorage(file, lease.identity, lease.slot, (await readUserPreparation(file, lease, secretFile)).nonce)
   const receipt = { version: 2, kind: "slot-attempt-finalization", status: "sessions_closed" as const, identity: lease.identity,
     slotId: lease.slot.id, leaseToken: lease.token, boundary, intent: await reference(intentFile), archived, archives, sessions,

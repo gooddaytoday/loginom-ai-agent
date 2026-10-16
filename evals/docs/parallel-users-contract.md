@@ -3354,3 +3354,21 @@ suites15 PASS/166 assertions61.77s, typecheck/diff PASS. All own test pair IDs a
 controller roots are absent; committed SDK/SQLite archives and source snapshots
 remain private.8 duplicate temporary logs/helpers removed after retained SHA
 read-back. This qualification does not resolve the historical writer blocker.
+
+
+2026-10-16 own-root file-backed mapping fence: finalizeSlotAttempt reads the
+pathname after the five metadata columns of each bound /proc/maps row and refuses
+ATTEMPT_SERVER_MAPPINGS_ACTIVE before terminal publication. Space, Unicode and
+U+2028 in the pathname are preserved. Native REDfd50f79a accepted a terminal while
+an actual copied executable remained mapped after native session absence, with no
+own-root FD; five segments matched the physical file inode. Native GREEN672886f3
+refuses that condition, then EOF/exit0 plus fresh mapping absence permits ordinary
+finalization/replay/reconstruction with the unchanged file inode.1 PASS/37
+assertions177.04s; audit309 checks/133 sources/7 causal observations+21 pins.
+FD/topology regression4edb2b66:1 PASS/39 assertions192.54s, audit301/133/4 causal+21
+pins. Related15 PASS/166 assertions60.46s, typecheck/diff PASS. Existing240s and
+holder60s limits remain unchanged. All own resources/controller roots absent,
+original failure and SDK/SQLite archives retained.7 duplicate temp files removed
+after retained SHA read-back. This is a pathname-scoped snapshot check; anonymous
+or relocated mappings and all-operation quiescence remain unqualified. No file
+deletion, reservation release or production admission permission is added.
