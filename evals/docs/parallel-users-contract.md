@@ -3301,4 +3301,18 @@ single ordered outer boundaries before deriving process/FD/maps/lock data.
 `storageDeletionAllowed` and `nextAdmissionAllowed` remain false: this is one
 observation, not a session-close, operation-cessation or no-regrowth proof.
 Recovery requires a fresh observation under its current fences; old-token data
-is not silently adopted. Finalizer/cleanup consumption remains open.
+is not silently adopted. Cleanup consumption remains open; finalizer binding is
+described below.
+
+
+Post-close kernel binding (2026-10-16): a new `finalizeSlotAttempt` terminal
+requires `serverFiles`, a source reference produced after its complete native
+absence snapshot. The point's controller start time must follow the absence
+command's finish. A completed replay reads this exact raw source through
+`readServerFiles` under the current fences, preserving the terminal source;
+it never replaces a missing or corrupt point with a fresh observation. Existing
+terminals without this field fail closed and remain available for explicit
+future reconciliation. Pending reconstruction without a terminal captures a new
+point after its own fresh absence confirmation. This does not certify cessation
+of all operations or no-regrowth; storageDeletionAllowed/nextAdmissionAllowed
+remain false, and actual cleanup/recovery/admission still require their gates.
