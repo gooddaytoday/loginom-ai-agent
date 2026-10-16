@@ -15,3 +15,9 @@ The test observes actual non-null Progress, successful native task completion
 with the same package still open and Progress null, then fresh package absence
 after targeted CloseSession. It grants no general operation/lock quiescence or
 storage cleanup authority. Native StartTime is retained without clock correction.
+
+
+The Pool control reuses this fixture through one own Scheduler job on a separate
+research service account. After the completed job and creator session close,
+the package remains in Pool; the test keeps cleanup/operation authority false.
+The exact job GUID is deleted and checked absent before fixture disposal.

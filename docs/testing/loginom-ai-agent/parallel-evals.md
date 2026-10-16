@@ -1259,3 +1259,23 @@ pair/network/root absence and retained original input. Six failed/diagnostic
 fixtures are also safely settled with original inputs/executed sources retained.
 Temporary open-error logging was removed. Positive Pool, backend quiescence,
 interruption, storage/backup cleanup and production admission remain separate.
+
+
+Populated Pool control (2026-10-16): a dedicated ephemeral `eval-pool-probe`
+account in its own research pair gets modes design/run3 with no admin/global
+file storage. Normal eval account rights remain unchanged. Its own Scheduler
+job runs once manually, with automatic start one day ahead, no startup/missed
+execution and timeout10s. Native completed3 log and exact job GUID deletion
+with fresh jobsAfter=[] are checked. After creator-session CloseSession, the
+same package remains in Pool type3 with actual false/-1/null descriptor values.
+No global pool clear is called; user-session absence grants no package quiescence.
+
+TDD unsupported phase RED41/54.32s, native permission/Ref/disabled-job feedback,
+fresh deletion RED42/62.05s→GREEN. Final ordinary/Progress/Pool3/174
+PASS202.77s; related49/160 PASS22.14s, typecheck/syntax/diff PASS.
+Private71f121cd… audit SHA256
+`c8983e29af999ddabf6e02b77c87fd7127b5d5ebcedc65e78ff54d6b0c0cb700`
+checks69/23 sources+8 pins; normalb04f5f9f…70844392…67/23 and Progress48d3d0d9…
+5f1f3d77…69/23 also pass. All own pairs/roots and seven RED/diagnostic fixtures
+have qualified boundaries and retained sources/input. Actual operation/lock
+quiescence, scoped pool closure, cleanup and production admission remain open.
