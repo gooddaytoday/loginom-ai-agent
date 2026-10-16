@@ -1,5 +1,16 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-16 — подготовлен выпуск v0.2.1
+
+Ветка `loginom`, база `b33555fee8`, изменение настройки `5ea6daf224`.
+Новые установки включают «Выбор агента»; сохранённый выбор не сбрасывается.
+Root/Desktop manifests и lock:0.2.1; frozen install PASS.
+Настройки/persist/agent:34 PASS; App typecheck PASS; review без замечаний.
+Packaging/static/notes:14 PASS,2 native macOS SKIP; pinned Node hash PASS.
+Следующий шаг:push annotated tag,полный CI,сверка assets и публикация pre-release.
+Installed GUI/live приёмка не выполнялась; пользовательская установка не меняется.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-16-v0.2.1-release.md).
+
 ## 2026-10-15 — Desktop и CLI v0.2.0 установлены пользователю
 
 Точные опубликованные DEB/CLI из `0c975a73676d9aba556085dbda97e1a9ceb23cc6`
