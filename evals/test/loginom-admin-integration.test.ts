@@ -12,7 +12,7 @@ import { parallelFixture } from "./helpers/parallel-fixture"
 import { superviseProcess } from "../src/process-supervisor"
 import { stageUserPreparation } from "../src/user-environment"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
-import { prepareEnvironment } from "../src/environment-preparation"
+import { prepareEnvironment, verifyEnvironment } from "../src/environment-preparation"
 
 const integration = process.env.EVAL_ADMIN_INTEGRATION === "1" ? test : test.skip
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -82,11 +82,12 @@ liveIntegration("native pool package inventory: completed manual job retains a p
 liveIntegration("native pool package close: refuses the pooled object and preserves another user", () => nativeUserCapability("pool-close"), 120_000)
 liveIntegration("native pool disabled policy: zero retains no completed job package", () => nativeUserCapability("pool-disabled"), 120_000)
 liveIntegration("native pool preparation: held controller disables retention and repeats without mutation", () => nativeUserCapability("pool-policy"), 120_000)
+liveIntegration("native pool environment: prepare applies policy and verify only reads it", () => nativeUserCapability("pool-environment"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy", hardCrash = false) {
-  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy"
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy" | "pool-environment", hardCrash = false) {
+  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy" || mode === "pool-environment"
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -100,7 +101,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
   const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
   const pair = await createPair(file, options)
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-user-${crypto.randomUUID()}`)
-  const settlement = { admin: false, packageParent: true }
+  const settlement = { admin: false, packageParent: true, environment: true }
   let policyLease: Awaited<ReturnType<typeof acquireResourceLease>> | undefined
   let packageParent: Awaited<ReturnType<typeof openLoginomAdmin>> | undefined
   try {
@@ -111,6 +112,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     const pins = packages ? await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs"),
       path.resolve(import.meta.dir, "../src/loginom-admin.ts"), path.resolve(import.meta.dir, "../src/package-inventory.ts"),
       path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!,
+      ...(mode === "pool-environment" ? [path.resolve(import.meta.dir, "../src/environment-preparation.ts"), path.resolve(import.meta.dir, "../src/environment-finalization.ts"), path.resolve(import.meta.dir, "../src/user-environment.ts")] : []),
       ...(["progress", "pool", "pool-close", "pool-disabled"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : [])]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
     if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
@@ -137,6 +139,36 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     try {
       expect((await request("init", { resourceRoot: runtime.resources, manifestHash: runtime.manifestHash, url,
         credentialsFile: file.controller.adminCredentialsFile, profileDir: path.join(profile, "loginom/runtime/admin/attempts/context/browser-profile") })).outcome).toBe("confirmed")
+      if (mode === "pool-environment") {
+        disposedBeforeRestart = await request("dispose", {})
+        expect(disposedBeforeRestart).toMatchObject({ outcome: "confirmed", data: { transportDisconnect: "confirmed" } })
+        await channel.end()
+        expect((await pending).processCleanup.status).toBe("confirmed")
+        const slotsFile = path.join(root, "prepared-slots.json"), policyLocks = path.join(root, "policy-locks")
+        await writeLeaseReceipt(slotsFile, file)
+        await mkdir(policyLocks, { mode: 0o700 })
+        settlement.environment = false
+        const prepared = await prepareEnvironment({ slotsFile, parallel: 1 }, policyLocks)
+        settlement.environment = prepared.finalization.status === "released"
+        await writeLeaseReceipt(path.join(evidence, "pool-environment-prepared.json"), prepared)
+        expect(prepared).toMatchObject({ ready: false, reason: "SESSION_IDENTITY_UNSUPPORTED", finalization: { status: "released" },
+          poolPolicy: { identity: pair.identity, packagePoolSize: 0, changed: true } })
+        settlement.environment = false
+        const verified = await verifyEnvironment({ slotsFile, parallel: 1 }, policyLocks)
+        settlement.environment = verified.finalization.status === "released"
+        await writeLeaseReceipt(path.join(evidence, "pool-environment-verified.json"), verified)
+        expect(verified).toMatchObject({ ready: false, reason: "SESSION_IDENTITY_UNSUPPORTED", finalization: { status: "released" },
+          poolPolicy: { identity: pair.identity, packagePoolSize: 0, changed: false } })
+        const command = await readLeaseReceipt(verified.journal) as { processInventory: string }
+        const inventory = await readLeaseReceipt(command.processInventory) as { connections: { directory: string }[] }
+        const operations = (await Promise.all(inventory.connections.map(entry => readdir(path.join(entry.directory, "commands"))
+          .then(names => Promise.all(names.map(async name => (await readLeaseReceipt(path.join(entry.directory, "commands", name)) as { op: string }).op)))))).flat()
+        expect(operations.every(op => ["init", "inspect", "dispose"].includes(op))).toBe(true)
+        await writeLeaseReceipt(path.join(evidence, "pool-environment.json"), { prepared, verified, operations, readinessQualified: false })
+        expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
+        complete = true
+        return
+      }
       const payload = { phase: "blocked", slot: file.slots[0]!, secretFile, preparationNonce: crypto.randomUUID(), desiredHash: "e".repeat(64),
         secretHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(credentials)).digest("hex"), owned: null }
       const first = await request("reconcile-user", payload)
@@ -815,22 +847,23 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
         expect(run.exitCode).toBe(0)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(["storage", "components", "peer-close", "pool-close"].includes(mode) ? 2 : 1)
-        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(["storage", "components", "peer-close", "pool-close"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_AUTHMODE")).toHaveLength(mode === "pool-environment" ? 0 : ["storage", "components", "peer-close", "pool-close"].includes(mode) ? 2 : 1)
+        expect(run.stderr.split("\n").filter(line => line === "ADMIN_USER_WRITE_PASSWORD")).toHaveLength(mode === "pool-environment" ? 0 : ["storage", "components", "peer-close", "pool-close"].includes(mode) ? 2 : 1)
       }
     }
   } finally {
-    if (packageParent) {
-      await packageParent.dispose()
+    if (packageParent || mode === "pool-environment") {
+      await packageParent?.dispose()
       const directories = (await readdir(file.controller.stateDir)).filter(name => name.startsWith("admin-"))
       const closures = await Promise.all(directories.map(name => readAdminFinalization(file, pair.identity, path.join(file.controller.stateDir, name), process.pid)))
       await cp(file.controller.stateDir, path.join(evidence, "controller"), { recursive: true, filter: source =>
         !source.endsWith(".secret.json") && !path.relative(file.controller.stateDir, source).split(path.sep).includes("profile") })
       await writeLeaseReceipt(path.join(evidence, "parent-package-admin.json"), { closures })
+      if (mode === "pool-environment") expect(closures.length).toBeGreaterThan(0)
       settlement.packageParent = true
     }
     await policyLease?.close()
-    if (!packages || settlement.admin && settlement.packageParent) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+    if ((!packages || settlement.admin && settlement.packageParent) && settlement.environment) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
     else console.error(`native package inventory fixture retained: ${root}`)
   }
 }
