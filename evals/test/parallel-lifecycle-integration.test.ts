@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readFile, readdir, rm, rmdir } from "node:fs/promises"
+import { chmod, link, mkdir, mkdtemp, readFile, readdir, rename, rm, rmdir, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { createPair, destroyPair, inspectUserStorage, pairImages, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { loadConfig } from "../src/config"
@@ -55,6 +55,53 @@ integration("owned user storage archive preserves all material without following
     expect(await readLeaseReceipt(archived.source.path)).toMatchObject({ kind: "user-storage-archive", status: "committed" })
     expect(await inspectUserStorage(fixture.file, fixture.pair.identity, fixture.lease.slot, fixture.prepared.nonce)).toEqual(before)
     expect((await Bun.$`docker exec ${fixture.pair.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()).toBe(peer)
+  } finally { await fixture.dispose() }
+}, 90_000)
+
+integration("committed user storage archive replays without replacing preserved material", async () => {
+  const { archiveUserStorage, readUserStorageArchive } = await import("../src/user-storage-archive")
+  const fixture = await storageCodecFixture()
+  try {
+    const storage = await prepareUserStorage(fixture.file, fixture.lease, fixture.prepared.secretFile, fixture.server)
+    await Bun.$`docker exec ${fixture.pair.identity.containerId} sh -c ${'printf original > "$1/value"'} replay ${storage.root}`.quiet()
+    const id = crypto.randomUUID()
+    const first = await archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)
+    const journal = await Bun.file(first.source.path).text()
+    const inode = (await Bun.file(first.payload.path).stat()).ino
+    expect(await archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)).toEqual(first)
+    expect(await Bun.file(first.source.path).text()).toBe(journal)
+    expect((await Bun.file(first.payload.path).stat()).ino).toBe(inode)
+    await Bun.$`docker exec ${fixture.pair.identity.containerId} rm -- ${`${storage.root}/value`}`.quiet()
+    await expect(archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)).rejects.toThrow("USER_STORAGE_ARCHIVE_CHANGED")
+    expect(await readUserStorageArchive(fixture.file, fixture.server, fixture.lease, first.source)).toEqual(first)
+    expect(await Bun.file(first.source.path).text()).toBe(journal)
+    expect((await Bun.file(first.payload.path).stat()).ino).toBe(inode)
+    await expect(readUserStorageArchive(fixture.file, fixture.server, fixture.lease, { ...first.source, sha256: "0".repeat(64) })).rejects.toThrow("USER_STORAGE_ARCHIVE_UNCONFIRMED")
+    const receipt = await readLeaseReceipt(first.source.path) as Record<string, unknown>
+    const foreign = { ...receipt, context: { ...first.context, slotId: "foreign" } }
+    await writeLeaseReceipt(first.source.path, foreign)
+    try {
+      await expect(readUserStorageArchive(fixture.file, fixture.server, fixture.lease, { path: first.source.path,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(foreign)).digest("hex") })).rejects.toThrow("USER_STORAGE_ARCHIVE_UNCONFIRMED")
+    } finally { await writeLeaseReceipt(first.source.path, receipt) }
+    await chmod(first.payload.path, 0o644)
+    try { await expect(readUserStorageArchive(fixture.file, fixture.server, fixture.lease, first.source)).rejects.toThrow("USER_STORAGE_ARCHIVE_UNCONFIRMED") }
+    finally { await chmod(first.payload.path, 0o600) }
+    await link(first.payload.path, first.payload.path + ".alias")
+    try { await expect(readUserStorageArchive(fixture.file, fixture.server, fixture.lease, first.source)).rejects.toThrow("USER_STORAGE_ARCHIVE_UNCONFIRMED") }
+    finally { await rm(first.payload.path + ".alias") }
+    await rename(first.payload.path, first.payload.path + ".saved")
+    await symlink(first.payload.path + ".saved", first.payload.path)
+    try { await expect(readUserStorageArchive(fixture.file, fixture.server, fixture.lease, first.source)).rejects.toThrow() }
+    finally { await rm(first.payload.path); await rename(first.payload.path + ".saved", first.payload.path) }
+    const bytes = await Bun.file(first.payload.path).bytes()
+    const corrupt = bytes.slice()
+    corrupt[512] = corrupt[512]! ^ 1
+    await Bun.write(first.payload.path, corrupt)
+    try { await expect(readUserStorageArchive(fixture.file, fixture.server, fixture.lease, first.source)).rejects.toThrow("USER_STORAGE_ARCHIVE_UNCONFIRMED") }
+    finally { await Bun.write(first.payload.path, bytes) }
+    expect(await readUserStorageArchive(fixture.file, fixture.server, fixture.lease, first.source)).toEqual(first)
+    expect(await Bun.file(first.source.path).text()).toBe(journal)
   } finally { await fixture.dispose() }
 }, 90_000)
 
