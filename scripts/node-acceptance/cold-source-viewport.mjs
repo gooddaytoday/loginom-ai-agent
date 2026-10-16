@@ -5,7 +5,7 @@ export async function revealColdSource(page,args,readGraph,reveal,readViewport,p
  const ref=args.node;
  need(ref?.document_id===args.request?.document_id
   &&ref.workflow_id===args.request.workflow_ref?.workflow_id&&typeof ref.node_id==='string','source owner');
- need(['imports.text','transform.collapse_columns','transform.cross_table'].includes(args.type),'source type');
+ need(['imports.text','transform.collapse_columns','transform.cross_table','transform.join'].includes(args.type),'source type');
  const task={request:args.request,types:args.types,origin:args.origin,build:args.build};
  const remaining=()=>{const n=args.deadline-Date.now();need(n>0,'deadline');return n;};
  remaining();

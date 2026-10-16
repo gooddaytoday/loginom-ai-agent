@@ -107,8 +107,6 @@ try {
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
-  let staticSources;
-  if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');
    const viewportHelpers=await load('client/lib/node-placement.mjs');
    const {NODE_TYPES}=await load('client/lib/node-contracts.mjs');
@@ -123,6 +121,8 @@ try {
     if(result.status!=='SUCCEEDED'||result.verified!==true||result.graph_unchanged!==true||result.fully_visible!==true||result.settings_applied!==false)
      throw Error('COLD_SOURCE_REVEAL_UNCONFIRMED');
    };
+  let staticSources;
+  if(expected.static_sources){
    const {createActionRuntime}=await load('client/lib/executor.mjs');
    const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8'));
    const selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
@@ -157,6 +157,7 @@ try {
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
+  if(target.type==='transform.join')await revealSource(target);
   const channel = createNodeProcedure({
     operation,
     execute,
