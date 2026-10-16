@@ -16,6 +16,10 @@ test("loadConfig: parallel selects slots v2 and defaults to legacy singleton", (
   expect(loadConfig(["--parallel", "2"], { ...full, EVAL_SLOTS_FILE: "/private/slots.json" })).toMatchObject({ parallel: 2, slotsFile: "/private/slots.json" })
 })
 
+test("loadConfig records the resource budget source without reading it", () => {
+  expect(loadConfig([], { ...full, EVAL_RESOURCE_BUDGET_FILE: "/private/n1-budget.json" })).toMatchObject({ resourceBudgetFile: "/private/n1-budget.json" })
+})
+
 test.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992"])("loadConfig: invalid parallel %s is refused before other requirements", value => {
   expect(() => loadConfig([`--parallel=${value}`], {})).toThrow("PARALLEL_COUNT")
   expect(() => loadConfig([`--parallel=${value}`], {})).toThrow(expect.objectContaining({ exitCode: 2 }))

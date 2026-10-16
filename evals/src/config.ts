@@ -56,6 +56,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   return {
     parallel,
     slotsFile,
+    resourceBudgetFile: env.EVAL_RESOURCE_BUDGET_FILE ? path.resolve(evalsRoot, env.EVAL_RESOURCE_BUDGET_FILE) : undefined,
     dryRun,
     calibrate,
     judgeOnly,
