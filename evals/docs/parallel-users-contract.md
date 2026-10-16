@@ -3404,3 +3404,25 @@ Related profile/archive/user/agent/management32 PASS/229 assertions63.76s;
 package typecheck and diff checks PASS. Private source/control verification
 `f6869d56c56d5dd3ed5a32110b786fd4279165dac3f3e140ebb0e9ecaae3e0f2`
 is retained; seven temporary duplicates were removed after hash/read-back.
+
+
+### Committed server archive replay — 2026-10-16
+
+`readUserStorageArchive` verifies a historical committed source under the exact
+held server/slot context and protected publication. The directory inode and
+private canonical paths, payload regular/single-link UID600 metadata, full tar
+SHA256, regular-file sizes and per-file SHA256 must match the source. Source and
+context are reread after payload verification. Current server contents are not
+needed for this historical proof; it grants no deletion or admission.
+
+A repeated `archiveUserStorage` with the same id also checks fresh physical root
+metadata and current regular content against the saved snapshot. A changed or
+empty source is refused without replacing the old journal or payload. The
+historical reader can still return that original archive after source removal.
+
+Actual Docker RED1FAIL35.44s (prior EXISTS refusal) → GREEN1/7 PASS42.14s.
+Added negatives for changed source SHA, foreign context, payload0644, hardlink,
+symlink and equal-length byte corruption require no further production changes.
+Both full pathological-name and replay/private-boundary tests2/36 PASS91.95s;
+package typecheck/diff PASS. Partial-copy reconciliation, recovery-only lineage
+and finalizer consumption remain open, with both grants false.
