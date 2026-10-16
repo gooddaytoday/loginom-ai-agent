@@ -30,9 +30,17 @@ export function boundWizardCloseConfirmation(state,binding,requireControls=true)
  const ui=state.ui,dialog=ui.dialogs[0];
  if(dialog.title!=='Подтвердить'||dialog.text!=='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет')return false;
  if(!requireControls)return true;
- return ['yes','no'].every(name=>ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name
-  &&e.signature?.dialog_ref===dialog.ref&&e.label===(name==='yes'?'Да':'Нет')
-  &&e.allowed_actions?.includes('click')).length===1);
+ const yes=ui.elements.filter(e=>e.wizard_close_confirmation?.dialog_ref===dialog.ref
+  &&e.wizard_close_confirmation.root_ref===binding.root_ref&&e.wizard_close_confirmation.root_tid===binding.root_tid
+  &&e.wizard_close_confirmation.stage===binding.stage&&e.allowed_actions?.includes('confirm_wizard_close'));
+ if(yes.length!==1)return false;
+ const confirmation=yes[0].wizard_close_confirmation;
+ if(binding.owner?.input_port&&!same(confirmation.input_port,binding.owner.input_port)
+  ||binding.owner?.output_port&&!same(confirmation.output_port,binding.owner.output_port))return false;
+ return ['yes','no'].every(name=>ui.elements.filter(e=>e.ref===confirmation.controls?.[name]?.ref
+  &&e.tid===confirmation.controls[name].tid&&e.signature?.dialog_ref===dialog.ref
+  &&e.label===(name==='yes'?'Да':'Нет')&&e.allowed_actions?.includes('click')).length===1);
+
 }
 
 export function cancelledWizardReady(state,binding) {
@@ -55,7 +63,7 @@ export async function closePreparedWizard(channel) {
  if(confirmationRequired) {
   await channel.perform({condition:'confirm cancellation of this wizard draft',initialObservation:s,
    ready:s=>boundWizardCloseConfirmation(s,binding),identity:()=>binding,
-   resolve:s=>({verb:'confirm_wizard_close',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes').ref})});
+   resolve:s=>({verb:'confirm_wizard_close',ref:s.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close')&&e.wizard_close_confirmation?.dialog_ref===s.ui.dialogs[0].ref).ref})});
  }
  const after=await channel.observe({condition:'cancelled wizard returned to the same unlocked node',
   ready:s=>cancelledWizardReady(s,binding)});

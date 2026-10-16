@@ -21,14 +21,14 @@ test('source navigation serializes the real bounded UI navigator and retains the
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.graph_unchanged,true);assert.equal(r.fully_visible,true);
  assert.equal(r.settings_applied,false);assert.equal(r.zoom_steps,0);assert.deepEqual(p.graph,graph());
 });
-test('an offscreen source is revealed through the bounded native zoom control without moving its model node',async()=>{
- const p=page();p.graph.nodes[0].position.x=1200;const before=structuredClone(p.graph);let scale=1,clicks=0;
+for(const type of ['imports.text','transform.join_data'])test(`an offscreen ${type} is revealed through the bounded native zoom control without moving its model node`,async()=>{
+ const p=page();p.graph.nodes[0].type=type;p.graph.nodes[0].position.x=1200;const before=structuredClone(p.graph);let scale=1,clicks=0;
  const zoom={count:async()=>1,isVisible:async()=>true,getAttribute:async()=> 'Уменьшить масштаб',
   click:async()=>{scale*=0.9;clicks++;}};
  p.locator=tid=>tid.includes('cmpDiagram')?{...root,evaluate:async()=>({
   x:0,y:0,width:800,height:600,viewportWidth:800,viewportHeight:600,scale,translate:{x:0,y:0},scroll:{x:0,y:0},
   node_bounds:{x:1200*scale,y:120*scale,width:100*scale,height:80*scale}})}:{...root,locator:()=>zoom};
- const code=makeColdSourceRevealCode(args(),{readGraph,revealNodePlacement,nodePlacementViewport,nodePlacementPoint,samePlacementGraph});
+ const code=makeColdSourceRevealCode({...args(),type},{readGraph,revealNodePlacement,nodePlacementViewport,nodePlacementPoint,samePlacementGraph});
  const r=await new Function('page',`return (${code})(page)`)(p);
  assert.equal(r.fully_visible,true);assert.ok(clicks>0&&clicks<=12);assert.equal(r.zoom_steps,clicks);
  assert.deepEqual(p.graph,before);

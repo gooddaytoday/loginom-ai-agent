@@ -32,9 +32,9 @@ export async function preflightJoin(options,ctx,config){
  }
  try{
   resolveJoinKeys(request.parameters,schemas);
-  const fields=joinOutputFields({input_fields:schemas,...request.parameters});
-  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field');
   const output=request.mappings.find(m=>m.direction==='output');
+  const fields=joinOutputFields({input_fields:schemas,...request.parameters},output);
+  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field');
   if(output?.fields)need(output.fields.length===fields.length&&output.fields.every(f=>fields.some(s=>s.name===f.source.name)),'Join output mapping is incomplete');
  }catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  return {verified:true,proofs};
@@ -60,6 +60,6 @@ export function createJoinNodeSupport(config){return createTabularTransformNodeS
   const destination=await channel.observe({condition:'join validated destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
   const inline_mapping=destination.wizard.stage==='output_mapping'?await configureDerivedInlineMapping(channel,changed.configuration,validateJoinInlineSources,verifyJoinOutputSync,{sourceOf:f=>f.source??f.exclusion_source}):null;
   const done=await channel.observe({condition:'join accepted by Loginom',ready:s=>s.wizard?.stage==='done'});
-  return {...changed,...(inline_mapping?{inline_mapping}:{}),validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+  return {...changed,configuration:{...changed.configuration,...(request.target.kind==='new'&&request.mappings.length===0?{default_output_order:true}:{})},...(inline_mapping?{inline_mapping}:{}),validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
  },configureOutput:configureJoinOutput,
 });}

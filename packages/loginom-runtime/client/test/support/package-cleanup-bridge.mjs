@@ -23,7 +23,7 @@ class ExternalClient {
   async callTool({arguments:{code}}){
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+      target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -48,13 +48,13 @@ mock.module(new URL('../../lib/skill.mjs',import.meta.url).href,{namedExports:{.
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
-  const f=current;return {tools:[],describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
-    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
+  const f=current;return {tools:[],describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
+    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',cleanup_complete:f.scenario!=='unsettled-save',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const scenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'])test('isolated shutdown lifecycle: '+scenario,async()=>{
+for(const managed of [false,true])for(const scenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable','unsettled-save'])test((managed?'managed':'isolated')+' shutdown lifecycle: '+scenario,async()=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-bridge-'));
   const f=current={scenario,events:[],busy:false,saves:0};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
@@ -63,14 +63,15 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
   let bridge,client;
   try{
     bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
-      loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',acceptanceCleanupPackage:path},session);
+      loginomUrl:'http://loginom.invalid/app',replayBootstrap:!managed,replayLoginUser:managed?null:'test-2',...(managed?{resultProfile:'user-v1'}:{acceptanceCleanupPackage:path})},session);
     client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     if(scenario!=='unprepared'){
       const prep=await client.callTool({name:'dock_prepare',arguments:{}});assert.notEqual(prep.isError,true,JSON.stringify(prep));
       if(scenario!=='no-save'){
         const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
         const values=saved.content.filter(c=>c.type==='text').map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
-        assert.equal(values[0].status,'SUCCEEDED');assert.deepEqual(values[0].output,{package_ref:{path}});
+        assert.equal(values[0].status,'SUCCEEDED');if(managed){assert.deepEqual(values[0].output.package_ref,{path});assert.ok(values[0].output.reporting_constraints.length>0);}
+        else assert.deepEqual(values[0].output,{package_ref:{path}});
         const advice=values.find(v=>v.kind==='dock_saved_package_state');assert.ok(advice);
         assert.equal(advice.modified,scenario==='state-unavailable'?null:scenario==='dirty-after-save');
         if(scenario==='dirty-after-save'){

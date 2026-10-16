@@ -147,7 +147,7 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      const reply = await request("close", undefined, 120_000).catch(() => undefined)
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
