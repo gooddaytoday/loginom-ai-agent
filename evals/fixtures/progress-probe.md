@@ -55,3 +55,11 @@ Native Progress triggers supervisor abort; a fresh inventory must still show
 backend activity after local process closure. The finalizer archives pending
 recovery bytes before the exact session closes. This is controlled interruption,
 not a hard-kill, FD/lock or storage/admission qualification.
+
+The second actual-CLI case uses SIGKILL on the unique selected executable from
+its observed slot supervisor scope. It persists owner, launcher, full process
+identity and the fresh active-package trigger before dispatch. signalProcess
+rechecks birth/UID/executable/group/session at the syscall boundary. The measured
+result is137 without timeout/interrupted; the AbortController stays unused.
+Both active cases retain120s CLI/300s aggregate bounds. The RED control deliberately
+used abort and failed its137 expectation after safe archive/finalization.

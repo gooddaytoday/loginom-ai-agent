@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { Database } from "bun:sqlite"
 import path from "node:path"
 import { tmpdir } from "node:os"
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, realpath, rm, stat } from "node:fs/promises"
 import { agentCommand, runAgent } from "../src/cli"
 import { finalizeSlotAttempt } from "../src/attempt-finalization"
 import { loadConfig } from "../src/config"
@@ -15,15 +15,17 @@ import { collectManagementSessions, collectSlotSessions } from "../src/managemen
 import { sealManagementProcessInventory } from "../src/management-process-evidence"
 import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { archiveProfileEvidence } from "../src/profile-archive"
+import { signalProcess, supervisedProcesses } from "../src/process-supervisor"
 import { ensureProfile, profileHistory, releaseStaleWriter } from "../src/profile"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { stageUserPreparation } from "../src/user-environment"
 import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
 
-for (const finalizer of [false, true, "interrupted"] as const) for (const browser of [true, false]) {
-  if (finalizer === "interrupted" && !browser) continue
+for (const finalizer of [false, true, "interrupted", "killed"] as const) for (const browser of [true, false]) {
+  const active = typeof finalizer === "string"
+  if (active && !browser) continue
   test.skipIf(!process.env.EVAL_CLI_BIN || !process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(
-  `native agent replay: actual sandboxed CLI ${finalizer === "interrupted" ? "is interrupted during server execution" : browser ? "activates Loginom through a local provider" : "finishes without a browser"}${finalizer ? " with slot finalizer" : ""}`, async () => {
+  `native agent replay: actual sandboxed CLI ${active ? `is ${finalizer === "killed" ? "killed" : "interrupted"} during server execution` : browser ? "activates Loginom through a local provider" : "finishes without a browser"}${finalizer ? " with slot finalizer" : ""}`, async () => {
     const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
     const root = await mkdtemp(path.join(tmpdir(), "evals-native-agent-"))
     const history = await mkdtemp(path.join(tmpdir(), "evals-native-history-"))
@@ -61,7 +63,7 @@ for (const finalizer of [false, true, "interrupted"] as const) for (const browse
     const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
     const credentials = await readLeaseReceipt(prepared.secretFile) as { username: string; password: string }
     const settlement = { cli: true, admin: false }
-    const provider = loginomReplayProvider(finalizer === "interrupted" ? "active" : browser ? "prepare" : "text")
+    const provider = loginomReplayProvider(active ? "active" : browser ? "prepare" : "text")
     try {
       const admin = await openLoginomAdmin(file, pair.identity, { serverLease: environment.server, processInventory })
       try {
@@ -70,7 +72,7 @@ for (const finalizer of [false, true, "interrupted"] as const) for (const browse
         await admin.reconcileOwnedAcl(lease, prepared.secretFile)
         const storage = await prepareUserStorage(file, lease, prepared.secretFile, environment.server)
         await admin.activateOwnedUser(lease, prepared.secretFile)
-        if (finalizer === "interrupted") {
+        if (active) {
           expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${path.resolve(import.meta.dir, "../fixtures/interrupt-probe.lgp")} ${`${pair.identity.containerId}:${storage.root}/interrupt-probe.lgp`}`.quiet()).exitCode).toBe(0)
           expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} chown ${`${storage.uid}:${storage.gid}`} ${`${storage.root}/interrupt-probe.lgp`}`.quiet()).exitCode).toBe(0)
         }
@@ -104,22 +106,38 @@ for (const finalizer of [false, true, "interrupted"] as const) for (const browse
         const during: Awaited<ReturnType<typeof admin.inspectSessionInventory>>[] = []
         const state = { done: false }
         const interruption = new AbortController()
+        const kill = { sent: false }
         const packages: Awaited<ReturnType<typeof admin.inspectPackageInventory>>[] = []
         await mkdir(path.join(file.controller.stateDir, "agent-result"), { mode: 0o700 })
         settlement.cli = false
         const pending = runAgent({ command: { ...command, agentEvidence }, taskId: "native-replay", model: config.agent.model,
           prompt: "Activate the bundled Loginom skill and return Native replay complete.", files: [], workdir: lease.slot.workspaceRoot,
-          timeoutMs: finalizer === "interrupted" ? 120_000 : 60_000, outDir: path.join(file.controller.stateDir, "agent-result"), profileDir: lease.slot.profileDir, slotId: "a",
+          timeoutMs: active ? 120_000 : 60_000, outDir: path.join(file.controller.stateDir, "agent-result"), profileDir: lease.slot.profileDir, slotId: "a",
           signal: interruption.signal })
           .finally(() => { state.done = true })
         const observed = (async () => {
           while (!state.done) {
             during.push(await admin.inspectSessionInventory())
-            if (finalizer === "interrupted") {
+            if (active) {
               const snapshot = await admin.inspectPackageInventory()
               packages.push(snapshot)
               if (snapshot.collections.some(row => row.name.startsWith(credentials.username + ":") &&
-                row.packages.some(item => item.path === `/${credentials.username}/interrupt-probe.lgp` && item.progress !== null))) interruption.abort()
+                row.packages.some(item => item.path === `/${credentials.username}/interrupt-probe.lgp` && item.progress !== null))) {
+                if (finalizer === "interrupted") interruption.abort()
+                if (finalizer === "killed" && !kill.sent) {
+                  const selected = await stat(await realpath(process.env.EVAL_CLI_BIN!))
+                  const scopes = supervisedProcesses().scopes.filter(scope => scope.owner.kind === "slot" && scope.owner.id === lease.slot.id && scope.status === "observed")
+                  if (scopes.length !== 1) throw Error("KILL_CLI_SCOPE_UNCONFIRMED")
+                  const targets = scopes[0]!.processes!.filter(process => process.device === selected.dev && process.inode === selected.ino)
+                  if (targets.length !== 1) throw Error("KILL_CLI_IDENTITY_UNCONFIRMED")
+                  const intent = { owner: scopes[0]!.owner, launcher: scopes[0]!.launcher, process: targets[0]!, signal: "SIGKILL",
+                    trigger: snapshot.source, at: new Date().toISOString() }
+                  await writeLeaseReceipt(path.join(evidence, "kill-control.json"), { intent, status: "planned" })
+                  kill.sent = await signalProcess(intent.process, "SIGKILL")
+                  await writeLeaseReceipt(path.join(evidence, "kill-control.json"), { intent, status: kill.sent ? "sent" : "not_sent", settledAt: new Date().toISOString() })
+                  if (!kill.sent) throw Error("KILL_CLI_NOT_SENT")
+                }
+              }
             }
             if (!state.done) await Bun.sleep(100)
           }
@@ -129,19 +147,19 @@ for (const finalizer of [false, true, "interrupted"] as const) for (const browse
         const run = settled[0].value
         settlement.cli = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
         const after = settlement.cli ? await admin.inspectSessionInventory() : null
-        const backendAfterCli = finalizer === "interrupted" && settlement.cli ? await admin.inspectPackageInventory() : null
+        const backendAfterCli = active && settlement.cli ? await admin.inspectPackageInventory() : null
         await writeLeaseReceipt(path.join(evidence, "observation.json"), { version: 1, kind: "native-agent-replay", identity: pair.identity,
           root, commandId, run, before, during, after, packages, backendAfterCli, requests: provider.requests, liveQualified: false, sessionOwnershipQualified: false })
         expect(settlement.cli).toBe(true)
         expect(settled[1].status).toBe("fulfilled")
-        if (finalizer !== "interrupted") expect(run).toMatchObject({ exitCode: 0, timedOut: false, interrupted: false, finalText: "Native replay complete" })
+        if (!active) expect(run).toMatchObject({ exitCode: 0, timedOut: false, interrupted: false, finalText: "Native replay complete" })
         const qualified = qualifyClosedProcessEvidence(run.processCleanup, { owner: { kind: "slot", id: "a" }, producerPid: process.pid })
         expect(qualified).toBeDefined()
         const entry = await readAgentProcess({ ...agentEvidence, producerPid: process.pid }, (await Bun.file(agents).json()).processes[0].id)
         const references = { process: entry.entrySource, before: before.source, after: after!.source,
           during: during.filter(snapshot => Date.parse(snapshot.observation.startedAt) <= Date.parse(qualified!.finishedAt) &&
             Date.parse(snapshot.observation.finishedAt) >= Date.parse(qualified!.startedAt)).map(snapshot => snapshot.source) }
-        if (finalizer === "interrupted") {
+        if (active) {
           const inputs = { management, agents: { file: agents, observations: [references] } }
           const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
           const closed = await admin.inspectSessionInventory()
@@ -153,8 +171,13 @@ for (const finalizer of [false, true, "interrupted"] as const) for (const browse
           expect(await archivedSession(completed.archived.archive, run.sessionId!)).toBe(true)
           expect(backendAfterCli?.collections.some(row => row.name.startsWith(credentials.username + ":") && row.packages.some(item =>
             item.path === `/${credentials.username}/interrupt-probe.lgp` && item.progress !== null))).toBe(true)
-          expect(interruption.signal.aborted).toBe(true)
-          expect(run).toMatchObject({ timedOut: false, interrupted: true })
+          expect(interruption.signal.aborted).toBe(finalizer === "interrupted")
+          if (finalizer === "killed") {
+            expect(kill.sent).toBe(true)
+            expect(await readLeaseReceipt(path.join(evidence, "kill-control.json"))).toMatchObject({ status: "sent", intent: {
+              owner: { kind: "slot", id: lease.slot.id }, signal: "SIGKILL" } })
+          }
+          expect(run).toMatchObject(finalizer === "killed" ? { exitCode: 137, timedOut: false, interrupted: false } : { timedOut: false, interrupted: true })
           expect(await readServerIdentity(file)).toEqual(pair.identity)
           expect(await Promise.all(sources.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex"))))
             .toEqual(sources.map(source => source.sha256))
@@ -332,7 +355,7 @@ for (const finalizer of [false, true, "interrupted"] as const) for (const browse
       }
       if (!historyArchived) console.error(`native agent history retained: ${root}`)
     }
-  }, finalizer === "interrupted" ? 300_000 : finalizer ? 240_000 : 180_000,
+  }, active ? 300_000 : finalizer ? 240_000 : 180_000,
 )
 }
 
