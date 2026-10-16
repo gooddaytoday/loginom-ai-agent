@@ -1241,3 +1241,21 @@ checks74/24 sources+6 pins; ordinary40574ffb… audit7634c941…67/23.
 Both admin closures/transport ACKs and exact own pair/network/root absence pass.
 Three new RED/diagnostic fixtures are safely settled with executed source/native
 data retained. Positive Pool/running controls and backend quiescence remain open.
+
+
+Native Progress control (2026-10-16): `session-progress-probe` loads the
+self-contained one-node LGP/readable JavaScript fixture and checks its actual
+native engine.Code. The node runs with a time/iteration bound. Parent inventories
+observe running Progress (actual50), then the same open package with null
+Progress after successful task completion, then package absence after targeted
+CloseSession. Native StartTime is retained without host-clock correction.
+
+TDD missing phase RED41/53.52s; routing/XML fixture repairs; initial running
+1/52 PASS67.70s; retained-idle RED45/59.70s→final1/53 PASS61.95s. Related49/160
+PASS21.58s, typecheck/syntax/diff PASS. Privatef7fa45bd… source-audit SHA256
+`c33e5b9980b72ea47a6939f6f04efe36d71e319478757f1b45eed8bae32a8e97`
+checks69/23 sources+8 pins, both admin closures/transport ACKs, exact own
+pair/network/root absence and retained original input. Six failed/diagnostic
+fixtures are also safely settled with original inputs/executed sources retained.
+Temporary open-error logging was removed. Positive Pool, backend quiescence,
+interruption, storage/backup cleanup and production admission remain separate.
