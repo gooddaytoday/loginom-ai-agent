@@ -18,8 +18,8 @@ import { acquireHarnessLease, retireRecordedHarnessLease } from "./lease"
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
 type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string }
-export type NodeOpsConfig = { version: 1 | 2; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths }; offline?: OfflinePaths }
-export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
+export type NodeOpsConfig = { version: 1 | 2 | 3; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths; evalrunner?: BaselinePaths }; offline?: OfflinePaths }
+export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline" | "evalrunner"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
 export type NodeStandLease = NodeStandOwner & { version: 1; token: string; device: number; inode: number; endpoint: string; containerId: string; acquiredAt: string; configSha256: string }
 export type NodeStandCompletion = { version: 1; owner: NodeStandOwner; acquiredAt: string } & (
   { kind: "unit"; checks: { command: string; exitCode: number; processes: ProcessCleanup }[] } |
@@ -89,6 +89,8 @@ export async function assertNodeStandOwner(config: NodeOpsConfig, expected: Node
 export async function releaseNodeStand(config: NodeOpsConfig, lease: NodeStandLease, evidence: string) {
   return exclusive(config, lease, async () => {
     const completion = await readCompletion(config, lease, evidence)
+    // Eval-only orchestration stays with its existing installation; schema compatibility grants no generic completion.
+    if (evalOnlyRole(lease.role) && !(lease.phase === "unit" && completion.kind === "unit")) throw new NodeOpsFailure("BASELINE_COMPLETION_REQUIRED")
     await verifyCompletion(config, lease, completion, evidence)
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
@@ -141,6 +143,7 @@ Commands:
 Lease handles must stay private (0600); no TTL, waiting, PID stealing, or external retry.
 Runtime config v1 contains runtimeRoot, endpoint, container {name,id,storageDir}, cliBin,
 roles {rich,ben}, each {checkout,referenceProfile,evalProfile,workRoots,resultsRoot}.
+v3 adds eval-only evalrunner with its own CLI and sixth profile. Eval-only series orchestration is not part of this helper.
 Optional offline {checkout,workRoots,resultsRoot} gives Evaler read-only evidence paths.
 One operator recovery is reserved per immutable lease; incident renaming cannot reset it.
 Successful release archives the private lease and proofs under operations/completed.
@@ -830,14 +833,14 @@ async function readLease(config: NodeOpsConfig) {
 
 function validateOwner(owner: NodeStandOwner) {
   if (![owner.issue, owner.task].every(id => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(id)) ||
-    !["rich", "ben", "evalbaseline"].includes(owner.role) || owner.role === "evalbaseline" && ["reference", "cold"].includes(owner.phase) || !["unit", "reference", "cold", "eval", "recovery"].includes(owner.phase) || !/^[0-9a-f]{40}$/.test(owner.sha))
+    !["rich", "ben", "evalbaseline", "evalrunner"].includes(owner.role) || evalOnlyRole(owner.role) && ["reference", "cold"].includes(owner.phase) || !["unit", "reference", "cold", "eval", "recovery"].includes(owner.phase) || !/^[0-9a-f]{40}$/.test(owner.sha))
     throw new NodeOpsFailure("INVALID_OWNER")
 }
 
 async function validateConfig(config: NodeOpsConfig) {
-  if (![1, 2].includes(config.version) || !path.isAbsolute(config.runtimeRoot) || !/^[0-9a-f]{64}$/.test(config.container.id) ||
+  if (![1, 2, 3].includes(config.version) || !path.isAbsolute(config.runtimeRoot) || !/^[0-9a-f]{64}$/.test(config.container.id) ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.name) || !/^\/workdir\/UserStorage\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.storageDir) ||
-    Object.keys(config.roles).sort().join(",") !== (config.version === 1 ? "ben,rich" : "ben,evalbaseline,rich") || config.version === 2 && !config.roles.evalbaseline?.cliBin || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
+    Object.keys(config.roles).sort().join(",") !== (config.version === 1 ? "ben,rich" : config.version === 2 ? "ben,evalbaseline,rich" : "ben,evalbaseline,evalrunner,rich") || config.version >= 2 && !config.roles.evalbaseline?.cliBin || config.version === 3 && !config.roles.evalrunner?.cliBin || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
     throw new NodeOpsFailure("INVALID_CONFIG")
   const endpoint = new URL(config.endpoint)
   if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash)
@@ -863,9 +866,13 @@ async function validateConfig(config: NodeOpsConfig) {
     index !== otherIndex && (inside(root, other) || inside(other, root))))) throw new NodeOpsFailure("INVALID_CONFIG_PATH")
 }
 
+function evalOnlyRole(role: NodeStandOwner["role"]) {
+  return role === "evalbaseline" || role === "evalrunner"
+}
+
 function nodeRole(config: NodeOpsConfig, role: NodeStandOwner["role"]) {
   const paths = config.roles[role]
-  if (!paths || role === "evalbaseline" && config.version !== 2) throw new NodeOpsFailure("ROLE_NOT_CONFIGURED")
+  if (!paths || role === "evalbaseline" && config.version < 2 || role === "evalrunner" && config.version !== 3) throw new NodeOpsFailure("ROLE_NOT_CONFIGURED")
   return paths
 }
 
