@@ -13,42 +13,48 @@ type Manifest = { version: 1; kind: "user-storage-archive"; context: Awaited<Ret
   root: Snapshot["observed"]; rootDetails: Snapshot["details"][number];
   entries: (Snapshot["observed"]["entries"][number] & Snapshot["details"][number] & { sha256?: string })[];
   directory: Awaited<ReturnType<typeof privateDirectory>>; payload: { path: string; bytes: number; sha256: string };
-  startedAt: string; status: "committed"; committedAt: string; storageDeletionAllowed: false; nextAdmissionAllowed: false }
+  startedAt: string; status: "copying" | "committed"; committedAt?: string; storageDeletionAllowed: false; nextAdmissionAllowed: false;
+  partialCopies?: { expected: { path: string; bytes: number; sha256: string }; observed: { bytes: number; sha256: string } | null }[] }
+type Archive = Manifest & { status: "committed"; committedAt: string; source: { path: string; sha256: string } }
 
 /** Copies all owned server material; a committed snapshot grants no deletion. */
-export async function archiveUserStorage(file: SlotFile, server: ServerLease, lease: SlotLease, id: string): Promise<Manifest & { source: { path: string; sha256: string } }> {
+export async function archiveUserStorage(file: SlotFile, server: ServerLease, lease: SlotLease, id: string): Promise<Archive> {
   const context = await archiveContext(file, server, lease, id)
   const journal = path.join(file.controller.stateDir, `user-storage-archive-${id}.json`)
   const existing = await lstat(journal).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined
     throw error
   })
-  if (existing) {
+  const saved = existing ? (await loadStorageArchive(file, server, lease, { path: journal, sha256: hash(await readLeaseReceipt(journal)) })).receipt : undefined
+  if (saved?.status === "committed") {
     const previous = await readUserStorageArchive(file, server, lease, { path: journal, sha256: hash(await readLeaseReceipt(journal)) })
-    const expected = { observed: previous.root, details: [previous.rootDetails, ...previous.entries.map(entry => ({ name: entry.name, mode: entry.mode, target: entry.target, modifiedAt: entry.modifiedAt, changedAt: entry.changedAt }))] }
+    const expected = archivedSnapshot(previous)
     if (hash(await snapshotRoot(file, lease, context.prepared.nonce)) !== hash(expected) ||
       hash(await filesInArchive(await copyRoot(lease.identity.containerId, previous.root.root), previous.root)) !== hash(regularFiles(previous)) ||
       hash(await snapshotRoot(file, lease, context.prepared.nonce)) !== hash(expected)) throw new EvalFailure("USER_STORAGE_ARCHIVE_CHANGED", 2)
     return previous
   }
-  const startedAt = new Date().toISOString()
+  const startedAt = saved?.startedAt ?? new Date().toISOString()
   const before = await snapshotRoot(file, lease, context.prepared.nonce)
+  if (saved && hash(archivedSnapshot(saved)) !== hash(before)) throw new EvalFailure("USER_STORAGE_ARCHIVE_CHANGED", 2)
   if (["device", "inode", "uid", "gid"].some(key => context.published[key] !== before.observed[key as keyof typeof before.observed]))
     throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
   const bytes = await copyRoot(lease.identity.containerId, before.observed.root)
   const files = await filesInArchive(bytes, before.observed)
+  if (saved && hash(files) !== hash(regularFiles(saved))) throw new EvalFailure("USER_STORAGE_ARCHIVE_CHANGED", 2)
   if (hash(await filesInArchive(await copyRoot(lease.identity.containerId, before.observed.root), before.observed)) !== hash(files) ||
     hash(await snapshotRoot(file, lease, context.prepared.nonce)) !== hash(before)) throw new EvalFailure("USER_STORAGE_ARCHIVE_CHANGED", 2)
   await server.assertHeld()
   await lease.assertHeld()
   if (hash(await readLeaseReceipt(context.publication)) !== hash(context.published)) throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
+  const partialCopies = saved ? [...saved.partialCopies ?? [], { expected: saved.payload, observed: await payloadSnapshot(saved.payload.path) }] : undefined
   const directory = await mkdtemp(path.join(lease.slot.historyDir, "user-storage-"))
   const binding = await privateDirectory(directory)
   const payload = { path: path.join(directory, "payload.tar"), bytes: bytes.byteLength, sha256: hashBytes(bytes) }
   const entries = before.observed.entries.map(entry => ({ ...entry, ...before.details.find(detail => detail.name === entry.name)!,
     ...(entry.type === "f" ? { sha256: files.find(item => item.name === entry.name)!.sha256 } : {}) }))
   const base = { version: 1 as const, kind: "user-storage-archive" as const, context: context.binding, root: before.observed, rootDetails: before.details.find(detail => detail.name === "")!,
-    entries, directory: binding, payload, startedAt, storageDeletionAllowed: false as const, nextAdmissionAllowed: false as const }
+    entries, directory: binding, payload, startedAt, ...(partialCopies ? { partialCopies } : {}), storageDeletionAllowed: false as const, nextAdmissionAllowed: false as const }
   await writeLeaseReceipt(journal, { ...base, status: "copying" })
   const target = await open(payload.path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
   try { await target.writeFile(bytes); await target.sync() }
@@ -58,6 +64,10 @@ export async function archiveUserStorage(file: SlotFile, server: ServerLease, le
     try { await handle.sync() } finally { await handle.close() }
   }
   if (hashBytes(await Bun.file(payload.path).bytes()) !== payload.sha256) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+  for (const partial of base.partialCopies ?? []) {
+    if (JSON.stringify(await payloadSnapshot(partial.expected.path)) !== JSON.stringify(partial.observed))
+      throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+  }
   await server.assertHeld()
   await lease.assertHeld()
   const receipt = { ...base, status: "committed" as const, committedAt: new Date().toISOString() }
@@ -66,7 +76,19 @@ export async function archiveUserStorage(file: SlotFile, server: ServerLease, le
 }
 
 /** Historical payload proof; current server files need not still exist. */
-export async function readUserStorageArchive(file: SlotFile, server: ServerLease, lease: SlotLease, source: { path: string; sha256: string }): Promise<Manifest & { source: { path: string; sha256: string } }> {
+export async function readUserStorageArchive(file: SlotFile, server: ServerLease, lease: SlotLease, source: { path: string; sha256: string }): Promise<Archive> {
+  const loaded = await loadStorageArchive(file, server, lease, source)
+  const receipt = loaded.receipt
+  if (receipt.status !== "committed" || !receipt.committedAt) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+  const bytes = await readPayload(receipt.payload.path)
+  if (!bytes || bytes.byteLength !== receipt.payload.bytes || hashBytes(bytes) !== receipt.payload.sha256 ||
+    hash(await filesInArchive(bytes, receipt.root)) !== hash(regularFiles(receipt))) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+  if (hash(await archiveContext(file, server, lease, receipt.context.id)) !== hash(loaded.context) || hash(await readLeaseReceipt(source.path)) !== source.sha256 ||
+    hash(await privateDirectory(receipt.directory.path)) !== hash(receipt.directory)) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+  return { ...receipt, status: "committed", committedAt: receipt.committedAt, source }
+}
+
+async function loadStorageArchive(file: SlotFile, server: ServerLease, lease: SlotLease, source: { path: string; sha256: string }) {
   const name = path.basename(source.path).match(/^user-storage-archive-([a-f0-9-]{36})\.json$/)
   if (!name || path.dirname(source.path) !== file.controller.stateDir || path.resolve(source.path) !== source.path || !/^[a-f0-9]{64}$/.test(source.sha256))
     throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
@@ -74,29 +96,48 @@ export async function readUserStorageArchive(file: SlotFile, server: ServerLease
   const value = await readLeaseReceipt(source.path)
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
   const row = value as Partial<Manifest>
-  if (hash(row) !== source.sha256 || row.version !== 1 || row.kind !== "user-storage-archive" || row.status !== "committed" ||
+  if (hash(row) !== source.sha256 || row.version !== 1 || row.kind !== "user-storage-archive" || !["copying", "committed"].includes(String(row.status)) ||
     JSON.stringify(row.context) !== JSON.stringify(context.binding) || !row.root || row.root.root !== context.published.root ||
     ["device", "inode", "uid", "gid"].some(key => context.published[key] !== row.root![key as keyof typeof row.root]) ||
     !row.rootDetails || !Array.isArray(row.entries) || !row.directory || path.dirname(row.directory.path) !== lease.slot.historyDir ||
     !path.basename(row.directory.path).startsWith("user-storage-") || !row.payload || row.payload.path !== path.join(row.directory.path, "payload.tar") ||
     !/^[a-f0-9]{64}$/.test(row.payload.sha256) || !Number.isSafeInteger(row.payload.bytes) || row.payload.bytes < 0 ||
     row.storageDeletionAllowed !== false || row.nextAdmissionAllowed !== false ||
-    !Number.isFinite(Date.parse(row.startedAt ?? "")) || !Number.isFinite(Date.parse(row.committedAt ?? "")))
+    !Number.isFinite(Date.parse(row.startedAt ?? "")) || row.status === "committed" && !Number.isFinite(Date.parse(row.committedAt ?? "")) || row.partialCopies !== undefined && !Array.isArray(row.partialCopies))
     throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
   if (hash(await privateDirectory(row.directory.path)) !== hash(row.directory)) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
   const receipt = row as Manifest
-  const handle = await open(receipt.payload.path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  for (const partial of receipt.partialCopies ?? []) {
+    if (path.basename(partial.expected.path) !== "payload.tar" || path.dirname(path.dirname(partial.expected.path)) !== lease.slot.historyDir ||
+      !path.basename(path.dirname(partial.expected.path)).startsWith("user-storage-"))
+      throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+    await privateDirectory(path.dirname(partial.expected.path))
+    if (JSON.stringify(await payloadSnapshot(partial.expected.path)) !== JSON.stringify(partial.observed))
+      throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+  }
+  return { receipt, context }
+}
+
+async function readPayload(file: string) {
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (!handle) return null
   try {
     const info = await handle.stat()
-    if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600 || info.size !== receipt.payload.bytes)
+    if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600)
       throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
     const bytes = await handle.readFile()
-    if (hashBytes(bytes) !== receipt.payload.sha256 || hash(await filesInArchive(bytes, receipt.root)) !== hash(regularFiles(receipt)))
-      throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
+    // A recovered partial may have been interrupted before its first fsync.
+    await handle.sync()
+    return bytes
   } finally { await handle.close() }
-  if (hash(await archiveContext(file, server, lease, name[1]!)) !== hash(context) || hash(await readLeaseReceipt(source.path)) !== source.sha256 ||
-    hash(await privateDirectory(receipt.directory.path)) !== hash(receipt.directory)) throw new EvalFailure("USER_STORAGE_ARCHIVE_UNCONFIRMED", 2)
-  return { ...receipt, source }
+}
+
+async function payloadSnapshot(file: string) {
+  const bytes = await readPayload(file)
+  return bytes ? { bytes: bytes.byteLength, sha256: hashBytes(bytes) } : null
 }
 
 async function archiveContext(file: SlotFile, server: ServerLease, lease: SlotLease, id: string) {
@@ -123,6 +164,11 @@ async function archiveContext(file: SlotFile, server: ServerLease, lease: SlotLe
 
 function regularFiles(receipt: Manifest) {
   return receipt.entries.filter(entry => entry.type === "f").map(entry => ({ name: entry.name, bytes: entry.bytes, sha256: entry.sha256 }))
+}
+
+function archivedSnapshot(receipt: Manifest) {
+  return { observed: receipt.root, details: [receipt.rootDetails, ...receipt.entries.map(entry => ({ name: entry.name, mode: entry.mode,
+    target: entry.target, modifiedAt: entry.modifiedAt, changedAt: entry.changedAt }))] }
 }
 
 async function snapshotRoot(file: SlotFile, lease: SlotLease, nonce: string) {
