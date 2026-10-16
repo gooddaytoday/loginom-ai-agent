@@ -14,6 +14,18 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('user node apply publishes finish first without changing its contract or source schema',()=>{
+ const source=nodeApiTools.find(t=>t.name==='dock_node_apply'),before=structuredClone(source);
+ const tool=userNodeTool(source),keys=Object.keys(JSON.parse(JSON.stringify(tool.inputSchema)).properties);
+ assert.equal(keys[0],'finish');
+ assert.ok(keys.indexOf('finish')<keys.indexOf('parameters'));
+ assert.ok(keys.indexOf('finish')<keys.indexOf('mappings'));
+ assert.deepEqual(tool.inputSchema.properties.finish,source.inputSchema.properties.finish);
+ assert.ok(tool.inputSchema.required.includes('finish'));
+ assert.ok(tool.description.length<500);
+ assert.deepEqual(source,before);
+});
+
 test('mapping conflict explains full-request repair while preserving finish and strict rejection',async()=>{
  const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
  const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
