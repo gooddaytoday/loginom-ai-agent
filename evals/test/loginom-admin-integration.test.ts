@@ -81,11 +81,12 @@ liveIntegration("native running package inventory: bounded server node has Progr
 liveIntegration("native pool package inventory: completed manual job retains a package after its creator closes", () => nativeUserCapability("pool"), 120_000)
 liveIntegration("native pool package close: refuses the pooled object and preserves another user", () => nativeUserCapability("pool-close"), 120_000)
 liveIntegration("native pool disabled policy: zero retains no completed job package", () => nativeUserCapability("pool-disabled"), 120_000)
+liveIntegration("native pool preparation: held controller disables retention and repeats without mutation", () => nativeUserCapability("pool-policy"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled", hardCrash = false) {
-  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled"
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy", hardCrash = false) {
+  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy"
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -100,6 +101,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
   const pair = await createPair(file, options)
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-user-${crypto.randomUUID()}`)
   const settlement = { admin: false, packageParent: true }
+  let policyLease: Awaited<ReturnType<typeof acquireResourceLease>> | undefined
   let packageParent: Awaited<ReturnType<typeof openLoginomAdmin>> | undefined
   try {
     const runtime = await verifyAdminRuntime(process.env.EVAL_CLI_BIN!)
@@ -190,6 +192,33 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         const peerActivation = { ...neighborPayload, owned: { ...peerOwned, secretHash: neighborPayload.secretHash }, expectedPolicy: after }
         expect(await request("reconcile-user", { ...peerActivation, phase: "activate" })).toMatchObject({ outcome: "confirmed" })
         return { user: peer, activation: peerActivation }
+      }
+      if (mode === "pool-policy") {
+        const journal = path.join(file.controller.stateDir, "pool-policy-command.json"), processInventory = path.join(file.controller.stateDir, "pool-policy-processes.json")
+        await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "pool-policy", identity: pair.identity,
+          slotIds: [file.slots[0]!.id], phase: "unactivated", processInventory })
+        await writeLeaseReceipt(processInventory, { version: 2, kind: "admin-processes", commandId: "pool-policy", journal, identity: pair.identity, connections: [] })
+        const policyLocks = path.join(root, "policy-locks")
+        await mkdir(policyLocks, { mode: 0o700 })
+        policyLease = await acquireResourceLease({ key: `server:${pair.identity.containerId}`, identity: pair.identity, journal,
+          commandId: "pool-policy", lockRoot: policyLocks })
+        settlement.packageParent = false
+        packageParent = await openLoginomAdmin(file, pair.identity, { serverLease: policyLease, processInventory })
+        await expect(packageParent.inspectPoolPolicy()).rejects.toThrow("POOL_POLICY_DRIFT")
+        const original = await readLeaseReceipt(journal) as Record<string, unknown>
+        await writeLeaseReceipt(journal, { ...original, phase: "finalizing" })
+        try { await expect(packageParent.configurePoolPolicy()).rejects.toThrow("POOL_POLICY_PHASE_UNCONFIRMED") }
+        finally { await writeLeaseReceipt(journal, original) }
+        const configured = await packageParent.configurePoolPolicy()
+        expect(configured).toMatchObject({ identity: pair.identity, packagePoolSize: 0, changed: true })
+        const repeated = await packageParent.configurePoolPolicy()
+        expect(repeated).toMatchObject({ identity: pair.identity, packagePoolSize: 0, changed: false })
+        const verified = await packageParent.inspectPoolPolicy()
+        expect(verified).toMatchObject({ identity: pair.identity, packagePoolSize: 0, changed: false })
+        await writeLeaseReceipt(path.join(evidence, "prepared-pool-policy.json"), { configured, repeated, verified })
+        expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
+        complete = true
+        return
       }
       if (mode === "peer-close") {
         const neighbor = await preparePeer()
@@ -800,6 +829,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       await writeLeaseReceipt(path.join(evidence, "parent-package-admin.json"), { closures })
       settlement.packageParent = true
     }
+    await policyLease?.close()
     if (!packages || settlement.admin && settlement.packageParent) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
     else console.error(`native package inventory fixture retained: ${root}`)
   }

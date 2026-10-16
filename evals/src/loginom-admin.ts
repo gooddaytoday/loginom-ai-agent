@@ -33,7 +33,7 @@ import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
 import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation } from "./user-environment"
 
-export type AdminOperation = "init" | "inspect" | "reconcile-user" | "close-session" | "confirm-session-absent" | "dispose"
+export type AdminOperation = "init" | "inspect" | "reconcile-user" | "configure-pool" | "close-session" | "confirm-session-absent" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
 export type AdminReply = { v: 1; id: string; outcome: "confirmed" | "not_applied" | "unknown"; data: unknown }
 const frameLimit = 1024 * 1024
@@ -44,6 +44,8 @@ type AdminSessionRow = { objectId: string; sessionGuid: string | null; name: str
 
 export type AdminConnection = {
   identity: ServerIdentity
+  configurePoolPolicy(): Promise<Awaited<ReturnType<typeof readAdminPoolPolicy>>>
+  inspectPoolPolicy(): Promise<Awaited<ReturnType<typeof readAdminPoolPolicy>>>
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
   inspectPackageInventory(): Promise<Awaited<ReturnType<typeof readAdminPackageInventory>>>
   inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
@@ -135,11 +137,11 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   const request = (op: AdminOperation, payload: unknown, beforeSend?: () => Promise<void>) => {
     const result = sequence.then(async () => {
       if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      if (op === "reconcile-user") await verifyParallelPair(file, identity)
-      if (op === "reconcile-user" || op === "close-session" || op === "confirm-session-absent") {
+      if (op === "reconcile-user" || op === "configure-pool") await verifyParallelPair(file, identity)
+      if (op === "reconcile-user" || op === "configure-pool" || op === "close-session" || op === "confirm-session-absent") {
         if (!options.serverLease || options.serverLease.reservation.key !== `server:${identity.containerId}` ||
           JSON.stringify(options.serverLease.reservation.identity) !== JSON.stringify(identity) ||
-          op === "reconcile-user" && options.serverLease.reservation.state !== "retained") throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
+          (op === "reconcile-user" || op === "configure-pool") && options.serverLease.reservation.state !== "retained") throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
         await options.serverLease.assertHeld()
       }
       await beforeSend?.()
@@ -185,8 +187,26 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     return { data, reply }
   }
   let disposal: Promise<void> | undefined
+  const poolPolicy = async (configure: boolean) => {
+    const reply = await request(configure ? "configure-pool" : "inspect", configure ? {} : { poolPolicy: true }, configure ? async () => {
+      const command = await readLeaseReceipt(options.serverLease!.reservation.journal)
+      if (!jsonObject(command) || command.kind !== "unactivated-preparation" || command.phase !== "unactivated" ||
+        command.commandId !== options.serverLease!.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
+        throw new EvalFailure("POOL_POLICY_PHASE_UNCONFIRMED", 2)
+    } : undefined)
+    requireAdminReply(reply)
+    const command = path.join(directory, "commands", `${reply.id}.json`)
+    const receipt = { version: 2, kind: "admin-pool-policy", identity, reply,
+      command: { path: command, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(command))).digest("hex") } }
+    const source = { path: path.join(directory, `pool-policy-${reply.id}.json`),
+      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") }
+    await writeLeaseReceipt(source.path, receipt)
+    return readAdminPoolPolicy(file, identity, source)
+  }
   const connection: AdminConnection = {
     identity,
+    configurePoolPolicy: () => poolPolicy(true),
+    inspectPoolPolicy: () => poolPolicy(false),
     async inspectPolicy() {
       const data = (await observe()).data
       if (!jsonObject(data) || JSON.stringify(data.identity) !== JSON.stringify(identity)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
@@ -588,6 +608,43 @@ async function withAdminInventoryWrite<T>(file: string, callback: () => Promise<
 }
 
 /** Immutable native observations; this reader grants no session ownership or cleanup authority. */
+/** Replays native policy evidence; it grants no dispatch or cleanup authority. */
+export async function readAdminPoolPolicy(file: { controller: { stateDir: string } }, identity: ServerIdentity, source: { path: string; sha256: string }) {
+  const directory = path.dirname(source.path), hash = (value: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
+  if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
+    path.resolve(source.path) !== source.path || !/^[a-f0-9]{64}$/.test(source.sha256)) throw new EvalFailure("POOL_POLICY_UNCONFIRMED", 2)
+  const root = await lstat(directory).catch(() => undefined)
+  if (!root?.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
+    await realpath(directory).catch(() => undefined) !== directory) throw new EvalFailure("POOL_POLICY_UNCONFIRMED", 2)
+  const receipt = await readLeaseReceipt(source.path).catch(() => null)
+  if (!jsonObject(receipt) || Object.keys(receipt).length !== 5 || receipt.version !== 2 || receipt.kind !== "admin-pool-policy" ||
+    hash(receipt) !== source.sha256 || JSON.stringify(receipt.identity) !== JSON.stringify(identity) || !jsonObject(receipt.command) ||
+    Object.keys(receipt.command).length !== 2 || !jsonObject(receipt.reply) || Object.keys(receipt.reply).length !== 4 ||
+    receipt.reply.v !== 1 || receipt.reply.outcome !== "confirmed" || typeof receipt.reply.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(receipt.reply.id) ||
+    path.basename(source.path) !== `pool-policy-${receipt.reply.id}.json` || receipt.command.path !== path.join(directory, "commands", `${receipt.reply.id}.json`))
+    throw new EvalFailure("POOL_POLICY_UNCONFIRMED", 2)
+  const data = receipt.reply.data, command = await readLeaseReceipt(receipt.command.path).catch(() => null)
+  if (!jsonObject(command) || Object.keys(command).length !== 10 || command.version !== 1 || command.kind !== "loginom-admin-command" ||
+    hash(command) !== receipt.command.sha256 || !["configure-pool", "inspect"].includes(String(command.op)) || command.state !== "confirmed" || command.id !== receipt.reply.id ||
+    JSON.stringify(command.expectedIdentity) !== JSON.stringify(identity) || command.desiredHash !== hash(command.op === "configure-pool" ? {} : { poolPolicy: true }) ||
+    command.replyHash !== hash(receipt.reply) || typeof command.at !== "string" || !Number.isFinite(Date.parse(command.at)) ||
+    typeof command.settledAt !== "string" || !Number.isFinite(Date.parse(command.settledAt)) || Date.parse(command.settledAt) < Date.parse(command.at) ||
+    !jsonObject(data) || Object.keys(data).length !== 6 || JSON.stringify(data.identity) !== JSON.stringify(identity) || data.packagePoolSize !== 0 ||
+    !Number.isSafeInteger(data.before) || Number(data.before) < 0 || typeof data.changed !== "boolean" || typeof data.observer !== "string" || !data.observer ||
+    !Array.isArray(data.collections) || data.collections.some(value => !jsonObject(value) || Object.keys(value).length !== 3 ||
+      typeof value.name !== "string" || !value.name || !Number.isSafeInteger(value.sessionType) || Number(value.sessionType) < 0 || Number(value.sessionType) > 4 ||
+      !Number.isSafeInteger(value.packageCount) || Number(value.packageCount) < 0) ||
+    new Set(data.collections.map(value => value.name)).size !== data.collections.length ||
+    !data.collections.some(value => value.sessionType === 1 && value.name.startsWith(data.observer + ":")) ||
+    (command.op === "configure-pool" ? data.changed !== (data.before !== 0) || data.collections.some(value => value.packageCount !== 0 ||
+      [0, 1].includes(value.sessionType) && !value.name.startsWith(data.observer + ":")) : data.before !== 0 || data.changed))
+    throw new EvalFailure("POOL_POLICY_UNCONFIRMED", 2)
+  if (hash(await readLeaseReceipt(source.path)) !== source.sha256 || hash(await readLeaseReceipt(receipt.command.path)) !== receipt.command.sha256)
+    throw new EvalFailure("POOL_POLICY_UNCONFIRMED", 2)
+  return { identity, before: Number(data.before), packagePoolSize: 0 as const, changed: data.changed,
+    observation: { startedAt: command.at, finishedAt: command.settledAt }, source }
+}
+
 export async function readAdminSessionInventory(file: { controller: { stateDir: string } }, identity: ServerIdentity, source: { path: string; sha256: string }) {
   const directory = path.dirname(source.path)
   if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
@@ -690,7 +747,7 @@ export async function readAdminFinalization(file: { controller: { stateDir: stri
 }
 
 function adminReplyCode(reply: AdminReply) {
-  return jsonObject(reply.data) && typeof reply.data.code === "string" && /^(ADMIN|SESSION|SERVER)_[A-Z_]{1,64}$/.test(reply.data.code)
+  return jsonObject(reply.data) && typeof reply.data.code === "string" && /^(ADMIN|SESSION|SERVER|POOL_POLICY)_[A-Z_]{1,64}$/.test(reply.data.code)
     ? reply.data.code : "ADMIN_OPERATION_UNKNOWN"
 }
 
@@ -831,7 +888,7 @@ export function createAdminChannel(input: ReadableStream<Uint8Array>, output: Wr
 
 function requireAdminRequest(value: unknown): AdminRequest {
   if (!jsonObject(value) || Object.keys(value).length !== 6 || value.v !== 1 || typeof value.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(value.id) ||
-    typeof value.op !== "string" || !["init", "inspect", "reconcile-user", "close-session", "confirm-session-absent", "dispose"].includes(value.op) ||
+    typeof value.op !== "string" || !["init", "inspect", "reconcile-user", "configure-pool", "close-session", "confirm-session-absent", "dispose"].includes(value.op) ||
     typeof value.deadline !== "number" || !Number.isSafeInteger(value.deadline) || !Object.hasOwn(value, "payload") ||
     !jsonObject(value.expectedIdentity) || Object.keys(value.expectedIdentity).length !== 6)
     throw new EvalFailure("ADMIN_REQUEST_INVALID", 2)

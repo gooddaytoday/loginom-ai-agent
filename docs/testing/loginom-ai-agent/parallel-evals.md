@@ -1304,3 +1304,14 @@ Same-source default-retention control62335c26…:1/54 PASS66.51s,
 audit7e614cb9…74/25 verifies the same package retained after creator close.
 Both cases freeze the identical8 code/binary/input pins. Related49/160
 PASS21.15s; typecheck/syntax/diff PASS.
+
+Public Pool API control: `native pool preparation: held controller disables
+retention and repeats without mutation` exercises a real held server fence,
+initial readonly drift refusal, phase rejection before dispatch, actual10→0,
+unchanged repeat and readonly0. Native1/48 PASS62.31s; related50/162
+PASS22.76s, typecheck/syntax/diff PASS. Private691caaea… audit5b14827c…51/23+6pins
+verifies full policy replies/journals, both admin closures/ACKs and exact own
+pair/network/root absence. Source reader rejects omitted self-observer even when
+hashes match. Fixture controller leases use their own lock root; failed original
+collisions were CAS-recovered/released from full closure sources and their owned
+pairs destroyed. Prepare/verify integration remains the next step.

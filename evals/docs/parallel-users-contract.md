@@ -3101,3 +3101,25 @@ Same-source default-retention control62335c26…:1/54 PASS66.51s,
 audit7e614cb9…74/25 verifies the same package retained after creator close.
 Both cases freeze the identical8 code/binary/input pins. Related49/160
 PASS21.15s; typecheck/syntax/diff PASS.
+
+### Fenced public Pool policy checks (2026-10-16)
+
+AdminConnection.configurePoolPolicy requires a held retained same-epoch server
+fence and its same-command private unactivated-preparation journal. Native
+configure-pool refuses nonempty collections or user sessions and sets0 only when
+the getter is nonzero. inspectPoolPolicy is readonly and refuses drift. Both
+persist the complete native reply with its exact command binding; the independent
+readAdminPoolPolicy validates private source, epoch, schema, native observer,
+operation, timestamps and hashes. A matching-hash omitted observer is refused.
+
+Native1/48 PASS62.31s: initial readonly drift, phase rejection before RPC,
+actual10→0, unchanged repeat and readonly0. Related50/162 PASS22.76s,
+typecheck/syntax/diff PASS. Private691caaea… audit SHA256
+`5b14827c66c09c56cd235c53a194545f59ab8fe5b5fda5a362c84931f0ce7fa2`
+checks51/23 sources+6 pins, both continuous admin closures/transport ACKs and
+exact own pair/network/root absence. Native Pool error codes preserve their
+POOL_POLICY namespace. Two failed fixture lock collisions were fixed by separating
+controller and factory lock roots; original pairs were reclaimed with qualified
+closure/transport sources, recovery-only CAS, release and owned factory destroy.
+Original failed logs/proofs remain unchanged. Production prepare/verify wiring
+and runtime policy drift/admission guards still require integration.
