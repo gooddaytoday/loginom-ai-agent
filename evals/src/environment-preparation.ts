@@ -10,6 +10,7 @@ import { checkIsolatedLoginom } from "./preflight"
 import { assertAuth, ensureProfile, verifyProfile } from "./profile"
 import { assertSessionBackupEmpty, cleanupSlotStorage } from "./slot-storage"
 import { acquireEnvironmentLeases, loadSlots, type SlotFile, type SlotLease } from "./slots"
+import { reconcileEnvironment } from "./startup-reconciliation"
 import { readUserConfiguration, readUserOwnership, readUserPreparation, stageUserPreparation } from "./user-environment"
 
 export class EnvironmentFailure extends EvalFailure {
@@ -39,6 +40,7 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number; co
   if (config.agent.cliMode !== "binary" || !path.isAbsolute(config.agent.cliBin ?? "")) throw new EvalFailure("PREPARATION_BINARY_REQUIRED", 2)
   const identity = await readServerIdentity(file)
   await verifyParallelPair(file, identity)
+  await reconcileEnvironment(file, identity, config.agent.cliBin!, lockRoot)
   const commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `${operation}-command-${commandId}.json`)
   const receipt = path.join(file.controller.stateDir, `${operation === "prepare" ? "preparation" : "verification"}-${commandId}.json`)
   const record = { version: 2, kind: "unactivated-preparation", commandId, identity,

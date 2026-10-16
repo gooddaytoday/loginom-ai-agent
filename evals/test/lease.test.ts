@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, rename, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireHarnessLease, acquireJudgeLease, acquireResourceLease, readResourceReservation, recoverResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
+import { acquireHarnessLease, acquireJudgeLease, acquireResourceLease, readResourceReservation, recoverResourceLease, reopenResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
 import type { Reservation } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -14,6 +14,30 @@ async function resourceFixture() {
   await writeFile(journal, "{}", { mode: 0o600 })
   return { root, request: { key: "server:container", lockRoot, journal, commandId: "run-one" } }
 }
+
+test("startup reopens a dead owner's exact reservation without a new epoch", async () => {
+  const item = await resourceFixture()
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});const lease=await acquireResourceLease(${JSON.stringify(item.request)});await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    const saved = (await readResourceReservation(item.request))!
+    const before = JSON.stringify(saved)
+    const lease = await reopenResourceLease(item.request, saved)
+    try {
+      expect(JSON.stringify(lease.reservation)).toBe(before)
+      expect(await readResourceReservation(item.request)).toEqual(saved)
+      await lease.assertHeld()
+      await expect(reopenResourceLease(item.request, saved)).rejects.toThrow("BUSY")
+      const proof = path.join(item.root, "startup-cleanup.json")
+      await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: saved.key, token: saved.token, revision: saved.revision })
+      await lease.release(proof)
+      expect((await readResourceReservation(item.request))?.state).toBe("released")
+    } finally { await lease.close() }
+    const live = await acquireResourceLease(item.request)
+    await live.close()
+    await expect(reopenResourceLease(item.request, live.reservation)).rejects.toThrow("BUSY")
+  } finally { await rm(item.root, { recursive: true }) }
+})
 
 test("resource set refuses a busy later key without reserving the earlier key", async () => {
   const item = await resourceFixture()
