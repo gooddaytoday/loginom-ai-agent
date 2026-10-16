@@ -22,7 +22,7 @@ export type Environment = {
   loginom: { imageDigest: string | null } | null
 }
 
-export async function preflight(config: EvalConfig, source: ArtifactSource, signal?: AbortSignal): Promise<Environment> {
+export async function preflight(config: EvalConfig, source: ArtifactSource, signal?: AbortSignal, slot?: SlotStorageContext): Promise<Environment> {
   const environment: Environment = { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
   if (config.dryRun) {
     await requireFixtures()
@@ -34,7 +34,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource, sign
   if (config.agent.cliMode === "source")
     throw new EvalFailure("Изолированный live eval требует EVAL_CLI_MODE=binary и EVAL_CLI_BIN установленного CLI", 2)
   if (config.agent.cliMode === "binary") {
-    await checkIsolatedLoginom(source)
+    await checkIsolatedLoginom(source, slot)
     await assertNoDebuggers()
     await checkSandbox(config)
   }

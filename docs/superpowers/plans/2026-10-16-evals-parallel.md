@@ -69,18 +69,22 @@
   typecheck/diff PASS; обновлены три проверки нового режима вместо epoch recovery.
 - [ ] Подключить judge-home lock к общему run (primitive/статусная проверка уже работают);
   проверить весь prepare/verify/run путь без создания пользователей во время run.
-- [ ] RED: prepare создаёт только недостающее/проверяет права; verify/run отказывают
+- [x] RED: prepare создаёт только недостающее/проверяет права; verify/run отказывают
   на missing user, ACL drift, Pool!=0 и непустой SessionBackup без исправлений/delete.
-  Свежая read-only проверка пользователя/ролей/ACL реализована; подключение
-  prepare/verify/run и проверки Pool/SessionBackup ещё впереди.
-- [ ] GREEN: переиспользовать рабочие lease/preparation primitives; исключить user
+  Свежая read-only проверка пользователя/ролей/ACL подключена к prepare/verify/run,
+  как и Pool/SessionBackup. Native verify не меняет пользователей и пароли.
+- [x] GREEN: переиспользовать рабочие lease/preparation primitives; исключить user
   lock из нового пути. Одна повторяемая startup-процедура сверяет остатки прошлого
-  run; неизвестность сохраняет карантин. Не расширять recovery/epoch API.
+  run; неизвестность сохраняет карантин. Повторно берутся точные прежние tokens,
+  без новых эпох. Supervisor cleanup обязателен; unknown оставляет файлы и бронь.
+  Unit62/225 PASS, native startup после неуспешного prepare завершён с освобождением брони.
 - [x] Реализовать prepare/verify без process inventories/старого финализатора:
   недостающий пользователь настраивается и активируется, готовый только проверяется;
   Pool=0 до работы пользователя, backup read-only, профиль проверяется без setup.
   История сохраняется, собственные сессии закрываются с readback, чистые guards
-  освобождаются после admin.dispose. Живой readiness ещё не подтверждён.
+  освобождаются после admin.dispose. Native prepare/verify92c5ac16…/08bb7493…
+  ready=true, verify changedUsers=[], оба профиля чисты,0 model calls; evidence
+  `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/`.
 - [x] Проверить `bun run test test/slots.test.ts test/lease.test.ts test/parallel-env.test.ts`
   и `bun typecheck` из `evals/`; коммит `refactor(evals): simplify run ownership and preparation`.
   68/264 PASS41.65s; verifyProfile RED→GREEN1/5 PASS2.19s, diff PASS.
@@ -110,8 +114,9 @@
   Драйвер требует явный LOGINOM_EVALS_ADMIN_RESEARCH=1 для старых probes;
   штатный openLoginomAdmin его не передаёт. Read-only/native boundary32/131
   unit PASS10.82s, typecheck/diff PASS.
-- [ ] Проверить `bun run test test/loginom-admin.test.ts test/artifact.test.ts test/profile-archive.test.ts`
+- [x] Проверить `bun run test test/loginom-admin.test.ts test/artifact.test.ts test/profile-archive.test.ts`
   и `bun typecheck`; коммит `feat(evals): close slot user sessions before cleanup`.
+  Unit53/221 PASS29.31s, логический коммит2eeacf5030; native A/B отдельно ниже.
 
 ## 4. Процессы и выделенный судья
 
@@ -172,25 +177,38 @@
 - [ ] RED: запись бюджета до dispatch, host/container CPU/RAM, диск/OOM,
   licence/provider errors определяют приёмку; процессная телеметрия не gate;
   missing mandatory sample не PASS, скрытый 429/успешный retry не скрывает отказ.
-- [ ] GREEN: подключить подготовленные слоты к существующим runSlotQueue и judge
+- [x] GREEN: подключить подготовленные слоты к существующим runSlotQueue и judge
   gate, убрать `SLOTS_ADMISSION_UNAVAILABLE` для этого пути. Run не вызывает
   создание/исправление пользователей; использовать прежний home/VPN wrapper.
-- [ ] Run запускает `script/sample-parallel-resources.ts` с чистым env перед
+  Исход при неполных limit observations — incomplete/exit1; старый binary скрывает
+  session.status/retry, поэтому модельная приёмка ещё не открыта.
+- [x] Run запускает `script/sample-parallel-resources.ts` с чистым env перед
   dispatch N=1/N=2 и останавливает/дожидается его в finally; out — private JSONL
   плюс существующая summary, interval=1000ms. Unit проверяет start/stop при успехе,
   отказе и SIGINT. Процессные пробы не влияют на исход, обязательные пробы влияют.
   Helper RED→GREEN3/11 unit PASS1.63s +typecheck/diff: fresh output/первая проба,
   idempotent stop с supervisor и summary, env allowlist, проверка MemAvailable
-  против заданного budget. Вызов helper из настоящего run ещё не подключён.
-- [ ] Проверить `bun run test test/parallel-run.test.ts test/scheduler.test.ts test/parallel-users-acceptance.test.ts`
+  против заданного budget. Helper подключён к run/finally; OOM6/18 PASS,
+  resource/run/report/scheduler/incidents105/555 PASS30.52s +typecheck.
+- [x] Проверить `bun run test test/parallel-run.test.ts test/scheduler.test.ts test/parallel-users-acceptance.test.ts`
   и `bun typecheck`; логические изменения сохранять отдельными коммитами
   `feat(evals): execute prepared user slots` / `refactor(evals): bound run resource acceptance`.
+  Runtime/resources/report/incidents105/555 PASS30.52s, parallel-run29/196
+  PASS332.99s, typecheck/diff PASS. Повторное независимое ревью четырёх исправлений
+  Approved; fixture-проверки не доказывают native N=1/N=2.
+
+Точечный блокер перед продолжением: CLI не выводит существующий session.status/retry.
+Private diff подготовлен (путь в blockers), но не применён/не проверен: он касается
+packages/agent и его process-теста, что выходит за evals/AGENTS.md:49.
+Владельцу отправлен запрос на исключение границы; до ответа реализация остановлена.
 
 ## 6. Четыре live A/B сценария, затем N=1 → утверждение → N=2
 
 **Files:** новый `evals/test/parallel-slots-live.test.ts`, существующие task inputs,
 private config/budget/results вне Git; операторские команды в runbook.
 
+- [x] Новый acceptance pair829f82ae…/428fd481… создан на32791, prepare/verify
+  двух пользователей готовы, startup после первого отказа проверен без новых epochs.
 - [ ] Создать только новый acceptance стенд и private config; закрепить binary SHA,
   task/rubric hashes, модели, timeouts и бюджет/условия до N=1 dispatch.
 - [ ] Ровно четыре обязательных A/B сценария: взаимная невидимость файлов,
@@ -250,7 +268,7 @@ private config/budget/results вне Git; операторские команд�
 6. Исход нового пути: supervisor cleanup и systemd-unit судьи; описи диагностические.
 7. Harness сам очищает доказанно своё на новом стенде после обязательных проверок.
 8. N=1/N=2 collector запускает/останавливает run; перед N=1 проверить MemAvailable.
-9. N=2 ждёт утверждения числовых порогов по N=1; runtime подключён, ревью выявило4 доработки.
+9. N=2 ждёт утверждения числовых порогов по N=1; исправления runtime повторно Reviewed/Approved.
 10. Wrapper d551ddf:7 unit PASS; harness VPN boundary44/147 PASS, typecheck/diff PASS.
 11. Harness unit boundary0e6994f736; scoped login status exit0/clean unit/0 model calls, A00yuH journal unchanged.
 12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
@@ -261,4 +279,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Acceptance829f82ae…/428fd481… создан; starting→check исправлен8/15 PASS. Startup повторно берёт те же tokens без epochs, unknown сохраняет данные;62/225 PASS+typecheck, далее native повтор prepare.
+20. Acceptance: prepare92c5ac16…/verify08bb7493… ready=true/0models; startup62/225,runtime134/751 PASS+typecheck. Ждём исключения scope для CLI retry diff; затем4 A/B,N=1,пороги,N=2.
