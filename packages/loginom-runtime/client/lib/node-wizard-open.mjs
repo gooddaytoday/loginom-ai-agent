@@ -6,7 +6,7 @@ export function wizardOpenBinding(state) {
  const n=state.prepared_node_context;
  requireValue(n?.verified===true&&n.surface==='graph'&&state.wizard?.status==='absent',
   'A prepared graph node is required to open settings');
- const controls=state.ui.elements.filter(e=>e.tid===n.tid+';Setting'&&e.wizard_open&&e.allowed_actions?.includes('begin_wizard'));
+ const controls=state.ui.elements.filter(e=>e.tid===n.tid+';Setting'&&e.wizard_open&&e.allowed_actions?.includes('begin_wizard')&&e.interaction?.state==='point_observed');
  requireValue(controls.length===1,'One prepared settings control is required');
  const labels=state.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.tid===n.tid+';Label;Label');
  return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
@@ -37,10 +37,10 @@ export function boundWizardDeactivationConfirmation(state,binding,requireControl
 
 export async function openPreparedWizard(channel) {
  let s=await channel.observe({condition:'prepared node settings available',ready:s=>s.prepared_node_context?.surface==='graph'
-  &&s.wizard?.status==='absent'&&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'))});
+  &&s.wizard?.status==='absent'&&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard')&&e.interaction?.state==='point_observed')});
  const binding=wizardOpenBinding(s);
  await channel.perform({condition:'open settings of the prepared node',initialObservation:s,
-  ready:s=>same(wizardOpenBinding(s),binding),identity:()=>binding,
+  ready:s=>s.ui.elements.some(e=>e.tid===binding.graph_tid+';Setting'&&e.interaction?.state==='point_observed')&&same(wizardOpenBinding(s),binding),identity:()=>binding,
   resolve:s=>({verb:'begin_wizard',ref:s.ui.elements.find(e=>e.tid===binding.graph_tid+';Setting').ref})});
  s=await channel.observe({condition:'prepared wizard or exact deactivation question',wizardConfirmation:binding,
   ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'
