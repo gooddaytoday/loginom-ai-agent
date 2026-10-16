@@ -20,7 +20,7 @@ export async function preflightCrossTableSource(options,ctx,config){
  if(!graph.node_outputs.node_selected){await selectPreparedGraphNode(channel,graph,'select CrossTable upstream',{refreshReplacedBody:true});
   graph=await channel.observe({condition:'selected CrossTable upstream',readOutputs:true,ready:s=>s.node_outputs?.verified===true&&s.node_outputs.node_selected});}
  const ports=graph.node_outputs.ports.filter(p=>p.index===input.output);
- if(ports.length!==1||ports[0].active!==true){const error=Error('CrossTable: execute and read the upstream table before configuring this node');
+ if(ports.length!==1||ports[0].active!==true){const error=Error('CrossTable: upstream output is inactive; execute the existing upstream node again with read.ports=[] or sample_rows=0, then submit this CrossTable request with a new operation_id. Reading upstream rows is not required.');
   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  await channel.openOutputPort(input.output);await showMissingValuesMappingTable(channel);
  const observed=await channel.observe({condition:'upstream complete output definition',readMappings:true,
