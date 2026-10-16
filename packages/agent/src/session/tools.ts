@@ -1,3 +1,5 @@
+import { retainSDKInvocation } from "@/cli/private-admission.mjs"
+import { retainUnionInvocation } from "./union-invocation"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
@@ -44,6 +46,7 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
 ])
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
+  originalContext?: object
   loginom?: Awaited<ReturnType<typeof LoginomHost.acquire>>
   loginomStatus?: { failure?: string }
   agent: Agent.Info
@@ -563,6 +566,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             } as JSONSchema7),
           ),
           execute(args, options) {
+            const sdkRecord = retainSDKInvocation(args, options)
+            if (input.originalContext && !sdkRecord) throw Error('LOGINOM_EXECUTION_ORIGIN_UNAVAILABLE')
+            const sdkPacket = sdkRecord && definition.name === 'dock_node_apply' && args?.target?.type === 'transform.filter_data'
+              ? LoginomHost.bindOriginalSDKCall(loginom, sdkRecord, args, options, user.info.id) : undefined
+            const invocation = retainUnionInvocation({ definition, request: args, options, owner: loginom, sessionInput: input, user: user.info })
             return run.promise(
               Effect.gen(function* () {
                 const ctx = context(args, options)
@@ -574,7 +582,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
-                    await loginom.call(definition.name, args, user.info.id, options.abortSignal),
+                    await (invocation ? invocation.invoke() : loginom.call(definition.name, args, user.info.id, options.abortSignal, sdkPacket)),
                   ),
                 )
                 yield* plugin.trigger(

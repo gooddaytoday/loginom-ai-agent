@@ -1,0 +1,7 @@
+# Process readiness and durable recording
+
+Native aa838157: fresh CLI, gpt-6-luna/high, no project context/external tools; Import succeeded and checkpoint was saved BEFORE Filter creation with conflict policy fail. Filter creation/input mapping completed, but opening stopped after the completed-process menu was closed. The sample predicate was already true at 221ms; awaited sample recording crossed the 15-second readiness deadline. This is a recording-bound expiry, not an unclosed menu. Old filter-first-aa stays AMBIGUOUS/open and is never replayed.
+
+The existing private execution driver's process observations now select a 60-second window at initial observation admission. NodeProcedure still clamps it to the SAME original operation absolute deadline, uses original cancellation, preserves deadline refusal AFTER durable recording, and requires the full pre-gesture epoch check. No timer/deadline is reset after await or retry, no expired record is published, no fsync/record is skipped. Other NodeProcedure observations retain their existing default. The original RunCommand 7200-second origin is unchanged.
+
+Addressed tests cover a 21-second recording delay inside an initially sufficient window, unchanged 15-second refusal, and refusal when the original deadline is only 10 seconds despite a 60-second request. Execution-focus identity/no-replay controls remain. These are labelled IO/Page controls, not new native/full acceptance. Native/warm cleanup and cold require a new independent scenario after review.

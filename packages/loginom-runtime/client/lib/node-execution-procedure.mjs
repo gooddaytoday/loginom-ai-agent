@@ -7,7 +7,9 @@ const button='MF;cntMain;tlbMainToolbar;btnProgress';
 const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
 const filter='mnContextMenu;mniShowCompletedProcesses';
 const showNode='mnContextMenu;mniShowNodeToProcess';
-const consoleMenuIdentity=s=>({epoch:s.dom_epoch,root:s.node_processes?.root_id,
+// Readiness is scoped to the original console. The UI capability still checks
+// the full current epoch immediately before dispatching its gesture.
+const consoleMenuIdentity=s=>({document:s.dom_epoch?.document,root:s.node_processes?.root_id,
   grid:s.ui.elements.find(e=>e.tid===grid)?.signature});
 const processControl=(process,part='process_tid')=>s=>s.node_processes?.processes.find(p=>
   p.process_id===process.process_id&&p.record_id===process.record_id)?.[part];
@@ -77,7 +79,9 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
 
 export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false}={}) {
   let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false;
-  const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
+  // Include durable process-snapshot recording in the initial readiness window.
+  // NodeProcedure still clamps this to the original operation deadline.
+  const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,timeoutMs:60000,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>e.tid===current&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
@@ -121,7 +125,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       requireValue(!baseline,'Execution baseline has already been captured');
       let s=await openConsole();
       // A long buffered process list can repaint after the panel becomes
-      // visible. Require two matching epochs before its menu gesture, and
+      // visible. Require two matching console identities before its menu gesture, and
       // retain this readiness check on strictly pre-gesture recovery.
       s=await observe('process console menu settled',s=>consoleVisible(s)&&control(s,grid,'right_click').length===1,
         {confirmIdentity:consoleMenuIdentity});

@@ -20,10 +20,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       dispatching: boolean
       released: boolean
       active: Set<string>
+      acquiredServiceOwner?: ReturnType<typeof service.retainAcquiredServiceOwner>
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
+  const controlled = new Map<string, { run: string; cancelled: boolean; interrupt?: Promise<unknown> }>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
@@ -41,6 +43,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.closed) return
     port.postMessage(value)
   }
+  function originalReceipt(id:string) {
+    const run=runs.get(id)
+    if(state.closed || !run || run.released || !run.acquiredServiceOwner)throw Error('LOGINOM_ORIGINAL_HOST_PROVIDER_UNAVAILABLE')
+    if(run.dispatching || run.active.size)throw Error('LOGINOM_RECOVERY_REQUIRED')
+    const b=service.assertAcquiredServiceOwner(run.acquiredServiceOwner,owner,id,run.chat,run.lease)
+    return {generation:b.generation,acquiredService:{phase:b.phase,owner:b.owner,run:b.run,lease:`${b.owner}:${b.run}`,generation:b.generation,chat:b.chat,account:b.account}}
+  }
   async function handle(data: unknown) {
     if (state.closed) return
     if (
@@ -57,8 +66,25 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
     }
+    if (data.method === 'readonly.preReady.cancel') {
+      const record = 'requestId' in input && typeof input.requestId === 'string' ? controlled.get(input.requestId) : undefined
+      if (record && record.run === input.run && !record.cancelled) {
+        record.cancelled = true
+        const run = runs.get(record.run)
+        if (run?.dispatching) record.interrupt = service.runtime(run.lease.generation, run.chat)
+          .then(runtime => runtime.request('interrupt')).catch(() => undefined)
+      }
+      return
+    }
     try {
       if (data.method === "acquire") {
+        const receiver='receiverPurpose' in input
+        if(receiver && input.receiverPurpose!=='union-acquired-service-v1')throw Error('LOGINOM_METHOD_INVALID')
+        if(receiver && 'receiverPhase' in input) {
+          if(input.receiverPhase!=='current' || Object.keys(input).sort().join(',')!=='receiverPhase,receiverPurpose,run')throw Error('LOGINOM_METHOD_INVALID')
+          reply({id:data.id,result:originalReceipt(input.run)});return
+        }
+        if(receiver && Object.keys(input).sort().join(',')!=='receiverPurpose,run,session')throw Error('LOGINOM_METHOD_INVALID')
         if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
@@ -71,8 +97,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         await service.retireRuntime(chat)
         service.resetRestarts(chat)
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
-        reply({ id: data.id, result: { generation: lease.generation } })
+        let acquiredServiceOwner:ReturnType<typeof service.retainAcquiredServiceOwner>|undefined
+        try { if(receiver)acquiredServiceOwner=service.retainAcquiredServiceOwner(owner,input.run,chat,lease) }
+        catch(error){lease.release();throw error}
+        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set(), acquiredServiceOwner })
+        reply({ id: data.id, result: receiver?originalReceipt(input.run):{ generation: lease.generation } })
         return
       }
       const run = runs.get(input.run)
@@ -89,6 +118,20 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       // Refuse competing calls before durable admission. The active call keeps its
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
       if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
+      let bound: { check(): void; deadline: number; record: { run: string; cancelled: boolean; interrupt?: Promise<unknown> } } | undefined
+      if (data.method === 'call' && 'receiverPurpose' in input) {
+        if (input.receiverPurpose !== 'row-filter-sdk-v1' || !('deadline' in input) || !Number.isSafeInteger(input.deadline)) throw Error('LOGINOM_CALL_INVALID')
+        const deadline = input.deadline as number, lease = run.lease, generation = lease.generation, originalRun = input.run
+        originalReceipt(input.run)
+        const record = { run: input.run, cancelled: false }
+        const check = () => {
+          if (record.cancelled) throw Error('LOGINOM_RUN_ABORTED')
+          if (Date.now() >= deadline) throw Error('LOGINOM_PRE_READY_READ_EXPIRED')
+          if (state.closed || runs.get(originalRun) !== run || input.run !== originalRun || run.released || run.lease !== lease || lease.generation !== generation || input.deadline !== deadline) throw Error('LOGINOM_ORIGINAL_HOST_OWNER_CHANGED')
+          service.assertLease(lease, `${owner}:${originalRun}`)
+        }
+        check(); controlled.set(data.id, record); bound = { check, record, deadline }
+      }
       if (data.method === "call") run.dispatching = true
       run.calls++
       try {
@@ -136,7 +179,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
+          bound?.check()
           await service.runtime(run.lease.generation, run.chat)
+          bound?.check()
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
           const runtime = await service.runtime(run.lease.generation, run.chat).catch(async (error: unknown) => {
@@ -149,8 +194,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             throw error
           })
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+          bound?.check()
           const result = await runtime.request("call", {
             name: input.name,
+            ...(bound ? { executionDeadline: bound.deadline } : {}),
             arguments: "args" in input ? input.args : undefined,
           })
           if (
@@ -175,6 +222,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               service.recoveries.delete(run.chat)
             }
           }
+          if (bound?.record.interrupt) await bound.record.interrupt
           reply({ id: data.id, result: result.result })
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
@@ -186,6 +234,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
+        if (bound?.record.interrupt) await bound.record.interrupt
+        controlled.delete(data.id)
         if (data.method === "call") run.dispatching = false
         run.calls--
         if (run.released && !run.calls) {

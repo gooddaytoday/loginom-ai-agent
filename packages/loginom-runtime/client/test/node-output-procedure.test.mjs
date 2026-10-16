@@ -57,9 +57,9 @@ test('empty default datetime masks are applied without selecting away and verifi
  await assert.rejects(restoreEmptyDateTimeFormats(channel,table,targets,[{...originals[0],settings:{...originals[0].settings,format_string:'nonempty'}}]),/Only an observed/);
 });
 
-test('new output tables reveal offscreen cards within their exact port before adding and entering',async()=>{
+test('new output tables reveal exact cards through a shared owned scroll surface before adding and entering',async()=>{
  const {openNewOutputTable}=await import('../lib/node-output-procedure.mjs');
- for(const fault of ['none','already_selected','selected_without_controls','foreign_port','stalled']){
+ for(const fault of ['none','already_selected','selected_without_controls','shared_owner','foreign_port','other_owner','unobserved_anchor','stalled']){
   let views=false,selected=false,added=false,active=false,top=0,nodeClicked=false;const actions=[];
   const control=(ref,extra={})=>({ref,tid:ref,allowed_actions:['click'],interaction:{state:'point_observed'},bounding_box:{y:100},...extra});
   const card=(ref,kind,guid,outside)=>control(ref,{viewer_card:{kind,port_guid:'port',port_panel_ref:'panel',...(guid?{view_guid:guid}:{})},
@@ -67,19 +67,20 @@ test('new output tables reveal offscreen cards within their exact port before ad
    allowed_actions:outside?[]:[kind==='enter'?'enter_table':'click','scroll']});
   const snapshot=()=>({prepared_node_context:{verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:views?'views':'graph',tid:'node'},
    ui:{elements:views?[control('vendor',{viewer_vendor:{kind:'table',selected}}),
-    {...card('anchor','enter','old',false),...(fault==='foreign_port'?{viewer_card:{kind:'enter',port_guid:'other',port_panel_ref:'foreign',view_guid:'old'}}:{})},
+    {...card('anchor','enter','old',false),...(['foreign_port','shared_owner'].includes(fault)?{viewer_card:{kind:'enter',port_guid:'other',port_panel_ref:'other-panel',view_guid:'old'}}:{}),
+     ...(fault==='other_owner'?{scroll:{ref:'other-scroll',top,max_top:800}}:{}),...(fault==='unobserved_anchor'?{interaction:{state:'outside_viewport'}}:{})},
     card('add','add',null,top<400),...(added?[card('new','enter','new',top<800)]:[])]:[
      control('node',{graph_node:{part:'body'},...(fault==='already_selected'?{allowed_actions:[],interaction:{state:'obscured'}}:{})}),...(fault!=='selected_without_controls'||nodeClicked?[control('views',{allowed_actions:['open_node_views']})]:[])]},
    node_outputs:{verified:true,node_selected:['already_selected','selected_without_controls'].includes(fault),surface:views?'views':'graph',ports:[{index:0,port_guid:'port',active:true}],
-    tables:[{view_guid:'old',port_guid:'port',active:false},...(added?[{view_guid:'new',port_guid:'port',active,table_tid:active?'table':null}]:[])]}});
-  const channel={observe:async o=>{const s=snapshot();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
+    tables:[{view_guid:'old',port_guid:fault==='shared_owner'?'other':'port',active:false},...(added?[{view_guid:'new',port_guid:'port',active,table_tid:active?'table':null}]:[])]}});
+  const channel={observe:async o=>{if(o.condition==='new Table card bound to output')assert.equal(o.settleViewerAdd,true);const s=snapshot();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
    const s=snapshot();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);actions.push(a);
    if(a.ref==='node')nodeClicked=true;if(a.ref==='views')views=true;if(a.ref==='vendor')selected=true;
    if(a.verb==='scroll'){assert.ok(['anchor','add'].includes(a.ref));if(fault!=='stalled')top+=400;}
    if(a.ref==='add'&&a.verb==='click'){assert.equal(top>=400,true);added=true;}
    if(a.ref==='new'){assert.equal(top>=800,true);active=true;}
   }};
-  if(['none','already_selected','selected_without_controls'].includes(fault)){const r=await openNewOutputTable(channel,0);assert.equal(r.table.view_guid,'new');assert.equal(actions.filter(a=>a.verb==='scroll').length,2);assert.equal(actions.filter(a=>a.ref==='node').length,fault==='already_selected'?0:1);}
+  if(['none','already_selected','selected_without_controls','shared_owner'].includes(fault)){const r=await openNewOutputTable(channel,0);assert.equal(r.table.view_guid,'new');assert.equal(actions.filter(a=>a.verb==='scroll').length,2);assert.equal(actions.filter(a=>a.ref==='node').length,fault==='already_selected'?0:1);}
   else {await assert.rejects(openNewOutputTable(channel,0),/scroll/);assert.equal(added,false);assert.equal(active,false);}
  }
 });
@@ -98,7 +99,7 @@ test('wide precision readback visits stored fields once without returning to col
    selected_numeric:selected===null?null:{source_index:selected,name_key:'F'+selected,...Object.fromEntries(Object.entries(draft).map(([k,value])=>[k,{status:'observed',value,input_ref:k}]))}}},
    ui:{dialogs:open?['format']:[],elements:[...fields().map(f=>control('f'+f.index,{table_field:f})),control('format_string'),control('table;ModalWindow_BrowseFormat;btnApply')]},
    node_outputs:{tables:[{active:true,view_guid:'view'}]}});
-  const channel={observe:async o=>{offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
+  const channel={observe:async o=>{if(o.condition==='Table numeric mask draft matches'||o.condition==='Table numeric mask applied to draft')assert.equal(o.timeoutMs,60000);offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
    const s=state();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);
    if(/^f\d+$/.test(a.ref)){
     if(selected!==null)stored[selected]={...draft, ...(corrupt&&selected===12?{format_string:'0.00'}:{})};

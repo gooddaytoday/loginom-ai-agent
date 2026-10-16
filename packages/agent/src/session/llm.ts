@@ -1,3 +1,4 @@
+import { assertSDKContext } from "@/cli/private-admission.mjs"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { llmClient } from "@loginom-ai-agent/core/effect/app-node-platform"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
@@ -33,6 +34,7 @@ import { LLMRequestPrep } from "./llm/request"
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
 export type StreamInput = {
+  originalContext?: object
   user: SessionV1.User
   sessionID: string
   parentSessionID?: string
@@ -133,6 +135,7 @@ const live: Layer.Layer<
             const result = await t.execute!(JSON.parse(argsJson), {
               toolCallId: _requestID,
               messages: input.messages,
+              ...(input.originalContext ? { experimental_context: assertSDKContext(input.originalContext) } : {}),
               abortSignal: input.abort,
             })
             const output = typeof result === "string" ? result : (result?.output ?? JSON.stringify(result))
@@ -278,6 +281,7 @@ const live: Layer.Layer<
       return {
         type: "ai-sdk" as const,
         result: streamText({
+          ...(input.originalContext ? { experimental_context: assertSDKContext(input.originalContext) } : {}),
           onError(error) {
             bridge.fork(
               Effect.logError("stream error", {

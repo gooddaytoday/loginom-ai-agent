@@ -32,8 +32,13 @@ async function revealViewerCard(channel,state,select,verb){
     const target=one(s.ui.elements.filter(select),'Exact output viewer card required');
     if(target.allowed_actions.includes(verb)&&target.interaction?.state==='point_observed')return s;
     const scroll=target.scroll;
-    const anchors=s.ui.elements.filter(e=>e.viewer_card?.port_guid===target.viewer_card.port_guid
-      &&e.viewer_card.port_panel_ref===target.viewer_card.port_panel_ref&&e.scroll?.ref===scroll?.ref
+    // Native output panels can share one scrolling ViewsForm. The target's
+    // entire port may be below the viewport; use a visible owned Table card
+    // from either port only when it attests that same observed scroll owner.
+    const anchors=s.ui.elements.filter(e=>e.viewer_card
+      &&(e.viewer_card.port_guid===target.viewer_card.port_guid&&e.viewer_card.port_panel_ref===target.viewer_card.port_panel_ref
+        ||e.viewer_card.kind==='enter'&&s.node_outputs.tables.some(t=>t.view_guid===e.viewer_card.view_guid&&t.port_guid===e.viewer_card.port_guid))
+      &&e.scroll?.ref===scroll?.ref
       &&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
     requireValue(scroll&&anchors.length,'Owned viewer scroll anchor unavailable');
     const anchor=anchors[Math.floor(anchors.length/2)],direction=target.bounding_box.y<anchor.bounding_box.y?-1:1;
@@ -72,11 +77,11 @@ export async function openNewOutputTable(channel,port) {
     &&s.ui.elements.some(e=>e.viewer_card?.kind==='add'&&e.viewer_card.port_guid===output.port_guid));
   s=await revealViewerCard(channel,s,e=>e.viewer_card?.kind==='add'&&e.viewer_card.port_guid===output.port_guid,'click');
   await perform(s,'add Table to native output',e=>e.viewer_card?.kind==='add'&&e.viewer_card.port_guid===output.port_guid);
-  s=await observe('new Table card bound to output',s=>{
+  s=await channel.observe({condition:'new Table card bound to output',readOutputs:true,settleViewerAdd:true,ready:s=>{
     const added=s.node_outputs?.verified?s.node_outputs.tables.filter(t=>!before.includes(t.view_guid)&&t.port_guid===output.port_guid):[];
     return added.length===1&&s.ui.elements.filter(e=>e.viewer_card?.kind==='enter'&&e.viewer_card.view_guid===added[0].view_guid
       &&e.viewer_card.port_guid===output.port_guid).length===1;
-  },s=>({epoch:s.dom_epoch,tables:s.node_outputs.tables}));
+  },confirmIdentity:s=>({epoch:s.dom_epoch,tables:s.node_outputs.tables})});
   const added=s.node_outputs.tables.find(t=>!before.includes(t.view_guid)&&t.port_guid===output.port_guid);
   s=await revealViewerCard(channel,s,e=>e.viewer_card?.kind==='enter'&&e.viewer_card.view_guid===added.view_guid&&e.viewer_card.port_guid===output.port_guid,'enter_table');
   await perform(s,'enter new Table',e=>e.viewer_card?.kind==='enter'&&e.viewer_card.view_guid===added.view_guid,'enter_table');
@@ -108,7 +113,7 @@ export function verifyTableDateTimeFormat(observed,target) {
 
 export async function configureTablePrecision(channel,table,{alreadyOpen=false,restore=null}={}) {
   const dialog={table,kind:'format'};let offset=0,definition;
-  const read=(condition,ready=()=>true)=>channel.observe({condition,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.status==='observed'
+  const read=(condition,ready=()=>true)=>channel.observe({condition,timeoutMs:60000,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.status==='observed'
     &&s.table_settings.kind==='format'&&!!s.table_settings.format?.page?.schema_id&&(!definition||s.table_settings.format.page.schema_id===definition.schema_id)&&ready(s)});
   const field=s=>s.table_settings.format.selected_numeric??s.table_settings.format.selected_datetime;
   const action=(s,condition,resolve,identity)=>channel.perform({condition,initialObservation:s,ready:s=>s.table_settings?.format?.page?.schema_id===definition.schema_id,
@@ -186,7 +191,7 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
   }
   if(!s)s=await read('Table format ready to apply');
   await action(s,'apply bound Table format',s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';ModalWindow_BrowseFormat;btnApply'),'Unique Table format Apply missing').ref}),()=>({fields:targets}));
-  await channel.observe({condition:'Table format dialog closed',tableDialog:dialog,readOutputs:true,ready:s=>s.ui.dialogs.length===0&&s.node_outputs?.tables?.some(t=>t.active&&t.view_guid===table.view_guid)});
+  await channel.observe({condition:'Table format dialog closed',tableDialog:dialog,settleTableFormat:true,readOutputs:true,ready:s=>s.ui.dialogs.length===0&&s.node_outputs?.tables?.some(t=>t.active&&t.view_guid===table.view_guid)});
   const default_datetime_restoration=deferred.length?await restoreEmptyDateTimeFormats(channel,table,deferred,restore):[];
   return {table,fields,numeric_formats:numeric,datetime_formats:datetime,original_formats:originals,restored:restore!==null,default_datetime_restoration,
     dialog_readback_verified:fields.length!==1||targets.length===0,format_application_pending:fields.length===1&&targets.length===1,values_verified:false};
@@ -215,7 +220,7 @@ export async function restoreEmptyDateTimeFormats(channel,table,targets,original
       return Math.floor(native.index/8)*8;
     };
     let offset=await open();
-    const read=condition=>channel.observe({condition,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.format?.selected_datetime?.source_index===target.index&&s.table_settings.format.selected_datetime.name_key===target.key});
+    const read=condition=>channel.observe({condition,timeoutMs:60000,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.format?.selected_datetime?.source_index===target.index&&s.table_settings.format.selected_datetime.name_key===target.key});
     const act=async(s,condition,resolve)=>channel.perform({condition,initialObservation:s,
       ready:s=>s.table_settings?.format?.selected_datetime?.source_index===target.index&&s.table_settings.format.selected_datetime.name_key===target.key,
       identity:()=>({table,target}),resolve});

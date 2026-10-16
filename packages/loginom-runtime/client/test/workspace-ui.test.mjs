@@ -89,6 +89,7 @@ class Handle {
   async boundingBox() { this.page.playwrightBoxReads++; return this.element.isConnected ? { ...this.element.box, ...this.page.playwrightBox } : null; }
   async click() { this.page.events.push('click'); this.page.document.activeElement = this.element; }
   async dblclick() { this.page.events.push('double_click'); this.page.document.activeElement = this.element; }
+  async focus() { this.page.document.activeElement = this.element; this.page.onFocus?.(this.element); }
   async press(key) {
     this.page.events.push(key);
     this.page.onPress?.(key,this.element);
@@ -4329,15 +4330,17 @@ test('an empty native process console exposes only its bound context gesture and
 });
 
 test('Table add/enter controls are bound to native output panels, not repeated card labels',async()=>{
- for(const mode of ['valid','clipped_add','numbered','hidden_enter','foreign_panel','foreign_card','wrong_vendor','duplicate_add']) {
-  const page=new Page();page.context.innerWidth=1000;page.context.innerHeight=800;
+ for(const mode of ['valid','clipped_add','numbered','hidden_enter','foreign_panel','foreign_card','wrong_vendor','duplicate_add','scroll','offscreen_scroll']) {
+  const page=new Page();page.waitForTimeout=async()=>{};page.context.innerWidth=1000;page.context.innerHeight=800;
   class ViewsForm{};class BrowseViewVendor{};
   const root=page.add('div','MF;TF-1;ViewsForm','',{x:0,y:50,width:900,height:700});
+  if(mode==='scroll'||mode==='offscreen_scroll')Object.assign(root,{scrollTop:0,scrollHeight:922,clientHeight:700,style:{overflowY:'auto'}});
   const panel=page.add('div','MF;TF-1;ViewsForm;cntPorts;11111111-1111-1111-1111-111111111111','',{x:50,y:100,width:600,height:400},root);
   const add=page.add('div','MF;TF-1;ViewsForm;ViewerAddCard'+(mode==='numbered'?'-1':''),'Add',{x:70,y:120,width:150,height:120},panel);
   if(mode==='clipped_add')add.box.y=770;
   const cardTid='MF;TF-1;ViewsForm;ViewerCard'+(mode==='numbered'?'-1':'');
   const card=page.add('div',cardTid,'Table',{x:240,y:120,width:150,height:120},panel);
+  if(mode==='offscreen_scroll')card.box.y=900;
   const hoverEnter=page.add('button',cardTid+';btnEnter','Table',{x:250,y:130,width:100,height:30},card);
   if(mode==='hidden_enter')hoverEnter.box={x:250,y:130,width:0,height:0};
   const nativePanel={el:{dom:panel}},nativeCard={FView:{el:{dom:card}}};
@@ -4352,7 +4355,19 @@ test('Table add/enter controls are bound to native output panels, not repeated c
   assert.equal(adds.length,['foreign_panel','duplicate_add'].includes(mode)?0:1,mode);
   assert.equal(enters.length,['foreign_panel','foreign_card','wrong_vendor'].includes(mode)?0:1,mode);
   if(mode==='clipped_add'){let clicked;const click=page.mouse.click;page.mouse.click=async(x,y,...args)=>{clicked={x,y};return click(x,y,...args);};const result=await page.act({verb:'click',ref:adds[0].ref},s);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.ok(clicked.y<800);}
-  if(enters.length){assert.equal(enters[0].tid,cardTid);assert.deepEqual(enters[0].allowed_actions,['enter_table']);assert.equal(enters[0].viewer_card.view_guid,'22222222-2222-2222-2222-222222222222');}
+  if(enters.length){
+   assert.equal(enters[0].tid,cardTid);
+   assert.deepEqual(enters[0].allowed_actions,mode==='scroll'?['enter_table','scroll']:mode==='offscreen_scroll'?[]:['enter_table']);
+   assert.equal(enters[0].viewer_card.view_guid,'22222222-2222-2222-2222-222222222222');
+  }
+  if(mode==='scroll'){
+   assert.ok(adds[0].allowed_actions.includes('scroll'));
+   assert.equal(enters[0].scroll.ref,adds[0].scroll.ref);
+   const result=await page.act({verb:'scroll',ref:enters[0].ref,delta_y:200},s);
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(root.scrollTop,200);
+   const stale=await page.act({verb:'scroll',ref:enters[0].ref,delta_y:200},s);
+   assert.equal(stale.status,'NOT_APPLIED');assert.equal(root.scrollTop,200);
+  }
  }
 });
 
@@ -5142,5 +5157,76 @@ test('fractional Reform rows retain complete definitions and native record bindi
   const s=await page.observe();
   assert.equal(s.wizard.reform_columns.definition_coverage.status,'complete_configured_fields',String(scale));
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
+ }
+});
+
+
+test('F3 sends one key through the original checked output without joining ElementHandle.press', async () => {
+  const page = new Page();
+  const port = page.add('div', 'MF;TF-1;Graph;Source;Output_Data-0', '', {x:100,y:100,width:20,height:20});
+  const snapshot = await page.observe(), ref = snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']).ref;
+  page.onPress = () => { throw Error('ElementHandle.press must not own Preview settlement'); };
+  page.keyboard.press = async key => {
+    assert.equal(page.document.activeElement,port); assert.equal(key,'F3');
+    page.events.push(key);
+    page.add('div','MF;TF-1;ModelForm;PreviewWindow','Loading',{x:200,y:200,width:100,height:100});
+  };
+  const result = await page.act({verb:'press',ref,key:'F3'},snapshot);
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.output.verification_required,true);
+  assert.equal(result.output.node_preview_schema,undefined);
+  assert.deepEqual(page.events,['F3']);
+  assert.equal(result.trace.filter(e=>e.event==='ui_key_delivered').length,1);
+});
+
+test('F3 retains raw browser failure and never sends a replacement key', async () => {
+  const page = new Page();
+  const port = page.add('div','MF;TF-1;Graph;Source;Output_Data-0','',{x:100,y:100,width:20,height:20});
+  const snapshot=await page.observe(),ref=snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']).ref;
+  const failure=Error('Keyboard dispatch reply lost');failure.name='TimeoutError';
+  page.keyboard.press=async key=>{page.events.push(key);throw failure;};
+  const result=await page.act({verb:'press',ref,key:'F3'},snapshot);
+  assert.equal(result.status,'AMBIGUOUS');assert.deepEqual(page.events,['F3']);
+  assert.deepEqual(result.trace.find(e=>e.event==='ui_action_failed').browser_error,{name:'TimeoutError',message:failure.message});
+  assert.equal(result.trace.some(e=>e.event==='ui_key_delivered'),false);
+});
+
+test('F3 epoch refusal sends no key and ordinary Enter retains ElementHandle semantics', async () => {
+  const page=new Page();const port=page.add('div','MF;TF-1;Graph;Source;Output_Data-0','',{x:100,y:100,width:20,height:20});
+  const snapshot=await page.observe(),ref=snapshot.ui.elements.find(e=>e.tid===port.attrs['data-tid']).ref;
+  page.keyboard.press=async()=>{throw Error('No raw dispatch allowed');};
+  const ordinary=await page.act({verb:'press',ref,key:'Enter'},snapshot);assert.equal(ordinary.status,'SUCCEEDED');
+  assert.deepEqual(page.events,['Enter']);
+  const current=await page.observe();page.mutationObserver.pending.push({type:'attributes',target:port,attributeName:'data-tid'});
+  const stale=await page.act({verb:'press',ref,key:'F3'},current);
+  assert.equal(stale.status,'NOT_APPLIED');assert.equal(stale.error.code,'UI_EPOCH_CHANGED');
+  assert.deepEqual(page.events,['Enter']);
+});
+
+test('one bound node views click waits beyond forty-five seconds only within the parent remainder',async()=>{
+ for(const mode of ['long','expired','foreign']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;';
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;Filter','',{x:100,y:150,width:150,height:80},graph);
+  page.add('span',base+'Graph;Filter;Label;Label','Filter',{x:110,y:160,width:100,height:25},body);
+  page.add('button',base+'Graph;Filter;Visualizers','Views',{x:200,y:200,width:30,height:25},body);
+  const binding={document_id:'doc',node:{document_id:'doc',workflow_id:'flow',node_id:'node'},workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]}};
+  let views;
+  page.waitForTimeout=async ms=>{clock.advance(ms);if(clock.Date.now()>=70000&&!views)views=page.add('div',base+'ViewsForm','',{x:0,y:100,width:900,height:600});};
+  const reader=async()=>{
+   if(page.events.includes('click')) {
+    if(mode==='foreign'&&clock.Date.now()>20000)return {verified:false,reason:'node'};
+    if(!views)return {verified:false,surface_pending:true};
+   }
+   return {verified:true,...binding.node,surface:views?'views':'graph',tid:base+(views?'ViewsForm':'Graph;Filter')};
+  };
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},reader);
+  const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid===base+'Graph;Filter;Visualizers');assert.ok(button?.allowed_actions.includes('open_node_views'));
+  const options={mode:'act',action:{verb:'open_node_views',ref:button.ref},snapshot,prepared_node_context:binding,opening_timeout_ms:mode==='expired'?30000:120000};
+  assert.doesNotThrow(()=>makeWorkspaceUiCode(options));
+  const result=await execute(options);assert.equal(result.status,mode==='long'?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(mode==='long'){assert.ok(clock.Date.now()>=70000);assert.ok(result.trace.filter(e=>e.event==='node_surface_wait').length>900);}
+  if(mode==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(mode==='foreign')assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED');
+  assert.throws(()=>makeWorkspaceUiCode({...options,action:{verb:'begin_wizard',ref:button.ref},opening_timeout_ms:120000}),/45000/);
  }
 });

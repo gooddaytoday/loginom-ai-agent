@@ -1,0 +1,7 @@
+# Row Filter post-reopen console readiness
+
+Native fad1aec4: both Row Filter outputs match the independent golden oracle (8/2 then 5/5), with one node and fresh execution IDs. Save/reopen returned SUCCEEDED, but post-open Import execution stopped before the process-menu gesture. The observed document, native process root and grid signature remained identical while the global DOM revision changed. Confirmation restarted and exhausted the existing 15-second budget. Historical rerun-import-postopen-001 remains AMBIGUOUS/open and is never replayed.
+
+Readiness now compares the original document identity, native process root and full original grid signature. The existing workspace UI capability still checks the current complete DOM epoch immediately before any gesture; its stale/foreign/currentness, pending, durable receipt and deadline guards are unchanged. A changed document/root/grid still refuses before the menu. No timeout extension, native completion claim, reset or synthetic ACK is introduced.
+
+SOURCE/installed targeted controls use labelled process/Page fixtures. Native post-reopen behavior requires a new independent scenario after review. Complete persistence, package close/logout and cold acceptance remain open; Save UI receipts have persisted_content_verified=false. The previous failed startup profile/writer and older pending are retained. The successful scenario used a fresh profile, gpt-6-luna/high, project-context disable and external-tool deny.

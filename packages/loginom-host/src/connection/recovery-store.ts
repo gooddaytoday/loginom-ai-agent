@@ -67,6 +67,7 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
   }
   return {
     pending: () => [...recovered],
+    hasActive: () => active.size > 0,
     async acknowledge(ids: readonly string[]) {
       if (active.size) throw Error("LOGINOM_RECOVERY_BUSY")
       if (ids.length !== recovered.size || new Set(ids).size !== ids.length || ids.some((id) => !recovered.has(id)))

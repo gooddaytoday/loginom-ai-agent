@@ -1,3 +1,4 @@
+import { admitPromptInput } from "@/cli/private-admission.mjs"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
@@ -296,12 +297,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
     }) {
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const originalInput = admitPromptInput(request.source, { ...ctx.payload, sessionID: ctx.params.sessionID })
       yield* requireSession(ctx.params.sessionID)
       const message = yield* SessionError.mapPromptFailure(
-        promptSvc.prompt({
-          ...ctx.payload,
-          sessionID: ctx.params.sessionID,
-        }),
+        promptSvc.prompt(originalInput),
       )
       return HttpServerResponse.stream(Stream.make(JSON.stringify(message)).pipe(Stream.encodeText), {
         contentType: "application/json",
@@ -332,9 +332,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof CommandPayload.Type
     }) {
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const originalInput = admitPromptInput(request.source, { ...ctx.payload, sessionID: ctx.params.sessionID })
       yield* requireSession(ctx.params.sessionID)
       return yield* SessionError.mapPromptFailure(
-        promptSvc.command({ ...ctx.payload, sessionID: ctx.params.sessionID }),
+        promptSvc.command(originalInput),
       )
     })
 

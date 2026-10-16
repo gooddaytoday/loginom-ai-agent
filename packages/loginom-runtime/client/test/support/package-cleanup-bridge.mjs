@@ -54,7 +54,8 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const scenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'])test('isolated shutdown lifecycle: '+scenario,async()=>{
+for(const namedScenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable','product-success','product-no-save','product-native-blocked','product-busy'])test('isolated shutdown lifecycle: '+namedScenario,async()=>{
+  const production=namedScenario.startsWith('product-'),scenario=namedScenario.replace(/^product-/, '');
   const directory=await mkdtemp(join(tmpdir(),'cleanup-bridge-'));
   const f=current={scenario,events:[],busy:false,saves:0};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
@@ -63,7 +64,7 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
   let bridge,client;
   try{
     bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
-      loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',acceptanceCleanupPackage:path},session);
+      loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',...(production?{}:{acceptanceCleanupPackage:path})},session);
     client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     if(scenario!=='unprepared'){
       const prep=await client.callTool({name:'dock_prepare',arguments:{}});assert.notEqual(prep.isError,true,JSON.stringify(prep));

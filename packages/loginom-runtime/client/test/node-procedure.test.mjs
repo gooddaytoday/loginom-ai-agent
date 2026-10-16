@@ -697,3 +697,139 @@ test('readiness expiry retains geometry across a final incomplete scan',async()=
   await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
   assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
 });
+
+
+for(const [window,originalDeadline,success] of [[60000,90000,true],[15000,90000,false],[60000,10000,false]])
+ test('durable process sample window '+window+' retains original absolute deadline '+originalDeadline,async()=>{
+  let time=1,reads=0,mutations=0;
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
+   prepared_node_context:{...binding.node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import'},scan:{complete:true},wizard:{status:'absent'},
+   ui:{elements:[{ref:'ui-button',allowed_actions:['click']}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'slow-record',action:{action_key:'node.apply',revision:'1'},deadline:originalDeadline};
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,record:async e=>{if(e.phase==='node_observation_sample')time+=21000;return structuredClone(e);},
+   wrapMutation:(code,receipt)=>({code,receipt}),execute:async code=>{
+    if(typeof code==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)};}
+    mutations++;return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};}});
+  const observe=()=>channel.observe({condition:'process menu closed',readProcesses:true,ready:()=>true,timeoutMs:window});
+  if(success){await observe();await channel.act({verb:'click',ref:'ui-button'});assert.equal(mutations,1);}
+  else{await assert.rejects(observe(),/readiness timeout/);await assert.rejects(channel.act({verb:'click',ref:'ui-button'}));assert.equal(mutations,0);}
+  assert.equal(operation.deadline,originalDeadline);assert.equal(reads,3);
+ });
+test('ordinary observation keeps the fifteen second ceiling',async()=>{
+ const f=fixture();await assert.rejects(f.channel.observe({condition:'ordinary',ready:()=>true,timeoutMs:60000}),/bounded readiness/);
+ assert.equal(f.records.length,0);assert.ok(!f.events.includes('mutated'));
+});
+
+test('format window refuses an unbound or foreign dialog before recording',async()=>{
+ for(const extra of [{tableFormatPage:{offset:0,limit:8}},{tableFormatPage:{offset:0,limit:8},tableDialog:{kind:'filter'}}]){
+  const f=fixture();await assert.rejects(f.channel.observe({condition:'format',ready:()=>true,timeoutMs:60000,...extra}),/bounded readiness/);assert.equal(f.records.length,0);assert.ok(!f.events.includes('mutated'));
+ }
+});
+
+test('Table format Apply settlement retains the original deadline and exact owner without another gesture',async()=>{
+ for(const mode of ['slow','expired','foreign','no_apply','other_click','transport']) {
+  const table={view_guid:'11111111-1111-1111-1111-111111111111',port_guid:'22222222-2222-2222-2222-222222222222',table_tid:'MF;TF-1;ViewsForm;BrowseView'};
+  const dialog={table,kind:'format'},modal=table.table_tid+';ModalWindow_BrowseFormat';
+  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const node={...binding.node,verified:true,surface:'views',tid:'MF;TF-1;ViewsForm'};
+  let time=1,applied=false,mutations=0,reads=0;
+  const operation={id:'format-settle',deadline:mode==='expired'?12000:65000,action:{action_key:'node.apply',revision:'1'}};
+  const records=[];
+  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,
+   scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{ref:'ui-modal',tid:modal},{ref:'ui-apply',tid:modal+(mode==='other_click'?';btnCancel':';btnApply'),allowed_actions:['click']}],
+    masks:applied&&time<31000?[{kind:'busy',target_tid:modal}]:[],dialogs:!applied||time<31000?[{identity:{anchor_tid:modal}}]:[],truncated:{dialogs:false,masks:false}}});
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;},
+   targetOrigin:'http://example.test',targetBuild:'7.4.2',record:async r=>{records.push(r);return structuredClone(r);},wrapMutation:(code,receipt)=>({code,receipt}),
+   execute:async code=>{
+    if(typeof code!=='string') {mutations++;if(mode==='transport')throw Error('transport');applied=true;return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state()};}
+    time+=20;reads++;
+    if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:state()};
+    return {verified:true,node_context:node,tables:[{...table,active:true,...(mode==='foreign'&&applied&&time>20000?{port_guid:'foreign'}:{})}]};
+   }});
+  const settle=()=>channel.observe({condition:'Table format dialog closed',tableDialog:dialog,settleTableFormat:true,readOutputs:true,ready:s=>s.ui.dialogs.length===0});
+  if(mode==='no_apply') {await assert.rejects(settle(),/confirmed Apply/);assert.equal(records.length,0);continue;}
+  await channel.observe({condition:'bound format Apply',tableDialog:dialog,ready:()=>true});
+  if(mode==='transport') {await assert.rejects(channel.act({verb:'click',ref:'ui-apply'}),/transport/);await assert.rejects(settle(),/confirmed Apply/);continue;}
+  await channel.act({verb:'click',ref:'ui-apply'});
+  if(mode==='slow') {await settle();assert.ok(time>=31000);assert.ok(reads>160);}
+  else await assert.rejects(settle(),mode==='expired'?/readiness timeout|budget/:mode==='foreign'?/owner changed/:/confirmed Apply/);
+  if(mode!=='expired')await assert.rejects(settle(),/confirmed Apply/);
+  assert.equal(mutations,1);assert.equal(operation.deadline,mode==='expired'?12000:65000);
+ }
+});
+
+test('confirmed Table add waits through the parent remainder without replay',async()=>{
+ for(const mode of ['slow','confirmation_pause','expired','foreign','no_add','other_click','add_then_other','wrong_vendor','wrong_panel','transport','no_gesture']){
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const node={...binding.node,verified:true,surface:'views',tid:'MF;TF-1;ViewsForm'};
+  let time=1,applied=false,mutations=0,reads=0,paused=false;const records=[];
+  const operation={id:'viewer-settle',deadline:mode==='expired'?12000:65000,action:{action_key:'node.apply',revision:'1'}};
+  const added=()=>applied&&(mode==='confirmation_pause'||time>=31000);
+  const native=()=>({verified:true,surface:'views',node_context:node,port_panels:[{port_guid:mode==='wrong_panel'?'foreign':'port'}],tables:[{view_guid:'old',port_guid:'port'},...(added()?[{view_guid:'new',port_guid:mode==='foreign'?'foreign':'port'}]:[])]});
+  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[
+   {ref:'ui-vendor',allowed_actions:['click'],viewer_vendor:{kind:mode==='wrong_vendor'?'chart':'table',selected:true}},
+   {ref:'ui-add',allowed_actions:['click'],viewer_card:{kind:'add',port_guid:'port',port_panel_ref:'ui-panel'}}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}});
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;},
+   record:async e=>{records.push(e);if(mode==='confirmation_pause'&&!paused&&applied&&e.phase==='node_observation_sample'&&e.readiness.satisfied){paused=true;time+=30000;}return structuredClone(e);},wrapMutation:(code,receipt)=>({code,receipt}),execute:async code=>{
+    if(typeof code!=='string'){mutations++;if(mode==='transport')throw Error('transport');applied=true;return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,trace:mode==='no_gesture'?[]:[{event:'ui_gesture_applied'}],output:state()};}
+    reads++;time+=20;return code.includes('function workspaceUiCapability')?{status:'SUCCEEDED',output:state()}:native();
+   }});
+  const settle=()=>channel.observe({condition:'new owned Table card confirmed',settleViewerAdd:true,readOutputs:true,ready:s=>s.node_outputs.tables.some(t=>t.view_guid==='new'),confirmIdentity:s=>s.node_outputs.tables});
+  if(mode==='no_add'){await assert.rejects(settle(),/confirmed add receipt/);assert.equal(records.length,0);continue;}
+  await channel.observe({condition:'selected Table vendor and add card',readOutputs:true,ready:()=>true});
+  if(mode==='transport'){await assert.rejects(channel.act({verb:'click',ref:'ui-add'}),/transport/);await assert.rejects(settle(),/confirmed add receipt/);continue;}
+  await channel.act({verb:'click',ref:mode==='other_click'?'ui-vendor':'ui-add'});
+  if(mode==='add_then_other'){await channel.observe({condition:'unrelated control',readOutputs:true,ready:()=>true});await channel.act({verb:'click',ref:'ui-vendor'});}
+  if(['slow','confirmation_pause'].includes(mode)){await settle();assert.ok(time>=30000);if(mode==='slow')assert.ok(reads>160);}
+  else await assert.rejects(settle(),mode==='expired'?/readiness timeout|budget/:mode==='foreign'?/authorized port/:/confirmed add receipt/);
+  if(mode!=='expired')await assert.rejects(settle(),/confirmed add receipt/);
+  assert.equal(mutations,mode==='add_then_other'?2:1);assert.equal(operation.deadline,mode==='expired'?12000:65000);
+ }
+});
+
+test('confirmed filter Next settles its same wizard through the original parent remainder',async()=>{
+ for(const mode of ['slow','slow_journal','expired','foreign','no_next','other_action','next_then_other','wrong_button','no_gesture','no_verified','transport','cancel']){
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const node={...binding.node,verified:true,surface:'wizard',tid:'MF;TF-1;WizrdMCF'};
+  const root_tid=node.tid,root_ref='ui-wizard';let time=1,applied=false,mutations=0,reads=0;const records=[];
+  const signal=new AbortController();const operation={id:'filter-settle',deadline:mode==='expired'?12000:65000,action:{action_key:'node.apply',revision:'1'}};
+  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,scan:{complete:true},
+   wizard:{status:'observed',root_tid,root_ref:applied&&mode==='foreign'?'ui-foreign':root_ref,stage:applied&&(!['slow','expired'].includes(mode)||time>=31000)?'done':'row_filter'},node_filter:{verified:true},
+   ui:{elements:[{ref:'ui-next',tid:root_tid+(mode==='wrong_button'?';btnOther':';btnNext'),allowed_actions:['wizard_step','click']}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}});
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',signal:signal.signal,now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms},record:async e=>{records.push(e);if(mode==='slow_journal'&&applied&&e.phase==='node_observation_sample')time+=21000;return structuredClone(e);},wrapMutation:(code,receipt)=>({code,receipt}),execute:async code=>{
+   if(typeof code==='string'){reads++;time+=20;return {status:'SUCCEEDED',output:state()};}
+   mutations++;if(mode==='transport')throw Error('transport');applied=true;
+   return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state(),trace:[...(mode==='no_gesture'?[]:[{event:'ui_gesture_applied',verb:'wizard_step'}]),...(mode==='no_verified'?[]:[{event:'wizard_step_verified',from_stage:'row_filter',to_stage:'done',root_ref}])]};
+  }});
+  const settle=()=>channel.observe({condition:'filter accepted by Loginom',settleFilterValidation:true,ready:s=>s.wizard.stage==='done'});
+  if(mode==='no_next'){await assert.rejects(settle(),/confirmed Next receipt/);assert.equal(records.length,0);continue;}
+  await channel.observe({condition:'filter Next ready',ready:()=>true});
+  if(mode==='transport'){await assert.rejects(channel.act({verb:'wizard_step',ref:'ui-next',expected_stage:'done'}),/transport/);await assert.rejects(settle(),/confirmed Next receipt/);continue;}
+  await channel.act({verb:mode==='other_action'?'click':'wizard_step',ref:'ui-next',...(mode==='other_action'?{}:{expected_stage:'done'})});
+  if(mode==='next_then_other'){await channel.observe({condition:'other action',ready:()=>true});await channel.act({verb:'click',ref:'ui-next'});}
+  if(mode==='cancel')signal.abort(new Error('cancelled'));
+  if(['slow','slow_journal'].includes(mode)){await settle();assert.ok(time>=21000);if(mode==='slow')assert.ok(reads>160);await assert.rejects(settle(),/confirmed Next receipt/);}
+  else await assert.rejects(settle(),mode==='expired'?/timeout|budget/:mode==='foreign'?/owner changed/:mode==='cancel'?/cancelled/:/confirmed Next receipt/);
+  assert.equal(mutations,mode==='next_then_other'?2:1);assert.equal(operation.deadline,mode==='expired'?12000:65000);
+ }
+});
+
+test('node views opening receives the original parent remainder while wizard opening stays capped',async()=>{
+ for(const verb of ['open_node_views','begin_wizard']) {
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:{...binding.node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import'},scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{ref:'ui-button',allowed_actions:[verb]}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'opening',deadline:65000,action:{action_key:'node.apply',revision:'1'}};let clicks=0;
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1000,wait:async()=>{},record:async e=>structuredClone(e),wrapMutation:(code,receipt)=>({code,receipt}),execute:async(code,options)=>{
+   if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+   clicks++;const expected=verb==='open_node_views'?64000:45000;assert.match(code.code,new RegExp('"opening_timeout_ms":'+expected));assert.equal(options.timeout,expected+5000);
+   return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};
+  }});
+  await channel.observe({condition:'bound opening',ready:()=>true});await channel.act({verb,ref:'ui-button'});assert.equal(clicks,1);assert.equal(operation.deadline,65000);
+ }
+});

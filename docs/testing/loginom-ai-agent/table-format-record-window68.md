@@ -1,0 +1,5 @@
+# Durable Table format observation
+
+Native 13b8612, new final scenario: Import succeeded; Filter executed, then the exact Table numeric mask read stopped. Its predicate was true at 219.449 ms. The awaited sample recording crossed the 15-second window (18:49:05.020 → timeout18:49:27.328). Original result stays AMBIGUOUS/read; later rejected recovery does not replace the first cause. No replay.
+
+The existing precision reader admits 60 seconds only for the bound Table format page. NodeProcedure accepts it with a format dialog, still validates the actual table/node binding, clamps to the same original operation deadline and rejects expiry after durable recording. Ordinary observations keep15 seconds. No masks, setters, fsync, epoch checks, restoration or root RunCommand deadline change. Source/installed controls remain labelled IO/UI doubles; new native needs independent review. Previous 13b native warm outputs and independent cold pass remain separate, including its original CLI cleanup failure.

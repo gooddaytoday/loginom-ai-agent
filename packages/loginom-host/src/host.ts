@@ -114,6 +114,10 @@ export async function createLoginomHost(options: {
     journal,
   )
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
+  type AcquiredServiceOwner = Readonly<{phase:"acquired-service";owner:string;run:string;chat:string;
+    lease:NonNullable<ReturnType<typeof service.acquire>>;generation:number;account:string;assertCurrent():void}>
+  const acquiredOwners = new WeakMap<object, {binding:AcquiredServiceOwner;guard():void}>()
+  const acquiredRuns = new Map<string, AcquiredServiceOwner>()
   return {
     ...service,
     api: {
@@ -123,6 +127,41 @@ export async function createLoginomHost(options: {
         recoveries.clear()
         return view
       },
+    },
+    retainAcquiredServiceOwner(owner:string,run:string,chat:string,lease:NonNullable<ReturnType<typeof service.acquire>>) {
+      if(!owner || !run || !/^[a-f0-9]{64}$/.test(chat))throw Error('LOGINOM_ACQUIRED_SERVICE_OWNER_REFUSED')
+      service.assertLease(lease,`${owner}:${run}`)
+      const generation=generations.get(lease.generation),connection=generation?.connection
+      if(!generation || !connection)
+        throw Error('LOGINOM_ACQUIRED_SERVICE_OWNER_REFUSED')
+      const key=`${owner}:${run}`,previous=acquiredRuns.get(key)
+      if(previous) {
+        if(previous.lease!==lease || previous.chat!==chat)throw Error('LOGINOM_ACQUIRED_SERVICE_OWNER_CHANGED')
+        previous.assertCurrent();return previous
+      }
+      const original=Object.freeze({...connection}),number=lease.generation,readiness=generation.children.get("readiness"),journalPending=journal.pending,journalActive=journal.hasActive
+      if(!readiness)throw Error('LOGINOM_ACQUIRED_SERVICE_OWNER_REFUSED')
+      let binding:AcquiredServiceOwner
+      const guard=()=>{
+        service.assertLease(lease,key)
+        if(generations.get(number)!==generation || generation.connection!==connection
+            || generation.children.get("readiness")!==readiness
+            || Object.keys(original).some(k=>connection[k as keyof ActiveConnection]!==original[k as keyof ActiveConnection])
+            || acquiredRuns.get(key)!==binding || binding.lease!==lease || binding.generation!==number
+            || binding.owner!==owner || binding.run!==run || binding.chat!==chat || binding.account!==original.username
+            || journal.pending!==journalPending || journal.hasActive!==journalActive
+            || journalPending().length || journalActive() || recoveries.has(chat) || lost.has(chat) || stale.has(chat))
+          throw Error('LOGINOM_ACQUIRED_SERVICE_OWNER_CHANGED')
+      }
+      binding=Object.freeze({phase:'acquired-service',owner,run,chat,lease,generation:number,account:original.username,assertCurrent:guard})
+      acquiredRuns.set(key,binding);acquiredOwners.set(binding,{binding,guard});guard();return binding
+    },
+    assertAcquiredServiceOwner(value:object,owner:string,run:string,chat:string,lease:NonNullable<ReturnType<typeof service.acquire>>) {
+      const record=acquiredOwners.get(value)
+      if(!record || record.binding!==value || record.binding.owner!==owner || record.binding.run!==run
+          || record.binding.chat!==chat || record.binding.lease!==lease)
+        throw Error('LOGINOM_ACQUIRED_SERVICE_OWNER_REFUSED')
+      record.guard();return record.binding
     },
     journal,
     recoveries,
