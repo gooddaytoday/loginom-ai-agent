@@ -1489,3 +1489,22 @@ temporary files were removed after retained SHA read-back. Autosave no-regrowth,
 general operation coverage, SessionBackup and cleanup/release/unpause remain
 open; operationsQualified, storageDeletionAllowed and nextAdmissionAllowed
 remain false.
+
+
+Own-root FD finalizer refusal (2026-10-16): actual sandboxed text CLI/public
+finalizeSlotAttempt RED700f7136…1 FAIL/16 assertions131.45s returned
+sessions_closed while its post-absence kernel source still contained a real
+non-daemon FD7 into A root. Original failed verdict/paused prefix and source
+are retained; auditff62269e…232 checks/97 sources/6 causal+20 pins. A three-line
+runtime gate now rejects ATTEMPT_SERVER_FILES_ACTIVE before terminal write.
+GREEN5a3c024d…1/35 PASS174.82s confirms refusal, holder release via stdin/exit0,
+then successful finalization with a fresh point. Changed hash/backdated point
+refusals, stable replay and pending reconstruction still pass. Independent
+auditad2bd5a1…298/130/7+20 pins verifies all3 point sources (the rejected source
+is retained), no duplicate close RPC, original SDK/SQLite archives, continuous
+actor/native transport closures and exact own pair/network/root absence.
+Related process/session15/166 PASS60.14s, typecheck/diff PASS. Five duplicate
+temporary files removed after retained SHA read-back. This refuses an observed
+own-root FD; it does not qualify all mappings, operations, SessionBackup or
+autosave no-regrowth. Storage deletion/release/unpause and production admission
+remain closed, with both grants false.

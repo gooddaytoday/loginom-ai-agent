@@ -17,7 +17,7 @@ import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from 
 import { archiveProfileEvidence } from "../src/profile-archive"
 import { signalProcess, supervisedProcesses } from "../src/process-supervisor"
 import { ensureProfile, profileHistory, releaseStaleWriter } from "../src/profile"
-import { readServerFiles } from "../src/server-files"
+import { readServerFiles, serverFileObservation } from "../src/server-files"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { stageUserPreparation } from "../src/user-environment"
 import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
@@ -206,6 +206,33 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
           const accounted = await collectSlotSessions(file, lease, prepared.secretFile, inputs, untouched.source)
           const absenceOnly = await admin.closeManagementSession(lease, prepared.secretFile, accounted.management[0]!.id, "confirm-absent")
             .then(() => "unexpected confirmation", (error: Error) => error.message)
+          if (!browser) {
+            const target = `${storage.root}/fd-control-${crypto.randomUUID()}`
+            await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sh -c ${'printf fd-control > "$1"'} sh ${target}`.quiet()
+            const holder = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", "-i", pair.identity.containerId,
+              "sh", "-c", 'exec 7<"$1"; printf ready; read -r release', "sh", target], { stdin: "pipe", stdout: "pipe", stderr: "pipe", timeout: 60_000 })
+            try {
+              expect(new TextDecoder().decode((await holder.stdout.getReader().read()).value)).toBe("ready")
+              const opened = await serverFileObservation(pair.identity.containerId)
+              expect(opened.complete).toBe(true)
+              expect(opened.files.some(entry => entry.target === target && entry.pid !== 1 && entry.fd === 7)).toBe(true)
+              const attempted = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+                .then(completed => ({ completed, error: null }), (error: Error) => ({ completed: null, error: error.message }))
+              await writeLeaseReceipt(path.join(evidence, "finalization-open-fd.json"), { target, opened, attempted,
+                storageDeletionAllowed: false, nextAdmissionAllowed: false })
+              expect(attempted.error).toBe("ATTEMPT_SERVER_FILES_ACTIVE")
+              expect(await Bun.file(path.join(file.controller.stateDir, `agent-finalization-${entry.entrySource.id}.json`)).exists()).toBe(false)
+            } finally {
+              holder.stdin.write("release\n")
+              holder.stdin.end()
+              const exitCode = await holder.exited
+              const released = await serverFileObservation(pair.identity.containerId)
+              await writeLeaseReceipt(path.join(evidence, "finalization-fd-released.json"), { target, exitCode, released })
+              expect(exitCode).toBe(0)
+              expect(released.complete).toBe(true)
+              expect(released.files.some(entry => entry.target === target)).toBe(false)
+            }
+          }
           const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
           expect(completed.sessions).toHaveLength(browser ? 2 : 1)
           expect(completed.sessions.every(session => session.state === "closed")).toBe(true)
