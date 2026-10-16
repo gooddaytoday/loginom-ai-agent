@@ -121,7 +121,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       ...(mode === "pool-environment" ? [path.resolve(import.meta.dir, "../src/environment-preparation.ts"), path.resolve(import.meta.dir, "../src/environment-finalization.ts"), path.resolve(import.meta.dir, "../src/user-environment.ts")] : []),
       ...(["progress", "pool", "pool-close", "pool-disabled", "active-control", "active-close", "file-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : []),
       ...(["active-control", "active-close", "file-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")] : []),
-      ...(mode === "file-close" ? [path.resolve(import.meta.dir, "../src/server-files.ts"), path.resolve(import.meta.dir, "../fixtures/server-files.sh")] : []),
+      ...(["file-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../src/server-files.ts"), path.resolve(import.meta.dir, "../fixtures/server-files.sh")] : []),
       ...(mode === "active-peer" ? [path.resolve(import.meta.dir, "../fixtures/peer-probe.js"), path.resolve(import.meta.dir, "../src/closed-process-evidence.ts")] : [])]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
     if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
@@ -302,12 +302,39 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
             const before = samples.at(-1)!
             const rows = [credentials.username, neighbor.user.name].map(name => before.collections.filter(row => row.name.startsWith(name + ":")))
             expect(rows.every(rows => rows.length === 1 && rows[0]!.packageCount === 1 && rows[0]!.packages[0]!.progress !== null)).toBe(true)
+            const openedFiles = await serverFileObservation(pair.identity.containerId)
             const closed = await request("close-session", { proofId: writer.id, session: data.binding })
             expect(closed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+            const closedFiles = await serverFileObservation(pair.identity.containerId)
+            await writeLeaseReceipt(path.join(evidence, "backend-files.json"), { identity: pair.identity, opened: openedFiles, closed: closedFiles,
+              operationsQualified: false, cleanupAllowed: false })
+            expect(openedFiles.complete).toBe(true)
+            expect(closedFiles.complete).toBe(true)
+            expect(closedFiles.daemonStarttime).toBe(openedFiles.daemonStarttime)
+            const locks = [credentials.username, neighbor.user.name].map(name => openedFiles.files.find(entry =>
+              entry.target === `${file.server.storageRoot}/${name}/.progress-probe.lgp.lck`))
+            const keys = locks.map(lock => {
+              expect(lock).toMatchObject({ pid: 1 })
+              expect(lock!.info).toMatch(/^lock:\s+\d+: FLOCK\s+ADVISORY\s+WRITE\s+1\s+/m)
+              const key = lock!.info.match(/^lock:.*?\s([a-f0-9]+:[a-f0-9]+:\d+)\s/m)![1]!
+              expect(key.split(":")[2]).toBe(lock!.identity.split(":")[1])
+              expect(openedFiles.locksBefore).toContain(key)
+              expect(openedFiles.locksAfter).toContain(key)
+              return key
+            })
+            expect(keys[0]).not.toBe(keys[1])
+            expect(closedFiles.locksBefore).not.toContain(keys[0]!)
+            expect(closedFiles.locksAfter).not.toContain(keys[0]!)
+            expect(closedFiles.files.some(entry => entry.target === `${file.server.storageRoot}/${credentials.username}` ||
+              entry.target.startsWith(`${file.server.storageRoot}/${credentials.username}/`))).toBe(false)
+            expect(closedFiles.files.find(entry => entry.target === locks[1]!.target)).toMatchObject({ pid: 1, identity: locks[1]!.identity })
+            expect(closedFiles.locksBefore).toContain(keys[1]!)
+            expect(closedFiles.locksAfter).toContain(keys[1]!)
             const after = await packageParent!.inspectPackageInventory()
             expect(after.collections.some(row => row.name === data.binding.name)).toBe(false)
             const surviving = after.collections.find(row => row.objectId === rows[1]![0]!.objectId)
             expect(surviving?.packages[0]?.objectId).toBe(rows[1]![0]!.packages[0]!.objectId)
+            expect(surviving?.packages[0]?.progress).not.toBeNull()
             const continued = await pending
             await writeLeaseReceipt(path.join(evidence, "active-peer-continued.json"), continued)
             expect(continued).toMatchObject({ outcome: "confirmed", data: { binding: { username: neighbor.user.name, serverEpoch: pair.identity.serverEpoch },
@@ -315,6 +342,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
             const peerData = continued.data as { binding: { name: string }; progress: { startedAt: string; finishedAt: string } }
             const closeCommand = await readLeaseReceipt(path.join(journal, closed.id + ".json")) as { settledAt: string }
             expect(Date.parse(peerData.progress.finishedAt)).toBeGreaterThan(Date.parse(closeCommand.settledAt))
+            expect(Date.parse(peerData.progress.finishedAt)).toBeGreaterThan(Date.parse(closedFiles.finishedAt))
             expect(Date.parse(peerData.progress.finishedAt) - Date.parse(peerData.progress.startedAt)).toBeGreaterThanOrEqual(9_000)
             const canaryAfter = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum ${canaryPath}`.quiet()).text()
             expect(canaryAfter).toBe(canaryBefore)
@@ -322,6 +350,16 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
             expect(peerClosed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
             const absent = await packageParent!.inspectPackageInventory()
             expect(absent.collections.some(row => [data.binding.name, peerData.binding.name].includes(row.name))).toBe(false)
+            const finalFiles = await serverFileObservation(pair.identity.containerId)
+            await writeLeaseReceipt(path.join(evidence, "backend-files-final.json"), { identity: pair.identity, snapshot: finalFiles,
+              operationsQualified: false, cleanupAllowed: false })
+            expect(finalFiles.complete).toBe(true)
+            expect(finalFiles.daemonStarttime).toBe(openedFiles.daemonStarttime)
+            expect(finalFiles.locksBefore).not.toContain(keys[1]!)
+            expect(finalFiles.locksAfter).not.toContain(keys[1]!)
+            expect(finalFiles.files.some(entry => [credentials.username, neighbor.user.name].some(name =>
+              entry.target === `${file.server.storageRoot}/${name}` || entry.target.startsWith(`${file.server.storageRoot}/${name}/`)))).toBe(false)
+            expect(await readServerIdentity(file)).toEqual(pair.identity)
             await writeLeaseReceipt(path.join(evidence, "active-peer.json"), { identity: pair.identity, writer, samples, before, closed, after, continued, peerClosed, absent,
               canary: { path: canaryPath, before: canaryBefore, after: canaryAfter }, operationsQualified: false, cleanupAllowed: false })
             expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
