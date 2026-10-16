@@ -1,8 +1,69 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rename, rm, rmdir, stat, symlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rename, rm, rmdir, stat, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { writerIdentity } from "../src/process-supervisor"
+
+test("writer identity can observe first owner publication by an admitted CLI", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-publication-"))
+  const directory = path.join(profile, ".writer")
+  try {
+    await mkdir(directory, { mode: 0o700 })
+    const info = await stat(directory)
+    const pending = writerIdentity(profile, true).then(value => value, error => error)
+    await Bun.sleep(20)
+    await Bun.write(path.join(directory, "owner"), "new-owner")
+    expect(await pending).toEqual({ device: info.dev, inode: info.ino, owner: "new-owner" })
+  } finally { await rm(profile, { recursive: true, force: true }) }
+})
+
+test("first publication waits for the owner's nonce rather than capturing an empty file", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-nonce-"))
+  const directory = path.join(profile, ".writer")
+  try {
+    await mkdir(directory, { mode: 0o700 })
+    await writeFile(path.join(directory, "owner"), "", { flag: "wx", mode: 0o600 })
+    const pending = writerIdentity(profile, true).then(value => value, error => error)
+    await Bun.sleep(20)
+    await writeFile(path.join(directory, "owner"), "published-nonce")
+    expect((await pending)?.owner).toBe("published-nonce")
+  } finally { await rm(profile, { recursive: true, force: true }) }
+})
+
+for (const entry of ["missing", "empty"] as const)
+  test(`first publication refuses a persistently ${entry} owner without removing the guard`, async () => {
+    const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-unpublished-"))
+    const directory = path.join(profile, ".writer")
+    try {
+      await mkdir(directory, { mode: 0o700 })
+      if (entry === "empty") await Bun.write(path.join(directory, "owner"), "")
+      await expect(writerIdentity(profile, true)).rejects.toThrow("Writer owner unavailable")
+      expect((await stat(directory)).isDirectory()).toBe(true)
+    } finally { await rm(profile, { recursive: true, force: true }) }
+  })
+
+for (const replacement of ["directory", "empty-owner", "owner-unlink"] as const)
+  test(`first publication refuses replaced ${replacement}`, async () => {
+    const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-publish-replacement-"))
+    const directory = path.join(profile, ".writer")
+    const owner = path.join(directory, "owner")
+    try {
+      await mkdir(directory, { mode: 0o700 })
+      if (replacement !== "directory") await Bun.write(owner, "")
+      const pending = writerIdentity(profile, true).then(value => value, error => error)
+      await Bun.sleep(20)
+      if (replacement === "directory") {
+        await rename(directory, path.join(profile, "old-writer"))
+        await mkdir(directory, { mode: 0o700 })
+        await Bun.write(owner, "foreign-owner")
+      } else if (replacement === "empty-owner") {
+        await rename(owner, path.join(profile, "old-owner"))
+        await Bun.write(owner, "foreign-owner")
+      } else await rm(owner)
+      expect(String(await pending)).toContain("identity changed")
+      expect((await stat(directory)).isDirectory()).toBe(true)
+    } finally { await rm(profile, { recursive: true, force: true }) }
+  })
 
 test("writer identity observes the real unlink-owner then rmdir release window", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-release-"))
@@ -50,8 +111,8 @@ for (const replacement of ["directory", "owner", "owner-symlink"] as const)
     } finally { await rm(profile, { recursive: true, force: true }) }
   })
 
-for (const entry of ["directory", "owner", "dangling-owner"] as const)
-  test(`writer identity refuses ${entry} symlink`, async () => {
+for (const publication of [false, true]) for (const entry of ["directory", "owner", "dangling-owner"] as const)
+  test(`writer identity refuses ${entry} symlink (publication=${publication})`, async () => {
     const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-symlink-"))
     const directory = path.join(profile, ".writer")
     try {
@@ -63,18 +124,18 @@ for (const entry of ["directory", "owner", "dangling-owner"] as const)
         if (entry === "owner") await Bun.write(path.join(profile, "foreign"), "private")
         await symlink(path.join(profile, "foreign"), path.join(directory, "owner"))
       }
-      await expect(writerIdentity(profile)).rejects.toThrow("Writer")
+      await expect(writerIdentity(profile, publication)).rejects.toThrow("Writer")
     } finally { await rm(profile, { recursive: true, force: true }) }
   })
 
-test("writer owner EACCES remains ERROR and preserves the guard", async () => {
+for (const publication of [false, true]) test(`writer owner EACCES remains ERROR and preserves the guard (publication=${publication})`, async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-denied-"))
   const directory = path.join(profile, ".writer")
   try {
     await mkdir(directory)
     await Bun.write(path.join(directory, "owner"), "owner")
     await chmod(path.join(directory, "owner"), 0)
-    await expect(writerIdentity(profile)).rejects.toThrow("Writer owner unavailable")
+    await expect(writerIdentity(profile, publication)).rejects.toThrow("Writer owner unavailable")
     expect((await stat(directory)).isDirectory()).toBe(true)
   } finally {
     await chmod(path.join(directory, "owner"), 0o600)

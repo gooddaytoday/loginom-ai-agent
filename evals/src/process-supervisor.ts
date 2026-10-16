@@ -39,7 +39,7 @@ const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.E
 const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
 
-export async function writerIdentity(profile: string): Promise<WriterIdentity | null> {
+export async function writerIdentity(profile: string, allowOwnerPublication = false): Promise<WriterIdentity | null> {
   const directory = path.join(profile, ".writer")
   const info = await lstat(directory).catch((error) => {
     if (gone(error)) return undefined
@@ -48,9 +48,9 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   if (!info) return null
   if (!info.isDirectory() || info.isSymbolicLink()) throw Error("Writer is not a private directory")
   const ownerPath = path.join(directory, "owner")
-  const ownerBefore = await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
+  const ownerBefore = allowOwnerPublication ? await observeWriterTransition(directory, info, true) : await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
-    await observeWriterRelease(directory, info)
+    await observeWriterTransition(directory, info)
     return undefined
   })
   if (!ownerBefore) return null
@@ -58,7 +58,7 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   const file = await open(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW)
     .catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
-      await observeWriterRelease(directory, info)
+      await observeWriterTransition(directory, info)
       return undefined
     })
   if (!file) return null
@@ -69,7 +69,7 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
     const owner = await file.readFile("utf8")
     const observed = await Promise.all([lstat(directory), lstat(ownerPath)]).catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error
-      await observeWriterRelease(directory, info)
+      await observeWriterTransition(directory, info)
       return undefined
     })
     if (!observed) return null
@@ -81,9 +81,11 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   } finally { await file.close() }
 }
 
-/** CLI release unlinks owner before rmdir. Only that bounded ENOENT window is retried. */
-async function observeWriterRelease(directory: string, expected: Awaited<ReturnType<typeof lstat>>) {
+/** Initial CLI acquisition creates the directory before publishing owner; release unlinks owner before rmdir.
+ * Publication is allowed only for the first writer of an admitted CLI, never for an observed owner's release. */
+async function observeWriterTransition(directory: string, expected: Awaited<ReturnType<typeof lstat>>, allowOwnerPublication = false) {
   let absent = 0
+  let pendingOwner: Awaited<ReturnType<typeof lstat>> | undefined
   for (let attempt = 0; attempt < 6; attempt++) {
     const current = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return undefined
@@ -97,7 +99,15 @@ async function observeWriterRelease(directory: string, expected: Awaited<ReturnT
         if (error.code === "ENOENT") return undefined
         throw error
       })
-      if (owner) throw Error("Writer owner identity changed during release")
+      if (owner) {
+        if (!allowOwnerPublication) throw Error("Writer owner identity changed during release")
+        if (!owner.isFile() || owner.isSymbolicLink()) throw Error("Writer owner is not a private file")
+        if (pendingOwner && (pendingOwner.dev !== owner.dev || pendingOwner.ino !== owner.ino))
+          throw Error("Writer owner identity changed during publication")
+        // writeFile(wx) can expose the new empty file before its nonce is written.
+        if (owner.size > 0) return owner
+        pendingOwner = owner
+      } else if (pendingOwner) throw Error("Writer owner identity changed during publication")
     } else if (++absent === 2) return
     if (attempt < 5) await Bun.sleep(20)
   }
@@ -346,6 +356,10 @@ export async function superviseProcess(input: {
   const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true,
     observation_mode: input.observationMode ?? "continuous" }
   const profile = input.profileDir ? await realpath(input.profileDir) : undefined
+  const initialWriter = profile ? await lstat(path.join(profile, ".writer")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  }) : undefined
   const baseline = await snapshot()
   const existing = new Set(baseline.map(key))
   const oldDirectories = new Set(profile ? await runtimeDirectories(profile) : [])
@@ -522,7 +536,8 @@ export async function superviseProcess(input: {
         entry.admission = "allowed"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
-      const writer = await writerIdentity(profile)
+      const writer = await writerIdentity(profile, !initialWriter && !cleanup.writer &&
+        Boolean(cli && ledger.get(key(cli))?.admission === "allowed"))
       if (writer && !cleanup.writer) cleanup.writer = writer
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }

@@ -8,6 +8,50 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
+for (const writer of ["first", "preexisting", "replacement"] as const)
+  test(`supervisor permits only the admitted CLI's first writer publication (${writer})`, async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-admission-"))
+    const profile = path.join(root, "profile")
+    const fixture = path.join(root, "fixtures/fake-cli.ts")
+    await mkdir(profile, { mode: 0o700 })
+    await mkdir(path.dirname(fixture))
+    if (writer === "preexisting") await mkdir(path.join(profile, ".writer"), { mode: 0o700 })
+    await Bun.write(fixture, `
+      import { mkdir, writeFile, unlink, rmdir } from "node:fs/promises";
+      const directory = ${JSON.stringify(path.join(profile, ".writer"))};
+      const owner = directory + "/owner";
+      if (${JSON.stringify(writer)} !== "preexisting") await mkdir(directory, { mode: 0o700 });
+      await Bun.sleep(${writer === "preexisting" ? 250 : 40});
+      await writeFile(owner, "first-nonce", { flag: "wx", mode: 0o600 });
+      await Bun.sleep(300);
+      if (${JSON.stringify(writer)} === "replacement") {
+        await unlink(owner);
+        await Bun.sleep(40);
+        await writeFile(owner, "different-nonce", { flag: "wx", mode: 0o600 });
+        await Bun.sleep(300);
+      }
+      await unlink(owner);
+      await rmdir(directory);
+    `)
+    try {
+      const run = await superviseProcess({ cmd: [process.execPath, fixture], cwd: root, profileDir: profile,
+        env: { PATH: process.env.PATH ?? "", EVAL_CLI_MODE: "fake" }, timeoutMs: 5_000 })
+      expect(run.exitCode).toBe(0)
+      expect(run.processCleanup.capture_complete).toBe(true)
+      expect(run.processCleanup.unknownProcesses).toEqual([])
+      expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+      if (writer === "first") {
+        expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, writer: { owner: "first-nonce" } })
+        const cli = run.processCleanup.launcher?.cli_pid
+        expect(run.processCleanup.origins?.find(entry => entry.pid === cli)?.via).toBe("cli")
+        expect(run.processCleanup.admissions?.find(entry => entry.pid === cli)?.status).toBe("allowed")
+      } else {
+        expect(run.processCleanup.status).toBe("failed")
+        expect(run.processCleanup.error).toContain(writer === "preexisting" ? "Writer owner unavailable" : "Writer")
+      }
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }, 10_000)
+
 test("supervisor retains the live launcher until the terminated CLI exit receipt is observed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-exit-receipt-"))
   try {
