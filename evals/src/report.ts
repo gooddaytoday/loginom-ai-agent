@@ -157,6 +157,7 @@ export type RubricSnapshot = {
 }
 export type RunSummary = {
   parallel_limits?: ReturnType<typeof aggregateLimits>
+  resources?: { status: "passed" | "failed" | "incomplete"; evidence: string; codes: string[] }
   slots?: { id: string; username: string; profileDir: string; workspaceRoot: string; historyDir: string; liveQualified: boolean; state?: "planned" | "closed" | "quarantined"; lease_receipt?: string; cleanup_receipt?: string; storage_root?: string; storage_leftovers?: string[] | null; storage_error?: string | null }[]
   run_id: string
   label: string | null
@@ -208,6 +209,7 @@ export function renderReport(summary: RunSummary) {
     `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · CLI ${summary.agent.cli_version ?? "неизвестен"} · variant ${summary.agent.variant ?? "неизвестен"} · source ${summary.agent.source_commit ?? (summary.agent.cli_mode === "source" ? summary.agent.git_sha : null) ?? "неизвестен"}${summary.agent.source_dirty ? "-dirty" : ""} · binary sha256 ${summary.agent.binary_sha256 ?? "—"}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
     `Параллельность: ${summary.config.parallel ?? 1}. Длительность прогона: ${Number.isFinite(wall) && wall >= 0 ? (wall / 1000).toFixed(1) + "s" : "—"}. Сумма времени агентов: ${(m.total_duration_ms / 1000).toFixed(1)}s.`,
     ...(summary.parallel_limits ? [`Проверка лимитов: ${summary.parallel_limits.status} · ${cell(summary.parallel_limits.codes.join(", ") || "—")}`] : []),
+    ...(summary.resources ? [`Ресурсы: ${summary.resources.status} · [evidence](${summary.resources.evidence}) · ${cell(summary.resources.codes.join(", ") || "—")}`] : []),
     summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
     summary.stopped_reason ? `**Прогон остановлен: ${cell(summary.stopped_reason)}**` : "",
     "",
@@ -281,5 +283,6 @@ export function renderReport(summary: RunSummary) {
         ? `не удалось получить листинг: ${cell(slot.storage_error ?? "причина неизвестна")}`
         : slot.storage_leftovers!.length ? slot.storage_leftovers!.map(cell).join(", ") : "остатков нет"}`)] : []),
     ...(scoped && (summary.storage_leftovers === null || summary.storage_leftovers.length)
-      ? ["", "Адресное восстановление: `parallel-env recover` со slot_id и сохранённым incident/lease receipt."] : []), ""].join("\n")
+      ? ["", summary.resources ? "Карантин сохраняется до проверки остатков в начале следующего run; неизвестность требует решения владельца."
+        : "Адресное восстановление: `parallel-env recover` со slot_id и сохранённым incident/lease receipt."] : []), ""].join("\n")
 }

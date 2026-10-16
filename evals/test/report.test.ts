@@ -5,6 +5,18 @@ import path from "node:path"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
 import { comparisonSummary } from "./helpers/compare-summary"
 
+test("prepared run report links mandatory resource evidence and keeps quarantine for startup reconciliation", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.storage_leftovers = null
+  run.slots = [{ id: "a", username: "eval-a", profileDir: "/private/a", workspaceRoot: "/private/work-a", historyDir: "/private/history-a",
+    liveQualified: true, state: "quarantined" }]
+  const report = renderReport({ ...run, resources: { status: "incomplete", evidence: "resource-acceptance.json", codes: ["RESOURCE_SAMPLES_MISSING"] } })
+  expect(report).toContain("Ресурсы: incomplete")
+  expect(report).toContain("resource-acceptance.json")
+  expect(report).toContain("RESOURCE_SAMPLES_MISSING")
+  expect(report).not.toContain("parallel-env recover")
+})
+
 test("statusFor: ошибка изоляции останавливает запуск даже при exit 1 или timeout", () => {
   const run = { exitCode: 1, timedOut: false, interrupted: false, sandboxError: "SANDBOX_EXECUTION_FAILED" }
   expect(statusFor(run, false)).toEqual({ status: "harness_error", stop: true })

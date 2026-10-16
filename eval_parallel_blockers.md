@@ -22,3 +22,13 @@ status lease освобождён. Проверка не заменяет реа
 Недостаточно MemAvailable для бюджета N=1 — остановка и сообщение владельцу.
 Иной блокер сквозного пути или изменение требования — вопрос и ожидание ответа,
 без обхода через запись в blockers и переход к другой задаче.
+
+Текущий блокер: установленный CLI поглощает session.status/retry, поэтому скрытый
+provider429 нельзя исключить по headless JSON. Новый run сохраняет incomplete/exit1.
+Минимальная правка зеркалирует существующий status через JSON emit; process-тест
+429→200 включён в private proposal
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-output-proposal.patch`.
+Diff не применён/не проверен. Он затрагивает packages/agent/src/cli/cmd/run.ts и
+его process-тест, а evals/AGENTS.md разрешает вне evals только документы и judge
+launcher. Требуется точное исключение этой границы владельцем; до ответа модельные
+прогоны и дальнейшая реализация приостановлены. Это не новое согласование плана.
