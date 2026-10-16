@@ -684,12 +684,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
           const scanRefusal=timeScanRefusal(r,'ui.act');
+          const settingsPointRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&action.verb==='begin_wizard'&&preparedNodeContext&&observed.prepared_node_context?.surface==='graph'
+            &&observed.ui.elements.some(e=>e.ref===action.ref&&e.tid===observed.prepared_node_context.tid+';Setting'
+              &&e.wizard_open&&e.interaction?.state==='point_observed');
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_STALE'
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!settingsPointRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -698,6 +702,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             effect_possible: false,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
+            ...(settingsPointRefusal?{reason:'prepared_settings_point_obscured'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {
