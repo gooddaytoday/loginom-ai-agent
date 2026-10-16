@@ -1,0 +1,137 @@
+{
+  "scope": "Read-only static public assets fetched now; not old-b7 source byte binding, not live Page observation, no store instantiated or mutated",
+  "framework_version": "5.1.2.748",
+  "framework_sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+  "observed_definitions": [
+    {
+      "file": "capturefix-static-ext-all-debug.js",
+      "file_sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "class_name": "Ext.data.AbstractStore",
+      "line": 47652,
+      "end_line": 48176,
+      "extends": null,
+      "mixins": [
+        "Ext.mixin.Observable",
+        "Ext.mixin.Factoryable"
+      ],
+      "isBufferedStore": {
+        "type": "absent"
+      },
+      "buffered": {
+        "type": "absent"
+      },
+      "config_isBufferedStore": false,
+      "getBuffered_present": false,
+      "getIsBufferedStore_present": false
+    },
+    {
+      "file": "capturefix-static-ext-all-debug.js",
+      "file_sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "class_name": "Ext.data.ProxyStore",
+      "line": 52051,
+      "end_line": 52614,
+      "extends": "Ext.data.AbstractStore",
+      "mixins": [],
+      "isBufferedStore": {
+        "type": "absent"
+      },
+      "buffered": {
+        "type": "absent"
+      },
+      "config_isBufferedStore": false,
+      "getBuffered_present": false,
+      "getIsBufferedStore_present": false
+    },
+    {
+      "file": "capturefix-static-ext-all-debug.js",
+      "file_sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "class_name": "Ext.data.LocalStore",
+      "line": 52617,
+      "end_line": 52924,
+      "extends": "Ext.Mixin",
+      "mixins": [],
+      "isBufferedStore": {
+        "type": "absent"
+      },
+      "buffered": {
+        "type": "absent"
+      },
+      "config_isBufferedStore": false,
+      "getBuffered_present": false,
+      "getIsBufferedStore_present": false
+    },
+    {
+      "file": "capturefix-static-ext-all-debug.js",
+      "file_sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "class_name": "Ext.data.Store",
+      "line": 54251,
+      "end_line": 55051,
+      "extends": "Ext.data.ProxyStore",
+      "mixins": [
+        "Ext.data.LocalStore"
+      ],
+      "isBufferedStore": {
+        "type": "absent"
+      },
+      "buffered": {
+        "type": "absent"
+      },
+      "config_isBufferedStore": false,
+      "getBuffered_present": false,
+      "getIsBufferedStore_present": false
+    },
+    {
+      "file": "capturefix-static-ext-all-debug.js",
+      "file_sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "class_name": "Ext.data.BufferedStore",
+      "line": 61814,
+      "end_line": 62594,
+      "extends": "Ext.data.ProxyStore",
+      "mixins": [],
+      "isBufferedStore": {
+        "type": "boolean",
+        "value": true
+      },
+      "buffered": {
+        "type": "boolean",
+        "value": true
+      },
+      "config_isBufferedStore": false,
+      "getBuffered_present": false,
+      "getIsBufferedStore_present": false
+    },
+    {
+      "file": "capturefix-static-CollectionProxy.js",
+      "file_sha256": "909db7a263d7ce966031fb7a010c1a34813eaca4af497505eb0349b9c8a85559",
+      "class_name": "bg.ext.CollectionProxy",
+      "line": 360,
+      "end_line": 585,
+      "extends": "Ext.data.proxy.Proxy",
+      "mixins": [],
+      "isBufferedStore": {
+        "type": "absent"
+      },
+      "buffered": {
+        "type": "absent"
+      },
+      "config_isBufferedStore": false,
+      "getBuffered_present": false,
+      "getIsBufferedStore_present": false
+    }
+  ],
+  "isBufferedStore_data_declarations": [
+    {
+      "file": "capturefix-static-ext-all-debug.js",
+      "line": 61829,
+      "type": "boolean",
+      "value": true
+    }
+  ],
+  "source_urls": {
+    "capturefix-static-ext-all-debug.js": "https://app.loginom.ai/app/ext/build/ext-all-debug.js",
+    "capturefix-static-ext-patch.js": "https://app.loginom.ai/app/ext/overrides/ext-patch.js",
+    "capturefix-static-ext-patch-debug.js": "https://app.loginom.ai/app/ext/overrides/ext-patch-debug.js",
+    "capturefix-static-ext-override.js": "https://app.loginom.ai/app/ext/ext-override.js",
+    "capturefix-static-CollectionProxy.js": "https://app.loginom.ai/app/bg/ext/CollectionProxy.js"
+  }
+}

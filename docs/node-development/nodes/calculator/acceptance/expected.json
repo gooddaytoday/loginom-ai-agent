@@ -1,0 +1,156 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "output_node_type": "transform.calculator",
+  "columns": [
+    {
+      "name": "Id",
+      "label": "Id",
+      "type": "integer"
+    },
+    {
+      "name": "Qty",
+      "label": "Количество",
+      "type": "integer"
+    },
+    {
+      "name": "Revenue",
+      "label": "Сумма",
+      "type": "real"
+    },
+    {
+      "name": "Adjusted",
+      "label": "Сумма",
+      "type": "real"
+    },
+    {
+      "name": "UnitPrice",
+      "label": "UnitPrice",
+      "type": "real"
+    },
+    {
+      "name": "Note",
+      "label": "Комментарий",
+      "type": "string"
+    },
+    {
+      "name": "Moment",
+      "label": "Дата",
+      "type": "datetime"
+    },
+    {
+      "name": "Comment",
+      "label": "Comment",
+      "type": "string"
+    }
+  ],
+  "rows": [
+    {
+      "Id": 1,
+      "Qty": 3,
+      "Revenue": 37.5,
+      "Adjusted": 37.5001,
+      "UnitPrice": 25.0,
+      "Note": "!",
+      "Moment": "2024-02-29T00:00:00.000",
+      "Comment": ""
+    },
+    {
+      "Id": 2,
+      "Qty": 2,
+      "Revenue": 14.5,
+      "Adjusted": 14.5001,
+      "UnitPrice": 14.5,
+      "Note": "missing",
+      "Moment": "2024-02-29T00:00:00.000",
+      "Comment": null
+    },
+    {
+      "Id": 3,
+      "Qty": 4,
+      "Revenue": 10.0,
+      "Adjusted": 10.0001,
+      "UnitPrice": 5.0,
+      "Note": "поставка; срочно!",
+      "Moment": "2024-02-29T00:00:00.000",
+      "Comment": "поставка; срочно"
+    },
+    {
+      "Id": 4,
+      "Qty": 0,
+      "Revenue": 0.0,
+      "Adjusted": 0.0001,
+      "UnitPrice": 198.0,
+      "Note": "нулевое количество!",
+      "Moment": "2024-02-29T00:00:00.000",
+      "Comment": "нулевое количество"
+    },
+    {
+      "Id": 5,
+      "Qty": -1,
+      "Revenue": -8.0,
+      "Adjusted": -7.9999,
+      "UnitPrice": 16.0,
+      "Note": "возврат!",
+      "Moment": "2024-02-29T00:00:00.000",
+      "Comment": "возврат"
+    },
+    {
+      "Id": 6,
+      "Qty": 2,
+      "Revenue": 8.0,
+      "Adjusted": 8.0001,
+      "UnitPrice": 8.0,
+      "Note": "missing",
+      "Moment": "2024-02-29T00:00:00.000",
+      "Comment": null
+    }
+  ],
+  "static_sources": [
+    {
+      "file": "data/sales.csv",
+      "bytes": 230,
+      "sha256": "f628434c20873f7dd9a8ee142c17af7c0b99f447114fcf60e983f6ed6b357eb3",
+      "format": {
+        "delimiter": ";",
+        "decimal_separator": ".",
+        "null_marker": "\\N",
+        "text_qualifier": "\""
+      },
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Quantity",
+          "label": "Quantity",
+          "type": "integer"
+        },
+        {
+          "name": "UnitPrice",
+          "label": "UnitPrice",
+          "type": "real"
+        },
+        {
+          "name": "Comment",
+          "label": "Comment",
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

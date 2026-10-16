@@ -15,12 +15,21 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
+import {createNodeReadDrivers} from './node-read-driver.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possible:false,...details});
 
+export function isSavedTextImportExecution(request) {
+  return request.target?.type==='imports.text' && request.target.kind==='existing'
+    && request.mode==='delimited' && request.finish==='execute'
+    && request.parameters && typeof request.parameters==='object' && !Array.isArray(request.parameters) && Object.keys(request.parameters).length===0
+    && request.inputs?.length===0 && request.mappings?.length===0 && request.read?.ports?.length===0;
+}
+
 export function validateTextImportNodeParameters(p,mode,request) {
+  if(p===request.parameters && mode===request.mode && isSavedTextImportExecution(request))return;
   requireValue(p && Object.keys(p).sort().join(',')==='settings,source','Exact import source and settings required');
   const existing=request.target?.kind==='existing';
   if(!existing)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
@@ -100,11 +109,19 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
+    executionOnly:isSavedTextImportExecution,
     parameter_schema:textImportParametersSchema,
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
   const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,verifiedUploads,uploadHistory})=>{
+    if(isSavedTextImportExecution(operation.parameters))return {
+      ...createNodeReadDrivers({operation,execute,onRecord,now,receiptOptions},{targetOrigin,targetBuild}),
+      // Executes only the already saved node. No file bytes or provenance are
+      // inferred from its path; requesting any source/settings still uses upload proof.
+      verifySource:async()=>verified({source_kind:'saved_import_configuration',
+        source_integrity_verified:false,configuration_unchanged:true}),
+    };
     let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
     const enter=ctx=>{

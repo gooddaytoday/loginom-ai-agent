@@ -1,10 +1,12 @@
 import { fork } from "node:child_process"
-import { isAbsolute } from "node:path"
+import { isAbsolute, join, resolve } from "node:path"
+import { readFile, realpath } from "node:fs/promises"
+import { createHash, randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 
-export async function launchNodeHost(input: {
+type NodeHostInput = {
   node: string
   entry: string
   root: string
@@ -12,7 +14,48 @@ export async function launchNodeHost(input: {
   headless: boolean
   environment?: NodeJS.ProcessEnv
   strictRecovery?: boolean
-}) {
+  acceptanceCleanupPackage?: string
+}
+const diagnostics = new WeakMap<object, { authorization: string; packagePath: string }>()
+
+// Closed diagnostic launcher. Resource paths and harness are fixed; callers
+// cannot supply executable code, a module path or a transport capability.
+export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
+  if (typeof input.packagePath !== "string" || input.packagePath.length > 1024 || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
+      || input.packagePath.split("/").some(x => x === "." || x === ".."))
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  const manifest = JSON.parse(await readFile(join(input.resources, "resource-manifest.json"), "utf8"))
+  // The post-staging Node host belongs to the product inventory, not the
+  // runtime resource inventory. Use its canonical receiving product location.
+  const product = resolve(input.resources, "../..")
+  if (await realpath(input.resources) !== join(product, "resources/loginom"))
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  const cli = JSON.parse(await readFile(join(product, "cli-manifest.json"), "utf8"))
+  const hosts = cli.files?.filter((file: { path: string }) => file.path === "resources/loginom/host/node-host.mjs")
+  const hostItem = hosts?.[0]
+  if (cli.format !== "loginom-cli-artifact-v1" || hosts?.length !== 1 || !/^[a-f0-9]{64}$/.test(hostItem.sha256)
+      || await realpath(input.entry) !== join(product, "resources/loginom/host/node-host.mjs")
+      || createHash("sha256").update(await readFile(input.entry)).digest("hex") !== hostItem.sha256)
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  for (const [path, actual] of [["bin/node", input.node],
+    ["runtime/src/acceptance/calculator-grouped-before-done-v1.mjs", join(input.resources, "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs")]]) {
+    const items = manifest.files?.filter((file: { path: string }) => file.path === path)
+    const item = items?.[0]
+    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
+        || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
+      throw Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath }
+  const options = { ...input }
+  diagnostics.set(options, grant)
+  const host = await launchNodeHost(options)
+  return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
+}
+
+export async function launchNodeHost(input: NodeHostInput) {
+  // Ordinary product callers cannot turn structural fields into authority.
+  if ("acceptanceCapture" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
+  const diagnostic = diagnostics.get(input)
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const environment = runtimeEnvironment(input.environment ?? process.env)
@@ -66,9 +109,11 @@ export async function launchNodeHost(input: {
       "start",
       {
         protocol: 1,
+        ...(diagnostic ? { acceptanceCapture: diagnostic } : {}),
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        ...(input.acceptanceCleanupPackage !== undefined ? { acceptanceCleanupPackage: input.acceptanceCleanupPackage } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
       // Startup restores the saved connection and waits for browser/MCP readiness.
@@ -104,7 +149,9 @@ export async function launchNodeHost(input: {
     close() {
       if (state.closing) return state.closing
       state.closing = (async () => {
-        const result = await client.request("close", {}, 30_000).catch(() => undefined)
+        const result = await client.request("close", {}, 30_000)
+        if (!result || typeof result !== "object" || !("closed" in result) || result.closed !== true)
+          throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
         // An acknowledgement alone does not prove exit. Bound a stuck host while
         // retaining a failed cleanup result so the caller keeps its profile guard.
         const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
@@ -124,7 +171,9 @@ export async function launchNodeHost(input: {
           client.close()
         }
       })()
-      return state.closing
+      const attempt = state.closing
+      attempt.catch(() => { if (state.closing === attempt) state.closing = undefined })
+      return attempt
     },
   }
 }

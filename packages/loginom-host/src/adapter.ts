@@ -4,14 +4,17 @@ export * as LoginomHost from "./adapter"
 import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
 
-const state: { connection?: ReturnType<typeof transport> } = {}
-export function connect(port: Port) {
+type Owner = { deferRelease: boolean; leases: Set<{ release(): Promise<void> }> }
+const state: { connection?: ReturnType<typeof transport>; owner?: Owner } = {}
+export function connect(port: Port, owner?: Owner) {
   state.connection?.close()
   state.connection = transport(port)
+  state.owner = owner
 }
 export function disconnect() {
   state.connection?.close()
   state.connection = undefined
+  state.owner = undefined
 }
 export async function acquire(session: string) {
   const connection = state.connection
@@ -21,8 +24,9 @@ export async function acquire(session: string) {
   if (!value) throw new Error("LOGINOM_HOST_NOT_READY")
   if (typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number")
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  const owner = state.owner
   const queue = { tail: Promise.resolve(), released: false }
-  return {
+  const lease = {
     generation: value.generation,
     async admit(userMessage: string, files: InputFile[]) {
       return connection.request("admit", { run, userMessage, files })
@@ -50,8 +54,12 @@ export async function acquire(session: string) {
       }
     },
     async release() {
+      if (owner?.deferRelease) return
       queue.released = true
       await connection.request("release", { run }).catch(() => undefined)
+      owner?.leases.delete(lease)
     },
   }
+  owner?.leases.add(lease)
+  return lease
 }

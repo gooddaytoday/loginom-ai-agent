@@ -3412,6 +3412,10 @@ function readRenderedInputMapping(observation) {
         if (!current.authenticated) fail('LOGIN_REQUIRED', 'Loginom authentication is required before changing the workspace');
         if (!same(task.snapshot.dom_epoch, current.dom_epoch)) fail('UI_EPOCH_CHANGED', 'The document changed since this observation; observe again even if its visible state looks unchanged');
         if (!same(current.ui.dialogs.map(item => item.ref), task.snapshot.ui.dialogs.map(item => item.ref))) fail('UI_CONTEXT_CHANGED', 'The visible dialog changed; observe the workspace again');
+        // Only a fresh bound reader can supply this alias proof. Keep exact
+        // workflow equality for unbound/exact-key opening; caller receipts stay immutable.
+        const openingWorkflowMatches=(node,path,opening)=>same(path,opening)
+          ||node?.verified===true&&same(node.navigation_alias?.original_path,opening)&&same(node.navigation_alias?.path,path);
         if(task.action.verb==='confirm_wizard_deactivation') {
           const binding=task.snapshot.node_wizard_confirmation,n=current.prepared_node_context;
           if(binding?.kind!=='deactivation'||n?.verified!==true||n.surface!=='graph'||n.tid!==binding.graph_tid
@@ -3420,7 +3424,7 @@ function readRenderedInputMapping(observation) {
             ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
               ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
                 &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
-            ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+            ||!openingWorkflowMatches(n,current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))
@@ -3782,7 +3786,7 @@ function readRenderedInputMapping(observation) {
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingWorkflowMatches(afterNode,owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
@@ -4064,4 +4068,166 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
   return `async (page) => (${workspaceUiCapability.toString()})(page, ${JSON.stringify(task)}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
+}
+
+// Internal Calculator-only diagnostic capture; not a public observer option.
+export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
+ const fail=m=>{throw Error('LOGINOM_CAPTURE_'+m);};
+ if(!limits||limits.bytes!==524288||limits.dom!==4096||limits.records!==1000||limits.string!==512)fail('LIMITS');
+ const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+ if(p?.document!==document||p.id!==owner.document_id||app?.Version!==owner.loginom_build
+  ||app.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName!==owner.account)fail('RAW_IDENTITY');
+ const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+ const tabs=exact(owner.tab_tid);
+ if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active'))fail('RAW_TAB');
+ const roots=exact(root_tid);if(roots.length!==1)fail('RAW_ROOT');
+ const root=roots[0],ui=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+ if(ui?.document!==document||ui.refs?.get(root_ref)?.deref()!==root||!root.isConnected)fail('RAW_ROOT_REF');
+ const receipts=[...p.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===owner.workflow_id&&r.tab===tabs[0]);
+ if(!receipts.length||receipts.some(r=>r.packageNode!==receipts[0].packageNode))fail('RAW_WORKFLOW');
+ const ids=new WeakMap();let seq=0;
+ const id=o=>{if(!o||typeof o!=='object')return null;if(!ids.has(o))ids.set(o,++seq);return ids.get(o);};
+ const scalar=v=>{if(v===undefined)return {missing:true};if(v===null||typeof v==='boolean')return v;
+  if(typeof v==='number'){if(!Number.isFinite(v))fail('FINITE');return v;}
+  if(typeof v==='string'){if(new TextEncoder().encode(v).length>limits.string)fail('STRING_BOUND');return v;}return {object_id:id(v)};};
+ const own=(o,k)=>{const d=o&&Object.getOwnPropertyDescriptor(o,k);return !d?{missing:true}:!('value'in d)?{accessor_not_read:true}:scalar(d.value);};
+ // Operative class metadata: first descriptor wins; never invoke accessors.
+ const classString=o=>{
+  if(!o)return {missing:true};let current=o;
+  for(let depth=0;depth<=8;depth++){
+   const d=Object.getOwnPropertyDescriptor(current,'$className');
+   if(d){if(!('value'in d))return {accessor_not_read:true};
+    return typeof d.value==='string'?scalar(d.value):{class_type:typeof d.value};}
+   if(depth===8)return {depth_bound:true};
+   current=Object.getPrototypeOf(current);
+   if(current===null)return {missing:true};
+  }
+  return {depth_bound:true};
+ };
+ // Operative buffering flag: explicit boolean only, first descriptor wins.
+ const storeBoolean=store=>{
+  if(!store)return {missing:true};let current=store;
+  for(let depth=0;depth<=8;depth++){
+   const d=Object.getOwnPropertyDescriptor(current,'isBufferedStore');
+   if(d){if(!('value'in d))return {accessor_not_read:true};
+    return typeof d.value==='boolean'?d.value:{boolean_type:typeof d.value};}
+   if(depth===8)return {depth_bound:true};
+   current=Object.getPrototypeOf(current);
+   if(current===null)return {missing:true};
+  }
+  return {depth_bound:true};
+ };
+ const rect=e=>{const r=e.getBoundingClientRect();if(![r.x,r.y,r.width,r.height,e.clientWidth,e.clientHeight,e.scrollWidth,e.scrollHeight,e.scrollLeft,e.scrollTop].every(Number.isFinite))fail('GEOMETRY');return {x:r.x,y:r.y,width:r.width,height:r.height,
+  clientWidth:e.clientWidth,clientHeight:e.clientHeight,scrollWidth:e.scrollWidth,scrollHeight:e.scrollHeight,scrollLeft:e.scrollLeft,scrollTop:e.scrollTop};};
+ const dom=[],stack=[root];while(stack.length){
+  if(dom.length>=limits.dom)fail('DOM_BOUND');const e=stack.pop();
+  dom.push({id:id(e),parent_id:id(e.parentElement),tag:e.tagName,
+   attrs:Object.fromEntries(['id','data-tid','data-recordindex','data-recordid','data-boundview','class'].map(k=>[k,scalar(e.getAttribute(k))])),rect:rect(e)});
+  // Charge before allocating a child list; reject rather than truncate.
+  if(e.children.length+stack.length+dom.length>limits.dom)fail('DOM_BOUND');
+  for(let i=e.children.length-1;i>=0;i--)stack.push(e.children[i]);
+ }
+ const bufferedDescriptor=store=>{
+  const result={own:'unavailable',own_type:null,own_value:null,inherited:'not_checked',inherited_type:null,inherited_value:null,depth:null};
+  try{
+   const d=Object.getOwnPropertyDescriptor(store,'isBufferedStore');
+   result.own=d?('value'in d?'data':'accessor'):'absent';
+   if(d){if('value'in d){result.own_type=typeof d.value;if(typeof d.value==='boolean')result.own_value=d.value;}return result;}
+   let p=store;
+   for(let depth=1;depth<=8;depth++){
+    p=Object.getPrototypeOf(p);
+    if(p===null){result.inherited='absent';return result;}
+    const inherited=Object.getOwnPropertyDescriptor(p,'isBufferedStore');
+    if(inherited){result.inherited='value'in inherited?'data':'accessor';
+     result.inherited_type='value'in inherited?typeof inherited.value:null;
+     if('value'in inherited&&typeof inherited.value==='boolean')result.inherited_value=inherited.value;
+     result.depth=depth;return result;}
+   }
+   result.inherited='depth_bound';return result;
+  }catch{return result;}
+ };
+ // Diagnostic-only fixed properties. Never use these values as cache proof.
+ const provenanceDescriptor=(store,key)=>{
+  const result={own:'unavailable',own_type:null,own_value:null,own_truncated:false,
+   inherited:'not_checked',inherited_type:null,inherited_value:null,inherited_truncated:false,depth:null};
+  const copy=(descriptor,where)=>{
+   result[where]='value'in descriptor?'data':'accessor';
+   if(!('value'in descriptor))return;
+   const value=descriptor.value;result[where+'_type']=typeof value;
+   if(key==='buffered'&&typeof value==='boolean')result[where+'_value']=value;
+   if(key==='$className'&&typeof value==='string'){
+    result[where+'_value']=value.slice(0,128);result[where+'_truncated']=value.length>128;
+   }
+  };
+  try{
+   const d=Object.getOwnPropertyDescriptor(store,key);
+   if(d){copy(d,'own');return result;}
+   result.own='absent';result.inherited='unavailable';let p=store;
+   for(let depth=1;depth<=8;depth++){
+    p=Object.getPrototypeOf(p);
+    if(p===null){result.inherited='absent';return result;}
+    const d=Object.getOwnPropertyDescriptor(p,key);
+    if(d){copy(d,'inherited');result.depth=depth;return result;}
+   }
+   result.inherited='depth_bound';return result;
+  }catch{return {...result,diagnostic_error:true};}
+ };
+ const stores=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(suffix=>{
+  const candidates=root.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']');
+  if(candidates.length!==1)fail('GRID');const element=candidates[0],view=globalThis.Ext?.getCmp?.(element.id);
+  if(view?.el?.dom!==element)fail('GRID_BINDING');
+  // These are the same cached UI accessors used by the native mapping reader.
+  const store=view.getStore?.(),data=store?.getData?.(),source=data?.getSource?.(),proxy=store?.getProxy?.();
+  if(!Array.isArray(data?.items)||data.items.length>limits.records||source&&(!Array.isArray(source.items)||source.items.length>limits.records))fail('CACHE_BOUND');
+  const records=data.items.map(r=>({object_id:id(r),internalId:own(r,'internalId'),data_id:id(r.data),
+   data:Object.fromEntries(['ID','Index','Name','DisplayName','DataType','GroupField','DataKind','Required','Broken','IsDerived','SourceDisplayName','SourceName','ConnectedRecord'].map(k=>[k,own(r.data,k)]))}));
+  const rendered=[...element.querySelectorAll('table.x-grid-item')];
+  if(rendered.length>limits.records)fail('ROW_BOUND');
+  const rows=rendered.map(e=>({element_id:id(e),parent_id:id(e.parentElement),record_index:scalar(e.getAttribute('data-recordindex')),record_id:scalar(e.getAttribute('data-recordid')),bound_view:scalar(e.getAttribute('data-boundview')),rect:rect(e)}));
+  const pending=proxy&&Object.getOwnPropertyDescriptor(proxy,'pendingOperations');
+  const pendingKeys=pending&&'value'in pending&&pending.value?Object.keys(pending.value):null;
+  if(pendingKeys&&pendingKeys.length>limits.records)fail('PENDING_BOUND');
+  return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
+   isBufferedStore_descriptor:bufferedDescriptor(store),
+   provenance_descriptors:Object.fromEntries(['$className','buffered'].map(key=>[key,provenanceDescriptor(store,key)])),
+   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,k==='$className'?classString(store):k==='isBufferedStore'?storeBoolean(store):own(store,k)])),
+   cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
+    remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
+   proxy_class:classString(proxy),pendingKeys:pendingKeys?.map(scalar)??null,
+   source_membership:source?.items.map(id)??null,cache_membership:data.items.map(id),records,rows,geometry:rect(element)};
+ });
+ // These are diagnostic cache/row predicates, not the observer's ordinary
+ // coverage or addressed-definition decision. Missing facts stay unevaluated.
+ const window=stores.map(s=>{
+  const f=s.flags,c=s.cached_reads;
+  const available=typeof c.count==='number'&&typeof c.loading==='boolean'
+   &&typeof c.remoteFilter==='boolean'&&typeof c.remoteSort==='boolean'&&Array.isArray(s.source_membership)
+   &&Array.isArray(s.pendingKeys)&&typeof f.isBufferedStore==='boolean';
+  const inputType=value=>({type:value===null?'null':typeof value,isArray:Array.isArray(value),
+   length:Array.isArray(value)?value.length:null});
+  const available_inputs=Object.fromEntries(Object.entries({count:c.count,loading:c.loading,
+   remoteFilter:c.remoteFilter,remoteSort:c.remoteSort,source_membership:s.source_membership,
+   pendingKeys:s.pendingKeys,isBufferedStore:f.isBufferedStore}).map(([key,value])=>[key,inputType(value)]));
+  const diagnosticScalar=(value,type)=>({type:typeof value,
+   value:typeof value===type&&(type==='string'||Number.isFinite(value))?(type==='string'?value.slice(0,128):value):null,
+   truncated:typeof value==='string'&&value.length>128});
+  const store_provenance={$className:diagnosticScalar(f.$className,'string'),currentPage:diagnosticScalar(f.currentPage,'number'),
+   proxy_class:diagnosticScalar(s.proxy_class,'string'),descriptors:s.provenance_descriptors};
+  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable',available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor,store_provenance};
+  const cache=f.$className==='Ext.data.Store'&&f.isBufferedStore===false&&c.loading===false
+   &&f.currentPage===1&&c.remoteFilter===false&&c.remoteSort===false&&s.pendingKeys.length===0
+   &&s.proxy_class==='bg.ext.CollectionProxy'&&c.count===s.records.length
+   &&s.source_membership.length===s.cache_membership.length
+   &&new Set(s.source_membership).size===s.source_membership.length
+   &&s.source_membership.every(id=>s.cache_membership.includes(id));
+  const rows=s.rows.length===s.records.length&&s.rows.every((r,i)=>
+   r.record_index===String(i)&&r.record_id===String(s.records[i].internalId)
+   &&r.bound_view===dom.find(e=>e.id===s.element_id)?.attrs.id);
+  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows,available_inputs,isBufferedStore_descriptor:s.isBufferedStore_descriptor,store_provenance};
+ });
+ const result={owner,root_tid,root_ref,dom,stores,collector_revision:1,
+  predicates:{status:'partial',evaluated:false,cached_windows:window,
+   missing:['ordinary_coverage','addressed_complete','native_window','full_geometry_trace']}};
+ if(new TextEncoder().encode(JSON.stringify(result)).length>limits.bytes)fail('BYTE_BOUND');
+ return result;
 }

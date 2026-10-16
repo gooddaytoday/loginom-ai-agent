@@ -8,6 +8,7 @@ import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '.
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, skillTransport, skillUri, prepareTool } from './skill.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
+import {open as receiptOpen,writeFile as receiptWrite,fsync as receiptSync,close as receiptClose} from 'node:fs';
 import { join } from 'node:path';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
@@ -84,7 +85,13 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport } = {}) {
+function shutdownRejection(value) {
+  return value instanceof Error?{kind:'Error',name:value.name,message:value.message,
+    ...('cause' in value?{cause:shutdownRejection(value.cause)}:{})}:
+    {kind:'value',value:value===undefined?null:value,is_undefined:value===undefined};
+}
+
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture } = {}) {
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -124,6 +131,16 @@ export async function createBridge(config, session, { browserTransport: managedB
   const browserGate = createSerialGate();
   const heldLeases = new Set();
   const savedPackages = new Map();
+  // Managed model runs derive teardown authority from guarded preparation and a
+  // settled save on this bridge, never from a caller-supplied cleanup path.
+  const managedCleanup = userProfile && config.mode === 'executor-replay';
+  let managedSave, cleanupRefused = false;
+  let confirmedCleanup, retainedNativeCleanup, cleanupShutdownBinding, cleanupReceiptWritten = false;
+  const cleanupWriters = new Set();
+  let cleanupEvidenceBinding;
+  let cleanupPersistencePrimary;
+  const cleanupPersistenceFailures = [];
+  let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -191,6 +208,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
+      if ((cleanupRefused || captureInFlight) && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
+        'dock_operation_inspect','dock_node_status','dock_node_wait','tool_search','tool_describe'].includes(request.params.name))
+        throw new McpError(ErrorCode.InvalidRequest, 'Package cleanup is unconfirmed; only read-only diagnosis is allowed');
       if (request.params.name === 'dock_diagnostics') {
         let archive = null;
         try { archive = JSON.parse(await readFile(join(session.directory, 'archive.json'), 'utf8')); } catch {}
@@ -345,6 +365,14 @@ export async function createBridge(config, session, { browserTransport: managedB
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
+            if (managedCleanup && outcome.status === 'SUCCEEDED' && outcome.cleanup_complete === true
+                && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key) && outcome.output?.package_ref?.path) {
+              const prepared=session.metadata.workspacePreparation?.state;
+              managedSave={operationId:outcome.operation_id, sessionId:session.metadata.sessionId,
+                documentId:prepared?.document_id, tabTid:prepared?.workflow_ref?.tab_tid,
+                account:prepared?.loginom_account, packagePath:outcome.output.package_ref.path,
+                loginomUrl:config.loginomUrl, loginomBuild:session.metadata.targetIdentity?.loginom_build};
+            }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
@@ -428,49 +456,311 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     });
-    return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
-      hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
+    async function captureAcceptance() {
+      const binding = acceptanceCapture?.binding;
+      if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
+        throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
+      const assertBound = () => {
+        actionRuntime.assertPreparationAllowed();
+        const prepared=session.metadata.workspacePreparation;
+        if (clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
+            || Date.now() >= binding.expires || session.metadata.workspaceReady !== true
+            || binding.session !== session.metadata.sessionId || !prepared?.attempted
+            || prepared.state.loginom_account !== binding.account || !managedSave
+            || managedSave.sessionId !== binding.session || managedSave.documentId !== prepared.state.document_id
+            || managedSave.tabTid !== prepared.state.workflow_ref.tab_tid || managedSave.account !== binding.account
+            || managedSave.packagePath !== binding.packagePath || !savedPackages.has(binding.packagePath)
+            || managedSave.loginomBuild !== session.metadata.targetIdentity?.loginom_build)
+          throw Error('LOGINOM_CAPTURE_IDENTITY_REFUSED');
+      };
+      assertBound();
+      captureConsumed=true;
+      captureInFlight=browserGate(async () => {
+        assertBound();
+        if (typeof acceptanceCapture.resourceReader?.read !== 'function') throw Error('LOGINOM_CAPTURE_RESOURCE_READER_MISSING');
+        const resources = await acceptanceCapture.resourceReader.read({deadline: binding.expires});
+        assertBound();
+        if (resources.scope !== 'current-owned-session' || resources.account !== binding.account
+            || resources.package_count !== 1 || resources.running !== false)
+          throw Error('LOGINOM_CAPTURE_RESOURCE_REFUSED');
+        const identity=Object.freeze({session_id:binding.session, document_id:managedSave.documentId,
+          tab_tid:managedSave.tabTid, account:binding.account, package_path:binding.packagePath,
+          loginom_build:managedSave.loginomBuild});
+        // Only the fixed verified resource receives this private Page transport.
+        // It is never supplied by IPC, the tool catalogue or the model.
+        captureUnknown=true;
+        let cancelledDraft=false;
+        const recordCapture=async event=>{
+          if(event?.event==='calculator_capture_cancel') {
+            assertBound();
+            const owner=event.owner,c=event.cancellation;
+            if(!owner || Object.keys(identity).some(key=>owner[key]!==identity[key])
+                || ['owner','lease','run','generation','chat'].some(key=>owner[key]!==binding[key])
+                || owner.workflow_id!==session.metadata.workspacePreparation.state.workflow_ref.workflow_id
+                || typeof owner.node_id!=='string'||!owner.node_id
+                || c?.verified!==true||c.cleanup_complete!==true||c.draft_discarded!==true
+                || c.settings_applied!==false||c.execution_started!==false
+                || ['document_id','workflow_id','node_id'].some(key=>c.node_context?.[key]!==owner[key]))
+              throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
+            const persisted=await recordExecution(event);
+            assertBound();
+            cancelledDraft=true;
+            return persisted;
+          }
+          return await recordExecution(event);
+        };
+        let receipt;
+        try { receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordCapture}); }
+        catch(error) {
+          // The fixed harness may discard an owned draft and still reject its
+          // original capture. Only its durable, exact cancellation permits
+          // ordinary cleanup; it never promotes that rejection to capture PASS.
+          if(cancelledDraft) { try { assertBound();captureUnknown=false; }catch {} }
+          throw error;
+        }
+        assertBound();
+        if (!receipt || receipt.settings_applied !== false || receipt.cancel_verified !== true
+            || Object.keys(identity).some(key => receipt[key] !== identity[key]))
+          throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
+        await writeFile(join(session.directory,'acceptance-capture.json'),JSON.stringify({binding,identity,receipt},null,2)+'\n',{mode:0o600});
+        await recordExecution({event:'acceptance_capture',binding,identity,receipt});
+        captureUnknown=false;
+        return receipt;
+      });
+      try {
+        const receipt=await captureInFlight;
+        captureInFlight=undefined;
+        const closed=await closeBridge();
+        const cleanup=JSON.parse(await readFile(join(session.directory,'package-cleanup.json'),'utf8'));
+        if (closed.browser_transport_closed !== true || cleanup.status !== 'SUCCEEDED'
+            || cleanup.package_closed !== true || cleanup.logged_out !== true)
+          throw Error('LOGINOM_CAPTURE_CLEANUP_UNCONFIRMED');
+        return {receipt,cleanup,cleanupComplete:true};
+      } catch (error) { cleanupRefused=true; captureRejected=true; captureRejection=error; throw error }
+      finally { captureInFlight=undefined }
+    }
+    function assertCleanupDestination(binding) {
+      if(binding.directory!==session.directory || binding.metadata!==session.metadata
+          || binding.sessionId!==session.metadata.sessionId) {
+        cleanupReceiptWritten=false;
+        throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
+      }
+    }
+    function assertCleanupReceiptBinding(binding,cleanup) {
+      assertCleanupDestination(binding);
+      if(binding.receipt!==cleanup || binding.confirmed!==confirmedCleanup
+          || (binding.confirmed && cleanupEvidenceBinding!==binding)) {
+        cleanupReceiptWritten=false;
+        throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
+      }
+    }
+    async function writeCleanupReceipt(cleanup) {
+      const candidate=Object.freeze({receipt:cleanup,confirmed:confirmedCleanup,
+        directory:session.directory,metadata:session.metadata,sessionId:session.metadata.sessionId,
+        bytes:JSON.stringify(cleanup,null,2)+'\n'});
+      const binding=confirmedCleanup ? (cleanupEvidenceBinding??=candidate) : candidate;
+      const assertBound=()=>assertCleanupReceiptBinding(binding,cleanup);
+      assertBound();
+      let phase='retained_close',primary;
+      const remember=(value,failedPhase)=>{
+        primary ??= {phase:failedPhase,value};
+        cleanupPersistencePrimary ??= primary;
+        cleanupPersistenceFailures.push({phase:failedPhase,rejection:shutdownRejection(value)});
+      };
+      const closeWriter=async file=>{
+        if(file.closeComplete)return;
+        if(file.io?.pending)throw Error('LOGINOM_CLEANUP_WRITER_IO_UNKNOWN');
+        if(file.closeStarted)throw file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+        file.closeStarted=true;
+        let projection;
+        const completion=new Promise((resolve,reject)=>{
+          try{projection=receiptClose(file.fd,error=>{
+            if(error===null||error===undefined){file.closeComplete=true;resolve()}
+            else{file.closeFailure={value:error};reject(error)}
+          })}catch(value){file.closeFailure??={value};reject(value)}
+        });
+        // Only the original native callback proves close, never fd/status or
+        // fulfillment of a returned projection. Preserve a rejected projection.
+        await Promise.all([completion,projection]);
+      };
+      for(const file of cleanupWriters){
+        if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
+          try{await closeWriter(file)}catch(value){file.closeFailure??={value};remember(value,'retained_close')}
+        }
+        if(!file.closeComplete){
+          remember(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN'),'retained_close');
+          throw cleanupPersistencePrimary.value;
+        }
+        cleanupWriters.delete(file);
+        assertBound();
+      }
+      assertBound();
+      const persistHandle=async(path,mode,write)=>{
+        const file={fd:undefined,closeComplete:false};
+        cleanupWriters.add(file);
+        const callback=invoke=>{
+          assertBound();
+          const operation={pending:true,phase};file.io=operation;
+          let projection;
+          const completion=new Promise((resolve,reject)=>{
+            try{projection=invoke((error,result)=>{
+              operation.pending=false;
+              if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve(result);
+            })}catch(value){reject(value)}
+          });
+          return Promise.all([completion,projection]).then(([result])=>{assertBound();return result});
+        };
+        try{
+          phase=write?'file_open':'directory_open';
+          await callback(done=>receiptOpen(path,mode,0o600,(error,fd)=>{
+            file.openComplete=true;
+            if(error===null||error===undefined)file.fd=fd;
+            else cleanupWriters.delete(file);
+            done(error,fd);
+          }));
+          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,binding.bytes,done))}
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));
+        }catch(value){remember(value,phase)}
+        if(file.fd!==undefined){
+          const closePhase=write?'file_close':'directory_close';
+          try{await closeWriter(file);cleanupWriters.delete(file);assertBound()}
+          catch(value){file.closeFailure??={value};remember(value,closePhase)}
+        }
+        if(primary)throw primary.value;
+        if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+      };
+      await persistHandle(join(binding.directory,'package-cleanup.json'),'w',true);
+      assertBound();
+      await persistHandle(binding.directory,'r',false);
+      assertBound();
+      // No marker before both writes/syncs/closes actually complete.
+      if(cleanupWriters.size)throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
+      if(confirmedCleanup)cleanupReceiptWritten=true;
+    }
+    function closeBridge() {
+      if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
+      if (captureInFlight) return captureInFlight.then(() => closeBridge());
+      if(closing)return closing;
+      if([...cleanupWriters].some(file=>!file.closeComplete &&
+          (file.io?.pending || file.closeStarted || !file.openComplete || file.fd===undefined)))
+        return Promise.reject(cleanupPersistencePrimary?cleanupPersistencePrimary.value:Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED'));
+      const shutdownBinding=cleanupShutdownBinding??=Object.freeze({directory:session.directory,metadata:session.metadata,
+        sessionId:session.metadata.sessionId});
+      const assertShutdownBound=()=>{
+        assertCleanupDestination(shutdownBinding);
+        if(retainedNativeCleanup)assertCleanupDestination(retainedNativeCleanup.binding);
+        if(cleanupEvidenceBinding)assertCleanupReceiptBinding(cleanupEvidenceBinding,confirmedCleanup);
+      };
       shutdownStarted = true;
+      let shutdownPrimary, shutdownStage;
       closing ??= (async () => {
-        if (config.acceptanceCleanupPackage) {
+        shutdownStage='native_cleanup';
+        let shutdownCleanup;
+        if (config.acceptanceCleanupPackage || managedCleanup) {
+          if (managedCleanup) cleanupRefused=true;
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
-          if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
+          assertShutdownBound();
+          if(retainedNativeCleanup)assertCleanupDestination(retainedNativeCleanup.binding);
+          if (confirmedCleanup) cleanup=confirmedCleanup;
+          else if(retainedNativeCleanup)cleanup=retainedNativeCleanup.receipt;
+          else if (managedCleanup && (clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
+            cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
+          else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
             try {
               // Refuse unsettled background node jobs before waiting on the
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
-              if (session.metadata.workspaceReady !== true || !savedPackages.has(config.acceptanceCleanupPackage)) {
+              const path=config.acceptanceCleanupPackage ?? managedSave?.packagePath;
+              if (session.metadata.workspaceReady !== true || !savedPackages.has(path)
+                  || (managedCleanup && (!managedSave || managedSave.sessionId!==session.metadata.sessionId
+                    || managedSave.documentId!==prepared.state.document_id
+                    || managedSave.tabTid!==prepared.state.workflow_ref.tab_tid
+                    || managedSave.account!==prepared.state.loginom_account
+                    || managedSave.packagePath!==path || managedSave.loginomBuild!==session.metadata.targetIdentity.loginom_build))) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
+                assertShutdownBound();
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
                   tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
-                  packagePath:config.acceptanceCleanupPackage, loginomUrl:config.loginomUrl,
+                  packagePath:path, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity.loginom_build,
                 };
-                const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
+                // Keep the shared helper unchanged. Add the current native tab
+                // guard inside its existing evaluate, immediately before ClosePackage.
+                const anchor='const state = globalThis.__loginomDockCleanupV1 =';
+                const original=makePackageCleanupCode(cleanupOptions);
+                if (!original.includes(anchor)) throw Error('Cleanup guard insertion unavailable');
+                const code=original.replace(anchor, `
+                  const tabs=[...document.querySelectorAll('[data-tid]')].filter(el=>el.getAttribute('data-tid')===o.tabTid);
+                  if(tabs.length!==1 || !visible(tabs[0])) return {reason:'CURRENT_TAB_CHANGED'};
+                  ${anchor}`);
+                const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
               });
             } catch { cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'}; }
           }
-          cleanup = {...cleanup, session_id:session.metadata.sessionId,
-            save_operation_id:savedPackages.get(config.acceptanceCleanupPackage) ?? null};
-          await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+          // Escrow only the parsed native receipt and its original destination.
+          // This is not a persisted cache/marker or transport/release authority.
+          if(cleanup.status==='SUCCEEDED' && !retainedNativeCleanup)
+            retainedNativeCleanup=Object.freeze({binding:shutdownBinding,receipt:Object.freeze({...cleanup,
+              save_operation_id:savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath)??null})});
+          assertShutdownBound();
+          if(retainedNativeCleanup)assertCleanupDestination(retainedNativeCleanup.binding);
+          cleanup = {...cleanup, session_id:cleanup.session_id??shutdownBinding.sessionId,
+            save_operation_id:retainedNativeCleanup ? retainedNativeCleanup.receipt.save_operation_id
+              :savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath) ?? null};
+          shutdownCleanup=cleanup;
+
+          if (managedCleanup && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=true;
+          // Preserve the verified native result across persistence failures on
+          // this same foreground owner. No cache is minted for unknown responses.
+          if (cleanup.status==='SUCCEEDED' && !confirmedCleanup) confirmedCleanup=Object.freeze(cleanup);
+          if (!confirmedCleanup || !cleanupReceiptWritten) {
+            try {await writeCleanupReceipt(confirmedCleanup??cleanup)} catch(error) {
+              shutdownPrimary={stage:'cleanup_receipt',reason:cleanupPersistencePrimary?cleanupPersistencePrimary.value:error,
+                rejections:cleanupPersistenceFailures};
+              throw error;
+            }
+          }
+          assertShutdownBound();
           await recordExecution({event:'isolated_package_cleanup', cleanup});
+          assertShutdownBound();
+          if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
             package_cleanup:cleanup,
           };
         }
-        await server.close(); const closed=await closeClients();
+        assertShutdownBound();
+        shutdownStage='server_close';
+        await server.close();
+        assertShutdownBound();
+        shutdownStage='transport_close';
+        const closed=await closeClients();
+        const rejectedStages=closed.flatMap((result,index)=>result.status==='rejected'?[{stage:index===0?'remote_close':'browser_transport_close',rejection:shutdownRejection(result.reason)}]:[]);
+        if(rejectedStages.length) shutdownPrimary={stage:'transport_close',rejections:rejectedStages,reason:closed.find(result=>result.status==='rejected').reason};
+        assertShutdownBound();
         if (closed[1].status === 'fulfilled') await awaitBrowserExit();
         const browserTransportClosed = closed[1].status === 'fulfilled' && browserProcessTerminated;
-        if (browserTransportClosed) {
+        const cleanupComplete=browserTransportClosed&&closed.every(result=>result.status==='fulfilled');
+        const shutdown={browser_transport_closed:browserTransportClosed,cleanup_complete:cleanupComplete,
+          browser_process_terminated:browserProcessTerminated,native_logout_confirmed:shutdownCleanup?.logged_out===true,
+          package_cleanup:shutdownCleanup??null,clipboard_leases_retained:heldLeases.size,
+          stages:{remote_close:closed[0].status,browser_transport_close:closed[1].status,browser_transport_onclose:browserProcessTerminated},
+          ...(rejectedStages.length?{rejection:rejectedStages[0].rejection,rejections:rejectedStages}:{})};
+        shutdownStage='durable_transport_receipt';
+        assertShutdownBound();
+        await writeFile(join(shutdownBinding.directory,'shutdown-receipt.json'),JSON.stringify(shutdown,null,2)+'\n',{mode:0o600});
+        assertShutdownBound();
+        await recordExecution({event:'bridge_shutdown',shutdown});
+        assertShutdownBound();
+        if (cleanupComplete) {
           await session.artifactStore.releaseUploads();
           await Promise.allSettled([...heldLeases].map(async lease => {
             await lease.release(); heldLeases.delete(lease);
@@ -479,11 +769,32 @@ export async function createBridge(config, session, { browserTransport: managedB
         // A failed transport close does not prove that an unconfirmed paste has
         // stopped. Retain leases while this process lives; process exit still
         // releases kernel locks and is not cross-process recovery evidence.
-        return { browser_transport_closed: browserTransportClosed,
-          browser_process_terminated: browserProcessTerminated, clipboard_leases_retained: heldLeases.size };
-      })();
+        return {...shutdown,clipboard_leases_retained:heldLeases.size};
+      })().then(result => {
+        if (result?.browser_transport_closed !== true || result.cleanup_complete===false) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
+        return result;
+      }, async error => {
+        if(managedCleanup)cleanupRefused=true;
+        if (managedCleanup || config.acceptanceCleanupPackage) { closing = undefined; shutdownStarted = false; }
+        try {
+          assertShutdownBound();
+          if([...cleanupWriters].some(file=>!file.closeComplete))throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
+          await writeFile(join(shutdownBinding.directory,'bridge-shutdown-failure.json'),
+          JSON.stringify({stage:shutdownStage,rejection:shutdownPrimary?shutdownRejection(shutdownPrimary.reason):shutdownRejection(error),
+            ...(shutdownPrimary?{primary_phase:shutdownPrimary.stage,primary_rejection:shutdownRejection(shutdownPrimary.reason),rejections:shutdownPrimary.rejections,persistence_failure:shutdownRejection(error)}:{})},null,2)+'\n',{mode:0o600});
+          assertShutdownBound();
+        } catch(persistence) {
+          try {shutdownBinding.metadata.cleanupFailurePublicationRefusal??=shutdownRejection(persistence)}
+          catch { /* Unavailable metadata must not replace the original failure. */ }
+        }
+        throw shutdownPrimary?new Error('LOGINOM_BRIDGE_CLEANUP_FAILED',{cause:shutdownPrimary.reason}):error;
+      });
       return closing;
-    } };
+    }
+    return {server,catalog,captureAcceptance,
+      hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
+      hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
+      close:closeBridge};
   } catch (error) {
     await closeClients();
     throw error;

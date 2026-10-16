@@ -1,3 +1,4 @@
+import {verifyCalculatorPortCommit} from './calculator-port-commit.mjs';
 const need=(value,message)=>{if(!value)throw Error('Output mapping recovery: '+message);};
 const canonical=x=>Array.isArray(x)?x.map(canonical):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
 export const sameOutputRecovery=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
@@ -51,6 +52,7 @@ export async function reconcileOutputMappingPhase({operation,readReceipt,record,
  const s=outputRecoveryBoundary(operation,now),driver=operation.nodeApplyDrivers;
  need(typeof driver?.recoverOutputMapping==='function','handler has no admitted recovery');
  const pending=structuredClone(s.pending),value=await driver.recoverOutputMapping({readReceipt,signal});
+ verifyCalculatorPortCommit(value?.port_commit,s.node);
  need(value?.verified===true&&value.cleanup_complete===true&&value.finish?.settings_applied===true
   &&value.finish.execution_started===false&&value.recovery?.verified===true,'mapping reconciliation incomplete');
  outputRecoveryBoundary(operation,now);need(sameOutputRecovery(pending,s.pending),'pending checkpoint changed');

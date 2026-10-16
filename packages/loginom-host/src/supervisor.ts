@@ -20,6 +20,8 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  acceptanceCapture?: { revision: 1; harness: "calculator-grouped-before-done-v1"; owner: string; run: string;
+    lease: string; generation: number; chat: string; account: string; packagePath: string; admission: string; expires: number }
 }
 
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
@@ -133,12 +135,13 @@ export async function supervise(input: Launch) {
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
+      const deadline = Date.now() + timeout
       const timer = setTimeout(() => {
         pending.delete(id)
         reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
       }, timeout)
       pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value }, (error) => {
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => {
         if (error) fail()
       })
     })
@@ -147,7 +150,9 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      const reply = await request("close", undefined, 5000)
+      if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
@@ -164,21 +169,29 @@ export async function supervise(input: Launch) {
         clearTimeout(timer)
       }
     })()
-    return closing.promise
+    const attempt = closing.promise
+    attempt.catch(() => { if (closing.promise === attempt) closing.promise = undefined })
+    return attempt
   }
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
   // documented budget with the ordinary 120-second runtime handshake.
-  const ready = await request(
+  let ready: unknown
+  const runtime = { get ready() { return ready }, request, close, exited }
+  async function rejectStartup(primary: Error): Promise<never> {
+    let cleanupFailure: unknown, cleanupFailed = false
+    try { await close() } catch (error) { cleanupFailure = error; cleanupFailed = true }
+    // Private in-process custody, never serialized over public IPC. Keep the
+    // first start rejection and the original child even if cleanup rejects.
+    Object.defineProperty(primary, "retainedRuntime", { value: runtime })
+    if (cleanupFailed) Object.defineProperty(primary, "cleanupFailure", { value: cleanupFailure })
+    throw primary
+  }
+  ready = await request(
     "start",
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
+  ).catch(rejectStartup)
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -190,8 +203,7 @@ export async function supervise(input: Launch) {
       ? !("checked" in ready) || ready.checked !== true
       : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
   ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    return rejectStartup(new Error("LOGINOM_HANDSHAKE_INVALID"))
   }
-  return { ready, request, close, exited }
+  return runtime
 }

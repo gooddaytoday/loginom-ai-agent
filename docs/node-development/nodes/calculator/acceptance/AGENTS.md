@@ -1,0 +1,7 @@
+This directory contains a business task and input data for Calculator verification. Execute the task through the Loginom tools, using the connected ordinary account. The Multica orchestration CLI is outside this task.
+
+Before configuring a Calculator, read its current parameter schema with `dock_action_describe` using `node_types: ["transform.calculator"]`. Read the request feedback before retrying a rejected request. Every complete `dock_node_apply` request requires `finish` and `read` in addition to its target and parameters; retain them when correcting another part of a request. A new operation ID belongs to a corrected, fully specified request, not an identical retry.
+
+Input-port mappings use the complete `fields` layout. `changes` is supported only for output-port mappings. A complete output layout must account for excluded fields as well as included fields. Expression order lists expression names only, not inherited input fields. Inspect the selected node schema and product help for supported expression syntax rather than guessing a language from its appearance.
+
+After a node operation starts, wait or inspect its original operation ID until it settles. Do not repeat a mutation with an unknown outcome. Save after the final reads, verify the task result, close the owned package, and log out of the owned session. If a schema refusal repeats, reread the schema and stop the identical retry loop.

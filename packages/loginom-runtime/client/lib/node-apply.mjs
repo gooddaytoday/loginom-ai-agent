@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {verifyCalculatorPortCommit} from './calculator-port-commit.mjs';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal} from './native-read-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
@@ -283,7 +284,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
       value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
-    const readingOnly=request.mode===NODE_READ_MODE;
+    const readingOnly=request.mode===NODE_READ_MODE||handler.executionOnly?.(request)===true;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>drivers.openWizard(ctx));
@@ -294,7 +295,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       requireValue(value.mode==='done'&&value.settings_applied===true&&value.execution_started===false&&value.execution_id==null,
         'Intermediate node Done must save settings without execution');
     }});
-    if(!separateOutput||request.finish!=='close')await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
+    if(!separateOutput||request.finish!=='close')await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx),{
+      verify:value=>{if(request.target.type==='transform.calculator')verifyCalculatorPortCommit(value.port_commit,state.node);}});
     }
     const finish=await phase('finish',ctx=>(readingOnly||separateOutput&&request.finish!=='close')
       ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{

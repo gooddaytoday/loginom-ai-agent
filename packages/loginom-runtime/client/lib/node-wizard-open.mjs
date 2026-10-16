@@ -1,5 +1,7 @@
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
+const workflowMatches=(node,path,opening)=>same(path,opening)
+ ||node?.verified===true&&same(node.navigation_alias?.original_path,opening)&&same(node.navigation_alias?.path,path);
 const question='Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет';
 
 export function wizardOpenBinding(state) {
@@ -21,7 +23,7 @@ export function wizardDeactivationDialogOwner(state,binding) {
   &&(state.wizard_pending_owner.node?.tid===binding.opening?.workflow_path?.at(-1)?.tid+'>'+binding.opening?.node?.node_label
     ||n.pending_wizard_node?.tid===state.wizard_pending_owner.node?.tid
       &&typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.label===state.wizard_pending_owner.node?.label)
-  &&same(state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
+  &&workflowMatches(n,state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
   &&Array.isArray(ui?.dialogs)&&ui.dialogs.length===1&&Array.isArray(ui.masks)
   &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===binding.graph_tid.split(';Graph;')[0]&&m.dialog_ref===null);
 }
@@ -57,7 +59,7 @@ export async function openPreparedWizard(channel) {
  const ownerMatches=owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
   ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label);
  requireValue(bound&&ownerMatches
-  &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
+  &&workflowMatches(n,owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');
  return {verified:true,deactivation_required:deactivationRequired,node_context:after.prepared_node_context,
   owner,settings_applied:false,execution_started:false};

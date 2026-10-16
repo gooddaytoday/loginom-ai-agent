@@ -248,16 +248,18 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
   const identity = request ? JSON.stringify(request) : null;
   let previous = metadata.workspacePreparation;
   if (previous && previous.identity !== identity) {
-    // An observed missing workflow did not create/open anything. A new explicit
+    // An observed missing workflow or expired entry read did not create/open anything. A new explicit
     // request can replace that terminal refusal; uncertain attempts keep their ID.
     const lostWithoutEffect = previous.effect_possible === false
-      && previous.state?.status === 'NOT_READY' && previous.state.reason === 'WORKFLOW_LOST'
+      && previous.state?.status === 'NOT_READY' && (previous.state.reason === 'WORKFLOW_LOST'
+        || previous.state.reason === 'DEADLINE' && previous.state.phase === 'workspace_entry_ready')
       && previous.state.effect_possible === false && previous.state.created_draft === false
       && previous.state.authenticated === true;
     if (previous.operation_id === request?.operation_id
         || !lostWithoutEffect && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
       throw new Error('Preparation operation conflict: reconcile the existing request first');
     }
+    await record({ event: 'workspace_preparation_replaced', previous: structuredClone(previous), request: structuredClone(request) });
     previous = null;
   }
   metadata.workspaceReady = false;
@@ -308,12 +310,22 @@ export const workspaceObserveTool = {
 
 function bootstrapWorkspace(page, expected) {
   return (async () => {
-    let origin = null;
-    try { origin = new URL(page.url()).origin; } catch { /* No open application. */ }
-    let output = { bootstrap: true, target_state: 'not_open', origin, authenticated: null,
+    if (page.isClosed?.()) throw new Error('Bootstrap page is closed');
+    const url = page.url();
+    if (typeof url !== 'string' || !url) throw new Error('Bootstrap page URL is unavailable');
+    // URL belongs to the browser realm, not the unsafe VM executing this helper.
+    const origin = url === 'about:blank' ? null : await page.evaluate(url => {
+      try {
+        const parsed = new URL(url);
+        return ['http:', 'https:'].includes(parsed.protocol) ? parsed.origin : null;
+      } catch { return null; }
+    }, url);
+    let output = { bootstrap: true, target_state: url === 'about:blank' ? 'not_open' : 'indeterminate', origin, authenticated: null,
       login_required: null, compatible_build: null, observation_only: true };
     if (origin === expected.origin) {
-      output = await page.evaluate(({ expectedBuild }) => {
+      output = await page.evaluate(({ expectedBuild, expectedOrigin }) => {
+        if (location.origin !== expectedOrigin) return { bootstrap: true, target_state: 'indeterminate',
+          origin: location.origin, authenticated: null, login_required: null, compatible_build: null, observation_only: true };
         const started = Date.now(), walker = document.createTreeWalker(document.documentElement, 1);
         let visited = 0, element, exhausted = false, avatar = false, login = false, dialogs = 0, masks = 0;
         const visible = element => {
@@ -348,7 +360,7 @@ function bootstrapWorkspace(page, expected) {
           compatible_build: compatible, blockers: { visible_dialogs: dialogs, visible_masks: masks },
           scan: { visited_elements: visited, complete: exhausted, max_elements: 4000, max_ms: 75 },
           observation_only: true };
-      }, { expectedBuild: expected.build });
+      }, { expectedBuild: expected.build, expectedOrigin: expected.origin });
     }
     return { status: 'SUCCEEDED', action_key: 'workspace.observe', action_revision: '1', operation_id: null,
       phase: 'observed', effect_possible: false, cleanup_complete: true, error: null, trace: [], output };

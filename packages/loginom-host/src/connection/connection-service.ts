@@ -342,15 +342,26 @@ export async function connectionService(
     async settled() {
       while (state.applying) await state.applying
     },
-    async close() {
+    close() {
+      const lifecycle = state as typeof state & { closingAttempt?: Promise<void> }
+      if (lifecycle.closingAttempt) return lifecycle.closingAttempt
       state.closing = true
-      state.pending = undefined
-      clearValidations()
-      await state.recovering?.catch(() => undefined)
-      await state.applying
-      await state.handle?.close()
-      state.handle = undefined
-      state.phase = state.active ? "recoverable-error" : "unconfigured"
+      const attempt = (async () => {
+        await state.recovering
+        await state.applying
+        await state.handle?.close()
+        state.pending = undefined
+        clearValidations()
+        state.handle = undefined
+        state.phase = state.active ? "recoverable-error" : "unconfigured"
+      })()
+      lifecycle.closingAttempt = attempt
+      void attempt.catch(() => {
+        if (lifecycle.closingAttempt !== attempt) return
+        lifecycle.closingAttempt = undefined
+        state.closing = false
+      })
+      return attempt
     },
   }
 }

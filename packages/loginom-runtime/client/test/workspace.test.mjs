@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext, createContext, runInContext } from 'node:vm';
-import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
+import {pathToFileURL} from 'node:url';
+const {makeWorkspacePrepareCode,makeWorkspaceBootstrapCode,parseWorkspacePreparation,prepareWorkspaceSession,requirePreparedWorkspace}=await import(process.env.WORKSPACE_HELPER?pathToFileURL(process.env.WORKSPACE_HELPER):new URL('../lib/workspace.mjs',import.meta.url));
 import {prepareTool} from '../lib/skill.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
@@ -21,10 +22,10 @@ async function bootstrap({ url='https://loginom.test/app', actualBuild=build, ti
   }));
   const page={url:()=>url, async evaluate(fn,args) {
     evaluations++;
-    return runInNewContext(`(${fn.toString()})(args)`,{args,location:{origin:'https://loginom.test'},bg:{app:{Version:actualBuild}},
+    return runInNewContext(`(${fn.toString()})(args)`,{URL,args,location:{origin:'https://loginom.test'},bg:{app:{Version:actualBuild}},
       Date:{now:()=>0},getComputedStyle:()=>({}),document:{documentElement:{},createTreeWalker:()=>({nextNode:()=>elements[scanned++]??null})}});
   }};
-  const result=await runInNewContext(makeWorkspaceBootstrapCode({origin:'https://loginom.test',build}),{URL})(page);
+  const result=await runInNewContext(makeWorkspaceBootstrapCode({origin:'https://loginom.test',build}),{page,__end__:()=>{}})(page);
   return {result:JSON.parse(JSON.stringify(result)),evaluations,scanned};
 }
 
@@ -390,5 +391,27 @@ for(const variant of ['lost','effect','created','unauthenticated','cancelled','s
    assert.equal((await prepareWorkspaceSession(next)).status,'READY');assert.equal(calls,2);
   }else{
    await assert.rejects(prepareWorkspaceSession(next),/conflict/);assert.equal(calls,1);
+  }
+ });
+
+for(const fault of ['none','later-phase','effect','created','unauthenticated','same-id','unknown','record-failed'])
+ test('terminal entry deadline replacement preserves original preparation: '+fault,async()=>{
+  const old={identity:JSON.stringify({operation_id:'old'}),operation_id:'old',effect_possible:false,
+   state:{status:'NOT_READY',reason:'DEADLINE',phase:'workspace_entry_ready',effect_possible:false,created_draft:false,authenticated:true}};
+  if(fault==='later-phase')old.state.phase='exact_workflow_ready';
+  if(fault==='effect')old.state.effect_possible=true;
+  if(fault==='created')old.state.created_draft=true;
+  if(fault==='unauthenticated')old.state.authenticated=false;
+  if(fault==='unknown')old.effect_possible=undefined;
+  const metadata={workspacePreparation:structuredClone(old),workspaceReady:false},records=[];let calls=0;
+  const args={metadata,request:{operation_id:fault==='same-id'?'old':'new',intent:'existing_workflow'},assertAllowed(){},assertTarget(){},save:async()=>{},
+   record:async record=>{if(fault==='record-failed')throw Error('storage unavailable');records.push(record);},
+   prepare:async({recoverOnly})=>{calls++;assert.equal(recoverOnly,false);return {status:'READY',target:{},workflow_ref:{}};}};
+  if(fault==='none'){
+   assert.equal((await prepareWorkspaceSession(args)).status,'READY');assert.equal(calls,1);
+   assert.deepEqual(records[0].previous,old);
+  }else{
+   await assert.rejects(prepareWorkspaceSession(args));assert.equal(calls,0);
+   assert.deepEqual(metadata.workspacePreparation,old);
   }
  });

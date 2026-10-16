@@ -3,6 +3,16 @@ import assert from "node:assert/strict"
 import { validateStartInput } from "../src/start-input.mjs"
 
 const base = { protocol: 1, generation: 1, chat: "chat-1", stateDir: "/tmp/state" }
+const capture={revision:1,harness:'calculator-grouped-before-done-v1',owner:'owner',run:'run',lease:'owner:run',
+  generation:1,chat:'chat-1',account:'user',packagePath:'/user/draft.lgp',admission:'one-shot',expires:Date.now()+500000}
+test('capture start binds the host-derived identity, without treating validation as authorization',()=>{
+ assert.deepEqual(validateStartInput({...base,connection:{username:'user'},acceptanceCapture:capture}).acceptanceCapture,capture)
+})
+for(const patch of [{revision:2},{harness:'code'},{owner:undefined},{lease:'other'},{generation:2},{chat:'foreign'},
+ {account:'foreign'},{packagePath:'/foreign/draft.lgp'},{packagePath:'/user/../draft.lgp'},{expires:0},
+ {expires:Date.now()+900000},{modulePath:'/evil'},{callback:'evil'},{admission:''}])
+ test('capture start rejects '+JSON.stringify(patch),()=>assert.throws(()=>validateStartInput({...base,
+   connection:{username:'user'},acceptanceCapture:{...capture,...patch}}),/LOGINOM_START_INVALID/))
 
 test("managed start without cleanup input stays a product launch", () => {
   assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null })

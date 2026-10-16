@@ -14,7 +14,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   requireValue(saved?.phase===phase&&saved.operation_id===job.id,'Delivery evidence was not durably acknowledged');
  };
  const snapshot=job=>structuredClone({operation_id:job.id,state:job.state,phase:job.phase,
-  upload_operation_id:job.uploadId,outcome:job.outcome??null,error:job.error??null});
+  upload_operation_id:job.uploadId,outcome:job.outcome??null,error:job.error??null,
+  ...(job.originalRefusal?{original_refusal:job.originalRefusal}: {})});
  const finish=async(job,artifact,final)=>{
   const outcome=final.output?.outcome,proof=outcome?.output?.server_copy_verification;
   requireValue(final.output?.state==='resolved'&&final.output?.cleanup_confirmed===true&&outcome.status==='SUCCEEDED'
@@ -275,6 +276,33 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    job.deadline=Math.min(job.deadline,now()+request.budget_ms);job.state='running';job.error=null;active=job;
    const promise=run(job,artifact,signal,request.resume_id);
    job.resumeRequests.set(request.resume_id,{signature,promise});return promise;
+  },
+  async reconcileInspection(operationId,inspection) {
+   const job=[...jobs.values()].find(value=>value.uploadId===operationId);
+   if(!job || job.phase==='completed' || inspection?.output?.state!=='resolved'
+      || inspection.output.outcome?.status!=='SUCCEEDED')return;
+   requireValue(!active&&job.state==='settled'&&job.uploadStarted===true,'Delivery reconciliation requires a settled original upload');
+   // Consume only the executor's original verified receipt. No clock reset,
+   // browser call, navigation, upload or verification is dispatched here.
+   const final=structuredClone(inspection),outcome=final.output.outcome,output=outcome.output;
+   const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
+   requireValue(JSON.stringify(artifact)===JSON.stringify(job.artifact),'Original delivery artifact changed');
+   requireValue(final.output.operation_id===job.uploadId&&outcome.operation_id===job.uploadId
+     &&outcome.action_key==='artifact.upload'&&outcome.cleanup_complete===true
+     &&output?.upload_submitted===true&&output.artifact_id===artifact.artifact_id
+     &&output.upload_grant_id===artifact.upload.grant_id&&output.destination===artifact.upload.destination
+     &&output.bytes===artifact.bytes&&output.sha256===artifact.sha256
+     &&output.verification_required===false&&output.server_copy_verification?.status==='SUCCEEDED'
+     &&output.server_copy_verification.verification_id===job.id+':verify',
+     'Original verified upload binding mismatch');
+   const originalRefusal=job.originalRefusal??snapshot(job);
+   active=job;
+   try {
+    // Keep uncertainty until durable management acknowledgement succeeds.
+    await acknowledge(job,'artifact_delivery_reconciled',{original_refusal:originalRefusal,inspection:final,original_deadline:job.deadline});
+    await finish(job,artifact,final);
+    job.originalRefusal=originalRefusal;
+   } finally {active=null;}
   },
   status(id){const job=jobs.get(id);requireValue(job,'Unknown delivery operation');return snapshot(job);},
  });

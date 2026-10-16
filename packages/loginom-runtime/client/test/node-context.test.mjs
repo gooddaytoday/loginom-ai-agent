@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readPreparedNodeContext,validatePreparedNodeContext} from '../lib/node-context.mjs';
+const {readPreparedNodeContext,validatePreparedNodeContext}=await import(process.env.NODE_CONTEXT_MODULE??new URL('../lib/node-context.mjs',import.meta.url));
 
 function fixture() {
   class PackageTreeNode{}; class WorkFlowTreeNode{}; class ModelNodeTreeNode{}; class ModelForm{};
@@ -112,3 +112,77 @@ test('pending deactivation rejects mismatched breadcrumb native objects',async()
   assert.equal((await readPreparedNodeContext(f.page,f.binding)).pending_wizard_node,undefined);
  }
 });
+
+// Native observation paths from LAB-66 b073 receipts 012/020, reviewed in
+// 01a12cc9-0aa2-7ebc-8f9d-edc88c010728. Native objects below are explicit VM
+// doubles; receipts do not supply raw Ext instances or prove their binding.
+const savedNavigation=[{"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер", "label": ""}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты", "label": "Пакеты"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1", "label": "cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1", "label": "Модуль1"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий", "label": "Сценарий"}];
+const openedNavigation=[{"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер", "label": ""}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты", "label": "Пакеты"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2", "label": "cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1", "label": "Модуль1"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий", "label": "Сценарий"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий>DiagInput", "label": "DiagInput"}, {"tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий>DiagInput>Настройка", "label": "Настройка"}];
+function checkpointFixture(){
+ class PackageTreeNode{};class WorkFlowTreeNode{};class ModelNodeTreeNode{};class ModelForm{};class WizardModelComponentForm{};
+ const packageNode=Object.assign(new PackageTreeNode(),{PackageFileName:'/own/cdiag_b073.lgp'}),moduleNode={ParentNode:packageNode};
+ const workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:moduleNode}),nodeData={};
+ const nodeTree=Object.assign(new ModelNodeTreeNode(),{ParentNode:workflowNode,FGuid:'node',FModelNode:nodeData});
+ const el=(tid,id='')=>({id,isConnected:true,textContent:'',getAttribute:()=>tid,getBoundingClientRect:()=>({width:100,height:20}),classList:{contains:()=>true}});
+ const tab=el('MF;cntMain;cntWorkspace;Workspace;t.br;tb-1'),graphRoot=el('MF;TF-1;ModelForm;cmpDiagram'),nodeRoot=el('MF;TF-1;Graph;DiagInput'),wizardRoot=el('MF;TF-1;WizrdMCF');graphRoot.contains=e=>e===nodeRoot;
+ const graph=Object.assign(new ModelForm(),{FDiagram:{FNodes:{FCollection:[{FGuid:'node',FCell:{},data:nodeData}]},FmxGraph:{container:graphRoot,view:{getState:()=>({shape:{node:nodeRoot}})}}}});
+ const controller={Node:{data:{node:workflowNode}},FController:graph};
+ let crumbs=[],surface=[tab,graphRoot,nodeRoot];const components=new Map();
+ const setCrumbs=path=>{crumbs=path.map((p,i)=>Object.assign(el(p.tid,'crumb-'+i),{textContent:p.label}));components.clear();crumbs.forEach((e,i)=>components.set(e.id,{el:{dom:e},_node:{data:{node:[null,null,packageNode,moduleNode,workflowNode,nodeTree,{}][i]}}}));};setCrumbs(savedNavigation);
+ const document={querySelectorAll:selector=>selector.startsWith('[data-tid^=')?crumbs:[...surface,...crumbs].filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']')};
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:tab.getAttribute(),navigation_path:structuredClone(savedNavigation)},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const record={phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflowNode,crumbs:structuredClone(savedNavigation),request:JSON.stringify({intent:'open_package',packagePath:'/own/cdiag_b073.lgp'})};
+ const preparation={id:'doc',document,receipts:new Map([['canonical-prepare',record]])};
+ const app={PackageTreeNode,WorkFlowTreeNode,ModelNodeTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}};
+ const context=vm.createContext({document,bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'}),Ext:{getCmp:id=>components.get(id)}});
+ const page={evaluate:(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)};
+ const open=()=>{controller.Node.data.node={ParentNode:nodeTree};controller.FController=Object.assign(new WizardModelComponentForm(),{FModelNode:nodeData});surface=[tab,wizardRoot];setCrumbs(openedNavigation);};
+ return {page,binding,record,preparation,packageNode,moduleNode,workflowNode,nodeTree,controller,components,context,open,setCrumbs,wizardRoot,tab,
+ duplicate:()=>surface.push(crumbs[2]),missingSurface:()=>surface=[tab],crumb:i=>crumbs[i]};
+}
+test('SaveCheckpoint canonical preparation: old graph keys then native-bound wizard keys',async()=>{
+ const f=checkpointFixture();assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);assert.equal(f.record.nodeNavigationPath,undefined);
+ f.open();const r=await readPreparedNodeContext(f.page,f.binding);
+ if(process.env.NODE_CONTEXT_BEFORE==='1'){assert.equal(r.reason,'navigation');return;}
+ assert.equal(r.verified,true);assert.equal(r.surface,'wizard');assert.equal(r.node_id,'node');
+ assert.deepEqual(JSON.parse(JSON.stringify(f.record.nodeNavigationPath)),openedNavigation.slice(0,5));
+ assert.deepEqual(f.record.crumbs,savedNavigation);assert.deepEqual(f.binding.workflow_ref.navigation_path,savedNavigation);
+ assert.deepEqual(await readPreparedNodeContext(f.page,f.binding),r); // stable before/after capture identity
+});
+const invalidCheckpoint={
+ foreign_package:f=>{f.record.packageNode={PackageFileName:f.packageNode.PackageFileName};},
+ foreign_workflow:f=>{f.record.nodeTargetWorkflowNode={};},
+ foreign_node:f=>{f.nodeTree.FGuid='foreign';},
+ document_epoch:f=>{f.preparation.id='foreign';},
+ foreign_tab:f=>{f.record.tab={};},
+ unverified_receipt:f=>{f.record.phase='pending';},
+ unbound_request:f=>{f.record.request='{}';},
+ wrong_path:f=>{f.packageNode.PackageFileName='/foreign/same-label.lgp';},
+ missing_original:f=>{delete f.record.crumbs;},
+ stale_original:f=>{f.record.crumbs=structuredClone(savedNavigation);f.record.crumbs[2].tid='stale';},
+ label_only:f=>{f.components.clear();},
+ foreign_native_module:f=>{f.components.get('crumb-3')._node.data.node={ParentNode:f.packageNode};},
+ foreign_native_package:f=>{f.components.get('crumb-2')._node.data.node={};},
+ detached_element:f=>{f.crumb(2).isConnected=false;},
+ stale_component_dom:f=>{f.components.get('crumb-2').el.dom={};},
+ duplicate_breadcrumb:f=>f.duplicate(),
+ changed_label:f=>{f.crumb(2).textContent='Other';},
+ foreign_prefix:f=>{f.crumb(0).getAttribute=()=> 'foreign';},
+ stale_alias:f=>{f.record.nodeNavigationPath=[{tid:'foreign'}];},
+ pending_surface:f=>f.missingSurface(),
+ foreign_wizard_model:f=>{f.controller.FController.FModelNode={};},
+};
+for(const [name,change] of Object.entries(invalidCheckpoint))test('canonical rebind refuses '+name+' without updating original binding',async()=>{
+ const f=checkpointFixture();f.open();change(f);const original=JSON.stringify(f.binding);const alias=JSON.stringify(f.record.nodeNavigationPath);
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ assert.equal(JSON.stringify(f.binding),original);assert.equal(JSON.stringify(f.record.nodeNavigationPath),alias);
+});
+
+for(const path of [savedNavigation,openedNavigation.map((c,i)=>i===2?{...c,tid:c.tid+'-stale'}:c)])
+ test('verified alias cannot silently rebind again or revert to stale keys',async()=>{
+  const f=checkpointFixture();f.open();const before=await readPreparedNodeContext(f.page,f.binding);
+  if(process.env.NODE_CONTEXT_BEFORE==='1'){assert.equal(before.verified,false);return;}
+  assert.equal(before.verified,true);const alias=JSON.stringify(f.record.nodeNavigationPath);
+  f.setCrumbs(path);assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+  assert.equal(JSON.stringify(f.record.nodeNavigationPath),alias);
+ });

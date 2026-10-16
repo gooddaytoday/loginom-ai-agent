@@ -162,7 +162,8 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     } finally {
       LoginomHost.disconnect()
       client.close()
-      await port.close()
+      if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
+      else await port.close()
       await host.close()
       await rm(directory, { recursive: true, force: true })
     }
