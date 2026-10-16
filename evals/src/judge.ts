@@ -8,6 +8,7 @@ import { EvalFailure } from "./fail"
 import { checkOracle } from "./oracle"
 import { superviseJudgeProcess } from "./judge-process-evidence"
 import type { JudgeProcessEvidence } from "./judge-process-evidence"
+import { runJudgeUnit } from "./judge-unit"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -25,6 +26,7 @@ export type JudgeSettings = {
   passThreshold: number
   env?: Record<string, string>
   processEvidence?: JudgeProcessEvidence
+  systemd?: boolean
 }
 type RunView = Pick<AgentRun, "finalText" | "tools" | "nodeReceipts" | "nodeReceiptsDropped">
 
@@ -76,7 +78,7 @@ function parseJson(text: string): unknown {
   }
 }
 
-export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "processEvidence"> }, signal?: AbortSignal) {
+export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "processEvidence" | "systemd"> }, signal?: AbortSignal) {
   const version = await judgeVersion(config.judge, signal)
   return {
     backend: "codex" as const,
@@ -89,11 +91,11 @@ export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" |
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
 
-export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env" | "processEvidence">, signal?: AbortSignal) {
-  const version = await superviseJudgeProcess({ cmd: [...judge.command, "--version"], cwd: evalsRoot,
-    env: judgeEnvironment(judge.env), timeoutMs: 10_000, signal, owner: { kind: "judge", id: "version" } }, judge.processEvidence)
+export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env" | "processEvidence" | "systemd">, signal?: AbortSignal) {
+  const version = await runJudge({ cmd: [...judge.command, "--version"], cwd: evalsRoot,
+    env: judgeEnvironment(judge.env), timeoutMs: 10_000, signal, owner: { kind: "judge", id: "version" } }, judge)
     .catch(() => { throw new EvalFailure("Судья недоступен: проверка версии не подтверждена", 2) })
-  if (version.processCleanup.status !== "confirmed" || !version.processCleanup.capture_complete || version.timedOut || version.interrupted)
+  if (!version.cleanupConfirmed || version.timedOut || version.interrupted)
     throw new EvalFailure("JUDGE_VERSION_UNCONFIRMED", 2)
   return { exitCode: version.exitCode, stdout: version.stdout }
 }
@@ -280,18 +282,18 @@ async function invoke(
   await rm(verdictPath, { force: true })
   const processDir = path.join(path.dirname(input.outDir), `judge-processes-${attempt}`)
   await mkdir(processDir, { recursive: true, mode: 0o700 })
-  const supervised = await superviseJudgeProcess({
+  const supervised = await runJudge({
     cmd: judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
     cwd: input.outDir, env: judgeEnvironment(input.judge.env),
     stdin: await Bun.file(path.join(input.outDir, "PROMPT.md")).text(),
     outDir: processDir,
     timeoutMs: input.judge.timeoutMs, signal: input.signal,
     owner: { kind: "judge", id: input.outDir },
-  }, input.judge.processEvidence)
+  }, input.judge)
   await Bun.write(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`), supervised.stdout)
   await Bun.write(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`), supervised.stderr)
-  if (supervised.processCleanup.status !== "confirmed") return { ok: false as const,
-    error: `Judge process cleanup unconfirmed: ${supervised.processCleanup.error ?? "unknown"}`, cleanupUnconfirmed: true }
+  if (!supervised.cleanupConfirmed) return { ok: false as const,
+    error: `Judge process cleanup unconfirmed: ${supervised.cleanupError ?? "unknown"}`, cleanupUnconfirmed: true }
   const exitCode = supervised.exitCode
   if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
   const file = Bun.file(verdictPath)
@@ -301,4 +303,12 @@ async function invoke(
   const scored = scoreVerdict(checklist, verdict, input.judge.passThreshold)
   if (!scored.ok) return { ok: false as const, error: scored.error }
   return { ...scored, verdict }
+}
+
+async function runJudge(input: Parameters<typeof superviseJudgeProcess>[0] & { timeoutMs: number; stdin?: string },
+  judge: Pick<JudgeSettings, "processEvidence" | "systemd">) {
+  if (judge.systemd) return runJudgeUnit(input)
+  const result = await superviseJudgeProcess(input, judge.processEvidence)
+  return { ...result, cleanupConfirmed: result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete,
+    cleanupError: result.processCleanup.error }
 }

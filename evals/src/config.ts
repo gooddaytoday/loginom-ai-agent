@@ -118,7 +118,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   }
 }
 
-export type EvalConfig = ReturnType<typeof loadConfig> & { auth?: { sharedDir: string }; judge: { env?: Record<string, string>; processEvidence?: JudgeProcessEvidence } }
+export type EvalConfig = ReturnType<typeof loadConfig> & { auth?: { sharedDir: string }; judge: { env?: Record<string, string>; processEvidence?: JudgeProcessEvidence; systemd?: boolean } }
 
 function parseEvalArgs(argv: string[]) {
   try {
