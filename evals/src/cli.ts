@@ -7,6 +7,7 @@ import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { assertProfileClean } from "./profile"
 import type { ManagementProcessEvidence } from "./management-process-evidence"
 import { redactKnownSecrets } from "./output-redaction"
+import { childEnvironment } from "./child-environment"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -115,7 +116,7 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
     value === undefined || droppedChildEnv.test(key) ? [] : [[key, value] as const],
   )
   const isolated: Record<string, string> = {
-    ...Object.fromEntries(inherited),
+    ...(config.slotsFile && config.agent.cliMode === "binary" ? childEnvironment(env) : Object.fromEntries(inherited)),
     LOGINOM_AI_AGENT_CLI_PROFILE: config.profileDir,
     LOGINOM_AI_AGENT_PURE: "1",
     LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
