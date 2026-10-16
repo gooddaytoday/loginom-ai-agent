@@ -419,7 +419,14 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         state.wizard.settings.fields[name]?.value === label), name);
       requireValue(after.value === label && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
         'Import format field or exact label changed after selection');
-    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
+    } else {
+      const binding=state=>({root:state.wizard.root_tid,owner:identity(state.wizard.owner_context),
+        field:name,owner_ref:field(state,name).owner_ref,input_ref:field(state,name).input_ref,value:field(state,name).value});
+      const before=binding(s);
+      await channel.perform({condition:'set text import format '+name,initialObservation:s,
+        ready:state=>state.wizard?.status==='observed'&&state.wizard.stage==='text_import_format'&&same(binding(state),before),
+        identity:binding,resolve:state=>({verb:'set_wizard_field',ref:field(state,name).input_ref,text})});
+    }
   }
   let parsedColumns;
   if(patch) {

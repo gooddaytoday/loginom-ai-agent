@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta,ImportColumnCountError,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
-function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null,fillChange=null}={}) {
+function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null,fillChange=null,formatChange=null}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
   cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map(p=>[p,p+':'+index]))}));
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
@@ -46,6 +46,13 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
   const before=options.initialObservation;
   assert.equal(options.ready(before),true);
   const refreshed=structuredClone(before);
+  if(options.resolve(before).verb==='set_wizard_field'){
+   performed.push('format');
+   if(formatChange)formatChange(refreshed);
+   assert.equal(options.ready(refreshed),true,'changed format field is not ready');
+   assert.deepEqual(options.identity(refreshed),options.identity(before),'format field identity changed');
+   return channel.act(options.resolve(refreshed));
+  }
   refreshed.wizard.import_column_editor.input_ref='fresh-editor';
   const filling=options.resolve(before).verb==='fill';
   performed.push(filling?'fill':'commit');
@@ -127,6 +134,18 @@ for(const marker of ['NULL','null'])test('Null marker selects exact native optio
 test('arbitrary Null marker retains the observed input path',async()=>{
  const f=fixture(1,{nullMarker:'\\N'});const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
  assert.equal(result.verified,true);assert.equal(f.gestures,2);
+ assert.deepEqual(f.performed,['format']);
+});
+for(const [name,formatChange] of Object.entries({
+ owner:s=>s.wizard.owner_context.node.tid='foreign',root:s=>s.wizard.root_tid='foreign',
+ field_owner:s=>s.wizard.settings.fields.null_marker.owner_ref='foreign',
+ input:s=>s.wizard.settings.fields.null_marker.input_ref='foreign',
+ value:s=>s.wizard.settings.fields.null_marker.value='changed',
+ stage:s=>s.wizard.stage='output_mapping',
+}))test('format field refresh refuses changed '+name,async()=>{
+ const f=fixture(1,{nullMarker:'\\N',formatChange});
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner));
+ assert.equal(f.gestures,1,'only Next was applied before refusing the changed format field');
 });
 for(const optionMode of ['duplicate','foreign_owner','foreign_root','wrong_case','bad_readback','replaced_input'])test('Null marker refuses '+optionMode+' without typing fallback',async()=>{
  const f=fixture(1,{nullMarker:'NULL',optionMode});await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner));
