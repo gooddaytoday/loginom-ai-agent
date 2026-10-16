@@ -3223,3 +3223,20 @@ the post-CLI active observation; these intervals are not native RPC durations.
 Native1/14 PASS180.97s, all own disposable resources/root absent and history
 retained. Both storageDeletionAllowed and nextAdmissionAllowed stay false; hard
 crash, backend FD/locks/no-regrowth and full cleanup consumption are still open.
+
+
+Hard CLI crash follow-up (2026-10-16): the native replay case selected by
+`--test-name-pattern 'is killed during server execution'` now sends SIGKILL only
+to the unique admitted candidate executable in the exact slot scope, using
+signalProcess with a fresh full-identity check. Private intent records identity,
+owner/launcher and immutable native Progress trigger. Actual exit137 has neither
+timeout nor controlled-interruption flags. Continuous local closure is followed
+by fresh backend activity, committed pending-history archive, exact agent/setup
+closes and fresh absence; both cleanup/admission grants remain false.
+Native1/16 PASS184.30s; private5e699014… auditf8cbd6b2…2239 checks/183 sources,
+29 causal frames and18 source/binary pins, SQLite-copy integrity, original archive
+objects, admin transport/closure and exact own disposable pair/root absence.
+The wrong-abort RED966365c1… failed safely; auditfdcf3641…2223/179 and all own
+resources/root absent. Related22/160 PASS30.09s, signal identity/refusal3/6
+PASS0.217s. This resolves the controlled hard-CLI-crash component; FD/locks,
+no-regrowth, backup, full N2/live runtime and normal admission remain open.
