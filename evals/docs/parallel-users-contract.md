@@ -3145,3 +3145,33 @@ executed sources with a verified safe boundary. Pre-CLI finalization release is
 separate from evaluated-attempt cleanup. Runtime admission must still bind the
 frozen policy/fingerprint and detect drift; backend operations/locks, backup
 and remaining readiness gates remain mandatory.
+
+### Controlled detached JavaScript execution and stop (2026-10-16)
+
+The research-only session-active-probe uses the existing one-node package and
+sets its native engine Code to exact interrupt-probe.js. This bounded CPU loop
+runs20s. The activation is unfinished before creator context loss; a fresh
+observer still sees the retained pending Count1 session with active Progress.
+A natural control observes active→idle before closing it. The stop control
+calls the existing bound CloseSession while Progress is active and then observes
+complete session/package absence across collections. Existing ownership and
+PendingDisconnect guards are unchanged. The observer connects before the probe
+supervisor; no deadline was raised.
+
+Final close1/53 PASS61.68s and natural control1/54 PASS79.82s freeze identical9
+code/binary/input pins and image manifests. Browser/controller activation-start
+to fresh absence spans3051ms for stop and21456ms for natural completion; native
+StartTime remains untouched. Related50/162 PASS22.75s, typecheck/syntax/diff PASS.
+Private05c609b2… audit SHA256
+`48d6b74906a33d26d8253124bfb27a8124b53aa2f9059d19d0e9ef9afc6dcec1`
+checks64/25 sources; control0ff79e61… audit
+`192a52d358dca035f84f0b9a5872826240621a41a29a965407689746ce1a1540`
+checks184/73 sources: full native replies/journals, continuous closures and
+transport ACKs for both admins, retained input and exact own pair/network/root
+absence. Missing-phase REDcb0aeee0… and the initial natural control retain their
+original sources and verified boundaries.
+
+This qualifies one actual JavaScript operation after client-context loss. Actual
+CLI crash, simultaneous B activity, backend file descriptors/locks, backup and
+storage/no-regrowth plus durable cleanup consumption remain unqualified. The
+component evidence keeps operationsQualified=false and cleanupAllowed=false.

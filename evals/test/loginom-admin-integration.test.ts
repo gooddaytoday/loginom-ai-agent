@@ -83,11 +83,13 @@ liveIntegration("native pool package close: refuses the pooled object and preser
 liveIntegration("native pool disabled policy: zero retains no completed job package", () => nativeUserCapability("pool-disabled"), 120_000)
 liveIntegration("native pool preparation: held controller disables retention and repeats without mutation", () => nativeUserCapability("pool-policy"), 120_000)
 liveIntegration("native pool environment: prepare applies policy and verify only reads it", () => nativeUserCapability("pool-environment"), 120_000)
+liveIntegration("native active backend control: bounded node continues after its client disconnects", () => nativeUserCapability("active-control"), 120_000)
+liveIntegration("native active backend close: CloseSession stops the node after client loss", () => nativeUserCapability("active-close"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy" | "pool-environment", hardCrash = false) {
-  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy" || mode === "pool-environment"
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress" | "pool" | "pool-close" | "pool-disabled" | "pool-policy" | "pool-environment" | "active-control" | "active-close", hardCrash = false) {
+  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || mode === "pool-policy" || mode === "pool-environment" || ["active-control", "active-close"].includes(mode)
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -113,7 +115,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       path.resolve(import.meta.dir, "../src/loginom-admin.ts"), path.resolve(import.meta.dir, "../src/package-inventory.ts"),
       path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!,
       ...(mode === "pool-environment" ? [path.resolve(import.meta.dir, "../src/environment-preparation.ts"), path.resolve(import.meta.dir, "../src/environment-finalization.ts"), path.resolve(import.meta.dir, "../src/user-environment.ts")] : []),
-      ...(["progress", "pool", "pool-close", "pool-disabled"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : [])]
+      ...(["progress", "pool", "pool-close", "pool-disabled", "active-control", "active-close"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : []),
+      ...(["active-control", "active-close"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")] : [])]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
     if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
       resources: pair.resources, root, pairNonce: pair.nonce })
@@ -126,6 +129,10 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     const input = new TransformStream<Uint8Array, Uint8Array>()
     const output = new TransformStream<Uint8Array, Uint8Array>()
     const abort = new AbortController()
+    if (["active-control", "active-close"].includes(mode)) {
+      settlement.packageParent = false
+      packageParent = await openLoginomAdmin(file, pair.identity)
+    }
     const pending = superviseProcess({ cmd: [runtime.node, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")], cwd: root,
       env: { PATH: "/usr/bin:/bin", HOME: root, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
       timeoutMs: ["peer-close", "pool-close"].includes(mode) ? 90_000 : 60_000, profileDir: profile, outDir: evidence, stdin: input.readable, stdout: output.writable, signal: abort.signal, owner: { kind: "admin", id: root } })
@@ -471,13 +478,15 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         complete = true
         return
       }
-      if (mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled") {
+      if (mode === "progress" || mode === "pool" || mode === "pool-close" || mode === "pool-disabled" || ["active-control", "active-close"].includes(mode)) {
         const artifact = path.join(evidence, "progress-probe.lgp")
         await Bun.write(artifact, await Bun.file(path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp")).bytes())
         await chmod(artifact, 0o600)
         expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${artifact} ${`${pair.identity.containerId}:${file.server.storageRoot}/${credentials.username}/progress-probe.lgp`}`.quiet().nothrow()).exitCode).toBe(0)
-        settlement.packageParent = false
-        packageParent = await openLoginomAdmin(file, pair.identity)
+        if (!packageParent) {
+          settlement.packageParent = false
+          packageParent = await openLoginomAdmin(file, pair.identity)
+        }
         const peer = mode === "pool-close" ? await (async () => {
           const neighbor = await preparePeer()
           const probe = await request("reconcile-user", { ...neighbor.activation, phase: "session-package-crash-probe" })
@@ -489,7 +498,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         if (peerBefore) await writeLeaseReceipt(path.join(evidence, "pool-close-peer-before.json"), peerBefore)
         const observations: Awaited<ReturnType<typeof readAdminPackageInventory>>[] = []
         let settled = false
-        const pendingProbe = request("reconcile-user", { ...activation, phase: mode === "pool-disabled" ? "session-pool-disabled-probe" : mode === "pool-close" ? "session-pool-close-probe" : mode === "pool" ? "session-pool-probe" : "session-progress-probe" }).finally(() => { settled = true })
+        const pendingProbe = request("reconcile-user", { ...activation, phase: ["active-control", "active-close"].includes(mode) ? "session-active-probe" : mode === "pool-disabled" ? "session-pool-disabled-probe" : mode === "pool-close" ? "session-pool-close-probe" : mode === "pool" ? "session-pool-probe" : "session-progress-probe" }).finally(() => { settled = true })
         const deadline = Date.now() + 25_000
         while (!settled && Date.now() < deadline) {
           const inventory = await packageParent.inspectPackageInventory()
@@ -534,6 +543,38 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
             expect(await request("close-session", { proofId: peer.id, session: binding })).toMatchObject({ outcome: "confirmed", data: { closed: true } })
           }
           await writeLeaseReceipt(path.join(evidence, "pool-inventory.json"), { identity: pair.identity, observations, before, after, probe, closed, peer, peerBefore,
+            cleanupAllowed: false, operationsQualified: false })
+          expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
+          complete = true
+          return
+        }
+        if (["active-control", "active-close"].includes(mode)) {
+          const data = probe.data as typeof observed & { progress: { finished: boolean; source: string; startedAt: string } }
+          expect(data.progress).toMatchObject({ finished: false, source: await Bun.file(path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")).text() })
+          const before = await packageParent.inspectPackageInventory()
+          await writeLeaseReceipt(path.join(evidence, "active-before.json"), before)
+          const active = before.collections.find(row => row.name === data.binding.name)?.packages.find(item => item.path === `/${credentials.username}/progress-probe.lgp`)
+          expect(active?.progress).not.toBeNull()
+          expect(active).toBeDefined()
+          const samples = [before], deadline = Date.now() + 25_000
+          while (mode === "active-control" && Date.now() < deadline) {
+            const sample = await packageParent.inspectPackageInventory()
+            samples.push(sample)
+            if (sample.collections.find(row => row.name === data.binding.name)?.packages.find(item => item.path === active!.path)?.progress === null) break
+            await Bun.sleep(100)
+          }
+          const beforeClose = samples.at(-1)!
+          if (mode === "active-control") {
+            expect(beforeClose.collections.find(row => row.name === data.binding.name)?.packages.find(item => item.path === active!.path)).toMatchObject({ progress: null })
+            expect(Date.parse(beforeClose.observation.startedAt) - Date.parse(data.progress.startedAt)).toBeGreaterThanOrEqual(19_000)
+          }
+          const closed = await request("close-session", { proofId: probe.id, session: data.binding })
+          expect(closed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+          const absent = await packageParent.inspectPackageInventory()
+          expect(absent.collections.flatMap(row => row.packages).some(item => item.path === active!.path)).toBe(false)
+          const elapsedMs = Date.parse(absent.observation.finishedAt) - Date.parse(data.progress.startedAt)
+          if (mode === "active-close") expect(elapsedMs).toBeLessThan(15_000)
+          await writeLeaseReceipt(path.join(evidence, `${mode}.json`), { identity: pair.identity, probe, before, samples, beforeClose, closed, absent, elapsedMs,
             cleanupAllowed: false, operationsQualified: false })
           expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
           complete = true
