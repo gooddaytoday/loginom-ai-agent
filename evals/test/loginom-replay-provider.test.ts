@@ -39,3 +39,24 @@ test("native replay provider activates Loginom once and ends after the real tool
     expect(JSON.stringify(provider.requests)).not.toContain("Loaded skill")
   } finally { provider.server.stop(true) }
 })
+
+test("native replay provider stops waiting after a terminal node refusal", async () => {
+  const provider = loginomReplayProvider("active")
+  try {
+    const response = await fetch(new URL("chat/completions", provider.server.url), { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "replay", tools: [{ function: { name: "loginom_dock_node_wait" } }], messages: [
+        { role: "tool", tool_call_id: "native-activation", content: "skill activated" },
+        { role: "tool", tool_call_id: "native-preparation", content: JSON.stringify({ prepared: true,
+          workspace: { document_id: "document", workflow_ref: { workflow_id: "workflow" } } }) },
+        { role: "tool", tool_call_id: "native-description", content: "calculator contract" },
+        { role: "tool", tool_call_id: "native-execution", content: JSON.stringify({ state: "running" }) },
+        { role: "tool", tool_call_id: "native-wait-1", content: JSON.stringify({ state: "settled", status: "NOT_APPLIED",
+          error: { code: "NODE_APPLY_STOPPED", message: "calculator preflight requires an active source output" } }) },
+      ] }) })
+    expect(response.status).toBe(200)
+    const stream = await response.text()
+    expect(stream).toContain('"content":"Native replay complete"')
+    expect(stream).toContain('"finish_reason":"stop"')
+    expect(stream).not.toContain('"tool_calls"')
+  } finally { provider.server.stop(true) }
+})
