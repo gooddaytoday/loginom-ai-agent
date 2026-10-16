@@ -20,6 +20,10 @@ test("loadConfig records the resource budget source without reading it", () => {
   expect(loadConfig([], { ...full, EVAL_RESOURCE_BUDGET_FILE: "/private/n1-budget.json" })).toMatchObject({ resourceBudgetFile: "/private/n1-budget.json" })
 })
 
+test("the default temporary workspace follows TMPDIR", () => {
+  expect(loadConfig(["--dry-run"], {}).agent.workspaceRoot).toBe(path.join(os.tmpdir(), "loginom-evals"))
+})
+
 test.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992"])("loadConfig: invalid parallel %s is refused before other requirements", value => {
   expect(() => loadConfig([`--parallel=${value}`], {})).toThrow("PARALLEL_COUNT")
   expect(() => loadConfig([`--parallel=${value}`], {})).toThrow(expect.objectContaining({ exitCode: 2 }))
