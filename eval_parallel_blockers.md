@@ -1056,3 +1056,30 @@ are absent; archived histories/source snapshots and original failed verdicts rem
 8 duplicate temp files removed after retained SHA read-back, cleanup SHA256
 `79886755b9c142eabf914a5de1af5e0dd6ac087e6207e5afa1599d49cab72bec`. Writer root cause and general cleanup/backup/admission gates
 remain open; no production deletion/release permission was emitted.
+
+
+## Own-root file-backed mapping fence qualified; broader quiescence remains open — 2026-10-16
+
+Native REDfd50f79a:1 FAIL/18 assertions144.58s, actual /bin/cat copy in A mapped
+without an open FD into A. Five /proc/maps segments match the captured physical
+inode; accepted kernel point after full native session absence still contains that
+same mapper. EOF exits0, fresh mapping absence and unchanged inode recorded. Audit
+SHA256 `bb89c0cb9e2d569d9cd25f27193a26f547515ef5570cb7c143e50de43dacf0ed`.
+Five-line runtime pathname gate now has GREEN672886f3:1 PASS/37 assertions177.04s,
+including actual space/Unicode/U+2028 pathname, refusal before terminal, valid retry,
+replay and sidecar reconstruction; audit SHA256
+`4105c9d60348f8b16d6c11f35486e26cefc0f16177203ad7f08c2c5da1ce9095`,
+309 checks/133 sources/7 causal observations+21 pins. Existing FD/topology case
+4edb2b66:1 PASS/39 assertions192.54s/audit SHA256
+`6da34ebf0999f58ced07b0f6c1a5bcecc017b74d7054b7ca8b4a1608a513573b`,
+301 checks/133 sources/4 causal observations+21 pins. Related15 PASS/166 assertions
+60.46s; typecheck/diff PASS. No budget increase (aggregate240s/holder60s), no PID-only
+signal: the mapper is released through its owned stdin EOF. All own9 immutable
+Docker IDs and3 controller roots absent; actual SDK/SQLite archives, original FAIL
+and exact tested source snapshots retained.7 duplicate temporary files removed only
+after matching retained SHA read-back; cleanup receipt SHA256
+`e7f3aa53dd87454eea5321a20a9f144f7813330eb5d64fb1fdb27a46193aec85`.
+This qualifies observed own-root file-backed pathname mappings. Anonymous/relocated
+mappings, broader operation classes, owned server-file archival/published-inode
+cleanup binding, SessionBackup and production cleanup/release/admission remain
+open. Historical writer errors are not diagnosed or repaired by these successes.
