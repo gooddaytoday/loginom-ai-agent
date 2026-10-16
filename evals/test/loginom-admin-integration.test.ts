@@ -76,10 +76,12 @@ liveIntegration("native targeted close preserves a different user's active brows
 liveIntegration("native backup research: observes real autosave and unqualified backup after daemon restart", () => nativeUserCapability("backup"), 120_000)
 liveIntegration("native backup research: captures a hard daemon crash and restart", () => nativeUserCapability("backup", true), 120_000)
 liveIntegration("native package inventory: named package is observed before close and absent afterward", () => nativeUserCapability("packages"), 120_000)
+liveIntegration("native shared package inventory: linked package is observed outside its owning session", () => nativeUserCapability("shared-packages"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages", hardCrash = false) {
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages", hardCrash = false) {
+  const packages = mode === "packages" || mode === "shared-packages"
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -99,11 +101,11 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     const profile = path.join(root, "admin-profile")
     await mkdir(evidence, { mode: 0o700 })
     console.error(`native user evidence: ${evidence}`)
-    const pins = mode === "packages" ? await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs"),
+    const pins = packages ? await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs"),
       path.resolve(import.meta.dir, "../src/loginom-admin.ts"), path.resolve(import.meta.dir, "../src/package-inventory.ts"),
       path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
-    if (mode === "packages") await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
+    if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
       resources: pair.resources, root, pairNonce: pair.nonce })
     const journal = path.join(evidence, "commands")
     await mkdir(profile, { mode: 0o700 })
@@ -402,12 +404,12 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         complete = true
         return
       }
-      if (mode === "backup" || mode === "packages") {
-        if (mode === "packages") {
+      if (mode === "backup" || packages) {
+        if (packages) {
           settlement.packageParent = false
           packageParent = await openLoginomAdmin(file, pair.identity)
         }
-        const backupProbe = await request("reconcile-user", { ...activation, phase: "session-backup-probe" })
+        const backupProbe = await request("reconcile-user", { ...activation, phase: mode === "shared-packages" ? "session-shared-probe" : "session-backup-probe" })
         await writeLeaseReceipt(path.join(evidence, "session-backup-reply.json"), backupProbe)
         const files = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", pair.identity.containerId,
           "find", file.server.backupRoot, file.server.storageRoot, "-maxdepth", "4", "-printf", "%P\\0%y\\0%s\\0"], { stdout: "pipe", stderr: "pipe" })
@@ -427,7 +429,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await writeLeaseReceipt(path.join(evidence, "autosave-evidence.json"), { identity: pair.identity, username: credentials.username,
           sessionGuid: backupData.ownSession.guid, periodMs: backupData.backup.periodMs, bytes: bytes.length,
           sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"), sessionBackupQualified: false })
-        if (mode === "packages") {
+        if (packages) {
           const packageFile = path.join(evidence, "backup-probe.lgp")
           expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${`${pair.identity.containerId}:${file.server.storageRoot}/${credentials.username}/backup-probe.lgp`} ${packageFile}`.quiet().nothrow()).exitCode).toBe(0)
           const parent = packageParent!
@@ -435,6 +437,16 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
           expect(await readAdminPackageInventory(file, pair.identity, parentBefore.source)).toEqual(parentBefore)
           expect(parentBefore.collections.find(row => row.name === backupData.binding.name)?.packages[0])
             .toMatchObject({ path: "/eval-a/backup-probe.lgp", referenceCount: -1, progress: null })
+          if (mode === "shared-packages") {
+            const libraryFile = path.join(evidence, "shared-probe.lgp")
+            expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${`${pair.identity.containerId}:${file.server.storageRoot}/${credentials.username}/shared-probe.lgp`} ${libraryFile}`.quiet().nothrow()).exitCode).toBe(0)
+            const shared = parentBefore.collections.find(row => row.sessionType === 2)!
+            expect(shared.packageCount).toBeGreaterThan(0)
+            const linked = shared.packages.find(item => item.path === "/eval-a/shared-probe.lgp")!
+            // The installed server reports false here; this is not an effective ACL check.
+            expect(linked).toMatchObject({ readOnly: false, progress: null })
+            expect(linked.referenceCount).toBeGreaterThan(0)
+          }
           const before = await request("inspect", { packages: true })
           await writeLeaseReceipt(path.join(evidence, "packages-before.json"), before)
           expect(before).toMatchObject({ outcome: "confirmed", data: { identity: pair.identity } })
@@ -675,9 +687,9 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       expect(run.processCleanup.status).toBe("confirmed")
       expect(run.processCleanup.capture_complete).toBe(true)
       expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
-      settlement.admin = disposed?.outcome === "confirmed" && (mode !== "packages" ||
+      settlement.admin = disposed?.outcome === "confirmed" && (!packages ||
         (disposed.data as { transportDisconnect?: string })?.transportDisconnect === "confirmed")
-      if (mode === "packages") await writeLeaseReceipt(path.join(evidence, "package-settlement.json"), { identity: pair.identity, resources: pair.resources,
+      if (packages) await writeLeaseReceipt(path.join(evidence, "package-settlement.json"), { identity: pair.identity, resources: pair.resources,
         root, admin: settlement.admin, disposed, processCleanup: run.processCleanup, cleanupAllowed: false })
       if (complete) {
         expect(disposed?.outcome).toBe("confirmed")
@@ -696,7 +708,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       await writeLeaseReceipt(path.join(evidence, "parent-package-admin.json"), { closures })
       settlement.packageParent = true
     }
-    if (mode !== "packages" || settlement.admin && settlement.packageParent) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
+    if (!packages || settlement.admin && settlement.packageParent) { await destroyPair(file, options); await rm(root, { recursive: true, force: true }) }
     else console.error(`native package inventory fixture retained: ${root}`)
   }
 }
