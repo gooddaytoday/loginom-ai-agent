@@ -1,7 +1,10 @@
 {
   "five-aggregates.csv": {
     "status": "not_checked",
-    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "semantic_basis": "independent CSV calculation; native confirmation pending",
+    "input": "data/five-aggregates.csv",
+    "task": "fixtures/five-aggregates/task.md",
+    "expected_path": "fixtures/five-aggregates/expected.json",
     "keys": [
       "Region"
     ],
@@ -94,7 +97,10 @@
   },
   "multiple-keys.csv": {
     "status": "not_checked",
-    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "semantic_basis": "independent CSV calculation; native confirmation pending",
+    "input": "data/multiple-keys.csv",
+    "task": "fixtures/multiple-keys/task.md",
+    "expected_path": "fixtures/multiple-keys/expected.json",
     "keys": [
       "Region",
       "Product"
@@ -218,7 +224,10 @@
   },
   "null-empty.csv": {
     "status": "not_checked",
-    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "semantic_basis": "independent CSV calculation; native confirmation pending",
+    "input": "data/null-empty.csv",
+    "task": "fixtures/null-empty/task.md",
+    "expected_path": "fixtures/null-empty/expected.json",
     "keys": [
       "Region"
     ],
@@ -315,7 +324,10 @@
   },
   "header-only.csv": {
     "status": "not_checked",
-    "semantic_basis": "legacy oracle; live confirmation required before autonomous run",
+    "semantic_basis": "independent CSV calculation; native confirmation pending",
+    "input": "data/header-only.csv",
+    "task": "fixtures/header-only/task.md",
+    "expected_path": "fixtures/header-only/expected.json",
     "keys": [
       "Region"
     ],
@@ -399,5 +411,21 @@
       ],
       "rows": []
     }
+  },
+  "editing": {
+    "status": "not_checked",
+    "input": "data/grouping.csv",
+    "task": "task.md",
+    "initial_expected_path": "initial.json",
+    "expected_path": "expected.json",
+    "checks": [
+      "same_node_reconfiguration",
+      "remove_aggregate",
+      "add_aggregate",
+      "ordered_keys_and_measures",
+      "exclude_output_key",
+      "save_reopen_execute",
+      "preserve_unrequested_options"
+    ]
   }
 }

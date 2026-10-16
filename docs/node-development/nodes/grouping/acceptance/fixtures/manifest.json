@@ -7,21 +7,27 @@
     "delimiter": ";",
     "text_qualifier": "\"",
     "null_marker": "\\N",
+    "decimal_separator": ".",
+    "rows_to_skip": 0,
+    "first_line_as_title": true,
     "columns": [
       {
         "name": "Region",
         "label": "Region",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Amount",
         "label": "Amount",
-        "type": "real"
+        "type": "real",
+        "data_kind": "Непрерывный"
       },
       {
         "name": "RowID",
         "label": "RowID",
-        "type": "integer"
+        "type": "integer",
+        "data_kind": "Непрерывный"
       }
     ],
     "rows": 5
@@ -34,31 +40,39 @@
     "delimiter": ";",
     "text_qualifier": "\"",
     "null_marker": "\\N",
+    "decimal_separator": ".",
+    "rows_to_skip": 0,
+    "first_line_as_title": true,
     "columns": [
       {
         "name": "Group",
         "label": "Group",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Segment",
         "label": "Segment",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Amount",
         "label": "Amount",
-        "type": "real"
+        "type": "real",
+        "data_kind": "Непрерывный"
       },
       {
         "name": "Other",
         "label": "Other",
-        "type": "integer"
+        "type": "integer",
+        "data_kind": "Непрерывный"
       },
       {
         "name": "Text",
         "label": "Text",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       }
     ],
     "rows": 8
@@ -71,21 +85,27 @@
     "delimiter": ";",
     "text_qualifier": "\"",
     "null_marker": "\\N",
+    "decimal_separator": ".",
+    "rows_to_skip": 0,
+    "first_line_as_title": true,
     "columns": [
       {
         "name": "Region",
         "label": "Region",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Amount",
         "label": "Amount",
-        "type": "real"
+        "type": "real",
+        "data_kind": "Непрерывный"
       },
       {
         "name": "Text",
         "label": "Text",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       }
     ],
     "rows": 0
@@ -98,26 +118,33 @@
     "delimiter": ";",
     "text_qualifier": "\"",
     "null_marker": "\\N",
+    "decimal_separator": ".",
+    "rows_to_skip": 0,
+    "first_line_as_title": true,
     "columns": [
       {
         "name": "Region",
         "label": "Region",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Product",
         "label": "Product",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Amount",
         "label": "Amount",
-        "type": "real"
+        "type": "real",
+        "data_kind": "Непрерывный"
       },
       {
         "name": "Quantity",
         "label": "Quantity",
-        "type": "integer"
+        "type": "integer",
+        "data_kind": "Непрерывный"
       }
     ],
     "rows": 4
@@ -130,21 +157,27 @@
     "delimiter": ";",
     "text_qualifier": "\"",
     "null_marker": "\\N",
+    "decimal_separator": ".",
+    "rows_to_skip": 0,
+    "first_line_as_title": true,
     "columns": [
       {
         "name": "Region",
         "label": "Region",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       },
       {
         "name": "Amount",
         "label": "Amount",
-        "type": "real"
+        "type": "real",
+        "data_kind": "Непрерывный"
       },
       {
         "name": "Text",
         "label": "Text",
-        "type": "string"
+        "type": "string",
+        "data_kind": "Дискретный"
       }
     ],
     "rows": 2

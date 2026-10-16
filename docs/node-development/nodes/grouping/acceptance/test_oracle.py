@@ -52,7 +52,7 @@ class OracleTests(unittest.TestCase):
             actual = deepcopy(expected)
             change(actual)
             with self.assertRaises(ValueError): self.compare(expected, actual)
-        # The separate reconfiguration stage retains both A/Segment groups.
+        # Excluding Segment does not merge its two separate A groups.
         projected = generate()["reconfiguration.json"]["outputs"][0]
         actual = deepcopy(projected)
         actual["rows"] = list({r["Group"]: r for r in actual["rows"]}.values())
@@ -95,12 +95,33 @@ class OracleTests(unittest.TestCase):
         initial = generate()["initial.json"]["outputs"][0]
         self.assertEqual(initial["rows"][-1], dict(Group="C", Total=None, Rows=2, Average=None, Minimum=None, Maximum=None, TextRows=2))
 
-    def test_current_task_saves_first_summary_without_reconfiguration(self):
+    def test_current_task_saves_reconfigured_target_output_only(self):
         expected = generate()["expected.json"]
         self.assertEqual(set(expected), {"outputs"})
-        self.assertEqual(expected, generate()["initial.json"])
-        self.assertEqual([c["name"] for c in expected["outputs"][0]["columns"]],
+        self.assertEqual(expected, generate()["reconfiguration.json"])
+        self.assertEqual([c["name"] for c in generate()["initial.json"]["outputs"][0]["columns"]],
                          ["Group", "Total", "Rows", "Average", "Minimum", "Maximum", "TextRows"])
+        self.assertEqual([c["name"] for c in expected["outputs"][0]["columns"]],
+                         ["Group", "OtherTotal", "MeanAmount", "TextRows"])
+
+    def test_each_matrix_fixture_has_target_only_expected_and_business_task(self):
+        generated = generate()
+        for name in ["five-aggregates.csv", "multiple-keys.csv", "null-empty.csv", "header-only.csv"]:
+            case = generated["fixtures/matrix.json"][name]
+            self.assertTrue((ROOT/case["input"]).is_file())
+            self.assertTrue((ROOT/case["task"]).is_file())
+            self.assertEqual(generated[case["expected_path"]], {"outputs": [case["expected"]]})
+            self.assertEqual(case["status"], "not_checked")
+
+    def test_composite_keys_and_separate_fact_totals(self):
+        observed = generate()["fixtures/matrix.json"]["multiple-keys.csv"]["expected"]
+        self.assertEqual(observed["rows"], [
+            dict(Region="A", Product="X", Amount_sum=30, Amount_count=2, Amount_avg=15,
+                 Amount_min=10, Amount_max=20, Quantity_sum=3),
+            dict(Region="A", Product="Y", Amount_sum=-5, Amount_count=1, Amount_avg=-5,
+                 Amount_min=-5, Amount_max=-5, Quantity_sum=3),
+            dict(Region="B", Product="X", Amount_sum=0, Amount_count=1, Amount_avg=0,
+                 Amount_min=0, Amount_max=0, Quantity_sum=4)])
 
     def test_matrix_covers_empty_and_five_aggregates(self):
         matrix = generate()["fixtures/matrix.json"]
