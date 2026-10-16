@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
+import { createAdminChannel, createJournaledAdminChannel, openLoginomAdmin, readAdminFinalization, readAdminProcessInventory, readAdminSessionInventory, readAdminPoolPolicy, sealAdminProcessInventory, selectOwnedSessions } from "../src/loginom-admin"
 import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -368,4 +368,28 @@ test("owned sessions: duplicate remote identities are ambiguous in observations 
 test("owned sessions: a username alone cannot substitute a recorded remote identity", () => {
   expect(selectOwnedSessions([{ ...owned, remoteKey: "session-42" }], [owned])).toEqual([])
   expect(selectOwnedSessions([], [owned])).toEqual([])
+})
+
+
+test("pool policy receipt refuses an omitted native observer even with matching source hashes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-pool-policy-")), fixture = await parallelFixture(root)
+  const directory = path.join(fixture.slots.controller.stateDir, "admin-policy")
+  await mkdir(path.join(directory, "commands"), { recursive: true, mode: 0o700 })
+  const hash = (value: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
+  const data = { identity, packagePoolSize: 0, before: 10, changed: true, observer: "admin",
+    collections: [{ name: "admin:1", sessionType: 1, packageCount: 0 }, { name: "pool", sessionType: 3, packageCount: 0 }] }
+  const store = async (value: typeof data) => {
+    const reply = { v: 1, id: "policy", outcome: "confirmed", data: value }
+    const command = { version: 1, kind: "loginom-admin-command", id: reply.id, op: "configure-pool", expectedIdentity: identity,
+      desiredHash: hash({}), replyHash: hash(reply), state: "confirmed", at: "2026-10-16T03:00:00Z", settledAt: "2026-10-16T03:00:01Z" }
+    const commandFile = path.join(directory, "commands/policy.json"), target = path.join(directory, "pool-policy-policy.json")
+    const receipt = { version: 2, kind: "admin-pool-policy", identity, reply, command: { path: commandFile, sha256: hash(command) } }
+    await writeLeaseReceipt(commandFile, command)
+    await writeLeaseReceipt(target, receipt)
+    return { path: target, sha256: hash(receipt) }
+  }
+  try {
+    expect(await readAdminPoolPolicy(fixture.slots, identity, await store(data))).toMatchObject({ packagePoolSize: 0, before: 10, changed: true })
+    await expect(readAdminPoolPolicy(fixture.slots, identity, await store({ ...data, collections: [] }))).rejects.toThrow("POOL_POLICY_UNCONFIRMED")
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
