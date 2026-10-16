@@ -1325,3 +1325,15 @@ PASS46.09s, typecheck/syntax/diff PASS. Private51f765be… audit9c6e5d40…83/45
 verifies all admin closures/ACKs, both pre-CLI finalizers released and exact own
 pair/network/root absence. The helper bridge closes early; deadlines are unchanged.
 Evaluated-attempt cleanup, frozen runtime admission and the remaining gates are open.
+
+Detached active-backend controls: run `native active backend control` and
+`native active backend close` separately with the existing private native config.
+The same20s Code is installed in the existing package. After client-context loss
+Progress is still active; the natural case waits for idle, while the stop case
+uses the existing bound CloseSession and fresh absence. Final close1/53
+PASS61.68s, control1/54 PASS79.82s, identical9 pins/images; controller start→fresh
+absence3051ms versus21456ms. Related50/162 PASS22.75s, typecheck/syntax/diff PASS.
+Private05c609b2… audit48d6b749…64/25 and0ff79e61…192a52d3…184/73 verify both
+admin closures/ACKs, exact own pair/network/root absence and retained sources/input.
+This preserves existing close guards/deadlines and grants no general operation,
+lock or storage cleanup authority. CLI crash and B-active lifecycle remain open.
