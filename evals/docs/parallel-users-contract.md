@@ -3045,3 +3045,30 @@ Primary enums/UI are preserved in native-pool-schema-f6236ca2…/source.json SHA
 `7a68a6b3c8afab41bc9a01acbf19062fc2daa3b1854fe09f59b227dfa70c5a01`;
 installed model RPC source was already frozen. Interrupted work, selected Pool
 closure, operation/lock quiescence, storage/backup and production remain open.
+
+### Native selected Pool ClosePackage refusal (2026-10-16)
+
+The guarded research phase `session-pool-close-probe` uses only ephemeral
+`eval-pool-probe`. After the owned once-only job completes and its exact GUID
+is deleted with fresh empty enumeration, the admin resolves one matching idle
+Pool object and calls `manager.ClosePackage(packageInfo, 5000)` once. Native
+Loginom refuses with “Не найдена сессия в которой находился пакет…”. A fresh
+lookup retains the same object; creator CloseSession also leaves that Pool item.
+This is a qualified refusal, not a cleanup primitive.
+
+A second user's retained package is compared in full before the attempt and
+after creator closure through one admin observer, then closed separately by
+its own cached binding. Managed SessionInfo proxy IDs observed through different
+admin observers differ; they are not cross-observer identifiers. Existing
+session close ownership checks are unchanged. No global pool clear is called.
+
+Native1/70 PASS68.76s; related49/160 PASS21.98s, typecheck/syntax/diff PASS.
+Private63e4e2dc… source-audit SHA256
+`17f23462c0b57a6f77072a64780ae85453e5cb3c149c89a668e2bd4848782e12`
+checks93 facts/43 sources plus8 pins, both continuous admin closures/transport
+ACKs, retained input and exact own pair/network/root absence. The earlier
+ordinary Pool control1641d4d8… PASS64.57s has audit8af85dfe…69/23. Unsupported
+phase, failed positive expectation, cross-observer oracle and fixture-counter
+runs retain their original failures. Production cleanup/delete/unpause/admission
+remain blocked. Next investigate PackagePoolSize=0 before work on a fresh pair;
+its exposed unsigned setter alone does not prove disabled retention.

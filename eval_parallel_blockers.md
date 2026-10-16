@@ -618,3 +618,44 @@ read-only API не выдаёт cleanup/operations permission. Следующи�
 имеют actual continuous closure обоих admins, transport ACK, original LGP/autosave
 и verified absence собственных exact pair/network/root (boundary-audit.json,
 22/22/25/22/25 checks). Старые incidents и permanent research/dev не удалялись.
+
+## Selected Pool ClosePackage: native refusal (2026-10-16)
+
+On a newly owned research pair, the completed and deleted once-only Scheduler
+job leaves `/eval-pool-probe/progress-probe.lgp` in Pool type3. A fresh exact
+path/unique-object/Progress=false lookup followed by one native
+`IBGDeductorSessionsManager.ClosePackage(packageInfo, 5000)` throws
+«Не найдена сессия в которой находился пакет progress_probe. Возможно она уже закрыта».
+The same Pool object remains after fresh read-back. This RPC is not a qualified
+scoped Pool cleanup path. The installed SessionsManagerForm.IsClosable also
+excludes Pool/shared collections; its ClearPackagePool operation has no selector.
+No global clear or server restart was used.
+
+Native failed positive expectation is retained in private
+`native-user-5de62e6a-b0bf-4c13-a89f-d995ecdc382f`; its exact sources/input,
+original reply/journal, both continuous admin closures, transport ACKs and
+absence of the exact own pair/network/root passed boundary audit
+SHA256 `53a38350a18c5fee8ac7f1704eaed549a308becefa5a418dce45a2097ad494b7`.
+The unsupported-phase RED `38f64f35…` is settled separately.
+
+The neighbor comparison initially used another admin observer's proxy ID.
+Observed native SessionInfo proxy IDs differ between admin observers even for
+the same named session. The control now finds B's unique name in one observer
+and compares that observer's full package row and proxy ID across bookends.
+This does not weaken the separate session ownership/close guards. The original
+failed oracle `34704c2b…` and fixture-counter failure `a8193505…` retain their
+executed sources and diagnostics; they are not full passing test runs.
+
+Next candidate: qualify native PackagePoolSize=0 on a fresh disposable pair
+before user work, with getter/read-back and an actual completed job. Installed
+ServerSettingsForm exposes this unsigned setting with minimum0; this is only
+a verified setter surface, not yet evidence that zero disables retention.
+Static source manifest `native-pool-settings-schema-2683f213-b58b-4d45-8019-803e6d6bb314/source.json`
+SHA256 `f9292a8b396eeefa4206935eb65828d66acfccabf7c7d19b2a7a45bcf3cace2a`.
+Production cleanup/delete/unpause/admission remain ungranted.
+
+Final refusal/preservation control: native1/70 PASS68.76s, related49/160
+PASS21.98s, typecheck/syntax/diff PASS. Private63e4e2dc… source-audit
+SHA256 `17f23462c0b57a6f77072a64780ae85453e5cb3c149c89a668e2bd4848782e12`
+checks93/43 sources+8 pins, both admin closures/transport ACKs and own pair/root
+absence verified. This closes the research control, not the cleanup blocker.
