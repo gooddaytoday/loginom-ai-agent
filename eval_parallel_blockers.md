@@ -1031,3 +1031,28 @@ Private verification and source snapshots are in first incident writer-refusal/;
 12 duplicate temporary logs/helpers were removed only after retained SHA read-back,
 cleanup receipt SHA256
 `ef8d3d41e545037f292c51f0b3056795a08f3e9df7d130f7a272a5732976a0f7`.
+
+Instrumented fourth run ce3a9440 reached the intended storage RED after successful
+management and agent process qualification:1 FAIL/18 assertions184.53s, terminal
+accepted after a successful hardlink control. Native writer cause was not reproduced
+or diagnosed by that success; original3 writer failures remain unresolved. Original
+RED has exact ln/test source but no raw link stat, explicitly limited in source audit
+SHA6ee9947fd8c81c28afd7f4f95a6cae48e20bf8b4f0f25fc21ed7dedb22bef4e1.
+Minimal readonly finalizer traversal gate now has native GREEN67bf6231:1 PASS/39
+assertions225.24s; actual NUL nlink2/refusal/no mutation, followed by valid retry,
+replay and reconstruction. Audit SHA256
+`13e20eec40fdbd77301309e05bc7994e0436f10c5b9726b34322af4b43c95fe7`,
+324 checks/139 sources/8 causal points+21 pins. Both own factory teardowns completed;
+raw native failures, histories/source snapshots remain. This closes only the missing
+readonly topology gate; general storage deletion and production admission stay closed.
+
+Normal browser regression64edcd81 is now1 PASS/25 assertions237.72s under the
+unchanged240s budget: actual Loginom package material, continuous actor closure,
+finalization/replay/sidecar reconstruction all pass. Audit SHA256
+`c8fc089448ee789ebedaee01f642c24ca2753b493255f570030322631f65562e`,
+1902 checks/160 sources/24 causal observations+21 pins. Related15 PASS/166
+assertions61.77s; typecheck/diff PASS. All own RED/GREEN/regression pairs and roots
+are absent; archived histories/source snapshots and original failed verdicts remain.
+8 duplicate temp files removed after retained SHA read-back, cleanup SHA256
+`79886755b9c142eabf914a5de1af5e0dd6ac087e6207e5afa1599d49cab72bec`. Writer root cause and general cleanup/backup/admission gates
+remain open; no production deletion/release permission was emitted.

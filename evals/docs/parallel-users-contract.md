@@ -3331,3 +3331,26 @@ failed earlier with the same generic writer error in different phases; they do n
 qualify the intended hardlink gate. Original proofs/source snapshots and pending
 test patch remain private, with exact incidents and research retirement in
 `eval_parallel_blockers.md`. No cleanup/admission permission follows from diagnostics.
+
+
+2026-10-16 finalizer topology fence: after native session absence and its bound
+kernel FD point, finalizeSlotAttempt reuses inspectUserStorage with the protected
+preparation nonce before terminal publication. Native hardlink RED was accepted by
+the earlier code; native GREEN67bf6231 refuses nlink2 before terminal and preserves
+raw NUL names/inodes, then accepts unusual own names and a symlink after only the
+control hardlink is removed. B canary hash, archive/replay/reconstruction and exact
+research teardown pass.1 PASS/39 assertions225.24s, audit324 checks/139 sources/8
+causal points+21 pins. Original RED did not retain raw link stat; its successful ln
+control and exact source are preserved without reconstructing that observation.
+No delete or release is added. Published-inode binding for eventual cleanup,
+server-file archival, full operation/mmap/backup qualification and production
+admission remain separate gates; both grants stay false.
+
+Browser regression64edcd81 also passes with actual Loginom-created material:
+1 PASS/25 assertions237.72s under the unchanged240s budget; audit1902 checks/160
+sources/24 causal observations+21 pins. Exact session closure, profile archive,
+no duplicate CloseSession and reconstruction remain valid. Related process/session
+suites15 PASS/166 assertions61.77s, typecheck/diff PASS. All own test pair IDs and
+controller roots are absent; committed SDK/SQLite archives and source snapshots
+remain private.8 duplicate temporary logs/helpers removed after retained SHA
+read-back. This qualification does not resolve the historical writer blocker.
