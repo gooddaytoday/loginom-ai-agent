@@ -23,21 +23,26 @@
 - Никаких новых эпох, процессных описей/телеметрии, FD/kernel receipts,
   server-storage archives и исследовательских операций в рабочем admin-драйвере.
 - Subreaper, pid+starttime перед сигналом, marker v2, изоляция секретов сохраняются.
-- Блокер сквозного пути/изменение требования/удаление кроме собственных временных
-  файлов текущего хода — запрос владельцу и ожидание, без обхода через blockers.
+- Блокер сквозного пути/изменение требования — запрос владельцу и ожидание.
+  Harness автоматически удаляет только своё на новом стенде после обязательных
+  проверок; старые стенды/инциденты и созданное не этим harness требуют разрешения.
+  Ограничение временными файлами текущего хода относится к работе исполнителя.
 - Предлагается новая acceptance pair `loginom-evals-acceptance-20261016-server`
   / `loginom-evals-acceptance-20261016-studio`, private root
   `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/`, config `slots.json`.
-  Username eval-a/eval-b, раздельные a/b profile/work/history, новый judge-codex.
+  Username eval-a/eval-b, раздельные a/b profile/work/history. Home судьи прежний:
+  `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex`.
   Эти имена/root отсутствовали при чтении 2026-10-16; перед созданием перепроверить.
-  Старый judge-home retained; его reservation и все прежние стенды не трогать.
+  Разрешено снять только retained judge reservation команды
+  `585940be-5c1b-4bff-a7c6-00459a4f7fa3` под guard после сверки identity.
+  A00yuH и все прежние стенды/инциденты сохраняются до успешного N=2.
 - Новая пара создаётся после утверждения плана, с новым loopback-портом/сетью,
   marker v2 и private state. Старые profiles/auth/archives не перезаписываются.
-- Чужие правки не включать в коммиты. Два незавершённых code-diff server archive
-  сохраняются замороженными. При утверждении плана запросить отдельное решение:
-  разрешена ли отмена только этих собственных незакоммиченных hunks в
-  `evals/src/attempt-finalization.ts` и `evals/test/native-agent-run-integration.test.ts`
-  перед работой; committed mechanisms пока сохраняются до успешного N=2.
+- Чужие правки не включать в коммиты. Разрешён откат двух незакоммиченных
+  archive-правок: `evals/src/attempt-finalization.ts`,
+  `evals/test/native-agent-run-integration.test.ts`; перед откатом сохранить
+  единый diff private0600 в state. `user-storage-archive.ts` не подключать,
+  его удаление и остальные неиспользуемые механизмы — шаг 7 после N=2.
 
 ## 1. Документы и решение до реализации
 
@@ -47,7 +52,9 @@
   [перечень удержанного](../../testing/loginom-ai-agent/2026-10-16-evals-parallel-retained.md).
 - [x] Независимое ревью плана/документов: Approved; замечание порядка startup
   исправлено (единственный admin открывается до процедуры остатков).
-- [ ] Показать владельцу план/перечень и **дождаться ответа до реализации**.
+- [x] Владелец утвердил план/перечень с поправками; повторное согласование не нужно.
+- [ ] Отдельным docs-коммитом внести поправки владельца, затем сохранить единый
+  private diff и откатить только две разрешённые archive-правки.
 - [x] Сохранить предложенную редакцию документов отдельным коммитом
   `docs(evals): simplify parallel run requirements and plan`.
 
@@ -80,7 +87,7 @@
 - [ ] GREEN: в новом пути заменить actor-ledger admission точным пользователем,
   архивировать профиль/результаты, закрыть свои сессии, перечитать и непосредственно
   проверить открытые файлы перед очисткой своего root. Не развивать замороженный
-  server-storage archive diff; до решения об отмене этих hunks файл не редактировать.
+  server-storage archive diff; после разрешённого отката модуль не подключать.
 - [ ] Исключить research phases из рабочих операций admin-драйвера; не вводить
   заменяющий probe protocol. Их окончательное удаление — только после N=2.
 - [ ] Проверить `bun run test test/loginom-admin.test.ts test/artifact.test.ts test/profile-archive.test.ts`
@@ -88,22 +95,38 @@
 
 ## 4. Процессы и выделенный судья
 
-**Files:** `evals/src/process-supervisor.ts`, `judge-environment.ts`, `judge.ts`;
+**Files:** `evals/src/process-supervisor.ts`, `cli.ts`, `profile.ts`,
+`judge-environment.ts`, `judge.ts`, `run.ts`;
 `/home/kiselev/git/codex-vpn-lockdown/bin/codex` в другом репозитории.
 **Unit tests:** `process-supervisor.test.ts`, `judge-environment.test.ts`;
 новый `verify/test_codex_home.py` рядом с существующими verify tests wrapper repo.
 
 - [ ] RED/GREEN: полностью прочитанная чужая ancestry не сигналится и не карантинится;
   ошибка чтения отказывает; own descendant проходит subreaper/pid+starttime guards.
+- [ ] RED/GREEN: при подтверждённом дереве и пустом unknown ошибка
+  `Writer owner unavailable` не проваливает попытку; `.writer` снимается через
+  существующий `releaseStaleWriter`, непроверенное дерево/unknown по-прежнему отказ.
 - [ ] Проверить `bun run test test/process-supervisor.test.ts test/judge-environment.test.ts`
   и `bun typecheck`; отдельный коммит `fix(evals): ignore proven foreign process ancestry`.
 - [ ] RED/GREEN wrapper unit: разрешённый canonical caller CODEX_HOME с тем же
   lockdown-конфигом сохраняется; outside/symlink/mismatch не допускаются;
   отсутствие caller home сохраняет прежнее поведение и сетевые ограничения.
+- [ ] В том же маленьком wrapper-коммите определить unit boundary: валидируемые
+  `LOGINOM_EVALS_JUDGE_UNIT=loginom-evals-judge-<UUID>` и
+  `LOGINOM_EVALS_JUDGE_TIMEOUT_SEC` (целые секунды 1..86400); `systemd-run --unit`
+  с RuntimeMaxSec и ограниченным TimeoutStopSec. Сеть/VPN остаются прежними.
+- [ ] Unit RED/GREEN harness: ждать wrapper с таймаутом без сигналов root/sudo/
+  systemd-run; после выхода проверить завершение точного юнита через systemctl.
+  Root-процессы этой цепочки не ошибка владения; активный/непроверенный юнит — отказ.
+  Для обычного локального агента остаётся supervisor/subreaper, без исключений root.
 - [ ] Проверить `python3 -m unittest discover -s verify -p test_codex_home.py`
   и `bash -n bin/codex` в wrapper repo. Отдельным маленьким коммитом
   `fix(codex): preserve validated eval judge home` включить только свои hunks,
   сохранив имеющиеся чужие правки bin/codex и других файлов.
+- [ ] Снять ровно разрешённую judge reservation, сохранив incident A00yuH.
+  Проверить lockdown-конфиг прежнего home и `codex login status` через исправленную
+  обёртку (0 model calls). Нет/недействителен вход — остановиться и попросить вход
+  владельца; глобальный CODEX_HOME не подменяет эту проверку.
 
 ## 5. Очередь, ресурсы и сводка: открыть настоящий slots path
 
@@ -120,7 +143,11 @@
   missing mandatory sample не PASS, скрытый 429/успешный retry не скрывает отказ.
 - [ ] GREEN: подключить подготовленные слоты к существующим runSlotQueue и judge
   gate, убрать `SLOTS_ADMISSION_UNAVAILABLE` для этого пути. Run не вызывает
-  создание/исправление пользователей; использовать новый judge-home/VPN wrapper.
+  создание/исправление пользователей; использовать прежний home/VPN wrapper.
+- [ ] Run запускает `script/sample-parallel-resources.ts` с чистым env перед
+  dispatch N=1/N=2 и останавливает/дожидается его в finally; out — private JSONL
+  плюс существующая summary, interval=1000ms. Unit проверяет start/stop при успехе,
+  отказе и SIGINT. Процессные пробы не влияют на исход, обязательные пробы влияют.
 - [ ] Проверить `bun run test test/parallel-run.test.ts test/scheduler.test.ts test/parallel-users-acceptance.test.ts`
   и `bun typecheck`; логические изменения сохранять отдельными коммитами
   `feat(evals): execute prepared user slots` / `refactor(evals): bound run resource acceptance`.
@@ -132,12 +159,13 @@ private config/budget/results вне Git; операторские команд�
 
 - [ ] Создать только новый acceptance стенд и private config; закрепить binary SHA,
   task/rubric hashes, модели, timeouts и бюджет/условия до N=1 dispatch.
-- [ ] Перед первым нетемпоральным удалением показать конкретные пути/файлы владельцу
-  и получить разрешение; это отдельный gate, не подразумевается утверждением плана.
 - [ ] Ровно четыре обязательных A/B сценария: взаимная невидимость файлов,
   close A сохраняет B, delete A после close/readback, unknown ownership без delete.
   Остальные live tests только явным флагом; native и proc-negative unit не совмещать.
 - [ ] Сохранить live результат без skip и коммит `test(evals): qualify required slot isolation cases`.
+- [ ] Непосредственно перед N=1 проверить MemAvailable хоста против записанного
+  бюджета (владелец наблюдал около5GiB из38GiB). Не хватает — остановиться и
+  сообщить владельцу; не освобождать память остановкой чужих/удержанных стендов.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -146,20 +174,47 @@ private config/budget/results вне Git; операторские команд�
 
 ## 7. Один проход удаления неиспользуемого после успешного N=2
 
-- [ ] Составить точный список orphaned mechanisms/tests, показать владельцу
-  и дождаться разрешения на удаления; старые incident/evidence не включать молча.
+- [ ] Одним списком согласовать судьбу старых стендов/инцидентов после N=2.
+  Неиспользуемые механизмы/тесты убрать по уже утверждённому шагу; чужие изменения
+  и incident/evidence не удалять без отдельного разрешения.
 - [ ] Убрать неиспользуемые recovery epochs/user-lock/process inventories/telemetry/
   receipt chains/server-storage archive code и их тесты, сохранив обязательные guards.
 - [ ] `bun run test:unit`, `bun typecheck` из `evals/`, `git diff --check`;
   коммит `refactor(evals): remove unused parallel research mechanisms`.
-- [ ] Проверить итог по каждому правилу контракта; обновить короткий checkpoint.
+- [ ] Свести повторённые правила к контракту; в дизайне/AGENTS/blockers/runbook/
+  плане оставить короткие ссылки. Проверить итог по контракту, обновить checkpoint.
+
+## Рабочие вызовы нового пути
+
+- Используются `runSlotQueue`, `runAgent` (без agentEvidence), `management`
+  (без managementEvidence) и их прямой `superviseProcess`; подтверждённый cleanup
+  supervisor-а решает исход. `superviseAgentProcess(input, undefined)` — только
+  существующий transparent fallback, без inventory. `releaseStaleWriter`,
+  `archiveProfileHistory`/`archiveProfileEvidence` сохраняют историю;
+  `serverFileObservation` непосредственно проверяет открытые файлы.
+- `judgeInfo`/`judgeVersion`/`judgeTask` для VPN проходят границу точного systemd-юнита,
+  не строгую CLI executable/ancestry-проверку sudo-цепочки. `createJudgeGate`
+  и `acquireJudgeLease` сохраняются. Обычный fake/local judge сохраняет локальный путь.
+- Не вызываются как admission/finalization gates: `superviseManagementProcess`,
+  inventory-ветки `superviseAgentProcess`/`superviseJudgeProcess`,
+  `sealAgentProcessInventory`, `pauseAgentProcessInventory`,
+  `sealManagementProcessInventory/Inventories`, `readAgentProcess*`,
+  `readManagementProcess*`, `sealJudgeProcessInventory`, `readJudgeProcessInventory`,
+  `qualifyClosedProcessEvidence`, `readResourceNativeCensus`, `checkResourceEvidence`
+  с process census. Старые `collectSlotSessions`/`finalizeSlotAttempt` с actor/receipt
+  chains не используются новым путём. Диагностика не меняет cleanup/status/exit code.
+- `archiveUserStorage`/`readUserStorageArchive` не подключаются; отдельный user lock,
+  epoch recovery и `captureServerFiles`/`readServerFiles` receipt chain не вызываются.
 
 ## Checkpoint
 
-1. 2026-10-16: решения владельца заменяют прежние цель/дизайн/план.
-2. Нормативные документы сокращены; полные прежние тексты сохранены в одном архиве.
-3. Удержанные 12 research pairs/старые incidents не удалялись и не освобождались.
-4. Два code-diff server-storage archive и чужой untracked review сохранены без изменений.
-5. Новый runtime путь не реализован; N=1/N=2 и реальный судья не запускались.
-6. Независимое ревью: Approved; исправлен порядок admin/startup.
-7. Следующий gate: ответ владельца на план/перечень и судьбу двух code-diff.
+1. 2026-10-16: новая цель и поправки владельца нормативны; план утверждён.
+2. Документы/единый архив/перечень12 пар в39127c48e1, независимое ревью Approved.
+3. Старые стенды/инциденты не трогать до успешного N=2; A00yuH не удалять.
+4. Home судьи прежний parallel/judge-codex; снятие точной брони585940be… разрешено.
+5. До отката2 archive-правок сохранить единый private diff; модуль не подключать.
+6. Исход нового пути: supervisor cleanup и systemd-unit судьи; описи диагностические.
+7. Harness сам очищает доказанно своё на новом стенде после обязательных проверок.
+8. N=1/N=2 collector запускает/останавливает run; перед N=1 проверить MemAvailable.
+9. N=2 ждёт утверждения числовых порогов по N=1; новый runtime ещё не реализован.
+10. Следующий шаг: commit поправок, сохранение diff/откат, unit TDD сквозного пути.
