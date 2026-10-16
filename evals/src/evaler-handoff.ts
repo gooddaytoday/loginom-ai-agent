@@ -43,7 +43,8 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     if (input.state.processed_report_ids.includes(input.event.id)) return { action: "no_action", reason: "decision already processed", state: input.state }
     const blocked = input.state.blocked_context
     if (input.state.phase !== "blocked" || !blocked || input.event.issue_id !== input.state.issue_id ||
-      input.event.report_id !== blocked.report_id || input.event.sha !== blocked.sha)
+      input.event.report_id !== blocked.report_id || input.event.sha !== blocked.sha ||
+      input.event.target === "Ben" && input.event.sha !== input.state.frozen_sha)
       return { action: "no_action", reason: "continuation requires the current blocked issue/report/SHA", state: input.state }
     if (blocked.cleanup_required && input.event.stand_ready !== true)
       return { action: "blocked", reason: "confirmed free and healthy stand required", state: input.state }

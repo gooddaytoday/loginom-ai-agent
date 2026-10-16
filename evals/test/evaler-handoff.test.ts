@@ -349,3 +349,20 @@ test("cleanup unknown requires a verified free and healthy stand before continua
     expect(evaluateHandoff({ state: stopped, event: { ...event, stand_ready: true }, pending_tasks: [] }).action).toBe("ready_to_dispatch")
   }
 })
+
+test("Ben can resume only an already frozen SHA, never unfinished Rich work", () => {
+  const event = { kind: "continue_after_evaler", id: "ben-decision", issue_id: state.issue_id,
+    report_id: report.id, sha: next, target: "Ben" }
+  for (const frozen_sha of [null, sha]) {
+    const stopped = evaluateHandoff({ state: { ...state, frozen_sha }, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+    const result = evaluateHandoff({ state: stopped, event, pending_tasks: [] })
+    expect(result.action).toBe("no_action")
+    expect(result.state).toEqual(stopped)
+  }
+  const stopped = evaluateHandoff({ state: reviewing(), event: { ...verdict, status: "BLOCKED" }, pending_tasks: [] }).state
+  const result = evaluateHandoff({ state: stopped, event: { ...event, report_id: verdict.id }, pending_tasks: [] })
+  expect(result.action).toBe("ready_to_dispatch")
+  expect(result.target).toBe("Ben")
+  expect(result.state.frozen_sha).toBe(next)
+  expect(result.state.review_cycle).toBe(stopped.review_cycle)
+})
