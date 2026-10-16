@@ -121,7 +121,7 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
     await archiveDiagnostics(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.runtimeDirectories, out, command.cleanupSecrets)
   if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
-    await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
+    await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writerRefusal ? undefined : result.processCleanup.writer)
   if (workdir) await rm(workdir, { recursive: true })
   return { ...result, evidenceDir: out }
 }
