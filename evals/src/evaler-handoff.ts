@@ -144,7 +144,8 @@ function parseInput(value: unknown): HandoffInput {
     last_dispatch: dispatch ? { id: text(dispatch.id), phase: member(dispatch.phase, ["rich", "ben"]), sha: sha(dispatch.sha),
       root_trigger: dispatch.root_trigger === null ? null : text(dispatch.root_trigger), task_id: dispatch.task_id === null ? null : text(dispatch.task_id),
       outcome: member(dispatch.outcome, ["queued", "coalesced", "deferred", "ambiguous", "not_queued"]) } : null }
-  if (phase === "ben" && state.frozen_sha === null) invalid()
+  if (phase === "ben" && state.frozen_sha === null || phase === "blocked" && executor !== null || blocked && phase !== "blocked") invalid()
+  if (state.resume_sha !== undefined && (!["rich", "ben"].includes(phase) || phase === "ben" && state.resume_sha !== state.frozen_sha)) invalid()
   const pending_tasks = array(input.pending_tasks).map(value => {
     const task = record(value)
     return { issue_id: text(task.issue_id), phase: member(task.phase, ["rich", "ben"]), sha: sha(task.sha), task_id: text(task.task_id) }

@@ -389,3 +389,14 @@ test("continuation dispatches Rich's stopped SHA once and clears it before handi
   expect(review.state.last_dispatch?.sha).toBe(final)
   expect(evaluateHandoff({ state: completed, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state).toEqual(completed)
 })
+
+test("malformed continuation state cannot redirect Ben or carry a stop into a runnable phase", () => {
+  const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+  const dispatch = { kind: "dispatch", id: "invalid-state", root_trigger: null }
+  for (const current of [
+    { ...reviewing(), resume_sha: sha },
+    { ...stopped, resume_sha: next },
+    { ...state, blocked_context: stopped.blocked_context },
+    { ...stopped, executor: "Rich" },
+  ]) expect(() => evaluateHandoff({ state: current, event: dispatch, pending_tasks: [] })).toThrow("invalid handoff input")
+})
