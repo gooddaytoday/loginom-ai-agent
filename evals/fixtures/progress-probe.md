@@ -40,3 +40,18 @@ detached twenty-second source. Both packages must have Progress concurrently;
 after A closes, B's same package stays active and completes successfully, its
 file-canary hash remains unchanged, and B is then closed by its own binding.
 This remains a Native API control rather than a CLI-crash or file-lock proof.
+
+The actual-CLI control uses `interrupt-probe.lgp`: the exact twenty-second
+`interrupt-probe.js` node feeds a preconfigured Calculator (`ReplayValue=Value`).
+Its Calculator XML skeleton comes from the tracked budget-variance reference;
+the reduced fixture is self-contained. The local provider opens this package,
+reads the Calculator contract and executes that existing node without changing
+its expressions or links. Both GUIDs belong to this pinned fixture and the
+normal runtime verifies them in the prepared graph. A new Calculator would
+correctly refuse its inactive input at preflight. The provider stops waiting on
+a terminal node refusal. Only this longer CLI scenario uses120s (300s aggregate);
+the four existing replay modes retain60s and their original aggregate budgets.
+Native Progress triggers supervisor abort; a fresh inventory must still show
+backend activity after local process closure. The finalizer archives pending
+recovery bytes before the exact session closes. This is controlled interruption,
+not a hard-kill, FD/lock or storage/admission qualification.

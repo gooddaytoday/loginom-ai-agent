@@ -1347,3 +1347,19 @@ verifies three continuous admin closures/ACKs and exact own pair/network/root
 absence. The missing-phase RED011628b4… is retained and safely settled;
 qualifier-object assertion is fixed and unknown peer teardown preserves fixtures.
 This does not qualify a CLI crash, backend locks or evaluated-attempt cleanup.
+
+
+Actual CLI active interruption (2026-10-16): the opt-in
+`test/native-agent-run-integration.test.ts` case selected by
+`--test-name-pattern 'is interrupted during server execution'` uses the explicit
+candidate binary and local replay provider. Its prelinked JS20→Calculator package
+is delivered to the activated own research user; file UID/GID match observed
+storage ownership. Existing-node execution activates the bounded source. Native
+Progress triggers supervisor abort; backend remains active after CLI closure.
+The finalizer commits all pending recovery history, closes exact agent/setup
+sessions and confirms absence with both cleanup/admission grants false.
+Native1/14 PASS180.97s; private d9c44aac… auditd10a7521…2191 checks/168 sources,
+26 causal frames and18 source/binary pins; SQLite was checked only on a private
+copy. Archive bytes/inodes, admin transport/closure and own pair/network/root
+absence were verified. Controlled interruption is distinct from hard SIGKILL.
+Three earlier archive-barrier probes remain preserved incidents in blockers.

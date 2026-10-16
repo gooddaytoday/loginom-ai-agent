@@ -742,3 +742,12 @@ dc751ee6-eb90-4fda-9338-e4d4b7d73a38, root
 Progress at77.681s (new scenario budget120s), backend active after local closure.
 Both failed at the old archive barrier and retain reservations/history/resources.
 They require source-qualified recovery; no PID-only or reservation unlink cleanup.
+
+Native pending-history archive follow-up (2026-10-16): fixed path verified with
+actual CLI interruption, not timeout. Private d9c44aac-e380-4d91-9194-5bd260e311b3
+passed1/14 (180.97s), auditd10a7521…2191/168 with all source pins, continuous local
+closure, backend still active afterward, preserved recovery bytes, committed
+archive-before-close, exact agent/setup close and fresh absence. Own disposable
+pair/network/root gone; history retained. This resolves normal-owner controlled
+interruption/archive composition. It does not release f547/2f/dc old reservations
+or qualify hard SIGKILL, FD/locks, no-regrowth, storage cleanup or admission.
