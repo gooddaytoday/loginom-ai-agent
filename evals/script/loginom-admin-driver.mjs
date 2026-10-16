@@ -151,7 +151,8 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
             if (binding.absenceOnly) return { outcome: "not_applied", data: { code: "SESSION_STILL_PRESENT" } }
             // Agent closure requires its archived history and the frozen post-CLI package count.
             if (retained[0].packageCount !== binding.retainedPackageCount || retained[0].pendingDisconnect !== true)
-              return { outcome: "not_applied", data: { code: "SESSION_NOT_IDLE" } }
+              return { outcome: "not_applied", data: { code: "SESSION_NOT_IDLE", packageCount: retained[0].packageCount,
+                pendingDisconnect: retained[0].pendingDisconnect, expectedPackageCount: binding.retainedPackageCount } }
             applied = true
             if (!await manager.CloseSession(retained[0].proxy, 5000)) throw Error("close")
             while (Date.now() < binding.deadline) {

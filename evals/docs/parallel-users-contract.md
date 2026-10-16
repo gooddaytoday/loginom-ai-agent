@@ -2921,3 +2921,37 @@ operation quiescence, durable parent consumption and cleanup admission remain
 open. The probe retains cleanupAllowed=false and operationsQualified=false.
 The new fixture retains its root/pair if admin closure/transport is unconfirmed;
 production and existing native deadlines are unchanged.
+
+
+### Durable parent package observations — 2026-10-16
+
+`AdminConnection.inspectPackageInventory()` persists the full native wire reply
+with its canonical inspect command reference/SHA. `readAdminPackageInventory`
+validates the private canonical path, server epoch, complete reply/request hashes,
+command window and nested collection/package schema, then rereads both sources.
+Counts must match arrays; duplicate collection IDs or package IDs within one
+collection fail. Signed native referenceCount and nullable Progress are preserved.
+A descriptor may appear across different collections; this grants no ownership,
+freshness, operation/lock quiescence, cleanup, release or unpause authority.
+
+Codec missing-module RED→GREEN1/8; inconsistent-tree RED→GREEN1/20 including
+forged matching journal hashes, altered epoch/times, unsafe mode/symlink and raw
+negative-reference/null-progress controls. Positive Progress here is synthetic.
+Native missing-parent API RED44/64.90s; final preconnected-parent named package
+control1/67 PASS67.56s, related49/160 PASS21.68s, typecheck/syntax/diff PASS.
+Private native-user-9bcdf36b… source-audit SHA256
+`0e6fc145fa8c5fadafe0e8eac129a42aa14310894e16764bfbeb5268947af7b0`
+checks67 facts/23 sources+6 tested code/binary pins: durable parent replay before
+and after actual CloseSession, original named/modified package/autosave, both
+continuous admin closures/transport ACKs, exact own pair/network/root absence.
+
+Late parent initialization against a retained Count1 session observed
+PendingDisconnect=false and safe SESSION_NOT_IDLE; the initial disconnect
+snapshot was true. The preconnected ordering passes without speculative handle
+release or weaker close guards. Cause remains unresolved in blockers; this does
+not qualify replacement-admin finalization of a retained nonempty session.
+All five failed/diagnostic fixtures retain original sources/data and have verified
+closures/pair absence. Installed enum source f9e4d339…/source.json SHA256
+`0cc2dadf184aba07af8cb30a2fd7b83074a8aca9f651d96f4869d737cfcd5768`
+defines client0/self1/shared2/pool3/backup4. Self denotes the observer, not a role.
+Running/nonempty shared/pool controls and production cleanup remain open.

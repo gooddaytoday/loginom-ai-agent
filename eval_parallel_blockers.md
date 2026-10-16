@@ -593,3 +593,28 @@ audit87/45 подтвердил новую active Count1 row и все closures/
 Это квалифицирует новый recipe, но не исправляет предыдущие два incidents.
 Нужен recovery producer для incomplete local actor/pre-spawn registrations;
 production run и normal release этими исследованиями не разрешены.
+
+
+### 2026-10-16 — Late admin and retained nonempty session
+
+В native package control после disconnect named/modified designer session
+исходный PendingDisconnect=true, Count1. Позднее открытый второй parent admin
+успешно читает package receipt, но raw close видит PendingDisconnect=false,
+Count1/expected1 и отказывает SESSION_NOT_IDLE. Условия close не ослаблены.
+Private native-user-5037b495… и3173ba84… сохраняют full replies/journals и before
+snapshots; вариант с освобождением query handles тоже отказал. Отдельный probe
+со стандартным inspect был confounded и не доказывает источник изменения.
+Причина изменения пока не установлена, связь по времени не объявляется причиной.
+
+Контроль с parent admin, открытым до создания designer session, проходит:
+native-user-9bcdf36b…1/67 PASS67.56s, audit SHA256
+`0e6fc145fa8c5fadafe0e8eac129a42aa14310894e16764bfbeb5268947af7b0`.
+Это квалифицирует durable package reader в режиме заранее открытого соединения;
+replacement-admin finalization retained Count1 остаётся отдельным gate. Native
+read-only API не выдаёт cleanup/operations permission. Следующий независимый
+шаг — positive running/shared/pool controls и quiescence mapping.
+
+Все5 RED/diagnostic fixtures86482995…,3cf852eb…,5037b495…,bd7e9cf6…,3173ba84…
+имеют actual continuous closure обоих admins, transport ACK, original LGP/autosave
+и verified absence собственных exact pair/network/root (boundary-audit.json,
+22/22/25/22/25 checks). Старые incidents и permanent research/dev не удалялись.
