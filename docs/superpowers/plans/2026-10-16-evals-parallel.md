@@ -125,10 +125,12 @@
   и `bash -n bin/codex` в wrapper repo. Отдельным маленьким коммитом
   `fix(codex): preserve validated eval judge home` включить только свои hunks,
   сохранив имеющиеся чужие правки bin/codex и других файлов.
-- [ ] Снять ровно разрешённую judge reservation, сохранив incident A00yuH.
+- [x] Снята ровно разрешённая judge reservation; A00yuH journal неизменён.
   Проверить lockdown-конфиг прежнего home и `codex login status` через исправленную
   обёртку (0 model calls). Нет/недействителен вход — остановиться и попросить вход
   владельца; глобальный CODEX_HOME не подменяет эту проверку.
+  Проверка через repo wrapper: exit0/loggedIn=true, unit завершён,0 model calls;
+  конфиг скопирован точно/private600, статусный lease освобождён.
 
 ## 5. Очередь, ресурсы и сводка: открыть настоящий slots path
 
@@ -220,4 +222,6 @@ private config/budget/results вне Git; операторские команд�
 8. N=1/N=2 collector запускает/останавливает run; перед N=1 проверить MemAvailable.
 9. N=2 ждёт утверждения числовых порогов по N=1; новый runtime ещё не реализован.
 10. Wrapper d551ddf:7 unit PASS; harness VPN boundary44/147 PASS, typecheck/diff PASS.
-11. Следующий шаг: разрешённое снятие точной judge брони/config/login status (0 model calls).
+11. Harness unit boundary0e6994f736; scoped login status exit0/clean unit/0 model calls, A00yuH journal unchanged.
+12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
+13. Следующий шаг: unit TDD server/profile locks без user lock, затем подготовка/cleanup/очередь.

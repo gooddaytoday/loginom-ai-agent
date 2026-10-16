@@ -75,6 +75,7 @@ export EVAL_CLI_MODE=binary
 export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/parallel/candidate-home/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610140002-dev/bin/loginom-ai-agent-cli
 export EVAL_AGENT_MODEL=openai/gpt-6-luna
 export EVAL_AGENT_VARIANT=high
+export EVAL_JUDGE_COMMAND=/home/kiselev/git/codex-vpn-lockdown/bin/codex
 export JUDGE_MODEL=gpt-6-sol
 export JUDGE_REASONING=xhigh
 ```
