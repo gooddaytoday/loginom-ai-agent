@@ -1429,3 +1429,23 @@ Its independent audit9c9c3af9…61/16 preserves both verdicts/source snapshots
 and proves all own resources/roots absent. This is collector visibility, not
 a qualification of workload-wide quiescence. One never-started configuration
 fixture was removed after retaining its manifest and confirming empty journals.
+
+
+The fenced raw-kernel control is opt-in in `parallel-lifecycle-integration`:
+`EVAL_PAIR_INTEGRATION=1 bun run test test/parallel-lifecycle-integration.test.ts
+--test-name-pattern 'server file evidence'` (run from `evals`, TMPDIR under
+storage/tmp). It creates its own pair without Loginom/model sessions; protected
+account authority in this fixture is explicitly data-only. With the research
+`EVAL_ADMIN_LIVE_CONFIG`, source pins and raw snapshots are retained privately.
+Missing module, unknown record and repeated-boundary RED controls preceded
+GREENc8719560…1/12 PASS46.25s. The test verifies replay, changed source hash,
+foreign slot and closed guard refusal; modified records are restored. Independent
+audit6a282b8a…78 checks/22 sources covers both boundary RED/GREEN, 8 source pins
+each, exact six resource IDs and two roots absent. This does not qualify file
+cleanup, native operation quiescence, recovery lineage or production admission.
+
+Moved-collector regressions: LF/mmap ce062306…1/9 PASS42.19s,
+audita89ad84f…61/16; active native FD/FLOCK f7f4c786…1/65 PASS77.16s,
+audit76cc72e1…82/28+11 pins. Related lease/slots/user/package69/334 PASS70.27s,
+typecheck/shell syntax/diff PASS. Private verificationd9837842… retains all
+three controls; finalizer/cleanup/admission gates stay closed.

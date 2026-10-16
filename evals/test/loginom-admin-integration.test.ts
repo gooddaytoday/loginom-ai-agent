@@ -10,7 +10,7 @@ import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pai
 import { acquireSlotLease, loadSlots, parseSlots, recoverSlotLease, type SlotFile, type ServerIdentity } from "../src/slots"
 import { acquireResourceLease, globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
-import { serverFileObservation } from "./helpers/server-file-observation"
+import { serverFileObservation } from "../src/server-files"
 import { superviseProcess } from "../src/process-supervisor"
 import { stageUserPreparation } from "../src/user-environment"
 import { finalizeUnactivatedEnvironment } from "../src/environment-finalization"
@@ -121,7 +121,7 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
       ...(mode === "pool-environment" ? [path.resolve(import.meta.dir, "../src/environment-preparation.ts"), path.resolve(import.meta.dir, "../src/environment-finalization.ts"), path.resolve(import.meta.dir, "../src/user-environment.ts")] : []),
       ...(["progress", "pool", "pool-close", "pool-disabled", "active-control", "active-close", "file-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : []),
       ...(["active-control", "active-close", "file-close", "active-peer"].includes(mode) ? [path.resolve(import.meta.dir, "../fixtures/interrupt-probe.js")] : []),
-      ...(mode === "file-close" ? [path.resolve(import.meta.dir, "helpers/server-file-observation.ts"), path.resolve(import.meta.dir, "../fixtures/server-files.sh")] : []),
+      ...(mode === "file-close" ? [path.resolve(import.meta.dir, "../src/server-files.ts"), path.resolve(import.meta.dir, "../fixtures/server-files.sh")] : []),
       ...(mode === "active-peer" ? [path.resolve(import.meta.dir, "../fixtures/peer-probe.js"), path.resolve(import.meta.dir, "../src/closed-process-evidence.ts")] : [])]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
     if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
