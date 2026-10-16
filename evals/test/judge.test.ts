@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -643,4 +643,22 @@ test("scoreVerdict: дробные веса полного успеха оста
   const saved = parseComparisonSummary(JSON.parse(JSON.stringify(run)))
   expect(analyzeComparison(saved, saved).axes.structure.observed).toEqual({ a: 1, b: 1, drop: 0 })
   expect(scored.structural_score).toBe(100)
+})
+
+test("judgeTask: VPN verdict requires terminal named unit and unconfirmed cleanup prevents retry", async () => {
+  const fixture = await gateFixture()
+  try {
+    const query = path.join(fixture.root, "queried")
+    const systemctl = path.join(fixture.root, "systemctl")
+    for (const state of ["inactive", "active"]) {
+      await Bun.write(systemctl, `#!/bin/sh\nprintf '%s\n' "$@" > '${query}'\nprintf 'LoadState=loaded\nActiveState=${state}\nMainPID=0\n'\n`)
+      await chmod(systemctl, 0o700)
+      const input = fixture.input(state, { PATH: fixture.root + ":" + process.env.PATH! })
+      input.judge = { ...input.judge, systemd: true, command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts")] }
+      const result = await judgeTask(input)
+      expect(result).toMatchObject(state === "inactive" ? { ok: true, pass: true, attempts: 1 }
+        : { ok: false, cleanupUnconfirmed: true, attempts: 1 })
+      expect(await Bun.file(query).text()).toContain("loginom-evals-judge-")
+    }
+  } finally { await fixture.close() }
 })
