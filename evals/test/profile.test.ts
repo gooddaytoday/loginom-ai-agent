@@ -510,6 +510,21 @@ test("ensureProfile v2: matching ready profile is reused without setup or genera
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
+test("verifyProfile checks a starting standalone host without setup or recovery", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json"), calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "starting", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
 test("verifyProfile checks readiness and saved configuration without setup or replacement", async () => {
   const context = await fakeProfile()
   const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
