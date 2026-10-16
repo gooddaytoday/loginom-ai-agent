@@ -298,12 +298,12 @@ export function agentConfigJson(config: EvalConfig) {
 export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
   const observed = await management(command, ["loginom", "status", "--format", "json"])
   const view = parseView(observed.stdout)
-  if (observed.exitCode !== 0 || view?.state !== "ready" || view.hasApiKey !== true ||
+  if (observed.exitCode !== 0 || !view || !["ready", "starting"].includes(view.state) || view.failure || view.recoveries?.length || view.hasApiKey !== true ||
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
   const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
   if (JSON.stringify(saved) !== JSON.stringify(agentConfigJson(config))) throw new EvalFailure("PROFILE_CONFIGURATION_DRIFT", 2)
-  return observed
+  return view.state === "starting" ? checkStarting(command, 2) : observed
 }
 
 export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
@@ -424,7 +424,7 @@ async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
   await assertProfileSettled(command.env.LOGINOM_AI_AGENT_CLI_PROFILE!)
   if (result.evidenceDir) await Bun.write(path.join(result.evidenceDir, "connection-check.json"),
     JSON.stringify({ ok: receipt.ok, code: receipt.code, help: { state: receipt.help.state } }, null, 2))
-  return true
+  return result
 }
 
 export async function resetProfile(config: EvalConfig) {

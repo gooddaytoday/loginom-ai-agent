@@ -250,7 +250,7 @@ private config/budget/results вне Git; операторские команд�
 6. Исход нового пути: supervisor cleanup и systemd-unit судьи; описи диагностические.
 7. Harness сам очищает доказанно своё на новом стенде после обязательных проверок.
 8. N=1/N=2 collector запускает/останавливает run; перед N=1 проверить MemAvailable.
-9. N=2 ждёт утверждения числовых порогов по N=1; новый runtime ещё не реализован.
+9. N=2 ждёт утверждения числовых порогов по N=1; runtime подключён, ревью выявило4 доработки.
 10. Wrapper d551ddf:7 unit PASS; harness VPN boundary44/147 PASS, typecheck/diff PASS.
 11. Harness unit boundary0e6994f736; scoped login status exit0/clean unit/0 model calls, A00yuH journal unchanged.
 12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
@@ -261,4 +261,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Следующий шаг: подключить новый prepare/cleanup/resource helpers к настоящей queue без inventories.
+20. Новый acceptance pair829f82ae…/428fd481… создан; prepare остановлен PROFILE_NOT_PREPARED, starting→check исправлен (8/15 PASS+typecheck); далее startup-сверка и повтор prepare.
