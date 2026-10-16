@@ -105,6 +105,62 @@ integration("committed user storage archive replays without replacing preserved 
   } finally { await fixture.dispose() }
 }, 90_000)
 
+integration("partial user storage archive reconciles retained payload without overwriting evidence", async () => {
+  const { archiveUserStorage, readUserStorageArchive } = await import("../src/user-storage-archive")
+  const fixture = await storageCodecFixture()
+  try {
+    const storage = await prepareUserStorage(fixture.file, fixture.lease, fixture.prepared.secretFile, fixture.server)
+    await Bun.$`docker exec ${fixture.pair.identity.containerId} sh -c ${'printf original > "$1/value"'} partial ${storage.root}`.quiet()
+    const id = crypto.randomUUID()
+    const first = await archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)
+    // Real filesystem reconstruction of the copying boundary, not a SIGKILL claim.
+    const copying: Record<string, unknown> = { ...await readLeaseReceipt(first.source.path) as Record<string, unknown>, status: "copying" }
+    delete copying.committedAt
+    await writeLeaseReceipt(first.source.path, copying)
+    const partial = (await Bun.file(first.payload.path).bytes()).slice(0, 700)
+    await Bun.write(first.payload.path, partial)
+    const repaired = await archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)
+    expect(repaired.status).toBe("committed")
+    expect(repaired.payload.path).not.toBe(first.payload.path)
+    expect(await Bun.file(first.payload.path).bytes()).toEqual(partial)
+    expect(repaired.partialCopies).toEqual([{ expected: first.payload, observed: { bytes: partial.byteLength,
+      sha256: new Bun.CryptoHasher("sha256").update(partial).digest("hex") } }])
+    expect(await readUserStorageArchive(fixture.file, fixture.server, fixture.lease, repaired.source)).toEqual(repaired)
+    const original = await readLeaseReceipt(repaired.source.path) as Record<string, unknown>
+    const foreignPath = path.join(fixture.root, "foreign-payload.tar")
+    await writeLeaseReceipt(foreignPath, { control: "outside-slot-history" })
+    const foreignBytes = await Bun.file(foreignPath).bytes()
+    const foreignIntent: Record<string, unknown> = { ...original, status: "copying", partialCopies: [...repaired.partialCopies!,
+      { expected: { path: foreignPath, bytes: foreignBytes.byteLength, sha256: new Bun.CryptoHasher("sha256").update(foreignBytes).digest("hex") },
+        observed: { bytes: foreignBytes.byteLength, sha256: new Bun.CryptoHasher("sha256").update(foreignBytes).digest("hex") } }] }
+    delete foreignIntent.committedAt
+    await writeLeaseReceipt(repaired.source.path, foreignIntent)
+    try { await expect(archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)).rejects.toThrow("USER_STORAGE_ARCHIVE_UNCONFIRMED") }
+    finally { await writeLeaseReceipt(repaired.source.path, original) }
+    expect(await Bun.file(foreignPath).bytes()).toEqual(foreignBytes)
+    const missing: Record<string, unknown> = { ...await readLeaseReceipt(repaired.source.path) as Record<string, unknown>, status: "copying" }
+    delete missing.committedAt
+    await writeLeaseReceipt(repaired.source.path, missing)
+    await rm(repaired.payload.path)
+    const resumed = await archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)
+    expect(resumed.partialCopies).toEqual([...repaired.partialCopies!, { expected: repaired.payload, observed: null }])
+    expect(await Bun.file(first.payload.path).bytes()).toEqual(partial)
+    expect(await readUserStorageArchive(fixture.file, fixture.server, fixture.lease, resumed.source)).toEqual(resumed)
+    expect((await Bun.$`docker exec ${fixture.pair.identity.containerId} cat -- ${`${storage.root}/value`}`.quiet()).text()).toBe("original")
+    const complete = await readLeaseReceipt(resumed.source.path) as Record<string, unknown>
+    const changed: Record<string, unknown> = { ...complete, status: "copying" }
+    delete changed.committedAt
+    await writeLeaseReceipt(resumed.source.path, changed)
+    const pending = await Bun.file(resumed.source.path).text()
+    await Bun.$`docker exec ${fixture.pair.identity.containerId} sh -c ${'printf changed > "$1/value"'} partial ${storage.root}`.quiet()
+    try {
+      await expect(archiveUserStorage(fixture.file, fixture.server, fixture.lease, id)).rejects.toThrow("USER_STORAGE_ARCHIVE_CHANGED")
+      expect(await Bun.file(resumed.source.path).text()).toBe(pending)
+      expect(new Bun.CryptoHasher("sha256").update(await Bun.file(resumed.payload.path).bytes()).digest("hex")).toBe(resumed.payload.sha256)
+    } finally { await writeLeaseReceipt(resumed.source.path, complete) }
+  } finally { await fixture.dispose() }
+}, 90_000)
+
 integration("server file evidence replays a fenced raw kernel snapshot", async () => {
   const fixture = await storageCodecFixture()
   try {

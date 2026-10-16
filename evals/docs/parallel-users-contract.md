@@ -3397,8 +3397,9 @@ LGP and pathological UTF-8 names, the neighbor symlink and an empty directory;
 source metadata and B canary remain unchanged. The fixture uses data-only
 protected account authority and does not create a native Loginom user/session.
 `storageDeletionAllowed` and `nextAdmissionAllowed` remain false. Committed
-replay, partial-copy recovery, finalizer consumption and general cleanup remain
-separate pending work; this producer grants no operation-quiescence authority.
+replay and partial-copy recovery are specified below; finalizer consumption and
+general cleanup remain pending. This producer grants no operation-quiescence
+authority.
 
 Related profile/archive/user/agent/management32 PASS/229 assertions63.76s;
 package typecheck and diff checks PASS. Private source/control verification
@@ -3424,5 +3425,34 @@ Actual Docker RED1FAIL35.44s (prior EXISTS refusal) → GREEN1/7 PASS42.14s.
 Added negatives for changed source SHA, foreign context, payload0644, hardlink,
 symlink and equal-length byte corruption require no further production changes.
 Both full pathological-name and replay/private-boundary tests2/36 PASS91.95s;
-package typecheck/diff PASS. Partial-copy reconciliation, recovery-only lineage
-and finalizer consumption remain open, with both grants false.
+package typecheck/diff PASS. Copying reconciliation follows below; recovery-only
+lineage and finalizer consumption remain open, with both grants false.
+
+
+### Partial server archive reconciliation — 2026-10-16
+
+A `copying` receipt can resume only under the same protected context, physical
+root metadata and regular content as its initial intent. The original payload
+is retained, including a truncated file or its recorded absence. Recovery writes
+a new complete tar into a fresh private history directory; it does not overwrite
+the previous payload. `partialCopies` records each expected original payload and
+its observed size/SHA256 or absence. Read-back verifies that retained chain as
+well as the new full payload. Partial bytes are fsynced before publication.
+
+The shared loader validates every partial path under the current slot's canonical
+private `historyDir/user-storage-*/payload.tar` before archive creation. Partial
+chains cannot refer to another directory, even if that file is private and its
+SHA256 matches. Changed server source is refused without replacing the pending
+journal or its material. These are preservation receipts, with both grants false.
+
+The first real-filesystem copying/truncated+absent reconstruction passed1/9 in
+61.13s after the prior committed-only reader refused it. A subsequent actual RED
+accepted a foreign-history partial (53.16s); shared loader scope checks address
+that boundary. Full pathological-name/replay/partial regression3/50 PASS171.99s
+includes changed-source refusal with unchanged pending journal/payload; typecheck
+and diff checks PASS. Exact RED/final source snapshots and original verdicts are
+retained in private evidence; five temporary duplicates were removed after
+SHA/read-back.
+The fixture reconstructs a copying boundary on actual filesystem; it does not
+claim an actual SIGKILL, native Loginom session, recovery-only lease adoption or
+full cleanup qualification.
