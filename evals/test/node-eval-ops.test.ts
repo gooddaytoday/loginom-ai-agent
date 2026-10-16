@@ -6,15 +6,17 @@ import { acquireNodeHarnessLease, acquireNodeStand, assertNodeStandOwner, nodePr
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
-async function runtime() {
+async function runtime(version: 1 | 2 | 3 = 1) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-node-ops-"))
   const role = (name: string) => ({ checkout: path.join(root, "checkouts", name), referenceProfile: path.join(root, "roles", name, "reference"),
     evalProfile: path.join(root, "roles", name, "eval"), workRoots: [path.join(root, "roles", name, "work")], resultsRoot: path.join(root, "roles", name, "results") })
-  const config: NodeOpsConfig = { version: 1, runtimeRoot: root, endpoint: "http://localhost/app/", container: { name: "test", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
-    cliBin: path.join(root, "cli", "bin", "loginom-ai-agent-cli"), roles: { rich: role("rich"), ben: role("ben") } }
+  const evalOnly = (name: string) => ({ checkout: path.join(root, "checkouts", name), evalProfile: path.join(root, "roles", name, "eval"),
+    workRoots: [path.join(root, "roles", name, "work")], resultsRoot: path.join(root, "roles", name, "results"), cliBin: path.join(root, `cli-${name}/bin/loginom-ai-agent-cli`) })
+  const config: NodeOpsConfig = { version, runtimeRoot: root, endpoint: "http://localhost/app/", container: { name: "test", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
+    cliBin: path.join(root, "cli", "bin", "loginom-ai-agent-cli"), roles: { rich: role("rich"), ben: role("ben"), ...(version >= 2 ? { evalbaseline: evalOnly("evalbaseline") } : {}), ...(version === 3 ? { evalrunner: evalOnly("evalrunner") } : {}) } }
   for (const item of Object.values(config.roles)) for (const directory of [item.checkout, item.referenceProfile, item.evalProfile, ...item.workRoots, item.resultsRoot].filter((value): value is string => value !== undefined))
     await mkdir(directory, { recursive: true, mode: 0o700 })
-  await Bun.write(config.cliBin, "installed")
+  for (const bin of new Set([config.cliBin, ...Object.values(config.roles).flatMap(role => role.cliBin ? [role.cliBin] : [])])) await Bun.write(bin, "installed")
   return { config, dispose: () => rm(root, { recursive: true, force: true }) }
 }
 
@@ -614,3 +616,39 @@ test("offline failed admission fixture keeps its original evidence and owner byt
   } finally { await f.dispose() }
 })
 
+
+
+test("v3 admission checks every one of the six profiles and explicit worker CLI pins", async () => {
+  const f = await runtime(3)
+  try {
+    for (const role of ["rich", "ben"] as const) {
+      f.config.roles[role].cliBin = path.join(f.config.runtimeRoot, `cli-${role}/bin/loginom-ai-agent-cli`)
+      await Bun.write(f.config.roles[role].cliBin!, "separate installed fixture")
+      expect(nodeRoleCli(f.config, role)).toBe(f.config.roles[role].cliBin!)
+    }
+    const profiles = Object.values(f.config.roles).flatMap(role => [role.referenceProfile, role.evalProfile].filter((value): value is string => Boolean(value)))
+    expect(profiles).toHaveLength(6)
+    const lease = await acquireNodeStand(f.config, owner)
+    for (const profile of profiles) {
+      const pending = path.join(profile, "loginom/recovery/pending.json")
+      await Bun.write(pending, "{}")
+      await expect(preflightNodeStand(f.config, lease, {})).rejects.toThrow("PROFILE_NOT_CLEAN")
+      await rm(path.dirname(pending), { recursive: true })
+      await mkdir(`${profile}.harness-lease`)
+      await expect(preflightNodeStand(f.config, lease, {})).rejects.toThrow("HARNESS_PROFILE_BUSY")
+      await rm(`${profile}.harness-lease`, { recursive: true })
+    }
+    expect((await nodeStandStatus(f.config)).status).toBe("BUSY")
+  } finally { await f.dispose() }
+}, 30_000)
+
+test("v3 config cannot omit a worker reference profile or add a seventh eval-only profile", async () => {
+  const f = await runtime(3)
+  try {
+    const extra = path.join(f.config.runtimeRoot, "roles/extra-reference")
+    await mkdir(extra, { recursive: true })
+    const missing = { ...f.config, roles: { ...f.config.roles, rich: { ...f.config.roles.rich, referenceProfile: undefined } } }
+    const seventh = { ...f.config, roles: { ...f.config.roles, evalrunner: { ...f.config.roles.evalrunner!, referenceProfile: extra } } }
+    for (const config of [missing, seventh]) await expect(acquireNodeStand(config as unknown as NodeOpsConfig, owner)).rejects.toThrow("INVALID_CONFIG")
+  } finally { await f.dispose() }
+})

@@ -868,6 +868,8 @@ async function validateConfig(config: NodeOpsConfig) {
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.name) || !/^\/workdir\/UserStorage\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.storageDir) ||
     Object.keys(config.roles).sort().join(",") !== (config.version === 1 ? "ben,rich" : config.version === 2 ? "ben,evalbaseline,rich" : "ben,evalbaseline,evalrunner,rich") || config.version >= 2 && !config.roles.evalbaseline?.cliBin || config.version === 3 && !config.roles.evalrunner?.cliBin || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
     throw new NodeOpsFailure("INVALID_CONFIG")
+  if (![config.roles.rich, config.roles.ben].every(role => typeof role.referenceProfile === "string" && role.referenceProfile.length > 0) ||
+    [config.roles.evalbaseline, config.roles.evalrunner].some(role => role && role.referenceProfile !== undefined)) throw new NodeOpsFailure("INVALID_CONFIG")
   const endpoint = new URL(config.endpoint)
   if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash)
     throw new NodeOpsFailure("INVALID_CONFIG")
