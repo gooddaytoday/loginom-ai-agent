@@ -334,3 +334,18 @@ test("Evaler's bound decision resumes the stopped worker without resetting count
   expect(result.state.rework_limit).toBe(3)
   expect(result.state.processed_report_ids).toEqual([report.id, event.id])
 })
+
+test("cleanup unknown requires a verified free and healthy stand before continuation", () => {
+  for (const evidence of [undefined, { ...report.evidence, cleanup: "unknown" as const }]) {
+    const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED", evidence }, pending_tasks: [] }).state
+    expect(stopped.blocked_context?.cleanup_required).toBe(true)
+    const event = { kind: "continue_after_evaler", id: "cleanup-decision", issue_id: state.issue_id,
+      report_id: report.id, sha: next, target: "Rich" }
+    for (const stand_ready of [undefined, false]) {
+      const result = evaluateHandoff({ state: stopped, event: { ...event, stand_ready }, pending_tasks: [] })
+      expect(result.action).toBe("blocked")
+      expect(result.state).toEqual(stopped)
+    }
+    expect(evaluateHandoff({ state: stopped, event: { ...event, stand_ready: true }, pending_tasks: [] }).action).toBe("ready_to_dispatch")
+  }
+})

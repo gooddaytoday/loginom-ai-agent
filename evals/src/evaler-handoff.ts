@@ -45,6 +45,8 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     if (input.state.phase !== "blocked" || !blocked || input.event.issue_id !== input.state.issue_id ||
       input.event.report_id !== blocked.report_id || input.event.sha !== blocked.sha)
       return { action: "no_action", reason: "continuation requires the current blocked issue/report/SHA", state: input.state }
+    if (blocked.cleanup_required && input.event.stand_ready !== true)
+      return { action: "blocked", reason: "confirmed free and healthy stand required", state: input.state }
     return { action: "ready_to_dispatch", target: input.event.target, reason: "Evaler decision recorded; dispatch separately",
       state: { ...input.state, phase: input.event.target === "Rich" ? "rich" : "ben", executor: input.event.target,
         blocked_context: undefined, last_dispatch: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
