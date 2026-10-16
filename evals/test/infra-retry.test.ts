@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test"
 import { watch } from "node:fs"
 import { cp, mkdtemp, rm } from "node:fs/promises"
-import os from "node:os"
 import path from "node:path"
 import { evalsRoot } from "../src/config"
 import { compare } from "../src/compare"
@@ -10,7 +9,7 @@ import { main } from "../src/run"
 import type { RunSummary } from "../src/report"
 
 async function fixture(ids: string[]) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-infra-retry-"))
+  const directory = await mkdtemp(path.join("/home/kiselev/storage/tmp/", "evals-infra-retry-"))
   const profile = path.join(directory, "profile")
   const tasks = path.join(directory, "tasks")
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
@@ -67,6 +66,26 @@ test("main: один startup timeout повторяется после cleanup �
     expect(await Bun.file(path.join(context.profile, ".writer/owner")).exists()).toBe(false)
     expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(2)
     expect(await Bun.file(path.join(run.runDir, "report.md")).text()).toContain("infra_error")
+  } finally { await context.close() }
+}, 30_000)
+
+test("main --no-infra-retry: один физический вызов сохраняет исходный ERROR и cleanup", async () => {
+  const id = "infra-retry-success"
+  const context = await fixture([id])
+  try {
+    const run = await main(["--skip-judge", "--no-infra-retry", "--tasks", context.tasks], context.env)
+    const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+    const result = summary.tasks[0]!.attempts[0]!
+    expect(result).toMatchObject({ status: "infra_error", score: null, pass: null,
+      stderr_head: "LOGINOM_HOST_TIMEOUT\n", environment_cleanup: { status: "confirmed" } })
+    expect(result.infra_retry).toBeUndefined()
+    expect(summary.tasks[0]!.attempts).toHaveLength(1)
+    expect(summary.metrics.infra_error_count).toBe(1)
+    expect(await Bun.file(path.join(run.runDir, id, "1/result.json")).json()).toEqual(result)
+    expect(await Bun.file(path.join(run.runDir, id, "1/infra-error/result.json")).exists()).toBe(false)
+    expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(1)
+    expect(await Bun.file(path.join(context.profile, ".writer/owner")).exists()).toBe(false)
+    expect((await Bun.file(path.join(run.runDir, "config.json")).json()).infraRetry).toBe(false)
   } finally { await context.close() }
 }, 30_000)
 

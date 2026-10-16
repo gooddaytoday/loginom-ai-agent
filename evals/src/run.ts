@@ -113,7 +113,7 @@ async function executeRun(config: EvalConfig) {
           break outer
         }
         if (result.status === "interrupted") break outer
-        if (result.status !== "infra_error" || retry === 1 || controller.signal.aborted) break
+        if (!config.infraRetry || result.status !== "infra_error" || retry === 1 || controller.signal.aborted) break
         const out = path.join(runDir, task.id, String(attempt))
         await archiveInfraAttempt(out).catch(async (error: unknown) => {
           state.stopped = describe(error)
