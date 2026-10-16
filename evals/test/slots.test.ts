@@ -467,7 +467,7 @@ test("environment leases: busy slot B leaves earlier slot and server unreserved"
   } finally { await b.close(); await rm(item.root, { recursive: true, force: true }) }
 })
 
-test("environment leases: command-local journals survive another run journal during recovery", async () => {
+test("environment leases: a stopped controller retains run reservations without slot recovery", async () => {
   const item = await fixture()
   const file = parseSlots(item.value, 2)
   const lockRoot = path.join(item.root, "locks")
@@ -487,45 +487,40 @@ test("environment leases: command-local journals survive another run journal dur
     expect(await Bun.file(path.join(file.controller.stateDir, "run-journal.json")).text()).toBe(before)
     const server = await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot })
     expect(server).toMatchObject({ state: "retained", journal, commandId: "prepare-command" })
-    for (const [index, incident] of incidents.entries()) {
+    for (const incident of incidents)
       expect(await readLeaseReceipt(incident)).toMatchObject({ journal, commandId: "prepare-command", state: "retained" })
-      const lease = await recoverSlotLease(file, file.slots[index]!, identity, incident, lockRoot)
-      try { await lease.assertHeld(); expect(lease.recoveryOnly).toBe(true) }
-      finally { await lease.close() }
-    }
+    const { acquireEnvironmentLeases } = await import("../src/slots")
+    await expect(acquireEnvironmentLeases(file, 2, identity, journal, lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
     expect(await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot })).toEqual(server)
   } finally { await rm(item.root, { recursive: true, force: true }) }
 })
 
-test("environment leases: terminal release reconciles against its command journal", async () => {
+test("environment leases: a clean profile releases while its peer and the server remain guarded", async () => {
   const item = await fixture()
-  const file = parseSlots(item.value, 1)
+  const file = parseSlots(item.value, 2)
   const lockRoot = path.join(item.root, "locks")
-  const journal = path.join(file.controller.stateDir, "prepare-command.json")
-  await writeFile(journal, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
+  const journal = path.join(file.controller.stateDir, "run-journal.json")
   const { acquireEnvironmentLeases } = await import("../src/slots")
-  const environment = await acquireEnvironmentLeases(file, 1, identity, journal, lockRoot)
+  const environment = await acquireEnvironmentLeases(file, 2, identity, journal, lockRoot)
   const lease = environment.slots[0]!
   try {
-    const original = await readLeaseReceipt(lease.receipt) as object
     const cleanup = path.join(file.controller.stateDir, "codec-cleanup.json")
-    // Data-only cleanup proof tests the release codec; no native actor has been admitted.
+    // Data-only cleanup tests the release codec; no native actor has been admitted.
     await writeFile(cleanup, JSON.stringify({ status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
       processes: "confirmed", serverSessions: "confirmed", archive: "committed", storageDeletionAllowed: true, nextAdmissionAllowed: true }), { mode: 0o600 })
     await lease.release(cleanup)
-    await writeFile(lease.receipt, JSON.stringify(original), { mode: 0o600 })
-    expect(await finalizeReleasedSlot(file, lease.slot, identity, lease.receipt, lockRoot)).toMatchObject({ status: "released", cleanupReceipt: cleanup })
-    expect(await finalizeReleasedSlot(file, lease.slot, identity, lease.receipt, lockRoot)).toMatchObject({ status: "already_released" })
+    expect(await readLeaseReceipt(lease.receipt)).toMatchObject({ state: "released", cleanupReceipt: cleanup })
+    expect(await readResourceReservation({ key: `profile:${lease.slot.profileDir}`, lockRoot })).toMatchObject({ state: "released" })
+    await environment.slots[1]!.assertHeld()
     await environment.server.assertHeld()
-    const next = await acquireSlotLease(file, lease.slot, identity, lockRoot)
-    try { await next.assertHeld() } finally { await next.close() }
+    await expect(acquireEnvironmentLeases(file, 2, identity, journal, lockRoot)).rejects.toThrow("BUSY")
   } finally {
     await Promise.all([environment.server.close(), ...environment.slots.map(slot => slot.close())])
     await rm(item.root, { recursive: true, force: true })
   }
 })
 
-test("environment leases: recovery refuses an untrusted command journal without changing resources", async () => {
+test("environment leases: a changed command binding revokes slot authority without changing reservations", async () => {
   const item = await fixture()
   const file = parseSlots(item.value, 1)
   const lockRoot = path.join(item.root, "locks")
@@ -541,15 +536,37 @@ test("environment leases: recovery refuses an untrusted command journal without 
     const alias = path.join(file.controller.stateDir, "alias.json")
     await writeFile(foreign, JSON.stringify({ version: 2, commandId: "prepare-command" }), { mode: 0o600 })
     await symlink(foreign, alias)
-    await lease.close()
     for (const untrusted of [null, 42, foreign, alias, path.join(file.controller.stateDir, "run-journal.json")]) {
       await writeFile(lease.receipt, JSON.stringify({ ...original, journal: untrusted }), { mode: 0o600 })
-      await expect(recoverSlotLease(file, lease.slot, identity, lease.receipt, lockRoot)).rejects.toThrow("SLOT_RECOVERY_LINEAGE_INVALID")
+      await expect(lease.assertHeld()).rejects.toThrow("LEASE_NOT_HELD")
       expect(await Promise.all(original.resources.map(resource => Bun.file(resource.receipt).text()))).toEqual(before)
     }
+    await writeFile(lease.receipt, JSON.stringify(original), { mode: 0o600 })
+    await lease.assertHeld()
     await environment.server.assertHeld()
   } finally {
     await Promise.all([environment.server.close(), ...environment.slots.map(slot => slot.close())])
+    await rm(item.root, { recursive: true, force: true })
+  }
+})
+
+test("environment leases: run owns only server and profiles and slots require the server guard", async () => {
+  const item = await fixture()
+  const file = parseSlots(item.value, 2)
+  const lockRoot = path.join(item.root, "locks")
+  const journal = path.join(file.controller.stateDir, "run-journal.json")
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const environment = await acquireEnvironmentLeases(file, 2, identity, journal, lockRoot)
+  try {
+    const reservations = await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: lockRoot, absolute: true }))
+    const rows = await Promise.all(reservations.map(file => Bun.file(file).json() as Promise<{ key: string }>))
+    expect(rows.map(row => row.key).sort()).toEqual([`server:${identity.containerId}`, ...file.slots.map(slot => `profile:${slot.profileDir}`)].sort())
+    await expect(acquireEnvironmentLeases(file, 2, identity, journal, lockRoot)).rejects.toThrow("BUSY")
+    for (const lease of environment.slots) await lease.assertHeld()
+    await environment.server.close()
+    await expect(environment.slots[0]!.assertHeld()).rejects.toThrow("LEASE_NOT_HELD")
+  } finally {
+    await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())])
     await rm(item.root, { recursive: true, force: true })
   }
 })

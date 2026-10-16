@@ -117,21 +117,21 @@ export async function acquireEnvironmentLeases(file: SlotFile, parallel: number,
   const commandId = text(record(await readLeaseReceipt(journal)).commandId)
   const selected = file.slots.slice(0, parallel)
   const resources = await acquireResourceSet([`server:${identity.containerId}`,
-    ...selected.flatMap(slot => [`user:${identity.containerId}:${slot.username}:0`, `profile:${slot.profileDir}`])]
+    ...selected.map(slot => `profile:${slot.profileDir}`)]
     .map(key => ({ key, lockRoot, journal, commandId, identity })), requireFinalizedSlotRelease)
   try {
+    const server = resources.find(resource => resource.reservation.key === `server:${identity.containerId}`)!
     const slots: SlotLease[] = []
     for (const slot of selected) {
-      const owned = resources.filter(resource => resource.reservation.key === `user:${identity.containerId}:${slot.username}:0` ||
-        resource.reservation.key === `profile:${slot.profileDir}`)
+      const owned = resources.filter(resource => resource.reservation.key === `profile:${slot.profileDir}`)
       const token = crypto.randomUUID()
       const receipt = path.join(file.controller.stateDir, `slot-${slot.id}-${token}.lease.json`)
       const manifest = { version: 2, token, slot, identity, commandId, journal, resources: owned.map(resource => ({ receipt: resource.receipt,
         key: resource.reservation.key, token: resource.reservation.token, revision: resource.reservation.revision })) }
       await writeLeaseReceipt(receipt, { ...manifest, state: "retained" })
-      slots.push(slotLease(receipt, manifest, owned))
+      slots.push(slotLease(receipt, manifest, owned, server))
     }
-    return { server: resources.find(resource => resource.reservation.key === `server:${identity.containerId}`)!, slots }
+    return { server, slots }
   } catch (error) {
     await Promise.all(resources.map(resource => resource.close()))
     throw error
@@ -332,8 +332,9 @@ export async function finalizeReleasedSlot(file: SlotFile, slot: SlotDefinition,
 }
 
 function slotLease(receipt: string, manifest: { version: number; token: string; slot: SlotDefinition; identity: ServerIdentity; commandId: string;
-  resources: { receipt: string; key: string; token: string; revision: number }[]; incident?: string }, resources: Awaited<ReturnType<typeof acquireResourceLease>>[]): SlotLease {
+  resources: { receipt: string; key: string; token: string; revision: number }[]; incident?: string }, resources: Awaited<ReturnType<typeof acquireResourceLease>>[], server?: Awaited<ReturnType<typeof acquireResourceLease>>): SlotLease {
   const assertHeld = async () => {
+    await server?.assertHeld()
     await Promise.all(resources.map(resource => resource.assertHeld()))
     if (JSON.stringify(await readLeaseReceipt(receipt).catch(() => { throw new EvalFailure("LEASE_NOT_HELD", 2) })) !==
       JSON.stringify({ ...manifest, state: manifest.incident ? "recovery-only" : "retained" })) throw new EvalFailure("LEASE_NOT_HELD", 2)

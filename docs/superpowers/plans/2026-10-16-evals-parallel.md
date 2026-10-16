@@ -64,8 +64,11 @@
 `environment-finalization.ts`, `user-environment.ts`, `script/parallel-env.ts`.
 **Unit tests:** `slots.test.ts`, `lease.test.ts`, `parallel-env.test.ts`.
 
-- [ ] RED: один server guard/reservation, два profile locks и judge-home lock;
-  повторный controller отказан, user lock не нужен, неизвестная бронь не стирается.
+- [x] RED→GREEN: один server guard/reservation и два profile locks, без user lock;
+  потеря server guard отзывает slot authority. Slots31 PASS/127 assertions33.22s,
+  typecheck/diff PASS; обновлены три проверки нового режима вместо epoch recovery.
+- [ ] Подключить judge-home lock к общему run (primitive/статусная проверка уже работают);
+  проверить весь prepare/verify/run путь без создания пользователей во время run.
 - [ ] RED: prepare создаёт только недостающее/проверяет права; verify/run отказывают
   на missing user, ACL drift, Pool!=0 и непустой SessionBackup без исправлений/delete.
 - [ ] GREEN: переиспользовать рабочие lease/preparation primitives; исключить user
@@ -224,4 +227,5 @@ private config/budget/results вне Git; операторские команд�
 10. Wrapper d551ddf:7 unit PASS; harness VPN boundary44/147 PASS, typecheck/diff PASS.
 11. Harness unit boundary0e6994f736; scoped login status exit0/clean unit/0 model calls, A00yuH journal unchanged.
 12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
-13. Следующий шаг: unit TDD server/profile locks без user lock, затем подготовка/cleanup/очередь.
+13. Server/profile guard: slots31/127 PASS33.22s/typecheck; user lock исключён из environment.
+14. Следующий шаг: supervisor writer/foreign cleanup, затем подготовка/cleanup/очередь.
