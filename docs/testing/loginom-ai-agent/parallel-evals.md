@@ -1222,3 +1222,22 @@ is not an admin-role marker. Read-only primary copy native-session-types-f9e4d33
 source.json SHA256 `0cc2dadf184aba07af8cb30a2fd7b83074a8aca9f651d96f4869d737cfcd5768`
 preserves exact source before/after hashes. No research sessions were opened.
 The receipt grants no operation/lock quiescence, cleanup or admission authority.
+
+
+Populated Shared control (2026-10-16): the research fixture creates a real
+library, closes its direct handle and adds a link from its own named/modified
+package. Parent and raw admin inventories both see Shared Count1, the library's
+exact `/eval-a/shared-probe.lgp` path, referenceCount1, readOnly=false and idle
+Progress=null. ReadOnly is preserved as data and does not establish effective
+access permissions. After targeted CloseSession, Shared Count0 and library
+absence are freshly observed by both admins. Original library/root LGP/autosave
+are retained before fixture removal.
+
+Unsupported-phase RED40/52.93s→invalid ReadOnly oracle RED48/66.66s→final
+ordinary/shared2/138 PASS134.44s. Related49/160 PASS24.03s, typecheck/syntax/diff
+PASS. Private6b4a9575… source-audit SHA256
+`e5025baf32f86b4548b72ceed1388c014853213730cee7fa23d8bda4d8c73378`
+checks74/24 sources+6 pins; ordinary40574ffb… audit7634c941…67/23.
+Both admin closures/transport ACKs and exact own pair/network/root absence pass.
+Three new RED/diagnostic fixtures are safely settled with executed source/native
+data retained. Positive Pool/running controls and backend quiescence remain open.

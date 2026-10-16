@@ -2955,3 +2955,30 @@ closures/pair absence. Installed enum source f9e4d339…/source.json SHA256
 `0cc2dadf184aba07af8cb30a2fd7b83074a8aca9f651d96f4869d737cfcd5768`
 defines client0/self1/shared2/pool3/backup4. Self denotes the observer, not a role.
 Running/nonempty shared/pool controls and production cleanup remain open.
+
+
+### Populated Shared descriptor control — 2026-10-16
+
+The protected research phase `session-shared-probe` creates a native library in
+the isolated designer's own storage, closes its direct package handle, and adds
+`AddModelPackageLink` from the named/modified root package. Parent and raw admin
+observers both see `/eval-a/shared-probe.lgp` in sessionType2 with referenceCount1,
+readOnly=false and Progress=null. This raw ReadOnly value does not establish
+an effective ACL. Ordinary backup phase retains its existing reply shape.
+
+Unsupported phase RED40/52.93s; first populated control disproved the test's
+ReadOnly=true assumption (RED48/66.66s). Corrected ordinary/shared2/138
+PASS134.44s; related49/160 PASS24.03s, typecheck/syntax/diff PASS.
+Private native-user-6b4a9575… source-audit SHA256
+`e5025baf32f86b4548b72ceed1388c014853213730cee7fa23d8bda4d8c73378`
+checks74 facts/24 sources+6 tested pins: causal link/path/count, full native
+receipts/journals, original library/root LGP/autosave, both admin transport ACKs
+and continuous closures, exact own pair/network/root absence. Shared Count0
+and referenced library absence are freshly observed after targeted CloseSession
+by both admins. Ordinary40574ffb… audit7634c941… checks67/23 sources.
+
+All three new failed/diagnostic fixtures have qualified admin closures and exact
+pair/root absence; executed sources and native data remain. The library file was
+not copied before the oracle failure; the final fixture retains it. Positive
+running Progress, populated Pool, backend operations/locks and production
+cleanup admission remain open. This control grants no general quiescence.
