@@ -3,6 +3,7 @@ export type HandoffState = {
   phase: "admission" | "rich" | "ben" | "in_review" | "blocked"
   base_sha: string
   frozen_sha: string | null
+  resume_sha?: string
   delivery_sha?: string | null
   executor: "Rich" | "Ben" | null
   review_cycle: number
@@ -50,7 +51,7 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
       return { action: "blocked", reason: "confirmed free and healthy stand required", state: input.state }
     return { action: "ready_to_dispatch", target: input.event.target, reason: "Evaler decision recorded; dispatch separately",
       state: { ...input.state, phase: input.event.target === "Rich" ? "rich" : "ben", executor: input.event.target,
-        blocked_context: undefined, last_dispatch: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
+        blocked_context: undefined, resume_sha: input.event.sha, last_dispatch: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
   }
   if (input.event.kind === "receipt") {
     if (input.event.dispatch_id !== input.state.last_dispatch?.id) return { action: "no_action", reason: "stale dispatch receipt", state: input.state }
@@ -65,7 +66,7 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
       last_dispatch: { ...input.state.last_dispatch, outcome: input.event.outcome, task_id: input.event.task_id } } }
   }
   if (input.event.kind === "dispatch") {
-    const sha = input.state.delivery_sha ?? input.state.frozen_sha ?? input.state.base_sha
+    const sha = input.state.resume_sha ?? input.state.delivery_sha ?? input.state.frozen_sha ?? input.state.base_sha
     if (input.state.last_dispatch?.phase === input.state.phase && input.state.last_dispatch.sha === sha &&
       ["queued", "coalesced", "deferred"].includes(input.state.last_dispatch.outcome))
       return { action: "no_action", reason: "dispatch already accepted", state: input.state }
@@ -86,35 +87,36 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     return { action: "no_action", reason: "stale issue/task/phase", state: input.state }
   if (input.event.phase === "ben" && input.event.actual_sha !== input.state.frozen_sha)
     return { action: "no_action", reason: "stale frozen SHA", state: input.state }
+  const state = { ...input.state, resume_sha: undefined }
   if (input.event.status === "BLOCKED" || (input.event.phase === "rich" ? input.event.status !== "READY_FOR_BEN" : !["ACCEPT", "REJECT"].includes(input.event.status)))
-    return blockReport(input.state, input.event, "worker BLOCKED or invalid role status")
-  if (input.event.phase === "rich" && input.state.reject_count > 0 && input.event.actual_sha === input.state.frozen_sha)
-    return blockReport(input.state, input.event, "corrections require a new SHA")
-  if (input.state.delivery_sha && input.event.actual_sha !== input.state.delivery_sha)
-    return blockReport(input.state, input.event, "delivery completion must preserve the author SHA")
+    return blockReport(state, input.event, "worker BLOCKED or invalid role status")
+  if (input.event.phase === "rich" && state.reject_count > 0 && input.event.actual_sha === state.frozen_sha)
+    return blockReport(state, input.event, "corrections require a new SHA")
+  if (state.delivery_sha && input.event.actual_sha !== state.delivery_sha)
+    return blockReport(state, input.event, "delivery completion must preserve the author SHA")
   const evidence = input.event.evidence
   if (!evidence || evidence.checked_sha !== input.event.actual_sha ||
     evidence.validation !== "confirmed" || evidence.cleanup !== "confirmed" || (evidence.product === "ERROR" &&
       (input.event.phase !== "rich" || evidence.review_admission?.kind !== "recovered_author" || !/^[a-f0-9]{64}$/.test(evidence.review_admission.resolution_sha256))))
-    return blockReport(input.state, input.event, "evidence/cleanup unconfirmed or infrastructure ERROR")
+    return blockReport(state, input.event, "evidence/cleanup unconfirmed or infrastructure ERROR")
   if (!evidence.attachment_id || !/^[a-f0-9]{64}$/.test(evidence.manifest_sha256)) {
-    if (evidence.product === "ERROR" || input.event.phase !== "rich" || input.state.delivery_sha)
-      return blockReport(input.state, input.event, "OWNER_ACTION_REQUIRED: incomplete delivery")
+    if (evidence.product === "ERROR" || input.event.phase !== "rich" || state.delivery_sha)
+      return blockReport(state, input.event, "OWNER_ACTION_REQUIRED: incomplete delivery")
     return { action: "ready_to_dispatch", target: "Rich", reason: "DELIVERABLES_REQUIRED: upload existing evidence; no new quality attempt",
-      state: { ...input.state, delivery_sha: input.event.actual_sha, last_dispatch: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
+      state: { ...state, delivery_sha: input.event.actual_sha, last_dispatch: null, processed_report_ids: [...state.processed_report_ids, input.event.id] } }
   }
   if (input.event.status === "ACCEPT") return { action: "in_review", reason: `ACCEPT; product ${evidence.product}`,
-    state: { ...input.state, phase: "in_review", executor: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
+    state: { ...state, phase: "in_review", executor: null, processed_report_ids: [...state.processed_report_ids, input.event.id] } }
   if (input.event.status === "REJECT") {
-    const reject_count = input.state.reject_count + 1
-    const next = { ...input.state, reject_count, processed_report_ids: [...input.state.processed_report_ids, input.event.id] }
-    if (reject_count > (input.state.rework_limit ?? 1)) return blockReport(next, input.event, "EVALER_DECISION_REQUIRED: rework limit reached")
+    const reject_count = state.reject_count + 1
+    const next = { ...state, reject_count, processed_report_ids: [...state.processed_report_ids, input.event.id] }
+    if (reject_count > (state.rework_limit ?? 1)) return blockReport(next, input.event, "EVALER_DECISION_REQUIRED: rework limit reached")
     return { action: "ready_to_dispatch", target: "Rich", reason: "REJECT: corrections require a new SHA",
       state: { ...next, phase: "rich", executor: "Rich" } }
   }
   return { action: "ready_to_dispatch", target: "Ben", reason: "READY_FOR_BEN",
-    state: { ...input.state, phase: "ben", executor: "Ben", frozen_sha: input.event.actual_sha, delivery_sha: null,
-      processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
+    state: { ...state, phase: "ben", executor: "Ben", frozen_sha: input.event.actual_sha, delivery_sha: null,
+      processed_report_ids: [...state.processed_report_ids, input.event.id] } }
 }
 
 function blockReport(state: HandoffState, event: HandoffReport, reason: string): HandoffDecision {
@@ -135,6 +137,7 @@ function parseInput(value: unknown): HandoffInput {
     frozen_sha: raw.frozen_sha === null ? null : sha(raw.frozen_sha), executor,
     ...(raw.delivery_sha !== undefined ? { delivery_sha: raw.delivery_sha === null ? null : sha(raw.delivery_sha) } : {}),
     review_cycle: count(raw.review_cycle), reject_count: count(raw.reject_count),
+    ...(raw.resume_sha !== undefined ? { resume_sha: sha(raw.resume_sha) } : {}),
     ...(raw.rework_limit !== undefined ? { rework_limit: count(raw.rework_limit) } : {}),
     ...(blocked ? { blocked_context: { reason: text(blocked.reason), report_id: text(blocked.report_id), sha: sha(blocked.sha), cleanup_required: flag(blocked.cleanup_required) } } : {}),
     processed_report_ids: array(raw.processed_report_ids).map(value => text(value)),

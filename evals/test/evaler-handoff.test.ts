@@ -366,3 +366,26 @@ test("Ben can resume only an already frozen SHA, never unfinished Rich work", ()
   expect(result.state.frozen_sha).toBe(next)
   expect(result.state.review_cycle).toBe(stopped.review_cycle)
 })
+
+test("continuation dispatches Rich's stopped SHA once and clears it before handing a new SHA to Ben", () => {
+  const stopped = evaluateHandoff({ state, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state
+  const decision = { kind: "continue_after_evaler", id: "resume-author", issue_id: state.issue_id,
+    report_id: report.id, sha: next, target: "Rich" }
+  const resumed = evaluateHandoff({ state: stopped, event: decision, pending_tasks: [] }).state
+  const event = { kind: "dispatch", id: "resumed-dispatch", root_trigger: decision.id }
+  const proposed = evaluateHandoff({ state: resumed, event, pending_tasks: [] }).state
+  expect(proposed.last_dispatch?.sha).toBe(next)
+  const accepted = evaluateHandoff({ state: proposed, event: { kind: "receipt", dispatch_id: event.id,
+    outcome: "queued", task_id: "resumed-rich-task" }, pending_tasks: [] }).state
+  expect(accepted.resume_sha).toBe(next)
+  expect(evaluateHandoff({ state: accepted, event: decision, pending_tasks: [] }).state).toEqual(accepted)
+  expect(evaluateHandoff({ state: accepted, event: { ...event, id: "duplicate-dispatch" }, pending_tasks: [] }).action).toBe("no_action")
+  const final = "d".repeat(40)
+  const completed = evaluateHandoff({ state: accepted, event: { ...report, id: "resumed-ready", task_id: "resumed-rich-task",
+    actual_sha: final, evidence: { ...report.evidence, checked_sha: final } }, pending_tasks: [] }).state
+  expect(completed.resume_sha).toBeUndefined()
+  expect(completed.frozen_sha).toBe(final)
+  const review = evaluateHandoff({ state: completed, event: { kind: "dispatch", id: "fresh-ben", root_trigger: "resumed-ready" }, pending_tasks: [] })
+  expect(review.state.last_dispatch?.sha).toBe(final)
+  expect(evaluateHandoff({ state: completed, event: { ...report, status: "BLOCKED" }, pending_tasks: [] }).state).toEqual(completed)
+})
