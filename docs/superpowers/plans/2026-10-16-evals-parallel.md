@@ -261,4 +261,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Новый acceptance pair829f82ae…/428fd481… создан; prepare остановлен PROFILE_NOT_PREPARED, starting→check исправлен (8/15 PASS+typecheck); далее startup-сверка и повтор prepare.
+20. Acceptance829f82ae…/428fd481… создан; starting→check исправлен8/15 PASS. Startup повторно берёт те же tokens без epochs, unknown сохраняет данные;62/225 PASS+typecheck, далее native повтор prepare.

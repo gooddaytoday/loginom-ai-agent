@@ -1,8 +1,8 @@
 import path from "node:path"
 import { constants } from "node:fs"
-import { lstat, open, readFile, realpath } from "node:fs/promises"
+import { lstat, open, readFile, readdir, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
-import { acquireResourceLease, acquireResourceSet, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, withResourceReservationGuards, writeLeaseReceipt } from "./lease"
+import { acquireResourceLease, acquireResourceSet, globalLockRoot, readLeaseReceipt, readResourceReservation, recoverResourceLease, reopenResourceLease, withResourceReservationGuards, writeLeaseReceipt } from "./lease"
 import type { Reservation } from "./lease"
 
 export type SlotDefinition = {
@@ -136,6 +136,40 @@ export async function acquireEnvironmentLeases(file: SlotFile, parallel: number,
     await Promise.all(resources.map(resource => resource.close()))
     throw error
   }
+}
+
+export async function reopenEnvironmentLeases(file: SlotFile, identity: ServerIdentity, lockRoot = globalLockRoot) {
+  const key = `server:${identity.containerId}`, previous = await readResourceReservation({ key, lockRoot })
+  if (!previous || previous.state === "released") return undefined
+  if (path.dirname(previous.journal) !== file.controller.stateDir || JSON.stringify(previous.identity) !== JSON.stringify(identity))
+    throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
+  const command = record(await readLeaseReceipt(previous.journal))
+  if (command.kind !== "unactivated-preparation" || command.commandId !== previous.commandId ||
+    JSON.stringify(command.identity) !== JSON.stringify(identity) || !Array.isArray(command.slotIds) ||
+    command.slotIds.some(id => !file.slots.some(slot => slot.id === id))) throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
+  const selected = file.slots.filter(slot => (command.slotIds as unknown[]).includes(slot.id))
+  const server = await reopenResourceLease({ key, lockRoot }, previous)
+  const resources: Awaited<ReturnType<typeof reopenResourceLease>>[] = [], slots: SlotLease[] = []
+  try {
+    const manifests = await Promise.all((await readdir(file.controller.stateDir)).filter(name => /^slot-.*\.lease\.json$/.test(name))
+      .map(async name => ({ receipt: path.join(file.controller.stateDir, name), manifest: record(await readLeaseReceipt(path.join(file.controller.stateDir, name))) })))
+    for (const slot of selected) {
+      const key = `profile:${slot.profileDir}`, current = await readResourceReservation({ key, lockRoot })
+      if (current?.state === "released") continue
+      if (!current || current.commandId !== previous.commandId || current.journal !== previous.journal ||
+        JSON.stringify(current.identity) !== JSON.stringify(identity)) throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
+      const matches = manifests.filter(({ manifest }) => manifest.state === "retained" && manifest.commandId === previous.commandId &&
+        manifest.journal === previous.journal && JSON.stringify(manifest.slot) === JSON.stringify(slot) && JSON.stringify(manifest.identity) === JSON.stringify(identity) &&
+        typeof manifest.token === "string" && Array.isArray(manifest.resources) && manifest.resources.length === 1 &&
+        record(manifest.resources[0]).key === key && record(manifest.resources[0]).token === current.token && record(manifest.resources[0]).revision === current.revision)
+      if (matches.length !== 1) throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
+      const resource = await reopenResourceLease({ key, lockRoot }, current)
+      resources.push(resource)
+      const { state, ...manifest } = matches[0]!.manifest
+      slots.push(slotLease(matches[0]!.receipt, manifest as Parameters<typeof slotLease>[1], [resource], server))
+    }
+    return { server, slots }
+  } catch (error) { await Promise.all([server.close(), ...resources.map(resource => resource.close())]); throw error }
 }
 
 export async function acquireSlotLease(file: SlotFile, slot: SlotDefinition, identity: ServerIdentity, lockRoot: string): Promise<SlotLease> {

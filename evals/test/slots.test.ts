@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireSlotLease, finalizeReleasedSlot, loadSlots, parseSlots, recoverSlotLease } from "../src/slots"
+import { acquireSlotLease, finalizeReleasedSlot, loadSlots, parseSlots, recoverSlotLease, reopenEnvironmentLeases } from "../src/slots"
 import { globalLockRoot, readLeaseReceipt, readResourceReservation } from "../src/lease"
 import { stageUserPreparation } from "../src/user-environment"
 
@@ -25,6 +25,26 @@ async function fixture() {
   await mkdir(path.join(root, "locks"), { mode: 0o700 })
   return { root, value }
 }
+
+test("startup reopens only the exact prepared environment without changing its tokens", async () => {
+  const item = await fixture()
+  const locks = path.join(item.root, "locks")
+  const journal = path.join(item.value.controller.stateDir, "prepare-command.json")
+  await writeFile(journal, JSON.stringify({ version: 2, kind: "unactivated-preparation", phase: "unactivated", commandId: "startup-fixture", identity, slotIds: ["a", "b"] }), { mode: 0o600 })
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});const env=await acquireEnvironmentLeases(${JSON.stringify(item.value)},2,${JSON.stringify(identity)},${JSON.stringify(journal)},${JSON.stringify(locks)});await Promise.all([env.server.close(),...env.slots.map(s=>s.close())])`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    const before = await Promise.all((await readdir(item.value.controller.stateDir)).filter(name => name.endsWith(".lease.json")).map(name => Bun.file(path.join(item.value.controller.stateDir, name)).text()))
+    const reopened = (await reopenEnvironmentLeases(parseSlots(item.value, 2), identity, locks))!
+    try {
+      expect(reopened.slots.map(slot => slot.slot.id)).toEqual(["a", "b"])
+      await Promise.all(reopened.slots.map(slot => slot.assertHeld()))
+      expect((await Promise.all(reopened.slots.map(slot => Bun.file(slot.receipt).text()))).sort()).toEqual(before.sort())
+      expect(reopened.server.reservation.lineage).toEqual([])
+    } finally { await Promise.all([reopened.server.close(), ...reopened.slots.map(slot => slot.close())]) }
+    await expect(reopenEnvironmentLeases(parseSlots(item.value, 2), { ...identity, serverEpoch: "changed" }, locks)).rejects.toThrow("STARTUP_OWNERSHIP_UNCONFIRMED")
+  } finally { await rm(item.root, { recursive: true }) }
+})
 
 test("slots: two different users share one server", async () => {
   const item = await fixture()
