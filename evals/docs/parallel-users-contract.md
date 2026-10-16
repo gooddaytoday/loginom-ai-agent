@@ -3316,3 +3316,18 @@ future reconciliation. Pending reconstruction without a terminal captures a new
 point after its own fresh absence confirmation. This does not certify cessation
 of all operations or no-regrowth; storageDeletionAllowed/nextAdmissionAllowed
 remain false, and actual cleanup/recovery/admission still require their gates.
+
+
+2026-10-16 writer refusal diagnostics: `ProcessCleanup.writerRefusal` optionally
+retains the first unavailable-owner observation: lookup operation, reader branch,
+errno, timestamp and directory device/inode/UID/mode used by that lookup. It contains
+no owner bytes, argv or environment. The reader branch is not proof of the writer's
+historical acquisition/release phase. The original error, failed verdict, bounded
+wait, guard preservation and reconciliation prerequisites are unchanged. Actual-fs
+and supervised-child TDD checks cover missing-owner and EACCES diagnostics plus
+receipt persistence;59 supervisor-related PASS/3 existing nativeBusy SKIP/246 assertions and
+final writer11 PASS/21, typecheck/diff PASS. Three native storage-finalizer attempts
+failed earlier with the same generic writer error in different phases; they do not
+qualify the intended hardlink gate. Original proofs/source snapshots and pending
+test patch remain private, with exact incidents and research retirement in
+`eval_parallel_blockers.md`. No cleanup/admission permission follows from diagnostics.
