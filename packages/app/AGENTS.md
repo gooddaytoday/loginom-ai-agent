@@ -51,6 +51,7 @@ Core workflow:
 
 ## Loginom application integration
 
+- «Выбор агента» (`showCustomAgents`) включён по умолчанию для новых установок, в том числе после первичной инициализации Desktop/web. Уже инициализированные профили сохраняют выбор пользователя; регрессия — `src/context/settings.test.ts`.
 - `src/components/settings-loginom.tsx` is the shared first-run/settings form; `loginom-button.tsx` keeps access prominent. Desktop operations go through the platform/preload contract.
 - Ask API key, URL, username and password only. Default URL/username come from Product; password is empty and has no placeholder. Never add a folder input or folder availability check; use `/<username>` in runtime. Keep provider/model connection in the existing settings flow.
 - Never render stored secrets back from main. Connection changes may be pending until the active generation is released; display the actual state rather than treating save as immediate activation.

@@ -96,7 +96,7 @@ export function hasExistingWebState(settings: Promise<string> | string | null, p
 
 export function initialAgentVisibility(initialized: boolean | undefined, existing: boolean, previousVersion?: string) {
   if (initialized === true) return
-  return existing || previousVersion !== undefined
+  return existing || previousVersion !== undefined || defaultSettings.general.showCustomAgents
 }
 
 export function shouldEnableNewLayout(previous: string | undefined, current: string | undefined) {
@@ -193,7 +193,7 @@ const defaultSettings: Settings = {
     showReasoningSummaries: false,
     shellToolPartsExpanded: false,
     editToolPartsExpanded: false,
-    showCustomAgents: false,
+    showCustomAgents: true,
     mobileTitlebarPosition: "top",
   },
   appearance: {

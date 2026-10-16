@@ -13,9 +13,9 @@ import {
 } from "./settings"
 
 describe("agent visibility", () => {
-  test("shows the picker for existing profiles and hides it for first-time installs", () => {
+  test("shows the picker for existing profiles and first-time installs", () => {
     expect(initialAgentVisibility(undefined, true)).toBe(true)
-    expect(initialAgentVisibility(undefined, false)).toBe(false)
+    expect(initialAgentVisibility(undefined, false)).toBe(true)
   })
 
   test("shows the picker when updating from a recent release", () => {
