@@ -79,6 +79,21 @@ test("resource incidents reject Docker OOM state even without a surviving runnin
     .toEqual({ status: "failed", codes: ["CONTAINER_OOM_OBSERVED"] })
 })
 
+test("resource incidents require host and container OOM counters, with root cgroup exemption", () => {
+  const samples = [0, 1].map(index => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
+    host: { cpu: null, memory: null, collector_cgroup: { path: "/", memory_events: null } },
+    containers: [{ container_id: "a".repeat(64), epoch_stable: true, inspect: { started_at: "observed-epoch", oom_killed: false },
+      cgroup: { path: "/docker/a", memory_events: null as { oom: number; oom_kill: number } | null } }],
+  }))
+  expect(assessResourceIncidents({ samples, summary: summarizeResourceSamples(samples) }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_OOM_OBSERVATIONS_INCOMPLETE"] })
+  samples.forEach(sample => { sample.containers[0]!.cgroup.memory_events = { oom: 0, oom_kill: 0 } })
+  expect(assessResourceIncidents({ samples, summary: summarizeResourceSamples(samples) })).toEqual({ status: "passed", codes: [] })
+  const missingHost = samples.map(sample => ({ ...sample, host: { ...sample.host, collector_cgroup: null } }))
+  expect(assessResourceIncidents({ samples: missingHost, summary: summarizeResourceSamples(missingHost) }))
+    .toEqual({ status: "incomplete", codes: ["CGROUP_OOM_OBSERVATIONS_INCOMPLETE"] })
+})
+
 test("resource incidents cannot infer an absent Docker OOM observation as false", () => {
   for (const oomKilled of [undefined, null, "false"]) {
     const samples = [0, 1].map(index => ({ sequence: index + 1, elapsed_ms: index * 1000, missed_intervals: 0,
