@@ -104,15 +104,16 @@
 **Unit tests:** `process-supervisor.test.ts`, `judge-environment.test.ts`;
 новый `verify/test_codex_home.py` рядом с существующими verify tests wrapper repo.
 
-- [ ] RED/GREEN: полностью прочитанная чужая ancestry не сигналится и не карантинится;
+- [x] RED/GREEN: полностью прочитанная чужая ancestry не сигналится и не карантинится;
   ошибка чтения отказывает; own descendant проходит subreaper/pid+starttime guards.
 - [x] RED/GREEN: при подтверждённом дереве и пустом unknown ошибка
   `Writer owner unavailable` не проваливает попытку; `.writer` снимается через
   существующий `releaseStaleWriter`, непроверенное дерево/unknown по-прежнему отказ.
   Profile75 PASS/218 assertions47.34s,2 proc-denial cases не запускались для
   предотвращения помех другим агентам; typecheck/diff PASS.
-- [ ] Проверить `bun run test test/process-supervisor.test.ts test/judge-environment.test.ts`
-  и `bun typecheck`; отдельный коммит `fix(evals): ignore proven foreign process ancestry`.
+- [x] Выбранная ownership/management regression25 PASS/125 assertions109.40s
+  (82 filtered, включая proc-denial tests); strict own-unknown/birth guards PASS.
+  `bun typecheck`/diff PASS; отдельный коммит `fix(evals): ignore proven foreign process ancestry`.
 - [x] RED/GREEN wrapper unit: разрешённый canonical caller CODEX_HOME с тем же
   lockdown-конфигом сохраняется; outside/symlink/mismatch не допускаются;
   отсутствие caller home сохраняет прежнее поведение и сетевые ограничения.
@@ -231,4 +232,5 @@ private config/budget/results вне Git; операторские команд�
 12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
 13. Server/profile guard: slots31/127 PASS33.22s/typecheck; user lock исключён из environment.
 14. Writer diagnostic: profile75/218 PASS47.34s +typecheck;2 proc-denial cases исключены.
-15. Следующий шаг: foreign ancestry, затем новый prepare/verify/cleanup/queue без inventories.
+15. Foreign ancestry: ownership/management25 PASS/125 assertions109.40s +typecheck,82 filtered.
+16. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.

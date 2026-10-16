@@ -5,7 +5,7 @@ import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
+import { hasOwnedAncestry, signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
 test("supervisor persists its actual launcher lifetime bound to the admitted owner and birth", async () => {
@@ -319,7 +319,7 @@ test("signalProcess: другая birth или executable identity не разр
   } finally { child.kill("SIGKILL"); await exited }
 })
 
-test("supervisor: собственный detached browser закрыт, неизвестный helper остаётся и блокирует продолжение", async () => {
+test("supervisor: own detached browser closes while a proven foreign helper stays alive", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-proof-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-bundle-"))
   await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
@@ -335,13 +335,18 @@ test("supervisor: собственный detached browser закрыт, неиз
   try {
     const run = await pending
     expect(run.exitCode).toBe(0)
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Unexplained browser/helper")
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.error).toBeNull()
+    expect(run.processCleanup.unknownProcesses).toEqual([])
     expect(unknown.exitCode).toBeNull()
     const pid = Number(await Bun.file(pidFile).text())
     const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
     expect(state === "" || state.startsWith("Z")).toBe(true)
-  } finally { unknown.kill("SIGKILL"); await exited }
+  } finally {
+    unknown.kill("SIGKILL"); await exited
+    await rm(out, { recursive: true, force: true })
+    await rm(bundle, { recursive: true, force: true })
+  }
 }, 20_000)
 
 test("a refused child of a proven peer quarantines its owner without blocking A cleanup", async () => {
@@ -654,7 +659,7 @@ test("supervisor: новый противоречащий profile после bin
 }, 20_000)
 
 
-test("supervisor: unmanaged Chromium with an outside profile stays unknown and alive", async () => {
+test("supervisor: Chromium with readable foreign ancestry stays alive without quarantine", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-bundle-"))
   await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
@@ -664,17 +669,21 @@ test("supervisor: unmanaged Chromium with an outside profile stays unknown and a
     EVAL_FAKE_BROWSER_PID_FILE: path.join(out, "browser.pid") } }, taskId: "default", model: "fake/model", prompt: "test",
     files: [], workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
   await Bun.sleep(300)
-  const foreign = spawn(path.join(bundle, "chrome"), ["--user-data-dir=/tmp/other-browser-profile"], { detached: true, stdio: "ignore" })
+  const foreign = spawn(path.join(bundle, "chrome"), [`--user-data-dir=${path.join(bundle, "foreign-profile")}`], { detached: true, stdio: "ignore" })
   const exited = new Promise((resolve) => foreign.once("exit", resolve))
   try {
     const run = await pending
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Unexplained browser/helper")
-    expect(run.processCleanup.unknownProcesses?.some(entry => entry.pid === foreign.pid)).toBe(true)
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.error).toBeNull()
+    expect(run.processCleanup.unknownProcesses).toEqual([])
     expect(run.processCleanup.processes.some(entry => entry.pid === foreign.pid)).toBe(false)
     expect(foreign.exitCode).toBeNull()
     process.kill(foreign.pid!, 0)
-  } finally { foreign.kill("SIGKILL"); await exited }
+  } finally {
+    foreign.kill("SIGKILL"); await exited
+    await rm(out, { recursive: true, force: true })
+    await rm(bundle, { recursive: true, force: true })
+  }
 }, 20_000)
 
 test("supervisor: неизвестный потомок браузера вне bundle остаётся живым и запрещает переход", async () => {
@@ -774,3 +783,12 @@ test("supervisor: неизвестный adopted helper вне bundle не по�
     }
   }
 }, 20_000)
+
+test("supervisor ancestry: kernel parent chain proves own or foreign and unreadable chain refuses", async () => {
+  const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
+  const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+  expect(await hasOwnedAncestry(process.pid, [owner])).toBe(true)
+  expect(await hasOwnedAncestry(1, [owner])).toBe(false)
+  expect(await hasOwnedAncestry(process.pid, [{ ...owner, starttime: "0" }])).toBe(false)
+  await expect(hasOwnedAncestry(Number.MAX_SAFE_INTEGER, [owner])).rejects.toThrow()
+})
