@@ -155,6 +155,10 @@
   только A, B продолжает очередь; SIGINT прекращает выдачу; license denial
   останавливает весь run. Артефакты/results не пропадают при ошибке cleanup; unit-проверка env и outputs
   агента/судьи подтверждает отсутствие всех секретов, включая пароли слотов.
+  RED→GREEN env: реальные binary slots и VPN judge наследуют только служебный
+  allowlist; judge home явный. Canary/env/VPN10/33 PASS +typecheck/diff;
+  вывод уже покрывается существующими redaction tests. Один старый CLI proc-denial
+  тест обновлён под foreign ancestry; повторно не запускался ради других агентов.
 - [ ] RED: запись бюджета до dispatch, host/container CPU/RAM, диск/OOM,
   licence/provider errors определяют приёмку; процессная телеметрия не gate;
   missing mandatory sample не PASS, скрытый 429/успешный retry не скрывает отказ.
@@ -242,4 +246,5 @@ private config/budget/results вне Git; операторские команд�
 15. Foreign ancestry: ownership/management25 PASS/125 assertions109.40s +typecheck,82 filtered.
 16. Exact-name close:53/221 unit PASS29.31s +typecheck/diff; native A/B ещё не выполнен.
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
-18. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
+18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
+19. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.

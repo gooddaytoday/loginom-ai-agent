@@ -1,4 +1,5 @@
 import path from "node:path"
+import { childEnvironment } from "./child-environment"
 import { cp, mkdir, rm } from "node:fs/promises"
 import { evalsRoot } from "./config"
 import type { ChecklistItem, Task } from "./task"
@@ -307,7 +308,8 @@ async function invoke(
 
 async function runJudge(input: Parameters<typeof superviseJudgeProcess>[0] & { timeoutMs: number; stdin?: string },
   judge: Pick<JudgeSettings, "processEvidence" | "systemd">) {
-  if (judge.systemd) return runJudgeUnit(input)
+  if (judge.systemd) return runJudgeUnit({ ...input, env: { ...childEnvironment(input.env),
+    ...(input.env.CODEX_HOME ? { CODEX_HOME: input.env.CODEX_HOME } : {}) } })
   const result = await superviseJudgeProcess(input, judge.processEvidence)
   return { ...result, cleanupConfirmed: result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete,
     cleanupError: result.processCleanup.error }
