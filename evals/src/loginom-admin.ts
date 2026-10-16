@@ -18,6 +18,19 @@ export function selectOwnedSessions(observed: ServerSession[], owned: ServerSess
     return true
   })
 }
+
+export async function closeUserSessions(admin: {
+  inspectSessionInventory(): Promise<{ sessions: { name: string }[] }>
+  closeUserSession(username: string, name: string): Promise<void>
+}, username: string) {
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(username)) throw new EvalFailure("ADMIN_REQUEST_INVALID", 2)
+  const names = (await admin.inspectSessionInventory()).sessions.filter(row => row.name.startsWith(username + ":")).map(row => row.name)
+  if (new Set(names).size !== names.length) throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
+  for (const name of names) await admin.closeUserSession(username, name)
+  if ((await admin.inspectSessionInventory()).sessions.some(row => row.name.startsWith(username + ":")))
+    throw new EvalFailure("SESSION_STILL_PRESENT", 2)
+  return names
+}
 import { EvalFailure } from "./fail"
 import { readManagementSession, recordManagementSessionClosed } from "./management-sessions"
 import { readAgentArchive, readAgentSession, recordAgentSessionClosed } from "./agent-sessions"
@@ -64,6 +77,7 @@ export type AdminConnection = {
   closeAgentSession(lease: SlotLease, secretFile: string, id: string, archive: { path: string; sha256: string }, mode?: "confirm-absent"): Promise<void>
   activateOwnedUser(lease: SlotLease, secretFile: string): Promise<{ activated: boolean; userKey: string; source: { path: string; id: string; sha256: string } }>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
+  closeUserSession(username: string, name: string): Promise<void>
   closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
 }
@@ -518,6 +532,12 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       })
       requireAdminReply(reply)
       await recordAgentSessionClosed(file, lease, secretFile, id, archive, path.join(directory, "commands", `${reply.id}.json`), reply)
+    },
+    async closeUserSession(username, name) {
+      if (!file.slots.some(slot => slot.username === username) || !name.startsWith(username + ":"))
+        throw new EvalFailure("SESSION_OWNERSHIP_UNCONFIRMED", 2)
+      const data = requireAdminReply(await request("close-session", { username, name }))
+      if (!jsonObject(data) || data.closed !== true) throw new EvalFailure("ADMIN_CLOSE_UNCONFIRMED", 2)
     },
     async closeSession(session) {
       const data = requireAdminReply(await request("close-session", { session }))

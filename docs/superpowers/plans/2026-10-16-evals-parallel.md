@@ -83,8 +83,10 @@
 `src/attempt-finalization.ts`, `src/artifact.ts`, `src/profile-archive.ts`.
 **Unit tests:** `loginom-admin.test.ts`, `artifact.test.ts`, `profile-archive.test.ts`.
 
-- [ ] RED: точные native имена всех сессий eval-a закрываются через один заранее
+- [x] RED→GREEN unit: точные native имена всех сессий eval-a закрываются через один заранее
   открытый admin; eval-b/admin сохраняются; readback still-present запрещает delete.
+  Рабочая ветка существующего close-session без actor ledger; SESSION_NOT_IDLE
+  сохраняется отказом. Проверка native A/B и подключение к run ещё впереди.
 - [ ] RED: неизвестное владение/root, активный открытый файл или непустой/нечитаемый
   SessionBackup оставляют файлы неизменными; история/inputs сохраняются вне mounts.
 - [ ] GREEN: в новом пути заменить actor-ledger admission точным пользователем,
@@ -233,4 +235,5 @@ private config/budget/results вне Git; операторские команд�
 13. Server/profile guard: slots31/127 PASS33.22s/typecheck; user lock исключён из environment.
 14. Writer diagnostic: profile75/218 PASS47.34s +typecheck;2 proc-denial cases исключены.
 15. Foreign ancestry: ownership/management25 PASS/125 assertions109.40s +typecheck,82 filtered.
-16. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
+16. Exact-name close:53/221 unit PASS29.31s +typecheck/diff; native A/B ещё не выполнен.
+17. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
