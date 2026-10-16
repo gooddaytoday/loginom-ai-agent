@@ -3121,5 +3121,27 @@ exact own pair/network/root absence. Native Pool error codes preserve their
 POOL_POLICY namespace. Two failed fixture lock collisions were fixed by separating
 controller and factory lock roots; original pairs were reclaimed with qualified
 closure/transport sources, recovery-only CAS, release and owned factory destroy.
-Original failed logs/proofs remain unchanged. Production prepare/verify wiring
-and runtime policy drift/admission guards still require integration.
+Original failed logs/proofs remain unchanged. Prepare/verify wiring is qualified
+in the follow-up below; runtime policy drift/admission guards remain open.
+
+### Pool policy in public environment preparation (2026-10-16)
+
+prepareEnvironment now configures fixed PackagePoolSize=0 before staging or
+configuring any selected user. verifyEnvironment only inspects the live value;
+both environment receipts contain the bound poolPolicy observation. Overall
+readiness remains false with SESSION_IDENTITY_UNSUPPORTED in this control.
+These policy observations still do not grant runtime dispatch.
+
+Actual public prepare→verify: missing field RED7/76.03s→native1/16 PASS99.68s.
+The helper bridge terminates before both commands; no deadline was raised.
+Related CLI/recovery/admin62/232 PASS46.09s; typecheck/syntax/diff PASS.
+Private51f765be… source-audit SHA256
+`9c6e5d40565159ad8493dd7433181945afdb3c993ea1a2a783b7d4b72c627bd0`
+checks83/45 sources+9 pins: actual10→0 before every reconcile-user command,
+readonly verification0, three continuous admin lifetimes/transport ACKs, both
+unactivated finalizers released and exact own pair/network/root absence.
+RED80d294fe… auditbf910e54…35/17 retains the original missing-field receipt and
+executed sources with a verified safe boundary. Pre-CLI finalization release is
+separate from evaluated-attempt cleanup. Runtime admission must still bind the
+frozen policy/fingerprint and detect drift; backend operations/locks, backup
+and remaining readiness gates remain mandatory.

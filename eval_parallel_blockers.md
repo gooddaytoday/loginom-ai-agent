@@ -671,11 +671,19 @@ Native1/54 PASS63.23s; private2df05c6e… audit
 checks70/23 sources+8 pins, both admin closures/ACKs and own pair/network/root
 absence. Missing-phase REDe83d02ea…41/51.90s is settled with original sources.
 Do not repeat the unsupported selected Pool ClosePackage recipe. Remaining
-work is production configuration before user work plus frozen-epoch read-back
-and drift guards. Package/lock quiescence, backup and storage cleanup remain
+work is runtime admission with a frozen policy/fingerprint and drift guards;
+public prepare/verify wiring is now qualified below. Package/lock quiescence, backup and storage cleanup remain
 separate gates; this control grants neither delete nor next admission.
 
 Same-source default-retention control62335c26…:1/54 PASS66.51s,
 audit7e614cb9…74/25 verifies the same package retained after creator close.
 Both cases freeze the identical8 code/binary/input pins. Related49/160
 PASS21.15s; typecheck/syntax/diff PASS.
+
+Pool preparation wiring follow-up (2026-10-16): public prepare configures0 before
+user staging/configuration; verify only reads live0 and both receipts persist
+the policy source. Native1/16 PASS99.68s, related62/232 PASS46.09s,
+typecheck/syntax/diff PASS. Private51f765be… audit9c6e5d40…83/45+9pins confirms
+three closed admin actors/transport ACKs, two released pre-CLI finalizers and
+exact own pair/network/root absence. This resolves prepare/verify wiring;
+runtime frozen-policy admission/drift and evaluated-attempt cleanup remain open.

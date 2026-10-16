@@ -1314,4 +1314,14 @@ verifies full policy replies/journals, both admin closures/ACKs and exact own
 pair/network/root absence. Source reader rejects omitted self-observer even when
 hashes match. Fixture controller leases use their own lock root; failed original
 collisions were CAS-recovered/released from full closure sources and their owned
-pairs destroyed. Prepare/verify integration remains the next step.
+pairs destroyed. The public prepare/verify follow-up is qualified below.
+
+`native pool environment: prepare applies policy and verify only reads it` now
+executes both public environment APIs on a fresh own pair. Preparation writes0
+before every user mutation; verify sends only init/inspect/dispose and reads0.
+Both receipts include poolPolicy while ready=false/SESSION_IDENTITY_UNSUPPORTED
+remains intact. Native1/16 PASS99.68s; related CLI/recovery/admin62/232
+PASS46.09s, typecheck/syntax/diff PASS. Private51f765be… audit9c6e5d40…83/45+9pins
+verifies all admin closures/ACKs, both pre-CLI finalizers released and exact own
+pair/network/root absence. The helper bridge closes early; deadlines are unchanged.
+Evaluated-attempt cleanup, frozen runtime admission and the remaining gates are open.
