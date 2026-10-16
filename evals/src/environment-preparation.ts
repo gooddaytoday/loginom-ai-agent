@@ -42,6 +42,7 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number }, 
   try {
     const admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, processInventory })
     try {
+      const poolPolicy = operation === "prepare" ? await admin.configurePoolPolicy() : await admin.inspectPoolPolicy()
       const slots = [], changedUsers = [], changedPasswords = []
       for (const lease of environment.slots) {
         const existing = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
@@ -67,7 +68,7 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number }, 
       // Qualified CLI sessions, effective probes, backup policy and fingerprint are still mandatory.
       const finalization = await finalizeUnactivatedEnvironment(file, environment, admin)
       const result = { version: 2, kind, commandId, identity, journal, status: "blocked" as const, ready: false as const,
-        reason, slots, changedUsers, changedPasswords, finalization }
+        reason, slots, changedUsers, changedPasswords, poolPolicy, finalization }
       await writeLeaseReceipt(receipt, result)
       return { ...result, receipt, code: 2 as const }
     } catch (error) {
