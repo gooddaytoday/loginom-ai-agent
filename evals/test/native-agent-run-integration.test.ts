@@ -10,13 +10,14 @@ import { pauseAgentProcessInventory, readAgentProcess, readAgentProcessInventory
 import { readAgentArchive, readAgentSession, recordAgentSessions } from "../src/agent-sessions"
 import { qualifyClosedProcessEvidence } from "../src/closed-process-evidence"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { openLoginomAdmin } from "../src/loginom-admin"
+import { openLoginomAdmin, readAdminSessionInventory } from "../src/loginom-admin"
 import { collectManagementSessions, collectSlotSessions } from "../src/management-sessions"
 import { sealManagementProcessInventory } from "../src/management-process-evidence"
 import { createPair, destroyPair, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { archiveProfileEvidence } from "../src/profile-archive"
 import { signalProcess, supervisedProcesses } from "../src/process-supervisor"
 import { ensureProfile, profileHistory, releaseStaleWriter } from "../src/profile"
+import { readServerFiles } from "../src/server-files"
 import { acquireEnvironmentLeases, loadSlots, parseSlots } from "../src/slots"
 import { stageUserPreparation } from "../src/user-environment"
 import { loginomReplayProvider } from "./helpers/loginom-replay-provider"
@@ -46,7 +47,7 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
     await mkdir(evidence, { mode: 0o700 })
     console.error(`native agent replay evidence: ${evidence}`)
     const sources = await Promise.all(["native-agent-run-integration.test.ts", "helpers/loginom-replay-provider.ts", "../src/cli.ts",
-      "../src/attempt-finalization.ts", "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/management-sessions.ts", "../src/management-process-evidence.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
+      "../src/attempt-finalization.ts", "../src/server-files.ts", "../fixtures/server-files.sh", "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/management-sessions.ts", "../src/management-process-evidence.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
       "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", "../fixtures/interrupt-probe.lgp", "../fixtures/interrupt-probe.js", process.env.EVAL_CLI_BIN!].map(async file => {
       const source = path.resolve(import.meta.dir, file)
       return { path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }
@@ -164,6 +165,14 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
           const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
           const closed = await admin.inspectSessionInventory()
           await writeLeaseReceipt(path.join(evidence, "attempt-finalization.json"), { inputs, completed, after: closed })
+          expect(await readLeaseReceipt(completed.source.path)).toHaveProperty("serverFiles")
+          const files = await readServerFiles(file, environment.server, lease, completed.serverFiles)
+          const absence = await readAdminSessionInventory(file, pair.identity, completed.after)
+          expect(Date.parse(files.snapshot.startedAt)).toBeGreaterThanOrEqual(Date.parse(absence.observation.finishedAt))
+          expect(files.snapshot.files.some(entry => entry.target === storage.root || entry.target.startsWith(`${storage.root}/`))).toBe(false)
+          expect((await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)).source).toEqual(completed.source)
+          await writeLeaseReceipt(path.join(evidence, "finalization-files.json"), { files, absence,
+            server: environment.server.reservation, storageDeletionAllowed: false, nextAdmissionAllowed: false })
           await sealAgentProcessInventory(agentEvidence)
           expect(completed.sessions).toHaveLength(2)
           expect(completed.sessions.every(session => session.state === "closed")).toBe(true)
@@ -207,6 +216,29 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
           expect((await Bun.file(agents).json()).state).toBe("paused")
           expect(run.sessionId).toBeDefined()
           expect(await archivedSession(completed.archived.archive, run.sessionId!)).toBe(true)
+          if (!browser) {
+            const files = await readServerFiles(file, environment.server, lease, completed.serverFiles)
+            const absence = await readAdminSessionInventory(file, pair.identity, completed.after)
+            const terminal = await readLeaseReceipt(completed.source.path) as Record<string, unknown>
+            const raw = await readLeaseReceipt(completed.serverFiles.path) as { frame: typeof files.snapshot.frame }
+            await writeLeaseReceipt(completed.serverFiles.path, { ...raw, kind: "changed-kernel-source" })
+            const changed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+              .then(() => "unexpected success", (error: Error) => error.message).finally(() => writeLeaseReceipt(completed.serverFiles.path, raw))
+            expect(changed).toBe("SERVER_FILE_SOURCE_UNCONFIRMED")
+            const at = new Date(Date.parse(absence.observation.startedAt) - 1).toISOString()
+            const early = { ...raw, frame: { ...raw.frame, startedAt: at, finishedAt: at } }
+            await writeLeaseReceipt(completed.serverFiles.path, early)
+            await writeLeaseReceipt(completed.source.path, { ...terminal, serverFiles: { ...completed.serverFiles,
+              sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(early)).digest("hex") } })
+            const reordered = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+              .then(() => "unexpected success", (error: Error) => error.message).finally(async () => {
+                await writeLeaseReceipt(completed.serverFiles.path, raw)
+                await writeLeaseReceipt(completed.source.path, terminal)
+              })
+            expect(reordered).toBe("ATTEMPT_FINALIZATION_UNCONFIRMED")
+            await writeLeaseReceipt(path.join(evidence, "finalization-files.json"), { files, absence, server: environment.server.reservation,
+              controls: { changed, reordered }, storageDeletionAllowed: false, nextAdmissionAllowed: false })
+          }
           expect((await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)).source).toEqual(completed.source)
           await writeLeaseReceipt(path.join(evidence, "attempt-finalization.json"), { inputs, completed, after: closed })
           expect(absenceOnly).toBe("SESSION_STILL_PRESENT")

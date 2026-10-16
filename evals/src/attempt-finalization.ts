@@ -10,6 +10,7 @@ import { readAdminSessionInventory, type AdminConnection } from "./loginom-admin
 import { verifyParallelPair } from "./parallel-pair"
 import { archiveProfileEvidence } from "./profile-archive"
 import { releaseStaleWriter } from "./profile"
+import { captureServerFiles, readServerFiles } from "./server-files"
 import type { ProcessCleanup } from "./process-supervisor"
 import type { acquireEnvironmentLeases, SlotFile, SlotLease } from "./slots"
 
@@ -98,12 +99,16 @@ export async function finalizeSlotAttempt(file: SlotFile, server: Awaited<Return
   if (completed && (Date.parse(finalAfter.observation.startedAt) < Date.parse(intent.at) || finalAfter.sessions.some(row =>
     row.name.toLowerCase() === lease.slot.username.toLowerCase() || row.name.toLowerCase().startsWith(lease.slot.username.toLowerCase() + ":"))))
     throw new EvalFailure("ATTEMPT_FINALIZATION_UNCONFIRMED", 2)
+  const files = completed ? await readServerFiles(file, server, lease, record(completed.serverFiles) as { path: string; sha256: string }) :
+    await captureServerFiles(file, server, lease)
+  if (Date.parse(files.snapshot.startedAt) < Date.parse(finalAfter.observation.finishedAt))
+    throw new EvalFailure("ATTEMPT_FINALIZATION_UNCONFIRMED", 2)
   const receipt = { version: 2, kind: "slot-attempt-finalization", status: "sessions_closed" as const, identity: lease.identity,
     slotId: lease.slot.id, leaseToken: lease.token, boundary, intent: await reference(intentFile), archived, archives, sessions,
-    after: finalAfter.source, storageDeletionAllowed: false, nextAdmissionAllowed: false }
+    after: finalAfter.source, serverFiles: files.source, storageDeletionAllowed: false, nextAdmissionAllowed: false }
   if (completed && JSON.stringify(completed) !== JSON.stringify(receipt)) throw new EvalFailure("ATTEMPT_FINALIZATION_UNCONFIRMED", 2)
   if (!completed) await writeLeaseReceipt(target, receipt)
-  return { status: receipt.status, sessions, archived, after: receipt.after, source: { path: target, sha256: hash(receipt) } }
+  return { status: receipt.status, sessions, archived, after: receipt.after, serverFiles: receipt.serverFiles, source: { path: target, sha256: hash(receipt) } }
 }
 
 async function reference(file: string) {

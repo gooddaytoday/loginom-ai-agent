@@ -828,3 +828,32 @@ slot and closed guard controls refuse; malformed protocol tags/boundaries refuse
 even with a recomputed hash. This resolves the durable point-observation gap.
 Finalizer binding, operation/package accounting, no-regrowth/B-active filesystem
 controls and actual cleanup consumption still remain; no grants were enabled.
+
+
+Native setup health diagnostic (2026-10-16): text finalizer probe1e06a8e1…
+failed PAIR_HEALTH_TIMEOUT before CLI admission (50.21s). Its exact research
+Studio started06:44:34.538972912Z and logged Apache AH00489 ready only at
+06:45:14.745396422Z (+40.206s),6.761s after the original failure log ended.
+The read-only collector observed three later HTTP200/wsproxy=true responses,
+no restarts/OOM, fixed images/nonce/CIDs; source GET errors were not retained,
+so their type and the cause of late readiness remain unproven. Factory code
+and30s budget were unchanged. Public createPair resumed this same configured
+pair without restart, then public destroyPair released4 factory claims;
+exact3 resources and own bpTCqq root are absent. Private disposald142b481…,
+report30a2c352… and original failed verdict/sources remain. No slot or CLI was
+admitted; the separate unlocated history directory was not touched. This is a
+research setup refusal/decommission, not production cleanup or a passing test.
+
+
+Finalizer kernel source binding is qualified (2026-10-16): hard-kill native
+b5e3bb27…1/20 PASS237.31s/audit57566cdf…2304/219 and text5a6780c2…1/27
+PASS161.10s/audit593d3fe8…289/121,20 pins each. Post-close source is mandatory,
+causally ordered and replayed under current fences; corrupt/backdated points
+refuse without silent refresh. Pending reconstruction creates one fresh point
+after new absence; no duplicate CloseSession RPC. Related15/166 PASS56.49s,
+typecheck/diff PASS. The original missing-field REDcd27cb3e… remains failed,
+with independent2262/200 audit and complete research teardown. This resolves
+terminal binding only: B-active filesystem/no-regrowth, complete operation/lock
+coverage, SessionBackup, storage cleanup/release/unpause and production admission
+remain open, with all grants false. Initial setup health refusal above is not a
+passing test or a proven code regression; the new isolated text test passed.
