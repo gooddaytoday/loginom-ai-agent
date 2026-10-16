@@ -1,17 +1,17 @@
 # Node evals — checkpoint
-Дата: 16.10.2026; A применён, B реализован и проверен offline.
-База B: text-import-evals@c02b83b257; источник кода/тестов B: 45f2e14690.
-SHA назначения берётся из шапки карточки; до исполнения он должен включать B.
-Контракт: ../evaler-orchestration.md; операции: operations.md.
-Серия и отдельный установленный helper: ../2026-10-16-text-import-integration.md.
-Методика: ../../skills/loginom-node-eval-case/SKILL.md, из назначенного checkout.
-Evaler — лидер; Rich — автор; Ben — независимость и итоговая готовность стенда.
-LAB-56/57 приняты; повтор пилота и его очистки не требуется.
-B: rework_limit по умолчанию 1; для импорта при допуске назначить 3.
-B: четвёртый REJECT → blocked; continue_after_evaler привязан к issue/report/SHA.
-B: unknown cleanup требует проверенный stand_ready; Ben ограничен frozen SHA.
-B: 37 тестов handoff/CLI PASS, bun typecheck из evals/ PASS; без модели и Docker.
-Бюджеты/история не обнуляются; новый dispatch сохраняет SHA и проверяет очередь.
-C ещё не проверен; repeat=1 пока допускает infra retry, защита одного вызова не реализована.
-Multica и стенды в пакете B не изменялись; карточки остаются на опубликованном A до будущего допуска.
-Следующий шаг: C и защита одного вызова, затем отдельный разрешённый старт LAB-58.
+Дата: 16.10.2026; A опубликован, B реализован, C квалифицирован.
+Код B: 45f2e14690; при допуске импорта rework_limit=3 без сброса счётчиков.
+Продолжение B привязано к issue/report/SHA; unknown cleanup требует stand_ready.
+Ben ограничен frozen SHA; бюджеты, ERROR и независимость не изменены.
+SHA назначения — из шапки карточки, должен включать B/C и принятые исправления.
+Общий контракт: ../evaler-orchestration.md; команды: operations.md.
+Активные CLI/helper/config/container: ../2026-10-16-text-import-integration.md.
+Процедура и доказательства C: ../node-eval-cleanup.md.
+C: один сброс на eval-tests; READY → COMPLETE → RELEASED → FREE в 15:04 МСК.
+C: 622 PASS / 6 SKIP / 0 FAIL; typecheck PASS, 0 model/reference/product/cold.
+Первый typecheck без tsc сохранён; devdeps Ben установлены по lockfile, код clean.
+Шесть профилей чисты; их настройки сохранены; старый lease и архивы сохранены.
+Причина старого writer не доказана; supervisor/once guards не ослаблены.
+LAB-58–63 — backlog/revision14, прежние run IDs; Multica и модели не менялись.
+Следующий шаг: защита одного физического вызова; repeat=1 ещё допускает infra retry.
+Затем отдельный разрешённый старт LAB-58. Сейчас карточки не запускать.
