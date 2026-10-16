@@ -1,11 +1,12 @@
 import path from "node:path"
-import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
 import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
+import { writeManagementEvidence } from "./management-evidence"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
 
@@ -95,8 +96,13 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
-    env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
-  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
+    env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, outDir: out })
+  if (out) {
+    await chmod(path.join(out, "process-cleanup.json"), 0o600)
+    const evidence = await writeManagementEvidence(out, args, result, command.managementBinding)
+    if (!evidence.capture_matches_returned) throw new EvalFailure("Management capture differs", 1)
+    await writeFile(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2), { mode: 0o600, flag: "wx" })
+  }
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)

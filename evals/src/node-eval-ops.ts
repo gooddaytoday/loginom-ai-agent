@@ -14,6 +14,7 @@ import { validateNodeRun } from "./node-evals"
 import type { RunSummary } from "./report"
 import { archiveDiagnostics } from "./diagnostics"
 import { acquireHarnessLease, retireRecordedHarnessLease } from "./lease"
+import { assertManagementBinding, managementIsReady, nodeManagementArguments, writeManagementEvidence } from "./management-evidence"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
@@ -264,8 +265,16 @@ export async function nodeProcessOutput(config: NodeOpsConfig, lease: NodeStandL
   return outDir
 }
 
-export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStandLease, env: Record<string, string | undefined> = process.env) {
+export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStandLease, env: Record<string, string | undefined> = process.env, evidenceDir?: string) {
   return exclusive(config, lease, async () => {
+    // Every new attempt is separate; historical failed admission bytes are immutable.
+    if (evidenceDir && (!evidenceDir.startsWith(directory(config) + path.sep) || path.dirname(evidenceDir) !== directory(config)))
+      throw new NodeOpsFailure("EVIDENCE_PATH_REFUSED")
+    if (await Bun.file(path.join(directory(config), "admission-complete.json")).exists()) throw new NodeOpsFailure("ADMISSION_ALREADY_READY")
+    const admissionRoot = evidenceDir ?? await mkdtemp(path.join(directory(config), "preflight-attempt-"))
+    if (evidenceDir) {
+      await mkdir(evidenceDir, { mode: 0o700 })
+    }
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
     const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
@@ -274,34 +283,51 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
     if (storage.containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
     const current = evalConfig(config, lease, env)
     const environment = await preflight(current, source(config))
-    const command = { ...agentCommand(current, env), cleanupDir: path.join(directory(config), "preflight"),
+    const binding = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, configSha256: configDigest(config), containerId: storage.containerId }
+    const command = { ...agentCommand(current, env), cleanupDir: path.join(admissionRoot, "preflight"), managementBinding: binding,
       cleanupSecrets: [current.loginom.password, current.dock.apiKey, current.agent.provider?.apiKey ?? ""] }
     await assertAuth(current, command)
     const admission = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, containerId: storage.containerId, configSha256: configDigest(config),
       profiles: Object.values(config.roles).flatMap(roleProfiles), checkedAt: new Date().toISOString() }
-    await writeFile(path.join(directory(config), "admission.json"), JSON.stringify(admission), { mode: 0o600 })
-    const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
-    if (view?.state !== "ready" || view.recoveries?.length) throw new NodeOpsFailure("PROFILE_NOT_READY")
+    await writeFile(path.join(directory(config), "admission.json"), JSON.stringify(admission), { flag: "wx", mode: 0o600 }).catch(async (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EEXIST") throw error
+      await assertOriginalAdmission(config, lease)
+    })
+    await writeFile(path.join(admissionRoot, "admission.json"), JSON.stringify(admission), { flag: "wx", mode: 0o600 })
+    const status = await management(command, nodeManagementArguments("status"))
+    await assertNodeStandOwner(config, lease)
+    assertManagementBinding(binding, { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, configSha256: configDigest(config), containerId: lease.containerId })
+    await verifyProcesses(status.processCleanup, lease)
+    if (!managementIsReady(status)) throw new NodeOpsFailure("PROFILE_NOT_READY")
     // Validate Loginom credentials, websocket and licence with the installed product's real browser.
     // No run/model command is admitted here, and no settings or credentials are replaced.
     const workdir = await mkdtemp(path.join(nodeRole(config, lease.role).workRoots[0]!, ".ops-check-"))
     const checkDir = await nodeProcessOutput(config, lease, "native-check")
-    const cmd = [...command.cmd, "loginom", "check", "--format", "json"]
+    const cmd = [...command.cmd, ...nodeManagementArguments("check")]
     const boundary = await sandboxCommand({ cmd, profileDir: current.profileDir, workdir, env: command.env })
     const check = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir: current.profileDir, outDir: checkDir, timeoutMs: 120_000 })
+    if (!(await writeManagementEvidence(checkDir, nodeManagementArguments("check"), check, binding)).capture_matches_returned)
+      throw new NodeOpsFailure("NATIVE_CAPTURE_CHANGED")
+    await assertNodeStandOwner(config, lease)
+    assertManagementBinding(binding, { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, configSha256: configDigest(config), containerId: lease.containerId })
     await verifyProcesses(check.processCleanup, lease)
     await archiveDiagnostics(current.profileDir, check.processCleanup.runtimeDirectories, checkDir, command.cleanupSecrets)
     await releaseStaleWriter(current.profileDir, check.processCleanup.writer)
     const receipt = JSON.parse(check.stdout.trim().split("\n").at(-1) ?? "null") as { ok?: boolean; code?: string } | null
     if (check.exitCode !== 0 || check.sandboxError || check.timedOut || check.interrupted || receipt?.ok !== true || receipt.code !== "LOGINOM_CONNECTION_VALID")
       throw new NodeOpsFailure("NATIVE_LOGINOM_CHECK_FAILED")
-    await archiveProfileHistory(current.profileDir, `node-ops-admission-${lease.task}`)
+    const historyArchive = await archiveProfileHistory(current.profileDir, `node-ops-admission-${lease.task}`)
     await rm(workdir, { recursive: true })
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
     if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
+    const complete = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, configSha256: lease.configSha256,
+      status: "READY", processEvidence: path.join(checkDir, "process-cleanup.json"), historyArchive }
+    await writeFile(path.join(admissionRoot, "admission-complete.json"), JSON.stringify(complete), { flag: "wx", mode: 0o600 })
+    await writeFile(path.join(directory(config), "admission-complete.json"), JSON.stringify(complete), { flag: "wx", mode: 0o600 })
     return { status: "READY", sha: git.sha, dirty: git.dirty, containerId: storage.containerId,
-      cliSourceSha: environment.agent?.sourceCommit ?? null, model: current.agent.model, variant: current.agent.variant }
+      cliSourceSha: environment.agent?.sourceCommit ?? null, model: current.agent.model, variant: current.agent.variant,
+      admission: path.join(admissionRoot, "admission-complete.json"), processEvidence: path.join(checkDir, "process-cleanup.json"), historyArchive }
   })
 }
 

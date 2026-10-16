@@ -4,6 +4,7 @@ import { evalsRoot, repoRoot } from "./config"
 import { superviseProcess } from "./process-supervisor"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { assertProfileClean } from "./profile"
+import type { ManagementBinding } from "./management-evidence"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -122,7 +123,7 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
   if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
   return { mode: "fake" as const, cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
 }
-export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[] }
+export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[]; managementBinding?: ManagementBinding }
 
 export async function runAgent(input: {
   command: AgentCommand
