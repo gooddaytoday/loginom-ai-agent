@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { mkdir, mkdtemp, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { createPair, destroyPair, pairImages, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
+import { createPair, destroyPair, inspectUserStorage, pairImages, prepareUserStorage, readServerIdentity } from "../src/parallel-pair"
 import { loadConfig } from "../src/config"
 import { agentCommand } from "../src/cli"
 import { loadTasks } from "../src/task"
@@ -23,6 +23,40 @@ import { signalProcess, supervisedProcesses, type ProcessIdentity } from "../src
 import { captureServerFiles, readServerFiles } from "../src/server-files"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
+
+integration("owned user storage archive preserves all material without following links", async () => {
+  const { archiveUserStorage } = await import("../src/user-storage-archive")
+  const fixture = await storageCodecFixture()
+  try {
+    const storage = await prepareUserStorage(fixture.file, fixture.lease, fixture.prepared.secretFile, fixture.server)
+    const names = ["ordinary.csv", ".hidden", "draft.lgp.autosave", "white space", "tab\tfile", "line\nfile", "Юникод", "-leading", "nested/value"]
+    await Bun.$`docker exec ${fixture.pair.identity.containerId} sh -c ${'mkdir -- "$1/nested" "$1/empty" /workdir/UserStorage/eval-b; printf untouched-peer > /workdir/UserStorage/eval-b/control; root=$1; shift; for name do printf owned > "$root/$name"; done; ln -s ../eval-b/control "$root/neighbor"'} archive-control ${storage.root} ${names}`.quiet()
+    const binary = path.resolve(import.meta.dir, "../fixtures/storage/fixture-group-sum-qty.lgp")
+    await Bun.$`docker cp ${binary} ${`${fixture.pair.identity.containerId}:${storage.root}/ordinary-package.lgp`}`.quiet()
+    await Bun.$`docker exec ${fixture.pair.identity.containerId} chown ${`${storage.uid}:${storage.gid}`} ${`${storage.root}/ordinary-package.lgp`}`.quiet()
+    const before = await inspectUserStorage(fixture.file, fixture.pair.identity, fixture.lease.slot, fixture.prepared.nonce)
+    const peer = (await Bun.$`docker exec ${fixture.pair.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()
+    const archived = await archiveUserStorage(fixture.file, fixture.server, fixture.lease, crypto.randomUUID())
+    expect(archived).toMatchObject({ status: "committed", storageDeletionAllowed: false, nextAdmissionAllowed: false })
+    // Independent tar reader verifies names, binary bytes and symlink objects.
+    const decoded = Bun.spawn(["python3", "-c", "import sys,tarfile,hashlib,json; a=tarfile.open(fileobj=sys.stdin.buffer,mode='r|'); print(json.dumps([dict(name=e.name,kind=e.type.decode(),target=e.linkname,sha256=hashlib.sha256(a.extractfile(e).read()).hexdigest() if e.isfile() else None) for e in a]))"],
+      { stdin: Bun.file(archived.payload.path), stdout: "pipe", stderr: "pipe", timeout: 10_000 })
+    const [code, output] = await Promise.all([decoded.exited, new Response(decoded.stdout).text(), new Response(decoded.stderr).text()])
+    expect(code).toBe(0)
+    const files = JSON.parse(output) as { name: string; kind: string; target: string; sha256: string | null }[]
+    expect(files.filter(entry => entry.kind === "0").map(entry => entry.name).sort()).toEqual([...names, "ordinary-package.lgp"].map(name => `${fixture.lease.slot.username}/${name}`).sort())
+    for (const name of names) expect(files.find(entry => entry.name === `${fixture.lease.slot.username}/${name}`)?.sha256).toBe(new Bun.CryptoHasher("sha256").update("owned").digest("hex"))
+    expect(files.find(entry => entry.name === `${fixture.lease.slot.username}/ordinary-package.lgp`)?.sha256).toBe(new Bun.CryptoHasher("sha256").update(await Bun.file(binary).bytes()).digest("hex"))
+    expect(files.find(entry => entry.name === `${fixture.lease.slot.username}/neighbor`)).toMatchObject({ kind: "2", target: "../eval-b/control", sha256: null })
+    expect(archived.entries.find(entry => entry.name === "neighbor")).toMatchObject({ type: "l", target: "../eval-b/control" })
+    expect(archived.entries.find(entry => entry.name === "empty")).toMatchObject({ type: "d" })
+    expect(new Bun.CryptoHasher("sha256").update(await Bun.file(archived.payload.path).bytes()).digest("hex")).toBe(archived.payload.sha256)
+    expect((await Bun.file(archived.payload.path).stat()).mode & 0o777).toBe(0o600)
+    expect(await readLeaseReceipt(archived.source.path)).toMatchObject({ kind: "user-storage-archive", status: "committed" })
+    expect(await inspectUserStorage(fixture.file, fixture.pair.identity, fixture.lease.slot, fixture.prepared.nonce)).toEqual(before)
+    expect((await Bun.$`docker exec ${fixture.pair.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()).toBe(peer)
+  } finally { await fixture.dispose() }
+}, 90_000)
 
 integration("server file evidence replays a fenced raw kernel snapshot", async () => {
   const fixture = await storageCodecFixture()

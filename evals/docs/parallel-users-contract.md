@@ -3372,3 +3372,35 @@ original failure and SDK/SQLite archives retained.7 duplicate temp files removed
 after retained SHA read-back. This is a pathname-scoped snapshot check; anonymous
 or relocated mappings and all-operation quiescence remain unqualified. No file
 deletion, reservation release or production admission permission is added.
+
+
+### All-owned server storage archive producer — 2026-10-16
+
+`archiveUserStorage(file, server, slot, id)` is a data-preservation primitive.
+It requires the exact held server/slot fences and protected published ownership,
+binds the current physical root, and observes the entire root without following
+links. NUL-delimited metadata includes root/entry modes, symlink targets and raw
+mtime/ctime. Two independent Docker cp tar reads must have identical regular-file
+names, sizes and SHA256, and the final physical/metadata snapshot must match.
+
+The private history directory receives `payload.tar` (0600) under a durable
+copying → committed journal, with payload SHA256 and per-file hashes. File and
+directory fsync plus payload read-back precede committed publication. GNU tar
+and sha256sum from /usr/bin:/bin are required for stdin-only regular payload
+verification: Bun1.3.14 Archive.files truncates Docker-compatible PAX at Unicode
+paths in the observed runtime. No archive members are extracted to the host.
+Symlinks remain archive objects, with exact targets in the manifest.
+
+TDD missing-module RED → real Docker filesystem positive1/21 PASS37.89s.
+An independent Python tar reader verifies all ten regular files including binary
+LGP and pathological UTF-8 names, the neighbor symlink and an empty directory;
+source metadata and B canary remain unchanged. The fixture uses data-only
+protected account authority and does not create a native Loginom user/session.
+`storageDeletionAllowed` and `nextAdmissionAllowed` remain false. Committed
+replay, partial-copy recovery, finalizer consumption and general cleanup remain
+separate pending work; this producer grants no operation-quiescence authority.
+
+Related profile/archive/user/agent/management32 PASS/229 assertions63.76s;
+package typecheck and diff checks PASS. Private source/control verification
+`f6869d56c56d5dd3ed5a32110b786fd4279165dac3f3e140ebb0e9ecaae3e0f2`
+is retained; seven temporary duplicates were removed after hash/read-back.
