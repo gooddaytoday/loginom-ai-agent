@@ -1,23 +1,19 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-16 — v0.2.1: CI fix подготовлен, тег ожидает решения
+## 2026-10-16 — v0.2.1 опубликован
 
-Ветка `loginom`, база `b33555fee8`, изменение настройки `5ea6daf224`.
-Новые установки включают «Выбор агента»; сохранённый выбор не сбрасывается.
-Root/Desktop manifests и lock:0.2.1; frozen install PASS.
-Настройки/persist/agent:34 PASS; App typecheck PASS; review без замечаний.
-Packaging/static/notes:14 PASS,2 native macOS SKIP; pinned Node hash PASS.
-Release SHA:`aae2c5d35b87d4ce30a903b9101fe252ae0bbb66`;tag v0.2.1 и ветка pushed.
-CI38862534170:три build,unit/HttpApi,typecheck,e2e PASS;Linux matrix5/5 PASS.
-Windows:попытка1 LoginForm timeout15s;попытки2/3/4 CRL Microsoft в proxy trap.
-Diagnostic91369bfab2/run38866284961 подтвердил CryptSvc/svchost,CryptoAPI UA.
-CI fix:`46a1821ae949e34e98f9d9e09e10bcdfe506f268`;2 unit tests PASS.
-Эквивалентный ecfdb5267b/run38867058084:Windows3×16 PASS,CRL не возникали.
-Нативная положительная ветка нового фильтра не покрыта;runtime не менялся.
-Draft/release не создан;логи/snapshots сохранены в storage/tmp/release-v0.2.1.
-Следующий шаг:разрешение заменить неопубликованный тег0.2.1 (runbook запрещает),
-затем проверка исправления,полный CI,сверка assets и публикация.
-Installed GUI/live приёмка не выполнялась; пользовательская установка не меняется.
+Release source:`e98b2597492c0fcad18d3e72a8c7533ae10cfa30`,ветка `loginom`.
+Tag v0.2.1 перенесён с aae2c5d35b по явному разрешению владельца.
+Новые установки включают «Выбор агента»;сохранённый выбор не сбрасывается.
+CI38869145218 PASS:три platform builds,общие тесты/typecheck,Chromium/cleanup.
+Linux DEB offline non-root matrix5/5:Ubuntu22/24/26,Debian12/13.
+Предыдущий Windows CRL-блокер атрибутирован CryptSvc;CI fix46a1821ae9.
+Новый Windows suite16 PASS;CRL не возникали,положительная ветка фильтра не покрыта.
+Все30 GitHub digests,29 SHA256SUMS entries и bytes19 metadata файлов сверены.
+Три manifests:source/version/clean-tree PASS;все30 публичных URLs HTTP200.
+Published2026-10-16T08:09:49Z,pre-release=true,latest=false,release ID414695923.
+Installed GUI/live приёмка и установка не выполнялись;профили не менялись.
+Следующий шаг:installed/live приёмка точных артефактов при отдельном поручении.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-16-v0.2.1-release.md).
 
 ## 2026-10-15 — Desktop и CLI v0.2.0 установлены пользователю
