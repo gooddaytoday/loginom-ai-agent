@@ -77,11 +77,12 @@ liveIntegration("native backup research: observes real autosave and unqualified 
 liveIntegration("native backup research: captures a hard daemon crash and restart", () => nativeUserCapability("backup", true), 120_000)
 liveIntegration("native package inventory: named package is observed before close and absent afterward", () => nativeUserCapability("packages"), 120_000)
 liveIntegration("native shared package inventory: linked package is observed outside its owning session", () => nativeUserCapability("shared-packages"), 120_000)
+liveIntegration("native running package inventory: bounded server node has Progress until it finishes", () => nativeUserCapability("progress"), 120_000)
 liveIntegration("native effective storage: both users refuse neighbor and shared read, write and copy", () => nativeUserCapability("storage"), 120_000)
 liveIntegration("native components: both users execute their own CSV and refuse neighbor and shared import/export", () => nativeUserCapability("components"), 120_000)
 
-async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages", hardCrash = false) {
-  const packages = mode === "packages" || mode === "shared-packages"
+async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "components" | "peer-close" | "packages" | "shared-packages" | "progress", hardCrash = false) {
+  const packages = mode === "packages" || mode === "shared-packages" || mode === "progress"
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
   const root = await mkdtemp(path.join(tmpdir(), "evals-admin-user-"))
   const fixture = await parallelFixture(root)
@@ -103,7 +104,8 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
     console.error(`native user evidence: ${evidence}`)
     const pins = packages ? await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs"),
       path.resolve(import.meta.dir, "../src/loginom-admin.ts"), path.resolve(import.meta.dir, "../src/package-inventory.ts"),
-      path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!]
+      path.resolve(import.meta.dir, "../src/process-supervisor.ts"), process.env.EVAL_CLI_BIN!,
+      ...(mode === "progress" ? [path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp"), path.resolve(import.meta.dir, "../fixtures/progress-probe.js")] : [])]
       .map(async source => ({ path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }))) : []
     if (packages) await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, identity: pair.identity,
       resources: pair.resources, root, pairNonce: pair.nonce })
@@ -401,6 +403,44 @@ async function nativeUserCapability(mode: "sessions" | "backup" | "storage" | "c
         await writeLeaseReceipt(path.join(evidence, "storage-probe.json"), { version: 1, identity: pair.identity,
           username: credentials.username, positive: { ...data.storage, sha256: digests[0] }, peerPositive: { username: peer.name, ...peerData.storage, sha256: peerHashes[0] },
           sharedControls: shared.map(name => ({ name, sha256: digests[0] })), denials, liveQualified: false })
+        complete = true
+        return
+      }
+      if (mode === "progress") {
+        const artifact = path.join(evidence, "progress-probe.lgp")
+        await Bun.write(artifact, await Bun.file(path.resolve(import.meta.dir, "../fixtures/progress-probe.lgp")).bytes())
+        await chmod(artifact, 0o600)
+        expect((await Bun.$`docker --host unix:///var/run/docker.sock cp ${artifact} ${`${pair.identity.containerId}:${file.server.storageRoot}/${credentials.username}/progress-probe.lgp`}`.quiet().nothrow()).exitCode).toBe(0)
+        settlement.packageParent = false
+        packageParent = await openLoginomAdmin(file, pair.identity)
+        const observations: Awaited<ReturnType<typeof readAdminPackageInventory>>[] = []
+        let settled = false
+        const pendingProbe = request("reconcile-user", { ...activation, phase: "session-progress-probe" }).finally(() => { settled = true })
+        const deadline = Date.now() + 25_000
+        while (!settled && Date.now() < deadline) {
+          const inventory = await packageParent.inspectPackageInventory()
+          observations.push(inventory)
+          if (inventory.collections.some(row => row.packages.some(item => item.path === "/eval-a/progress-probe.lgp" && item.progress !== null))) break
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+        const probe = await pendingProbe
+        await writeLeaseReceipt(path.join(evidence, "progress-probe-reply.json"), probe)
+        expect(probe.outcome).toBe("confirmed")
+        const data = probe.data as typeof observed & { progress: { finished: boolean; failed: boolean; source: string } }
+        expect(data.progress).toMatchObject({ finished: true, failed: false, source: await Bun.file(path.resolve(import.meta.dir, "../fixtures/progress-probe.js")).text() })
+        const during = observations.find(value => value.collections.some(row => row.name === data.binding.name && row.packages.some(item => item.path === "/eval-a/progress-probe.lgp" && item.progress !== null)))
+        expect(during).toBeDefined()
+        expect(await readAdminPackageInventory(file, pair.identity, during!.source)).toEqual(during!)
+        const after = await packageParent.inspectPackageInventory()
+        expect(after.collections.find(row => row.name === data.binding.name)?.packages.find(item => item.path === "/eval-a/progress-probe.lgp"))
+          .toMatchObject({ progress: null })
+        const closed = await request("close-session", { proofId: probe.id, session: data.binding })
+        expect(closed).toMatchObject({ outcome: "confirmed", data: { closed: true, disposition: "rpc_closed" } })
+        const absent = await packageParent.inspectPackageInventory()
+        expect(absent.collections.flatMap(row => row.packages).some(item => item.path === "/eval-a/progress-probe.lgp")).toBe(false)
+        await writeLeaseReceipt(path.join(evidence, "progress-inventory.json"), { identity: pair.identity, observations, during, after, absent, probe, closed,
+          artifact: { path: artifact, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(artifact).bytes()).digest("hex") }, operationsQualified: false, cleanupAllowed: false })
+        expect(await Promise.all(pins.map(async source => new Bun.CryptoHasher("sha256").update(await Bun.file(source.path).bytes()).digest("hex")))).toEqual(pins.map(source => source.sha256))
         complete = true
         return
       }

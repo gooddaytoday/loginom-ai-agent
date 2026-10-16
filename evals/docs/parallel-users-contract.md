@@ -2982,3 +2982,31 @@ pair/root absence; executed sources and native data remain. The library file was
 not copied before the oracle failure; the final fixture retains it. Positive
 running Progress, populated Pool, backend operations/locks and production
 cleanup admission remain open. This control grants no general quiescence.
+
+
+### Native package Progress lifecycle — 2026-10-16
+
+The protected research `session-progress-probe` opens a self-contained XML LGP
+with one bounded JavaScript node. Its actual native engine source must equal
+the readable fixture. Parent package observations run while that native probe
+is in flight. They capture non-null Progress (observed percent50), then the same
+package objectId/path with Progress=null after successful task completion while
+the package remains open, then fresh absence after targeted CloseSession.
+Native Finished=true/Failed=false/status4 and full replies/journals are retained.
+Native StartTime stays raw; it is not compared with controller clock timestamps.
+
+Missing-phase RED41/53.52s; fixture routing and XML containers corrected. The
+fixture retains native-style MD5 ZIP fields and ModelViews Nodes/Links. Initial
+running1/52 PASS67.70s; stricter idle RED45/59.70s→retain only the progress probe
+package→final1/53 PASS61.95s. Temporary open-error diagnostics were removed.
+Related49/160 PASS21.58s, typecheck/syntax/diff PASS. Privatef7fa45bd… source-audit
+SHA256 `c33e5b9980b72ea47a6939f6f04efe36d71e319478757f1b45eed8bae32a8e97`
+checks69 facts/23 sources+8 tested code/binary/fixture pins. Both admin continuous
+closures/transport ACKs, exact own pair/network/root absence and original input
+LGP read-backs pass. All six failed/diagnostic fixtures retain executed sources
+and input LGP with qualified closures/absence. Intermediate0d2d8fdc…
+auditfd2c5ff4… checks67/23 sources before the retained-idle assertion was added.
+
+This qualifies native Progress delivery and its completion transition. Populated
+Pool, backend operation/lock quiescence, interrupted work, targeted storage/backup
+cleanup and production admission remain open. No cleanup/operation grant follows.
