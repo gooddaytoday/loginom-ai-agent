@@ -133,8 +133,8 @@ research labels/nonces и сохранёнными записями. Во все
   не подменяет этот FAIL на PASS; исправление теста по новой цели не выполняется.
 - Незакоммиченные `evals/src/attempt-finalization.ts` и
   `evals/test/native-agent-run-integration.test.ts` относятся к server-storage
-  archive. Владелец разрешил сохранить один private diff и откатить только их;
-  модуль не подключается, его удаление — шаг7.
+  archive. Единый diff сохранён private, обе правки откатаны до HEAD; модуль
+  не подключён, его удаление — шаг7.
 - Чужой `docs/2026-10-15-evals-parallel-overengineering-review.md` не изменён
   и не включается в коммит. Чужая текстовая правка старого плана сохранена
   verbatim внутри архивного снимка вместе с остальным старым планом.
