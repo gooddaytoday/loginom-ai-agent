@@ -31,6 +31,22 @@ export async function closeUserSessions(admin: {
     throw new EvalFailure("SESSION_STILL_PRESENT", 2)
   return names
 }
+
+export function requireSlotUserPolicy(observed: unknown, username: string) {
+  if (!jsonObject(observed) || !Array.isArray(observed.users) || !Array.isArray(observed.sharedDirectories))
+    throw new EvalFailure("ADMIN_PROTOCOL", 2)
+  const matches = observed.users.filter(user => jsonObject(user) && typeof user.name === "string" && user.name.toLowerCase() === username.toLowerCase())
+  if (!matches.length) throw new EvalFailure("SLOT_USER_MISSING", 2)
+  if (matches.length !== 1) throw new EvalFailure("SLOT_USER_IDENTITY_AMBIGUOUS", 2)
+  const user = matches[0]
+  if (!jsonObject(user) || user.name !== username || user.userKind !== 0 || user.authMode !== 1 || user.blocked !== false ||
+    user.isAdmin !== false || user.isDesigner !== true || user.isViewer !== false || user.useGlobalFileStorage !== false ||
+    user.schedulerFullAccess !== false || user.allowPublish !== false || typeof user.objectId !== "string" || !user.objectId)
+    throw new EvalFailure("SLOT_USER_POLICY_DRIFT", 2)
+  if (observed.sharedDirectories.some(directory => !jsonObject(directory) || !Array.isArray(directory.permissions) || directory.permissions.length))
+    throw new EvalFailure("SLOT_ACL_DRIFT", 2)
+  return user
+}
 import { EvalFailure } from "./fail"
 import { readManagementSession, recordManagementSessionClosed } from "./management-sessions"
 import { readAgentArchive, readAgentSession, recordAgentSessionClosed } from "./agent-sessions"
@@ -60,6 +76,7 @@ export type AdminConnection = {
   configurePoolPolicy(): Promise<Awaited<ReturnType<typeof readAdminPoolPolicy>>>
   inspectPoolPolicy(): Promise<Awaited<ReturnType<typeof readAdminPoolPolicy>>>
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
+  verifySlotUser(username: string): Promise<void>
   inspectPackageInventory(): Promise<Awaited<ReturnType<typeof readAdminPackageInventory>>>
   inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
     observation: { startedAt: string; finishedAt: string }; source: { path: string; sha256: string } }>
@@ -85,14 +102,15 @@ export type AdminConnection = {
 const inventoryWrites = new Map<string, Promise<void>>()
 
 export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity, options: {
-  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>; processInventory?: string
+  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>; processInventory?: string; research?: boolean
 } = {}): Promise<AdminConnection> {
   if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
   if (options.serverLease) {
     const command = await readLeaseReceipt(options.serverLease.reservation.journal)
     if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind))) {
       await options.serverLease.assertHeld()
-      if (options.processInventory !== command.processInventory || typeof options.processInventory !== "string" ||
+      if ((options.processInventory !== undefined || command.processInventory !== undefined) &&
+        (options.processInventory !== command.processInventory || typeof options.processInventory !== "string") ||
         command.commandId !== options.serverLease.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
         throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
       if (command.phase !== "unactivated" && (command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted"))
@@ -142,7 +160,8 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   options.signal?.addEventListener("abort", stop, { once: true })
   if (options.signal?.aborted) stop()
   const pending = superviseProcess({ cmd: [runtime.node, driver], cwd: directory,
-    env: { PATH: "/usr/bin:/bin", HOME: directory, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
+    env: { PATH: "/usr/bin:/bin", HOME: directory, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources,
+      ...(options.research ? { LOGINOM_EVALS_ADMIN_RESEARCH: "1" } : {}) },
     timeoutMs: null, profileDir: path.join(directory, "profile"), stdin: input.readable, stdout: output.writable, signal: abort.signal,
     owner: { kind: "admin", id: directory } })
   void pending.catch(() => { stopInput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)); stopOutput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)) })
@@ -225,6 +244,14 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       const data = (await observe()).data
       if (!jsonObject(data) || JSON.stringify(data.identity) !== JSON.stringify(identity)) throw new EvalFailure("ADMIN_PROTOCOL", 2)
       return { identity, sharedDirectories: sharedPolicy(data.sharedDirectories) }
+    },
+    async verifySlotUser(username) {
+      if (!file.slots.some(slot => slot.username === username)) throw new EvalFailure("SESSION_OWNERSHIP_UNCONFIRMED", 2)
+      await options.serverLease?.assertHeld()
+      const data = (await observe()).data
+      if (!jsonObject(data) || !jsonObject(data.ownSession) || data.ownSession.isAdmin !== true)
+        throw new EvalFailure("ADMIN_IDENTITY_CHANGED", 2)
+      requireSlotUserPolicy(data, username)
     },
     async inspect() {
       const data = (await observe()).data
