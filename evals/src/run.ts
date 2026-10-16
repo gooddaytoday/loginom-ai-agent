@@ -90,6 +90,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
         passThreshold: config.passThreshold,
         env: config.judge.env,
         processEvidence,
+        systemd: config.judge.systemd,
       }
     : undefined
   const judgeGate = createJudgeGate()

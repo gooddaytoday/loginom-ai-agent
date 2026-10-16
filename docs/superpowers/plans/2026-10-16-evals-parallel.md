@@ -108,18 +108,20 @@
   существующий `releaseStaleWriter`, непроверенное дерево/unknown по-прежнему отказ.
 - [ ] Проверить `bun run test test/process-supervisor.test.ts test/judge-environment.test.ts`
   и `bun typecheck`; отдельный коммит `fix(evals): ignore proven foreign process ancestry`.
-- [ ] RED/GREEN wrapper unit: разрешённый canonical caller CODEX_HOME с тем же
+- [x] RED/GREEN wrapper unit: разрешённый canonical caller CODEX_HOME с тем же
   lockdown-конфигом сохраняется; outside/symlink/mismatch не допускаются;
   отсутствие caller home сохраняет прежнее поведение и сетевые ограничения.
-- [ ] В том же маленьком wrapper-коммите определить unit boundary: валидируемые
+- [x] Wrapper-коммит d551ddf (`codex-vpn-lockdown`) определяет unit boundary: валидируемые
   `LOGINOM_EVALS_JUDGE_UNIT=loginom-evals-judge-<UUID>` и
   `LOGINOM_EVALS_JUDGE_TIMEOUT_SEC` (целые секунды 1..86400); `systemd-run --unit`
   с RuntimeMaxSec и ограниченным TimeoutStopSec. Сеть/VPN остаются прежними.
-- [ ] Unit RED/GREEN harness: ждать wrapper с таймаутом без сигналов root/sudo/
+- [x] Unit RED/GREEN harness: ждать wrapper с таймаутом без сигналов root/sudo/
   systemd-run; после выхода проверить завершение точного юнита через systemctl.
   Root-процессы этой цепочки не ошибка владения; активный/непроверенный юнит — отказ.
+  Judge/VPN regression44 PASS/147 assertions53.61s, bun typecheck/diff PASS.
   Для обычного локального агента остаётся supervisor/subreaper, без исключений root.
-- [ ] Проверить `python3 -m unittest discover -s verify -p test_codex_home.py`
+- [x] Python unit7 PASS (включая staged-only snapshot), `bash -n`/diff PASS;
+  проверить `python3 -m unittest discover -s verify -p test_codex_home.py`
   и `bash -n bin/codex` в wrapper repo. Отдельным маленьким коммитом
   `fix(codex): preserve validated eval judge home` включить только свои hunks,
   сохранив имеющиеся чужие правки bin/codex и других файлов.
@@ -217,4 +219,5 @@ private config/budget/results вне Git; операторские команд�
 7. Harness сам очищает доказанно своё на новом стенде после обязательных проверок.
 8. N=1/N=2 collector запускает/останавливает run; перед N=1 проверить MemAvailable.
 9. N=2 ждёт утверждения числовых порогов по N=1; новый runtime ещё не реализован.
-10. Следующий шаг: unit TDD supervisor cleanup и минимального владения.
+10. Wrapper d551ddf:7 unit PASS; harness VPN boundary44/147 PASS, typecheck/diff PASS.
+11. Следующий шаг: разрешённое снятие точной judge брони/config/login status (0 model calls).
